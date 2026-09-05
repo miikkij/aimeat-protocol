@@ -26,6 +26,11 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.24.0 — 2026-09-05 — MOTION IS ALREADY ON, said first in the motion section: what arrives,
+ *     what a change looks like row by row, which components are matched up by id, where a view
+ *     crossing happens, and the two switches — the app's and the block's — with the viewer over
+ *     both. The attention gesture keeps its paragraph beneath it
+ *     (wish-atelier-always-excellent, part 2).
  *   v1.23.0 — 2026-09-05 — THE EFFECTS, taught after the ambient (wish-atelier-post-process-
  *     effects): the nine rendered from the effects registry (feel, evokes, where each lands, how
  *     it may move, its knobs with bounds), the three motions and where each may run, the hosts
@@ -530,8 +535,25 @@ function composeBody(config: AimeatConfig): string {
     + 'and adopting one lands it on the block it names.\n\n';
 
   body += '## Motion, and the moment something needs the eye\n\n';
-  body += 'Entrances, live-change repaints and the hover greeting are the components\' own work: '
-    + 'you never write an animation. The one motion call you DO make is the attention gesture, '
+  body += 'MOTION IS ALREADY ON, and you write none of it. Everything this kit builds arrives, '
+    + 'changes and leaves in front of the reader: a block and a row enter with a fade and a short '
+    + 'rise, staggered and capped so a long list is finished inside half a second; on a `set()` '
+    + 'the list, table, timeline, card grid and queue are matched up by row id, so a row that is '
+    + 'NEW rises in, a row that LEFT fades out where it stood, a row that MOVED — a sort, a '
+    + 'reorder — glides there from where it was standing, and every row that merely changed '
+    + 'repaints in place instead of re-entering; a figure whose number changed counts to it; a '
+    + 'tab, a bottom-bar pick, a flow step and a picked row opening its detail cross into the '
+    + 'next view; a dialog, a sheet, a drawer and a toast enter AND leave; the skeleton gives way '
+    + 'to the content rather than being swapped for it. The pace, the curve, the distance and the '
+    + 'beat are the LOOK\'s (`--ak-motion`, `--ak-ease`, `--ak-enter-distance`, '
+    + '`--ak-enter-stagger`), so a still register stays still and a springy one bounces from the '
+    + 'same code you wrote — never reach past the look to make a screen move more. Two switches '
+    + 'exist and they are the whole surface: `app({ motion: false })` stands the lot down for an '
+    + 'app, and `motion: false` in one block\'s props stands it down for that block. The viewer '
+    + 'beats both: the bar\'s Less-motion switch and the operating system\'s reduced-motion '
+    + 'setting collapse every move above to instant, and the screen that is left is the same '
+    + 'screen.\n\n';
+  body += 'The one motion call you DO make is the attention gesture, '
     + 'for the moment a thing on screen needs to be noticed: `AIMEAT.atelier.attention(el, '
     + '"pulse" | "shake" | "flash" | "rise")`. One finite gesture, no repeat, and reduced motion '
     + 'makes it a no-op (it returns false, so you can tell). USE IT FOR: a fresh row that '

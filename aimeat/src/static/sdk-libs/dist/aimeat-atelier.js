@@ -16,6 +16,8 @@
   // src/static/sdk-libs/atelier/dom.js
   var SPECIAL = { text: 1, on: 1, vars: 1, children: 1 };
   var ENTER_MAX = 12;
+  var ENTER_SPAN_CAP = 500;
+  var DEFAULTS_ATTR = "data-ak-motion-defaults";
   var seq = 0;
   function el(tag, attrs, kids) {
     const node = document.createElement(tag);
@@ -90,6 +92,21 @@
     } catch {
     }
     return next;
+  }
+  function motionOff(node) {
+    if (reducedMotion()) return true;
+    if (!node || typeof /** @type {any} */
+    node.closest !== "function") return false;
+    const marked = (
+      /** @type {Element|null} */
+      node.closest("[" + DEFAULTS_ATTR + "]")
+    );
+    return !!marked && marked.getAttribute(DEFAULTS_ATTR) === "off";
+  }
+  function setMotionDefaults(node, on) {
+    if (!node) return;
+    if (on === false) node.setAttribute(DEFAULTS_ATTR, "off");
+    else node.removeAttribute(DEFAULTS_ATTR);
   }
   var motionRestored = false;
   function restoreMotion() {
@@ -199,7 +216,7 @@
     );
   }
   function enter(root, opts) {
-    if (!root || reducedMotion() || typeof root.animate !== "function") return;
+    if (!root || motionOff(root) || typeof root.animate !== "function") return;
     const cs = getComputedStyle(root);
     const dist = parseFloat(cs.getPropertyValue("--ak-enter-distance")) || 0;
     const step = parseFloat(cs.getPropertyValue("--ak-enter-stagger")) || 0;
@@ -214,7 +231,7 @@
           { opacity: 0, transform: "translateY(" + dist + "px)" },
           { opacity: 1, transform: "translateY(0)" }
         ],
-        { duration: span, delay: i * step, easing: ease, fill: "backwards" }
+        { duration: span, delay: Math.min(i * step, ENTER_SPAN_CAP), easing: ease, fill: "backwards" }
       );
     }
   }
@@ -311,6 +328,613 @@
       if (p < 1) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
+  }
+
+  // src/static/sdk-libs/atelier/mosaic-motion.js
+  function transition(run) {
+    if (typeof document.startViewTransition === "function" && !reducedMotion()) {
+      document.startViewTransition(run);
+    } else {
+      run();
+    }
+  }
+  function morph(moving, run) {
+    if (typeof document.startViewTransition !== "function" || reducedMotion()) {
+      run();
+      return;
+    }
+    moving.style.viewTransitionName = "ak-morph";
+    const vt = document.startViewTransition(run);
+    vt.finished.finally(function() {
+      moving.style.viewTransitionName = "";
+    });
+  }
+
+  // src/static/sdk-libs/atelier/transitions.js
+  var SCREEN_KINDS = ["fade", "wipe", "curtain", "zoom", "iris", "slide"];
+  var PANEL_KINDS = ["crossfade", "slide", "flip", "morph", "push"];
+  var CURTAIN_KINDS = ["band", "halves", "iris"];
+  var TINTS = ["accent", "ink", "surface"];
+  var DIRECTIONS = ["left", "right", "up", "down"];
+  var AWAY = { left: "translateX(-100%)", right: "translateX(100%)", up: "translateY(-100%)", down: "translateY(100%)" };
+  var TOWARD = { left: "translateX(100%)", right: "translateX(-100%)", up: "translateY(100%)", down: "translateY(-100%)" };
+  var STAND_IN = { fade: "band", wipe: "band", slide: "band", zoom: "halves", curtain: "halves", iris: "iris" };
+  var INTRO_HOLD_MS = 120;
+  var INTRO_CAP_MS = 1500;
+  var lastPoint = null;
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("pointerdown", function(ev) {
+      lastPoint = { x: ev.clientX, y: ev.clientY };
+    }, { capture: true, passive: true });
+  }
+  function originOf(from) {
+    if (from && typeof from.x === "number" && typeof from.y === "number") return { x: from.x, y: from.y };
+    if (lastPoint) return { x: lastPoint.x, y: lastPoint.y };
+    const w = typeof window !== "undefined" ? window.innerWidth : 0;
+    const h = typeof window !== "undefined" ? window.innerHeight : 0;
+    return { x: w / 2, y: h / 2 };
+  }
+  function spanOf(node, ms) {
+    if (ms) return ms;
+    const cs = getComputedStyle(node);
+    return (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 2;
+  }
+  function easeOf(node) {
+    const cs = getComputedStyle(node);
+    return (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)";
+  }
+  function oneOf(set, value) {
+    return set.indexOf(value) >= 0 ? String(value) : set[0];
+  }
+  function playAll(runs) {
+    const settled = runs.map(function(r) {
+      if (typeof r.node.animate !== "function") return Promise.resolve();
+      const anim = r.node.animate(r.frames, r.timing);
+      return anim.finished.then(function() {
+        anim.cancel();
+      }, function() {
+      });
+    });
+    return Promise.all(settled).then(function() {
+    });
+  }
+  function reachOf(point) {
+    const w = typeof window !== "undefined" ? window.innerWidth : 0;
+    const h = typeof window !== "undefined" ? window.innerHeight : 0;
+    const dx = Math.max(point.x, w - point.x);
+    const dy = Math.max(point.y, h - point.y);
+    return Math.ceil(Math.sqrt(dx * dx + dy * dy));
+  }
+  function originIn(host, from) {
+    const r = host.getBoundingClientRect();
+    const src = from && typeof from.x === "number" ? from : lastPoint;
+    if (src) {
+      const x = src.x - r.left;
+      const y = src.y - r.top;
+      if (x >= 0 && y >= 0 && x <= r.width && y <= r.height) return { x, y };
+    }
+    return { x: r.width / 2, y: r.height / 2 };
+  }
+  function curtain(opts) {
+    const o = opts || {};
+    const kind = oneOf(CURTAIN_KINDS, o.kind);
+    const tint = o.colour && TINTS.indexOf(o.colour) >= 0 ? o.colour : "ink";
+    const dir = oneOf(DIRECTIONS, o.direction);
+    const axis = dir === "up" || dir === "down" ? "y" : "x";
+    const host = o.host ? (
+      /** @type {HTMLElement} */
+      resolve(o.host)
+    ) : null;
+    const point = host ? originIn(host, o.from) : originOf(o.from);
+    const reach = host ? Math.ceil(Math.hypot(host.clientWidth, host.clientHeight)) : reachOf(point);
+    const layer = el("div", {
+      class: "ak-root ak-curtain ak-curtain--" + kind + " ak-curtain--" + tint + " ak-curtain--axis-" + axis,
+      "aria-hidden": "true"
+    });
+    const leaves = [];
+    if (kind === "halves") {
+      leaves.push(el("div", { class: "ak-curtain__half ak-curtain__half--a" }));
+      leaves.push(el("div", { class: "ak-curtain__half ak-curtain__half--b" }));
+    } else {
+      leaves.push(el("div", { class: kind === "iris" ? "ak-curtain__iris" : "ak-curtain__band" }));
+    }
+    const open = kind === "iris" ? ["circle(0px at " + point.x + "px " + point.y + "px)"] : kind === "halves" ? [AWAY[axis === "y" ? "up" : "left"], AWAY[axis === "y" ? "down" : "right"]] : [TOWARD[dir]];
+    const shut = kind === "iris" ? ["circle(" + reach + "px at " + point.x + "px " + point.y + "px)"] : ["none", "none"];
+    const past = kind === "band" ? [AWAY[dir]] : open;
+    const begun = o.start === "covered" ? shut : open;
+    let parked = begun;
+    leaves.forEach(function(leaf, i) {
+      if (kind === "iris") leaf.style.clipPath = begun[i];
+      else leaf.style.transform = begun[i];
+      layer.appendChild(leaf);
+    });
+    if (host) {
+      host.classList.add("ak-curtain-host");
+      layer.classList.add("ak-curtain--inset");
+      host.appendChild(layer);
+    } else {
+      document.body.appendChild(layer);
+    }
+    const ms = spanOf(layer, o.duration);
+    const ease = easeOf(layer);
+    let covered = o.start === "covered";
+    if (covered) layer.classList.add("ak-curtain--on");
+    let gone = false;
+    function travel3(from, to) {
+      if (gone) return Promise.resolve();
+      const land = function() {
+        leaves.forEach(function(leaf, i) {
+          if (kind === "iris") leaf.style.clipPath = to[i];
+          else leaf.style.transform = to[i];
+        });
+      };
+      if (reducedMotion() || typeof leaves[0].animate !== "function") {
+        land();
+        return Promise.resolve();
+      }
+      const runs = leaves.map(function(leaf, i) {
+        return {
+          node: leaf,
+          frames: kind === "iris" ? [{ clipPath: from[i] }, { clipPath: to[i] }] : [{ transform: from[i] }, { transform: to[i] }],
+          timing: { duration: ms, easing: ease, fill: (
+            /** @type {FillMode} */
+            "both"
+          ) }
+        };
+      });
+      return playAll(runs).then(land);
+    }
+    return {
+      cover() {
+        if (covered) return Promise.resolve();
+        covered = true;
+        layer.classList.add("ak-curtain--on");
+        const was = parked;
+        parked = shut;
+        return travel3(was, shut);
+      },
+      uncover() {
+        if (!covered) return Promise.resolve();
+        covered = false;
+        parked = past;
+        return travel3(shut, past).then(function() {
+          layer.classList.remove("ak-curtain--on");
+        });
+      },
+      destroy() {
+        gone = true;
+        if (layer.parentNode) layer.parentNode.removeChild(layer);
+        if (host && !host.querySelector(".ak-curtain")) host.classList.remove("ak-curtain-host");
+      }
+    };
+  }
+  function intro(opts) {
+    const o = opts || {};
+    const hold = typeof o.hold === "number" && o.hold >= 0 ? Math.min(o.hold, INTRO_CAP_MS) : INTRO_HOLD_MS;
+    const cover = curtain({
+      kind: (
+        /** @type {'band'|'halves'|'iris'} */
+        oneOf(CURTAIN_KINDS, o.kind)
+      ),
+      colour: o.colour,
+      start: "covered"
+    });
+    const waits = [new Promise(function(settle4) {
+      setTimeout(settle4, hold);
+    })];
+    const fonts = typeof document !== "undefined" ? (
+      /** @type {any} */
+      document.fonts
+    ) : null;
+    if (fonts && fonts.ready && typeof fonts.ready.then === "function") {
+      waits.push(fonts.ready.then(
+        function() {
+        },
+        function() {
+        }
+      ));
+    }
+    let capTimer = (
+      /** @type {any} */
+      null
+    );
+    const capped = new Promise(function(settle4) {
+      capTimer = setTimeout(settle4, INTRO_CAP_MS);
+    });
+    const done = function() {
+      clearTimeout(capTimer);
+    };
+    return Promise.race([Promise.all(waits), capped]).then(function() {
+      done();
+      return cover.uncover();
+    }).then(function() {
+      cover.destroy();
+    }, function(err) {
+      done();
+      cover.destroy();
+      throw err;
+    });
+  }
+  function screenTransition(kind, run, opts) {
+    const o = opts || {};
+    const move = oneOf(SCREEN_KINDS, kind);
+    const root = document.documentElement;
+    if (reducedMotion()) return Promise.resolve(run()).then(function() {
+    });
+    if (typeof document.startViewTransition !== "function") {
+      const cover = curtain({
+        kind: (
+          /** @type {'band'|'halves'|'iris'} */
+          STAND_IN[move]
+        ),
+        colour: o.colour,
+        from: o.from,
+        direction: o.direction,
+        duration: o.duration
+      });
+      return cover.cover().then(function() {
+        return run();
+      }).then(function() {
+        return cover.uncover();
+      }).then(function() {
+        cover.destroy();
+      }, function(err) {
+        cover.destroy();
+        throw err;
+      });
+    }
+    const point = originOf(o.from);
+    root.setAttribute("data-ak-transition", move);
+    if (o.direction && DIRECTIONS.indexOf(o.direction) >= 0) root.setAttribute("data-ak-transition-dir", o.direction);
+    if (o.colour && TINTS.indexOf(o.colour) >= 0) root.setAttribute("data-ak-transition-colour", o.colour);
+    root.style.setProperty("--ak-iris-x", point.x + "px");
+    root.style.setProperty("--ak-iris-y", point.y + "px");
+    if (o.duration) root.style.setProperty("--ak-transition-span", o.duration + "ms");
+    const clear2 = function() {
+      root.removeAttribute("data-ak-transition");
+      root.removeAttribute("data-ak-transition-dir");
+      root.removeAttribute("data-ak-transition-colour");
+      root.style.removeProperty("--ak-iris-x");
+      root.style.removeProperty("--ak-iris-y");
+      root.style.removeProperty("--ak-transition-span");
+    };
+    return document.startViewTransition(run).finished.then(clear2, clear2);
+  }
+  function heightOf(node) {
+    const cs = getComputedStyle(node);
+    const box = node.getBoundingClientRect().height;
+    if (cs.boxSizing === "border-box") return box;
+    const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const edge = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    return Math.max(0, box - pad - edge);
+  }
+  function whenMorphDone(moving, cap) {
+    return new Promise(function(settle4) {
+      let done = false;
+      const finish = function() {
+        if (done) return;
+        done = true;
+        if (obs) obs.disconnect();
+        clearTimeout(timer);
+        settle4();
+      };
+      const obs = typeof MutationObserver === "function" ? new MutationObserver(function() {
+        if (!moving.style.viewTransitionName) finish();
+      }) : null;
+      if (obs) obs.observe(moving, { attributes: true, attributeFilter: ["style"] });
+      const timer = setTimeout(finish, cap);
+    });
+  }
+  function panelTransition(from, to, kind, opts) {
+    const o = opts || {};
+    const move = oneOf(PANEL_KINDS, kind);
+    const parent = (
+      /** @type {HTMLElement|null} */
+      from && from.parentElement
+    );
+    if (!parent || !to || from === to) return Promise.resolve();
+    const swap = function() {
+      parent.insertBefore(to, from);
+      if (from.parentNode) from.parentNode.removeChild(from);
+    };
+    if (reducedMotion() || typeof from.animate !== "function") {
+      swap();
+      return Promise.resolve();
+    }
+    const ms = spanOf(from, o.duration);
+    const ease = easeOf(from);
+    const dir = oneOf(DIRECTIONS, o.direction);
+    const moving = (
+      /** @type {HTMLElement|null} */
+      o.moving || null
+    );
+    if (move === "morph") {
+      if (!moving || typeof document.startViewTransition !== "function") {
+        return panelTransition(from, to, "crossfade", o);
+      }
+      const done = whenMorphDone(moving, ms * 6);
+      morph(moving, swap);
+      return done;
+    }
+    const outgoing = (
+      /** @type {HTMLElement} */
+      from
+    );
+    const incoming = (
+      /** @type {HTMLElement} */
+      to
+    );
+    const box = outgoing.getBoundingClientRect();
+    const seat = parent.getBoundingClientRect();
+    const pcs = getComputedStyle(parent);
+    const startH = heightOf(parent);
+    const kept = { position: parent.style.position, overflow: parent.style.overflow };
+    if (pcs.position === "static") parent.style.position = "relative";
+    parent.style.overflow = "hidden";
+    if (move === "flip") parent.classList.add("ak-swap--flip");
+    parent.insertBefore(incoming, outgoing);
+    outgoing.style.position = "absolute";
+    outgoing.style.boxSizing = "border-box";
+    outgoing.style.margin = "0";
+    outgoing.style.top = box.top - seat.top - (parseFloat(pcs.borderTopWidth) || 0) + parent.scrollTop + "px";
+    outgoing.style.left = box.left - seat.left - (parseFloat(pcs.borderLeftWidth) || 0) + parent.scrollLeft + "px";
+    outgoing.style.width = box.width + "px";
+    outgoing.style.height = box.height + "px";
+    const endH = heightOf(parent);
+    const runs = [];
+    if (Math.abs(endH - startH) > 1) {
+      runs.push({
+        node: parent,
+        frames: [{ height: startH + "px" }, { height: endH + "px" }],
+        timing: { duration: ms, easing: ease, fill: (
+          /** @type {FillMode} */
+          "backwards"
+        ) }
+      });
+    }
+    if (move === "flip") {
+      const half = Math.round(ms / 2);
+      runs.push({
+        node: outgoing,
+        frames: [{ transform: "rotateY(0deg)", opacity: 1 }, { transform: "rotateY(-90deg)", opacity: 0 }],
+        timing: { duration: half, easing: "ease-in", fill: (
+          /** @type {FillMode} */
+          "forwards"
+        ) }
+      });
+      runs.push({
+        node: incoming,
+        frames: [{ transform: "rotateY(90deg)", opacity: 0 }, { transform: "rotateY(0deg)", opacity: 1 }],
+        timing: { duration: half, delay: half, easing: "ease-out", fill: (
+          /** @type {FillMode} */
+          "backwards"
+        ) }
+      });
+    } else if (move === "crossfade") {
+      runs.push({ node: outgoing, frames: [{ opacity: 1 }, { opacity: 0 }], timing: { duration: ms, easing: ease, fill: (
+        /** @type {FillMode} */
+        "forwards"
+      ) } });
+      runs.push({ node: incoming, frames: [{ opacity: 0 }, { opacity: 1 }], timing: { duration: ms, easing: ease, fill: (
+        /** @type {FillMode} */
+        "backwards"
+      ) } });
+    } else {
+      const fade = move === "slide";
+      runs.push({
+        node: outgoing,
+        frames: [{ transform: "none", opacity: 1 }, { transform: AWAY[dir], opacity: fade ? 0 : 1 }],
+        timing: { duration: ms, easing: ease, fill: (
+          /** @type {FillMode} */
+          "forwards"
+        ) }
+      });
+      runs.push({
+        node: incoming,
+        frames: [{ transform: TOWARD[dir], opacity: fade ? 0 : 1 }, { transform: "none", opacity: 1 }],
+        timing: { duration: ms, easing: ease, fill: (
+          /** @type {FillMode} */
+          "backwards"
+        ) }
+      });
+    }
+    return playAll(runs).then(function() {
+      if (outgoing.parentNode) outgoing.parentNode.removeChild(outgoing);
+      incoming.style.removeProperty("transform");
+      incoming.style.removeProperty("opacity");
+      parent.classList.remove("ak-swap--flip");
+      parent.style.position = kept.position;
+      parent.style.overflow = kept.overflow;
+      parent.style.removeProperty("height");
+    });
+  }
+
+  // src/static/sdk-libs/atelier/arrive.js
+  var ARRIVE_SPAN_CAP = 500;
+  var EXIT_SCALE = 0.96;
+  var GHOST = "ak-layout__ghost";
+  function paceOf(node) {
+    let cs;
+    try {
+      cs = getComputedStyle(node);
+    } catch {
+      cs = null;
+    }
+    const num = function(name, floor) {
+      if (!cs) return floor;
+      const v = parseFloat(cs.getPropertyValue(name));
+      return isFinite(v) ? v : floor;
+    };
+    const ease = cs ? (cs.getPropertyValue("--ak-ease") || "").trim() : "";
+    return {
+      span: num("--ak-motion", 200) || 200,
+      ease: ease || "cubic-bezier(0.2, 0.7, 0.3, 1)",
+      dist: num("--ak-enter-distance", 14),
+      step: num("--ak-enter-stagger", 40)
+    };
+  }
+  function still(node) {
+    if (!node || motionOff(node)) return true;
+    return typeof /** @type {any} */
+    node.animate !== "function";
+  }
+  function kidsOf(node, sel) {
+    const all = sel ? Array.prototype.slice.call(node.querySelectorAll(sel)) : Array.prototype.slice.call(node.children);
+    return (
+      /** @type {HTMLElement[]} */
+      all.filter(function(k) {
+        return !k.classList.contains(GHOST);
+      })
+    );
+  }
+  function keyOf(kid, attr) {
+    const k = kid.getAttribute(attr);
+    return k == null ? kid : k;
+  }
+  function fadeIn(kid, pace2, index) {
+    if (still(kid)) return;
+    if (!pace2.dist && !pace2.step) return;
+    const delay = Math.min((index || 0) * pace2.step, ARRIVE_SPAN_CAP);
+    kid.animate(
+      [
+        { opacity: 0, transform: "translateY(" + pace2.dist + "px)" },
+        { opacity: 1, transform: "translateY(0)" }
+      ],
+      { duration: pace2.span, delay, easing: pace2.ease, fill: "backwards" }
+    );
+  }
+  function fadeOut(kid, box, pace2) {
+    const ghost = (
+      /** @type {HTMLElement} */
+      kid.cloneNode(true)
+    );
+    ghost.className = kid.className + " " + GHOST;
+    ghost.setAttribute("aria-hidden", "true");
+    ghost.removeAttribute("id");
+    ghost.style.setProperty("--ak-ghost-x", box.left + "px");
+    ghost.style.setProperty("--ak-ghost-y", box.top + "px");
+    ghost.style.setProperty("--ak-ghost-w", box.width + "px");
+    ghost.style.setProperty("--ak-ghost-h", box.height + "px");
+    document.body.appendChild(ghost);
+    const drop = function() {
+      if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+    };
+    if (typeof ghost.animate !== "function") {
+      drop();
+      return;
+    }
+    const anim = ghost.animate(
+      [
+        { opacity: 1, transform: "scale(1)" },
+        { opacity: 0, transform: "scale(" + EXIT_SCALE + ")" }
+      ],
+      { duration: pace2.span, easing: "ease-in" }
+    );
+    anim.onfinish = drop;
+    anim.oncancel = drop;
+  }
+  function glide(kid, dx, dy, pace2) {
+    kid.animate(
+      [
+        { transform: "translate(" + dx + "px, " + dy + "px)" },
+        { transform: "translate(0, 0)" }
+      ],
+      { duration: pace2.span * 1.4, easing: pace2.ease }
+    );
+  }
+  function settle(container, run, opts) {
+    if (typeof run !== "function") return;
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(container)
+    );
+    if (still(node)) {
+      run();
+      return;
+    }
+    const o = opts || {};
+    const attr = o.keyed || "data-ak-id";
+    const pace2 = paceOf(node);
+    const before = /* @__PURE__ */ new Map();
+    kidsOf(node, o.rows).forEach(function(kid) {
+      before.set(keyOf(kid, attr), { el: kid, box: kid.getBoundingClientRect() });
+    });
+    run();
+    const seen = /* @__PURE__ */ new Set();
+    let arrivals = 0;
+    kidsOf(node, o.rows).forEach(function(kid) {
+      const key = keyOf(kid, attr);
+      seen.add(key);
+      const was = before.get(key);
+      if (!was) {
+        if (o.enter !== false) fadeIn(kid, pace2, arrivals++);
+        return;
+      }
+      if (o.move === false) return;
+      const now2 = kid.getBoundingClientRect();
+      const dx = was.box.left - now2.left;
+      const dy = was.box.top - now2.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+      glide(kid, dx, dy, pace2);
+    });
+    if (o.exit === false) return;
+    before.forEach(function(was, key) {
+      if (seen.has(key)) return;
+      if (was.el.parentNode === node) return;
+      fadeOut(was.el, was.box, pace2);
+    });
+  }
+  var KEPT = /* @__PURE__ */ new WeakMap();
+  function keyedRows(container, items, spec) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(container)
+    );
+    const attr = spec.keyed || "data-ak-id";
+    let kept = KEPT.get(node);
+    if (!kept) {
+      kept = /* @__PURE__ */ new Map();
+      KEPT.set(node, kept);
+    }
+    const order = [];
+    settle(node, function() {
+      const next = /* @__PURE__ */ new Map();
+      (items || []).forEach(function(item, i) {
+        const key = String(spec.key(item, i));
+        let row = kept.get(key);
+        if (!row || row.parentNode !== node) {
+          row = spec.build(item, i);
+          row.setAttribute(attr, key);
+        } else if (spec.update) {
+          spec.update(row, item, i);
+        }
+        next.set(key, row);
+        order.push(row);
+      });
+      kept.forEach(function(row, key) {
+        if (next.has(key)) return;
+        if (row.parentNode === node) node.removeChild(row);
+      });
+      let at = node.firstChild;
+      order.forEach(function(row) {
+        if (at === row) {
+          at = row.nextSibling;
+          return;
+        }
+        node.insertBefore(row, at);
+      });
+      kept.clear();
+      next.forEach(function(row, key) {
+        kept.set(key, row);
+      });
+    }, { keyed: attr, rows: spec.rows });
+    return order;
+  }
+  function viewSwap(run, opts) {
+    const o = opts || {};
+    if (o.node && motionOff(o.node)) return Promise.resolve(run()).then(function() {
+    });
+    return screenTransition(o.kind || "fade", run, { from: o.from, direction: o.direction });
   }
 
   // src/static/sdk-libs/atelier/i18n.js
@@ -652,7 +1276,7 @@
   var t = i18n.t;
 
   // src/static/sdk-libs/atelier/scenics.js
-  function easeOf(node) {
+  function easeOf2(node) {
     const cs = getComputedStyle(node);
     return (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.34, 1.56, 0.64, 1)";
   }
@@ -724,7 +1348,7 @@
       if (!reducedMotion() && bar.animate) {
         bar.animate(
           [{ transform: "scaleY(0)" }, { transform: "scaleY(1)" }],
-          { duration: 260, delay: i * 18, easing: easeOf(node), fill: "backwards" }
+          { duration: 260, delay: i * 18, easing: easeOf2(node), fill: "backwards" }
         );
       }
     });
@@ -764,7 +1388,7 @@
           { opacity: 0, transform: at + "translateY(24px) scale(0.96)" },
           { opacity: 1, transform: rest === "none" ? "none" : rest }
         ],
-        { duration: 380, delay: i * step, easing: easeOf(el2), fill: "backwards" }
+        { duration: 380, delay: i * step, easing: easeOf2(el2), fill: "backwards" }
       );
     });
     return list2.length;
@@ -842,425 +1466,6 @@
         if (root.parentNode) root.parentNode.removeChild(root);
       }
     };
-  }
-
-  // src/static/sdk-libs/atelier/mosaic-motion.js
-  function transition(run) {
-    if (typeof document.startViewTransition === "function" && !reducedMotion()) {
-      document.startViewTransition(run);
-    } else {
-      run();
-    }
-  }
-  function morph(moving, run) {
-    if (typeof document.startViewTransition !== "function" || reducedMotion()) {
-      run();
-      return;
-    }
-    moving.style.viewTransitionName = "ak-morph";
-    const vt = document.startViewTransition(run);
-    vt.finished.finally(function() {
-      moving.style.viewTransitionName = "";
-    });
-  }
-
-  // src/static/sdk-libs/atelier/transitions.js
-  var SCREEN_KINDS = ["fade", "wipe", "curtain", "zoom", "iris", "slide"];
-  var PANEL_KINDS = ["crossfade", "slide", "flip", "morph", "push"];
-  var CURTAIN_KINDS = ["band", "halves", "iris"];
-  var TINTS = ["accent", "ink", "surface"];
-  var DIRECTIONS = ["left", "right", "up", "down"];
-  var AWAY = { left: "translateX(-100%)", right: "translateX(100%)", up: "translateY(-100%)", down: "translateY(100%)" };
-  var TOWARD = { left: "translateX(100%)", right: "translateX(-100%)", up: "translateY(100%)", down: "translateY(-100%)" };
-  var STAND_IN = { fade: "band", wipe: "band", slide: "band", zoom: "halves", curtain: "halves", iris: "iris" };
-  var INTRO_HOLD_MS = 120;
-  var INTRO_CAP_MS = 1500;
-  var lastPoint = null;
-  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
-    window.addEventListener("pointerdown", function(ev) {
-      lastPoint = { x: ev.clientX, y: ev.clientY };
-    }, { capture: true, passive: true });
-  }
-  function originOf(from) {
-    if (from && typeof from.x === "number" && typeof from.y === "number") return { x: from.x, y: from.y };
-    if (lastPoint) return { x: lastPoint.x, y: lastPoint.y };
-    const w = typeof window !== "undefined" ? window.innerWidth : 0;
-    const h = typeof window !== "undefined" ? window.innerHeight : 0;
-    return { x: w / 2, y: h / 2 };
-  }
-  function spanOf(node, ms) {
-    if (ms) return ms;
-    const cs = getComputedStyle(node);
-    return (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 2;
-  }
-  function easeOf2(node) {
-    const cs = getComputedStyle(node);
-    return (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)";
-  }
-  function oneOf(set, value) {
-    return set.indexOf(value) >= 0 ? String(value) : set[0];
-  }
-  function playAll(runs) {
-    const settled = runs.map(function(r) {
-      if (typeof r.node.animate !== "function") return Promise.resolve();
-      const anim = r.node.animate(r.frames, r.timing);
-      return anim.finished.then(function() {
-        anim.cancel();
-      }, function() {
-      });
-    });
-    return Promise.all(settled).then(function() {
-    });
-  }
-  function reachOf(point) {
-    const w = typeof window !== "undefined" ? window.innerWidth : 0;
-    const h = typeof window !== "undefined" ? window.innerHeight : 0;
-    const dx = Math.max(point.x, w - point.x);
-    const dy = Math.max(point.y, h - point.y);
-    return Math.ceil(Math.sqrt(dx * dx + dy * dy));
-  }
-  function originIn(host, from) {
-    const r = host.getBoundingClientRect();
-    const src = from && typeof from.x === "number" ? from : lastPoint;
-    if (src) {
-      const x = src.x - r.left;
-      const y = src.y - r.top;
-      if (x >= 0 && y >= 0 && x <= r.width && y <= r.height) return { x, y };
-    }
-    return { x: r.width / 2, y: r.height / 2 };
-  }
-  function curtain(opts) {
-    const o = opts || {};
-    const kind = oneOf(CURTAIN_KINDS, o.kind);
-    const tint = o.colour && TINTS.indexOf(o.colour) >= 0 ? o.colour : "ink";
-    const dir = oneOf(DIRECTIONS, o.direction);
-    const axis = dir === "up" || dir === "down" ? "y" : "x";
-    const host = o.host ? (
-      /** @type {HTMLElement} */
-      resolve(o.host)
-    ) : null;
-    const point = host ? originIn(host, o.from) : originOf(o.from);
-    const reach = host ? Math.ceil(Math.hypot(host.clientWidth, host.clientHeight)) : reachOf(point);
-    const layer = el("div", {
-      class: "ak-root ak-curtain ak-curtain--" + kind + " ak-curtain--" + tint + " ak-curtain--axis-" + axis,
-      "aria-hidden": "true"
-    });
-    const leaves = [];
-    if (kind === "halves") {
-      leaves.push(el("div", { class: "ak-curtain__half ak-curtain__half--a" }));
-      leaves.push(el("div", { class: "ak-curtain__half ak-curtain__half--b" }));
-    } else {
-      leaves.push(el("div", { class: kind === "iris" ? "ak-curtain__iris" : "ak-curtain__band" }));
-    }
-    const open = kind === "iris" ? ["circle(0px at " + point.x + "px " + point.y + "px)"] : kind === "halves" ? [AWAY[axis === "y" ? "up" : "left"], AWAY[axis === "y" ? "down" : "right"]] : [TOWARD[dir]];
-    const shut = kind === "iris" ? ["circle(" + reach + "px at " + point.x + "px " + point.y + "px)"] : ["none", "none"];
-    const past = kind === "band" ? [AWAY[dir]] : open;
-    const begun = o.start === "covered" ? shut : open;
-    let parked = begun;
-    leaves.forEach(function(leaf, i) {
-      if (kind === "iris") leaf.style.clipPath = begun[i];
-      else leaf.style.transform = begun[i];
-      layer.appendChild(leaf);
-    });
-    if (host) {
-      host.classList.add("ak-curtain-host");
-      layer.classList.add("ak-curtain--inset");
-      host.appendChild(layer);
-    } else {
-      document.body.appendChild(layer);
-    }
-    const ms = spanOf(layer, o.duration);
-    const ease = easeOf2(layer);
-    let covered = o.start === "covered";
-    if (covered) layer.classList.add("ak-curtain--on");
-    let gone = false;
-    function travel3(from, to) {
-      if (gone) return Promise.resolve();
-      const land = function() {
-        leaves.forEach(function(leaf, i) {
-          if (kind === "iris") leaf.style.clipPath = to[i];
-          else leaf.style.transform = to[i];
-        });
-      };
-      if (reducedMotion() || typeof leaves[0].animate !== "function") {
-        land();
-        return Promise.resolve();
-      }
-      const runs = leaves.map(function(leaf, i) {
-        return {
-          node: leaf,
-          frames: kind === "iris" ? [{ clipPath: from[i] }, { clipPath: to[i] }] : [{ transform: from[i] }, { transform: to[i] }],
-          timing: { duration: ms, easing: ease, fill: (
-            /** @type {FillMode} */
-            "both"
-          ) }
-        };
-      });
-      return playAll(runs).then(land);
-    }
-    return {
-      cover() {
-        if (covered) return Promise.resolve();
-        covered = true;
-        layer.classList.add("ak-curtain--on");
-        const was = parked;
-        parked = shut;
-        return travel3(was, shut);
-      },
-      uncover() {
-        if (!covered) return Promise.resolve();
-        covered = false;
-        parked = past;
-        return travel3(shut, past).then(function() {
-          layer.classList.remove("ak-curtain--on");
-        });
-      },
-      destroy() {
-        gone = true;
-        if (layer.parentNode) layer.parentNode.removeChild(layer);
-        if (host && !host.querySelector(".ak-curtain")) host.classList.remove("ak-curtain-host");
-      }
-    };
-  }
-  function intro(opts) {
-    const o = opts || {};
-    const hold = typeof o.hold === "number" && o.hold >= 0 ? Math.min(o.hold, INTRO_CAP_MS) : INTRO_HOLD_MS;
-    const cover = curtain({
-      kind: (
-        /** @type {'band'|'halves'|'iris'} */
-        oneOf(CURTAIN_KINDS, o.kind)
-      ),
-      colour: o.colour,
-      start: "covered"
-    });
-    const waits = [new Promise(function(settle3) {
-      setTimeout(settle3, hold);
-    })];
-    const fonts = typeof document !== "undefined" ? (
-      /** @type {any} */
-      document.fonts
-    ) : null;
-    if (fonts && fonts.ready && typeof fonts.ready.then === "function") {
-      waits.push(fonts.ready.then(
-        function() {
-        },
-        function() {
-        }
-      ));
-    }
-    let capTimer = (
-      /** @type {any} */
-      null
-    );
-    const capped = new Promise(function(settle3) {
-      capTimer = setTimeout(settle3, INTRO_CAP_MS);
-    });
-    const done = function() {
-      clearTimeout(capTimer);
-    };
-    return Promise.race([Promise.all(waits), capped]).then(function() {
-      done();
-      return cover.uncover();
-    }).then(function() {
-      cover.destroy();
-    }, function(err) {
-      done();
-      cover.destroy();
-      throw err;
-    });
-  }
-  function screenTransition(kind, run, opts) {
-    const o = opts || {};
-    const move = oneOf(SCREEN_KINDS, kind);
-    const root = document.documentElement;
-    if (reducedMotion()) return Promise.resolve(run()).then(function() {
-    });
-    if (typeof document.startViewTransition !== "function") {
-      const cover = curtain({
-        kind: (
-          /** @type {'band'|'halves'|'iris'} */
-          STAND_IN[move]
-        ),
-        colour: o.colour,
-        from: o.from,
-        direction: o.direction,
-        duration: o.duration
-      });
-      return cover.cover().then(function() {
-        return run();
-      }).then(function() {
-        return cover.uncover();
-      }).then(function() {
-        cover.destroy();
-      }, function(err) {
-        cover.destroy();
-        throw err;
-      });
-    }
-    const point = originOf(o.from);
-    root.setAttribute("data-ak-transition", move);
-    if (o.direction && DIRECTIONS.indexOf(o.direction) >= 0) root.setAttribute("data-ak-transition-dir", o.direction);
-    if (o.colour && TINTS.indexOf(o.colour) >= 0) root.setAttribute("data-ak-transition-colour", o.colour);
-    root.style.setProperty("--ak-iris-x", point.x + "px");
-    root.style.setProperty("--ak-iris-y", point.y + "px");
-    if (o.duration) root.style.setProperty("--ak-transition-span", o.duration + "ms");
-    const clear2 = function() {
-      root.removeAttribute("data-ak-transition");
-      root.removeAttribute("data-ak-transition-dir");
-      root.removeAttribute("data-ak-transition-colour");
-      root.style.removeProperty("--ak-iris-x");
-      root.style.removeProperty("--ak-iris-y");
-      root.style.removeProperty("--ak-transition-span");
-    };
-    return document.startViewTransition(run).finished.then(clear2, clear2);
-  }
-  function heightOf(node) {
-    const cs = getComputedStyle(node);
-    const box = node.getBoundingClientRect().height;
-    if (cs.boxSizing === "border-box") return box;
-    const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-    const edge = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
-    return Math.max(0, box - pad - edge);
-  }
-  function whenMorphDone(moving, cap) {
-    return new Promise(function(settle3) {
-      let done = false;
-      const finish = function() {
-        if (done) return;
-        done = true;
-        if (obs) obs.disconnect();
-        clearTimeout(timer);
-        settle3();
-      };
-      const obs = typeof MutationObserver === "function" ? new MutationObserver(function() {
-        if (!moving.style.viewTransitionName) finish();
-      }) : null;
-      if (obs) obs.observe(moving, { attributes: true, attributeFilter: ["style"] });
-      const timer = setTimeout(finish, cap);
-    });
-  }
-  function panelTransition(from, to, kind, opts) {
-    const o = opts || {};
-    const move = oneOf(PANEL_KINDS, kind);
-    const parent = (
-      /** @type {HTMLElement|null} */
-      from && from.parentElement
-    );
-    if (!parent || !to || from === to) return Promise.resolve();
-    const swap = function() {
-      parent.insertBefore(to, from);
-      if (from.parentNode) from.parentNode.removeChild(from);
-    };
-    if (reducedMotion() || typeof from.animate !== "function") {
-      swap();
-      return Promise.resolve();
-    }
-    const ms = spanOf(from, o.duration);
-    const ease = easeOf2(from);
-    const dir = oneOf(DIRECTIONS, o.direction);
-    const moving = (
-      /** @type {HTMLElement|null} */
-      o.moving || null
-    );
-    if (move === "morph") {
-      if (!moving || typeof document.startViewTransition !== "function") {
-        return panelTransition(from, to, "crossfade", o);
-      }
-      const done = whenMorphDone(moving, ms * 6);
-      morph(moving, swap);
-      return done;
-    }
-    const outgoing = (
-      /** @type {HTMLElement} */
-      from
-    );
-    const incoming = (
-      /** @type {HTMLElement} */
-      to
-    );
-    const box = outgoing.getBoundingClientRect();
-    const seat = parent.getBoundingClientRect();
-    const pcs = getComputedStyle(parent);
-    const startH = heightOf(parent);
-    const kept = { position: parent.style.position, overflow: parent.style.overflow };
-    if (pcs.position === "static") parent.style.position = "relative";
-    parent.style.overflow = "hidden";
-    if (move === "flip") parent.classList.add("ak-swap--flip");
-    parent.insertBefore(incoming, outgoing);
-    outgoing.style.position = "absolute";
-    outgoing.style.boxSizing = "border-box";
-    outgoing.style.margin = "0";
-    outgoing.style.top = box.top - seat.top - (parseFloat(pcs.borderTopWidth) || 0) + parent.scrollTop + "px";
-    outgoing.style.left = box.left - seat.left - (parseFloat(pcs.borderLeftWidth) || 0) + parent.scrollLeft + "px";
-    outgoing.style.width = box.width + "px";
-    outgoing.style.height = box.height + "px";
-    const endH = heightOf(parent);
-    const runs = [];
-    if (Math.abs(endH - startH) > 1) {
-      runs.push({
-        node: parent,
-        frames: [{ height: startH + "px" }, { height: endH + "px" }],
-        timing: { duration: ms, easing: ease, fill: (
-          /** @type {FillMode} */
-          "backwards"
-        ) }
-      });
-    }
-    if (move === "flip") {
-      const half = Math.round(ms / 2);
-      runs.push({
-        node: outgoing,
-        frames: [{ transform: "rotateY(0deg)", opacity: 1 }, { transform: "rotateY(-90deg)", opacity: 0 }],
-        timing: { duration: half, easing: "ease-in", fill: (
-          /** @type {FillMode} */
-          "forwards"
-        ) }
-      });
-      runs.push({
-        node: incoming,
-        frames: [{ transform: "rotateY(90deg)", opacity: 0 }, { transform: "rotateY(0deg)", opacity: 1 }],
-        timing: { duration: half, delay: half, easing: "ease-out", fill: (
-          /** @type {FillMode} */
-          "backwards"
-        ) }
-      });
-    } else if (move === "crossfade") {
-      runs.push({ node: outgoing, frames: [{ opacity: 1 }, { opacity: 0 }], timing: { duration: ms, easing: ease, fill: (
-        /** @type {FillMode} */
-        "forwards"
-      ) } });
-      runs.push({ node: incoming, frames: [{ opacity: 0 }, { opacity: 1 }], timing: { duration: ms, easing: ease, fill: (
-        /** @type {FillMode} */
-        "backwards"
-      ) } });
-    } else {
-      const fade = move === "slide";
-      runs.push({
-        node: outgoing,
-        frames: [{ transform: "none", opacity: 1 }, { transform: AWAY[dir], opacity: fade ? 0 : 1 }],
-        timing: { duration: ms, easing: ease, fill: (
-          /** @type {FillMode} */
-          "forwards"
-        ) }
-      });
-      runs.push({
-        node: incoming,
-        frames: [{ transform: TOWARD[dir], opacity: fade ? 0 : 1 }, { transform: "none", opacity: 1 }],
-        timing: { duration: ms, easing: ease, fill: (
-          /** @type {FillMode} */
-          "backwards"
-        ) }
-      });
-    }
-    return playAll(runs).then(function() {
-      if (outgoing.parentNode) outgoing.parentNode.removeChild(outgoing);
-      incoming.style.removeProperty("transform");
-      incoming.style.removeProperty("opacity");
-      parent.classList.remove("ak-swap--flip");
-      parent.style.position = kept.position;
-      parent.style.overflow = kept.overflow;
-      parent.style.removeProperty("height");
-    });
   }
 
   // src/static/sdk-libs/atelier/token-color.js
@@ -2046,13 +2251,13 @@
       node.style.removeProperty("--ak-fx-filter");
       return;
     }
-    let still = false;
+    let still2 = false;
     let ref = "";
     for (const k of ids) {
-      if (STILLS[k]) still = true;
+      if (STILLS[k]) still2 = true;
       if (SVG_ENGINES[k] && rest[k].filterId) ref = filterRef(rest[k].filterId);
     }
-    node.classList.toggle("is-ak-fx-still", still);
+    node.classList.toggle("is-ak-fx-still", still2);
     if (ref) node.style.setProperty("--ak-fx-filter", ref);
     else node.style.removeProperty("--ak-fx-filter");
   }
@@ -2275,7 +2480,7 @@
     if (moLook && lookHost) moLook.observe(lookHost, { attributes: true, attributeFilter: ["data-ak-look"] });
     const moRoot = id === "duotone" ? new MutationObserver(onPalette) : null;
     if (moRoot) moRoot.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-palette"] });
-    function settle3() {
+    function settle4() {
       inst.playing = false;
       inst.anim = null;
       if (inst.raf) cancelAnimationFrame(inst.raf);
@@ -2303,7 +2508,7 @@
         const p = inst.params;
         const done = function() {
           if (!inst.playing) return;
-          settle3();
+          settle4();
           if (opts && opts.onDone) opts.onDone();
         };
         inst.playing = true;
@@ -2347,7 +2552,7 @@
           inst.anim = null;
           a.cancel();
         }
-        settle3();
+        settle4();
       },
       destroy() {
         if (inst.destroyed) return;
@@ -3330,6 +3535,7 @@
       "data-ak-look": state.look,
       "aria-labelledby": titleId
     }, [bar, statusHost, main, footer]);
+    if (spec.motion === false) setMotionDefaults(root, false);
     let nav = null;
     if (spec.navItems && spec.navItems.length) {
       nav = bottomNav({ items: spec.navItems });
@@ -3359,8 +3565,11 @@
     root.addEventListener("ak-ambient-preset", syncWeather);
     if (spec.ambient !== false) ensureSky(spec.ambient);
     let statusCard = null;
+    let shownState = null;
     function status(kind, opts) {
       const o = opts || {};
+      const leaving = shownState;
+      shownState = kind;
       if (statusCard) {
         statusCard.destroy();
         statusCard = null;
@@ -3368,6 +3577,11 @@
       clear(statusHost);
       if (kind === "none" || kind === "ready") {
         statusHost.hidden = true;
+        if (leaving && leaving !== "ready" && leaving !== "none" && typeof requestAnimationFrame === "function") {
+          requestAnimationFrame(function() {
+            enter(main);
+          });
+        }
         return;
       }
       statusHost.hidden = false;
@@ -3592,9 +3806,11 @@
           on: {
             click: function() {
               if (item.id === state.value) return;
-              state.value = item.id;
-              render();
-              if (spec.onChange) spec.onChange(item.id);
+              viewSwap(function() {
+                state.value = item.id;
+                render();
+                if (spec.onChange) spec.onChange(item.id);
+              }, { kind: spec.transition, node: root });
             }
           }
         }, item.label));
@@ -3630,9 +3846,15 @@
           "data-ak-noguard": true,
           on: {
             click: function() {
-              state.value = item.id;
-              render();
-              if (item.onPick) item.onPick(item);
+              if (item.id === state.value) {
+                if (item.onPick) item.onPick(item);
+                return;
+              }
+              viewSwap(function() {
+                state.value = item.id;
+                render();
+                if (item.onPick) item.onPick(item);
+              }, { kind: spec.transition, node: root });
             }
           }
         }, item.label));
@@ -4184,13 +4406,30 @@
     const root = el("ol", { class: "ak-root ak-timeline" });
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
+    function fillItem(node, item) {
+      clear(node);
+      node.appendChild(el("span", {
+        class: "ak-timeline__dot ak-timeline__dot--" + (item.tone || "plain"),
+        "aria-hidden": "true"
+      }));
+      node.appendChild(el("div", { class: "ak-timeline__body" }, [
+        el("span", { class: "ak-timeline__when", text: fmt(item.ts) }),
+        el("span", { class: "ak-timeline__title", text: item.title }),
+        item.sub != null ? el("span", { class: "ak-timeline__sub", text: item.sub }) : null
+      ]));
+    }
+    function buildItem(item) {
+      const node = el("li", { class: "ak-timeline__item" });
+      fillItem(node, item);
+      return node;
+    }
     function render(items) {
       if (emptyCard) {
         emptyCard.destroy();
         emptyCard = null;
       }
-      clear(root);
       if (!items.length) {
+        clear(root);
         const e = spec.empty || {};
         emptyCard = emptyState({
           target: root,
@@ -4200,17 +4439,13 @@
         });
         return;
       }
-      for (const item of items) {
-        root.appendChild(el("li", { class: "ak-timeline__item", "data-ak-id": item.id }, [
-          el("span", { class: "ak-timeline__dot ak-timeline__dot--" + (item.tone || "plain"), "aria-hidden": "true" }),
-          el("div", { class: "ak-timeline__body" }, [
-            el("span", { class: "ak-timeline__when", text: fmt(item.ts) }),
-            el("span", { class: "ak-timeline__title", text: item.title }),
-            item.sub != null ? el("span", { class: "ak-timeline__sub", text: item.sub }) : null
-          ])
-        ]));
-      }
-      enter(root);
+      keyedRows(root, items, {
+        key: function(item, i) {
+          return item.id != null ? String(item.id) : "ev-" + i;
+        },
+        build: buildItem,
+        update: fillItem
+      });
     }
     render(spec.items || []);
     return {
@@ -4388,7 +4623,7 @@
       fillRow(row, item);
       return row;
     }
-    function render(items, first) {
+    function reconcile(items) {
       if (emptyCard) {
         emptyCard.destroy();
         emptyCard = null;
@@ -4415,12 +4650,6 @@
           const row = buildRow(item);
           if (previous) previous.after(row);
           else root.prepend(row);
-          if (!first && !reducedMotion() && typeof row.animate === "function") {
-            row.animate(
-              [{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "translateY(0)" }],
-              { duration: 200, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)" }
-            );
-          }
           entry = { row, item };
           shown.set(item.id, entry);
         } else {
@@ -4444,14 +4673,18 @@
         }
       }
     }
-    render(spec.items || [], true);
-    enter(root);
+    function render(items) {
+      settle(root, function() {
+        reconcile(items);
+      });
+    }
+    render(spec.items || []);
     return {
       el: root,
       /** @param {{ items: ListItem[] }} patch */
       set(patch) {
         if (!patch || !patch.items) return;
-        render(patch.items, false);
+        render(patch.items);
       },
       destroy() {
         if (emptyCard) emptyCard.destroy();
@@ -4610,6 +4843,7 @@
     }
     return 'url("' + v.replace(/"/g, "%22") + '")';
   }
+  var SHOWING = /* @__PURE__ */ new WeakMap();
   function washOf(id) {
     let h = 0;
     const s = String(id);
@@ -4654,8 +4888,8 @@
         emptyCard.destroy();
         emptyCard = null;
       }
-      clear(root);
       if (!items.length) {
+        clear(root);
         const e = spec.empty || {};
         emptyCard = emptyState({
           target: root,
@@ -4666,8 +4900,27 @@
         });
         return;
       }
-      for (const item of items) root.appendChild(buildCard(item, pickable, spec.onPick));
-      enter(root);
+      keyedRows(root, items, {
+        key: function(item, i) {
+          return item.id != null ? String(item.id) : "card-" + i;
+        },
+        build: function(item) {
+          const card = buildCard(item, pickable, pickable ? function() {
+            if (spec.onPick) spec.onPick(SHOWING.get(card));
+          } : void 0);
+          SHOWING.set(card, item);
+          return card;
+        },
+        // A card's whole surface is its content, so a changed card is refilled in place: the
+        // element stays (no re-entrance), everything inside it is replaced.
+        update: function(node, item) {
+          SHOWING.set(node, item);
+          const next = buildCard(item, pickable, void 0);
+          node.className = next.className;
+          clear(node);
+          while (next.firstChild) node.appendChild(next.firstChild);
+        }
+      });
     }
     render(spec.items || []);
     return {
@@ -4898,9 +5151,15 @@
   }
 
   // src/static/sdk-libs/atelier/table.js
+  var RECORD = /* @__PURE__ */ new WeakMap();
   function table(spec) {
     const columns = spec.columns || [];
     let rows = spec.rows || [];
+    const keyOf2 = spec.key || function(row, i) {
+      if (row && row.id != null) return String(row.id);
+      const first = columns[0] && row ? row[columns[0].key] : null;
+      return first == null ? "row-" + i : String(first);
+    };
     let sort = null;
     const thead = el("thead");
     const tbody = el("tbody");
@@ -4956,14 +5215,22 @@
         return String(av).localeCompare(String(bv)) * dir;
       });
     }
+    function fillRow2(tr, row) {
+      clear(tr);
+      for (const col of columns) {
+        const raw = row[col.key];
+        const text = col.format ? col.format(raw, row) : raw == null ? "" : String(raw);
+        tr.appendChild(el("td", { class: col.align === "right" ? "ak-table__num" : null, text }));
+      }
+    }
     function renderBody() {
       if (emptyCard) {
         emptyCard.destroy();
         emptyCard = null;
       }
-      clear(tbody);
       tableEl.hidden = !rows.length;
       if (!rows.length) {
+        clear(tbody);
         const e = spec.empty || {};
         emptyCard = emptyState({
           target: root,
@@ -4974,30 +5241,33 @@
         return;
       }
       const pickable = typeof spec.onPick === "function";
-      for (const row of sortedRows()) {
-        const tr = el("tr", {
-          class: pickable ? "ak-table__row--pick" : null,
-          tabindex: pickable ? "0" : null,
-          on: pickable ? {
-            click: function() {
-              if (spec.onPick) spec.onPick(row);
-            },
-            keydown: function(ev) {
-              if (ev.key === "Enter" && spec.onPick) spec.onPick(row);
-            }
-          } : null
-        });
-        for (const col of columns) {
-          const raw = row[col.key];
-          const text = col.format ? col.format(raw, row) : raw == null ? "" : String(raw);
-          tr.appendChild(el("td", { class: col.align === "right" ? "ak-table__num" : null, text }));
+      keyedRows(tbody, sortedRows(), {
+        key: keyOf2,
+        build: function(row) {
+          const tr = el("tr", {
+            class: pickable ? "ak-table__row--pick" : null,
+            tabindex: pickable ? "0" : null,
+            on: pickable ? {
+              click: function() {
+                if (spec.onPick) spec.onPick(RECORD.get(tr));
+              },
+              keydown: function(ev) {
+                if (ev.key === "Enter" && spec.onPick) spec.onPick(RECORD.get(tr));
+              }
+            } : null
+          });
+          RECORD.set(tr, row);
+          fillRow2(tr, row);
+          return tr;
+        },
+        update: function(tr, row) {
+          RECORD.set(tr, row);
+          fillRow2(tr, row);
         }
-        tbody.appendChild(tr);
-      }
+      });
     }
     renderHead();
     renderBody();
-    enter(root);
     return {
       el: root,
       /** @param {{ rows?: any[] }} patch */
@@ -5306,7 +5576,7 @@
         class: "ak-chart__trend"
       }));
     }
-    const still = ctx.still();
+    const still2 = ctx.still();
     points.forEach((p, i) => {
       const dot = svg("circle", { cx: X(p.x), cy: Y(p.y), r: 6, class: "ak-chart__point" });
       if (p.label) {
@@ -5314,7 +5584,7 @@
         cap.textContent = String(p.label);
         dot.appendChild(cap);
       }
-      if (!still) {
+      if (!still2) {
         dot.classList.add("ak-chart__point--enter");
         dot.style.animationDelay = `${i * 22}ms`;
       }
@@ -5340,7 +5610,7 @@
     const H4 = steps2.length * (STEP_H + GAP) - GAP + 8;
     const first = steps2[0].value;
     const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
-    const still = ctx.still();
+    const still2 = ctx.still();
     const half = (v) => Math.max(v / first * BAND, 18) / 2;
     steps2.forEach((s, i) => {
       const y = 4 + i * (STEP_H + GAP);
@@ -5352,7 +5622,7 @@
         class: "ak-chart__funnelband"
       });
       band.style.fill = SERIES_VARS[i % SERIES_VARS.length];
-      if (!still) {
+      if (!still2) {
         band.classList.add("ak-chart__band--enter");
         band.style.animationDelay = `${i * 80}ms`;
       }
@@ -5416,7 +5686,7 @@
     const H4 = 320;
     const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     const cells = squarify(items.map((s, i) => ({ v: s.value, s, i })), 2, 2, W7 - 4, H4 - 4);
-    const still = ctx.still();
+    const still2 = ctx.still();
     cells.forEach((c, n) => {
       const G = 2.5;
       const rect = svg("rect", {
@@ -5431,7 +5701,7 @@
       const cap = svg("title", {});
       cap.textContent = `${c.it.s.label} · ${fmtTick(c.it.s.value)}`;
       rect.appendChild(cap);
-      if (!still) {
+      if (!still2) {
         rect.classList.add("ak-chart__band--enter");
         rect.style.animationDelay = `${n * 45}ms`;
       }
@@ -5572,13 +5842,13 @@
       cap.textContent = String(label);
       node.appendChild(cap);
     });
-    const still = ctx.still();
+    const still2 = ctx.still();
     series.forEach((s, si) => {
       const points = axes.map((a, i) => at(i, R * Math.min(Math.max((Number(s.values[i]) || 0) / max, 0), 1))).join(" ");
       const shape = svg("polygon", { points, class: "ak-chart__radarshape" });
       shape.style.fill = SERIES_VARS[si % SERIES_VARS.length];
       shape.style.stroke = SERIES_VARS[si % SERIES_VARS.length];
-      if (!still) {
+      if (!still2) {
         shape.classList.add("ak-chart__band--enter");
         shape.style.animationDelay = `${si * 120}ms`;
       }
@@ -5695,7 +5965,7 @@
         tx.textContent = String(label);
         node.appendChild(tx);
       });
-      const still = ctx.still();
+      const still2 = ctx.still();
       for (const s of series) {
         if (s.kind !== "area" || horizontal) continue;
         const si = series.indexOf(s);
@@ -5751,7 +6021,7 @@
         return s;
       }
       function decorateBar(rect, i) {
-        if (!still) {
+        if (!still2) {
           rect.classList.add("ak-chart__bar--enter");
           rect.style.transformOrigin = horizontal ? `${cross(0)}px center` : `center ${cross(0)}px`;
           rect.style.animationDelay = `${i * 36}ms`;
@@ -5762,7 +6032,7 @@
         const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
         const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot / 2, y: cross(v) }));
         const line = svg("path", { d: smoothPath(pts), class: "ak-chart__line", style: `stroke:${colour}` });
-        if (!still) line.classList.add("ak-chart__line--enter");
+        if (!still2) line.classList.add("ak-chart__line--enter");
         node.appendChild(line);
         const last = pts[pts.length - 1];
         node.appendChild(svg("circle", { cx: last.x, cy: last.y, r: 5, class: "ak-chart__dot", style: `stroke:${colour}` }));
@@ -5771,7 +6041,7 @@
       legendFor(series);
       if (!horizontal) wireTooltip(node, labels, series, along, slot);
       if (data.note && !horizontal) noteBubble(node, data.note, labels, along, slot);
-      if (!still) {
+      if (!still2) {
         for (const line of node.querySelectorAll(".ak-chart__line--enter")) {
           const len = (
             /** @type {SVGPathElement} */
@@ -6561,11 +6831,11 @@
       [{ height: from + "px", opacity: opening ? 0.4 : 1 }, { height: to + "px", opacity: opening ? 1 : 0.4 }],
       { duration: span, easing: ease }
     );
-    const settle3 = function() {
+    const settle4 = function() {
       panel.style.height = opening ? "auto" : "0px";
     };
-    anim.onfinish = settle3;
-    anim.oncancel = settle3;
+    anim.onfinish = settle4;
+    anim.oncancel = settle4;
   }
   function reveal(spec) {
     const root = el("div", { class: "ak-root ak-reveal" });
@@ -6973,31 +7243,31 @@
         box.appendChild(u.el);
       }
     };
-    return function(from, to, settle3) {
+    return function(from, to, settle4) {
       if (from === to) {
         to.hidden = false;
-        settle3();
+        settle4();
         return;
       }
       if (typeof document.startViewTransition === "function" && !reducedMotion()) {
         transition(function() {
           from.hidden = true;
           to.hidden = false;
-          settle3();
+          settle4();
         });
         return;
       }
       if (reducedMotion()) {
         from.hidden = true;
         to.hidden = false;
-        settle3();
+        settle4();
         return;
       }
       to.hidden = false;
       if (to.parentNode) to.parentNode.removeChild(to);
       const mine = ++epoch;
       const move = panelTransition(from, to, "crossfade");
-      settle3();
+      settle4();
       const tidy = function() {
         if (mine === epoch) restore();
       };
@@ -7287,6 +7557,7 @@
   }
 
   // src/static/sdk-libs/atelier/ops.js
+  var JOB = /* @__PURE__ */ new WeakMap();
   var SVG_NS7 = "http://www.w3.org/2000/svg";
   function svg4(name, attrs) {
     const node = document.createElementNS(SVG_NS7, name);
@@ -7348,8 +7619,21 @@
   }
   var QUEUE_STATES = ["waiting", "running", "done", "failed"];
   var QUEUE_TONE = { waiting: "plain", running: "warn", done: "ok", failed: "err" };
+  function fillJob(row, item) {
+    const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : "waiting";
+    clear(row);
+    row.appendChild(el("span", { class: "ak-queue__state ak-queue__state--" + s, text: t("queue." + s) }));
+    row.appendChild(el("span", { class: "ak-queue__words" }, [
+      el("span", { class: "ak-queue__title", text: item.title || item.id }),
+      item.sub ? el("span", { class: "ak-queue__sub", text: item.sub }) : null
+    ]));
+  }
   function queue(spec) {
     const root = el("div", { class: "ak-root ak-queue" });
+    const strip = el("div", { class: "ak-queue__strip", role: "status" });
+    const list2 = el("div", { class: "ak-queue__list", role: "list" });
+    root.appendChild(strip);
+    root.appendChild(list2);
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
     function render(data) {
@@ -7357,19 +7641,28 @@
         emptyCard.destroy();
         emptyCard = null;
       }
-      clear(root);
       const items = data && Array.isArray(data.items) ? data.items : [];
       if (!items.length) {
+        clear(strip);
+        keyedRows(list2, [], { key: function() {
+          return "";
+        }, build: function() {
+          return el("div");
+        } });
+        strip.hidden = true;
+        list2.hidden = true;
         const e = spec.empty || {};
         emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
         return;
       }
+      strip.hidden = false;
+      list2.hidden = false;
       const counts = {};
       for (const item of items) {
         const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : "waiting";
         counts[s] = (counts[s] || 0) + 1;
       }
-      const strip = el("div", { class: "ak-queue__strip", role: "status" });
+      clear(strip);
       for (const s of QUEUE_STATES) {
         if (!counts[s]) continue;
         strip.appendChild(el(
@@ -7378,27 +7671,28 @@
           [el("strong", { text: String(counts[s]) }), el("span", { text: " " + t("queue." + s) })]
         ));
       }
-      root.appendChild(strip);
-      const list2 = el("div", { class: "ak-queue__list", role: "list" });
-      for (const item of items) {
-        const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : "waiting";
-        const row = el(spec.onPick ? "button" : "div", {
-          class: "ak-queue__row",
-          role: "listitem",
-          type: spec.onPick ? "button" : void 0
-        }, [
-          el("span", { class: "ak-queue__state ak-queue__state--" + s, text: t("queue." + s) }),
-          el("span", { class: "ak-queue__words" }, [
-            el("span", { class: "ak-queue__title", text: item.title || item.id }),
-            item.sub ? el("span", { class: "ak-queue__sub", text: item.sub }) : null
-          ])
-        ]);
-        if (spec.onPick) row.addEventListener("click", function() {
-          spec.onPick(item);
-        });
-        list2.appendChild(row);
-      }
-      root.appendChild(list2);
+      keyedRows(list2, items, {
+        key: function(item, i) {
+          return item && item.id != null ? String(item.id) : "job-" + i;
+        },
+        build: function(item) {
+          const row = el(spec.onPick ? "button" : "div", {
+            class: "ak-queue__row",
+            role: "listitem",
+            type: spec.onPick ? "button" : void 0
+          });
+          JOB.set(row, item);
+          fillJob(row, item);
+          if (spec.onPick) row.addEventListener("click", function() {
+            spec.onPick(JOB.get(row));
+          });
+          return row;
+        },
+        update: function(row, item) {
+          JOB.set(row, item);
+          fillJob(row, item);
+        }
+      });
     }
     render(spec.data);
     return {
@@ -7948,11 +8242,11 @@
       easing: "cubic-bezier(0.2, 0.7, 0.3, 1)",
       fill: "forwards"
     });
-    const settle3 = () => {
+    const settle4 = () => {
       node.textContent = next;
     };
-    anim.addEventListener("finish", settle3);
-    anim.addEventListener("cancel", settle3);
+    anim.addEventListener("finish", settle4);
+    anim.addEventListener("cancel", settle4);
     return true;
   }
   function thumb(target) {
@@ -8455,7 +8749,7 @@
     function kindOf(kind) {
       return KINDS.indexOf(kind) >= 0 ? kind : "info";
     }
-    function settle3(dot) {
+    function settle4(dot) {
       if (!dot || dot.hidden) return;
       const done = function() {
         dot.hidden = true;
@@ -8483,7 +8777,7 @@
         if (!rec) return;
         rec.item.read = true;
         rec.node.classList.remove("is-unread");
-        settle3(rec.dot);
+        settle4(rec.dot);
       });
       if (markAll.parentNode) markAll.parentNode.removeChild(markAll);
       if (s.onRead) s.onRead(ids);
@@ -8789,6 +9083,7 @@
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
     let current2 = null;
+    const arrived = /* @__PURE__ */ new Set();
     function moveCard(cardId, toColumn) {
       if (!current2) return;
       const card = (current2.cards || []).find((c) => c && c.id === cardId);
@@ -8858,9 +9153,10 @@
             card.sub ? el("span", { class: "ak-kanban__cardsub", text: card.sub }) : null,
             card.badge ? el("span", { class: "ak-kanban__badge", text: card.badge }) : null
           ]);
-          if (!reducedMotion()) {
+          if (!motionOff(root) && !arrived.has(card.id)) {
+            arrived.add(card.id);
             node.classList.add("ak-kanban__card--enter");
-            node.style.animationDelay = `${i * 40}ms`;
+            node.style.animationDelay = `${Math.min(i * 40, 500)}ms`;
           }
           if (movable) {
             node.draggable = true;
@@ -11208,7 +11504,7 @@
     let index = 0;
     let flight = null;
     let driving = false;
-    let settle3 = 0;
+    let settle4 = 0;
     let swiped = false;
     let emptyCard = null;
     let dead = false;
@@ -11329,9 +11625,9 @@
       next.disabled = index >= items.length - 1;
     }
     function release(ms) {
-      if (settle3) clearTimeout(settle3);
-      settle3 = window.setTimeout(function() {
-        settle3 = 0;
+      if (settle4) clearTimeout(settle4);
+      settle4 = window.setTimeout(function() {
+        settle4 = 0;
         driving = false;
         syncFromScroll();
       }, ms);
@@ -11449,7 +11745,7 @@
       destroy: function() {
         dead = true;
         if (flight && typeof flight.stop === "function") flight.stop();
-        if (settle3) clearTimeout(settle3);
+        if (settle4) clearTimeout(settle4);
         if (resizing) cancelAnimationFrame(resizing);
         swipe.destroy();
         viewport.removeEventListener("scroll", onScroll);
@@ -11736,7 +12032,7 @@
         return m.country.name + (m.row.value != null ? " " + m.row.value : "");
       }).join(", "));
       const node = svg5("svg", { viewBox: vb.join(" "), class: "ak-atlas__svg", "aria-hidden": "true" });
-      const still = reducedMotion();
+      const still2 = reducedMotion();
       for (const c of geo.countries) node.appendChild(svg5("path", { d: c.d, class: "ak-atlas__land" }));
       matched.forEach(function(m, i) {
         const tone = TONES9.indexOf(m.row.tone) >= 0 ? m.row.tone : null;
@@ -11746,7 +12042,7 @@
           attrs.style = "fill: var(--ak-accent); fill-opacity: " + (0.25 + 0.75 * frac).toFixed(3);
         }
         const path = svg5("path", attrs);
-        if (!still) {
+        if (!still2) {
           path.classList.add("ak-atlas__region--enter");
           path.style.animationDelay = i * 40 + "ms";
         }
@@ -11764,7 +12060,7 @@
         const [x, y] = project(m.lon, m.lat);
         const tone = TONES9.indexOf(m.tone) >= 0 ? m.tone : null;
         const dot = svg5("circle", { cx: x, cy: y, r: dotR, class: "ak-atlas__marker" + (tone ? " ak-atlas__marker--" + tone : "") });
-        if (!still) {
+        if (!still2) {
           dot.classList.add("ak-atlas__marker--enter");
           dot.style.animationDelay = 120 + i * 60 + "ms";
         }
@@ -12360,6 +12656,7 @@
           continue;
         }
         const unitEl = el("section", { class: "ak-mosaic__unit", "data-ak-block": block.id });
+        if (block.props && block.props.motion === false) setMotionDefaults(unitEl, false);
         buildBlock(block, unitEl);
         if (block.effect) {
           const worn = fx(unitEl, block.effect);
@@ -12715,11 +13012,25 @@
         }
       } }, spec.action.label) : null
     ].filter(Boolean));
+    const pace2 = paceOf(node);
     function close() {
       if (timer) clearTimeout(timer);
-      if (node.parentNode) node.parentNode.removeChild(node);
+      const drop = function() {
+        if (node.parentNode) node.parentNode.removeChild(node);
+      };
+      if (motionOff(node) || typeof node.animate !== "function") {
+        drop();
+        return;
+      }
+      const anim = node.animate(
+        [{ opacity: 1, transform: "translateY(0)" }, { opacity: 0, transform: "translateY(" + (pace2.dist || 8) + "px)" }],
+        { duration: pace2.span, easing: "ease-in" }
+      );
+      anim.onfinish = drop;
+      anim.oncancel = drop;
     }
     toastHost.appendChild(node);
+    fadeIn(node, pace2, 0);
     enter(node);
     const ttl = spec.ttl == null ? 6e3 : spec.ttl;
     if (ttl > 0) timer = setTimeout(close, ttl);
@@ -13333,9 +13644,9 @@
     function armSnap() {
       if (!snapOn || !scenes.length) return;
       if (settleTimer) clearTimeout(settleTimer);
-      settleTimer = setTimeout(settle3, snapDelay);
+      settleTimer = setTimeout(settle4, snapDelay);
     }
-    function settle3() {
+    function settle4() {
       settleTimer = 0;
       if (dead || !snapOn || !scenes.length) return;
       if (now() < jumpUntil) return;
@@ -13693,12 +14004,12 @@
       });
     }
     function jump(it) {
-      const glide = (
+      const glide2 = (
         /** @type {any} */
         window.__akLenis
       );
-      if (glide && typeof glide.scrollTo === "function") {
-        glide.scrollTo(it.head, { duration: JUMP2 });
+      if (glide2 && typeof glide2.scrollTo === "function") {
+        glide2.scrollTo(it.head, { duration: JUMP2 });
       } else {
         it.head.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
       }
@@ -13820,7 +14131,7 @@
     if (typeof targets.length === "number") return Array.prototype.slice.call(targets);
     return [];
   }
-  function kidsOf(node) {
+  function kidsOf2(node) {
     return Array.prototype.slice.call(node.children);
   }
   var REVEAL_EACH = { words: 34, chars: 16, lines: 70 };
@@ -14062,14 +14373,14 @@
     const duration = o.duration || 640;
     root.classList.add("ak-wave", "ak-wave--" + kind);
     root.style.setProperty("--ak-wave-cols", String(cols));
-    let tiles = kidsOf(root);
+    let tiles = kidsOf2(root);
     const built = !tiles.length;
     if (built) {
       const count = Math.max(1, Math.round(o.cells || cols * rows));
       for (let i = 0; i < count; i++) {
         root.appendChild(el("div", { class: "ak-wave__tile", "aria-hidden": "true" }));
       }
-      tiles = kidsOf(root);
+      tiles = kidsOf2(root);
     } else {
       tiles.forEach(function(tile) {
         tile.classList.add("ak-wave__tile");
@@ -14139,7 +14450,7 @@
     );
     return value;
   }
-  function settle(node, props) {
+  function settle2(node, props) {
     let moved = false;
     const at = { x: 0, y: 0, scale: 1, rotate: 0 };
     END_KEYS.forEach(function(key) {
@@ -14172,7 +14483,7 @@
     if (reducedMotion()) {
       list2.forEach(function(step) {
         toElements(step.targets).forEach(function(node) {
-          settle(node, step.props);
+          settle2(node, step.props);
         });
       });
     } else {
@@ -14426,7 +14737,7 @@
     );
     return value;
   }
-  function settle2(node, props) {
+  function settle3(node, props) {
     let moved = false;
     const at = { x: 0, y: 0, scale: 1, rotate: 0 };
     END_KEYS2.forEach(function(key) {
@@ -14800,7 +15111,7 @@
     if (reducedMotion()) {
       list2.forEach(function(step) {
         toElements2(step.targets).forEach(function(n) {
-          settle2(n, step.props);
+          settle3(n, step.props);
         });
       });
       return {
@@ -14875,7 +15186,7 @@
     }, function() {
       list2.forEach(function(step) {
         toElements2(step.targets).forEach(function(n) {
-          settle2(n, step.props);
+          settle3(n, step.props);
         });
       });
       last = 1;
@@ -15001,7 +15312,7 @@
     else free();
     return anim;
   }
-  function paceOf(node) {
+  function paceOf2(node) {
     const cs = getComputedStyle(node);
     const ms = parseFloat(cs.getPropertyValue("--ak-motion")) || 200;
     const raw = (cs.getPropertyValue("--ak-ease") || "").trim();
@@ -15035,7 +15346,7 @@
         })
       );
     }
-    function keyOf(kid) {
+    function keyOf2(kid) {
       const k = kid.getAttribute(keyed);
       return k == null ? kid : k;
     }
@@ -15068,7 +15379,7 @@
       }
       M.animate(ghost, { opacity: [1, 0], scale: [1, 0.94] }, Object.assign({ type: "spring" }, feel)).finished.then(done, done);
     }
-    function glide(kid, dx, dy, M) {
+    function glide2(kid, dx, dy, M) {
       whileMoving(kid, function() {
         return M ? M.animate(kid, { x: [dx, 0], y: [dy, 0] }, Object.assign({ type: "spring" }, feel)) : flipFrom(kid, dx, dy, feel);
       });
@@ -15088,13 +15399,13 @@
       try {
         const before = /* @__PURE__ */ new Map();
         kids().forEach(function(kid) {
-          before.set(keyOf(kid), { el: kid, box: kid.getBoundingClientRect() });
+          before.set(keyOf2(kid), { el: kid, box: kid.getBoundingClientRect() });
         });
         run();
         const M = travel2();
         const seen = /* @__PURE__ */ new Set();
         kids().forEach(function(kid) {
-          const key = keyOf(kid);
+          const key = keyOf2(kid);
           seen.add(key);
           const was = before.get(key);
           if (!was) {
@@ -15105,7 +15416,7 @@
           const dx = was.box.left - now2.left;
           const dy = was.box.top - now2.top;
           if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
-          glide(kid, dx, dy, M);
+          glide2(kid, dx, dy, M);
         });
         if (!wantExit) return;
         before.forEach(function(was, key) {
@@ -15202,7 +15513,7 @@
       face.style.setProperty("--ak-swipe-yes", String(Math.max(0, share)));
       face.style.setProperty("--ak-swipe-no", String(Math.max(0, -share)));
     }
-    function settle3(card, face) {
+    function settle4(card, face) {
       pull(face, 0);
       whileMoving(card, function() {
         return spring(card, { x: 0, y: 0 }, BACK);
@@ -15217,7 +15528,7 @@
         },
         onEnd: function(dx, dy, velocity) {
           if (Math.abs(dx) > threshold || Math.abs(velocity.x) > FLICK2) toss(dx < 0 ? "left" : "right", dx, dy);
-          else settle3(top.el, top.face);
+          else settle4(top.el, top.face);
         }
       }, { axis: "both", back: false });
     }
@@ -15393,7 +15704,7 @@
       return c !== "ak-micro" && c !== "ak-micro--glow";
     });
     function bind(M) {
-      const feel = paceOf(node);
+      const feel = paceOf2(node);
       const hoverMove = hoverKind && hoverKind !== "glow" ? MOVES[hoverKind] : null;
       const pressMove = pressKind ? MOVES[pressKind] : null;
       nodes.forEach(function(n) {
@@ -15539,7 +15850,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.49.0",
+    version: "0.50.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -15700,6 +16011,13 @@
     // ── The sideways strip says so: every kit scroller is stamped with which side has more, and
     //    an app's own scroller joins with data-ak-scroll-edge or this call ──
     scrollEdge,
+    // ── The DEFAULT motion: the engine the components already run on. An app calls none of it;
+    //    these are here so a component built outside the kit can join the same behaviour ──
+    settle,
+    keyedRows,
+    viewSwap,
+    motionOff,
+    setMotionDefaults,
     // ── Theme, i18n, helpers ──
     injectStyle,
     i18n,

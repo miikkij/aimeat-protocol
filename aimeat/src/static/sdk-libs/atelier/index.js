@@ -22,15 +22,34 @@
  *   and the look presets are `[data-ak-look]` blocks in that same file: vivid is the default and
  *   flat is the deliberate opt-out. A skin or a preset sets variables and nothing else.
  *
- *   MOTION IS THE KIT'S, NOT THE APP'S. Entrances, count-ups and state changes come from the
- *   components, tuned by the preset's motion tokens, finite by construction — an idle Atelier
- *   surface repaints zero times, and the finish gate measures that.
+ *   MOTION IS THE KIT'S, NOT THE APP'S — AND IT IS ON BY DEFAULT. A block arrives, a row that is
+ *   new rises in, a row that left fades out where it stood, a row that moved glides there, a
+ *   figure counts to its new value and a view change crosses into the next screen, none of it
+ *   asked for and none of it written by the app. The pace, the curve and the distance are the
+ *   LOOK's (--ak-motion, --ak-ease, --ak-enter-distance, --ak-enter-stagger), so a still-hands
+ *   look stays still without a line of code. Everything is finite by construction — an idle
+ *   Atelier surface repaints zero times, and the finish gate measures that. `app({ motion: false })`
+ *   turns the whole thing off for an app, `motion: false` on a block turns it off for that block,
+ *   and the viewer's Less-motion switch or reduced-motion setting beats both.
  * @structure imports the component modules (dom · i18n · shell · hero · state), composes the
  *   AIMEAT.atelier surface, attaches it via _core/namespace.
  * @usage
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.50.0 — 2026-09-05 — MOTION IS THE DEFAULT (wish-atelier-always-excellent, part 2). Nothing
+ *     in an Atelier app appears, changes or disappears without being seen to, and the app asks for
+ *     none of it. arrive.js is the engine: `settle` gives a change its three moves (a row that
+ *     arrived rises in, one that left fades out where it stood, one that moved glides there),
+ *     `keyedRows` is the reconciler the rebuild-shaped components adopt so an entrance runs ONCE
+ *     per row rather than on every repaint, and `viewSwap` puts every view change through the
+ *     View Transitions API with the kit's curtain behind it. list, table, timeline, cardGrid and
+ *     queue are keyed; tabs and the bottom bar transition; a toast leaves as well as arrives;
+ *     the skeleton gives way to the content rather than being replaced by it; the kanban's
+ *     entrance stopped re-running on every rebuild. One option turns the whole thing off —
+ *     `app({ motion: false })` — and one block prop does the same for one block. The viewer
+ *     always wins: `data-ak-motion="less"` now reaches the stylesheet's animations too, which it
+ *     never did (the switch quieted the scripts and left every CSS entrance running).
  *   v0.49.0 — 2026-09-05 — THE MEASURED REVIEW. scroll-edge.js joins the kit: it stamps
  *     data-ak-scroll="start|middle|end|none" on every scroller this kit builds and on anything
  *     an app marks data-ak-scroll-edge, and the stylesheet paints an edge fade on the side that
@@ -244,7 +263,8 @@
  *     emptyState, skeleton, dom + i18n layers (TARGET-074 phase 1, slice 1).
  */
 import { attach } from '../_core/namespace.js';
-import { el, append, $, $$, clear, uid, busy, guardButtons, whileBusy, injectStyle, reducedMotion, enter, kinetic, countUp, attention } from './dom.js';
+import { el, append, $, $$, clear, uid, busy, guardButtons, whileBusy, injectStyle, reducedMotion, enter, kinetic, countUp, attention, motionOff, setMotionDefaults } from './dom.js';
+import { settle, keyedRows, viewSwap } from './arrive.js';
 import { i18n } from './i18n.js';
 import { flapify, ransom, vu, typeout, dealIn } from './scenics.js';
 import { app, section, tabs, bottomNav } from './shell.js';
@@ -301,7 +321,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.49.0',
+  version: '0.50.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -388,6 +408,10 @@ const atelier = {
   // ── The sideways strip says so: every kit scroller is stamped with which side has more, and
   //    an app's own scroller joins with data-ak-scroll-edge or this call ──
   scrollEdge,
+
+  // ── The DEFAULT motion: the engine the components already run on. An app calls none of it;
+  //    these are here so a component built outside the kit can join the same behaviour ──
+  settle, keyedRows, viewSwap, motionOff, setMotionDefaults,
 
   // ── Theme, i18n, helpers ──
   injectStyle, i18n, el, append, $, $$, clear, uid, busy, whileBusy, guardButtons,

@@ -22,11 +22,20 @@
  *   AIMEAT.atelier.gauge({ target: host, data: { value: 72, max: 100, label: 'CPU', unit: '%',
  *     bands: [{ upTo: 60, tone: 'ok' }, { upTo: 85, tone: 'warn' }, { upTo: 100, tone: 'err' }] } });
  * @version-history
+ *   v0.50.0 — 2026-09-05 — THE QUEUE MOVES. It had no entrance of any kind and was rebuilt whole
+ *     on every set, which is the worst shape for the one block whose subject IS change: a job
+ *     arriving, running and finishing all looked like the same silent repaint. The list is kept
+ *     now and reconciled by job id — a new job rises in, a finished one fades out where it stood,
+ *     and a job that changed state repaints in place without re-entering.
  *   v0.33.0 — 2026-08-29 — Initial (TARGET-074 next level: the admin panel vocabulary).
  */
 import { el, clear, resolve, reducedMotion } from './dom.js';
+import { keyedRows } from './arrive.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
+
+/** Which job a kept row is showing right now, so a pick reports what is under the finger. */
+const JOB = new WeakMap();
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 function svg(name, attrs) {
@@ -95,50 +104,72 @@ const QUEUE_TONE = { waiting: 'plain', running: 'warn', done: 'ok', failed: 'err
  *   empty?: { title?: string, hint?: string }, onPick?: (item: any) => void,
  * }} spec
  */
+/** One job's row contents, written into the element that already stands for it.
+ *  @param {HTMLElement} row @param {any} item */
+function fillJob(row, item) {
+  const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : 'waiting';
+  clear(row);
+  row.appendChild(el('span', { class: 'ak-queue__state ak-queue__state--' + s, text: t('queue.' + s) }));
+  row.appendChild(el('span', { class: 'ak-queue__words' }, [
+    el('span', { class: 'ak-queue__title', text: item.title || item.id }),
+    item.sub ? el('span', { class: 'ak-queue__sub', text: item.sub }) : null,
+  ]));
+}
+
 export function queue(spec) {
   const root = el('div', { class: 'ak-root ak-queue' });
+  // THE LIST OUTLIVES THE RENDER, which is the whole point: a job kept across a change keeps its
+  // element, so only what actually changed moves. The strip above it is one line of counts and is
+  // rewritten each time.
+  const strip = el('div', { class: 'ak-queue__strip', role: 'status' });
+  const list = el('div', { class: 'ak-queue__list', role: 'list' });
+  root.appendChild(strip);
+  root.appendChild(list);
   if (spec.target) resolve(spec.target).appendChild(root);
   let emptyCard = null;
 
   function render(data) {
     if (emptyCard) { emptyCard.destroy(); emptyCard = null; }
-    clear(root);
     const items = (data && Array.isArray(data.items)) ? data.items : [];
     if (!items.length) {
+      clear(strip);
+      keyedRows(list, [], { key: function () { return ''; }, build: function () { return el('div'); } });
+      strip.hidden = true;
+      list.hidden = true;
       const e = spec.empty || {};
       emptyCard = emptyState({ target: root, tone: 'quiet', title: e.title || t('empty'), hint: e.hint || t('emptyHint') });
       return;
     }
+    strip.hidden = false;
+    list.hidden = false;
     // The strip: one chip per state that has members, in lifecycle order.
     const counts = {};
     for (const item of items) {
       const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : 'waiting';
       counts[s] = (counts[s] || 0) + 1;
     }
-    const strip = el('div', { class: 'ak-queue__strip', role: 'status' });
+    clear(strip);
     for (const s of QUEUE_STATES) {
       if (!counts[s]) continue;
       strip.appendChild(el('span', { class: 'ak-queue__count ak-queue__count--' + QUEUE_TONE[s] },
         [el('strong', { text: String(counts[s]) }), el('span', { text: ' ' + t('queue.' + s) })]));
     }
-    root.appendChild(strip);
 
-    const list = el('div', { class: 'ak-queue__list', role: 'list' });
-    for (const item of items) {
-      const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : 'waiting';
-      const row = el(spec.onPick ? 'button' : 'div', {
-        class: 'ak-queue__row', role: 'listitem', type: spec.onPick ? 'button' : undefined,
-      }, [
-        el('span', { class: 'ak-queue__state ak-queue__state--' + s, text: t('queue.' + s) }),
-        el('span', { class: 'ak-queue__words' }, [
-          el('span', { class: 'ak-queue__title', text: item.title || item.id }),
-          item.sub ? el('span', { class: 'ak-queue__sub', text: item.sub }) : null,
-        ]),
-      ]);
-      if (spec.onPick) row.addEventListener('click', function () { spec.onPick(item); });
-      list.appendChild(row);
-    }
-    root.appendChild(list);
+    // Work moving between states is exactly what a queue shows, so a row that changed state
+    // repaints where it stands, a new job rises in, and a finished one fades out of the line.
+    keyedRows(list, items, {
+      key: function (item, i) { return item && item.id != null ? String(item.id) : 'job-' + i; },
+      build: function (item) {
+        const row = el(spec.onPick ? 'button' : 'div', {
+          class: 'ak-queue__row', role: 'listitem', type: spec.onPick ? 'button' : undefined,
+        });
+        JOB.set(row, item);
+        fillJob(row, item);
+        if (spec.onPick) row.addEventListener('click', function () { spec.onPick(JOB.get(row)); });
+        return row;
+      },
+      update: function (row, item) { JOB.set(row, item); fillJob(row, item); },
+    });
   }
 
   render(spec.data);

@@ -14,6 +14,11 @@
  * @structure list(spec) → { el, set, destroy } · listDetail(spec) → { el, set, select, destroy }
  * @usage  AIMEAT.atelier.list({ target: a.main, items, onPick(item) { open(item); } });
  * @version-history
+ *   v0.50.0 — 2026-09-05 — THE CHANGE IS A MOVE, not three separate ones. The whole reconcile runs
+ *     inside `settle`, so a row that arrived rises in on the LOOK's distance and pace, a row that
+ *     left fades out where it stood instead of blinking away, and a row that moved glides from
+ *     where it was standing. The 200 ms / 8 px pair frozen in this file since 0.3.0 is gone: it
+ *     was the one place in the kit where a look could not change the feel of its own rows.
  *   v0.46.0 — 2026-09-02 — The morph is the kit's own now: `morph` from mosaic-motion.js drives
  *     it, and the pair is the two TITLES (the row's words and the detail's heading), so the
  *     name travels out of the list into the pane instead of a whole row growing into a panel.
@@ -26,7 +31,8 @@
  *     and concluded nothing happened while the detail filled 700px below the fold.
  *   v0.3.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 3).
  */
-import { el, append, clear, resolve, enter, reducedMotion } from './dom.js';
+import { el, append, clear, resolve, reducedMotion } from './dom.js';
+import { settle } from './arrive.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
 import { morph } from './mosaic-motion.js';
@@ -107,8 +113,13 @@ export function list(spec) {
     return row;
   }
 
-  /** @param {ListItem[]} items @param {boolean} first */
-  function render(items, first) {
+  /**
+   * The reconcile, and nothing about motion inside it. `settle` measures the rows around this
+   * work and gives each one the move its own change earned — arrived, moved, or gone — on the
+   * look's own distance and pace.
+   * @param {ListItem[]} items
+   */
+  function reconcile(items) {
     if (emptyCard) { emptyCard.destroy(); emptyCard = null; }
     if (!items.length) {
       for (const [, entry] of shown) entry.row.remove();
@@ -130,12 +141,6 @@ export function list(spec) {
         // Insert in order: after the previous item's row, or first.
         if (previous) previous.after(row);
         else root.prepend(row);
-        if (!first && !reducedMotion() && typeof row.animate === 'function') {
-          row.animate(
-            [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }],
-            { duration: 200, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)' },
-          );
-        }
         entry = { row, item };
         shown.set(item.id, entry);
       } else {
@@ -158,15 +163,19 @@ export function list(spec) {
     }
   }
 
-  render(spec.items || [], true);
-  enter(root);
+  /** @param {ListItem[]} items */
+  function render(items) {
+    settle(root, function () { reconcile(items); });
+  }
+
+  render(spec.items || []);
 
   return {
     el: root,
     /** @param {{ items: ListItem[] }} patch */
     set(patch) {
       if (!patch || !patch.items) return;
-      render(patch.items, false);
+      render(patch.items);
     },
     destroy() {
       if (emptyCard) emptyCard.destroy();

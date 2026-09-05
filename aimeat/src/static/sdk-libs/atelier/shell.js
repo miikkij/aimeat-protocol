@@ -49,7 +49,8 @@
  *     a default hint pointing at the account pill.
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
  */
-import { el, append, clear, resolve, uid, injectStyle, enter, setMotion } from './dom.js';
+import { el, append, clear, resolve, uid, injectStyle, enter, setMotion, setMotionDefaults } from './dom.js';
+import { viewSwap } from './arrive.js';
 import { t, i18n } from './i18n.js';
 import { emptyState } from './state.js';
 import { screenTransition, curtain } from './transitions.js';
@@ -158,9 +159,15 @@ function ambientSpec(want) {
  * @param {{
  *   target?: string|Element, title: string, tagline?: string, look?: string, footer?: string,
  *   navItems?: Array<{ id: string, label: string, onPick?: (item: any) => void }>,
- *   requireLogin?: boolean, ambient?: AmbientWish,
+ *   requireLogin?: boolean, ambient?: AmbientWish, motion?: boolean,
  *   onReady?: (session: any) => void, onLogout?: () => void,
  * }} spec
+ *   `motion: false` is the WHOLE opt-out from the kit's default motion for this app: no
+ *   entrances, no enter/exit/move on a change, no count-up, no transition between views.
+ *   Everything still renders and still works; nothing travels. It is one option because the
+ *   alternative — an app remembering to switch off each move — is how a screen ends up half
+ *   still. A single block opts out on its own with `motion: false` in its props, and the
+ *   viewer's Less-motion switch and the operating system's reduced motion always win over both.
  * @returns {AppHandle}
  */
 export function app(spec) {
@@ -234,6 +241,11 @@ export function app(spec) {
     'aria-labelledby': titleId,
   }, [bar, statusHost, main, footer]);
 
+  // The app's own answer about motion, stamped on the frame rather than kept in a closure: every
+  // part built inside it — now or later, by the app or by the mosaic — reads the same mark, and
+  // so does the stylesheet.
+  if (spec.motion === false) setMotionDefaults(root, false);
+
   let nav = null;
   if (spec.navItems && spec.navItems.length) {
     nav = bottomNav({ items: spec.navItems });
@@ -275,6 +287,9 @@ export function app(spec) {
 
   /** The current status card, so `status()` swaps rather than stacks. */
   let statusCard = null;
+  /** Which designed state is showing, so leaving one for the content is a move rather than a
+   *  replacement (a skeleton or a loading line giving way to the real screen). */
+  let shownState = null;
 
   /**
    * Show one designed state (or clear them all with 'none'/'ready'). The states are the kit's,
@@ -284,9 +299,20 @@ export function app(spec) {
    */
   function status(kind, opts) {
     const o = opts || {};
+    const leaving = shownState;
+    shownState = kind;
     if (statusCard) { statusCard.destroy(); statusCard = null; }
     clear(statusHost);
-    if (kind === 'none' || kind === 'ready') { statusHost.hidden = true; return; }
+    if (kind === 'none' || kind === 'ready') {
+      statusHost.hidden = true;
+      // SKELETON TO CONTENT IS A MOVE, not a replacement. The app fills `main` right after this
+      // call returns (status('ready') then render is the shape every Atelier app is written in),
+      // so the entrance is queued for the next frame, when what it is choreographing exists.
+      if (leaving && leaving !== 'ready' && leaving !== 'none' && typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(function () { enter(main); });
+      }
+      return;
+    }
     statusHost.hidden = false;
     if (kind === 'loading') {
       statusHost.appendChild(el('div', { class: 'ak-loading', role: 'status', 'aria-live': 'polite' }, [
@@ -492,10 +518,13 @@ export function section(spec) {
 }
 
 /**
- * A tab row. Reports the pick; the host swaps the view.
+ * A tab row. Reports the pick; the host swaps the view — inside the kit's screen transition, so
+ * the swap is SEEN as a change without the host asking for it. `transition` names another move
+ * (slide, wipe, zoom, iris, curtain); the app's `motion: false` and reduced motion collapse it.
  * @param {{
  *   target?: string|Element, items: Array<{ id: string, label: string }>,
  *   value?: string, onChange?: (id: string) => void,
+ *   transition?: 'fade'|'wipe'|'curtain'|'zoom'|'iris'|'slide',
  * }} spec
  * @returns {{ el: HTMLElement, set: (patch: { value?: string, items?: any[] }) => void, destroy: () => void }}
  */
@@ -517,9 +546,16 @@ export function tabs(spec) {
         on: {
           click: function () {
             if (item.id === state.value) return;
-            state.value = item.id;
-            render();
-            if (spec.onChange) spec.onChange(item.id);
+            // A TAB CHANGE IS A SCREEN CHANGE, and the kit makes it look like one without being
+            // asked. The host's onChange is what swaps the view, so it runs INSIDE the
+            // transition: the browser crosses the old screen into the new one where it has View
+            // Transitions, the kit's curtain does it where it does not, and under reduced motion
+            // or an opt-out it is the plain swap it always was.
+            viewSwap(function () {
+              state.value = item.id;
+              render();
+              if (spec.onChange) spec.onChange(item.id);
+            }, { kind: spec.transition, node: root });
           },
         },
       }, item.label));
@@ -542,10 +578,11 @@ export function tabs(spec) {
 
 /**
  * The bottom navigation bar — fixed above the node's chrome strip (the stylesheet reserves
- * var(--aimeat-chrome-bottom), so it never sits under the injected controls).
+ * var(--aimeat-chrome-bottom), so it never sits under the injected controls). A pick runs inside
+ * the kit's screen transition, the same as a tab.
  * @param {{
  *   target?: string|Element, items: Array<{ id: string, label: string, onPick?: (item: any) => void }>,
- *   value?: string,
+ *   value?: string, transition?: 'fade'|'wipe'|'curtain'|'zoom'|'iris'|'slide',
  * }} spec
  * @returns {{ el: HTMLElement, set: (patch: { value?: string, items?: any[] }) => void, destroy: () => void }}
  */
@@ -565,9 +602,13 @@ export function bottomNav(spec) {
         'data-ak-noguard': true,
         on: {
           click: function () {
-            state.value = item.id;
-            render();
-            if (item.onPick) item.onPick(item);
+            if (item.id === state.value) { if (item.onPick) item.onPick(item); return; }
+            // The bottom bar changes the screen exactly as the tabs do, and gets the same move.
+            viewSwap(function () {
+              state.value = item.id;
+              render();
+              if (item.onPick) item.onPick(item);
+            }, { kind: spec.transition, node: root });
           },
         },
       }, item.label));
