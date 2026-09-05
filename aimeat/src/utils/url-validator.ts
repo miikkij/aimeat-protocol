@@ -17,6 +17,9 @@
  *   v2.1.0 — 2026-07-10 — Loopback egress now gated by AIMEAT_ALLOW_PRIVATE_EGRESS (config resolves
  *     it from the security profile; AIMEAT_DEV_MODE kept as a back-compat alias). RFC1918/link-local
  *     stay blocked regardless.
+ *   v2.3.0 — 2026-09-06 — stripTrailingSlashes, for the callers that normalise an address someone
+ *     else supplied before appending a path. `replace(/\/+$/, '')` on such an address is quadratic
+ *     on a long run of slashes (CodeQL js/polynomial-redos, alerts 1609 and 1610).
  *   v2.2.0 — 2026-07-14 — Web Bot Auth seam: an optional outbound-request signer
  *     (setOutboundRequestSigner) stamps RFC 9421 Signature headers on every hop AFTER validation.
  *     Best-effort and additive only — a signer failure never blocks the fetch, and no guard changes.
@@ -120,6 +123,19 @@ export async function validateOutboundUrl(urlStr: string): Promise<{ valid: bool
   }
 
   return { valid: true };
+}
+
+/**
+ * A base URL with its trailing slashes off, ready to have a path appended.
+ *
+ * A scan rather than `replace(/\/+$/, '')`: that pattern makes the engine retry from every slash in
+ * a run before it can fail, so an address someone else supplied ending in thousands of slashes
+ * costs quadratic time. Same answer, one pass, whatever arrives.
+ */
+export function stripTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url.charCodeAt(end - 1) === 47 /* '/' */) end -= 1;
+  return url.slice(0, end);
 }
 
 export interface SafeFetchInit extends RequestInit {

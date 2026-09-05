@@ -5,10 +5,12 @@
  *   redirect re-validation (an allowed host must not be able to 3xx-bounce to an
  *   internal target).
  * @version-history
+ *   v1.1.0 — 2026-09-06 — stripTrailingSlashes, including the input that made the regex it replaces
+ *     quadratic: a long run of slashes with one character after it, which can never match.
  *   v1.0.0 — 2026-06-20 — Initial creation alongside the H-3 SSRF hardening.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { validateOutboundUrl, safeFetch } from '../../src/utils/url-validator.js';
+import { validateOutboundUrl, safeFetch, stripTrailingSlashes } from '../../src/utils/url-validator.js';
 
 afterEach(() => {
     vi.restoreAllMocks();
@@ -82,5 +84,26 @@ describe('safeFetch — redirect re-validation', () => {
         const resp = await safeFetch('http://93.184.216.34/');
         expect(resp.status).toBe(200);
         expect(await resp.text()).toBe('ok');
+    });
+});
+
+describe('stripTrailingSlashes', () => {
+    it('takes off a run of trailing slashes and touches nothing else', () => {
+        expect(stripTrailingSlashes('https://node.example')).toBe('https://node.example');
+        expect(stripTrailingSlashes('https://node.example/')).toBe('https://node.example');
+        expect(stripTrailingSlashes('https://node.example///')).toBe('https://node.example');
+        expect(stripTrailingSlashes('https://node.example/v1/packages/')).toBe('https://node.example/v1/packages');
+        expect(stripTrailingSlashes('')).toBe('');
+        expect(stripTrailingSlashes('////')).toBe('');
+    });
+
+    it('answers in linear time on the input that made the regex quadratic', () => {
+        // 200k trailing slashes with a character after them, so the pattern can never match and has
+        // to give up from every position. `replace(/\/+$/, '')` is where a caller-supplied address
+        // stalled the process; this must return, and quickly.
+        const hostile = `https://node.example${'/'.repeat(200_000)}x`;
+        const started = Date.now();
+        expect(stripTrailingSlashes(hostile)).toBe(hostile);
+        expect(Date.now() - started).toBeLessThan(1000);
     });
 });

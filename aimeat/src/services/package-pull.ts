@@ -24,13 +24,16 @@
  *   import { pullPackage } from '../services/package-pull.js';
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
+ *   v1.0.1 — 2026-09-06 — Both trailing-slash strips of a caller-supplied address go through
+ *     stripTrailingSlashes, which is a scan rather than a backtracking regex (CodeQL
+ *     js/polynomial-redos, alerts 1609 and 1610).
  *   v1.0.0 — 2026-09-05 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, PackageRecord, UpstreamRef } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { gatePeer } from './federation-peer-gate.js';
-import { safeFetch } from '../utils/url-validator.js';
+import { safeFetch, stripTrailingSlashes } from '../utils/url-validator.js';
 import { parseZip, ZipValidationError } from './package-zip.js';
 import {
     verifyAttestation, verifyComponentDigests, type AttestationDoc,
@@ -76,7 +79,7 @@ interface ResolvedSource {
 
 /** A node's own public key, from the address every AIMEAT node publishes it at. */
 async function tofuKeyOf(baseUrl: string, timeoutMs: number): Promise<ResolvedSource | null> {
-    const res = await safeFetch(`${baseUrl.replace(/\/+$/, '')}/.well-known/aimeat`, {
+    const res = await safeFetch(`${stripTrailingSlashes(baseUrl)}/.well-known/aimeat`, {
         signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) return null;
@@ -175,7 +178,7 @@ export async function pullPackage(
     }
 
     // 5. Fetch, with a cap and a clock.
-    const base = source.baseUrl.replace(/\/+$/, '');
+    const base = stripTrailingSlashes(source.baseUrl);
     const path = `${base}/v1/packages/${encodeURIComponent(groupId)}/export`
         + (input.version ? `?version=${encodeURIComponent(input.version)}` : '');
 

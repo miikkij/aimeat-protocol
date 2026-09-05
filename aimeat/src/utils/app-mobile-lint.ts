@@ -13,6 +13,9 @@
  * @version-history
  *   v1.0.0 — 2026-07-19 — initial: viewport-meta presence + width=device-width, and the CSS-grid
  *     1fr-blowout hint (appdev pitfall grid-track-blowout).
+ *   v1.0.1 — 2026-09-06 — The viewport-meta match is two linear passes instead of one regex with an
+ *     unbounded run either side of `name="viewport"`, which cost quadratic time on a page carrying
+ *     many `<meta` starts (CodeQL js/polynomial-redos, alert 1611). Same hints, same wording.
  */
 
 /** High-confidence, non-blocking mobile hints for a published app's HTML. Empty = looks fine. */
@@ -23,10 +26,15 @@ export function lintAppHtmlForMobile(html: string): string[] {
   const noWs = lower.replace(/\s+/g, '');
 
   // 1) Viewport meta — without it, phones render at desktop width and every font looks tiny.
-  const viewport = lower.match(/<meta[^>]*name\s*=\s*["']viewport["'][^>]*>/);
+  //    Listed first, read second: one regex with an unbounded run on BOTH sides of the attribute it
+  //    looks for (`<meta[^>]*name=…[^>]*>`) makes the engine rescan the same bytes once per `<meta`
+  //    in the page, so a stranger's upload full of them costs quadratic time. `<meta\b[^>]*>` stops
+  //    at the first `>` from wherever it starts, and each tag is then read on its own.
+  const viewport = (lower.match(/<meta\b[^>]*>/g) ?? [])
+    .find(tag => /\bname\s*=\s*["']viewport["']/.test(tag));
   if (!viewport) {
     hints.push('No viewport meta tag — the app renders at desktop width on phones. Add: <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">');
-  } else if (!/width\s*=\s*device-width/.test(viewport[0])) {
+  } else if (!/width\s*=\s*device-width/.test(viewport)) {
     hints.push('The viewport meta is missing width=device-width — the app will not scale to the phone screen.');
   }
 
