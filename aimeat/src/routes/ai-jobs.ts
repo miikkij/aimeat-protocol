@@ -43,6 +43,9 @@
  * @structure aiJobsRouter(config, storage, service)
  * @usage app.use(aiJobsRouter(config, storage, aiJobService));
  * @version-history
+ *   v1.1.1 — 2026-09-05 — `created_by` is the resolved principal, not the raw `sub`: on an owner
+ *     session the two differ (bare name against GHII), and the identity ratchet main grew while
+ *     this branch waited refuses a route that reads `sub` and never resolves it.
  *   v1.1.0 — 2026-08-31 — The four doors ask assertAiUseAllowed instead of stating `ai:use` as
  *     requireScope middleware. Two ways of asking one question is one way too many: they disagreed
  *     about `ai:*` on the same key and the same budget. Asking the shared function is what has since
@@ -118,8 +121,11 @@ export function aiJobsRouter(config: AimeatConfig, storage: Storage, service: Ai
                 }, {
                     // Never from the body. `owner` decides whose key pays and whose namespace the
                     // answer lands in; `created_by` is the audit trail and carries no authority.
+                    // Both are the RESOLVED principal: an agent's GAII as it is, an owner session's
+                    // bare name turned into their GHII, so the trail names the same identity every
+                    // other record on this node names (and the MCP door writes the agent's GAII).
                     ownerGhii: resolve(req),
-                    createdBy: (req.auth!.sub as string) ?? resolve(req),
+                    createdBy: resolve(req),
                 });
 
                 // 202, not 200: accepted, not finished.
