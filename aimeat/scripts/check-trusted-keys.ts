@@ -533,7 +533,7 @@ function seed(findings: Finding[]): void {
         + `${relative(ROOT, EXEMPTIONS)} (${kept} existing reasons kept word for word)`);
 }
 
-function main(): void {
+export function main(): void {
     const strict = process.argv.includes('--strict');
     const files = walk(SRC);
     if (!files.length) {

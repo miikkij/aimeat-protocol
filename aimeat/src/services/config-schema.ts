@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.10.0 — 2026-09-05 — mcp.session_sweep_ms (AIMEAT_MCP_SESSION_SWEEP_MS), immutable: the idle
+ *     sweep's interval is read once at boot.
  *   v1.9.0 — 2026-09-03 — features.capability_call_counting (AIMEAT_CAPABILITY_CALL_COUNTING): whether
  *     a direct extension action call counts into the capability registry's statistics.
  *   v1.8.0 — 2026-08-30 — boards.public_per_owner_max (AIMEAT_BOARD_PUBLIC_PER_OWNER_MAX): how many
@@ -523,6 +525,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── MCP sessions (mutable) ──
   { key: 'mcpSessionIdleMinutes', dotPath: 'mcp.session_idle_minutes', envVar: 'AIMEAT_MCP_SESSION_IDLE_MINUTES', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 0.05 && (v as number) <= 1440, immutable: false, description: 'Close an MCP session after this many minutes without a request (fractions allowed; a reaped client re-initializes)', range: '0.05-1440' },
+  { key: 'mcpSessionSweepMs', dotPath: 'mcp.session_sweep_ms', envVar: 'AIMEAT_MCP_SESSION_SWEEP_MS', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 250 && (v as number) <= 600000, immutable: true, description: 'How often the idle sweep looks for sessions to close, in milliseconds (read at boot)', range: '250-600000' },
 
   // ── Registration (mutable) ──
   { key: 'registrationMode', dotPath: 'registration.mode', envVar: 'AIMEAT_REGISTRATION_MODE', type: 'string', validate: v => ['open', 'oauth', 'invite', 'closed'].includes(v as string), immutable: false, description: 'Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.' },

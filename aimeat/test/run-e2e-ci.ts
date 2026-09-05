@@ -9,6 +9,12 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.29.0 -- 2026-09-05 -- Parallel lanes: `--workers=N` (or AIMEAT_E2E_WORKERS) runs N nodes at
+ *            once, each on its own port and database, every suite still on an empty node. Suites
+ *            that bind a port of their own stay in lane 0. The summary says where the wall clock
+ *            went: suites versus restarts, and the mean restart. Measured before: 285 suites, 38
+ *            minutes, 20 of them restarts. Also registers e2e-admin-security-page.ts (the Security
+ *            page in the poster face, another session's suite, carried here by agreement).
  *   v1.28.0 -- 2026-09-03 -- Add e2e-federation-relay-claim.ts, in ALL_SUITES and in the guard tier:
  *            eleven of its seventeen assertions are a refusal, and the capability it proves did not
  *            exist before (a receiving node could not refuse a relay). It spawns its own node on
@@ -109,16 +115,19 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
     cleanDatabase,
+    ensureDatabase,
+    laneTarget,
     pinnedEnv,
     reportEnvLeaks,
     resolveTarget,
     startServer,
     stopServer,
+    type RunnerTarget,
 } from './run-e2e-server.js';
 
 const ALL_SUITES = [
@@ -401,6 +410,7 @@ const ALL_SUITES = [
     'test/e2e-admin-storage-stats.ts',
     'test/e2e-metrics.ts',
     'test/e2e-auth-refusals.ts',
+    'test/e2e-admin-security-page.ts',
     'test/e2e-living-pulse.ts',
     'test/e2e-registration-mode.ts',
     'test/e2e-mcp-session-expiry.ts',
@@ -769,15 +779,151 @@ function parseArgs(): string[] {
     return tests.length > 0 ? tests : ALL_SUITES;
 }
 
+// ── Parallel lanes ──
+//
+// One run, several nodes. `--workers=N` (or AIMEAT_E2E_WORKERS) splits the suites over N lanes,
+// each with its own server, its own port and its own database, so every suite still starts on an
+// empty node and the tier's promise ("alone, on a freshly deleted database") is unchanged; what
+// changes is that four of those nodes live at once. Measured before this existed (2026-09-05): 285
+// suites took 38 minutes of which 17.5 were the suites and 20 the restarts between them, and 241
+// of the 285 finish in under five seconds each — the restart was most of what a suite cost.
+//
+// Lane 0 keeps the base port and takes every suite that binds a port of its own (a second node, a
+// mesh, the fake connection provider on 40388): two lanes on one fixed port would collide, and the
+// runner cannot move a port a suite wrote down. Those are the heavier suites, so lane 0 gets fewer
+// of the rest. A lane's suite output is buffered and printed when the suite ends, whole; with one
+// lane it streams as before.
+
+function parseWorkers(): number {
+    const arg = process.argv.find(a => a.startsWith('--workers='));
+    const raw = arg ? arg.slice('--workers='.length) : (process.env.AIMEAT_E2E_WORKERS ?? '1');
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1 || n > 16) {
+        console.error(`--workers must be a whole number from 1 to 16, got "${raw}"`);
+        process.exit(1);
+    }
+    // A server somebody else started is one server.
+    return TARGET.external ? 1 : n;
+}
+
+/** Every port number a suite has written down, base port excluded: what no lane may be given. */
+function fixedPorts(suites: string[]): Map<string, number[]> {
+    const out = new Map<string, number[]>();
+    for (const suite of suites) {
+        let src: string;
+        try { src = readFileSync(suite, 'utf-8'); } catch { continue; }
+        const ports = [...src.matchAll(/\b(40[0-9]{3})\b/g)].map(m => Number(m[1]))
+            .filter(p => p !== Number(TARGET.port) && p !== 40050);
+        if (ports.length > 0) out.set(suite, [...new Set(ports)]);
+    }
+    return out;
+}
+
+function lanePort(lane: number, taken: Set<number>): string {
+    for (let p = 40500 + lane; p < 40600; p++) {
+        if (taken.has(p)) continue;
+        taken.add(p);
+        return String(p);
+    }
+    throw new Error('No free port for a lane between 40500 and 40599.');
+}
+
+function planLanes(suites: string[], workers: number, pinned: Map<string, number[]>): string[][] {
+    if (workers <= 1) return [suites];
+    const lanes: string[][] = Array.from({ length: workers }, () => []);
+    const fixed = suites.filter(s => pinned.has(s));
+    lanes[0].push(...fixed);
+    // A fixed-port suite boots a node of its own and costs about three ordinary suites, so lane 0
+    // is weighted accordingly when the next suite looks for the shortest queue.
+    const weight = (k: number): number => lanes[k].length + (k === 0 ? 2 * fixed.length : 0);
+    for (const s of suites) {
+        if (pinned.has(s)) continue;
+        let best = 0;
+        for (let k = 1; k < workers; k++) if (weight(k) < weight(best)) best = k;
+        lanes[best].push(s);
+    }
+    return lanes.filter(l => l.length > 0);
+}
+
+interface SuiteResult {
+    name: string; passed: number; failed: number; total: number; time: string; exitCode: number;
+    lane: number;
+    /** Stop + clean + start before this suite, ms; 0 for a lane's first suite. */
+    cycleMs: number;
+}
+
+async function runLane(lane: number, target: RunnerTarget, suites: string[], stream: boolean): Promise<SuiteResult[]> {
+    const tag = stream ? '' : `[lane ${lane}] `;
+    const results: SuiteResult[] = [];
+    let server: ChildProcess | null = null;
+
+    // Empty the database BEFORE the first suite, by the same call the loop makes between suites.
+    // The version that ran only between them left suite one on whatever the previous run wrote,
+    // so a solo run of any suite was a run against stale data.
+    if (!target.external) {
+        await cleanDatabase(target);
+        console.log(`${tag}Cleaned ${target.dbType} test database before the first suite.`);
+        server = await startServer(target);
+        console.log(`${tag}Server ready on :${target.port}.\n`);
+    }
+
+    try {
+        for (let i = 0; i < suites.length; i++) {
+            const suite = suites[i];
+            const name = basename(suite, '.ts');
+
+            // Clean DB and restart server between suites for isolation. stopServer does not return
+            // until the old process is gone and its port is free, so the delete below cannot fail
+            // on a live file handle and the next suite cannot reach the previous server.
+            let cycleMs = 0;
+            if (i > 0 && server && !target.external) {
+                const c0 = Date.now();
+                await stopServer(server, target);
+                server = null;
+                await cleanDatabase(target);
+                server = await startServer(target);
+                cycleMs = Date.now() - c0;
+            }
+
+            if (stream) {
+                console.log(`\n${'─'.repeat(40)}`);
+                console.log(`  ${name}`);
+                console.log(`${'─'.repeat(40)}`);
+            }
+
+            const t0 = Date.now();
+            const { output, exitCode } = await runTest(suite, target, stream);
+            const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
+            const parsed = parseResults(output);
+            const red = parsed.failed > 0 || exitCode !== 0;
+            if (!stream) {
+                console.log(`${tag}${red ? '✗' : '✓'} ${name}  ${parsed.passed}/${parsed.total} in ${elapsed}s`);
+                // A green suite's output is what the summary already says; a red one's is the point.
+                if (red) console.log(output.trimEnd());
+            }
+            results.push({ name, ...parsed, time: `${elapsed}s`, exitCode, lane, cycleMs });
+        }
+    } finally {
+        if (server) {
+            // Reported, not thrown: a failure to shut down must not replace whatever error brought
+            // us into this block, which is the thing the reader needs.
+            await stopServer(server, target).catch((e: unknown) => {
+                console.error(`${tag}Could not stop the test server: ${(e as Error).message}`);
+            });
+        }
+    }
+    return results;
+}
+
 // ── Run a single test suite ──
-function runTest(suitePath: string): Promise<{ output: string; exitCode: number }> {
+function runTest(suitePath: string, target: RunnerTarget, stream: boolean): Promise<{ output: string; exitCode: number }> {
     return new Promise((settle) => {
         // The suite gets the SAME pins as the server. A suite derives what it expects from its own
         // environment, so any pin it cannot see is a place where the two can disagree about what is
         // being tested: e2e-x402-testnet skips when the off-chain double is in use, could not see
         // that it was, and so ran its real-network acceptance cases against the double.
         const child = spawn('node', ['--import', 'tsx', suitePath], {
-            env: { ...process.env, ...pinnedEnv(TARGET), E2E_BASE: BASE_URL },
+            env: { ...process.env, ...pinnedEnv(target), E2E_BASE: target.baseUrl },
             stdio: ['ignore', 'pipe', 'pipe'],
             cwd: process.cwd(),
         });
@@ -786,12 +932,12 @@ function runTest(suitePath: string): Promise<{ output: string; exitCode: number 
         child.stdout?.on('data', (d: Buffer) => {
             const s = d.toString();
             output += s;
-            process.stdout.write(s);
+            if (stream) process.stdout.write(s);
         });
         child.stderr?.on('data', (d: Buffer) => {
             const s = d.toString();
             output += s;
-            process.stderr.write(s);
+            if (stream) process.stderr.write(s);
         });
 
         child.on('close', (code) => {
@@ -837,81 +983,57 @@ async function main() {
     console.log(`  AIMEAT E2E Test Runner`);
     console.log(`  Server: ${TARGET.external ? BASE_URL + ' (external)' : `auto-start on :${TARGET.port}`}`);
     console.log(`  Storage: ${TARGET.dbType}${TARGET.dbType === 'sqlite' ? ` (${TARGET.dbPath})` : ''}`);
-    console.log(`  Suites: ${suites.length}`);
+    const workers = parseWorkers();
+    const pinned = fixedPorts(suites);
+    const lanes = planLanes(suites, workers, pinned);
+    console.log(`  Suites: ${suites.length}${lanes.length > 1 ? ` over ${lanes.length} lanes (${lanes.map(l => l.length).join(' + ')}; ${lanes[0].filter(s => pinned.has(s)).length} bind their own port and stay in lane 0)` : ''}`);
     console.log(`${'='.repeat(50)}\n`);
-
-    let server: ChildProcess | null = null;
 
     reportEnvLeaks(pinnedEnv(TARGET));
 
-    // Empty the database BEFORE the first suite, by the same call the loop makes between suites.
-    // The version that ran only between them left suite one on whatever the previous run wrote,
-    // so a solo run of any suite was a run against stale data.
-    if (!TARGET.external) {
-        try {
-            await cleanDatabase(TARGET);
-            console.log(`Cleaned ${TARGET.dbType} test database before the first suite.`);
-        } catch (e) {
-            console.error(`Could not empty the test database: ${(e as Error).message}`);
-            process.exit(1);
-        }
-
-        console.log('Starting server...');
-        try {
-            server = await startServer(TARGET);
-            console.log('Server ready.\n');
-        } catch (e) {
-            console.error(`Failed to start server: ${(e as Error).message}`);
-            process.exit(1);
-        }
-    }
-
-    const results: { name: string; passed: number; failed: number; total: number; time: string; exitCode: number }[] = [];
-    let anyFailed = false;
-
+    // Lane 0 is the base target. Every other lane gets a port no suite has written down and a
+    // database of its own, created first for Postgres.
+    const taken = new Set<number>([Number(TARGET.port), ...[...pinned.values()].flat()]);
+    let targets = lanes.map((_, k) => k === 0 ? TARGET : laneTarget(TARGET, k, lanePort(k, taken)));
+    const wall0 = Date.now();
+    let results: SuiteResult[] = [];
     try {
-        for (let i = 0; i < suites.length; i++) {
-            const suite = suites[i];
-            const name = basename(suite, '.ts');
-
-            // Clean DB and restart server between suites for isolation. stopServer does not return
-            // until the old process is gone and its port is free, so the delete below cannot fail
-            // on a live file handle and the next suite cannot reach the previous server.
-            if (i > 0 && server && !TARGET.external) {
-                await stopServer(server, TARGET);
-                server = null;
-                await cleanDatabase(TARGET);
-                server = await startServer(TARGET);
+        if (!TARGET.external) {
+            try {
+                for (let k = 1; k < targets.length; k++) await ensureDatabase(TARGET, targets[k]);
+            } catch (e) {
+                // A role without CREATEDB (the developer's local appuser, as opposed to CI's
+                // superuser) cannot have lane databases. One lane on the base database is still a
+                // correct run, only slower, so that is what happens, said out loud.
+                console.warn(`\n⚠ ${(e as Error).message}\n  Falling back to one lane.\n`);
+                lanes.splice(0, lanes.length, suites);
+                targets = [TARGET];
             }
-
-            console.log(`\n${'─'.repeat(40)}`);
-            console.log(`  ${name}`);
-            console.log(`${'─'.repeat(40)}`);
-
-            const t0 = Date.now();
-            const { output, exitCode } = await runTest(suite);
-            const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
-            const parsed = parseResults(output);
-
-            if (parsed.failed > 0 || exitCode !== 0) anyFailed = true;
-            results.push({ name, ...parsed, time: `${elapsed}s`, exitCode });
         }
-    } finally {
-        if (server) {
-            // Reported, not thrown: a failure to shut down must not replace whatever error brought
-            // us into this block, which is the thing the reader needs.
-            await stopServer(server, TARGET).catch((e: unknown) => {
-                console.error(`Could not stop the test server: ${(e as Error).message}`);
-            });
+        // allSettled, not all: a lane that dies must not leave the others' servers running.
+        const settled = await Promise.allSettled(lanes.map((s, k) => runLane(k, targets[k], s, lanes.length === 1)));
+        const dead = settled.filter((s): s is PromiseRejectedResult => s.status === 'rejected');
+        if (dead.length > 0) {
+            for (const d of dead) console.error(`Lane failed: ${(d.reason as Error).message}`);
+            process.exit(1);
         }
+        results = settled.flatMap(s => (s as PromiseFulfilledResult<SuiteResult[]>).value);
+    } catch (e) {
+        console.error(`Runner failed: ${(e as Error).message}`);
+        process.exit(1);
     }
+    // Reported in the order the suites were asked for, whichever lane ran them.
+    const order = new Map(suites.map((s, i) => [basename(s, '.ts'), i]));
+    results.sort((a, b) => (order.get(a.name) ?? 0) - (order.get(b.name) ?? 0));
+    const anyFailed = results.some(r => r.failed > 0 || r.exitCode !== 0);
+    const wallMs = Date.now() - wall0;
 
     // Summary
     console.log(`\n${'='.repeat(50)}`);
     console.log('  SUMMARY');
     console.log(`${'='.repeat(50)}`);
     console.log('');
-    console.log('Suite'.padEnd(30) + 'Passed'.padEnd(10) + 'Failed'.padEnd(10) + 'Total'.padEnd(10) + 'Time');
+    console.log('Suite'.padEnd(30) + 'Passed'.padEnd(10) + 'Failed'.padEnd(10) + 'Total'.padEnd(10) + 'Time'.padEnd(10) + (lanes.length > 1 ? 'Lane' : ''));
     console.log('-'.repeat(70));
     let crashed = 0;
     for (const r of results) {
@@ -922,7 +1044,7 @@ async function main() {
         const status = didNotRun ? '!' : r.failed === 0 ? '✓' : '✗';
         const note = didNotRun ? `  DID NOT RUN (exit ${r.exitCode})` : '';
         if (didNotRun) crashed++;
-        console.log(`${status} ${r.name.padEnd(28)}${String(r.passed).padEnd(10)}${String(r.failed).padEnd(10)}${String(r.total).padEnd(10)}${r.time}${note}`);
+        console.log(`${status} ${r.name.padEnd(28)}${String(r.passed).padEnd(10)}${String(r.failed).padEnd(10)}${String(r.total).padEnd(10)}${r.time.padEnd(10)}${lanes.length > 1 ? String(r.lane) : ''}${note}`);
     }
 
     const totalPassed = results.reduce((s, r) => s + r.passed, 0);
@@ -930,6 +1052,12 @@ async function main() {
     const totalTests = results.reduce((s, r) => s + r.total, 0);
     console.log('-'.repeat(70));
     console.log(`  Total: ${totalPassed} passed, ${totalFailed} failed out of ${totalTests}`);
+    // Where the wall clock went: the suites themselves, and the restarts between them. The second
+    // number is the runner's own cost, and it is what --workers divides.
+    const suiteMs = results.reduce((s, r) => s + parseFloat(r.time) * 1000, 0);
+    const cycles = results.filter(r => r.cycleMs > 0);
+    const cycleMs = cycles.reduce((s, r) => s + r.cycleMs, 0);
+    console.log(`  Wall ${(wallMs / 1000).toFixed(0)}s over ${lanes.length} lane${lanes.length === 1 ? '' : 's'}: suites ${(suiteMs / 1000).toFixed(0)}s, restarts ${(cycleMs / 1000).toFixed(0)}s across ${cycles.length}${cycles.length ? ` (${(cycleMs / cycles.length / 1000).toFixed(1)}s each)` : ''}`);
     if (crashed > 0) {
         console.log(`  ${crashed} suite(s) DID NOT RUN — they exited non-zero without reporting a single test.`);
     }

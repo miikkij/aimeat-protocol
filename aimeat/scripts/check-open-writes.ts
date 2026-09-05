@@ -30,7 +30,8 @@
  *   v1.0.0 — 2026-09-04 — Initial, on the neighbouring session's triage and in the shape it specified.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { srcProgram, AIMEAT } from './inventory/program.js';
 import { collectDoors, toRows, openWriteDoors, type Row } from './inventory/doors.js';
 
@@ -47,8 +48,7 @@ const SEED_REASON = 'SEEDED 2026-09-04, NOT TRIAGED — writes, and the middlewa
 
 const key = (r: Row): string => r.id;
 
-function main(): void {
-    const strict = process.argv.includes('--strict');
+export function main(): boolean {
     const seed = process.argv.includes('--seed');
 
     const { files } = srcProgram();
@@ -69,7 +69,7 @@ function main(): void {
         };
         writeFileSync(EXEMPTIONS, JSON.stringify(file, null, 2) + '\n', 'utf-8');
         console.log(`  seeded ${doors.length} doors → ${EXEMPTIONS}`);
-        return;
+        return true;
     }
 
     const exempt = JSON.parse(readFileSync(EXEMPTIONS, 'utf-8')) as ExemptionFile;
@@ -96,17 +96,20 @@ function main(): void {
         console.error('  device_code, a pre-signed token, the admin password. If this one is too, add it to');
         console.error('  security/open-write-exemptions.json with the sentence saying where that check is.');
         console.error('  If it is not, it is a hole and the middleware chain is where it gets closed.');
-        if (strict) process.exit(1);
-        return;
+        return false;
     }
 
     if (stale.length > 0) {
         console.log(`  ✓ ${stale.length} listed door${stale.length === 1 ? '' : 's'} gone or now gated. Remove to lock the gain in:`);
         for (const k of stale) console.log(`    ${k}`);
-        return;
+        return true;
     }
 
     console.log(`  ✓ no writing door takes a caller with no credential, beyond the ${listed.length} listed`);
+    return true;
 }
 
-main();
+// Runs only when invoked as the script: check-invariants imports main() and runs the five
+// program-reading gates in one process against one compiler program.
+const invokedDirectly = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly && !main() && process.argv.includes('--strict')) process.exit(1);

@@ -35,7 +35,7 @@
  *     watching.
  */
 import ts from 'typescript';
-import { join, resolve, dirname, relative } from 'node:path';
+import { resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GATES } from './check-route-scopes.js';
 import { callsInside } from './inventory/entries.js';
@@ -147,8 +147,7 @@ export function collectFederationWrites(files: ts.SourceFile[]): Door[] {
 
 const softKey = (d: Door): string => `${d.file}:${d.id.replace(' ', ':')}`;
 
-function main(): void {
-    const strict = process.argv.includes('--strict');
+export function main(): boolean {
     const doors = collectFederationWrites(srcProgram(/[/\\]src[/\\]routes[/\\]federation/).files);
 
     const owned = doors.filter(d => d.gated);
@@ -179,17 +178,20 @@ function main(): void {
         console.error('  either the owner\'s session or the peer\'s signature; with neither, the body of the');
         console.error('  request is the only thing deciding what happens. If one of these is genuinely safe,');
         console.error('  add it to ALLOWED in this script with the sentence that says why.');
-        if (strict) process.exit(1);
-        return;
+        return false;
     }
 
     if (stale.length > 0) {
         console.log(`  ✓ ${stale.length} listed door${stale.length === 1 ? '' : 's'} now gated or signed. Remove from ALLOWED:`);
         for (const k of stale) console.log(`    ${k}`);
-        return;
+        return true;
     }
 
     console.log('  ✓ every federation write door is owner-gated or peer-signed');
+    return true;
 }
 
-main();
+// Runs only when invoked as the script: check-invariants imports main() and runs the five
+// program-reading gates in one process against one compiler program.
+const invokedDirectly = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly && !main() && process.argv.includes('--strict')) process.exit(1);

@@ -15,6 +15,8 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.11.0 — 2026-09-05 — mcpSessionSweepMs (AIMEAT_MCP_SESSION_SWEEP_MS): how often the MCP idle
+ *     sweep looks, 10 s shipped, pinned to 1 s by the E2E runner so the expiry proof waits 8 s not 18.
  *   v1.10.0 — 2026-08-28 — AIMEAT_SITE_STORE_URL and AIMEAT_SITE_INCUBATOR_URL join the site links;
  *     storeEnabled is derived from the first, so the front page's store block can gate on it.
  *   v1.9.0 — 2026-08-22 — AIMEAT_PROACTIVE_GUIDANCE, defaulting on: an operator opts out rather
@@ -604,6 +606,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // tools are logged so you can measure impact before enforcing.
     mcpEnforceScopes: process.env.AIMEAT_MCP_ENFORCE_SCOPES !== 'false',
     mcpSessionIdleMinutes: Math.max(0.05, parseFloat(process.env.AIMEAT_MCP_SESSION_IDLE_MINUTES ?? '60') || 60),
+    // How often that sweep looks. 10 s in production is plenty for a floor of 3 s; the E2E runner
+    // pins 1 s so the expiry proof waits for the reap and not for the clock.
+    mcpSessionSweepMs: Math.max(250, parseInt(process.env.AIMEAT_MCP_SESSION_SWEEP_MS ?? '10000', 10) || 10000),
 
     // Ecosystem application (GEAI) scope bounds. Defaults lean read + deposit (ecosystem apps mostly
     // deposit refined data into owner areas). Events/capability scopes are deferred to later chunks.
