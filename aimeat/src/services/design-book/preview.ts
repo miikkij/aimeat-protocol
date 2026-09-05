@@ -19,6 +19,13 @@
  * @usage
  *   const html = partPreviewHtml(part);   // a complete self-contained page, kit assets relative
  * @version-history
+ *   v1.3.1 — 2026-09-05 — Two blocks on ONE source get the plain rows both can render: the
+ *     dashboard leiska binds its list and its table to the same name, and the table's own demo
+ *     shape left the list drawing four empty rows.
+ *   v1.3.0 — 2026-09-05 — The demo pantry carries `queue`, `steps`, `facets` and `cardGrid` (the
+ *     leiskat compose with them now) and the row-shaped demos hold four to six rows instead of
+ *     two: a list with two rows is not a list, a grid with two cards is not a grid, and a
+ *     preview that shows one lies about the shape it is selling.
  *   v1.2.0 — 2026-09-05 — An effect part renders as the demo arrangement (with a figure after
  *     the hero) wearing the effect where it lands — the hero band, the figure, or a pass over
  *     the layer (the look's own ambient, plasma at its whisper when the look runs none) — and a
@@ -158,17 +165,54 @@ export function benchPageHtml(body: Record<string, unknown>): string {
     "    { id: 'r1', title: 'A question people actually ask', sub: 'The short answer', text: 'And the answer, in the words you would use out loud.' },",
     "    { id: 'r2', title: 'A second one', sub: 'Also short', text: 'Folded until someone wants it.' } ]; };",
     "  if (component === 'table') return function () { return [",
-    "    { id: 'r1', name: 'First row', when: '2026-08-01' }, { id: 'r2', name: 'Second row', when: '2026-08-14' } ]; };",
+    "    { id: 'r1', name: 'First row', when: '2026-08-01' }, { id: 'r2', name: 'Second row', when: '2026-08-14' },",
+    "    { id: 'r3', name: 'Third row', when: '2026-08-21' }, { id: 'r4', name: 'Fourth row', when: '2026-08-28' } ]; };",
     "  if (component === 'timeline') return function () { return [",
-    "    { id: 't1', ts: '2026-08-27T10:00:00Z', title: 'Something happened', tone: 'ok' } ]; };",
+    "    { id: 't1', ts: '2026-08-27T10:00:00Z', title: 'Something happened', tone: 'ok' },",
+    "    { id: 't2', ts: '2026-08-26T16:30:00Z', title: 'And before it, something else', sub: 'With the line that says more.' },",
+    "    { id: 't3', ts: '2026-08-25T09:15:00Z', title: 'Where the history starts', tone: 'warn' } ]; };",
+    "  if (component === 'queue') return function () { return [",
+    "    { id: 'q1', title: 'The piece under way', state: 'running', sub: 'Halfway through.' },",
+    "    { id: 'q2', title: 'Next in line', state: 'waiting' },",
+    "    { id: 'q3', title: 'Finished earlier', state: 'done', sub: 'Out at 07:10.' },",
+    "    { id: 'q4', title: 'The one that failed', state: 'failed', sub: 'Worth another run.' } ]; };",
+    "  if (component === 'steps') return function () { return { current: 1, steps: [",
+    "    { label: 'Where this starts', sub: 'Done' }, { label: 'The choosing step', sub: 'Under way' },",
+    "    { label: 'The finish line', sub: 'Ahead' } ] }; };",
+    "  if (component === 'facets') return function () { return { facets: [",
+    "    { id: 'kind', label: 'Kind', multi: true, options: [",
+    "      { id: 'a', label: 'The first kind', count: 12 }, { id: 'b', label: 'The second', count: 7 },",
+    "      { id: 'c', label: 'The third', count: 3 } ] },",
+    "    { id: 'when', label: 'When', options: [",
+    "      { id: 'now', label: 'This week', count: 5 }, { id: 'all', label: 'Any time', count: 22 } ] } ] }; };",
+    "  if (component === 'cardGrid') return function () { return [",
+    // Six DIFFERENT initials on purpose: an imageless card wears the first letter as its
+    // monogram, and six cards reading "T" would be a picture of the demo rather than the block.
+    "    { id: 'c1', title: 'First card', sub: 'What a card carries.' },",
+    "    { id: 'c2', title: 'Another one', sub: 'Titles and lines take this shape.' },",
+    "    { id: 'c3', title: 'Room to breathe', sub: 'An imageless card keeps its own wash.' },",
+    "    { id: 'c4', title: 'Something else', sub: 'A grid is a shape only once it has a grid.' },",
+    "    { id: 'c5', title: 'Browsing, this is it', sub: 'Five across on a wide screen.' },",
+    "    { id: 'c6', title: 'Where the screen ends', sub: 'And the scroll takes over.' } ]; };",
     '  return function () { return [',
     "    { id: 'i1', title: 'A sample row', sub: 'What content looks like here.', badge: 'sample' },",
-    "    { id: 'i2', title: 'Another row', sub: 'Titles and lines take this shape.' } ]; };",
+    "    { id: 'i2', title: 'Another row', sub: 'Titles and lines take this shape.' },",
+    "    { id: 'i3', title: 'A third one', sub: 'A list is a shape only once it has rows.' },",
+    "    { id: 'i4', title: 'And a fourth', sub: 'This is what the block looks like in use.' },",
+    "    { id: 'i5', title: 'A fifth', sub: 'Enough rows to read as a list rather than a sample.' } ]; };",
     '}',
+    // ONE SOURCE, ONE RECORD SHAPE. Two blocks may bind the same source — a list and a table
+    // over the same rows is the ordinary case — and then the demo has to suit both, so a shared
+    // name falls back to the plain rows every row-shaped component renders. Handing it the last
+    // block's shape instead left the dashboard's list drawing four empty rows.
     'var sources = {};',
+    'var owners = {};',
     '(BODY.blocks || []).forEach(function (b) {',
     '  var s = b.props && b.props.source;',
-    '  if (s) sources[s] = demoFor(b.component);',
+    '  if (!s) return;',
+    '  if (owners[s] && owners[s] !== b.component) { sources[s] = demoFor(""); return; }',
+    '  owners[s] = b.component;',
+    '  sources[s] = demoFor(b.component);',
     '});',
     'var frame = document.createElement("div");',
     'frame.className = "ak-root";',
