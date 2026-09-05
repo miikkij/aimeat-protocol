@@ -11,6 +11,9 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v2.2.0 — 2026-09-05 — aimeat_extension_invoke attaches ctx.workspace when the manifest declares
+ *     it, as the session's agent with the session's scopes (services/extension-workspace.ts), so
+ *     an action that keeps a shared workspace record works through this door as it does over HTTP.
  *   v2.1.0 — 2026-09-03 — extension_list carries installed_by and used_by; extension_get carries used_by (the dependency map).
  *   v2.0.0 — 2026-08-11 — Install, activate, deactivate and delete go through
  *     services/extension-lifecycle.ts instead of calling storage here. Four side effects the HTTP
@@ -53,6 +56,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
 import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, unavailableEmail, sandboxLimits } from '../services/extension-ctx.js';
+import { attachExtensionWorkspace } from '../services/extension-workspace.js';
 import { enforcePaywall } from '../routes/extensions/paywall.js';
 import { createRefusalRecorder, refusalText } from '../routes/extensions/metered-response.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
@@ -275,9 +279,15 @@ export function registerExtensionsTools(
             // hand is how this door came to differ from the HTTP one in four ways at once: no
             // charset detection beyond the header, a memory.set that ignored a request for a private
             // value and wrote public regardless, no email, and no paywall above.
+            // The caller's organism workspace, as this session's agent with this session's scopes,
+            // when the manifest declares it (services/extension-workspace.ts). A refusal reaches
+            // the caller as the action's error text, which carries the service's code and words.
+            const wsCap = attachExtensionWorkspace({ config, storage, ext, actionId: action.id,
+                caller: { gaii: agentGaii, owner: parseGAII(agentGaii)?.owner ?? agentGaii, roles: ['agent'], scopes: sessionScopes } });
             const ctx: ExtensionCtx = buildExtensionCtx({
                 config, storage, extMemoryOwner,
                 extension: { name: ext.name, owner: ext.installedBy },
+                workspace: wsCap.workspace,
                 caller: {
                     gaii: agentGaii,
                     owner: parseGAII(agentGaii)?.owner ?? agentGaii,

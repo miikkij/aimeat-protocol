@@ -18,6 +18,8 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.3.0 — 2026-09-05 — ctx.workspace in the ctx table, with the manifest declaration that
+ *     makes it exist and the scopes the caller must hold.
  *   v1.2.0 — 2026-09-03 — versionsSection: kept versions, pinned addresses and the dependency map.
  *   v1.1.0 — 2026-07-30 — Beneficiary splitting: how to route part of what you earn to other
  *     accounts, and the `_revenue` key an action returns to name a destination PER CALL. The
@@ -67,6 +69,11 @@ function sandboxSection(): string {
     '| `ctx.fetch(url, {method, headers, body})` | The only way out. Returns `{status, ok, text, headers}` |',
     '| `ctx.files.read(ref)` | A stored file as `{base64, mime, size, key}`, or null |',
     '| `ctx.files.write(key, base64, {mime, visibility})` | Store bytes, returns `{key, gaii, url, size}` |',
+    '| `ctx.workspace.index(orgId, ws)` | The CALLER\'s organism workspace: manifest, schemas, titles (no bodies) |',
+    '| `ctx.workspace.get(orgId, ws, ids, {space})` | Full values of those records; `_draftVersion` is what `ifVersion` swaps against |',
+    '| `ctx.workspace.write(orgId, ws, space, id, value, {ifVersion})` | A schema-validated DRAFT record, as the caller. `ifVersion: 0` = only if no draft yet |',
+    '| `ctx.workspace.writeDoc(orgId, ws, space, {title, markdown}, {id, section})` | A DRAFT document in a document space |',
+    '| `ctx.workspace.publish(orgId, ws, namespace, id, {expectedVersion})` | Publish the draft; `.latest` lands under the member |',
     '| `ctx.caller` | `{gaii, owner, roles}` of whoever invoked this action |',
     '| `ctx.caller.member` | Their standing in the app this extension gates, or null |',
     '| `ctx.caller.isAppOwner` | True when the caller owns that app |',
@@ -80,6 +87,16 @@ function sandboxSection(): string {
     '',
     '`ctx.files`, `ctx.notify` and `ctx.email` are OPTIONAL: a scheduled run with no caller does not',
     'get them. Check before use (`if (!ctx.files) ...`) rather than assuming.',
+    '',
+    '`ctx.workspace` exists only when your manifest declares it at the top level:',
+    '`workspace: { read: true, write: true }` (read alone makes the writers throw PERMISSION). It acts',
+    'on the CALLER\'s organism workspace AS THE CALLER, through the same operations',
+    'aimeat_workspace_read / _write / _publish perform, so every refusal those make (not a member of',
+    'the organism, no contributor grant, an agent token without `memory:write`, a record the locked',
+    'schema rejects, an `ifVersion` that no longer matches, the publish gate) reaches your script as a',
+    'thrown `CODE: message`. Let it propagate and the caller gets the service\'s status and code; catch',
+    'it and answer in your own words. A scheduled run never has it. Every call costs one API call. A',
+    'record written this way carries provenance naming your extension, because a script produced it.',
     '',
     '`ctx.notify` reaches the CALLER, never a third party. Read literally: "notify the owner" means',
     'the owner of whoever just invoked this action, not the owner who installed the extension. So an',

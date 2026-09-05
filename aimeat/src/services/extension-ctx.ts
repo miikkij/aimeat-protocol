@@ -27,6 +27,10 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.4.0 — 2026-09-05 — `workspace`, an optional capability like files: a road that has a real
+ *     caller and an extension whose manifest declares it passes what
+ *     services/extension-workspace.ts built; the scheduler passes nothing. Its guards live in the
+ *     builder, so this file only carries it through.
  *   v1.3.0 — 2026-08-23 — Carries `extension: { name, owner }` through to the sandbox so an
  *     owner-only action can exist. Every road that knows the record passes it; a road that does not
  *     leaves it absent, and a script must read that as "not the owner" rather than as permission.
@@ -80,6 +84,9 @@ export interface ExtensionCtxDeps {
     buy?: ExtensionCtx['buy'];
     notify?: ExtensionCtx['notify'];
     email?: ExtensionCtx['email'];
+    /** The caller's organism workspace (services/extension-workspace.ts). Only a road with a real
+     *  caller and a manifest that declares it can offer this. */
+    workspace?: ExtensionCtx['workspace'];
 }
 
 /** Does the buffer contain a well-formed UTF-8 multibyte sequence? Used to overrule a charset label
@@ -498,6 +505,7 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
     if (deps.buy) ctx.buy = deps.buy;
     if (deps.notify) ctx.notify = deps.notify;
     if (deps.email) ctx.email = deps.email;
+    if (deps.workspace) ctx.workspace = deps.workspace;
 
     return ctx;
 }

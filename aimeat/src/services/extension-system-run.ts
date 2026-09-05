@@ -33,12 +33,15 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
+ *   v1.1.0 -- 2026-09-05 -- Says, where the context is built, that no ctx.workspace is attached
+ *     here: an unattended run has no caller whose workspace it could act on.
  *   v1.0.0 -- 2026-08-15 -- TARGET-063 A3: extracted from services/scheduler-extension-job.ts when
  *     the workflow engine gained an `extension` step and would otherwise have grown the second copy.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { executeExtensionAction, trackMemoryAccess } from './extension-runtime.js';
+import { executeExtensionAction } from './extension-runtime.js';
+import { trackMemoryAccess } from './extension-runtime-tracking.js';
 import type { ExtensionCtx } from './extension-runtime.js';
 import { buildExtensionCtx, buildExtensionNotify, buildExtensionEmail, sandboxLimits } from './extension-ctx.js';
 import { makeExtensionFiles } from './extension-files.js';
@@ -143,7 +146,10 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
         extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), encKey),
         instance: instanceCtx,
         logPrefix: `[ext:${ext.name}:${logLabel}]`,
-        // No wallet: see the file header.
+        // No wallet: see the file header. No workspace either: ctx.workspace acts on the CALLER's
+        // organism workspace as the caller, and an unattended run has nobody present to act as —
+        // a schedule naming the owner would be the owner's authority on a clock, which is what the
+        // scope guard on the attended roads exists to refuse.
         files: makeExtensionFiles({
             config, storage, extName: ext.name,
             callerGaii: storageOwnerGhii,
