@@ -11,6 +11,7 @@
  *   - setLevel / doDelete / doRemoveEmail / doResetTotp: call admin service
  *
  * @version-history
+ *   v1.2.0 — 2026-09-05 — The remove-email button says its words instead of two glyphs: no emoji anywhere in the interface.
  *   v1.1.0 — 2026-09-04 — The two-step sign-in reset, on the rows that have it armed. Removing it
  *     the normal way needs a code from the device the person lost, so this was the account's only
  *     way back and it did not exist. The table gained its scroll box in the same change: at 390px
@@ -122,7 +123,7 @@ export default function GhiiTab({ data, reload }) {
                   <option value="2" selected=${u.verification_level === 2}>L2</option>
                 </select>
                 ${' '}
-                ${u.masked_email ? html`<button class="adm-btn-sm" onClick=${() => doRemoveEmail(u)} title=${t('dashboard.ghiiRemoveEmail')}>✉✕</button> ` : ''}
+                ${u.masked_email ? html`<button class="adm-btn-sm" onClick=${() => doRemoveEmail(u)} title=${t('dashboard.ghiiRemoveEmail')}>${t('dashboard.ghiiRemoveEmail')}</button> ` : ''}
                 ${u.totp_enabled ? html`<button class="adm-btn-sm" onClick=${() => doResetTotp(u)} title=${t('dashboard.ghiiTotpResetHint')}>${t('dashboard.ghiiTotpReset')}</button> ` : ''}
                 <button class="adm-btn-sm" onClick=${() => doDelete(u.ghii)}>${t('dashboard.deleteLabel')}</button>
               </td>

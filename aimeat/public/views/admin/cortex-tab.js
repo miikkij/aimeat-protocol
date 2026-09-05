@@ -6,6 +6,7 @@
  *   Lists all installed cortex extensions, allows activate/deactivate/uninstall,
  *   and shows component breakdowns.
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The per-component emoji icons go; the type word carries the row. No emoji anywhere in the interface.
  *   v1.0.0 — 2026-03-17 — Initial admin cortex management tab
  *   v1.1.0 — 2026-06-02 — Admin design unification: fix the broken useToast wiring
  *     (object-destructured the array-returning hook, and passed wrong props to
@@ -24,8 +25,6 @@ import { Badge, StatsGrid, Empty, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as cortexService from '/js/services/cortex.js';
 import { swallowed } from '/js/swallowed.js';
-
-const COMP_ICONS = { schema: '\u{1F4D0}', prompt: '\u{1F4AC}', action: '\u26A1', 'board-template': '\u{1F4CC}', ontology: '\u{1F9EC}', 'seed-data': '\u{1F331}', lib: '\u{1F4E6}' };
 
 export default function CortexTab() {
   const [toast, showErr, showOk, clearToast] = useToast();
@@ -113,7 +112,7 @@ export default function CortexTab() {
       <h4 class="adm-sec-title" style="margin-top:1.5rem">${t('dashboard.cortex.components')}</h4>
       <div class="adm-card">
         ${comps.length === 0 ? html`<${Empty} text=${t('dashboard.cortex.noComponents')} />` : comps.map(c => html`
-          <div class="adm-row">${COMP_ICONS[c.type] || '\u{1F4C4}'} ${c.type}: ${c.type === 'schema' ? c.key_pattern : (c.name || c.filename || '')}</div>
+          <div class="adm-row">${c.type}: ${c.type === 'schema' ? c.key_pattern : (c.name || c.filename || '')}</div>
         `)}
       </div>
 

@@ -98,7 +98,7 @@
       "searchPlaceholder": "Search by name, owner, or filename…",
       "hiddenOnly": "Hidden only",
       "hiddenChip": "hidden",
-      "scanCopies": "🔍 Scan for copies",
+      "scanCopies": "Scan for copies",
       "scanning": "Scanning…",
       "scanned": "scanned",
       "copyScanTitle": "Unattributed-copy scan",
@@ -128,7 +128,7 @@
       "deletedOk": "App permanently deleted.",
       "deleteTitle": "Delete application",
       "deleteConfirm": "Permanently delete",
-      "deleteWarn": "⚠️ This removes the app and all its versions from the node entirely. This cannot be undone — the owner loses it too. To just hide it, use Hide instead.",
+      "deleteWarn": "This removes the app and all its versions from the node entirely. This cannot be undone — the owner loses it too. To just hide it, use Hide instead.",
       "deleteTypeLabel": "Type the filename to confirm: {filename}"
     },
     "security": {
@@ -4357,7 +4357,7 @@
     "refresh": "Refresh",
     "logout": "Logout",
     "loading": "Loading...",
-    "loginTitle": "❤️ AIMEAT Dashboard",
+    "loginTitle": "AIMEAT Dashboard",
     "loginDesc": "Login to access the admin dashboard",
     "username": "Username",
     "password": "Password",

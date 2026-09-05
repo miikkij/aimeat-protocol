@@ -13,6 +13,7 @@
  * @usage
  *   Loaded by admin.js as a nav item component.
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The rating loses its star and the featured cell says ✓: no emoji anywhere in the interface.
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 6)
  *   v1.1.0 — 2026-03-20 — add template moderation queue subtab
  *   v1.2.0 — 2026-06-02 — Admin design unification: main btn-* classes → adm-btn* (btn-success→adm-btn, btn-danger→adm-btn-action adm-btn-danger), error divs → <ErrorBox>.
@@ -441,9 +442,9 @@ export default function PackagesAdminTab() {
                   <tr key=${tpl.id}>
                     <td><strong>${escHtml(tpl.title || '')}</strong></td>
                     <td>${escHtml(tpl.packageName || tpl.packageGroupId || '')}</td>
-                    <td>\u2B50 ${tpl.rating?.toFixed(1) ?? '0.0'} (${tpl.reviewCount ?? 0})</td>
+                    <td>${tpl.rating?.toFixed(1) ?? '0.0'} (${tpl.reviewCount ?? 0})</td>
                     <td>${tpl.installCount ?? 0}</td>
-                    <td>${tpl.featured ? '\u2705' : '\u2014'}</td>
+                    <td>${tpl.featured ? '\u2713' : '\u2014'}</td>
                     <td><${Badge} type=${tpl.status} /></td>
                   </tr>
                 `)}

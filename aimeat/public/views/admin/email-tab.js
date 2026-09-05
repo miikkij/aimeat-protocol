@@ -7,6 +7,7 @@
  * @structure EmailTab (default), TemplateEditor, buildAiPrompt
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v1.2.0 — 2026-09-05 — The four yes/no cells say ✓ and ✗ instead of two emoji: no emoji anywhere in the interface.
  *   v1.1.0 — 2026-06-02 — Admin design unification: raw textareas → adm-textarea
  *     adm-input-full; inline button color styles → adm-btn-success/adm-btn-danger.
  */
@@ -339,17 +340,17 @@ export default function EmailTab({ data, reload, locale }) {
       <div class="adm-hrow">
         <span class="adm-hmetric">${t('dashboard.secure')}</span>
         <span><label style="cursor:pointer"><input type="checkbox" checked=${email.smtp_secure} disabled=${cfgSaving}
-          onChange=${ev => toggleSmtpConfig('email.smtp_secure', ev.target.checked)} /> ${email.smtp_secure ? '\u2705' : '\u274C'}</label></span>
+          onChange=${ev => toggleSmtpConfig('email.smtp_secure', ev.target.checked)} /> ${email.smtp_secure ? '\u2713' : '\u2717'}</label></span>
       </div>
       <div class="adm-hrow">
         <span class="adm-hmetric">${t('dashboard.rejectUnauthorized')}</span>
         <span><label style="cursor:pointer"><input type="checkbox" checked=${email.smtp_reject_unauthorized} disabled=${cfgSaving}
-          onChange=${ev => toggleSmtpConfig('email.smtp_reject_unauthorized', ev.target.checked)} /> ${email.smtp_reject_unauthorized ? '\u2705' : '\u274C'}
+          onChange=${ev => toggleSmtpConfig('email.smtp_reject_unauthorized', ev.target.checked)} /> ${email.smtp_reject_unauthorized ? '\u2713' : '\u2717'}
           <span style="font-size:.72rem;color:var(--text-dim);margin-left:6px">${t('dashboard.rejectUnauthorizedHelp')}</span></label></span>
       </div>
       <${EconRow} label=${t('dashboard.from')} value=${email.smtp_from || '\u2014'} />
-      <${EconRow} label=${t('dashboard.emailUserConfigured')} value=${email.smtp_user_configured ? '\u2705' : '\u274C'} />
-      <${EconRow} label=${t('dashboard.emailPassConfigured')} value=${email.smtp_pass_configured ? '\u2705' : '\u274C'} />
+      <${EconRow} label=${t('dashboard.emailUserConfigured')} value=${email.smtp_user_configured ? '\u2713' : '\u2717'} />
+      <${EconRow} label=${t('dashboard.emailPassConfigured')} value=${email.smtp_pass_configured ? '\u2713' : '\u2717'} />
     </div>
 
     <!-- Test Email -->
