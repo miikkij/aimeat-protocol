@@ -429,9 +429,9 @@ export interface WorkflowDef {
 
 export type StepState =
   | 'pending' | 'input-red' | 'dispatched' | 'green' | 'output-red' | 'timed-out' | 'skipped'
-  // agent-offline: the step's agent was unreachable (no working webhook + stale lastSeen) and produced
-  // nothing within the offline grace — a connectivity failure, distinct from a productive-but-slow
-  // timed-out. Terminal + counts as a failure (partial run).
+  // agent-offline: the step's agent was unreachable (no working webhook, no live connector socket
+  // and a stale lastSeen) and produced nothing within the offline grace — a connectivity failure,
+  // distinct from a productive-but-slow timed-out. Terminal + counts as a failure (partial run).
   | 'agent-offline'
   // waiting-human: a human-input step has asked its question and the run is parked until the owner
   // answers (or the timeout policy fires). Non-terminal — the run stays 'waiting-step'.
