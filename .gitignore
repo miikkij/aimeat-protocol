@@ -63,6 +63,12 @@ logs/**
 *.db-shm
 *.db-wal
 
+# `pnpm sandbox` — the session's own node: its state file holds real tokens and private keys for
+# the sandbox accounts, and the log is a running node's output. Both are per-machine, neither is
+# source. The database itself is already covered by *.db above.
+aimeat/.sandbox.json
+aimeat/.sandbox.log
+
 # OS files
 Thumbs.db
 Desktop.ini
