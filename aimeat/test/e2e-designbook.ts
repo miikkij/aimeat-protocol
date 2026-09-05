@@ -612,12 +612,17 @@ const GOOD_BODY = {
     await test('an EFFECT part: the operator publishes, another owner adopts — it lands on the hero block, the rest of the arrangement survives; a layer pass lands on the ambient', async () => {
         const pub = await json(`/v1/designbook/${effectId}/status`, { method: 'POST', headers: auth(op.token), body: JSON.stringify({ status: 'published' }) });
         assert(pub.status === 200, `publish ${pub.status}`);
+        // The app holds whatever shape it last adopted (leiska-cover, above); an effect must not
+        // add or drop a block, so the count is compared with the count before, not with a number
+        // the cover shape happened to have on the day this was written (pitfalls 19).
+        const before = (await json(`/v1/apps/${other.name}/${otherApp}/ui`)).body.data.layout;
         const adopt = await json(`/v1/designbook/${effectId}/adopt`, { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: otherApp }) });
         assert(adopt.status === 200 && adopt.body.data.kind === 'effect', `adopt ${adopt.status}: ${JSON.stringify(adopt.body?.error)}`);
         const layout = (await json(`/v1/apps/${other.name}/${otherApp}/ui`)).body.data.layout;
         const hero = layout.blocks.find((b: any) => b.component === 'hero');
         assert(JSON.stringify(hero?.effect) === JSON.stringify({ id: 'glitch', params: { strength: 0.8 } }), `the effect wears on the hero block: ${JSON.stringify(hero)}`);
-        assert(layout.blocks.length === 3 && layout.ambient?.preset === 'waves' && layout.look === 'editorial', 'the arrangement, its ambient and its look survived');
+        assert(layout.blocks.length === before.blocks.length && layout.ambient?.preset === 'waves' && layout.look === 'editorial',
+            `the arrangement, its ambient and its look survived: ${layout.blocks.length} of ${before.blocks.length} blocks, ${JSON.stringify(layout.ambient)}, ${layout.look}`);
         // A pass over the layer lands on the arrangement's ambient, the newest two kept.
         const layerId = `${effectId}-layer`;
         const lr = await proposeEffect({ effect: 'kaleidoscope', on: 'layer', look: 'lounge' }, layerId, op.token);
