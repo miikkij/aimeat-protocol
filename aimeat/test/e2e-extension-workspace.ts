@@ -25,7 +25,7 @@
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=extension-workspace
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40254';
+const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0, failed = 0;
@@ -103,11 +103,11 @@ const SCRIPTS = {
         return { written: written, got: got, pub: pub, caller: ctx.caller.gaii };
     }`,
     bad: `export default async function(ctx, input){
-        return ctx.workspace.write(input.org, input.ws, 'claim', input.id, { id: input.id, port: 40254 });
+        return ctx.workspace.write(input.org, input.ws, 'claim', input.id, { id: input.id, port: 12345 });
     }`,
     index: `export default async function(ctx, input){ return ctx.workspace.index(input.org, input.ws); }`,
     doc: `export default async function(ctx, input){
-        var w = await ctx.workspace.writeDoc(input.org, input.ws, 'handoff', { title: 'Hand-off', markdown: '# Hand-off\\n\\nport 40254 is yours' });
+        var w = await ctx.workspace.writeDoc(input.org, input.ws, 'handoff', { title: 'Hand-off', markdown: '# Hand-off\\n\\nport 12345 is yours' });
         var pub = await ctx.workspace.publish(input.org, input.ws, 'shared.handoff', w.id);
         return { written: w, pub: pub };
     }`,
@@ -213,13 +213,13 @@ await test('Declaration: without it ctx.workspace is undefined; with it the five
 });
 
 await test('Happy path: B\'s agent writes a claim through A\'s extension, reads it back, publishes it', async () => {
-    const r = await invoke(EXT, 'claim', bAgentToken, { id: 'c1', port: '40254', publish: true });
+    const r = await invoke(EXT, 'claim', bAgentToken, { id: 'c1', port: '12345', publish: true });
     // HOLE: 500 EXTENSION_ERROR (TypeError on ctx.workspace) before this capability.
     assert(r.status === 200, `claim ${r.status}: ${JSON.stringify(r.body?.error)}`);
     const d = r.body.data;
     assert(d.written?.written === `${root()}.shared.claim.c1.draft`, `draft key: ${JSON.stringify(d.written)}`);
     assert(d.written?.mode === 'records' && d.written?.version === 1, `draft outcome: ${JSON.stringify(d.written)}`);
-    assert(d.got?.items?.[0]?.value?.port === '40254' && d.got.items[0].value.by === `${B_AGENT}#${B.name}@${NODE_ID}`, `read back: ${JSON.stringify(d.got)}`);
+    assert(d.got?.items?.[0]?.value?.port === '12345' && d.got.items[0].value.by === `${B_AGENT}#${B.name}@${NODE_ID}`, `read back: ${JSON.stringify(d.got)}`);
     assert(d.got.items[0]._draftVersion === 1, `draft version on the opened record: ${JSON.stringify(d.got.items[0])}`);
     assert(d.pub?.published === `${root()}.shared.claim.c1` && d.pub.version === 1, `publish: ${JSON.stringify(d.pub)}`);
     assert(d.caller === `${B_AGENT}#${B.name}@${NODE_ID}`, `the sandbox ran as the caller: ${d.caller}`);
@@ -229,7 +229,7 @@ await test('Ownership: the published record is B\'s (the caller), not A\'s (the 
     const mine = await json(`/v1/memory?prefix=${encodeURIComponent(`${root()}.shared.claim.c1.`)}`, { headers: auth(B.token) });
     assert(mine.status === 200, `B lists ${mine.status}`);
     const latest = (mine.body.data.items as any[]).find(i => i.key === `${root()}.shared.claim.c1.latest`);
-    assert(!!latest && latest.value.port === '40254', `B owns .latest: ${JSON.stringify(mine.body.data.items?.map((i: any) => i.key))}`);
+    assert(!!latest && latest.value.port === '12345', `B owns .latest: ${JSON.stringify(mine.body.data.items?.map((i: any) => i.key))}`);
     assert(!(mine.body.data.items as any[]).some(i => i.key.endsWith('.draft')), 'the publish consumed the draft');
     const theirs = await json(`/v1/memory?prefix=${encodeURIComponent(`${root()}.shared.claim.c1.`)}`, { headers: auth(A.token) });
     assert((theirs.body.data.items as any[]).length === 0, `nothing landed under the installer: ${JSON.stringify(theirs.body.data.items?.map((i: any) => i.key))}`);
