@@ -16221,7 +16221,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.51.0",
+    version: "0.52.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

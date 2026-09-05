@@ -28,6 +28,12 @@
  *   No `rgba(255,255,255,…)` anywhere — light-on-dark washes are `color-mix()` against the
  *   surface token, so they follow the palette instead of fighting it.
  *
+ *   THE LIGHT ACCENT HAS A FLOOR UNDER IT. On paper the action ink is white, and a palette is
+ *   free to hand this kit an accent too light to carry it, so `--ak-accent` in the light block
+ *   is the palette's primary with an OKLCh lightness CAP: chroma and hue untouched, L pulled
+ *   down only when the palette sits above the line. AK-SOLID in the matrix is what holds it, on
+ *   the RAW accent rather than on the gradient every look already darkens.
+ *
  *   MOTION IS FINITE. The entrance tokens drive a one-shot choreography in JS; the only CSS
  *   animations here (skeleton shimmer, loading pulse) carry a finite iteration count, so an
  *   idle Atelier surface repaints zero times and the finish gate can measure that.
@@ -43,6 +49,18 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.52.0 — 2026-09-05 — WHITE ON CORAL READS ON PAPER (the developer's decision after the
+ *     measuring review). The light accent takes an OKLCh lightness CAP —
+ *     `oklch(from var(--color-primary, #e8564a) min(l, 0.576) c h)` — so the house coral deepens
+ *     from #e8564a to #cf3e35 and white on it goes 3.58:1 → 4.78:1. Hue and chroma are untouched
+ *     and a palette already under the cap comes back byte-identical, so crimson, ocean, blue,
+ *     forest and magenta do not move and the palette control keeps working. The dark block caps
+ *     nothing: its accent ink is near-black. What made this invisible for a month is that the
+ *     matrix proved the GRADIENT (AK-GRAD) and every look darkens its gradient stops, while the
+ *     tab, the chip, the avatar, the compare handle and the price badge paint the raw accent and
+ *     were proven by nothing. AK-SOLID is that missing check, and it fails on the old value in
+ *     all nineteen looks. Beside it: a genre body's theme control now says it keeps its own
+ *     light instead of doing nothing (see the kit's JS, 0.52.0).
  *   v0.51.0 — 2026-09-05 — NEARLY RIGHT, MADE RIGHT (wish-atelier-always-excellent, part 3).
  *     Thirty-six PER-COMPONENT tokens join the contract — --ak-list-row-gap, --ak-stat-figure-size,
  *     --ak-card-aspect, --ak-hero-title-size and their kind — because the rule of this file was
@@ -339,7 +357,21 @@
   --ak-line-w:        var(--border-w, 1px);
 
   /* ── Meaningful colour ────────────────────────────────────────────────────────────────── */
-  --ak-accent:        var(--color-primary, #e8564a);
+  /* THE LIGHT ACCENT CARRIES A READABILITY FLOOR (2026-09-05, the developer's decision after the
+   * measuring review). White is the action ink on paper, and the house coral #e8564a measured
+   * 3.58:1 under it — on the tab, the chip, the avatar, the compare handle, the price badge and
+   * five more, every one of them painting `background: var(--ak-accent)` raw. The gradient was
+   * never the problem: every look already darkens --ak-grad toward the ink, which is why the
+   * primary action read and the flat fills did not.
+   * The cap is an OKLCh lightness ceiling, not a new colour: chroma and hue are untouched, L is
+   * pulled down only when the palette sits above the line, and a palette already under it comes
+   * back byte-identical (crimson, ocean, blue, forest and magenta do not move). So the login
+   * pill's palette control keeps working and the coral keeps its character — it deepens from
+   * #e8564a to #cf3e35, 4.78:1 with white. 0.576 is the L of the nearest shade that clears 4.5
+   * with headroom; the exact crossing is 0.5907 (#d4433a, 4.50:1), which leaves nothing for a
+   * derived stop. AK-SOLID in the matrix is what holds this, for every palette and every look.
+   * The DARK block below caps nothing: dark's accent ink is near-black, not white. */
+  --ak-accent:        oklch(from var(--color-primary, #e8564a) min(l, 0.576) c h);
   --ak-accent-2:      var(--color-secondary, var(--ak-accent));
   /* THE SPECTRUM: two hues DERIVED from the accent by OKLCh rotation — lightness and chroma do
    * not move, so every contrast ratio the matrix proves for the accent holds for its rotations.

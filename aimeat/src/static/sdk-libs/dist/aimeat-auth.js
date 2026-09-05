@@ -259,15 +259,30 @@
     } catch {
     }
   }
+  var FIXED_REGISTER_PREFIX = "genre-";
+  function aimeatFixedRegister() {
+    try {
+      var m = document.querySelector('meta[name="aimeat-register"]');
+      var v = m && m.getAttribute("content");
+      return v && v.indexOf(FIXED_REGISTER_PREFIX) === 0 ? v : null;
+    } catch {
+      return null;
+    }
+  }
   function modeSwitchHtml(i) {
     var cur = aimeatReadTheme();
     var light = i.lightMode || "Light mode";
     var dark = i.darkMode || "Dark mode";
-    return '<span id="aimeat-mode-switch" class="aimeat-seg" role="group" aria-label="' + escHtml(i.themeLabel || "Theme") + '"><button type="button" data-mode="light" aria-pressed="' + (cur === "light") + '" title="' + escHtml(light) + '" aria-label="' + escHtml(light) + '"><span class="seg-ico" aria-hidden="true">☀</span></button><button type="button" data-mode="dark" aria-pressed="' + (cur === "dark") + '" title="' + escHtml(dark) + '" aria-label="' + escHtml(dark) + '"><span class="seg-ico" aria-hidden="true">☾</span></button></span>';
+    var fixed = aimeatFixedRegister();
+    var why = i.fixedRegister || "This register keeps its own light";
+    var seg = fixed ? ' class="aimeat-seg aimeat-seg--fixed" title="' + escHtml(why) + '" aria-label="' + escHtml(why) + '"' : ' class="aimeat-seg" aria-label="' + escHtml(i.themeLabel || "Theme") + '"';
+    var off2 = fixed ? ' disabled aria-disabled="true" title="' + escHtml(why) + '"' : "";
+    return '<span id="aimeat-mode-switch" role="group"' + seg + '><button type="button" data-mode="light" aria-pressed="' + (cur === "light") + '"' + (fixed ? off2 : ' title="' + escHtml(light) + '"') + ' aria-label="' + escHtml(fixed ? why : light) + '"><span class="seg-ico" aria-hidden="true">☀</span></button><button type="button" data-mode="dark" aria-pressed="' + (cur === "dark") + '"' + (fixed ? off2 : ' title="' + escHtml(dark) + '"') + ' aria-label="' + escHtml(fixed ? why : dark) + '"><span class="seg-ico" aria-hidden="true">☾</span></button></span>';
   }
   function wireModeSwitch(container) {
     var root = container.querySelector("#aimeat-mode-switch");
     if (!root) return;
+    if (aimeatFixedRegister()) return;
     function sync(cur) {
       root.querySelectorAll("button[data-mode]").forEach(function(b) {
         b.setAttribute("aria-pressed", String(b.getAttribute("data-mode") === cur));
@@ -1455,6 +1470,13 @@
       "background:var(--aimeat-ink);color:var(--aimeat-paper)}",
       ".aimeat-seg button+button{border-left:0}",
       ".aimeat-seg .seg-ico{font-size:13px;line-height:1}",
+      /* A control that has stood down. The group keeps its frame so it still reads as an
+         instrument that exists, and the whole thing dims and takes the arrow cursor so nobody
+         aims at it twice — the reason is on the group's title, because a native tooltip on a
+         disabled button never appears. Used by a page that keeps its own palette (a genre body). */
+      ".aimeat-seg--fixed{opacity:.55;cursor:default}",
+      ".aimeat-seg button[disabled]{cursor:default;opacity:.6}",
+      ".aimeat-seg button[disabled]:hover{opacity:.6}",
       /* Popover trigger (palette picker; language picker when 4+ languages). */
       ".aimeat-pop-wrap{position:relative;display:inline-flex;flex:0 0 auto}",
       ".aimeat-pop-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;",
@@ -1627,6 +1649,7 @@
       lightMode: "Light mode",
       darkMode: "Dark mode",
       themeLabel: "Theme",
+      fixedRegister: "This register keeps its own light",
       chooseLook: "Choose look",
       switchLanguage: "Language"
     },
@@ -1640,6 +1663,7 @@
       lightMode: "Vaalea tila",
       darkMode: "Tumma tila",
       themeLabel: "Teema",
+      fixedRegister: "Tämä rekisteri pitää oman valonsa",
       chooseLook: "Valitse tyyli",
       switchLanguage: "Kieli"
     },
@@ -1653,6 +1677,7 @@
       lightMode: "Modo claro",
       darkMode: "Modo oscuro",
       themeLabel: "Tema",
+      fixedRegister: "Este registro conserva su propia luz",
       chooseLook: "Elige el aspecto",
       switchLanguage: "Idioma"
     }

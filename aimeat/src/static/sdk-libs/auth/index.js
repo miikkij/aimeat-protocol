@@ -10,6 +10,12 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
+ *   v1.3.0 — 2026-09-05 — The light/dark control stands down on a page that keeps its own palette.
+ *     A body declaring `<meta name="aimeat-register" content="genre-…">` gets the switch rendered
+ *     disabled, saying "This register keeps its own light" in the pill's three languages, and it
+ *     binds no handler at all — the stored preference and the operating system's setting are left
+ *     as they are. Twenty-two genre bodies had a control that did nothing (theme.js v1.4.0,
+ *     cluster.js v1.2.0, pill-strings.js v1.1.0).
  *   v1.2.0 — 2026-07-26 — An embedded app inherits the embedder's look: aimeatRestoreMode() joins
  *     aimeatRestorePalette() at parse time, so ?mode= / ?palette= in the frame URL win over an
  *     origin's own storage without overwriting it.

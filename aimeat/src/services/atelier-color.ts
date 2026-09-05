@@ -10,11 +10,15 @@
  *   the 800 cap, and the effects round adds the CSS filter transforms beside these. The contrast
  *   module re-exports every public name, so every importer keeps the address it had.
  * @structure lum · ratio · srgbToLinear · linearToSrgb · hexToLab · labToHex · rotateHue ·
- *   mixOklab · Rgba · over · hueRotateSrgb · saturateSrgb · duotoneSrgb
+ *   capLightness · mixOklab · Rgba · over · hueRotateSrgb · saturateSrgb · duotoneSrgb
  * @usage
  *   import { ratio, mixOklab, over } from './atelier-color.js';
  *   import { hueRotateSrgb, duotoneSrgb } from './atelier-color.js';   // the effects' proof
  * @version-history
+ *   v1.2.0 — 2026-09-05 — capLightness: the OKLCh lightness CAP the light contract now puts on
+ *     the accent (`oklch(from … min(l, N) c h)`), computed the way rotateHue computes the
+ *     rotation beside it — chroma and hue untouched, only L pulled down, and only when the
+ *     source sits above the cap.
  *   v1.1.0 — 2026-09-05 — The CSS filter transforms the effects registry's colour proofs run:
  *     hueRotateSrgb and saturateSrgb are the Filter Effects matrices on sRGB channel values (the
  *     shorthand filter functions interpolate in sRGB, and a hue turn there does not keep
@@ -89,6 +93,18 @@ export function rotateHue(hex: string, deg: number): string {
   const c = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
   const h = Math.atan2(lab.b, lab.a) + (deg * Math.PI) / 180;
   return labToHex({ L: lab.L, a: c * Math.cos(h), b: c * Math.sin(h) });
+}
+
+/** Pull a colour's OKLCh lightness down to at most `maxL`, keeping C and h — the browser's
+ *  relative-colour `oklch(from X min(l, maxL) c h)`, computed the same way. A colour already at
+ *  or under the cap comes back untouched, which is what makes the cap a FLOOR ON READABILITY
+ *  rather than a restyling: only a palette light enough to lose its white ink moves. */
+export function capLightness(hex: string, maxL: number): string {
+  const lab = hexToLab(hex);
+  if (lab.L <= maxL) return hex;
+  const c = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
+  const h = Math.atan2(lab.b, lab.a);
+  return labToHex({ L: maxL, a: c * Math.cos(h), b: c * Math.sin(h) });
 }
 
 /** Mix two opaque colours in OKLab, `p` being the first colour's share (0..1). */
