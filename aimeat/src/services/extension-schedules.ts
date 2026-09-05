@@ -96,6 +96,13 @@ export async function registerExtensionSchedules(
     if (opts.replace) {
         const existing = await storage.listScheduledJobs({ extensionName: ext.name });
         for (const job of existing) {
+            // ONLY the manifest's own. The listing returns every job pointing at this extension,
+            // and the owner's own schedules point at it too — they name one of its actions, which
+            // is the whole reason to make one. Deleting those here meant an extension update
+            // silently took away work the owner had set up, with nothing said and no way back:
+            // the manifest is republished, the owner's schedules are not. A nightly sweep created
+            // in the morning was gone by the next version of the extension it called.
+            if (!isManifestDeclaredJob(job)) continue;
             scheduler.removeJob(job.id);
             await storage.deleteScheduledJob(job.id);
         }

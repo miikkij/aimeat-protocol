@@ -189,6 +189,67 @@ async function run() {
     assert(scheds[0].id === 'ping-scheduled', `wrong schedule stored: ${JSON.stringify(scheds[0])}`);
   });
 
+  await test('updating an extension leaves the owner\'s OWN schedules alone', async () => {
+    // A redeploy replaces the manifest's schedules, because the new manifest is the whole truth
+    // about the extension's own clock. It was replacing the OWNER'S schedules too: the listing is
+    // by extension, and an owner's schedule names one of that extension's actions — which is the
+    // only reason to make one. So an update silently took away work the owner had set up, with
+    // nothing said and nothing to restore it from. A nightly sweep made in the morning was gone by
+    // the extension's next version.
+    const name = `hardown${Date.now()}`;
+    const manifest = (version: string) => JSON.stringify({
+      metadata: { name, version, description: 'hardening e2e', author: 'e2e' },
+      actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'echo' }],
+      schedules: [{ id: 'ping-scheduled', cron: '0 2 * * *', action: 'ping', input: {}, description: 'Scheduled: ping', instance_scope: false }],
+      config: { greeting: { default: 'hi' } },
+      limits: { timeout_ms: 5000, max_api_calls: 1 },
+    });
+    const first = await json('/v1/extensions', {
+      method: 'POST', headers: auth(ownerA.token),
+      body: JSON.stringify({ manifest: manifest('1.0.0'), scripts: { echo: ECHO } }),
+    });
+    assert(first.status === 201, `install ${first.status}: ${JSON.stringify(first.body?.error)}`);
+    // A manifest's schedules are registered when the extension is turned ON, not when it is
+    // installed (services/extension-lifecycle.ts), so an inactive extension has no clock to keep.
+    const on = await json(`/v1/extensions/${name}/activate`, { method: 'POST', headers: auth(ownerA.token) });
+    assert(on.status === 200 || on.status === 201, `activate ${on.status}: ${JSON.stringify(on.body?.error)}`);
+
+    const mine = await json('/v1/schedules', {
+      method: 'POST', headers: auth(ownerA.token),
+      body: JSON.stringify({
+        name: 'my own nightly sweep', kind: 'extension', extension_name: name,
+        action_id: 'ping', cron: '30 1 * * *', input: { wide: true },
+      }),
+    });
+    assert(mine.status === 201 || mine.status === 200, `own schedule: ${mine.status} ${JSON.stringify(mine.body?.error)}`);
+    const mineId = mine.body.data.schedule?.id ?? mine.body.data.id;
+    assert(typeof mineId === 'string' && !mineId.startsWith('ext:'),
+      `an owner's schedule must not wear a manifest id: ${mineId}`);
+
+    // PUT is the redeploy door: it upserts in place and re-registers the manifest's schedules
+    // with replace:true, which is exactly the path that was eating the owner's own.
+    const second = await json(`/v1/extensions/${name}`, {
+      method: 'PUT', headers: auth(ownerA.token),
+      body: JSON.stringify({ manifest: manifest('1.1.0'), scripts: { echo: ECHO } }),
+    });
+    assert(second.status === 201 || second.status === 200, `update ${second.status}: ${JSON.stringify(second.body?.error)}`);
+
+    // The aggregate keeps the two apart by construction: `managed` is what the owner made,
+    // `extensions` is what manifests declare. Both must be intact after a redeploy.
+    const after = await json('/v1/schedules', { headers: auth(ownerA.token) });
+    const jobs = [
+      ...((after.body.data.managed ?? []) as Array<Record<string, unknown>>),
+      ...((after.body.data.extensions ?? []) as Array<Record<string, unknown>>),
+    ];
+    const survived = jobs.find(j => j.id === mineId);
+    assert(!!survived, `the owner's own schedule was eaten by the update: ${JSON.stringify(jobs.map(j => j.id))}`);
+    assert((survived as Record<string, unknown>).cron === '30 1 * * *',
+      `it survived but was rewritten: ${JSON.stringify(survived)}`);
+    // And the manifest's own is still there, replaced rather than skipped.
+    assert(jobs.some(j => j.id === `ext:${name}:ping-scheduled`),
+      `the manifest's own schedule must still be registered: ${JSON.stringify(jobs.map(j => j.id))}`);
+  });
+
   // ── 3. A submitted ciphertext ──────────────────────────────────────────────────────────────
   await test('a manifest cannot submit a value that is already encrypted', async () => {
     const name = `hardenc${Date.now()}`;
