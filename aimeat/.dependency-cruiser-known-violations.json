@@ -12720,6 +12720,15 @@
   },
   {
     "type": "module",
+    "from": "src/static/sdk-libs/dist/aimeat-living.js",
+    "to": "src/static/sdk-libs/dist/aimeat-living.js",
+    "rule": {
+      "severity": "warn",
+      "name": "no-orphans"
+    }
+  },
+  {
+    "type": "module",
     "from": "src/static/sdk-libs/dist/aimeat-audio.js",
     "to": "src/static/sdk-libs/dist/aimeat-audio.js",
     "rule": {

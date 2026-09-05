@@ -18,6 +18,12 @@
  *     chiptune, designers, boss, brain).
  *   v1.9.1 — 2026-09-02 — The assets version check reads a three-part version: the atlas packer's
  *     TexturePacker format field (version "1.0") sits earlier in the bundle.
+ *   v1.10.0 — 2026-09-05 — aimeat-living.js coverage: the surface and the seven node types
+ *     exported, the generated vocabulary riding in the bundle, the two refusals that matter (a
+ *     circle, units that will not add), no CDN and no hardcoded colour, KaTeX served from THIS
+ *     node with only its woff2 faces and the face its stylesheet names, the stylesheet on the
+ *     kit's tokens with the reduced-motion block reaching all three switches, and the registry
+ *     entry declaring the kit as its dependency.
  *   v1.9.0 — 2026-09-02 — aimeat-assets.js coverage: every part exported, the self-describing
  *     manifest spec, no CDN, the version pin.
  *   v1.8.0 — 2026-09-02 — aimeat-phaser.js coverage: every part exported, Phaser loaded from this
@@ -1319,6 +1325,86 @@ await test('GET /v1/libs — catalogue lists aimeat-atelier with no dependencies
     assert(!atelier?.requires, `aimeat-atelier must declare no dependencies, got "${atelier?.requires}"`);
     assert(atelier?.include?.includes('/lib/aimeat-atelier.css'),
         'aimeat-atelier must include its stylesheet — the JS alone renders unstyled');
+});
+
+await test('GET /v1/libs/aimeat-living.js — serves the living document with every part', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-living.js`);
+    assert(res.ok, `living lib failed: ${res.status}`);
+    assert(res.headers.get('Content-Type')?.includes('javascript'), 'should be javascript');
+    const text = await res.text();
+    // The surface an app and an AI actually call.
+    for (const part of ['mount', 'validate', 'describe', 'chain', 'types']) {
+        assert(text.includes(part), `should export ${part}`);
+    }
+    // The seven node types, and the vocabulary generated from their own JSDoc — a type that
+    // silently stops being registered fails here rather than as a document that will not mount.
+    for (const type of ['value', 'formula', 'control', 'binding', 'text', 'machine', 'source']) {
+        assert(text.includes(`"${type}"`) || text.includes(`'${type}'`), `should carry the node type ${type}`);
+    }
+    assert(text.includes('A named quantity'), 'the generated describe() vocabulary must ride in the bundle');
+    // The two refusals that are the whole point: a circle, and units that will not add.
+    assert(text.includes('stand in a circle'), 'a cycle must be refused in words');
+    assert(text.includes('measure different things'), 'incompatible units must be refused in words');
+});
+
+await test('GET /v1/libs/aimeat-living.js — it computes here, and KaTeX comes from this node', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-living.js`);
+    const code = withoutComments(await res.text());
+    // No route of its own: the library reaches the node for exactly one file, the typesetter.
+    assert(!/cdn\.|unpkg|jsdelivr|cdnjs/i.test(code), 'must not name a CDN');
+    assert(code.includes('/lib/katex@0/katex.min.js'), 'KaTeX must be loaded from this node');
+    assert(code.includes('/lib/katex@0/katex.min.css'),
+        'the KaTeX stylesheet must be loaded too — the script alone renders unspaced glyphs');
+    // The colours are the kit's contract, never written into the library.
+    assert(!/#[0-9a-fA-F]{6}\b/.test(code), 'must not carry a hardcoded colour');
+
+    // And the typesetter it names is actually served, with the faces its stylesheet asks for.
+    const [js, css] = await Promise.all([
+        fetch(`${BASE}/lib/katex@0/katex.min.js`),
+        fetch(`${BASE}/lib/katex@0/katex.min.css`),
+    ]);
+    assert(js.ok, `katex script failed: ${js.status}`);
+    assert(css.ok, `katex stylesheet failed: ${css.status}`);
+    const sheet = await css.text();
+    assert(!/format\(["']?(woff|truetype)["']?\)/.test(sheet),
+        'only the woff2 faces are carried — the other two formats were removed as 876 kB nobody requests');
+    const face = sheet.match(/url\((fonts\/[^)]+\.woff2)\)/);
+    assert(!!face, 'the stylesheet must name at least one woff2 face');
+    const fontRes = await fetch(`${BASE}/lib/katex@0/${face![1]}`);
+    assert(fontRes.ok, `the face the stylesheet names must be served: ${face![1]} → ${fontRes.status}`);
+});
+
+await test('GET /lib/aimeat-living.css — every value comes off the kit\'s own tokens', async () => {
+    const res = await fetch(`${BASE}/lib/aimeat-living.css`);
+    assert(res.ok, `living stylesheet failed: ${res.status}`);
+    const css = await res.text();
+    for (const part of ['ak-living__control', 'ak-living__formula', 'ak-living__text',
+        'ak-living__machine', 'ak-living__chain']) {
+        assert(css.includes(part), `the stylesheet must dress ${part}`);
+    }
+    // Its own tokens exist and each falls back to the kit token it descends from.
+    assert(/--ak-living-gap:\s*var\(--ak-gap/.test(css), 'each --ak-living-* token must fall back to the kit\'s');
+    assert(!/rgba\(\s*255\s*,\s*255\s*,\s*255/.test(css), 'must not use rgba(255,255,255,…)');
+    // The switch reaches the stylesheet as well as the scripts (docs/pitfalls.md §47).
+    assert(css.includes('prefers-reduced-motion'), 'must carry the reduced-motion block');
+    assert(css.includes("html[data-ak-motion='less']"), 'the kit\'s own Less-motion switch must reach it too');
+    assert(css.includes("[data-ak-motion-defaults='off']"), 'the per-surface opt-out must reach it too');
+    // Nothing loops: the chain's flash is one finite pulse.
+    assert(!/animation[^;]*infinite/.test(css), 'nothing in a living document may animate forever');
+});
+
+await test('GET /v1/libs — catalogue lists aimeat-living, and it needs the kit', async () => {
+    const res = await fetch(`${BASE}/v1/libs`);
+    const data = await res.json() as any;
+    const names = (data.libraries ?? []).map((l: any) => l.name);
+    assert(names.includes('aimeat-living'), `catalogue should list aimeat-living (got: ${names.join(', ')})`);
+    const living = (data.libraries ?? []).find((l: any) => l.name === 'aimeat-living');
+    // It draws through the mosaic and the kit's components, so saying otherwise would ship an
+    // app that mounts nothing and says so only in the console.
+    assert(living?.requires?.includes('aimeat-atelier'),
+        `aimeat-living must declare aimeat-atelier, got "${living?.requires}"`);
+    assert(living?.include?.includes('/lib/aimeat-living.css'),
+        'aimeat-living must include its stylesheet');
 });
 
 // ─── Results ───

@@ -10,6 +10,12 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.12.0 — 2026-09-05 — aimeat-living 0.1.0: the living document, one JSON record wired to
+ *     itself through formulas in one dependency graph. Its aiDoc teaches the whole record format
+ *     (the seven node types, the units rule, the two roads onto the screen, three worked examples)
+ *     and lives in ./sdk-living.ts, which replaces the sdk-science.ts placeholder the revert of
+ *     c932f2f17 left behind. Its own track, like aimeat-atelier: no promptGroup and no interview
+ *     triggers, because a living document is written as a RECORD.
  *   v1.11.0 — 2026-09-05 — aimeat-atelier 0.51.0: NEARLY RIGHT IS CUSTOMISED, NOT FORKED. The
  *     aiDoc gains the whole model in the order a builder needs it (named parts, the parts:
  *     slots with `extra`/`aside`/`before`/`after` left empty, variant, the per-component tokens,
@@ -52,6 +58,9 @@ import type { LibraryPack } from '../library-packs.js';
 // The three UI packs live in their own file: their aiDoc texts are the longest in the registry
 // and this file crossed the 800-line ceiling carrying them. Pure extraction, spread back in below.
 import { SDK_UI_PACKS } from './sdk-ui.js';
+// The living document's aiDoc teaches a whole record format and is the longest text in the
+// registry, so it lives in its own file for the same reason. Pure list, spread back in below.
+import { LIVING_PACKS } from './sdk-living.js';
 
 export const SDK_PACKS: LibraryPack[] = [
   {
@@ -479,6 +488,7 @@ export const SDK_PACKS: LibraryPack[] = [
     promptLine: '- aimeat-assets.js — the asset manager (`AIMEAT.assets`): ONE manifest per app as one memory key (images, atlases, audio pairs, fonts, tilemaps, texts per language), files in storage at public addresses, `library()` to load / resolve / check / translate / hand a Phaser pack over, `packAtlas()` in the browser, `sound.record()` to a WAV, `upload()` through aimeat-storage, `preview()` on the Atelier tokens.',
   },
   ...SDK_UI_PACKS,
+  ...LIVING_PACKS,
   {
     id: 'aimeat-audio',
     kind: 'sdk',
