@@ -33,6 +33,8 @@
     "build:app-catalog": "tsx scripts/build-app-catalog.ts",
     "check:app-catalog": "tsx scripts/build-app-catalog.ts --check",
     "check:changelog": "tsx scripts/check-changelog.ts",
+    "check:imports-tracked": "tsx scripts/check-imports-tracked.ts",
+    "boot:smoke": "tsx scripts/boot-smoke.ts",
     "check:commit-msg": "tsx scripts/check-commit-msg.ts",
     "build:sdk": "tsx scripts/build-sdk-libs.ts",
     "build:atelier-looks": "tsx tools/build-atelier-looks.ts",
