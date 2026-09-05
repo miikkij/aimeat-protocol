@@ -847,6 +847,14 @@ function parseWorkers(): number {
 function portClashes(suites: string[], port: string): string[] {
     const n = Number(port);
     if (!Number.isFinite(n)) return [];
+    // MENTIONING THE DEFAULT IS NOT CLAIMING IT. Fifty-nine suites carry
+    // `process.env.E2E_BASE ?? 'http://localhost:40251'`, which is the runner's own default read as
+    // a fallback, not a server they start. Same for the dev server's 40050. fixedPorts() below
+    // excludes exactly these two numbers for exactly this reason, and the first version of this
+    // guard did not — so a plain `pnpm test:e2e` on the default port stopped with "40251 belongs to
+    // 59 suites" and took CI's two guard tiers down with it. A guard that fires on the normal case
+    // is worse than no guard: it teaches people to ignore it.
+    if (n === 40251 || n === 40050) return [];
     const out: string[] = [];
     for (const suite of suites) {
         let src: string;
