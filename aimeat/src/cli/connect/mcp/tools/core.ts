@@ -8,6 +8,8 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.12.0 -- 2026-09-05 -- aimeat_admin_security_overview and aimeat_admin_incident_resolve, thin
+ *     over GET /v1/admin/security/overview and the incident resolve route the Security page uses.
  *   v1.11.0 -- 2026-08-24 -- BR-04: the nine SSO-administration and account-lifecycle tools, thin
  *     over the same /v1/admin/sso and /v1/admin/owners routes the node MCP's service calls serve.
  *   v1.10.0 -- 2026-08-16 -- owner_scope on memory_read and memory_write, limit on memory_search.
@@ -575,5 +577,21 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_admin_totp_reset'), async ({ agent_name, name }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.delete(`/v1/admin/owners/${encodeURIComponent(name)}/totp`));
+  });
+
+  // The Security page in one read, and the incident action, over the same two routes the page uses.
+  mcp.tool('aimeat_admin_security_overview', descriptionFor('aimeat_admin_security_overview'), {
+    agent_name: agentNameSchema,
+  }, annotationsFor('aimeat_admin_security_overview'), async ({ agent_name }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.get('/v1/admin/security/overview'));
+  });
+
+  mcp.tool('aimeat_admin_incident_resolve', descriptionFor('aimeat_admin_incident_resolve'), {
+    agent_name: agentNameSchema,
+    id: z.string().describe('The incident id, from the overview\'s incidents list.'),
+  }, annotationsFor('aimeat_admin_incident_resolve'), async ({ agent_name, id }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.post(`/v1/admin/security/incidents/${encodeURIComponent(id)}/resolve`));
   });
 }

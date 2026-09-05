@@ -46897,6 +46897,68 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /v1/admin/security/overview:
+    get:
+      operationId: adminSecurityOverview
+      tags: [Admin]
+      summary: The Security page in one read (operator)
+      description: |
+        Operator-only. What is happening at the door in the last 24 hours (refusals, distinct
+        sources, walled addresses, each with a zone decided from this instance's own readable
+        history), the refusal log grouped by door, source, credential kind and credential
+        fingerprint plus its newest 200 lines, the refused-and-kept incidents with the open count,
+        who holds the operator role and which accounts are deactivated or use two-step sign-in,
+        and the door settings. The same data the `aimeat_admin_security_overview` tool returns.
+        Requires the `operator` role.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The overview
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          generated_at: { type: string, format: date-time }
+                          now:
+                            type: object
+                            description: The headline numbers, each with a zone (healthy, watch, critical), and the status word (quiet, watch, open)
+                            properties:
+                              status: { type: string, enum: [quiet, watch, open] }
+                              refusals: { type: object }
+                              sources: { type: object }
+                              rate_limit_hits: { type: object }
+                              scope_denials: { type: object }
+                              auth_failures_total: { type: integer }
+                              open_incidents: { type: object }
+                              counters_since: { type: string, nullable: true }
+                              uptime_seconds: { type: integer, nullable: true }
+                              log: { type: object, description: Whether the refusal log is on, its file, its size and its older generation's }
+                          refusals:
+                            type: object
+                            description: The last 24 hours grouped by door, source, credential kind and fingerprint; the readable span and its mean per day; the newest 200 lines
+                          incidents:
+                            type: object
+                            properties:
+                              items: { type: array, items: { type: object } }
+                              open: { type: integer }
+                              total: { type: integer }
+                          accounts:
+                            type: object
+                            description: Owners in all, the operator names, the deactivated accounts, how many use two-step sign-in, registration mode and organisation sign-in
+                          settings:
+                            type: object
+                            description: The door settings as configured (rate limits, tarpit, lockout, TOTP, passkeys, CORS origins, federation sign-in, body limits, the log file)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /v1/admin/security/incidents:
     get:
       operationId: listSecurityIncidents

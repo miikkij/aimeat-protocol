@@ -13,6 +13,7 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   v1.4.0 — 2026-09-05 — getSecurityOverview: the Security page in one read.
  *   v1.3.0 — 2026-08-24 — BR-04: SSO connection management + owner disable/enable helpers.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-17 — getMetricsText: raw Prometheus text for the Metrics tab
@@ -40,6 +41,7 @@ export const getTranslations = (lang)   => apiGet(`/v1/admin/translations?lang=$
 export const getAdminAgents  = ()       => apiGet('/v1/admin/agents');
 export const getAdminOwners  = ()       => apiGet('/v1/admin/owners');
 // Security incidents (rejected/quarantined uploads, etc.)
+export const getSecurityOverview     = ()   => apiGet('/v1/admin/security/overview');
 export const getSecurityIncidents    = ()   => apiGet('/v1/admin/security/incidents');
 export const getAuthRefusals         = (limit = 200) => apiGet(`/v1/admin/auth-refusals?limit=${limit}`);
 export const resolveSecurityIncident = (id) => apiPost(`/v1/admin/security/incidents/${encodeURIComponent(id)}/resolve`);
