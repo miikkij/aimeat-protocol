@@ -29,6 +29,9 @@
  * @structure controlRow · textView · machineView · valueRow · renderNodeInto
  * @usage  import { renderNodeInto } from './render.js';
  * @version-history
+ *   v0.3.0 — 2026-09-05 — Every number this file prints goes through format.js and the node's own
+ *     `format`: the reading beside a control (which keeps showing its unit, since it always has),
+ *     the value row, and the formula's answer. The count-up counts in the same writing.
  *   v0.2.0 — 2026-09-05 — The control row is built by the kit's form(): one field of the right
  *     type, `submit: false`, `onInput` reporting to the engine. Atelier 0.53.0's `type: 'range'`
  *     is what made that possible. The classes an app may already target — ak-input,
@@ -38,18 +41,20 @@
  */
 import { el, countTo, kit } from './dom.js';
 import { formulaView } from './formula-view.js';
-import { isError, isQuantity, asText, trimNumber, asNumber } from './formula-eval.js';
-import { unitLabel } from './units.js';
+import { isQuantity, asText, asNumber } from './formula-eval.js';
+import { formatNumber, formatParts } from './format.js';
 
 let seq = 0;
 function uid() { seq += 1; return 'ak-living-' + seq; }
 
-/** How a value reads in a control's readout: the number, and the unit when it has one. */
-function readout(v) {
-  if (isError(v)) return v.error;
-  if (isQuantity(v)) return trimNumber(v.n) + (unitLabel(v.u) ? ' ' + unitLabel(v.u) : '');
-  return asText(v);
-}
+/**
+ * How a value reads in a control's readout: the number in the target node's own writing, and the
+ * unit when it has one. A readout has always shown the unit, so 'after' is what it asks for when
+ * the node's format says nothing — a document with no format looks exactly as it did.
+ * @param {any} v @param {any} format
+ * @returns {string}
+ */
+function readout(v, format) { return formatParts(v, format, 'after').text; }
 
 /** Which of the kit's field types each control kind is. */
 const FIELD_TYPE = { slider: 'range', toggle: 'toggle', pick: 'select', number: 'number', text: 'text' };
@@ -126,7 +131,7 @@ export function controlRow(host, spec) {
       const n = asNumber(v);
       if (Number.isFinite(n) && String(n) !== input.value) handle.setValues({ value: n });
     }
-    const words = readout(v);
+    const words = readout(v, target.format);
     if (readoutEl.textContent !== words) readoutEl.textContent = words;
     // The kit mirrors the raw number into aria-valuetext; a living document knows the unit and
     // the refusal, so it says the same thing the eye is reading.
@@ -180,8 +185,9 @@ export function machineView(host, spec) {
 }
 
 /**
- * A value, read out. A number counts to its new figure the way the kit's figures do.
- * @param {HTMLElement} host @param {{ id: string, label?: string, value: any }} spec
+ * A value, read out. A number counts to its new figure the way the kit's figures do, written the
+ * way the node's `format` asks for all the way there.
+ * @param {HTMLElement} host @param {{ id: string, label?: string, value: any, format?: any }} spec
  */
 export function valueRow(host, spec) {
   const figure = el('span', { class: 'ak-living__figure' });
@@ -192,15 +198,27 @@ export function valueRow(host, spec) {
   ]);
   host.appendChild(root);
   let last = NaN;
+  let unitNow = '';
+  let placeNow = 'none';
+  const write = function (n) {
+    const body = formatNumber(n, spec.format);
+    if (!unitNow || placeNow === 'none') return body;
+    return placeNow === 'before' ? unitNow + ' ' + body : body + ' ' + unitNow;
+  };
   function update(v) {
+    const parts = formatParts(v, spec.format);
     if (isQuantity(v) || typeof v === 'number') {
       const n = isQuantity(v) ? v.n : v;
-      countTo(figure, Number.isFinite(last) ? last : n, n, trimNumber);
+      unitNow = parts.unit;
+      placeNow = parts.place;
+      countTo(figure, Number.isFinite(last) ? last : n, n, write);
       last = n;
-      unit.textContent = isQuantity(v) ? unitLabel(v.u) : '';
+      // The unit keeps its own element unless the format placed it, in which case the number's
+      // text already carries it.
+      unit.textContent = parts.place === 'none' ? parts.unit : '';
       return;
     }
-    figure.textContent = asText(v);
+    figure.textContent = parts.text;
     unit.textContent = '';
     last = NaN;
   }
@@ -242,7 +260,7 @@ export function renderNodeInto(host, spec) {
   }
   if (node.type === 'formula') {
     const view = formulaView(host, {
-      id: spec.id, label: node.label, value: value,
+      id: spec.id, label: node.label, value: value, format: node.format,
       tex: (graph.fieldsOf(spec.id) || {}).tex || '',
       plain: spec.id + ' = ' + String(node.expr),
     });
@@ -257,7 +275,7 @@ export function renderNodeInto(host, spec) {
     return { el: view.el, update: () => view.update(String(graph.valueOf(spec.id) || '')), kind: 'machine' };
   }
   if (node.type === 'value' || node.type === 'source') {
-    const view = valueRow(host, { id: spec.id, label: node.label, value: value });
+    const view = valueRow(host, { id: spec.id, label: node.label, value: value, format: node.format });
     return { el: view.el, update: () => view.update(graph.valueOf(spec.id)), kind: node.type };
   }
   return null;

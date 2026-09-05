@@ -5,11 +5,14 @@
  *   on, a refusal comes back as a VALUE with words in it rather than an exception, and the TeX
  *   printer sets the same tree the evaluator walked.
  *
- *   The one rule this file exists to hold: an offset unit (°C, °F) that meets a multiplication
- *   comes back as a plain number, which is what makes t * 9/5 + 32 with unit °F mean what its
- *   author meant — while p * v / (r * T) is still checked all the way through.
+ *   Two rules this file exists to hold. An offset unit (°C, °F) that meets a multiplication comes
+ *   back as a plain number, which is what makes t * 9/5 + 32 with unit °F mean what its author
+ *   meant — while p * v / (r * T) is still checked all the way through. And a percentage is a
+ *   LABEL on a face number: 72 % computes as 72, so ln(rh) and rh / 100 stop disagreeing about
+ *   which reading they took, and fraction(x) / percent(x) are the two doors between them.
  * @usage cd aimeat && pnpm vitest run test/unit/living-formula.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The percentage rule (living 0.3.0).
  *   v1.0.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { describe, it, expect } from 'vitest';
@@ -165,6 +168,64 @@ describe('evaluate: the units are carried and checked', () => {
     const out = parseUnit('bananas') as { error: string };
     expect(isError(out)).toBe(true);
     expect(out.error).toMatch(/bananas/);
+  });
+});
+
+/**
+ * A PERCENTAGE IS A LABEL ON A FACE NUMBER. With `%` carrying a scale of 0.01, one node read two
+ * ways in the same recompute: ln(rh) took the logarithm of 72 while rh / 100 came out as 0.0072,
+ * and neither said which reading it had used. The rule now is that 72 % computes as 72, and the
+ * two doors between that and a fraction of one are written into the formula.
+ */
+describe('evaluate: a percentage is a face number, and the conversion is asked for', () => {
+  const rh = { rh: q(72, '%') };
+
+  it('ln(rh), rh / 100 and fraction(rh) each mean what they say', () => {
+    expect(run('ln(rh)', rh)).toBeCloseTo(Math.log(72), 12);
+    expect(run('rh / 100', rh)).toBeCloseTo(0.72, 12);
+    expect(run('fraction(rh)', rh)).toBeCloseTo(0.72, 12);
+  });
+
+  it('arithmetic is on the number the author typed', () => {
+    expect(run('rh + 5', rh)).toBeCloseTo(77, 12);
+    expect(run('rh * 2', rh)).toBeCloseTo(144, 12);
+    expect(run('rh > 50', rh)).toBe(true);
+  });
+
+  it('the node itself still carries its label, so it reads as a percentage', () => {
+    expect(asText(q(72, '%'))).toBe('72 %');
+  });
+
+  it('percent() turns a fraction of one into a percentage, with the label on it', () => {
+    const out = run('percent(x)', { x: 0.72 }) as { n: number; u: { label: string } };
+    expect(out.n).toBeCloseTo(72, 12);
+    expect(out.u.label).toBe('%');
+  });
+
+  it('percent() of something already a percentage is refused rather than doubled', () => {
+    const out = run('percent(rh)', rh) as { error: string };
+    expect(isError(out)).toBe(true);
+    expect(out.error).toMatch(/already a percentage/);
+  });
+
+  it('fraction() of something measured is refused, naming what it was in', () => {
+    const out = run('fraction(t)', { t: q(22, '°C') }) as { error: string };
+    expect(isError(out)).toBe(true);
+    expect(out.error).toMatch(/°C/);
+  });
+
+  it('convert between two dimensionless labels refuses and points at the two doors', () => {
+    const out = run('convert(rh, "ppm")', rh) as { error: string };
+    expect(isError(out)).toBe(true);
+    expect(out.error).toMatch(/fraction\(x\)/);
+    expect(out.error).toMatch(/percent\(x\)/);
+  });
+
+  it('a formula may still LABEL its answer a percentage', () => {
+    // ratio comes out plain; the node's own unit names it, which is the same half of the unit
+    // field that makes t * 9/5 + 32 with unit °F work.
+    const out = run('a / b * 100', { a: 36, b: 50 });
+    expect(out).toBeCloseTo(72, 12);
   });
 });
 

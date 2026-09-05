@@ -14,14 +14,17 @@
  * @node     value     A named quantity: the writable ground the rest of the document stands on.
  * @inputs   value     value (the quantity itself, a literal — never a reference)
  * @outputs  value     value — the number with its unit, or the text, truth or list it holds
- * @options  value     unit · min · max · step · format · label
- * @example  value     { "type": "value", "value": 22, "unit": "°C", "min": -20, "max": 40, "step": 0.5, "label": "Lämpötila" }
+ * @options  value     unit · min · max · step · format (how it is printed: 1 · "int" · "unit" · an object) · label
+ * @example  value     { "type": "value", "value": 22, "unit": "°C", "min": -20, "max": 40, "step": 0.5, "format": 1, "label": "Lämpötila" }
  * @structure value: the node-type module (dependsOn · prepare · evaluate · coerce)
  * @usage  import { value } from './value.js';
  * @version-history
+ *   v0.3.0 — 2026-09-05 — `format` is read and refused by name when it is not one this build
+ *     knows; the printing itself is format.js's, and the value held here is untouched by it.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { parseUnit } from '../units.js';
+import { formatError } from '../format.js';
 import { isError } from '../formula-eval.js';
 
 /** Put a raw literal and a unit together into the value the graph carries. */
@@ -46,6 +49,8 @@ export const value = {
     const unit = parseUnit(node.unit);
     if (isError(unit)) errors.push(unit.error);
     ctx.compiled.unit = isError(unit) ? null : unit;
+    const badFormat = formatError(node.format);
+    if (badFormat) errors.push(badFormat);
     if (!ctx.state.values.has(ctx.id)) {
       ctx.state.values.set(ctx.id, wrapValue(node.value, ctx.compiled.unit));
     }

@@ -20,7 +20,9 @@
  *   assign to value nodes, so those depend on IT. That ordering is what lets arriving in a state
  *   put a word on the screen without the word and the state disagreeing for one frame. Events
  *   come from crossings after each pass, and a pass that fires an event runs again — bounded, so
- *   two machines sending each other events settle or stop rather than spin.
+ *   two machines sending each other events settle or stop rather than spin. The FIRST refresh
+ *   also runs each machine's initial entry, because a machine that merely occupies its starting
+ *   state has never written the word it is supposed to be showing.
  * @structure createGraph(doc) → { ids, errors, get, valueOf, fieldsOf, set, send, tick, refresh,
  *   dependents, nodeOf, edges }
  * @usage
@@ -28,6 +30,8 @@
  *   const g = createGraph(doc);
  *   g.set('t', 31);   // { changed: ['t', 'f', 'note', 'state'] }
  * @version-history
+ *   v0.3.0 — 2026-09-05 — The first refresh runs each machine's initial entry actions, so a value
+ *     a machine writes is right on the first paint instead of blank until the first crossing.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { NODE_TYPES, typeOf } from './nodes/index.js';
@@ -216,6 +220,26 @@ export function createGraph(doc) {
     }
   }
 
+  /**
+   * The entry actions of the state each machine STARTS in, run once, on the first refresh. A
+   * machine that was merely occupying its initial state left the value it writes blank until the
+   * first crossing, so the document opened saying nothing. It runs AFTER the first pass, because
+   * an entry action is an expression and needs the rest of the graph already worked out.
+   */
+  function startMachines(changed) {
+    const seed = [];
+    for (const id of order) {
+      if ((nodes[id] || {}).type !== 'machine') continue;
+      const m = state.machines.get(id);
+      if (!m || typeof m.start !== 'function') continue;
+      for (const a of m.start().assigns) {
+        const v = a.tree ? evaluateAssign(a.tree) : undefined;
+        if (put(a.id, v) && seed.indexOf(a.id) < 0) seed.push(a.id);
+      }
+    }
+    if (seed.length) pass(seed, changed);
+  }
+
   /** After a pass, ask every machine what just became true, and act on it. */
   function settleMachines(changed) {
     for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -271,6 +295,7 @@ export function createGraph(doc) {
     refresh() {
       const changed = [];
       pass(ids, changed);
+      startMachines(changed);
       settleMachines(changed);
       return { changed: changed };
     },

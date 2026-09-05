@@ -22,12 +22,23 @@
  *   EVENTS ARRIVE FROM A CROSSING. crossings() evaluates each { expr, send } and reports the ones
  *   that just BECAME true — a rising edge, not a level — so "t > 30" sends HOT once when the
  *   temperature goes over, not on every recompute while it stays there.
- * @structure createMachine(def) → { path, send, tick, crossings, nextDue, reset, errors }
+ *
+ *   THE STATE IT STARTS IN IS ENTERED, NOT MERELY OCCUPIED. start() hands back the entry actions
+ *   of the initial state — and of every nested initial state under it, outermost first — exactly
+ *   as SCXML and XState run them on the initial transition. Without it a value a machine writes
+ *   sat blank until the first crossing, so a document opened saying nothing and only became
+ *   correct once somebody touched a control. It is handed back rather than run, like every other
+ *   assignment here, and it happens ONCE: reset() re-arms it, a second start() is a no-op.
+ * @structure createMachine(def) → { path, states, start, send, tick, crossings, nextDue, reset,
+ *   errors }
  * @usage
  *   import { createMachine } from './machine.js';
  *   const m = createMachine({ initial: 'fine', states: { fine: { on: { HOT: 'hot' } }, hot: {} } });
+ *   m.start();              // { changed: false, path: 'fine', assigns: [] }
  *   m.send('HOT', scope);   // { changed: true, path: 'hot', assigns: [] }
  * @version-history
+ *   v0.3.0 — 2026-09-05 — start(): the initial state's entry actions, and its nested initial
+ *     states' entries outermost first, so a value a machine writes is right on the first paint.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { parse } from './formula-parse.js';
@@ -122,6 +133,8 @@ export function createMachine(def) {
   const compiled = compile(model, errors);
 
   let active = errors.length ? [] : settleInto(model, [model.initial]);
+  /** Whether the initial state's entry actions have been handed out; start() does that once. */
+  let started = false;
   /** When each active state was entered, so `after` knows how long it has been there. */
   let enteredAt = new Map();
 
@@ -167,6 +180,28 @@ export function createMachine(def) {
     /** Every state on the active path, outermost first. */
     states() { return active.map((_, i) => active.slice(0, i + 1).join('.')); },
     errors: errors,
+
+    /**
+     * ARRIVING WHERE IT STARTS. The entry actions of the initial state, and of every nested
+     * initial state beneath it, outermost first — the same order a transition into that state
+     * would run them in, which is what SCXML and XState call the initial transition.
+     *
+     * No exit action is ever produced here: nothing has been left. It answers once; a second
+     * call hands back nothing, and reset() puts it back on the line.
+     * @returns {{ changed: boolean, path: string, assigns: Array<{ id: string, tree: any }> }}
+     */
+    start() {
+      if (started || errors.length || !active.length) {
+        started = true;
+        return { changed: false, path: active.join('.'), assigns: [] };
+      }
+      started = true;
+      const out = [];
+      for (let i = 1; i <= active.length; i++) {
+        for (const a of assignsFor('entry', active.slice(0, i).join('.'))) out.push(a);
+      }
+      return { changed: out.length > 0, path: active.join('.'), assigns: out };
+    },
 
     /**
      * Send an event. Looks for a handler from the deepest active state outward, honouring guards.
@@ -252,11 +287,12 @@ export function createMachine(def) {
       return out;
     },
 
-    /** Back to the initial state, with the crossings forgotten. */
+    /** Back to the initial state, with the crossings forgotten and start() armed again. */
     reset() {
       active = errors.length ? [] : settleInto(model, [model.initial]);
       enteredAt = new Map();
       markEntered(active, 0);
+      started = false;
       for (const w of compiled.whens) w.was = false;
     },
   };

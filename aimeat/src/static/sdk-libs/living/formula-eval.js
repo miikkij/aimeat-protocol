@@ -16,14 +16,23 @@
  *   meets a multiplication comes back as a plain number, because half of 20 °C is not 10 °C.
  *   That is what lets the hand-written conversion t * 9/5 + 32 with unit °F mean what its author
  *   meant, while p * v / (r * T) is still checked properly all the way through.
+ *
+ *   AND THE THIRD, ALSO FROM units.js: a percentage is a label on a face number, so ln(rh) is the
+ *   logarithm of 72 and rh / 100 is 0.72. fraction(x) and percent(x) are the only two things that
+ *   move a number between those two readings, and they are written in the formula.
  * @structure evaluate(tree, scope) · isError · asText · asNumber · OPS
  * @usage
  *   import { evaluate } from './formula-eval.js';
  *   evaluate(parse('t * 9/5 + 32'), { get: (id) => ({ n: 22, u: celsius }) });   // 71.6
  * @version-history
+ *   v0.3.0 — 2026-09-05 — fraction() and percent(), the two explicit doors the percentage rule
+ *     leaves open now that `%` is a label on a face number rather than a scale of 0.01.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
-import { parseUnit, unitLabel, sameDim, convert, mulUnits, divUnits, powUnit, isAffine, toBase } from './units.js';
+import { parseUnit, unitLabel, sameDim, convert, mulUnits, divUnits, powUnit, isAffine, isPlain, toBase } from './units.js';
+
+/** The unit percent() puts on its answer. Read once: the table never changes at run time. */
+const PERCENT = /** @type {any} */ (parseUnit('%'));
 
 /** @typedef {{ error: string }} Err */
 
@@ -318,6 +327,28 @@ export function evaluate(tree, scope) {
       if (isError(target)) return target;
       const moved = convert(q, target);
       return isError(moved) ? moved : tidy(moved);
+    }
+    // THE TWO DOORS OF THE PERCENTAGE RULE. A percentage is a label on a face number here, so
+    // nothing rescales it behind the author's back; when they DO want the fraction of one, they
+    // say so, and when they want a fraction written as a percentage, they say that.
+    case 'Fraction': {
+      const q = num(a, 'fraction');
+      if (isError(q)) return q;
+      if (q.u && !isPlain(q.u)) {
+        return { error: 'fraction() takes a percentage or a plain number, and this one is in ' + unitLabel(q.u) + '.' };
+      }
+      return q.n / 100;
+    }
+    case 'Percent': {
+      const q = num(a, 'percent');
+      if (isError(q)) return q;
+      if (q.u && !isPlain(q.u)) {
+        return { error: 'percent() takes a fraction of one or a plain number, and this one is in ' + unitLabel(q.u) + '.' };
+      }
+      if (unitLabel(q.u) === '%') {
+        return { error: 'This is already a percentage. percent() turns a fraction of one into one, so pass the plain number.' };
+      }
+      return { n: q.n * 100, u: PERCENT };
     }
     case 'Min': return aggregate(args, (v) => Math.min.apply(null, v), 'min');
     case 'Max': return aggregate(args, (v) => Math.max.apply(null, v), 'max');

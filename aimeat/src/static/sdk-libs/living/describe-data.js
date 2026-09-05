@@ -32,8 +32,8 @@ export const NODES = {
     summary: "A spreadsheet expression over the other nodes, worked out with its units.",
     inputs: ["expr (an expression naming other nodes)"],
     outputs: ["value — the result, with its unit","tex — the same expression set as mathematics"],
-    options: ["unit (convert the result, or name a plain one)","format","label","block (a section to print it in)"],
-    example: {"type":"formula","expr":"t * 9/5 + 32","unit":"°F","label":"Fahrenheit","block":"maths"},
+    options: ["unit (convert the result, or name a plain one)","format (how the answer is printed: 1","\"int\"","\"unit\"","{ decimals, group, locale, style, currency, unit, prefix, suffix })","label","block (a section to print it in)"],
+    example: {"type":"formula","expr":"t * 9/5 + 32","unit":"°F","format":1,"label":"Fahrenheit","block":"maths"},
     file: "nodes/formula.js",
   },
   "machine": {
@@ -48,8 +48,8 @@ export const NODES = {
     summary: "A live value from a memory key, or a constant when the page cannot read one.",
     inputs: ["key (a memory key)","path (a dotted path inside the record)","value (the fallback)"],
     outputs: ["value — what the key holds now, with the node's unit on it"],
-    options: ["unit","scope=own|public","owner (for a public read)","label"],
-    example: {"type":"source","key":"sensors.livingroom","path":"celsius","unit":"°C","value":21},
+    options: ["unit","format (how it is printed: 1","\"int\"","\"unit\"","an object)","scope=own|public","owner (for a public read)","label"],
+    example: {"type":"source","key":"sensors.livingroom","path":"celsius","unit":"°C","format":1,"value":21},
     file: "nodes/source.js",
   },
   "text": {
@@ -64,8 +64,8 @@ export const NODES = {
     summary: "A named quantity: the writable ground the rest of the document stands on.",
     inputs: ["value (the quantity itself, a literal — never a reference)"],
     outputs: ["value — the number with its unit, or the text, truth or list it holds"],
-    options: ["unit","min","max","step","format","label"],
-    example: {"type":"value","value":22,"unit":"°C","min":-20,"max":40,"step":0.5,"label":"Lämpötila"},
+    options: ["unit","min","max","step","format (how it is printed: 1","\"int\"","\"unit\"","an object)","label"],
+    example: {"type":"value","value":22,"unit":"°C","min":-20,"max":40,"step":0.5,"format":1,"label":"Lämpötila"},
     file: "nodes/value.js",
   },
 };

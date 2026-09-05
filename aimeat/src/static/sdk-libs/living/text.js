@@ -23,10 +23,15 @@
  *   const parts = parseTemplate('It is {{ t }} °C{{ if t > 30 }} — too hot{{ end }}.');
  *   renderTemplate(parts, scope);
  * @version-history
+ *   v0.3.0 — 2026-09-05 — The words after the bar are format.js's now, not a second copy: the
+ *     same vocabulary a node's `format` option takes, so {{ t | 1 }} in a sentence and
+ *     "format": 1 on a figure print the same number. `plain` finally means what it said — it
+ *     was in the documented list and fell through to the branch that prints the unit as well.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { parse, symbolsOf } from './formula-parse.js';
-import { evaluate, isError, isQuantity, asText, asNumber, trimNumber } from './formula-eval.js';
+import { evaluate, isError, isQuantity } from './formula-eval.js';
+import { formatValue as printValue, FORMATS } from './format.js';
 import { unitLabel } from './units.js';
 
 /** @typedef {{ kind: 'text', text: string }} TextPart */
@@ -34,32 +39,15 @@ import { unitLabel } from './units.js';
 /** @typedef {{ kind: 'if', tree: any, then: any[], other: any[], source: string }} IfPart */
 
 /** The named ways a value is written out. A bare number after the bar is that many decimals. */
-export const FORMATS = ['unit', 'plain', 'int', 'percent', 'upper', 'lower', 'text', '<digits>'];
+export { FORMATS };
 
 /**
- * Write one value the way the template asked for.
+ * Write one value the way the template asked for — the SAME printer a node's `format` option
+ * goes through, so a sentence and a figure reading the same node cannot disagree about it.
  * @param {any} value @param {string|null} format
  * @returns {string}
  */
-export function formatValue(value, format) {
-  if (isError(value)) return value.error;
-  const f = format == null ? '' : String(format).trim().toLowerCase();
-  if (f === 'unit') return asText(value);
-  if (f === 'upper') return asText(value).toUpperCase();
-  if (f === 'lower') return asText(value).toLowerCase();
-  if (f === 'text' || f === '') {
-    // The default: a quantity prints as its number, because the sentence around it already
-    // carries the unit. Everything else prints as itself.
-    if (isQuantity(value)) return trimNumber(value.n);
-    return asText(value);
-  }
-  const n = asNumber(value);
-  if (!Number.isFinite(n)) return asText(value);
-  if (f === 'int') return String(Math.round(n));
-  if (f === 'percent') return trimNumber(Math.round(n * 1000) / 10) + ' %';
-  if (/^\d+$/.test(f)) return n.toFixed(Number(f));
-  return asText(value);
-}
+export function formatValue(value, format) { return printValue(value, format); }
 
 /** One {{ … }} tag, split into its expression and its format. */
 function splitTag(body) {

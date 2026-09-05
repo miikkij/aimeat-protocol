@@ -9,6 +9,8 @@
  *   recomputed everything every time, which is the failure this file exists to catch.
  * @usage cd aimeat && pnpm vitest run test/unit/living-graph.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The first refresh enters each machine's initial state, so what a
+ *     machine writes is right on the first paint (living 0.3.0).
  *   v1.0.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { describe, it, expect } from 'vitest';
@@ -182,6 +184,25 @@ describe('createGraph: the machine is a reader and a writer', () => {
     expect(g.errors).toEqual([]);
     expect(g.order.indexOf('t')).toBeLessThan(g.order.indexOf('state'));
     expect(g.order.indexOf('state')).toBeLessThan(g.order.indexOf('advice'));
+  });
+
+  // A machine that merely OCCUPIED its initial state left the value it writes at whatever the
+  // record seeded, so the document opened saying nothing and only became right once somebody
+  // moved a control. The first refresh enters the state instead.
+  it('the initial state is entered, so what the machine writes is right on the first paint', () => {
+    const g = createGraph(withMachine());
+    const out = g.refresh();
+    expect(g.valueOf('state')).toBe('fine');
+    expect(g.valueOf('advice')).toBe('ei mitään');
+    expect(out.changed).toContain('advice');
+  });
+
+  it('it enters once: a second refresh does not run the entry again', () => {
+    const g = createGraph(withMachine());
+    g.refresh();
+    g.set('advice', 'käsin');
+    expect(g.refresh().changed).not.toContain('advice');
+    expect(g.valueOf('advice')).toBe('käsin');
   });
 
   it('a crossing sends the event and the entry action lands in the same change', () => {

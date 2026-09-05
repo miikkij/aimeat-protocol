@@ -12,15 +12,22 @@
  *
  *   IT IS FETCHED ONCE PER PAGE AND ONLY WHEN A FORMULA IS ACTUALLY PRINTED — a document with no
  *   printed formula pays nothing for the six hundred kilobytes it did not use.
+ *
+ *   THE ANSWER IS PRINTED THROUGH THE NODE'S `format`, and the count-up counts in the same
+ *   writing, so a dew point reads 15.8 the whole way there instead of arriving at 15.8 through
+ *   fifteen frames of 15.7529759484. The unit keeps its own element unless the format says where
+ *   it goes, in which case the format's text carries it and this element steps aside.
  * @structure formulaView(host, spec) → { el, update } · loadKatex()
  * @usage  import { formulaView } from './formula-view.js';
  * @version-history
+ *   v0.3.0 — 2026-09-05 — The answer is written through format.js: the spec on the node decides
+ *     the digits, the grouping and where the unit sits, and the count-up uses the same printer.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { APEX_URL } from '../_core/config.js';
 import { el, countTo } from './dom.js';
-import { isError, isQuantity, trimNumber, asText } from './formula-eval.js';
-import { unitLabel } from './units.js';
+import { isError, isQuantity } from './formula-eval.js';
+import { formatNumber, formatParts } from './format.js';
 
 /** One promise per page: the first printed formula fetches KaTeX, the rest wait on the same one. */
 let katexPromise = null;
@@ -53,7 +60,7 @@ export function loadKatex() {
 /**
  * The printed formula.
  * @param {HTMLElement} host
- * @param {{ id: string, label?: string, tex: string, plain: string, value?: any }} spec
+ * @param {{ id: string, label?: string, tex: string, plain: string, value?: any, format?: any }} spec
  * @returns {{ el: HTMLElement, update: (value: any, tex: string) => void }}
  */
 export function formulaView(host, spec) {
@@ -88,6 +95,19 @@ export function formulaView(host, spec) {
     });
   }
 
+  /** Where the unit belongs right now, when the format asked for a placement rather than leaving
+   *  it to the element beside the number. */
+  let unitNow = '';
+  let placeNow = 'none';
+
+  /** The node's own way of writing a number, used for the final value AND for every frame of the
+   *  count-up, so the digits do not change shape when it lands. */
+  const write = function (n) {
+    const body = formatNumber(n, spec.format);
+    if (!unitNow || placeNow === 'none') return body;
+    return placeNow === 'before' ? unitNow + ' ' + body : body + ' ' + unitNow;
+  };
+
   /**
    * @param {any} value @param {string} tex
    */
@@ -101,14 +121,19 @@ export function formulaView(host, spec) {
       return;
     }
     root.removeAttribute('data-living-state');
+    const parts = formatParts(value, spec.format);
     if (isQuantity(value) || typeof value === 'number') {
       const n = isQuantity(value) ? value.n : value;
-      countTo(answerValue, Number.isFinite(lastNumber) ? lastNumber : n, n, trimNumber);
+      unitNow = parts.unit;
+      placeNow = parts.place;
+      countTo(answerValue, Number.isFinite(lastNumber) ? lastNumber : n, n, write);
       lastNumber = n;
-      answerUnit.textContent = isQuantity(value) ? unitLabel(value.u) : '';
+      // The unit has its own element unless the format asked for a placement, in which case the
+      // number's text already carries it and a second copy would read as a typo.
+      answerUnit.textContent = parts.place === 'none' ? parts.unit : '';
       return;
     }
-    answerValue.textContent = asText(value);
+    answerValue.textContent = parts.text;
     answerUnit.textContent = '';
     lastNumber = NaN;
   }
