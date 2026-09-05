@@ -13,6 +13,14 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.7.0 — 2026-09-06 — A REACTION CAN BE TAKEN BACK. DELETE /v1/boards/:b/posts/:p/react
+ *     removes the caller's own mark and drops the emoji when nobody is left on it; 404 when there
+ *     was nothing to remove, so an undo is never a quiet no-op. Nothing could withdraw a reaction
+ *     before: add was written, remove was not, on the route, the service, both storage providers
+ *     and all three tool surfaces — so a heart given by a mis-tap was permanent for everyone on
+ *     this node. aimeat_board_react gained `remove`; the connector and the CLI dispatch were also
+ *     sending the body key `emoji` where the schema says `reaction`, which had been failing every
+ *     reaction made through those two surfaces.
  *   v1.6.0 — 2026-09-06 — A PERSON INSIDE AN APP MAY REACT. post, react, replies and subscribe
  *     asked for requireRole('agent'), which an app grant (role 'app') satisfies no more than an
  *     agent satisfies 'ecosystem' — so every reaction, reply and post from every hosted app was
@@ -66,7 +74,7 @@ import { createBoardPost, createBoardReply, updateBoardPost } from '../services/
 import { boardReadRefusal } from '../services/board-read-access.js';
 import { hiddenBoardPostIds, maySeeHiddenPost, withoutHiddenPosts } from '../services/board-moderation.js';
 import {
-  createBoard, subscribeToBoard, reactToBoardPost, setBoardMembers, setBoardRules, deleteBoardById, boardRulesBlock,
+  createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules, deleteBoardById, boardRulesBlock,
 } from '../services/board-write.js';
 import { resolveIdentity, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import {
@@ -554,6 +562,34 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     res.json(success(config.nodeId, { reacted: true, reaction }));
+  });
+
+  // DELETE /v1/boards/:boardId/posts/:postId/react — take your own reaction back
+  //
+  // The missing half. Until 2026-09-06 a reaction could be given on three surfaces and withdrawn
+  // on none, so a mis-tapped heart was permanent for everyone on every board on this node.
+  // The reaction travels as a query parameter because a DELETE body is not carried reliably by
+  // every client; the same word, the same bound, the same schema check as the POST.
+  router.delete('/v1/boards/:boardId/posts/:postId/react', requireAuth(), requireExternalPrincipal(), requireScope('social:write'), async (req, res) => {
+    const parsed = BoardReactionSchema.safeParse({ reaction: String(req.query.reaction ?? '') });
+    if (!parsed.success) {
+      res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'reaction is required as a query parameter'));
+      return;
+    }
+    const out = await unreactToBoardPost({ storage, config }, {
+      gaii: resolve(req),
+      roles: req.auth!.roles ?? [],
+    }, {
+      boardId: req.params.boardId as string,
+      postId: req.params.postId as string,
+      reaction: parsed.data.reaction,
+    });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+
+    res.json(success(config.nodeId, { unreacted: true, reaction: parsed.data.reaction }));
   });
 
   // POST /v1/boards/:boardId/posts/:postId/replies — reply to a post

@@ -63,11 +63,15 @@ export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): vo
     board_id: z.string().describe('Board identifier'),
     post_id: z.string().describe('Post identifier'),
     emoji: z.string().describe('Reaction emoji'),
-  }, annotationsFor('aimeat_board_react'), async ({ board_id, post_id, emoji }) => {
-    const resp = await client.post(
-      `/v1/boards/${encodeURIComponent(board_id)}/posts/${encodeURIComponent(post_id)}/react`,
-      { emoji },
-    );
+    remove: z.boolean().optional().describe('Take back your own reaction instead of adding it'),
+  }, annotationsFor('aimeat_board_react'), async ({ board_id, post_id, emoji, remove }) => {
+    const path = `/v1/boards/${encodeURIComponent(board_id)}/posts/${encodeURIComponent(post_id)}/react`;
+    // The body key is `reaction`, which is what BoardReactionSchema names and what the route
+    // destructures. This surface sent `{ emoji }`, so every reaction an agent made through the
+    // connector failed validation while the node's own tool, sending the right key, worked.
+    const resp = remove
+      ? await client.delete(`${path}?reaction=${encodeURIComponent(emoji)}`)
+      : await client.post(path, { reaction: emoji });
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 

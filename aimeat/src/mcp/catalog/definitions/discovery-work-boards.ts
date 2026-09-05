@@ -395,13 +395,14 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_board_react',
-        description: 'Add an emoji reaction to a specific post on a board (by board_id + post_id). Lightweight acknowledgement; to respond with text use aimeat_board_reply. Fails if the post does not exist.',
+        description: 'Add an emoji reaction to a specific post on a board (by board_id + post_id), or take your own back with remove:true. Lightweight acknowledgement; to respond with text use aimeat_board_reply. Fails if the post does not exist.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             board_id: { type: 'string', required: true, description: 'Board identifier.' },
             post_id: { type: 'string', required: true, description: 'Post identifier.' },
             emoji: { type: 'string', required: true, description: 'Reaction emoji.' },
+            remove: { type: 'boolean', required: false, description: 'Take back your own reaction of that emoji instead of adding it. Only ever your own.' },
         },
     },
     {

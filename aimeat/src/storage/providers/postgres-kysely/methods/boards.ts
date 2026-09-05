@@ -184,6 +184,20 @@ export const boardMethods = {
     return true;
   },
 
+  async removeReaction(this: PostgresKyselyStorage, boardId: string, postId: string, emoji: string, gaii: string): Promise<boolean> {
+    const post = await this.db.selectFrom('BoardPost').select('reactions').where('boardId', '=', boardId).where('postId', '=', postId).executeTakeFirst();
+    if (!post) return false;
+    const reactions = (post.reactions ?? {}) as Record<string, string[]>;
+    const list = reactions[emoji];
+    if (!list || !list.includes(gaii)) return false;
+    const left = list.filter(g => g !== gaii);
+    // Nobody left on it: the key goes, not an empty array that still counts as a reaction.
+    if (left.length) reactions[emoji] = left; else delete reactions[emoji];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await this.db.updateTable('BoardPost').set({ reactions: jsonb(reactions) } as any).where('boardId', '=', boardId).where('postId', '=', postId).execute();
+    return true;
+  },
+
   async createBoardSubscription(this: PostgresKyselyStorage, sub: BoardSubscriptionRecord): Promise<BoardSubscriptionRecord> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await this.db.insertInto('BoardSubscription').values({ id: sub.id, boardId: sub.boardId, gaii: sub.gaii, callbackUrl: sub.callbackUrl ?? null, filters: jsonb(sub.filters ?? null), createdAt: new Date(sub.createdAt) } as any)

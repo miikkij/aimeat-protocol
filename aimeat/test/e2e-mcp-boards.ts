@@ -332,6 +332,59 @@ await test('7b. A reaction longer than 32 characters is refused', async () => {
     assert(body.result.isError === true, 'isError for an over-long reaction');
 });
 
+// A heart given by a mis-tap was permanent until 2026-09-06: add was written and remove was not,
+// on any surface. These four assert the whole of taking one back — it goes, the post stops
+// carrying the emoji at all when nobody is left on it, a second withdrawal is a 404 rather than a
+// silent success, and the HTTP door does the same as the tool.
+await test('7c. A reaction can be taken back, and the emoji goes with the last person on it', async () => {
+    const give = await mcpRpc('tools/call', {
+        name: 'aimeat_board_react',
+        arguments: { board_id: boardId, post_id: postId, emoji: '❤️' },
+    }, 122);
+    assert(JSON.parse(give.body.result.content[0].text).success === true, 'the heart is given');
+
+    const before = await json(`/v1/boards/${boardId}/posts/${postId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(Array.isArray(before.body.data.reactions?.['❤️']), 'the post carries the heart');
+
+    const take = await mcpRpc('tools/call', {
+        name: 'aimeat_board_react',
+        arguments: { board_id: boardId, post_id: postId, emoji: '❤️', remove: true },
+    }, 123);
+    assert(JSON.parse(take.body.result.content[0].text).success === true, 'the heart is taken back');
+
+    const after = await json(`/v1/boards/${boardId}/posts/${postId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(after.body.data.reactions?.['❤️'] === undefined,
+        `nobody is left on it, so the emoji is gone: ${JSON.stringify(after.body.data.reactions)}`);
+});
+
+await test('7d. Taking back what you never gave is a 404, not a quiet success', async () => {
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_board_react',
+        arguments: { board_id: boardId, post_id: postId, emoji: '❤️', remove: true },
+    }, 124);
+    assert(body.result.isError === true, 'isError when there was nothing to take back');
+});
+
+await test('7e. The HTTP door withdraws the same way the tool does', async () => {
+    const give = await json(`/v1/boards/${boardId}/posts/${postId}/react`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ reaction: '🎧' }),
+    });
+    assert(give.status === 200, `react: ${give.status}`);
+    const gone = await json(`/v1/boards/${boardId}/posts/${postId}/react?reaction=${encodeURIComponent('🎧')}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(gone.status === 200, `unreact: ${gone.status} ${JSON.stringify(gone.body.error ?? {})}`);
+    const again = await json(`/v1/boards/${boardId}/posts/${postId}/react?reaction=${encodeURIComponent('🎧')}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(again.status === 404, `a second withdrawal expected 404, got ${again.status}`);
+    const naked = await json(`/v1/boards/${boardId}/posts/${postId}/react`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(naked.status === 400, `no reaction named expected 400, got ${naked.status}`);
+});
+
 await test('8. Reply to post', async () => {
     const { body } = await mcpRpc('tools/call', {
         name: 'aimeat_board_reply',

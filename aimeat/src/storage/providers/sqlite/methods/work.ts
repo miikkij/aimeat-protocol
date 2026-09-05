@@ -499,6 +499,21 @@ export const workMethods = {
     return true;
   },
 
+  async removeReaction(this: SqliteStorage, boardId: string, postId: string, emoji: string, gaii: string): Promise<boolean> {
+    const row = this.db.prepare('SELECT reactions FROM board_posts WHERE boardId = ? AND id = ?').get(boardId, postId) as Record<string, unknown> | undefined;
+    if (!row) return false;
+    const reactions = JSON.parse(row.reactions as string) as Record<string, string[]>;
+    const list = reactions[emoji];
+    if (!list || !list.includes(gaii)) return false;
+    const left = list.filter(g => g !== gaii);
+    // Nobody left on it: the key goes, not an empty array that still counts as a reaction.
+    if (left.length) reactions[emoji] = left; else delete reactions[emoji];
+    this.db.prepare('UPDATE board_posts SET reactions = ? WHERE boardId = ? AND id = ?').run(
+      JSON.stringify(reactions), boardId, postId,
+    );
+    return true;
+  },
+
   deserializeBoard(this: SqliteStorage, row: Record<string, unknown>): BoardRecord {
     const record: BoardRecord = {
       id: row.id as string,

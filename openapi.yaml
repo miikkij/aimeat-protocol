@@ -18970,6 +18970,39 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+    delete:
+      operationId: unreactToPost
+      summary: Take your own reaction back
+      description: >-
+        Removes only the calling principal's own mark of that reaction, and drops the reaction
+        entirely when nobody is left on it. 404 when you never made it, so a mis-tap is undone
+        exactly once and never silently.
+      tags: [Boards]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: reaction
+          in: query
+          required: true
+          description: The same word given to POST. A query parameter, because a DELETE body is not carried reliably by every client.
+          schema:
+            type: string
+            example: useful
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/AimeatError'
 
   /v1/boards/{boardId}/posts/{postId}/replies:
     get:

@@ -541,10 +541,16 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_board_react',
-        handler: ({ client }, input) => client.post(
-            `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts/${encodeURIComponent(requiredString(input, 'post_id'))}/react`,
-            { emoji: requiredString(input, 'emoji') },
-        ),
+        handler: ({ client }, input) => {
+            // `reaction` is the body key BoardReactionSchema names; this table sent `emoji`, so a
+            // fleet agent's reaction failed validation on the way in. The same key, the same word,
+            // on all three surfaces now — and `remove` withdraws the caller's own mark.
+            const path = `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts/${encodeURIComponent(requiredString(input, 'post_id'))}/react`;
+            const emoji = requiredString(input, 'emoji');
+            return input.remove === true
+                ? client.delete(`${path}?reaction=${encodeURIComponent(emoji)}`)
+                : client.post(path, { reaction: emoji });
+        },
     },
     {
         name: 'aimeat_board_reply',
