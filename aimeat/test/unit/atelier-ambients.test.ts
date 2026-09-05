@@ -7,6 +7,8 @@
  *   whisper on a look that stands on the palette page — with the number.
  * @usage cd aimeat && pnpm test -- atelier-ambients
  * @version-history
+ *   v1.3.0 — 2026-09-05 — Nine presets: plasma, lava and tunnel through every invariant, the
+ *     kit pins included (wish-atelier-post-process-effects, stage 3).
  *   v1.2.0 — 2026-09-05 — validateAmbientSpec (stage 5): every preset accepted at its default,
  *     none accepted, the refusals worded, a loud field refused on the palette page and proven
  *     on a world; the shelf alpha proven on each preset's first fit, because that is the
@@ -57,7 +59,7 @@ describe('atelier-ambients — the registry', () => {
     expect(new Set(AMBIENT_IDS).size).toBe(AMBIENT_IDS.length);
     for (const id of AMBIENT_IDS) expect(id).toMatch(/^[a-z]+$/);
     expect(AMBIENT_IDS).not.toContain(AMBIENT_NONE);
-    expect(AMBIENT_IDS.length).toBe(6);
+    expect(AMBIENT_IDS.length).toBe(9);
   });
 
   it('every entry is measurable: technique, proof, blend, peak, alpha, speed and fps in range', () => {
@@ -162,7 +164,7 @@ describe('atelier-ambients — the matrix proves the layer (AK-AMBIENT)', () => 
     expect(runMatrix().filter((r) => !r.ok)).toEqual([]);
   });
 
-  it('an unknown preset is refused, naming the six', () => {
+  it('an unknown preset is refused, naming every preset', () => {
     const failures = runMatrix({ '--ak-ambient': 'banana' }, { presets: ['vivid'] }).filter((r) => !r.ok);
     expect(failures.length).toBeGreaterThan(0);
     expect(failures[0]!.label).toBe('AK-AMBIENT preset');

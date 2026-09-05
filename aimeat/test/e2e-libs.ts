@@ -5,6 +5,10 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.12.0 — 2026-09-05 — The effects (wish-atelier-post-process-effects): fx and fxPlay
+ *     asserted, effects.css among the fetched parts (its one keyframe runs once, so the
+ *     infinite claim stays at exactly two), the defs element and the colour-space declaration
+ *     asserted in the bundle.
  *   v1.11.0 — 2026-09-05 — The ambient (wish-atelier-ambient-visuals): the six new exports, the
  *     three contract tokens, lounge and dawn, ambient.css among the fetched parts, the layer's
  *     marker in the bundle — and the infinite-animation claim widened on purpose from one to
@@ -1144,9 +1148,14 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
         'morph', 'draggable', 'burst', 'scrub', 'layoutMove', 'swipeStack', 'micro',
         'parallax', 'readingRail', 'intro', 'setMotion',
         'ambient', 'ambientStage', 'weather', 'attract', 'setWeather', 'weatherLevel',
+        'fx', 'fxPlay',
     ]) {
         assert(text.includes(part), `should export ${part}`);
     }
+    // The effects' SVG graphs live in one hidden defs element and say sRGB out loud: the SVG
+    // default is linearRGB, and the matrix that proved the colour effects models sRGB.
+    assert(text.includes('ak-fx-defs'), 'the effects must keep their filters in one ak-fx-defs element');
+    assert(text.includes('color-interpolation-filters'), 'every effect filter must declare its colour space');
     // The imagery rule is enforced at the component boundary, not just at publish time.
     assert(text.includes('data: URIs are refused'),
         'a hero image data: URI must be refused with words, not painted');
@@ -1255,7 +1264,7 @@ await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, 
     assert(text.includes('@preset-block vivid'), 'the base contract must carry the vivid @preset-block tag');
     // The parts the entry imports must actually be reachable, or the kit renders unstyled.
     let parts = '';
-    for (const part of ['shell.css', 'content.css', 'data.css', 'scenics.css', 'patterns.css', 'ambient.css']) {
+    for (const part of ['shell.css', 'content.css', 'data.css', 'scenics.css', 'patterns.css', 'ambient.css', 'effects.css']) {
         assert(css.includes(part), `should import ${part}`);
         const partRes = await fetch(`${BASE}/lib/aimeat-atelier/${part}`);
         assert(partRes.ok, `/lib/aimeat-atelier/${part} failed: ${partRes.status}`);

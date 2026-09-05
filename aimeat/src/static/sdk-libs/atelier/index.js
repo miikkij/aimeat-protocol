@@ -31,6 +31,12 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.48.0 — 2026-09-05 — THE EFFECTS (wish-atelier-post-process-effects): fx() and fxPlay()
+ *     join the surface — nine post-process filters a block, a hero band or a picture may wear
+ *     (scanlines, vignette, duotone, recolour, distort, glitch, vhs, ripple, kaleidoscope),
+ *     still on the words or a finite moment on a cue, their parameters clamped to the registry
+ *     the contrast matrix proved; the ambient layer takes a `post` chain of up to two passes
+ *     (living motion, behind the words only); plasma, lava and tunnel join the ambient shelf.
  *   v0.47.1 — 2026-09-05 — Stylesheet only: the list-detail fold spans its panes on a phone and a
  *     tall dialog scrolls in its body (content.css v0.37.0); the version moves with the sheet.
  *   v0.47.0 — 2026-09-05 — THE AMBIENT (wish-atelier-ambient-visuals): the one layer allowed to
@@ -277,6 +283,7 @@ import { screenTransition, panelTransition, curtain, intro } from './transitions
 import { setMotion } from './dom.js';
 import { ambient, setWeather, weatherLevel } from './ambient.js';
 import { ambientStage, weather, attract } from './ambient-parts.js';
+import { fx, fxPlay } from './effects.js';
 
 const atelier = {
   /**
@@ -284,7 +291,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.47.1',
+  version: '0.48.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -358,6 +365,9 @@ const atelier = {
   // ── The ambient: the one layer allowed to move at idle, its stage, the weather switch and
   //    attract mode (the look decides; the viewer's weather and Less motion always win) ──
   ambient, ambientStage, weather, attract, setWeather, weatherLevel,
+  // ── The effects: still on the words, a moment on a cue, living only behind them (a post
+  //    pass on the ambient layer) ──
+  fx, fxPlay,
 
   // ── Data ──
   form, table, searchBar,
