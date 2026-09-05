@@ -18,12 +18,22 @@
  *   trusts what it ships (the drift gate that proves looks.css matches the registry stays in the
  *   tool, where the build lives).
  * @structure the colour arithmetic re-exported from atelier-color.ts · evalColor/gradientStops/mix
- *   scans · parseThemes/parseAtelier · loadAtelierSheets() (cached) · runMatrix(overrides?) →
- *   Result[]
+ *   scans · parseThemes/parseAtelier · loadAtelierSheets() (cached) · runMatrix(overrides?, opts?)
+ *   → Result[]
  * @usage
  *   import { runMatrix } from './atelier-contrast.js';
  *   const failures = runMatrix({ '--ak-accent': '#b3261e' }).filter((r) => !r.ok);
+ *   runMatrix(undefined, { presets: ['riso'], effect: { id: 'duotone', params: { strength: 0.8 } } });
  * @version-history
+ *   v1.5.0 — 2026-09-05 — AK-FX: a post-process EFFECT is proven on the grounds the rest of the
+ *     matrix resolves (wish-atelier-post-process-effects, stage 2). `opts.effect` names one of
+ *     the registry's effects and its parameters (clamped as the kit clamps them): a colour effect
+ *     (duotone, recolour) maps page, card, ink, dimmed ink and accent text through the same
+ *     transform the browser applies and holds the mapped pairs to 4.5:1, because a filter
+ *     transforms ground and words together and a hue turn in sRGB does not keep luminance; an
+ *     overlay effect (vignette, scanlines) composites ink at its strength over the page and the
+ *     card and holds body ink to 4.5:1 at the darkest point; an effect with no proof records
+ *     that it ran. An unknown effect refuses naming the nine.
  *   v1.4.0 — 2026-09-05 — The colour arithmetic (lum, ratio, OKLab both ways, rotateHue, mixOklab,
  *     Rgba, over) moved whole to atelier-color.ts and is re-exported from here: a pure move under
  *     the 800-line cap before the effects round adds the CSS filter transforms and the AK-FX
@@ -49,10 +59,14 @@
  */
 import { readFileSync } from 'node:fs';
 import { AMBIENT_BOUNDS, AMBIENT_IDS, AMBIENT_NONE, ambientById } from '../data/atelier-ambients.js';
+import { EFFECT_IDS, EFFECT_TOKEN_VARS, effectById, resolveParams } from '../data/atelier-effects.js';
 // The colour arithmetic (WCAG luminance and ratio, OKLab, the hue rotation, source-over) lives
 // in atelier-color.ts since 2026-09-05, a pure move under the 800-line cap; it is re-exported
-// here so every importer keeps the address it had.
-import { lum, ratio, rotateHue, mixOklab, over, type Rgba } from './atelier-color.js';
+// here so every importer keeps the address it had. The CSS filter transforms beside it are
+// what AK-FX runs.
+import {
+  lum, ratio, rotateHue, mixOklab, over, type Rgba, hueRotateSrgb, saturateSrgb, duotoneSrgb,
+} from './atelier-color.js';
 export { lum, ratio, rotateHue, mixOklab, over, type Rgba };
 
 // ── The tiny CSS colour-expression evaluator ─────────────────────────────────────────────────
@@ -368,7 +382,12 @@ export function loadAtelierSheets(): AtelierSheets {
  */
 export function runMatrix(
   overrides?: Record<string, string>,
-  opts?: { presets?: readonly string[] },
+  opts?: {
+    presets?: readonly string[];
+    /** A post-process effect to prove on every combination, with its parameters (missing ones
+     *  take the registry's defaults, and every number is clamped as the kit clamps it). */
+    effect?: { id: string; params?: Record<string, unknown> | null };
+  },
 ): Result[] {
   const { themes, sheet, presetNames: allPresets } = loadAtelierSheets();
   // A signature is proven WHERE IT LIVES: an accent pair chosen for one look validates against
@@ -613,6 +632,35 @@ export function runMatrix(
           const hex = c.alpha === 1 ? c.hex : over(c, surface);
           add(combo, `AK-TONE ${tone} text on card`, ratio(hex, surface), MIN_TEXT, 'a tone-coloured reading on a card');
           add(combo, `AK-TONE ${tone} text on vane`, ratio(hex, surface2), MIN_TEXT, 'a tone-coloured log line on the console ground');
+        }
+
+        // AK-FX: a post-process effect is proven on the SAME resolved grounds every check above
+        // stands on — the effect is the last thing the eye sees, after the whole cascade. A
+        // colour effect maps ground and words together, so the mapped PAIR must keep the floor
+        // (a hue turn in sRGB does not keep luminance); an overlay effect lays ink over the
+        // ground, so body ink must read at the darkest point. An effect with no proof records
+        // that it ran: the volume rule the validator enforces is its whole guarantee.
+        if (opts?.effect) {
+          const fx = effectById(opts.effect.id);
+          if (!fx) {
+            failR(combo, 'AK-FX effect', `"${opts.effect.id}" is not an effect the kit ships — one of ${EFFECT_IDS.join(', ')}`);
+          } else if (fx.proof === 'colour') {
+            const p = resolveParams(fx, opts.effect.params);
+            const map = fx.id === 'duotone'
+              ? (hex: string): string => duotoneSrgb(hex, colorOf(EFFECT_TOKEN_VARS[String(p.shadow)]!), colorOf(EFFECT_TOKEN_VARS[String(p.light)]!), Number(p.strength))
+              : (hex: string): string => saturateSrgb(hueRotateSrgb(hex, Number(p.hue)), Number(p.saturate));
+            add(combo, `AK-FX ${fx.id} ink on mapped page`, ratio(map(ink), map(bg)), MIN_TEXT, `body text and the page, both seen through the ${fx.id} effect`);
+            add(combo, `AK-FX ${fx.id} ink on mapped card`, ratio(map(ink), map(surface)), MIN_TEXT, `body text and a card, both seen through the ${fx.id} effect`);
+            add(combo, `AK-FX ${fx.id} dimmed ink on mapped card`, ratio(map(inkDim), map(surface)), MIN_TEXT, `secondary text and a card, both seen through the ${fx.id} effect`);
+            add(combo, `AK-FX ${fx.id} accent-as-text on mapped card`, ratio(map(accentText), map(surface)), MIN_TEXT, `accent-coloured text and a card, both seen through the ${fx.id} effect`);
+          } else if (fx.proof === 'overlay') {
+            const p = resolveParams(fx, opts.effect.params);
+            const veil: Rgba = { hex: ink, alpha: Number(p.strength) };
+            add(combo, `AK-FX ${fx.id} ink at the darkest point on page`, ratio(ink, over(veil, bg)), MIN_TEXT, `body text where the ${fx.id} overlay is darkest on the page`);
+            add(combo, `AK-FX ${fx.id} ink at the darkest point on card`, ratio(ink, over(veil, surface)), MIN_TEXT, `body text where the ${fx.id} overlay is darkest on a card`);
+          } else {
+            passR(combo, `AK-FX ${fx.id} ${fx.volume.join('/')}`);
+          }
         }
       } catch (e) {
         failR(combo, 'resolve', (e as Error).message);

@@ -10,10 +10,18 @@
  *   the 800 cap, and the effects round adds the CSS filter transforms beside these. The contrast
  *   module re-exports every public name, so every importer keeps the address it had.
  * @structure lum · ratio · srgbToLinear · linearToSrgb · hexToLab · labToHex · rotateHue ·
- *   mixOklab · Rgba · over
+ *   mixOklab · Rgba · over · hueRotateSrgb · saturateSrgb · duotoneSrgb
  * @usage
  *   import { ratio, mixOklab, over } from './atelier-color.js';
+ *   import { hueRotateSrgb, duotoneSrgb } from './atelier-color.js';   // the effects' proof
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The CSS filter transforms the effects registry's colour proofs run:
+ *     hueRotateSrgb and saturateSrgb are the Filter Effects matrices on sRGB channel values (the
+ *     shorthand filter functions interpolate in sRGB, and a hue turn there does not keep
+ *     luminance, which is why the matrix measures it), duotoneSrgb is the kit's SVG graph on one
+ *     colour (luminance rows → a two-entry table per channel → an arithmetic composite), so the
+ *     number the matrix proves is the number the browser paints
+ *     (wish-atelier-post-process-effects, stage 2).
  *   v1.0.0 — 2026-09-05 — Pure extraction from atelier-contrast.ts v1.3.0
  *     (wish-atelier-post-process-effects, stage 1).
  */
@@ -104,4 +112,69 @@ export function over(top: Rgba, ground: string): string {
   };
   const to = (v: number): string => v.toString(16).padStart(2, '0');
   return `#${to(ch(16))}${to(ch(8))}${to(ch(0))}`;
+}
+
+// ── The CSS filter transforms, on sRGB channel values as the shorthand functions run them ─────
+// The effects registry's colour proofs (AK-FX) map a ground and the words on it through the SAME
+// transform the browser applies, then hold the mapped pair to the floor. hue-rotate() and
+// saturate() are the Filter Effects matrices; a duotone is the kit's own SVG graph (effects.js),
+// modelled step for step so a change to one side is a change to the other.
+
+function bytes(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function toHex(r: number, g: number, b: number): string {
+  const c = (v: number): string => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0');
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+/** Apply a 3×3 matrix (row-major) to the sRGB channels of a colour. */
+function matrix(hex: string, m: readonly number[]): string {
+  const [r, g, b] = bytes(hex);
+  return toHex(
+    m[0]! * r + m[1]! * g + m[2]! * b,
+    m[3]! * r + m[4]! * g + m[5]! * b,
+    m[6]! * r + m[7]! * g + m[8]! * b,
+  );
+}
+
+/** `filter: hue-rotate(<deg>)` — the Filter Effects hueRotate matrix on sRGB channels. A gray
+ *  is a fixed point (every row sums to one and its cos/sin parts to zero); a saturated colour
+ *  changes luminance on the way round, which is the reason the matrix measures a grade. */
+export function hueRotateSrgb(hex: string, deg: number): string {
+  const a = (deg * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  return matrix(hex, [
+    0.213 + cos * 0.787 - sin * 0.213, 0.715 - cos * 0.715 - sin * 0.715, 0.072 - cos * 0.072 + sin * 0.928,
+    0.213 - cos * 0.213 + sin * 0.143, 0.715 + cos * 0.285 + sin * 0.140, 0.072 - cos * 0.072 - sin * 0.283,
+    0.213 - cos * 0.213 - sin * 0.787, 0.715 - cos * 0.715 + sin * 0.715, 0.072 + cos * 0.928 + sin * 0.072,
+  ]);
+}
+
+/** `filter: saturate(<s>)` — the Filter Effects saturate matrix: 1 is the identity, 0 is the
+ *  luminance gray, above 1 pushes every channel away from it. */
+export function saturateSrgb(hex: string, s: number): string {
+  return matrix(hex, [
+    0.213 + 0.787 * s, 0.715 - 0.715 * s, 0.072 - 0.072 * s,
+    0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s,
+    0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s,
+  ]);
+}
+
+/** The kit's duotone graph on one colour: the sRGB luminance (the feColorMatrix rows, Rec. 709
+ *  weights on the channel values, because color-interpolation-filters is sRGB) placed on the
+ *  straight ramp from `shadow` to `light` per channel (the feComponentTransfer tables), then
+ *  mixed back toward the source by 1 − strength (the arithmetic composite). */
+export function duotoneSrgb(hex: string, shadow: string, light: string, strength: number): string {
+  const [r, g, b] = bytes(hex);
+  const l = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  const s = bytes(shadow);
+  const d = bytes(light);
+  const ramp = (i: 0 | 1 | 2): number => s[i] + (d[i] - s[i]) * l;
+  return toHex(
+    ramp(0) * strength + r * (1 - strength),
+    ramp(1) * strength + g * (1 - strength),
+    ramp(2) * strength + b * (1 - strength),
+  );
 }
