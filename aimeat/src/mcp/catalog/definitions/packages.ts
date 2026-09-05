@@ -116,6 +116,22 @@ export const packagesTools: AimeatToolDefinition[] = [
         },
     },
     {
+        // Bringing a package in from another node. Idempotent on purpose, so the same call is both
+        // "install that one from over there" and "bring me the newer one": a source that has nothing
+        // newer answers applied:false rather than an error.
+        name: 'aimeat_package_pull',
+        description: 'Bring a package published on another node onto this one, verifying that node\'s signature and every component digest before anything is written.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            group_id: { type: 'string', required: true, description: 'The package on the other node, e.g. "signage::alice".' },
+            node_id: { type: 'string', description: 'A peer this node knows. Its address and key are read from the peer record.' },
+            source_url: { type: 'string', description: 'A node that is not a peer. Operator only, and only with trust:"tofu".' },
+            trust: { type: 'string', enum: ['tofu'], description: 'Accept and pin the key that node publishes. Needed only with source_url.' },
+            version: { type: 'string', description: 'A specific version. Defaults to the latest one published there.' },
+        },
+    },
+    {
         // Updating a whole installed package in one act. The per-component migration road still
         // exists and is what a component the owner EDITED goes through; this one moves everything
         // that can move safely and names the rest.

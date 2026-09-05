@@ -19,7 +19,7 @@ import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
-import { validateOutboundUrl } from '../../utils/url-validator.js';
+import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
 import { sign, verify } from '../../auth/keypair.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
@@ -139,6 +139,9 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
         for (const peer of activePeers) {
             try {
                 const peerUrl = `${peer.url}/v1/federation/templates?limit=100`;
+                // Kept for the message it produces: safeFetch below throws a generic "Fetch blocked",
+                // and a peer whose URL has become unroutable reads better named per peer in the
+                // result list than as an exception.
                 const urlCheck = await validateOutboundUrl(peerUrl);
                 if (!urlCheck.valid) {
                     results.push({ node: peer.nodeId, templates: 0, error: urlCheck.reason ?? 'URL validation failed' });
@@ -153,7 +156,11 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
                 const timestamp = new Date().toISOString();
                 const listSignature = await sign(nodeKey.privateKey, JSON.stringify({ source_node: config.nodeId, timestamp }));
 
-                const response = await fetch(peerUrl, {
+                // safeFetch, not fetch. The check above looks at the URL we are about to request and
+                // nothing else, so a peer answering 302 sent this node wherever it liked — including
+                // at the cloud metadata address the check exists to keep it away from. safeFetch
+                // re-validates every redirect hop. Invariant 3.
+                const response = await safeFetch(peerUrl, {
                     headers: {
                         'Content-Type': 'application/json',
                         'x-source-node': config.nodeId,

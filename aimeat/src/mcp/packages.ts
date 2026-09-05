@@ -38,6 +38,8 @@ import { listPackagesFor, getPackageFor } from '../services/package-read.js';
 import { setPackageVersionStatus } from '../services/package-create.js';
 import { composePackageFromApps } from '../services/package-compose.js';
 import { updateInstanceToLatest } from '../services/package-migrate.js';
+import { pullPackage } from '../services/package-pull.js';
+import type { PeerInfo } from '../services/federation.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
@@ -63,6 +65,7 @@ export function registerPackageTools(
     storage: Storage,
     config: AimeatConfig,
     getAgentGaii: () => string,
+    peers: Map<string, PeerInfo> = new Map(),
 ): void {
     /** The owner this agent acts for. Never a caller-supplied id. */
     const ownerOf = (): string => {
@@ -133,6 +136,48 @@ export function registerPackageTools(
                     ...packageSummary(out.package),
                     expects: out.expects,
                     notes: out.notes,
+                }, null, 2),
+            }],
+        };
+    });
+
+    mcp.tool('aimeat_package_pull', descriptionFor('aimeat_package_pull'), {
+        group_id: z.string().describe('The package on the other node, e.g. "signage::alice".'),
+        node_id: z.string().optional().describe('A peer this node knows. Its address and key come from the peer record.'),
+        source_url: z.string().optional().describe('A node that is not a peer. Operator only, and only with trust:"tofu".'),
+        trust: z.enum(['tofu']).optional().describe('Accept and pin the key that node publishes.'),
+        version: z.string().optional().describe('A specific version. Defaults to the latest one there.'),
+    }, annotationsFor('aimeat_package_pull'), async (args) => {
+        const out = await pullPackage({ storage, config, peers }, {
+            owner: ownerOf(),
+            sub: getAgentGaii(),
+            // An agent acts within its own grant; the operator branch of a pull is a person's
+            // decision at a keyboard, so it is not offered here.
+            isOperator: false,
+        }, {
+            groupId: args.group_id, nodeId: args.node_id, sourceUrl: args.source_url,
+            trust: args.trust, version: args.version,
+        });
+
+        if (!out.ok) {
+            return {
+                content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }],
+                isError: true,
+            };
+        }
+        if (!out.applied) {
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({ applied: false, reason: out.reason, upstream: out.upstream }, null, 2),
+                }],
+            };
+        }
+        return {
+            content: [{
+                type: 'text' as const,
+                text: JSON.stringify({
+                    applied: true, ...packageSummary(out.package), upstream: out.upstream,
                 }, null, 2),
             }],
         };

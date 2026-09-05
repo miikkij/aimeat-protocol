@@ -28,6 +28,7 @@ import { registerMessagingRoutes } from './federation-sync/messaging.js';
 import { registerCatalogueTrustRoutes } from './federation-sync/catalogue-trust.js';
 import { registerRoutingRoutes } from './federation-sync/routing.js';
 import { registerTemplatesRoutes } from './federation-sync/templates.js';
+import { registerFederationPackageRoutes } from './federation-sync/packages.js';
 
 export function federationSyncRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -37,6 +38,9 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
     registerCatalogueTrustRoutes(router, config, storage, peers);
     registerRoutingRoutes(router, config, storage, peers);
     registerTemplatesRoutes(router, config, storage, peers);
+    // After templates: /v1/federation/packages/* shares no path prefix with anything above, so the
+    // order is for reading rather than for matching.
+    registerFederationPackageRoutes(router, config, storage, peers);
 
     return router;
 }

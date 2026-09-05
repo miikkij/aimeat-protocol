@@ -92,6 +92,8 @@ export function applySchemaTables3(db: Database.Database): void {
       status            TEXT DEFAULT 'draft',
       components        TEXT NOT NULL,
       manifest          TEXT DEFAULT '',
+      -- Where this version came from, when it was pulled off another node (JSON UpstreamRef).
+      upstream          TEXT,
       createdAt         TEXT NOT NULL,
       updatedAt         TEXT NOT NULL,
       UNIQUE(packageGroupId, version)

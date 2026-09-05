@@ -37251,6 +37251,121 @@ paths:
         '413':
           description: Package exceeds size, component count or per-author limit
 
+  /v1/federation/packages/pull:
+    post:
+      operationId: pullPackageFromNode
+      summary: Bring a package in from another node
+      description: >-
+        Fetches a package published on another node and lands it here as the caller's own. The source
+        node's signature over the package descriptor is verified, and every component's sha256 is
+        recomputed from the bytes that arrived and compared against what that signature covers. The
+        per-author quota and the name conflict are checked BEFORE anything is downloaded. Nothing is
+        written until all of it has passed.
+
+
+        Name a peer with `node_id`, whose address and public key are read from the peer record and
+        never from this request. `source_url` reaches a node that is not a peer, is operator-only,
+        and requires `trust: "tofu"`, which accepts the key that node publishes at
+        /.well-known/aimeat and PINS it: a later pull from the same source under a different key is
+        refused rather than applied.
+
+
+        The package lands private, and its ownership is the caller's. The publishing author's GHII
+        travels as provenance and authorizes nothing. Idempotent: a source with nothing newer answers
+        200 with `applied: false, reason: "not_newer"`.
+      tags: [Federation, Packages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [group_id]
+              properties:
+                group_id: { type: string, description: 'The package on the other node, e.g. "signage::alice".' }
+                node_id: { type: string, description: A peer this node knows. }
+                source_url: { type: string, description: A node that is not a peer. Operator only. }
+                trust: { type: string, enum: [tofu], description: Accept and pin the key that node publishes. }
+                version: { type: string, description: A specific version. Defaults to the latest published there. }
+      responses:
+        '201':
+          description: The package landed
+        '200':
+          description: Nothing newer there, so nothing was written
+        '400':
+          description: Bad group id, a missing signature, or a component that does not match its signed digest
+        '401':
+          description: The signature does not check out against the source node's key
+        '403':
+          description: Package federation is off, the node is not an active peer, or the source is not a peer and no operator asked for it
+        '404':
+          description: That node does not serve a package by that name that this caller may read
+        '409':
+          description: A name conflict, or the source is signing with a different key than the pinned one
+        '413':
+          description: Over this node's package size or per-author limit
+        '502':
+          description: The source node could not be reached, or refused
+
+  /v1/federation/packages/{groupId}/attestation:
+    get:
+      operationId: getPackageAttestation
+      summary: This node's signed statement about a package
+      description: >-
+        The descriptor and signature that travel inside an exported package, served on their own so
+        an update check costs one small read instead of a whole archive. Carries the component
+        digests, never their content. Public on the same terms as the export door: a public package
+        is readable by anyone, a private one answers 404 to everyone but its author.
+      tags: [Federation, Packages]
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: This node has no key of its own yet, so it cannot sign a statement
+
+  /v1/packages/{groupId}/upstream-check:
+    get:
+      operationId: checkPackageUpstream
+      summary: Is there a newer version where this package came from?
+      description: >-
+        Reads the source node's signed statement and compares the published instant inside it with
+        the one this copy was pulled under. Writes nothing: applying is a separate act. Answers
+        `hasUpstream: false` for a package made on this node.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The source is answering with a signature that does not check out against the pinned key
+        '502':
+          description: The source node could not be reached
+
   /v1/packages/{groupId}/status:
     patch:
       operationId: setPackageStatus

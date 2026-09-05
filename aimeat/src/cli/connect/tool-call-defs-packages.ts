@@ -163,6 +163,27 @@ export const packageTools: ConnectCliToolDefinition[] = [
         },
     },
     {
+        // Bringing a package in from another node. All five parameters have to reach this door or
+        // withDeclaredInputOnly drops them and the call succeeds having done less than it was asked.
+        name: 'aimeat_package_pull',
+        description: 'Bring a package published on another node onto this one, verifying that node\'s signature and every component digest before anything is written.',
+        input: {
+            group_id: { type: 'string', required: true, description: 'The package on the other node, e.g. "signage::alice".' },
+            node_id: { type: 'string', description: 'A peer this node knows. Its address and key are read from the peer record.' },
+            source_url: { type: 'string', description: 'A node that is not a peer. Operator only, and only with trust:"tofu".' },
+            trust: { type: 'string', enum: ['tofu'], description: 'Accept and pin the key that node publishes. Needed only with source_url.' },
+            version: { type: 'string', description: 'A specific version. Defaults to the latest one published there.' },
+        },
+        handler: ({ client }, input) => {
+            const body: JsonObject = { group_id: requiredString(input, 'group_id') };
+            for (const key of ['node_id', 'source_url', 'trust', 'version']) {
+                const value = optionalString(input, key);
+                if (value !== undefined) body[key] = value;
+            }
+            return client.post('/v1/federation/packages/pull', body);
+        },
+    },
+    {
         // Updating a whole installed package in one act, without touching what the owner edited.
         name: 'aimeat_package_update',
         description: 'Update a whole installed package to its latest version. Parts you have edited are left untouched and reported, never overwritten.',

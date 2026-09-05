@@ -584,6 +584,32 @@ export interface PackageComponent {
 }
 
 /**
+ * Where a package came from, when it was pulled off another node.
+ *
+ * WHY THE PUBLISHED INSTANT AND NOT THE VERSION. `v{YYYY}-{MM}-{DD}-{HHmm}` happens to sort
+ * lexicographically for versions this node generated, but it is a local convention: a peer on other
+ * code, a package imported from a ZIP with an arbitrary version string, and the same-minute `-2`
+ * suffix all break it, and nothing validates the string on import. `version` is therefore kept for
+ * EQUALITY and display only, and `publishedAt` — taken from inside the signature — is what decides
+ * whether a later pull is newer.
+ *
+ * `publicKey` is pinned on the first pull, so a later pull from the same source signed by a
+ * different key is a refusal rather than a silent downgrade. `verifiedAt` is null for a package
+ * whose signature could not be checked against a key this node knows, which the manual import road
+ * allows and the federation road does not.
+ */
+export interface UpstreamRef {
+  node: string;
+  url: string;
+  groupId: string;
+  version: string;
+  publishedAt: string;
+  authorGhii: string;
+  publicKey: string;
+  verifiedAt: string | null;
+}
+
+/**
  * One record per package version. All versions of the same package share a packageGroupId.
  * Version format: v{YYYY}-{MM}-{DD}-{HHmm} — e.g. v2026-03-15-1701
  */
@@ -605,6 +631,9 @@ export interface PackageRecord {
 
   components: PackageComponent[];  // all components in this version
   manifest: string;                // full package YAML manifest (human-readable)
+
+  /** Set when this version was pulled from another node. Absent on a package made here. */
+  upstream?: UpstreamRef;
 
   createdAt: string;               // ISO 8601
   updatedAt: string;               // ISO 8601 — updated when metadata changes

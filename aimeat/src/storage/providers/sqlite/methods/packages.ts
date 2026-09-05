@@ -138,6 +138,7 @@ export const packagesMethods = {
       status: row.status as PackageRecord['status'],
       components: JSON.parse(row.components as string) as PackageComponent[],
       manifest: row.manifest as string,
+      ...(row.upstream ? { upstream: JSON.parse(row.upstream as string) as PackageRecord['upstream'] } : {}),
       createdAt: row.createdAt as string,
       updatedAt: row.updatedAt as string,
     };
@@ -146,13 +147,14 @@ export const packagesMethods = {
   async createPackage(this: SqliteStorage, record: PackageRecord): Promise<PackageRecord> {
     try {
       this.db.prepare(
-        `INSERT INTO packages (id, packageGroupId, name, author, authorGhii, version, changelog, description, category, tags, visibility, status, components, manifest, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO packages (id, packageGroupId, name, author, authorGhii, version, changelog, description, category, tags, visibility, status, components, manifest, upstream, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.id, record.packageGroupId, record.name, record.author,
         record.authorGhii, record.version, record.changelog, record.description,
         record.category, JSON.stringify(record.tags), record.visibility,
         record.status, JSON.stringify(record.components), record.manifest,
+        record.upstream ? JSON.stringify(record.upstream) : null,
         record.createdAt, record.updatedAt,
       );
     } catch (e) {
@@ -226,11 +228,12 @@ export const packagesMethods = {
     this.db.prepare(
       `UPDATE packages SET packageGroupId = ?, name = ?, author = ?, authorGhii = ?, version = ?,
        changelog = ?, description = ?, category = ?, tags = ?, visibility = ?, status = ?,
-       components = ?, manifest = ?, updatedAt = ? WHERE id = ?`
+       components = ?, manifest = ?, upstream = ?, updatedAt = ? WHERE id = ?`
     ).run(
       merged.packageGroupId, merged.name, merged.author, merged.authorGhii, merged.version,
       merged.changelog, merged.description, merged.category, JSON.stringify(merged.tags),
       merged.visibility, merged.status, JSON.stringify(merged.components), merged.manifest,
+      merged.upstream ? JSON.stringify(merged.upstream) : null,
       merged.updatedAt, id,
     );
     return merged;

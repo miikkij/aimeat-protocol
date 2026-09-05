@@ -40,6 +40,7 @@ function toPackage(r: Selectable<Package>): PackageRecord {
     status: (r.status ?? 'draft') as PackageRecord['status'],
     components: (r.components ?? []) as unknown as PackageComponent[],
     manifest: r.manifest ?? '',
+    ...(r.upstream ? { upstream: r.upstream as unknown as PackageRecord['upstream'] } : {}),
     createdAt: iso(r.createdAt),
     updatedAt: iso(r.updatedAt),
   };
@@ -72,7 +73,9 @@ export const packageMethods = {
         authorGhii: record.authorGhii, version: record.version, changelog: record.changelog,
         description: record.description, category: record.category, tags: record.tags,
         visibility: record.visibility, status: record.status, components: jsonb(record.components),
-        manifest: record.manifest, createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
+        manifest: record.manifest,
+        upstream: record.upstream ? jsonb(record.upstream) : null,
+        createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any).returningAll().executeTakeFirstOrThrow();
       return toPackage(row);
@@ -141,6 +144,7 @@ export const packageMethods = {
     if (updates.status !== undefined) data.status = updates.status;
     if (updates.components !== undefined) data.components = jsonb(updates.components);
     if (updates.manifest !== undefined) data.manifest = updates.manifest;
+    if (updates.upstream !== undefined) data.upstream = updates.upstream ? jsonb(updates.upstream) : null;
     data.updatedAt = new Date();
     const rows = await this.db.updateTable('Package').set(data as never).where('id', '=', id).returningAll().execute();
     return rows[0] ? toPackage(rows[0]) : null;

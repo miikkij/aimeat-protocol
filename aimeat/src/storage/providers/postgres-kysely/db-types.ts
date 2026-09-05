@@ -1721,6 +1721,8 @@ export interface Package {
   status: Generated<string>;
   tags: string[] | null;
   updatedAt: Timestamp;
+  /** UpstreamRef when this version was pulled off another node. Null for one made here. */
+  upstream: Json | null;
   version: string;
   visibility: Generated<string>;
 }

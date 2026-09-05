@@ -634,6 +634,11 @@ export function initializeSchema(db: Database.Database): void {
       ON outbound_messages(ownerGhii, organismId, createdAt);
   `);
 
+  // Where a package came from, when it was pulled off another node: the source, the instant its
+  // signature says it was published there, and the key that signature was checked against. One JSON
+  // column rather than eight scalars, because nothing queries inside it. Mirrors Postgres 0070.
+  safeAddColumn('packages', 'upstream', 'TEXT');
+
   // ── Memory full-text search (Tier-1 librarian retrieval) ──
   // FTS5 is built into better-sqlite3 — no dependency. A standalone virtual table mirrors the
   // searchable text of every memory row (key + JSON value + tags), keyed by memory.rowid. AFTER

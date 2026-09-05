@@ -37,10 +37,10 @@
  */
 
 import { Router } from 'express';
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import Busboy from 'busboy';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, PackageRecord, PackageComponent, TemplateListingRecord } from '../storage/interface.js';
+import type { Storage, PackageRecord, TemplateListingRecord } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { createPackagesTabService } from '../services/db/packages-tab-db-service.js';
@@ -54,22 +54,20 @@ import {
   listPackagesFor, getPackageFor, getPackageVersionFor, listPackageVersionsFor,
 } from '../services/package-read.js';
 import { composePackageFromApps } from '../services/package-compose.js';
+import { importParsedPackage, upstreamFromZip } from '../services/package-import.js';
+import type { PeerInfo } from '../services/federation.js';
+import { attestationFor } from '../services/package-attest-serve.js';
+import { checkUpstream } from '../services/package-pull.js';
 
-/** Generate a date-based version string: v{YYYY}-{MM}-{DD}-{HHmm} */
-function generateVersion(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `v${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
-}
+// The version generator, the content hash and the per-author ceiling used to live here, one copy
+// per road. They are in services/package-create.ts now, which is the one place a package version is
+// written, so this file no longer decides any of them.
 
-/** SHA-256 hash of content for change detection. */
-function hashContent(content: string): string {
-  return createHash('sha256').update(content).digest('hex');
-}
-
-const MAX_PACKAGES_PER_AUTHOR = 100;
-
-export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
+export function packagesRouter(
+  config: AimeatConfig,
+  storage: Storage,
+  peers: Map<string, PeerInfo> = new Map(),
+): Router {
   const router = Router();
 
   // ── Static routes FIRST (before parameterized :groupId) ──────────
@@ -207,79 +205,28 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Check max packages per author
-    const maxPerAuthor = config.packageMaxPerAuthor ?? MAX_PACKAGES_PER_AUTHOR;
-    const existingCount = await storage.listPackages({ author: owner, limit: 1, offset: 0 });
-    if (existingCount.total >= maxPerAuthor) {
-      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
-        `Maximum ${maxPerAuthor} packages per author. Archive unused packages first.`));
+    // A hand-uploaded ZIP may carry a signature, and this road does not demand one: somebody moving
+    // their own package between their own nodes should not need a peering first. What it will NOT do
+    // is treat a signature it cannot check as proof — the provenance is recorded either way, with
+    // `verifiedAt` saying which of the two happened, and a signature that resolves to a key we DO
+    // know and then fails to verify is a refusal rather than a note.
+    const upstream = await upstreamFromZip(parsed, peers);
+    if (upstream === 'INVALID') {
+      res.status(400).json(error(config.nodeId, 'INVALID_SIGNATURE',
+        'That package carries a signature from a node this one knows, and it does not check out against that node\'s key.'));
       return;
     }
 
-    // Check name conflicts — same name, different author = reject; same author = allow as new version
-    const packageGroupId = `${parsed.name}::${owner}`;
-    const existingGroup = await storage.listVersions(packageGroupId, 1, 0);
-    if (existingGroup.total > 0) {
-      const existingPkg = existingGroup.versions[0];
-      if (existingPkg.author !== owner) {
-        res.status(409).json(error(config.nodeId, 'CONFLICT',
-          `Package "${parsed.name}" already exists by a different author`));
-        return;
-      }
-      // Same author — will create as a new version
+    const out = await importParsedPackage({ storage, config },
+      { owner, sub: req.auth!.sub }, { parsed, upstream, via: 'zip' });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
     }
 
-    try {
-      const now = new Date().toISOString();
-      const id = randomUUID();
-      const author = owner;
-      const authorGhii = await resolveGhii(storage, owner, req.auth!.sub);
-      const version = generateVersion();
-
-      const components: PackageComponent[] = parsed.components.map(c => ({
-        id: c.id,
-        type: c.type as PackageComponent['type'],
-        label: c.label ?? '',
-        content: c.content ?? '',
-        contentHash: c.contentHash ?? hashContent(c.content ?? ''),
-        dependencies: c.dependencies ?? [],
-        // Carried through, so an app that was packaged with its own name and icon still has them
-        // after a download and an upload. parseZip admits `meta` only as a plain object.
-        ...(c.meta && Object.keys(c.meta).length > 0 ? { meta: c.meta } : {}),
-      }));
-
-      const record: PackageRecord = {
-        id,
-        packageGroupId,
-        name: parsed.name,
-        author,
-        authorGhii,
-        version,
-        changelog: parsed.changelog ?? 'Imported from ZIP',
-        description: parsed.description ?? '',
-        category: parsed.category ?? 'other',
-        tags: parsed.tags ?? [],
-        visibility: 'private',
-        status: 'published',
-        components,
-        manifest: '',
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      const created = await storage.createPackage(record);
-      res.status(201).json(success(config.nodeId, created, [
-        { description: 'View package', method: 'GET', url: `/v1/packages/${encodeURIComponent(packageGroupId)}` },
-      ]));
-      emitChange('packages');
-    } catch (e) {
-      const err = e as { message?: string; code?: string };
-      if (err.message === 'PACKAGE_EXISTS' || err.code === 'SQLITE_CONSTRAINT_UNIQUE' || err.code === 'P2002') {
-        res.status(409).json(error(config.nodeId, 'CONFLICT', `Package "${parsed.name}" already exists for this author`));
-        return;
-      }
-      res.status(500).json(error(config.nodeId, 'IMPORT_FAILED', err.message ?? 'Import failed'));
-    }
+    res.status(201).json(success(config.nodeId, out.package, [
+      { description: 'View package', method: 'GET', url: `/v1/packages/${encodeURIComponent(out.package.packageGroupId)}` },
+    ]));
   });
 
   // GET /v1/packages — list packages
@@ -454,8 +401,11 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Build ZIP bundle
-    const zip = await buildZip(pkg);
+    // Build ZIP bundle, carrying this node's signed statement about the version when it has a key
+    // of its own. That statement is what lets another node install this without trusting the
+    // transport: the signature covers the component digests, so a byte changed anywhere on the way
+    // is a refusal there rather than a silent install.
+    const zip = await buildZip(pkg, await attestationFor(storage, config, pkg));
     const filename = `${pkg.name}-${pkg.version}.zip`;
     res.set({
       'Content-Type': 'application/zip',
@@ -463,6 +413,39 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       'Content-Length': String(zip.length),
     });
     res.send(zip);
+  });
+
+  // GET /v1/packages/:groupId/upstream-check — is there a newer version where this came from?
+  //
+  // Reads the source node's signed statement rather than downloading the archive, so this is cheap
+  // enough to ask often. Writes nothing: applying is a separate act, because bringing somebody
+  // else's code onto your node is a decision and not a refresh.
+  router.get('/v1/packages/:groupId/upstream-check', requireAuth(), async (req, res) => {
+    const groupId = decodeURIComponent(req.params.groupId as string);
+    const pkg = await getPackageFor(storage, groupId, req.auth!.owner);
+    if (!pkg) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Package not found: ${groupId}`));
+      return;
+    }
+    if (pkg.author !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the package author can check its upstream'));
+      return;
+    }
+    if (!pkg.upstream) {
+      res.json(success(config.nodeId, { hasUpstream: false, updateAvailable: false }));
+      return;
+    }
+
+    const out = await checkUpstream({ storage, config, peers }, pkg);
+    res.status(out.ok ? 200 : out.status).json(out.ok
+      ? success(config.nodeId, out.answer, [
+        {
+          description: 'Pull the newer version',
+          method: 'POST',
+          url: '/v1/federation/packages/pull',
+        },
+      ])
+      : error(config.nodeId, out.code, out.message));
   });
 
   // GET /v1/packages/:groupId — get latest published version
