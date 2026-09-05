@@ -16,14 +16,27 @@
  *   refuse. It reports and does nothing else: the write goes through the engine, which is what
  *   makes a person's hand and an agent's call the same event.
  *
- *   EVERY CLASS HERE IS ak-living__*, and every size and colour in the stylesheet comes off an
- *   --ak-* token, so a living document wears the look of whatever page it is on.
+ *   THE CONTROL IS A KIT FIELD, NOT MARKUP OF OUR OWN. It is declared to AIMEAT.atelier.form as
+ *   one field with `submit: false` and an `onInput`, so the label wiring, the announced refusal,
+ *   the range's track and reading, and the 40px hit area are the kit's and stay the kit's. This
+ *   file used to build the input, the label and the readout by hand — five branches that were a
+ *   worse copy of what the kit already had, and a second place for every accessibility fix to be
+ *   made. What is left here is what a living document adds: the graph's own words in the readout
+ *   (a quantity with its unit, a refusal in words) and the marker classes an app targets.
+ *
+ *   EVERY CLASS THIS FILE ADDS IS ak-living__*, and every size and colour in the stylesheet comes
+ *   off an --ak-* token, so a living document wears the look of whatever page it is on.
  * @structure controlRow · textView · machineView · valueRow · renderNodeInto
  * @usage  import { renderNodeInto } from './render.js';
  * @version-history
+ *   v0.2.0 — 2026-09-05 — The control row is built by the kit's form(): one field of the right
+ *     type, `submit: false`, `onInput` reporting to the engine. Atelier 0.53.0's `type: 'range'`
+ *     is what made that possible. The classes an app may already target — ak-input,
+ *     ak-form__field, ak-form__label, ak-living__input, ak-living__slider, ak-living__readout —
+ *     are all still on the elements they were on.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
-import { el, countTo } from './dom.js';
+import { el, countTo, kit } from './dom.js';
 import { formulaView } from './formula-view.js';
 import { isError, isQuantity, asText, trimNumber, asNumber } from './formula-eval.js';
 import { unitLabel } from './units.js';
@@ -38,8 +51,18 @@ function readout(v) {
   return asText(v);
 }
 
+/** Which of the kit's field types each control kind is. */
+const FIELD_TYPE = { slider: 'range', toggle: 'toggle', pick: 'select', number: 'number', text: 'text' };
+
+/** One option of a pick, however the record wrote it: a bare value or { value, label }. */
+function asOption(o) {
+  const opt = o && typeof o === 'object' ? o : { value: o, label: String(o) };
+  return { value: String(opt.value), label: String(opt.label == null ? opt.value : opt.label) };
+}
+
 /**
- * A control row: a label, the input, and what it currently reads.
+ * A control row: ONE kit form field, reporting continuously, with the graph's own words in the
+ * reading beside it.
  * @param {HTMLElement} host
  * @param {{ id: string, node: any, target: any, value: any, onSet: (v: any) => void }} spec
  * @returns {{ el: HTMLElement, update: (value: any) => void }}
@@ -48,51 +71,66 @@ export function controlRow(host, spec) {
   const kind = String(spec.node.kind || 'slider');
   const target = spec.target || {};
   const id = uid();
-  const label = el('label', {
-    class: 'ak-form__label ak-living__label', for: id, 'data-ak-part': 'label',
-    text: spec.node.label || target.label || spec.node.target,
-  });
-  const value = el('output', { class: 'ak-living__readout', 'data-ak-part': 'readout', for: id });
+  const type = FIELD_TYPE[kind] || 'text';
+  const start = kind === 'toggle'
+    ? (spec.value === true || asNumber(spec.value) === 1)
+    : (isQuantity(spec.value) ? spec.value.n : (spec.value == null ? null : asText(spec.value)));
 
-  let input;
-  if (kind === 'toggle') {
-    input = el('input', { id: id, type: 'checkbox', class: 'ak-toggle ak-living__input' });
-  } else if (kind === 'pick') {
-    input = el('select', { id: id, class: 'ak-input ak-living__input' },
-      (spec.node.options || []).map(function (o) {
-        const opt = o && typeof o === 'object' ? o : { value: o, label: String(o) };
-        return el('option', { value: String(opt.value) }, String(opt.label == null ? opt.value : opt.label));
-      }));
-  } else if (kind === 'text') {
-    input = el('input', { id: id, type: 'text', class: 'ak-input ak-living__input' });
-  } else {
-    input = el('input', {
-      id: id, class: 'ak-input ak-living__input' + (kind === 'slider' ? ' ak-living__slider' : ''),
-      type: kind === 'slider' ? 'range' : 'number',
-      min: target.min == null ? null : String(target.min),
-      max: target.max == null ? null : String(target.max),
-      step: target.step == null ? null : String(target.step),
-    });
+  const k = kit();
+  const handle = k.form({
+    target: host,
+    submit: false,
+    fields: [{
+      name: 'value', id: id, type: type,
+      label: spec.node.label || target.label || spec.node.target,
+      min: target.min, max: target.max, step: target.step, unit: target.unit,
+      value: start,
+      options: kind === 'pick' ? (spec.node.options || []).map(asOption) : undefined,
+      // The person's hand goes through the ENGINE, exactly where an agent's call goes: the input
+      // is never the source of truth, it only reports.
+      onInput(v) { spec.onSet(v); },
+    }],
+  });
+
+  const root = handle.el;
+  root.classList.add('ak-living__control');
+  root.setAttribute('data-living-node', spec.id);
+  root.setAttribute('data-living-kind', kind);
+  const field = root.querySelector('[data-ak-part="field"]');
+  const input = /** @type {any} */ (root.querySelector('[data-ak-part="input"]'));
+  const labelEl = root.querySelector('[data-ak-part="label"]');
+  if (labelEl) labelEl.classList.add('ak-living__label');
+  input.classList.add('ak-living__input');
+  if (kind === 'slider') input.classList.add('ak-living__slider');
+  const row = root.querySelector('[data-ak-part="range"]');
+  if (row) row.classList.add('ak-living__control-row');
+
+  // The reading is the kit's for a range, which already draws one, and ours for the kinds it does
+  // not — one element either way, so the graph's words (a quantity with its unit, a refusal in
+  // words) always land in the same place and an app has one class to target.
+  let readoutEl = root.querySelector('[data-ak-part="readout"]');
+  if (!readoutEl) {
+    readoutEl = el('output', { class: 'ak-form__readout', 'data-ak-part': 'readout', for: id });
+    (field || root).appendChild(readoutEl);
   }
-
-  input.addEventListener('input', function () {
-    const node = /** @type {any} */ (input);
-    if (kind === 'toggle') { spec.onSet(!!node.checked); return; }
-    if (kind === 'text' || kind === 'pick') { spec.onSet(node.value); return; }
-    spec.onSet(node.value === '' ? null : Number(node.value));
-  });
-
-  const root = el('div', {
-    class: 'ak-form__field ak-living__control', 'data-living-node': spec.id, 'data-living-kind': kind,
-  }, [label, el('div', { class: 'ak-living__control-row' }, [input, value])]);
-  host.appendChild(root);
+  readoutEl.classList.add('ak-living__readout');
 
   function update(v) {
-    const node = /** @type {any} */ (input);
-    if (kind === 'toggle') node.checked = !!(v === true || asNumber(v) === 1);
-    else if (kind === 'text' || kind === 'pick') { const s = isQuantity(v) ? String(v.n) : asText(v); if (node.value !== s) node.value = s; }
-    else { const n = asNumber(v); if (Number.isFinite(n) && String(n) !== node.value) node.value = String(n); }
-    value.textContent = readout(v);
+    if (kind === 'toggle') {
+      const on = !!(v === true || asNumber(v) === 1);
+      if (input.checked !== on) handle.setValues({ value: on });
+    } else if (kind === 'text' || kind === 'pick') {
+      const s = isQuantity(v) ? String(v.n) : asText(v);
+      if (input.value !== s) handle.setValues({ value: s });
+    } else {
+      const n = asNumber(v);
+      if (Number.isFinite(n) && String(n) !== input.value) handle.setValues({ value: n });
+    }
+    const words = readout(v);
+    if (readoutEl.textContent !== words) readoutEl.textContent = words;
+    // The kit mirrors the raw number into aria-valuetext; a living document knows the unit and
+    // the refusal, so it says the same thing the eye is reading.
+    if (input.hasAttribute('aria-valuetext')) input.setAttribute('aria-valuetext', words);
   }
   update(spec.value);
   return { el: root, update: update };

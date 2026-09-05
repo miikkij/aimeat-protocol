@@ -19,24 +19,16 @@
  * @outputs  binding   value — the same value, so the chain view can show where it went
  * @options  binding   block (a layout block id) · prop (a prop path on that block, dots allowed)
  * @example  binding   { "type": "binding", "block": "dial", "prop": "value", "from": "t" }
- * @structure binding: the node-type module (dependsOn · prepare · evaluate) · BOUND_COMPONENTS
+ * @structure binding: the node-type module (dependsOn · prepare · evaluate) · setPath ·
+ *   unboundBlocks(surface, blockIds)
  * @usage  import { binding } from './binding.js';
  * @version-history
+ *   v0.2.0 — 2026-09-05 — The hand-kept BOUND_COMPONENTS list is gone. Which components read a
+ *     bound record is the kit's answer, asked of the mounted mosaic through its blocks()
+ *     accessor, so a newer kit with more of them needs no edit here and this library can never
+ *     be wrong about the kit's own vocabulary.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
-
-/**
- * The mosaic block components that take a bound source. Mirrors the `bound(...)` cases in the
- * kit's mosaic.js — it is here so validate() can say "that block does not read data" instead of
- * letting a binding land nowhere in silence. A newer kit build with more of them makes this list
- * short, never wrong: an unlisted component still works at run time, it is only unvalidated.
- */
-export const BOUND_COMPONENTS = [
-  'statRow', 'figure', 'rating', 'steps', 'list', 'cardGrid', 'table', 'timeline',
-  'chart', 'matrix', 'graph', 'waveform', 'scene3d', 'gauge', 'console', 'atlas', 'map',
-  'health', 'queue', 'kanban', 'plan', 'schedule', 'crt', 'ring', 'crew', 'poll', 'keys',
-  'thread', 'calendar', 'priceTable', 'facets', 'carousel', 'sortable', 'notices',
-];
 
 export const binding = {
   id: 'binding',
@@ -56,6 +48,31 @@ export const binding = {
     return node.from ? ctx.scope.get(String(node.from)) : undefined;
   },
 };
+
+/**
+ * THE ONE QUESTION THIS LIBRARY IS NOT ALLOWED TO ANSWER ITSELF: which of the arrangement's
+ * blocks actually read a bound record. It used to be a copy of the `bound(...)` cases in the
+ * kit's mosaic.js kept here, and a copy of somebody else's list is a list that goes stale while
+ * still claiming to be current. The mounted mosaic now says so itself.
+ *
+ * Answers with the block ids a binding was aimed at that the kit did NOT bind — which is the
+ * refusal a person needs, in the kit's own words rather than in this library's guess.
+ * @param {{ blocks?: () => Array<{ id: string, component: string, bound: boolean }> }} surface
+ * @param {Iterable<string>} blockIds  the blocks this document's bindings write to
+ * @returns {Array<{ id: string, component: string }>}
+ */
+export function unboundBlocks(surface, blockIds) {
+  if (!surface || typeof surface.blocks !== 'function') return [];
+  const mounted = new Map();
+  for (const b of surface.blocks()) mounted.set(String(b.id), b);
+  const out = [];
+  for (const id of blockIds) {
+    const block = mounted.get(String(id));
+    // A block the arrangement does not hold at all is validate()'s refusal, not this one's.
+    if (block && !block.bound) out.push({ id: block.id, component: block.component });
+  }
+  return out;
+}
 
 /**
  * Write one value at a dotted path inside a plain object, making the boxes on the way.

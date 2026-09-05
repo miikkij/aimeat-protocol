@@ -11,7 +11,15 @@
  * @structure graph(spec) → { el, set, destroy }
  * @usage  AIMEAT.atelier.graph({ target: host, data: { nodes: [{ id: 'a', label: 'Search' },
  *           { id: 'b', label: 'Index' }], edges: [{ from: 'a', to: 'b', label: 'reads' }] } });
+ *   NO PILL LEAVES THE FRAME. A pill is centred on its point and can be 190 units wide, while
+ *   the frame's own padding was 46 — so a word-length label in the leftmost or rightmost column
+ *   was cut off by the viewBox, and every caller was left to invent its own inset. The widest
+ *   pill is measured first, the layout insets by half of it, and each pill is then anchored
+ *   inside the frame as a belt. The viewBox scales, so this holds at every rendered size.
  * @version-history
+ *   v0.53.0 — 2026-09-05 — The pill is kept inside the frame: pillWidth() measures the label
+ *     that is actually drawn, the layout insets by half the widest one, and a final clamp
+ *     anchors each pill on both axes. A caller no longer needs a padding fudge of its own.
  *   v0.20.0 — 2026-08-28 — Initial (TARGET-074, the harvest: suunta's node map becomes a kit
  *     component).
  */
@@ -36,6 +44,11 @@ import { emptyState } from './state.js';
 const W = 720;
 const H = 420;
 const PAD = 46;
+/** The pill's own box, in viewBox units, and the breathing room kept outside it. */
+const PILL_H = 34;
+const GUTTER = 4;
+/** Past this many characters the label is trimmed, so the pill has a ceiling. */
+const LABEL_MAX = 24;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 function svg(name, attrs) {
@@ -44,25 +57,59 @@ function svg(name, attrs) {
   return node;
 }
 
-/** Every node a place: declared coordinates scale to the frame; the rest sit on a ring. */
-function place(nodes) {
+/** The words a pill actually carries — the label, trimmed where it would not fit. */
+export function pillLabel(label) {
+  const text = String(label == null ? '' : label);
+  return text.length > LABEL_MAX ? text.slice(0, LABEL_MAX - 1) + '…' : text;
+}
+
+/**
+ * How wide a pill is, measured off the label that is DRAWN rather than the one that was given:
+ * the layout below insets by half the widest of these, which is what keeps a node in an outer
+ * column whole instead of cut off by the viewBox.
+ * @param {string} label @returns {number}
+ */
+export function pillWidth(label) {
+  return Math.min(Math.max(pillLabel(label).length * 7.6 + 26, 60), 190);
+}
+
+/** Keep a number inside a pair of bounds, with a sane answer when the bounds cross. */
+function clamp(v, lo, hi) {
+  if (hi < lo) return (lo + hi) / 2;
+  return Math.min(Math.max(v, lo), hi);
+}
+
+/**
+ * Every node a place: declared coordinates scale to the frame; the rest sit on a ring. The frame
+ * is inset sideways by half the widest pill, and each pill is anchored inside the viewBox after
+ * that, so neither a long label in the first column nor a ring point can leave the picture.
+ * @param {GraphNode[]} nodes @param {Map<string, number>} widths
+ */
+function place(nodes, widths) {
   const out = new Map();
+  let widest = 0;
+  for (const w of widths.values()) widest = Math.max(widest, w);
+  const padX = Math.min(Math.max(PAD, widest / 2 + GUTTER), W / 2 - GUTTER);
+  const padY = Math.max(PAD, PILL_H / 2 + GUTTER);
   const ringed = nodes.filter((n) => typeof n.x !== 'number' || typeof n.y !== 'number');
   let ringIndex = 0;
   for (const node of nodes) {
+    let x;
+    let y;
     if (typeof node.x === 'number' && typeof node.y === 'number') {
-      out.set(node.id, {
-        x: PAD + (Math.min(Math.max(node.x, 0), 100) / 100) * (W - PAD * 2),
-        y: PAD + (Math.min(Math.max(node.y, 0), 100) / 100) * (H - PAD * 2),
-      });
+      x = padX + (Math.min(Math.max(node.x, 0), 100) / 100) * (W - padX * 2);
+      y = padY + (Math.min(Math.max(node.y, 0), 100) / 100) * (H - padY * 2);
     } else {
       const angle = (2 * Math.PI * ringIndex) / Math.max(ringed.length, 1) - Math.PI / 2;
-      out.set(node.id, {
-        x: W / 2 + Math.cos(angle) * (W / 2 - PAD * 1.6),
-        y: H / 2 + Math.sin(angle) * (H / 2 - PAD * 1.4),
-      });
+      x = W / 2 + Math.cos(angle) * (W / 2 - padX);
+      y = H / 2 + Math.sin(angle) * (H / 2 - padY);
       ringIndex++;
     }
+    const half = (widths.get(node.id) || 60) / 2;
+    out.set(node.id, {
+      x: clamp(x, half + GUTTER, W - half - GUTTER),
+      y: clamp(y, PILL_H / 2 + GUTTER, H - PILL_H / 2 - GUTTER),
+    });
   }
   return out;
 }
@@ -94,7 +141,9 @@ export function graph(spec) {
     }
     root.setAttribute('aria-label', (spec.title ? spec.title + ' — ' : '') + nodes.map((n) => n.label).join(', '));
 
-    const at = place(nodes);
+    const widths = new Map();
+    for (const item of nodes) widths.set(item.id, pillWidth(item.label));
+    const at = place(nodes, widths);
     const node = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ak-graph__svg', 'aria-hidden': 'true' });
 
     for (const edge of edges) {
@@ -114,11 +163,11 @@ export function graph(spec) {
 
     for (const item of nodes) {
       const p = at.get(item.id);
-      const width = Math.min(Math.max(item.label.length * 7.6 + 26, 60), 190);
+      const width = widths.get(item.id);
       const g = svg('g', { class: 'ak-graph__node ak-graph__node--' + (item.tone || 'plain'), transform: `translate(${p.x}, ${p.y})` });
-      g.appendChild(svg('rect', { x: -width / 2, y: -17, width, height: 34, rx: 17, class: 'ak-graph__pill' }));
+      g.appendChild(svg('rect', { x: -width / 2, y: -PILL_H / 2, width, height: PILL_H, rx: PILL_H / 2, class: 'ak-graph__pill' }));
       const label = svg('text', { x: 0, y: 5, class: 'ak-graph__label', 'text-anchor': 'middle' });
-      label.textContent = item.label.length > 24 ? item.label.slice(0, 23) + '…' : item.label;
+      label.textContent = pillLabel(item.label);
       g.appendChild(label);
       if (spec.onPick) {
         g.setAttribute('role', 'button');

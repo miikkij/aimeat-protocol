@@ -23,7 +23,7 @@
  *   step-by-step flow, or a pan-and-zoom canvas whose tiles expand to full view. Switching mode
  *   is a one-field change in the stored layout. Unit switches ride View Transitions when the
  *   browser has them and collapse cleanly under prefers-reduced-motion.
- * @structure mosaic(spec) → { el, set, reload, refresh, destroy } · appRef()
+ * @structure mosaic(spec) → { el, blocks, set, reload, refresh, destroy } · appRef()
  * @usage
  *   const m = AIMEAT.atelier.mosaic({
  *     app: a,
@@ -34,6 +34,9 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.53.0 — 2026-09-05 — `blocks()`: what is on the screen, block by block (id, component,
+ *     whether it reads a bound source, the source name, the element), so a caller wiring a block
+ *     by id asks the kit instead of keeping its own copy of which components take data.
  *   v0.48.0 — 2026-09-05 — A block's `effect` wears on its unit — on a hero, on its picture layer
  *     — through fx(); the arrangement's `ambient.post` reaches the layer with the rest of the
  *     wish; the viewer overlay copies `choreography` too, which it had dropped
@@ -149,6 +152,7 @@ export { appRef };
  *   owner?: string, filename?: string,
  * }} spec
  * @returns {{ el: HTMLElement, set: (layout: object|null) => void, reload: () => Promise<void>,
+ *   blocks: () => Array<{ id: string, component: string, bound: boolean, source: string|null, el: HTMLElement }>,
  *   setOverlay: (o: { hidden?: string[], order?: string[], nav?: string }|null) => void,
  *   explain: (opts?: { target?: string|Element }) => string[],
  *   exposeActions: () => Promise<string>,
@@ -160,7 +164,7 @@ export function mosaic(spec) {
   host.appendChild(root);
 
   /** Everything one render created, so the next render (and destroy) can end it cleanly. */
-  let alive = { handles: [], bound: [], cleanup: [] };
+  let alive = { handles: [], bound: [], cleanup: [], blocks: [] };
   let destroyed = false;
   /** Whether the app frame's ambient is this mosaic's doing (a stored layout's), not the app's own. */
   let ambientFromLayout = false;
@@ -180,14 +184,19 @@ export function mosaic(spec) {
    * component enters with it — no flash of the empty state on the way to a full one.
    * @param {{ id: string, component: string, props?: any, effect?: any }} block
    * @param {HTMLElement} into
+   * @param {{ id: string, component: string, bound: boolean, source: string|null, el: HTMLElement }} [entry]
+   *   this block's row in what blocks() answers with; `bound` is stamped here, at BUILD time,
+   *   because a caller asking right after the render must not be told "no" for the one turn the
+   *   source is still resolving in.
    */
-  function buildBlock(block, into) {
+  function buildBlock(block, into, entry) {
     const p = block.props || {};
     const pick = spec.onPick ? function (item) { spec.onPick(block.id, item); } : undefined;
     const empty = { title: p.emptyTitle, hint: p.emptyHint };
 
     /** Mount a source-bound component: skeleton → resolve → component. */
     function bound(kind, create) {
+      if (entry) entry.bound = true;
       const wait = skeleton({ target: into, rows: 2 });
       resolveSource(p.source).then(function (data) {
         if (destroyed) return;
@@ -513,7 +522,7 @@ export function mosaic(spec) {
   function render(layout) {
     for (const h of alive.handles) { if (h && h.destroy) h.destroy(); }
     for (const fn of alive.cleanup) fn();
-    alive = { handles: [], bound: [], cleanup: [] };
+    alive = { handles: [], bound: [], cleanup: [], blocks: [] };
     clear(root);
     if (!layout || !Array.isArray(layout.blocks)) return;
 
@@ -583,16 +592,24 @@ export function mosaic(spec) {
     const band = el('div', { class: 'ak-mosaic__band' });
     const units = [];
     for (const block of visible) {
+      /** This block's row in blocks(): what it is, whether it reads a source, where it landed. */
+      const entry = {
+        id: String(block.id), component: String(block.component), bound: false,
+        source: (block.props && block.props.source) ? String(block.props.source) : null,
+        el: band,
+      };
+      alive.blocks.push(entry);
       if (block.component === 'hero') {
-        buildBlock(block, band);
+        buildBlock(block, band, entry);
         continue;
       }
       const unitEl = el('section', { class: 'ak-mosaic__unit', 'data-ak-block': block.id });
+      entry.el = unitEl;
       // ONE BLOCK MAY STAND STILL while the rest of the screen moves: `motion: false` in a
       // block's props is the block-level opt-out, stamped on its unit before the component is
       // built inside it, so everything the component makes reads the same answer.
       if (block.props && block.props.motion === false) setMotionDefaults(unitEl, false);
-      buildBlock(block, unitEl);
+      buildBlock(block, unitEl, entry);
       // The block's effect wears on its unit: the server proved it on this look (a colour or
       // overlay effect under words through the matrix; a picture effect only on a picture).
       if (block.effect) {
@@ -638,6 +655,23 @@ export function mosaic(spec) {
 
   const api = {
     el: root,
+
+    /**
+     * WHAT IS ACTUALLY ON THIS SCREEN, block by block: the id the layout gave it, the component
+     * it became, whether that component reads a bound source, the source name it was given, and
+     * the element it was built into. A copy, so reading it cannot move anything.
+     *
+     * It exists because the alternative is a second list. A caller that wires a block by id —
+     * a living document binding a number to a gauge, a host writing into one section — was left
+     * to keep its own copy of "which components take data", and a copy of a list in the kit is a
+     * list that goes stale on the next kit release while claiming to be current. Ask instead.
+     * @returns {Array<{ id: string, component: string, bound: boolean, source: string|null, el: HTMLElement }>}
+     */
+    blocks() {
+      return alive.blocks.map(function (b) {
+        return { id: b.id, component: b.component, bound: b.bound, source: b.source, el: b.el };
+      });
+    },
 
     /** Replace the whole rendered layout — what a live layout-change event calls. */
     set(layout) {
@@ -745,7 +779,7 @@ export function mosaic(spec) {
       stopLive();
       for (const h of alive.handles) { if (h && h.destroy) h.destroy(); }
       for (const fn of alive.cleanup) fn();
-      alive = { handles: [], bound: [], cleanup: [] };
+      alive = { handles: [], bound: [], cleanup: [], blocks: [] };
       const host = /** @type {any} */ (spec.app && spec.app.el ? spec.app.el : root);
       if (host.__akSigStyle) { host.__akSigStyle.remove(); host.__akSigStyle = null; }
       if (root.parentNode) root.parentNode.removeChild(root);

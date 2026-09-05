@@ -49,6 +49,10 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.53.0 — 2026-09-05 — THE SLIDER IS A KIT FIELD. The form's `type: 'range'` brings its own
+ *     row (.ak-form__range with the reading beside the track), its own control skin
+ *     (.ak-input--range, the hit area the whole --ak-touch band rather than the 6px rail) and
+ *     two per-component tokens, --ak-range-track and --ak-range-thumb, in aimeat-atelier/data.css.
  *   v0.52.0 — 2026-09-05 — WHITE ON CORAL READS ON PAPER (the developer's decision after the
  *     measuring review). The light accent takes an OKLCh lightness CAP —
  *     `oklch(from var(--color-primary, #e8564a) min(l, 0.576) c h)` — so the house coral deepens
@@ -556,6 +560,8 @@
   --ak-kanban-card-pad:   10px;
   --ak-kanban-gap:        calc(var(--ak-gap) * 0.75);
   --ak-tabs-gap:          6px;
+  --ak-range-track:       6px;                  /* the slider's rail                         */
+  --ak-range-thumb:       22px;                 /* the grip; the hit area is --ak-touch      */
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════

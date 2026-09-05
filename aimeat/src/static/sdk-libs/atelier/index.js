@@ -55,6 +55,16 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.53.0 — 2026-09-05 — Three seams a library built on this kit had to work around, closed
+ *     here so it stops carrying its own copies. THE FORM GAINS A LIVE CONTROL: `type: 'range'`
+ *     with min/max/step, a unit, the reading beside the track and the 40px hit area;
+ *     `onInput(value, field)` and `onChange(value, field)` on every field beside the submit
+ *     path; `submit: false` for a form that is only controls. THE GRAPH KEEPS ITS PILLS INSIDE
+ *     THE FRAME: the widest pill is measured, the layout insets by half of it and each pill is
+ *     anchored, so a word-length label in an outer column is whole instead of clipped and no
+ *     caller needs a padding fudge. THE MOSAIC SAYS WHAT IT MOUNTED: `blocks()` answers with
+ *     every block's id, component, whether it reads a bound source, its source name and its
+ *     element, so a caller wiring a block by id asks the kit instead of keeping its own list.
  *   v0.52.0 — 2026-09-05 — Two decisions from the measuring review. WHITE ON CORAL READS ON
  *     PAPER: the light accent takes an OKLCh lightness cap, so the house coral deepens to
  *     #cf3e35 and white on a tab, a chip, an avatar or a price badge goes 3.58:1 → 4.78:1; a
@@ -358,7 +368,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.52.0',
+  version: '0.53.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
