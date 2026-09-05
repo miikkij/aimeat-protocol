@@ -13,6 +13,9 @@
  * @structure .ak-thread (well · day · msg · bubble · avatar · meta · composer) ·
  *   .ak-checkout (rail · well · page · section · lines · ships · totals · settled)
  * @version-history
+ *   v0.45.0 — 2026-09-05 — The measured review: the shipping radio is drawn rather than native, so
+ *     an 18px mark can sit in a 40px box. The label was already a 44px row, but a person aiming at
+ *     the circle was aiming at 18px of it.
  *   v0.44.0 — 2026-09-02 — Initial (wish-atelier-motion-libraries-and-parts, the Lenis pair).
  */
 
@@ -207,7 +210,31 @@
   border-color: color-mix(in oklab, var(--ak-accent) 55%, var(--ak-line));
   background: color-mix(in oklab, var(--ak-accent) 10%, var(--ak-surface));
 }
-.ak-checkout__radio { accent-color: var(--ak-accent); width: 18px; height: 18px; }
+/* THE MARK IS 18px AND THE TARGET IS 40. A native radio paints its own circle at whatever width
+ * the box is, so the two cannot differ: an 18px control is an 18px target, which is what the
+ * review measured. appearance:none is what separates them — the box takes the target floor and
+ * the circle is painted into the middle of it with one gradient, checked and unchecked alike. */
+.ak-checkout__radio {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: var(--ak-touch-min);
+  height: var(--ak-touch-min);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ak-radius-pill);
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-image: radial-gradient(circle at 50% 50%,
+    transparent 0 7px, var(--ak-line) 7px 9px, transparent 9px);
+  cursor: pointer;
+}
+.ak-checkout__radio:checked {
+  background-image: radial-gradient(circle at 50% 50%,
+    var(--ak-accent) 0 5px, transparent 5px 7px, var(--ak-accent) 7px 9px, transparent 9px);
+}
+.ak-checkout__radio:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: -9px; }
 .ak-checkout__ship-label { color: var(--ak-ink); }
 
 /* Review: the totals, the refusal and the settled state. */

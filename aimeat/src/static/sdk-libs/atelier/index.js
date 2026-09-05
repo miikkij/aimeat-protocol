@@ -31,6 +31,15 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.49.0 — 2026-09-05 — THE MEASURED REVIEW. scroll-edge.js joins the kit: it stamps
+ *     data-ak-scroll="start|middle|end|none" on every scroller this kit builds and on anything
+ *     an app marks data-ak-scroll-edge, and the stylesheet paints an edge fade on the side that
+ *     has more — a tab strip cut off at a phone width used to look exactly like a tab strip that
+ *     ended. scrollEdge() joins the surface for a scroller the kit did not build. The
+ *     stylesheet's four other findings ride the same version: the reduced-motion block reaches
+ *     ::before and ::after (the hero drift never stopped), sixteen compact controls reach 40px
+ *     of hit area, --ak-text-micro replaces five literals under the fine floor, and the facet
+ *     separator stops using a hairline colour as text.
  *   v0.48.0 — 2026-09-05 — THE EFFECTS (wish-atelier-post-process-effects): fx() and fxPlay()
  *     join the surface — nine post-process filters a block, a hero band or a picture may wear
  *     (scanlines, vignette, duotone, recolour, distort, glitch, vhs, ripple, kaleidoscope),
@@ -284,6 +293,7 @@ import { setMotion } from './dom.js';
 import { ambient, setWeather, weatherLevel } from './ambient.js';
 import { ambientStage, weather, attract } from './ambient-parts.js';
 import { fx, fxPlay } from './effects.js';
+import { scrollEdge } from './scroll-edge.js';
 
 const atelier = {
   /**
@@ -291,7 +301,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.48.0',
+  version: '0.49.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
@@ -374,6 +384,10 @@ const atelier = {
 
   // ── Designed states ──
   emptyState, skeleton,
+
+  // ── The sideways strip says so: every kit scroller is stamped with which side has more, and
+  //    an app's own scroller joins with data-ak-scroll-edge or this call ──
+  scrollEdge,
 
   // ── Theme, i18n, helpers ──
   injectStyle, i18n, el, append, $, $$, clear, uid, busy, whileBusy, guardButtons,

@@ -13,10 +13,13 @@
  *   scroller and the fixed bottom bar reserve the node's injected chrome strip
  *   (--ak-chrome-bottom), so nothing ever draws under the platform's own controls.
  * @structure ak-app · ak-app__motion · ak-hero · ak-statrow · ak-section · ak-tabs ·
- *   ak-bottomnav · ak-empty · ak-loading · ak-skeleton · shared primitives (ak-btn, ak-scroll,
- *   focus, ak-busy)
+ *   ak-bottomnav · ak-empty · ak-loading · ak-skeleton · [data-ak-scroll] (the sideways edge
+ *   fade, for every scroller in the kit) · shared primitives (ak-btn, ak-scroll, focus, ak-busy)
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.49.0 — 2026-09-05 — THE SIDEWAYS EDGE FADE, kit-wide: [data-ak-scroll] paints a mask on
+ *     the side that still has content, so a strip that is cut off stops looking like a strip
+ *     that ended. scroll-edge.js writes the attribute; the rule is here.
  *   v0.48.0 — 2026-09-05 — The hero's picture layer (.ak-hero__image) shares the mesh pseudo's
  *     rules through one declaration and replaces the pseudo when a picture is present, so an
  *     effect can land on the picture alone (wish-atelier-post-process-effects, stage 3).
@@ -359,6 +362,43 @@
 }
 .ak-section__hint { margin: 0; font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
 .ak-section__body { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+
+/* ── The sideways edge fade ───────────────────────────────────────────────────────────────────
+   A strip that scrolls sideways and a strip that ended look the same, and the measured review
+   found the tab bar on a phone hiding 211px of tabs with nothing on the screen saying so.
+
+   THE ATTRIBUTE IS THE CONTRACT. scroll-edge.js watches every scroller this kit builds and
+   stamps `data-ak-scroll` with which side has more: "start" (the left edge is the beginning,
+   so only the right fades), "middle" (both), "end" (only the left) and "none" (nothing is
+   hidden, and nothing fades). An app's own scroller joins by carrying `data-ak-scroll-edge`
+   or by one call to AIMEAT.atelier.scrollEdge(node) — no other markup, and no script of the
+   app's own.
+
+   A MASK, NOT AN OVERLAY. A pseudo-element inside a scroller travels with the content, so the
+   fade would slide off; a mask is painted in the element's own box and stays put. It is also
+   why nothing here animates: reduced motion has nothing to collapse and an idle strip still
+   repaints zero times. --ak-scroll-fade is how wide the fade is, on the contract like every
+   other number. `to right` is the physical direction the mask takes, so on a right-to-left
+   surface the fade sits on the physically correct side while the words start and end keep
+   their reading sense in the script. */
+[data-ak-scroll='start'] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--ak-scroll-fade)), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--ak-scroll-fade)), transparent);
+}
+[data-ak-scroll='middle'] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--ak-scroll-fade),
+    #000 calc(100% - var(--ak-scroll-fade)), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 var(--ak-scroll-fade),
+    #000 calc(100% - var(--ak-scroll-fade)), transparent);
+}
+[data-ak-scroll='end'] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--ak-scroll-fade));
+  mask-image: linear-gradient(to right, transparent, #000 var(--ak-scroll-fade));
+}
+[data-ak-scroll='none'] {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
 
 /* ── Tabs ─────────────────────────────────────────────────────────────────────────────────── */
 .ak-tabs {

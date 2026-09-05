@@ -12,6 +12,13 @@
  * @structure one `it` per fixture case, plus the idempotency and never-on-the-way-in guarantees.
  * @usage pnpm exec vitest run test/unit/app-serve-marks.test.ts
  * @version-history
+ *   v1.4.0 — 2026-09-05 — Goldens re-captured for the fourth intentional output change: the
+ *     attribution badge draws its bolt as an inline SVG instead of typing a ⚡, and its panel is
+ *     opaque so the words' contrast no longer depends on what the app painted behind them
+ *     (app-badge v2.1.0). 15 of 19 cases moved, and every one of them is a case that asks for the
+ *     badge — the four that do not are byte-identical, which is the check that the change went
+ *     where it was aimed. The third of the three cases again: the assertion was right and the
+ *     behaviour changed under it.
  *   v1.3.0 — 2026-08-25 — Goldens re-captured for the third intentional output change, and the
  *     corpus gains two cases. Nine went red because the head-meta pass now stamps
  *     `<meta name="robots" content="noindex, nofollow">` on an app whose owner has not asked for it

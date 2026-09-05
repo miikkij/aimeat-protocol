@@ -139,8 +139,8 @@
   function busy(node) {
     if (!node) return function() {
     };
-    const known2 = busyMap.get(node);
-    if (known2) return known2;
+    const known3 = busyMap.get(node);
+    if (known3) return known3;
     node.classList.add("ak-busy");
     node.setAttribute("aria-busy", "true");
     const wasDisabled = (
@@ -5110,9 +5110,9 @@
   }
   var defsCounter = 0;
   function defsFor(node, seriesCount) {
-    const stamp2 = ++defsCounter;
+    const stamp3 = ++defsCounter;
     const defs = svg("defs", {});
-    const sheenId = `ak-sheen-${stamp2}`;
+    const sheenId = `ak-sheen-${stamp3}`;
     const sheen2 = svg("linearGradient", { id: sheenId, x1: 0, y1: 0, x2: 0, y2: 1 });
     const s1 = svg("stop", { offset: "0", "stop-opacity": "0.22" });
     s1.style.stopColor = "var(--ak-chart-sheen)";
@@ -5122,7 +5122,7 @@
     sheen2.appendChild(s2);
     defs.appendChild(sheen2);
     for (let i = 0; i < seriesCount; i++) {
-      const fade = svg("linearGradient", { id: `ak-fade-${stamp2}-${i}`, x1: 0, y1: 0, x2: 0, y2: 1 });
+      const fade = svg("linearGradient", { id: `ak-fade-${stamp3}-${i}`, x1: 0, y1: 0, x2: 0, y2: 1 });
       const f1 = svg("stop", { offset: "0", "stop-opacity": "0.20" });
       f1.style.stopColor = SERIES_VARS[i % SERIES_VARS.length];
       const f2 = svg("stop", { offset: "1", "stop-opacity": "0" });
@@ -5132,7 +5132,7 @@
       defs.appendChild(fade);
     }
     node.appendChild(defs);
-    return { sheen: `url(#${sheenId})`, fade: (i) => `url(#ak-fade-${stamp2}-${i % SERIES_VARS.length})` };
+    return { sheen: `url(#${sheenId})`, fade: (i) => `url(#ak-fade-${stamp3}-${i % SERIES_VARS.length})` };
   }
 
   // src/static/sdk-libs/atelier/chart-shapes.js
@@ -6231,7 +6231,7 @@
     let settleUntil = 0;
     let disposed = false;
     const clock = { start: 0 };
-    function frame(now2) {
+    function frame2(now2) {
       raf = 0;
       if (disposed) return;
       const entering = now2 < entranceUntil;
@@ -6241,11 +6241,11 @@
       }
       controls.update();
       renderer.render(scene, camera);
-      if (entering || now2 < settleUntil) raf = requestAnimationFrame(frame);
+      if (entering || now2 < settleUntil) raf = requestAnimationFrame(frame2);
     }
     function wake(settleMs) {
       settleUntil = Math.max(settleUntil, performance.now() + (settleMs || 0));
-      if (!raf) raf = requestAnimationFrame(frame);
+      if (!raf) raf = requestAnimationFrame(frame2);
     }
     controls.addEventListener("start", function() {
       wake(60 * 1e3);
@@ -15440,6 +15440,98 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/scroll-edge.js
+  var SCROLLERS = [
+    ".ak-tabs",
+    ".ak-table",
+    ".ak-matrix__scroll",
+    ".ak-mosaic__deck",
+    ".ak-mosaic__rail",
+    ".ak-carousel__viewport",
+    ".ak-checkout__rail",
+    ".ak-kanban",
+    ".ak-reading__list",
+    "[data-ak-scroll-edge]"
+  ].join(", ");
+  var SLACK = 2;
+  var known2 = /* @__PURE__ */ new Set();
+  var sizes = null;
+  var tree = null;
+  var frame = 0;
+  var started = false;
+  function stamp2(node) {
+    const el2 = (
+      /** @type {HTMLElement} */
+      node
+    );
+    const hidden = el2.scrollWidth - el2.clientWidth;
+    let state;
+    if (hidden <= SLACK) {
+      state = "none";
+    } else {
+      const left = Math.abs(el2.scrollLeft);
+      const atStart = left <= SLACK;
+      const atEnd = left >= hidden - SLACK;
+      state = atStart ? "start" : atEnd ? "end" : "middle";
+    }
+    if (el2.dataset.akScroll !== state) el2.dataset.akScroll = state;
+  }
+  function stampAll() {
+    if (frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      for (const node of known2) {
+        if (node.isConnected) stamp2(node);
+        else unwatch(node);
+      }
+    });
+  }
+  function scrollEdge(node) {
+    if (!node || node.nodeType !== 1 || known2.has(node)) return !!(node && known2.has(node));
+    known2.add(node);
+    if (sizes) sizes.observe(node);
+    stamp2(node);
+    return true;
+  }
+  function unwatch(node) {
+    if (!known2.delete(node)) return;
+    if (sizes) sizes.unobserve(node);
+    delete /** @type {HTMLElement} */
+    node.dataset.akScroll;
+  }
+  function sweep(root) {
+    const scope = root && root.nodeType === 1 ? root : document;
+    if (scope !== document && /** @type {Element} */
+    scope.matches(SCROLLERS)) scrollEdge(scope);
+    for (const node of scope.querySelectorAll(SCROLLERS)) scrollEdge(node);
+  }
+  function watch() {
+    if (started) return true;
+    if (typeof document === "undefined" || typeof ResizeObserver === "undefined") return false;
+    started = true;
+    sizes = new ResizeObserver(stampAll);
+    tree = new MutationObserver((records) => {
+      for (const r of records) for (const n of r.addedNodes) if (n.nodeType === 1) sweep(n);
+      stampAll();
+    });
+    tree.observe(document.documentElement, { childList: true, subtree: true });
+    document.addEventListener("scroll", (e) => {
+      const t2 = (
+        /** @type {Element|null} */
+        /** @type {unknown} */
+        e.target
+      );
+      if (t2 && t2.nodeType === 1 && known2.has(t2)) stamp2(t2);
+    }, { capture: true, passive: true });
+    window.addEventListener("resize", stampAll, { passive: true });
+    sweep(document);
+    return true;
+  }
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watch, { once: true });
+    else watch();
+  }
+
   // src/static/sdk-libs/atelier/index.js
   var atelier = {
     /**
@@ -15447,7 +15539,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.48.0",
+    version: "0.49.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -15605,6 +15697,9 @@
     // ── Designed states ──
     emptyState,
     skeleton,
+    // ── The sideways strip says so: every kit scroller is stamped with which side has more, and
+    //    an app's own scroller joins with data-ak-scroll-edge or this call ──
+    scrollEdge,
     // ── Theme, i18n, helpers ──
     injectStyle,
     i18n,

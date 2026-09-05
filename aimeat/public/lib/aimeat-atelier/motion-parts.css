@@ -18,6 +18,9 @@
  *   .ak-lightbox (panel · figure · image · caption · nav · x) · body.ak-lightbox-open ·
  *   reduced-motion
  * @version-history
+ *   v0.45.0 — 2026-09-05 — The measured review: the dots take the 40px target floor under a
+ *     finger (the painted mark does not move), and the row wraps so ten of them still fit a
+ *     390px screen.
  *   v0.44.0 — 2026-09-02 — Initial (wish-atelier-motion-libraries-and-parts, stage 3).
  */
 
@@ -138,8 +141,9 @@
 .ak-carousel__label { font-weight: 650; overflow-wrap: anywhere; }
 .ak-carousel__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
 
-/* The dots: a 24px target (WCAG 2.2's floor) with a small painted mark inside it. */
-.ak-carousel__dots { display: flex; justify-content: center; gap: 2px; }
+/* The dots: a 24px target (WCAG 2.2's floor) with a small painted mark inside it. Under a finger
+   it grows to the kit's own 40px floor — see the block at the foot of this file. */
+.ak-carousel__dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; }
 .ak-carousel .ak-carousel__dot {
   width: 24px; height: 24px; min-height: 24px;
   padding: 0; border: 0;
@@ -225,6 +229,17 @@ body.ak-lightbox-open { overflow: hidden; }
   .ak-lightbox .ak-lightbox__nav--prev { left: 0; }
   .ak-lightbox .ak-lightbox__nav--next { right: 0; }
   .ak-carousel__card { flex-basis: 84%; }
+}
+
+/* ── Under a finger: the dots take the target floor ───────────────────────────────────────────
+   24px is what WCAG 2.2 asks and what a pointer needs; a thumb wants 40, and ten 40px dots are
+   400px wide, which is more than a 390px screen has. So the row wraps (declared above, at every
+   width, so the wrap is not a surprise the phone springs) and only the box grows here — the
+   painted mark stays 7px, and 18px when it is the current one. */
+@media (max-width: 760px), (pointer: coarse) {
+  .ak-carousel .ak-carousel__dot {
+    width: var(--ak-touch-min); height: var(--ak-touch-min); min-height: var(--ak-touch-min);
+  }
 }
 
 /* ── Less motion: everything arrives, nothing travels ────────────────────────────────────── */

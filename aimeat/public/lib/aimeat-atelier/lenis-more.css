@@ -18,6 +18,8 @@
  * @structure .ak-parallax (layer) · .ak-reading (line · fill · list · item · link) ·
  *   .ak-reading-host · the 900px fold · reduced-motion
  * @version-history
+ *   v0.47.0 — 2026-09-05 — The measured review: a contents link takes the 40px target floor under
+ *     a finger, in both directions — in the folded strip a short heading ("Beta") was 39px wide.
  *   v0.46.0 — 2026-09-02 — Initial (wish-atelier-story-director-show).
  */
 
@@ -120,6 +122,13 @@
   .ak-reading__fill { inline-size: var(--ak-fill, 0%); block-size: 100%; }
   .ak-reading__list { flex-direction: row; overflow-x: auto; overscroll-behavior-x: contain; }
   .ak-reading__item--deep { padding-inline-start: 0; }
+}
+
+/* ── Under a finger: a contents link takes the target floor, both ways ────────────────────────
+   Down the side it only needed height. Folded into the strip it is a row of short words, and a
+   one-word heading was 39px wide, so the inline floor matters there and only there. */
+@media (max-width: 760px), (pointer: coarse) {
+  .ak-reading__link { min-block-size: var(--ak-touch-min); min-inline-size: var(--ak-touch-min); }
 }
 
 /* ── Less motion: the layers stand still and the rail changes at once ─────────────────────── */

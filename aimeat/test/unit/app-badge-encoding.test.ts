@@ -19,6 +19,12 @@
  *   - the visible AI label is pure ASCII in both locales
  * @usage pnpm exec vitest run test/unit/app-badge-encoding.test.ts
  * @version-history
+ *   v1.3.0 — 2026-09-05 — The lightning-bolt assertion flips from "present as an entity" to
+ *     ABSENT, and gains the reason: the badge draws the bolt as an inline SVG now (the house
+ *     rule is no emoji in the interface, and a glyph owed 4.5 of text contrast where a drawing
+ *     owes 3). Third of the three cases — the assertion was right and the behaviour changed
+ *     under it, so it is rewritten rather than deleted. The middle dot stays a glyph and stays
+ *     asserted, which is what keeps the encoding rule under test.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 5 step 0a: driven through applyServeMarks(), the single
  *     serve-time pass that replaced the four injectors. Same assertions, same bytes.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 4 step 0c: the em-dash assertion flips from "present as an
@@ -50,8 +56,16 @@ describe('the attribution badge survives a document with no charset', () => {
   });
 
   it('still carries the glyphs it keeps — as entities, not as missing characters', () => {
-    expect(html).toContain('&#9889;');  // ⚡
     expect(html).toContain('&#183;');   // ·
+  });
+
+  // The bolt is an inline SVG since v2.1.0 of the badge, for two reasons at once: the house style
+  // bans emoji in the interface, and the glyph was TEXT, which owes 4.5 of contrast and measured
+  // 4.19 to 4.29 on every app page. Asserted as an absence so a glyph cannot come back quietly.
+  it('draws the lightning rather than typing it', () => {
+    expect(html).not.toContain('&#9889;');
+    expect(html).not.toContain('⚡');
+    expect(html).toContain('<svg viewBox="0 0 24 24"');
   });
 
   // The em dash is gone from the WORDING, not merely escaped. Encoding it produced `&#8212;`, which

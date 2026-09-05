@@ -25,6 +25,8 @@
  * @structure .ak-story (well · track · meter) · .ak-act (hold · stick) ·
  *   .ak-chapter (track · panel) · .ak-rail (dot · mark · label)
  * @version-history
+ *   v0.47.0 — 2026-09-05 — The measured review: the rail dots take the 40px target floor under a
+ *     finger. The rail is a column, so ten of them are 400px tall, which a phone has.
  *   v0.46.1 — 2026-09-02 — .ak-scene* becomes .ak-act*: the scene3d component owns .ak-scene.
  *   v0.46.0 — 2026-09-02 — The sideways chapter's clothes: .ak-act--x, .ak-chapter and the
  *     row of viewport-wide panels the scene's progress carries across
@@ -200,6 +202,13 @@
 @media (max-width: 640px) {
   .ak-rail { inset-inline-end: 6px; padding: 4px; }
   .ak-rail__label { display: none; }
+}
+
+/* ── Under a finger: the dot takes the target floor ───────────────────────────────────────────
+   24px is the WCAG 2.2 minimum and enough for a pointer. A thumb wants 40, and the rail is a
+   column, so the extra height costs nothing a phone does not have; the mark stays 10px. */
+@media (max-width: 760px), (pointer: coarse) {
+  .ak-rail__dot { min-block-size: var(--ak-touch-min); min-inline-size: var(--ak-touch-min); }
 }
 
 /* ── Less motion: the marks change at once, and a held scene still holds ──────────────────── */

@@ -43,6 +43,21 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.49.0 — 2026-09-05 — THE MEASURED REVIEW, five findings closed in the kit.
+ *     (1) The reduced-motion block reaches ::before and ::after, so the hero's aurora drift —
+ *     the one animation in this kit that ran forever under prefers-reduced-motion — stops.
+ *     (2) Every compact control reaches 40px of hit area on a phone, off the new --ak-touch-min:
+ *     the checkout radio, the carousel and rail dots, the sortable grip, the cart stepper and
+ *     remove, the notices mark-all, the facet chip and clear, the search clear, the calendar nav,
+ *     the price period, the tour buttons, the poll option, the kanban card, the reading link and
+ *     the table sort. A dot keeps its painted mark; only its box grows.
+ *     (3) A sideways scroller says so: scroll-edge.js stamps data-ak-scroll="start|middle|end|
+ *     none" and the kit paints an edge fade on the side that has more. Every kit scroller gets
+ *     it by class; an app opts its own in with data-ak-scroll-edge.
+ *     (4) --ak-text-micro (11px) is the one size under the fine floor, and the five places that
+ *     wrote 9.8 to 10.9 read it instead.
+ *     (5) .ak-facets__sep took a hairline colour as text (1.75 dark, 2.28 light); it is the
+ *     muted ink now.
  *   v0.48.0 — 2026-09-05 — THE EFFECTS (wish-atelier-post-process-effects): effects.css joins
  *     the parts — the .ak-fx-* classes effects.js puts on a block, a hero band or a picture,
  *     reading their numbers from the --ak-fx-<id>-<param> properties the kit writes from the
@@ -366,6 +381,13 @@
   --ak-text-title:    var(--text-title, clamp(1.1rem, 2.6vw, 1.4rem));
   --ak-text-body:     var(--text-body, 0.95rem);
   --ak-text-fine:     var(--text-fine, 0.8125rem);     /* 13px floor                         */
+  /* THE ONE SIZE UNDER THE FINE FLOOR, and the list of who may use it. A tick label on a chart
+   * axis, an edge label on a graph, a time inside a schedule band and a map's licence credit are
+   * read beside the thing they annotate, never on their own, and 13px would not fit the box the
+   * mark leaves. Nothing else in the kit is allowed below --ak-text-fine: a caption, a hint, a
+   * chip and a control's own label all read at the floor. 11px is the bottom (the review measured
+   * five places at 9.8 to 10.9 and every one of them fits at 11). */
+  --ak-text-micro:    11px;                             /* annotations only, see the list above */
   --ak-weight-display: 750;
   --ak-display-shadow: none;                            /* extrusion under display type      */
   --ak-display-stroke: 0;                               /* outline width around display type */
@@ -377,6 +399,8 @@
   --ak-gap:           var(--gap-card, 14px);
   --ak-pad:           16px;
   --ak-touch:         44px;                             /* minimum interactive height        */
+  --ak-touch-min:     40px;                             /* the floor a compact control may sit on */
+  --ak-scroll-fade:   28px;                             /* the edge fade on a sideways scroller */
   --ak-motion:        var(--motion-base, 200ms);
   --ak-ease:          var(--ease-out, cubic-bezier(0.2, 0.7, 0.3, 1));
   /* Vivid entrance: components rise in, staggered. Flat zeroes both and nothing animates. */
@@ -472,9 +496,18 @@
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
    Reduced motion: every animated thing collapses to its end state.
+
+   THE PSEUDO-ELEMENTS ARE PART OF "EVERY". `.ak-root *` matches elements, and a pseudo-element
+   is not one: for a year the hero's aurora drift lived on `.ak-hero::before` and kept wandering
+   forever under prefers-reduced-motion because this block never reached it, while the
+   ambient layer beside it was safe only because ambient.css names its own `animation: none`.
+   The four selectors below are the whole surface a declaration can be attached to, so a new
+   decorative layer is caught whether it is an element or a mark painted by one.
    ══════════════════════════════════════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
-  .ak-root, .ak-root * {
+  .ak-root, .ak-root *,
+  .ak-root::before, .ak-root::after,
+  .ak-root *::before, .ak-root *::after {
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
