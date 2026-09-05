@@ -155,6 +155,23 @@ by hand; the list here is the checklist.
 | `--font-headline` again, through the palette bridge | `lib/aimeat-theme.css` gives every `h1`-`h6` the palette's display face, and the house palette's display face is `var(--font-headline, 'Archivo Black', …)`: on the node the classic shell's headings follow the token; a published app without `theme.css` keeps the vendored Archivo Black; a chosen palette (paper, circuit, …) keeps its own face on purpose |
 | `--sun`, `--on-sun`, `--accent`, `--text`, `--bg` | every sheet; the auth pill and dialog read them with a fallback so an app origin without the tokens still gets the design |
 
+### The kit an app is built from has its own contract
+
+An app on the Atelier track does not read `theme.css`; it reads the `--ak-*` contract in
+`aimeat/public/lib/aimeat-atelier.css`, where the looks are `[data-ak-look]` blocks and the pace of
+every entrance is four tokens — `--ak-motion` (how long), `--ak-ease` (the curve),
+`--ak-enter-distance` (how far a row rises) and `--ak-enter-stagger` (the beat between rows) —
+with the spring hand beside them in `--ak-spring-*`, read off the element the kit is moving. Each
+`--ak-*` token falls back to the matching AIMEAT theme token and then to a literal, so an app
+served with `theme.css` inherits the house and an app served without it still looks finished. The
+same contract is documented to an AI in `aimeat/src/data/library-packs/sdk-ui.ts`, which is the
+`aimeat-atelier` pack's `aiDoc` and the answer an agent gets when it asks what the kit is. So the
+map above reaches the kit too: a value changes in one place, and the apps built on it follow.
+
+`--ak-tilt` belongs to an app's own register, not to this skill's flat poster face. The difference
+is scope, not disagreement: a genre that commits to a tilted photograph is that app's statement,
+and the house surfaces stay flat.
+
 Code that runs **outside** the node cannot read a token: the portfolio prompt a person carries to
 their own AI, the auth library's fallbacks, an app built elsewhere. Those carry the literal values
 from the table above and are the second half of the checklist when a value changes.

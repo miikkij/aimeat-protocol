@@ -39,6 +39,9 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   v1.9.0 — 2026-09-05 — The declared register travels to the publish response beside the track,
+ *     so an Atelier app is told which genre page it has to stand beside
+ *     (wish-atelier-always-excellent, part 4).
  *   v1.8.0 — 2026-09-03 — A publish refreshes the dependency map from the published source.
  *   v1.7.0 — 2026-08-29 — `legal` (the app's own pages) carries forward on a republish.
  *   v1.6.0 — 2026-08-29 — `marks`, `authorship` and `authorshipLog` carry forward on a republish.
@@ -276,6 +279,11 @@ export async function publishApp(
     .exec(html.slice(0, 4096))?.[1] as 'classic' | 'atelier' | undefined;
   const track = declaredTrack ?? prev?.track;
   if (track) manifest.track = track;
+  // The register the app committed to. The lint has already refused an Atelier app that names
+  // none, so by here it is a genre id or a `custom:<name>`; the publish response uses it to name
+  // the exact genre this app has to stand beside.
+  const declaredRegister = /<meta\b[^>]*name\s*=\s*["']aimeat-register["'][^>]*content\s*=\s*["']([^"']*)["']/i
+    .exec(html.slice(0, 4096))?.[1];
   const icon = requested.icon ?? prev?.icon;
   if (icon) manifest.icon = icon;
   // An explicit `cortexAgents` replaces the section (send `[]` to clear it); omitted carries forward.
@@ -521,7 +529,8 @@ export async function publishApp(
     artifactWarnings: artifact.warnings,
     // Every door returns this now. It used to exist only on the MCP inline branch, so the two
     // things an app most often lacks went unmentioned on the door most apps come through.
-    nextSteps: await buildPublishNextSteps(storage, config, ownerName, filename, data.length),
+    nextSteps: await buildPublishNextSteps(
+      storage, config, ownerName, filename, data.length, track, declaredRegister),
   };
 }
 

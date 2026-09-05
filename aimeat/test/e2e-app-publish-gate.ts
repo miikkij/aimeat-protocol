@@ -27,6 +27,12 @@
  *   visible afterwards) · blocking artifacts on all three REST doors · the warnings · next_steps
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-publish-gate
  * @version-history
+ *   v1.3.0 — 2026-09-05 — THE RECIPE AND THE ACCEPTANCE (wish-atelier-always-excellent, part 4):
+ *     the served Atelier spec carries the four customisation doors, `describe()`, the fork's price
+ *     and the five copy-paste patterns; an Atelier publish answers with an `acceptance` line
+ *     naming 390, 1440, both themes, the genre the app actually forked (the shelf when the
+ *     register is the app's own) and the question asked while looking; a Classic publish is told
+ *     nothing about genres.
  *   v1.2.0 — 2026-09-05 — The REGISTER gate: an Atelier app with no `aimeat-register` meta, or
  *     with the shell's REPLACE-ME placeholder still in the head, is refused with the
  *     atelier-register finding; the same app naming `genre-nightfloor` publishes; a Classic app
@@ -217,6 +223,27 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(txt.includes(atelierToken), 'the text/plain form dropped the token');
     });
 
+    await test('the Atelier spec carries the RECIPE: the four doors and the five patterns', async () => {
+        const r = await json('/v1/prompts/build-app-atelier?mode=improve');
+        const spec = r.body.data.prompt as string;
+        // The four doors. A builder who reads only the catalogue forks a component that was one
+        // slot away from right, and gives up the keyed reconcile to do it.
+        for (const door of ['data-ak-part', 'parts: {', 'data-ak-variant', '--ak-list-aside-size']) {
+            assert(spec.includes(door), `the customisation section must name the door "${door}"`);
+        }
+        assert(spec.includes('AIMEAT.atelier.describe('),
+            'the spec must say how to ASK the kit which doors a component has');
+        assert(spec.includes('describe(id).fork'),
+            'a fork the spec does not price is a fork a builder takes for free');
+        // The five patterns, each a call a builder can paste.
+        for (const title of ['A LIST THAT ARRIVES', 'A PANEL THAT CHANGES', 'A SCREEN THAT SWITCHES',
+            'A FORM THAT LANDS', 'A NEARLY-RIGHT ROW']) {
+            assert(spec.includes(title), `the spec must carry the pattern "${title}"`);
+        }
+        assert(spec.includes('AIMEAT.atelier.toast(') && spec.includes('AIMEAT.atelier.dialog('),
+            'the form pattern must show where a confirmation and a refusal go');
+    });
+
     await test('the Atelier token answers "ok", and the answer names the track it proves', async () => {
         const r = await publish(o.token, {
             filename: `gateat${Date.now()}.html`, mime_type: 'text/html', content: b64(app('x.html')),
@@ -352,6 +379,47 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(r.status === 201, `a Classic app must be untouched by the register gate — got ${r.status}: ${JSON.stringify(r.body?.error)}`);
         assert(!(r.body.data.app_hints ?? []).some((h: any) => h.pitfall === 'atelier-register'),
             `no register finding on a Classic app: ${JSON.stringify(r.body.data.app_hints)}`);
+        // And it is told nothing about genres: the acceptance question belongs to the track that
+        // forks one (docs/pitfalls.md §34).
+        assert(!r.body.data.next_steps?.acceptance,
+            `a Classic app must not be sent to a genre: ${JSON.stringify(r.body.data.next_steps?.acceptance)}`);
+    });
+
+    // ── The acceptance: an Atelier app is judged on a picture beside the genre it forked ──────
+    // The publish response is the one surface the publisher is guaranteed to read, and the
+    // measured checks pass on pages the owner rejects — so the response says which picture to
+    // take, and which page to put it beside.
+
+    await test('an Atelier publish is told to accept the app BESIDE the genre it forked, at 390 and 1440', async () => {
+        const f = `gateaccept${Date.now()}.html`;
+        const r = await publish(o.token, {
+            filename: f, mime_type: 'text/html', content: b64(atelierApp(f, 'genre-departures')),
+            name: 'Accepted', description: 'Forked from the departures genre.', spec_token: atelierToken,
+        });
+        assert(r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const line = r.body.data.next_steps?.acceptance as string | undefined;
+        assert(!!line, `the Atelier publish must carry an acceptance line: ${JSON.stringify(r.body.data.next_steps)}`);
+        assert(line!.includes('390') && line!.includes('1440'),
+            `the acceptance must name both widths: ${line}`);
+        assert(/both themes/i.test(line!), `the acceptance must name both themes: ${line}`);
+        // The exact genre, not a shelf to search: this app named one.
+        assert(line!.includes('/v1/app-templates/genre-departures'),
+            `the acceptance must address the genre this app forked: ${line}`);
+        assert(/would this pass beside the genre/i.test(line!),
+            `the acceptance must carry the question asked while looking: ${line}`);
+    });
+
+    await test('an Atelier app on a register of its own is sent to the genre SHELF instead', async () => {
+        const f = `gateacceptcustom${Date.now()}.html`;
+        const r = await publish(o.token, {
+            filename: f, mime_type: 'text/html', content: b64(atelierApp(f, 'custom:ledger')),
+            name: 'Own register', description: 'Committed to a look of its own.', spec_token: atelierToken,
+        });
+        assert(r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const line = r.body.data.next_steps?.acceptance as string | undefined;
+        assert(!!line, 'an app on its own register still gets the acceptance question');
+        assert(line!.includes('/v1/designbook?kind=genre'),
+            `with no genre to name, the acceptance points at the shelf: ${line}`);
     });
 
     const skippedName = `gateskip${Date.now()}.html`;
