@@ -19,6 +19,9 @@
  *   v1.1.0 — 2026-03-20 — add exportPackageZip, importPackageZip, proposeAsTemplate
  *   v1.2.0 — 2026-03-20 — add syncFederationTemplates, listFederationTemplates
  *   v1.2.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
+ *   v1.3.0 — 2026-09-05 — composePackage, setPackageStatus, updateInstance, upstreamCheck,
+ *     pullPackage. updateInstance is the one to reach for rather than applyMigration with every
+ *     component set to `replace`: it leaves what the owner edited alone and says which those were.
  */
 import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
 import { authHeaders } from '/js/services/auth.js';
@@ -28,6 +31,12 @@ export const listPackages = (params) => apiGet('/v1/packages' + buildQuery(param
 export const getPackage = (groupId) => apiGet(`/v1/packages/${enc(groupId)}`);
 export const getPackageVersions = (groupId) => apiGet(`/v1/packages/${enc(groupId)}/versions`);
 export const createPackage = (data) => apiPost('/v1/packages', data);
+/** Build a package out of apps the owner already published. `data` is { name, apps: [filename], … }. */
+export const composePackage = (data) => apiPost('/v1/packages/compose', data);
+/** Publish, unpublish or archive. Omit `version` and the newest one is meant. */
+export const setPackageStatus = (groupId, data) => apiPatch(`/v1/packages/${enc(groupId)}/status`, data);
+/** Is there a newer version where this was pulled from? Reads a signed statement; writes nothing. */
+export const upstreamCheck = (groupId) => apiGet(`/v1/packages/${enc(groupId)}/upstream-check`);
 export const createVersion = (groupId, data) => apiPost(`/v1/packages/${enc(groupId)}/versions`, data);
 export const updatePackage = (groupId, data) => apiPatch(`/v1/packages/${enc(groupId)}`, data);
 export const archiveVersion = (groupId, version) => apiDelete(`/v1/packages/${enc(groupId)}/versions/${enc(version)}`);
@@ -41,6 +50,13 @@ export const installPackage = (groupId, data) => apiPost(`/v1/packages/${enc(gro
 export const checkUpdate = (id) => apiGet(`/v1/instances/${enc(id)}/check-update`);
 export const getMigrationPrompt = (id, data) => apiPost(`/v1/instances/${enc(id)}/migration-prompt`, data);
 export const applyMigration = (id, data) => apiPost(`/v1/instances/${enc(id)}/apply-migration`, data);
+/**
+ * Move a whole installed package onto its latest version in one act.
+ *
+ * Use this rather than mapping every component to `replace` yourself: a part the owner has edited
+ * comes back in `needsYou` untouched, which the hand-rolled version could not tell.
+ */
+export const updateInstance = (id, data) => apiPost(`/v1/instances/${enc(id)}/update`, data ?? {});
 export const removeInstance = (id, removeComponents) => apiDelete(`/v1/instances/${enc(id)}` + buildQuery({ removeComponents }));
 
 // ── Templates ──
@@ -86,6 +102,8 @@ export const proposeAsTemplate = (groupId) => apiPost(`/v1/packages/${enc(groupI
 // ── Federation Templates ──
 export const syncFederationTemplates = () => apiPost('/v1/federation/templates/sync', {});
 export const listFederationTemplates = (params) => apiGet('/v1/federation/templates' + buildQuery(params));
+/** Bring a package in from another node. `data` is { group_id, node_id } or { group_id, source_url, trust }. */
+export const pullPackage = (data) => apiPost('/v1/federation/packages/pull', data);
 
 // ── Helpers ──
 const enc = (s) => encodeURIComponent(s);

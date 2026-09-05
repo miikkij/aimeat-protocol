@@ -11,6 +11,9 @@
  * @structure renderPage · secInstalled · secOffers · secOwn · secNew · secAgent
  * @usage import { renderPage } from './packages/page.js';
  * @version-history
+ *   v1.1.0 — 2026-09-05 — A third road, leading: make a package out of apps you already have. Each
+ *     app says what it loads, because that is what decides whether it travels with the package or is
+ *     named as something the installing side must already have.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { h } from 'preact';
@@ -153,6 +156,12 @@ function secNew(ctx) {
       <p class="pk-para">${x('newIntro')}</p>
       <div class="pk-roads">
         <div class="pk-road pk-road--lead">
+          <span class="pk-road-t">${x('roadApps')}</span>
+          <p class="pk-para">${x('roadAppsBody')}</p>
+          ${ctx.compose.open ? composeForm(ctx) : html`
+            <div class="og-doors"><button type="button" class="og-door" onClick=${() => ctx.openCompose()}>${x('pickApps')}</button><span class="pk-hint">${x('roadAppsSub')}</span></div>`}
+        </div>
+        <div class="pk-road">
           <span class="pk-road-t">${x('roadAsk')}</span>
           <p class="pk-para">${x('roadAskBody')}</p>
           <div class="og-doors"><button type="button" class="og-door" disabled=${ctx.busy === 'prompt'} onClick=${() => ctx.copyPrompt()}>${x('copyRequest')}</button><span class="pk-hint">${x('roadAskSub')}</span></div>
@@ -164,6 +173,58 @@ function secNew(ctx) {
         </div>
       </div>
     <//>`;
+}
+
+/**
+ * Pick your own apps and name the package.
+ *
+ * Each row says what that app loads, because that is what decides whether it travels: a cortex the
+ * owner installed is packaged, and a cortex this node ships, a library pack or an extension is named
+ * as something the installing node must already have. Saying so here means the answer is not a
+ * surprise on the other side.
+ */
+function composeForm(ctx) {
+  const apps = ctx.myApps;
+  const picked = ctx.compose.picked;
+  const ready = (ctx.compose.name || '').trim().length > 0 && picked.length > 0;
+
+  const needsOf = (a) => {
+    const r = a.requires || {};
+    const cortex = (r.cortex ?? []).map((c) => c.name);
+    const ext = (r.extensions ?? []).map((e) => e.name);
+    const packs = (r.packs ?? []).map((p) => p.name);
+    return [
+      cortex.length ? x('needsCortex', { names: cortex.join(', ') }) : '',
+      ext.length ? x('needsExt', { names: ext.join(', ') }) : '',
+      packs.length ? x('needsPacks', { names: packs.join(', ') }) : '',
+    ].filter(Boolean).join(' · ') || x('needsNothing');
+  };
+
+  return html`
+    <div class="pk-compose">
+      <label class="pk-compose-name">
+        <span class="og-label">${x('composeNameK')}</span>
+        <input type="text" value=${ctx.compose.name} placeholder=${x('composeNamePlaceholder')}
+          onInput=${(e) => ctx.setComposeName(e.target.value)} />
+      </label>
+      ${apps === null ? html`<p class="pk-hint">${x('loadingApps')}</p>`
+      : apps.length === 0 ? html`<p class="pk-empty">${x('noAppsYet')}</p>` : html`
+        <div class="pk-compose-list">
+          ${apps.map((a) => html`
+            <label class="pk-compose-app" key=${a.filename}>
+              <input type="checkbox" checked=${picked.includes(a.filename)} onChange=${() => ctx.togglePick(a.filename)} />
+              <span class="pk-compose-app-nm">${a.manifest?.name || a.name || a.filename}<small>${a.filename}</small></span>
+              <small class="pk-compose-app-needs">${needsOf(a)}</small>
+            </label>`)}
+        </div>`}
+      <p class="pk-hint">${x('composeCarries')}</p>
+      <div class="og-doors">
+        <button type="button" class="og-door" disabled=${!ready || ctx.busy === 'compose'} onClick=${() => ctx.doCompose()}>
+          ${ctx.busy === 'compose' ? x('composing') : x('composeN', { n: picked.length })}
+        </button>
+        <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.closeCompose()}>${x('cancel')}</button>
+      </div>
+    </div>`;
 }
 
 function secAgent(ctx) {

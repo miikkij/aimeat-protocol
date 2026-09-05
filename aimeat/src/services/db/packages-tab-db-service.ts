@@ -12,6 +12,10 @@
  * @structure PackagesTabService.overview(owner) → { instances, packages, templates, available }
  * @usage const p = await createPackagesTabService(storage).overview(owner);
  * @version-history
+ *   v1.2.0 — 2026-09-05 — The owner's own list carries DRAFTS. It was filtered to published, which
+ *     hid exactly the packages whose author still had something to do about them: a draft is
+ *     installable by nobody, including its author, and one that cannot be seen cannot be published.
+ *     Archived ones are dropped in the service, since the storage filter takes one status at a time.
  *   v1.1.0 — 2026-09-03 — `available`: every author's public published packages, so the page shows
  *     what is on offer as one list joined with the template listings (design canvas "AIMEAT
  *     Paketit-sivu"); the old page's Browse view listed only the owner's own.
@@ -43,14 +47,20 @@ export class PackagesTabService {
         this.storage.listInstances({ owner, status: 'installed', limit: 50, offset: 0 }),
         // author === owner → visibility left unset so the owner sees their own private packages too
         // (mirrors GET /v1/packages when author matches the authed owner).
-        this.storage.listPackages({ author: owner, status: 'published', limit: 50, offset: 0 }),
+        //
+        // AND STATUS LEFT UNSET, so a DRAFT appears. Filtering to published hid exactly the packages
+        // whose author still has something to do about them: a draft is installable by nobody,
+        // including its author, and one that cannot be seen cannot be published either. Archived ones
+        // are dropped below rather than by the query, because the filter takes one status at a time.
+        this.storage.listPackages({ author: owner, limit: 60, offset: 0 }),
         this.storage.listTemplateListings({ sort: 'newest', status: 'listed', limit: 20, offset: 0 }),
         // Mirrors GET /v1/packages with no author: public and published, every author.
         this.storage.listPackages({ status: 'published', visibility: 'public', limit: 100, offset: 0 }),
       ]);
+      const ownLive = pkg.packages.filter(p => p.status !== 'archived').slice(0, 50);
       return {
         instances: { instances: inst.instances, total: inst.total },
-        packages: { packages: pkg.packages, total: pkg.total },
+        packages: { packages: ownLive, total: ownLive.length },
         templates: { templates: tpl.listings, total: tpl.total },
         available: { packages: pub.packages, total: pub.total },
       };

@@ -10,6 +10,9 @@
  *   a new package, and the AI rule box.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The compose form (a name, the owner's apps as a capped scrolling list with
+ *     what each one loads beside it) and the block that says what a package deliberately did not
+ *     carry. On a phone the app's name and its needs stack under the checkbox.
  *   v1.0.0 — 2026-09-03 — Initial (replaces the .pkg-* rules in profile.css).
  */
 
@@ -92,6 +95,41 @@
 .pk-road .og-doors { align-items: center; }
 .pk-road .pk-hint { margin: 0; }
 
+/* ── Making a package out of apps you already have ─────────────────────────────────────────── */
+.pk-compose { margin-top: .5rem; }
+.pk-compose-name { display: block; margin-bottom: .7rem; }
+.pk-compose-name .og-label { display: block; margin-bottom: .25rem; }
+/* Width only. The profile face's own `.pf input[type="text"]` rule wins on specificity and gives
+ * this field the underline look every other field on the page has, which is the right look; a box
+ * declared here would be dead CSS claiming otherwise. */
+.pk-compose-name input { width: 100%; font-family: inherit; font-size: .95rem; }
+/* Capped and scrolling: an owner with forty apps must not push the button off the page. */
+.pk-compose-list {
+  display: flex; flex-direction: column; gap: .1rem;
+  max-height: 17rem; overflow-y: auto;
+  border: 1px solid var(--border); padding: .4rem;
+  margin-bottom: .6rem;
+}
+.pk-compose-app {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.1fr);
+  align-items: baseline; gap: .5rem;
+  padding: .35rem .3rem; border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.pk-compose-app:last-child { border-bottom: 0; }
+.pk-compose-app:hover { background: var(--hover-bg, var(--card-bg)); }
+.pk-compose-app-nm { min-width: 0; color: var(--text); }
+.pk-compose-app-nm small { display: block; color: var(--text-muted); font-size: .8rem; }
+.pk-compose-app-needs { min-width: 0; color: var(--text-muted); font-size: .82rem; }
+
+/* ── What a package deliberately did not carry ─────────────────────────────────────────────── */
+.pk-expects {
+  margin: .6rem 0; padding: .6rem .8rem;
+  border-left: 3px solid var(--sun); background: var(--card-bg);
+}
+.pk-expects .og-label { display: block; margin-bottom: .25rem; }
+.pk-expects .pk-para { margin: 0 0 .2rem; }
+.pk-expects .pk-para:last-child { margin-bottom: 0; }
+
 /* ── The rule an AI gets ───────────────────────────────────────────────────────────────────── */
 .pk-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; border: 3px solid var(--text); background: var(--card-bg); }
 .pk-rule .og-label { display: block; margin-bottom: .3rem; }
@@ -114,4 +152,7 @@
   .pk-comp--offer > div:nth-child(3n) { border-bottom: 1px solid var(--border); padding-bottom: .5rem; margin-bottom: .2rem; }
   .pk-roads { grid-template-columns: 1fr; }
   .pk-inst { flex-wrap: wrap; }
+  /* On a phone the app's name and what it loads stack under the box instead of beside it. */
+  .pk-compose-app { grid-template-columns: auto minmax(0, 1fr); }
+  .pk-compose-app-needs { grid-column: 2; }
 }

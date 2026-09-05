@@ -13,6 +13,11 @@
  * @structure PackagesTab() — state (data, remote, expanded, versions, updates, installForm, filter) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'packages'
  * @version-history
+ *   v2.1.0 — 2026-09-05 — A third road to a new package: pick your own apps and this node reads what
+ *     each one loads. Update calls POST /v1/instances/:id/update instead of mapping every component
+ *     to `replace` — the old shape overwrote whatever the owner had edited, and could not have known
+ *     better, since the flag it would have had to read is only refreshed by opening the status route.
+ *     And a draft can be published from its row, which nothing could do before.
  *   v2.0.0 — 2026-09-03 — Poster face (design canvas "AIMEAT Paketit-sivu", direction A): one page
  *     instead of three sub-views; what is on offer is every author's public package joined with its
  *     gallery listing, not the owner's own; the install name is asked on the row instead of a
@@ -51,6 +56,8 @@ export default function PackagesTab({ session, showToast }) {
   const [query, setQuery] = useState('');
   const [shown, setShown] = useState(20);
   const [busy, setBusy] = useState(false);
+  const [compose, setCompose] = useState({ open: false, name: '', picked: [] });
+  const [myApps, setMyApps] = useState(null);   // null until the compose road is opened
 
   const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || (typeof e === 'string' ? e : '') || fallback || t('profile.error'), true);
 
@@ -99,15 +106,22 @@ export default function PackagesTab({ session, showToast }) {
       setUpdates((m) => ({ ...m, [inst.id]: { updateAvailable: !!r.data?.updateAvailable, latestVersion: r.data?.latestVersion } }));
     } catch (e) { setUpdates((m) => ({ ...m, [inst.id]: { error: e?.message || x('updateFailed') } })); }
   };
+  // ONE DOOR, AND IT DECIDES WHAT IS SAFE. This used to fetch the instance and map every component
+  // to `replace` (memory and translations aside), which overwrote whatever the owner had edited —
+  // and it could not have known better, because the diff it would have had to read was reporting a
+  // customisation flag that is only refreshed when somebody opens the status route. The node decides
+  // now: what the owner edited comes back in `needsYou`, untouched.
   const applyUpdate = (inst, upd) => {
     confirm(x('confirmUpdate', { version: upd.latestVersion }), async () => {
       setBusy(true);
       try {
-        const cur = await pkgService.getInstance(inst.id);
-        const components = (cur?.data?.installedComponents || []).map((c) => ({ componentId: c.componentId, action: (c.type === 'memory' || c.type === 'translation') ? 'skip' : 'replace' }));
-        const r = await pkgService.applyMigration(inst.id, { targetVersion: upd.latestVersion, components });
+        const r = await pkgService.updateInstance(inst.id);
         if (!r?.ok) { fail(r); return; }
-        showToast?.(x('updatedToast', { name: inst.label || inst.packageGroupId }));
+        const needs = r.data?.needsYou ?? [];
+        const done = r.data?.applied?.updatedComponents?.length ?? 0;
+        showToast?.(needs.length
+          ? x('updatedSomeToast', { name: inst.label || inst.packageGroupId, n: done, kept: needs.length })
+          : x('updatedToast', { name: inst.label || inst.packageGroupId }));
         setUpdates((m) => ({ ...m, [inst.id]: undefined }));
         load();
       } catch (e) { fail(e); } finally { setBusy(false); }
@@ -181,7 +195,51 @@ export default function PackagesTab({ session, showToast }) {
     }, { title: x('archive'), danger: true });
   };
 
-  /* ── A new package: the request, or a zip ────────────────────────────────────────────────── */
+  // A package a compose left as a draft, or one an author took down, is made installable again.
+  const publishOwn = async (p) => {
+    setBusy(true);
+    try {
+      const r = await pkgService.setPackageStatus(p.packageGroupId, { status: 'published' });
+      if (!r?.ok) { fail(r); return; }
+      showToast?.(x('publishedToast', { name: p.name }));
+      load();
+    } catch (e) { fail(e); } finally { setBusy(false); }
+  };
+
+  /* ── A new package: from your own apps, the request, or a zip ────────────────────────────── */
+
+  // The owner's own apps, read once and only when the compose road is opened. `own=true` is what
+  // narrows GET /v1/apps to this caller; `requires` on each row is the dependency map, which is what
+  // lets the road say what will be packaged and what will not before anything is pressed.
+  const openCompose = async () => {
+    setCompose({ open: true, name: '', picked: [] });
+    if (myApps !== null) return;
+    try {
+      const r = await apiGet('/v1/apps?own=true&limit=200');
+      setMyApps(r?.data?.apps ?? []);
+    } catch (e) { swallowed('packages: own apps', e); setMyApps([]); }
+  };
+  const togglePick = (filename) => setCompose((c) => ({
+    ...c,
+    picked: c.picked.includes(filename) ? c.picked.filter((f) => f !== filename) : [...c.picked, filename],
+  }));
+  const doCompose = async () => {
+    const name = (compose.name || '').trim();
+    if (!name || compose.picked.length === 0) return;
+    setBusy('compose');
+    try {
+      const r = await pkgService.composePackage({ name, apps: compose.picked });
+      if (!r?.ok) { fail(r); return; }
+      const expects = r.data?.expects || {};
+      const named = [...(expects.cortex ?? []), ...(expects.packs ?? []), ...(expects.extensions ?? [])];
+      showToast?.(named.length
+        ? x('composedExpectsToast', { name, n: compose.picked.length, needs: named.join(', ') })
+        : x('composedToast', { name, n: compose.picked.length }));
+      setCompose({ open: false, name: '', picked: [] });
+      load();
+      setTimeout(() => document.getElementById('pk-own')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    } catch (e) { fail(e); } finally { setBusy(false); }
+  };
   const copyPrompt = async () => {
     setBusy('prompt');
     try {
@@ -218,6 +276,10 @@ export default function PackagesTab({ session, showToast }) {
     nodeUrl: getNodeUrl(), ownerName, isOperator, showToast, ConfirmUI, fileRef,
     data, instances, own, offers, offerByGroup, ownByGroup, listingByGroup,
     expanded, versions, updates, installForm, filter, query, shown, busy,
+    compose, myApps,
+    setComposeName: (name) => setCompose((c) => ({ ...c, name })),
+    closeCompose: () => setCompose({ open: false, name: '', picked: [] }),
+    openCompose, togglePick, doCompose, publishOwn,
     setFilter: (patch) => { setFilterState((f) => ({ ...f, ...patch })); setShown(20); },
     setQuery: (q) => { setQuery(q); setShown(20); },
     setShown,
