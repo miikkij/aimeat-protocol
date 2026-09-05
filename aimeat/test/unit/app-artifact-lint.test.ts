@@ -12,11 +12,16 @@
  *   it, and the blocking half would then be worked around rather than fixed — so the clean-app case
  *   asserts zero findings of ANY severity, and each warning has its own "and not this one" case.
  *
- *   The asset probe is off in these tests (`appAssetProbe: false`): making a real loopback request
- *   belongs in the E2E suite, where there is a node listening. What is tested here is everything
- *   the check can decide from the bytes alone, plus the classification the probe depends on.
+ *   The asset probe is off in these tests (`appAssetProbe: false`) except in the one case that
+ *   exists to watch where the probe goes: what is tested here is everything the check can decide
+ *   from the bytes alone, plus the classification the probe depends on. That one case stands up a
+ *   server on an ephemeral port and asserts the request arrived at it, because the claim being made
+ *   is about a destination and nothing short of a listening socket proves it.
  * @usage cd aimeat && pnpm test -- app-artifact-lint
  * @version-history
+ *   v1.4.0 — 2026-09-06 — The probe's destination, asserted against a real listening server: an
+ *     asset path of `/\host/x` reached `http://host/x` through `new URL(path, base)`, so an app's
+ *     own bytes could aim the node's publish-time probe at a stranger (CodeQL alert 1612).
  *   v1.3.0 — 2026-09-05 — The register gate: an Atelier app with no `aimeat-register`, with the
  *     shell's REPLACE-ME placeholder, or with `custom:default` BLOCKS; a genre id or a named
  *     custom register is silent; a Classic app never hears about it. The ATELIER fixture names
@@ -31,6 +36,8 @@
  *   v1.0.0 — 2026-08-11 — initial.
  */
 import { describe, it, expect } from 'vitest';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import type { AimeatConfig } from '../../src/config.js';
 import { lintAppArtifact } from '../../src/services/app-artifact-lint.js';
 
@@ -120,6 +127,26 @@ describe('lintAppArtifact — asset URLs', () => {
     const html = CLEAN.replace('</head>', '<script src="/lib/aimeat-auth.js"></script></head>');
     const { blocking, warnings } = await lintAppArtifact(html, config);
     expect({ blocking, warnings }).toEqual({ blocking: [], warnings: [] });
+  });
+
+  // The probe is the one place a published app's bytes decide where this node sends a request, so
+  // this case runs it for real against a listening server rather than reasoning about the URL. The
+  // src below resolved to `http://evil.example/probe.js` under `new URL(path, base)`: one leading
+  // slash, then a backslash, which a special scheme reads as the second slash of an authority.
+  it('probes an asset path that names another host on THIS node, and never that host', async () => {
+    const seen: string[] = [];
+    const server = createServer((req, res) => { seen.push(req.url ?? ''); res.statusCode = 404; res.end(); });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as AddressInfo).port;
+    const probing = { ...config, port, appAssetProbe: true } as unknown as AimeatConfig;
+    try {
+      const html = CLEAN.replace('</head>', '<script src="/\\evil.example/probe.js"></script></head>');
+      const { blocking } = await lintAppArtifact(html, probing);
+      expect(seen).toContain('//evil.example/probe.js');
+      expect(blocking.map(f => f.pitfall)).toContain('invented-lib-urls');
+    } finally {
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
   });
 });
 

@@ -41,6 +41,13 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   v1.3.1 — 2026-09-06 — Three CodeQL findings on this file, one of them a hole. The asset probe
+ *     no longer resolves the uploaded path against a base URL: `new URL('/\\host/x', base)` moves
+ *     the request to `host`, because a backslash is a slash in a special scheme, so an app could
+ *     aim the node's own probe outward (alert 1612). The destination is now built from the port
+ *     alone and the path reaches it through the pathname and search setters, which cannot change
+ *     the host. The `rel="…stylesheet…"` and `@media … prefers-color-scheme` matches were rewritten
+ *     without their two-sided unbounded runs (alerts 1607, 1608): same answers, linear time.
  *   v1.3.0 — 2026-09-05 — checkRegister, the third blocking finding (atelier-register): an
  *     Atelier app with no `aimeat-register` meta, with the shell's REPLACE-ME placeholder, or
  *     with a custom register that is not a name. Read on the declared track, and on the kit
@@ -373,7 +380,11 @@ function collectAssetRefs(html: string, config: AimeatConfig): AssetRefs {
   while ((m = scriptRe.exec(html)) !== null) raw.push(m[1] as string);
   while ((m = linkRe.exec(html)) !== null) {
     const attrs = m[1] ?? '';
-    if (!/\brel\s*=\s*["'][^"']*stylesheet[^"']*["']/i.test(attrs)) continue;
+    // The rel value is read out and then searched, rather than matched with `[^"']*stylesheet[^"']*`
+    // in one pattern: that shape has an unbounded run on both sides of the word, so a `<link>` tag
+    // with a long rel costs quadratic time on bytes a stranger uploaded.
+    const rel = /\brel\s*=\s*["']([^"']*)["']/i.exec(attrs)?.[1];
+    if (!rel?.toLowerCase().includes('stylesheet')) continue;
     const href = /\bhref\s*=\s*["']([^"']+)["']/i.exec(attrs)?.[1];
     if (href) raw.push(href);
   }
@@ -470,15 +481,15 @@ async function probeNodeAssets(paths: string[], config: AimeatConfig): Promise<A
 
 /** The status of one path, or null when the node could not get an answer at all. */
 async function probeOne(path: string, config: AimeatConfig): Promise<number | null> {
-  let target: URL;
-  try {
-    target = new URL(path, `http://127.0.0.1:${config.port}`);
-  } catch (err) {
-    // A path the URL parser rejects is not a path this node could answer for either. No finding:
-    // the check reports what it PROVED, and it proved nothing here.
-    logger.debug('app-artifact-lint: unparseable asset path — no finding recorded', { path, error: String(err) });
-    return null;
-  }
+  // The destination is built from the node's own port and NOTHING else, and the uploaded path then
+  // reaches it through the pathname and search setters, which cannot move a request to another
+  // host. `new URL(path, base)` can: WHATWG treats a backslash in a special scheme as a slash, so
+  // `/\example.invalid/x` in an app's `<script src>` resolves to `http://example.invalid/x` and the
+  // node's own asset probe would call a stranger's server on that app's say-so.
+  const target = new URL(`http://127.0.0.1:${config.port}`);
+  const q = path.indexOf('?');
+  target.pathname = q === -1 ? path : path.slice(0, q);
+  target.search = q === -1 ? '' : path.slice(q + 1);
   try {
     const res = await fetch(target, {
       method: 'GET',
@@ -502,6 +513,30 @@ async function probeOne(path: string, config: AimeatConfig): Promise<number | nu
 
 // ── Warnings ────────────────────────────────────────────────────────────────────────────────────
 
+/** How far back from `prefers-color-scheme` its `@media` may sit. No hand-written condition is longer. */
+const MEDIA_CONDITION_LOOKBACK = 200;
+
+/**
+ * Does a media condition in this page ask for `prefers-color-scheme`?
+ *
+ * Read backwards from each mention of the feature rather than forwards from each `@media`. Forwards
+ * is the natural way to write it (`/@media[^{]*prefers-color-scheme/`) and it is quadratic: the
+ * unbounded run restarts at every `@media` in the file, and the file is bytes a stranger uploaded.
+ * The feature name appears a handful of times at most, and each one is settled by a fixed window.
+ */
+function hasColorSchemeMediaQuery(html: string): boolean {
+  const lower = html.toLowerCase();
+  for (let at = lower.indexOf('prefers-color-scheme'); at !== -1;
+    at = lower.indexOf('prefers-color-scheme', at + 1)) {
+    const before = lower.slice(Math.max(0, at - MEDIA_CONDITION_LOOKBACK), at);
+    const media = before.lastIndexOf('@media');
+    // A `{` after the `@media` means the condition already closed and this mention is inside the
+    // block's declarations, which is not the app deciding light and dark for itself.
+    if (media !== -1 && !before.slice(media).includes('{')) return true;
+  }
+  return false;
+}
+
 /**
  * Does the app let the user's own light/dark and palette choices reach it?
  *
@@ -513,7 +548,7 @@ async function probeOne(path: string, config: AimeatConfig): Promise<number | nu
 function checkTheme(html: string): AppArtifactFinding[] {
   const usesPlatformTheme = /aimeat-theme\.css|aimeat-daisyui-bridge\.css|daisyui@5\.css/i.test(html);
   const usesTokens = /var\(\s*--(color-|text-|elev-|motion-|aimeat-)/i.test(html);
-  const ownColorScheme = /@media[^{]*prefers-color-scheme/i.test(html);
+  const ownColorScheme = hasColorSchemeMediaQuery(html);
   const ownHexes = (html.match(/[:\s]#[0-9a-f]{3,8}\b/gi) ?? []).length;
 
   if (usesPlatformTheme || usesTokens) return [];
