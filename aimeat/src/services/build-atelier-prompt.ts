@@ -26,6 +26,11 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.23.0 — 2026-09-05 — THE EFFECTS, taught after the ambient (wish-atelier-post-process-
+ *     effects): the nine rendered from the effects registry (feel, evokes, where each lands, how
+ *     it may move, its knobs with bounds), the three motions and where each may run, the hosts
+ *     and the hero's picture, the matrix numbers an author can rely on, backdrop, and the Book's
+ *     EFFECTS shelf; the Book section says eight kinds. The ambient shelf renders nine presets.
  *   v1.22.0 — 2026-09-05 — THE REGISTER IS REQUIRED: the first move of a build is the genre fork,
  *     the shell paragraph says the shell is a frame that the publish refuses as served, and the
  *     genre section names the `aimeat-register` meta every genre carries and `custom:<name>` for
@@ -105,6 +110,7 @@ import { LOOKS as LOOK_REGISTRY } from '../data/atelier-looks.js';
 import { getAppTemplateIndex } from '../data/app-templates.js';
 import { PATTERNS } from '../data/atelier-patterns.js';
 import { AMBIENTS } from '../data/atelier-ambients.js';
+import { EFFECTS, EFFECT_HOSTS, POST_IDS } from '../data/atelier-effects.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -235,6 +241,30 @@ export const ATELIER_AMBIENTS: ReadonlyArray<{ id: string; feel: string; evokes:
 function renderAmbients(): string {
   return ATELIER_AMBIENTS.map((a) => `- \`${a.id}\` — ${a.feel} Evokes: ${a.evokes} Fits: ${a.fits.join(', ')}. Ships at alpha ${a.defaultAlpha}${
     a.proof === 'field' ? ' (the whisper; a look that owns its ground may run it louder)' : ' (points and lines, any look)'}.`).join('\n');
+}
+
+/**
+ * The effects shelf — DERIVED from the effects registry (src/data/atelier-effects.ts), the same
+ * source the kit's clamp is pinned to and the validator refuses from, so the prompt cannot
+ * promise a knob the node would refuse.
+ */
+export const ATELIER_EFFECTS: ReadonlyArray<{
+  id: string; feel: string; evokes: string; volume: readonly string[]; motion: readonly string[];
+  post: boolean; backdrop: boolean; knobs: string; fits: readonly string[];
+}> = EFFECTS.map((e) => ({
+  id: e.id, feel: e.feel, evokes: e.evokes, volume: e.volume, motion: e.motion, post: e.post, backdrop: e.backdrop,
+  knobs: e.params.map((p) => (p.kind === 'number' ? `${p.name} ${p.min}..${p.max} (${p.default})` : `${p.name}: ${p.tokens.join('|')} (${p.default})`)).join(', '),
+  fits: e.fitsLooks,
+}));
+
+function renderEffects(): string {
+  return ATELIER_EFFECTS.map((e) => {
+    const where = e.volume.includes('ground') ? 'under words or on a picture' : e.volume.includes('prop') ? 'on a picture' : 'on a band';
+    const how = e.motion.includes('living') && !e.motion.includes('still') && !e.motion.includes('moment')
+      ? 'living, on the layer only'
+      : e.motion.join(' or ') + (e.post ? ', or living on the layer' : '');
+    return `- \`${e.id}\` — ${e.feel} Evokes: ${e.evokes} Lands ${where}; ${how}${e.backdrop ? '; may run on the backdrop' : ''}. Knobs: ${e.knobs}. Fits: ${e.fits.join(', ')}.`;
+  }).join('\n');
 }
 
 export interface AtelierPromptOptions {
@@ -469,6 +499,36 @@ function composeBody(config: AimeatConfig): string {
     + 'one merges it into the app\'s arrangement (the look stays), and a combination worth keeping '
     + 'is proposed back the same way.\n\n';
 
+  body += '## Effects: still on the words, a moment on a cue, living only behind them\n\n';
+  body += 'A post-process EFFECT transforms what is already painted — the raster of a tube '
+    + 'television, a lens vignette, a two-ink print, a colour grade, rippled glass, a tear, a worn '
+    + 'tape, a drop on water, a kaleidoscope. It is a field on a block of the stored arrangement, '
+    + '`effect: { id, params?, backdrop? }`, and the kit wears it for you; in your own code it is '
+    + '`AIMEAT.atelier.fx(el, { id, params })`. THREE MOTIONS, AND THE RULE IS WHERE THEY MAY '
+    + 'RUN: a STILL is drawn once by the compositor and may sit under words; a MOMENT plays once '
+    + 'on a cue you give (`AIMEAT.atelier.fxPlay(el, id)` — a glitch when a save fails, a ripple '
+    + 'where a touch landed) and is gone on finished; LIVING motion belongs behind the words only, '
+    + 'as `ambient.post: [id | { id, params }]` (up to two passes over the layer\'s own field: '
+    + POST_IDS.join(', ') + ') or inside an `ambientStage`. A picture effect (duotone, distort) '
+    + 'lands only on a picture or a band, never on a component that bears text — the hosts are '
+    + EFFECT_HOSTS.join(', ') + ', and on a hero it lands on the picture, so a hero needs an '
+    + 'image for one — because it would bend or recolour the words; the validator refuses it '
+    + 'with the hosts named. A colour or overlay effect under words is proven by the contrast '
+    + 'matrix on the look at the numbers you set: a quarter of ink passes every look, any hue at '
+    + 'saturate 1.5 or under passes every look, louder passes the worlds that own their ground '
+    + '(lounge, dawn, stage, broadcast), and a duotone under body text is refused on every look '
+    + 'but one, which is why it is a picture effect. Every knob has bounds and a default; give '
+    + 'only what differs. `backdrop: true` (recolour alone) grades what is BEHIND a block — the '
+    + 'ambient seen through a card. Under Less motion a moment does not play and a still stays; '
+    + 'the viewer\'s weather is the layer\'s.\n\n';
+  body += 'The nine, described for choosing:\n\n';
+  body += renderEffects() + '\n\n';
+  body += 'A filter of your own would be a second implementation nobody proved: the kit\'s nine '
+    + 'are declared once with their bounds, and the Book has an EFFECTS shelf — '
+    + '`aimeat_designbook_search` with kind `effect` finds each one proven where it lands (a '
+    + 'moment on the hero band, a picture effect on a figure, a living pass over the layer), '
+    + 'and adopting one lands it on the block it names.\n\n';
+
   body += '## Motion, and the moment something needs the eye\n\n';
   body += 'Entrances, live-change repaints and the hover greeting are the components\' own work: '
     + 'you never write an animation. The one motion call you DO make is the attention gesture, '
@@ -529,10 +589,11 @@ function composeBody(config: AimeatConfig): string {
   body += 'Before composing a screen from nothing, search the Design Book '
     + '(`aimeat_designbook_search`, or GET /v1/designbook): it holds PROVEN parts — every one '
     + 'passed its own bench before landing, and adopting one (`aimeat_designbook_adopt`) is one '
-    + 'call. Seven kinds: a `layout` (a complete arrangement) or `fill` (a starting shape with '
+    + 'call. Eight kinds: a `layout` (a complete arrangement) or `fill` (a starting shape with '
     + '<placeholder> slots) REPLACES the app\'s arrangement; a `look` (a signature token sheet, '
     + 'colour pair included), `motion` (a motion recipe), `illustration` (art direction for '
-    + 'the imagery) or `ambient` (the layer behind the app, proven on its look) MERGES into the '
+    + 'the imagery), `ambient` (the layer behind the app, proven on its look) or `effect` (a '
+    + 'post-process filter, proven where it lands) MERGES into the '
     + 'arrangement the app already has; a `genre` (a complete page in a committed register) is '
     + 'forked from its template, never adopted. A starting shape from the '
     + 'Book plus your words beats a fresh composition, and when you make something worth '
