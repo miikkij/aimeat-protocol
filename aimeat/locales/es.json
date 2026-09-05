@@ -2468,7 +2468,7 @@
   "pkpage.archive": "Eliminar el paquete",
   "pkpage.confirmArchive": "¿Eliminar el paquete {name} con todas sus versiones? Las copias instaladas siguen funcionando, pero nadie podrá instalarlo de nuevo.",
   "pkpage.archivedToast": "{name} queda retirado de la oferta.",
-  "pkpage.newIntro": "Dos caminos. El primero es para lo que existe este servidor: pídele a tu IA que construya el paquete y lo publique. El segundo es importar un .zip listo.",
+  "pkpage.newIntro": "Tres caminos. El primero no exige escribir nada: elige las aplicaciones que ya publicaste y con ellas se forma el paquete. El segundo le pide a tu IA que construya uno desde cero. El tercero importa un .zip ya hecho.",
   "pkpage.roadAsk": "Pídele a tu IA que lo construya",
   "pkpage.roadAskBody": "Copia la petición en tu conversación. Lleva la guía completa del constructor de paquetes: la IA pregunta qué quieres, elige las partes, las construye, las prueba y publica el paquete entre tus publicaciones, o te entrega un .zip para importar.",
   "pkpage.roadAskSub": "La misma guía que este servidor ha tenido siempre; nada que instalar.",

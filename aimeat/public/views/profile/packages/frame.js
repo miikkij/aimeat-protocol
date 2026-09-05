@@ -9,6 +9,8 @@
  *   agentTextFor · crumb · pageLinks · openTab
  * @usage import { x, joinOffers } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-09-05 — An offer carries its `manifest`, which is where a composed package records
+ *     what the installing side must already have.
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Paketit-sivu", direction A).
  */
 import { h } from 'preact';
@@ -43,7 +45,9 @@ export function partCounts(list) {
 export function joinOffers(available, templates, remote) {
   const byGroup = new Map();
   for (const p of available || []) {
-    byGroup.set(p.packageGroupId, { group: p.packageGroupId, name: p.name, title: p.name, author: p.author, version: p.version, description: p.description || '', category: p.category, tags: p.tags || [], components: p.components || [], updatedAt: p.updatedAt || p.createdAt, pkg: p, listing: null, remote: false, system: isSystem(p.author) });
+    // `manifest` rides along because a composed package records in it what the installing node has
+    // to supply itself; the offer row reads it to say so before anybody presses install.
+    byGroup.set(p.packageGroupId, { group: p.packageGroupId, name: p.name, title: p.name, author: p.author, version: p.version, description: p.description || '', category: p.category, tags: p.tags || [], components: p.components || [], manifest: p.manifest || '', updatedAt: p.updatedAt || p.createdAt, pkg: p, listing: null, remote: false, system: isSystem(p.author) });
   }
   for (const l of templates || []) {
     const row = byGroup.get(l.packageGroupId);

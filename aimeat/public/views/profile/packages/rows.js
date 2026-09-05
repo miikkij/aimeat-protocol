@@ -12,6 +12,10 @@
  * @structure instanceRow · offerRow · ownRow · loadingRow
  * @usage import { instanceRow, offerRow, ownRow } from './rows.js';
  * @version-history
+ *   v1.1.0 — 2026-09-05 — An offer says what it did NOT carry, so an extension that has to be
+ *     installed separately is known before install rather than after. An installed row says how many
+ *     parts the owner has edited before the update button rather than after it. A draft of the
+ *     owner's own leads with the door that publishes it, since a draft is installable by nobody.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { h } from 'preact';
@@ -60,7 +64,12 @@ function instanceOpen(ctx, inst, comps, app, source) {
           <div key=${'d' + c.componentId}>${c.type === 'app' ? html`<a class="og-door og-door--quiet" href=${`/v1/apps/${encodeURIComponent(ctx.ownerName)}/${encodeURIComponent(c.registeredAs)}?mode=inline`} target="_blank" rel="noopener">${x('open')}</a>` : html`<button type="button" class="og-door og-door--quiet" onClick=${() => openTab(partTab(c.type))}>${partTab(c.type) === 'memory' ? x('inspect') : x('manage')}</button>`}</div>`)}
       </div>
       <div class="pk-kv">
-        <div class="pk-k">${x('updateK')}</div><div class="pk-v">${!upd ? x('updateUnknown') : upd.checking ? x('updateChecking') : upd.error ? upd.error : upd.updateAvailable ? x('updateAvailable', { version: versionDate(upd.latestVersion) }) : x('updateNone')}<small>${x('updateSub')}${upd?.updateAvailable ? html` <button type="button" class="og-crumb-link pk-linkbtn" disabled=${ctx.busy} onClick=${() => ctx.applyUpdate(inst, upd)}>${x('applyUpdate')}</button>` : null}</small></div>
+        <div class="pk-k">${x('updateK')}</div><div class="pk-v">${!upd ? x('updateUnknown') : upd.checking ? x('updateChecking') : upd.error ? upd.error : upd.updateAvailable ? x('updateAvailable', { version: versionDate(upd.latestVersion) }) : x('updateNone')}<small>${
+          // Said before the button rather than after: a part this owner has edited is NOT updated,
+          // and knowing that beforehand is the difference between pressing a button and being
+          // surprised by it.
+          customized ? x('updateKeepsYours', { n: customized }) : x('updateSub')
+        }${upd?.updateAvailable ? html` <button type="button" class="og-crumb-link pk-linkbtn" disabled=${ctx.busy} onClick=${() => ctx.applyUpdate(inst, upd)}>${x('applyUpdate')}</button>` : null}</small></div>
         <div class="pk-k">${x('forAgentK')}</div><div class="pk-v">${x('forAgentInstance')}<small>${x('forAgentInstanceSub')}</small></div>
       </div>
       <div class="og-doors pk-open-doors">
@@ -93,6 +102,34 @@ export function offerRow(ctx, o) {
     </div>`;
 }
 
+/**
+ * What a composed package deliberately did not carry, and this node therefore has to have.
+ *
+ * Written on the offer rather than discovered at install time: a cortex this node ships is present
+ * everywhere and costs the reader nothing, but an extension is a separate install, and finding that
+ * out after pressing install is the worst moment to find it out.
+ */
+function expectsOf(o) {
+  let expects;
+  try { expects = JSON.parse(o.manifest || '{}').expects; }
+  // eslint-disable-next-line aimeat/no-silent-catch -- a manifest that is not our JSON simply has no expectations to show
+  catch { expects = null; }
+  if (!expects) return null;
+
+  const lines = [
+    (expects.extensions ?? []).length ? x('expectsExt', { names: expects.extensions.join(', ') }) : '',
+    (expects.cortex ?? []).length ? x('expectsCortex', { names: expects.cortex.join(', ') }) : '',
+    (expects.packs ?? []).length ? x('expectsPacks', { names: expects.packs.join(', ') }) : '',
+  ].filter(Boolean);
+  if (lines.length === 0) return null;
+
+  return html`
+    <div class="pk-expects">
+      <span class="og-label">${x('expectsLabel')}</span>
+      ${lines.map((line, i) => html`<p key=${i} class="pk-para">${line}</p>`)}
+    </div>`;
+}
+
 function offerOpen(ctx, o, key) {
   const inst = ctx.installForm && ctx.installForm.key === key ? ctx.installForm : { label: '' };
   const l = o.listing;
@@ -107,6 +144,7 @@ function offerOpen(ctx, o, key) {
             <div key=${'n' + c.id}>${c.label || c.id}<small>${c.id}</small></div>
             <div key=${'w' + c.id}>${(c.dependencies || []).length ? x('needs', { list: c.dependencies.join(', ') }) : ''}</div>`)}
         </div>` : null}
+      ${expectsOf(o)}
       <div class="pk-kv">
         <div class="pk-k">${x('makerK')}</div><div class="pk-v">${o.remote ? x('makerRemote', { node: o.sourceNode }) : o.system ? x('makerSystem') : x('makerAuthor', { author: o.author })}<small>${[o.version ? x('versionOf', { date: versionDate(o.version) }) : '', categoryWord(o.category) ? x('categoryOf', { c: categoryWord(o.category) }) : '', o.tags.length ? x('tagsOf', { tags: o.tags.join(', ') }) : ''].filter(Boolean).join(' · ')}</small></div>
         ${l && (l.installCount || l.reviewCount) ? html`<div class="pk-k">${x('galleryK')}</div><div class="pk-v">${[l.installCount ? x('installsN', { n: l.installCount }) : '', l.reviewCount ? x('reviewsN', { n: l.reviewCount, rating: Number(l.rating || 0).toFixed(1) }) : ''].filter(Boolean).join(' · ')}</div>` : null}
@@ -134,9 +172,17 @@ export function ownRow(ctx, p) {
     <div class=${`pk-p ${open ? 'is-open' : ''}`} key=${key} id=${'pk-row-' + p.packageGroupId.replace(/[^a-z0-9]/gi, '-')}>
       <div class="pk-nm">${p.name}<span class="pk-tag">${versionDate(p.version)}</span><small>${[x('partsN', { n: (p.components || []).length }), categoryWord(p.category), dateWord(p.updatedAt || p.createdAt)].filter(Boolean).join(' · ')}</small></div>
       <div class="pk-ds"><span class="pk-desc">${p.description || ''}</span>${partChips(p.components)}</div>
-      <div class="pk-me">${p.visibility === 'public' ? x('vis.public') : x('vis.private')}<small>${[state ? listingWord(state) : x('notInGallery'), installed ? (installed === 1 ? x('installedOnce') : x('installedN', { n: installed })) : ''].filter(Boolean).join(' · ')}</small></div>
+      <div class="pk-me">${p.visibility === 'public' ? x('vis.public') : x('vis.private')}<small>${[
+        p.status === 'published' ? '' : x('statusWord.' + p.status),
+        state ? listingWord(state) : x('notInGallery'),
+        installed ? (installed === 1 ? x('installedOnce') : x('installedN', { n: installed })) : '',
+      ].filter(Boolean).join(' · ')}</small></div>
       <div class="pk-go">
-        <button type="button" class="og-door" onClick=${() => ctx.toggle(key, p)}>${open ? x('close') : x('open')}</button>
+        ${p.status === 'published' ? null
+          // A draft cannot be installed by anybody, including its author, so the door that changes
+          // that leads the row and the usual open door steps back to quiet.
+          : html`<button type="button" class="og-door" disabled=${!!ctx.busy} onClick=${() => ctx.publishOwn(p)}>${x('publishIt')}</button>`}
+        <button type="button" class=${`og-door ${p.status === 'published' ? '' : 'og-door--quiet'}`} onClick=${() => ctx.toggle(key, p)}>${open ? x('close') : x('open')}</button>
         <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.download(p.packageGroupId, p.name)}>${x('downloadZip')}</button>
       </div>
       ${open ? ownOpen(ctx, p, key, listing, state, installed) : null}

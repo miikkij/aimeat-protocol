@@ -273,12 +273,16 @@ export async function composePackageFromApps(
         {
             name: input.name,
             components,
-            description: input.description,
+            // A composed package without a description reads as a blank column on every row that
+            // ever shows it, and the composer knows something worth saying: which apps are in it.
+            // A caller that gave a description keeps it.
+            description: input.description?.trim()
+                || appComponents.map(c => (c.meta?.app as { name?: string } | undefined)?.name || c.id).join(', '),
             category: input.category,
             tags: input.tags,
             visibility: input.visibility,
             status: input.status,
-            changelog: `Composed from ${appComponents.length} app(s): ${appComponents.map(c => c.id).join(', ')}`,
+            changelog: `Made from ${appComponents.length === 1 ? 'the app' : 'the apps'} ${appComponents.map(c => c.id).join(', ')}`,
             manifest: JSON.stringify({ expects }),
         },
     );
