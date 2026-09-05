@@ -28,12 +28,15 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   v1.0.1 -- 2026-09-05 -- Notifies MCP through mcp/resource-events.ts, the leaf, rather than
+ *            mcp/index.ts, which assembles the registry that imports this store back (a cycle the
+ *            dependency cruiser refused once ai-jobs' on_done reached here through the extension road).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, A4/B1/B2).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { writeStorageFile } from '../storage-file-write.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/resource-events.js';
 import { provenanceForWrite, type DeclaredProvenance } from '../ai-provenance.js';
 import { stableStringify } from '../../utils/stable-json.js';
 import { logger } from '../../utils/logger.js';

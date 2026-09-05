@@ -26,9 +26,12 @@
  *   const ctx = buildExtensionCtx({ …, ai: buildExtensionAi({ service, extName: ext.name,
  *       ownerGhii, nodeId }) });
  * @version-history
+ *   v1.0.1 — 2026-09-05 — ExtensionCtx comes from extension-ctx-contract.ts, the leaf the runtime
+ *     re-exports it from; a type import of the runtime itself is an edge the dependency cruiser
+ *     counts.
  *   v1.0.0 — 2026-08-31 — Initial.
  */
-import type { ExtensionCtx } from '../extension-runtime.js';
+import type { ExtensionCtx } from '../extension-ctx-contract.js';
 import { logger } from '../../utils/logger.js';
 import { AiJobError } from './types.js';
 import type { AiJobStarter, AiJobChainStop, StartAiJobInput } from './types.js';

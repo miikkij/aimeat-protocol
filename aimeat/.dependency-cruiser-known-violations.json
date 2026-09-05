@@ -7388,63 +7388,7 @@
         ]
       },
       {
-        "name": "src/services/workflow/engine-steps.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/datapackage/store.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/mcp/index.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/mcp/register-all.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/mcp/agent-crew.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/crew-ops.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/crew-def-store.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/memory-write.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/ecosystem-automation.ts",
+        "name": "src/services/workflow/lifecycle.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -7454,6 +7398,7 @@
         "name": "src/services/scheduler.ts",
         "dependencyTypes": [
           "local",
+          "type-only",
           "import"
         ]
       },

@@ -17,10 +17,20 @@
  * @version-history
  *   v1.0.0 — 2026-09-05 — Extracted from config.ts (max-file-lines). A pure move.
  */
-import type { AimeatConfig } from './config-types.js';
-
-export type AiJobConfig = Pick<AimeatConfig,
-  'aiJobSlots' | 'aiJobMaxQueued' | 'aiJobMaxPromptBytes' | 'aiJobMaxQueuedPerOwner' | 'aiJobMaxChain' | 'aiJobLogRetentionDays'>;
+/**
+ * The six fields, named here rather than picked from AimeatConfig: config-types.ts reaches
+ * config.ts through the sealing and schema modules, so a type import from it would close a cycle
+ * the dependency cruiser refuses. AimeatConfig declares the same six (config-types-ai.ts), and the
+ * spread in loadConfig is where the compiler checks they agree.
+ */
+export interface AiJobConfig {
+  aiJobSlots: number;
+  aiJobMaxQueued: number;
+  aiJobMaxPromptBytes: number;
+  aiJobMaxQueuedPerOwner: number;
+  aiJobMaxChain: number;
+  aiJobLogRetentionDays: number;
+}
 
 /** The AI job settings, from the environment. See config-types-ai.ts for what each one protects. */
 export function aiJobDefaults(): AiJobConfig {

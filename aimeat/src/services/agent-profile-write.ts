@@ -33,6 +33,8 @@
  *   const outcome = await setAgentMode({ storage, config }, req.auth!.owner, name, req.body?.mode);
  *   if (!outcome.ok) return renderRefusal(outcome.code, outcome.message);
  * @version-history
+ *   v1.3.1 -- 2026-09-05 -- Notifies MCP through mcp/resource-events.ts, the leaf, not mcp/index.ts,
+ *     which assembles the registry that imports services back (a cycle the dependency cruiser refuses).
  *   v1.3.0 -- 2026-08-13 -- setAgentConsoleUrl(): where the agent's HOST manages it. An agent created
  *     from a chat runs in a fleet runtime the node has never heard of, so the person is told it is
  *     running and has nowhere to go and look at it. Same-owner gated like tags and mode, because the
@@ -55,7 +57,7 @@ import type { AimeatConfig } from '../config.js';
 import type { AgentRecord, AgentTechnicalCapability, Storage } from '../storage/interface.js';
 import { buildGAII } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
-import { emitToolListChanged } from '../mcp/index.js';
+import { emitToolListChanged } from '../mcp/resource-events.js';
 import { deriveStepsForMode } from '../models/agent-onboarding-schemas.js';
 import { AgentCapabilitiesUpdateSchema } from '../models/agent-capabilities-schemas.js';
 import { inferModeFromPlatform } from './platform-detector.js';

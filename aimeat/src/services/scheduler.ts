@@ -7,6 +7,9 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.14.1 — 2026-09-05 — Notifies MCP through mcp/resource-events.ts, the leaf, not mcp/index.ts:
+ *     the registry that file assembles imports the workflow engine, which reaches this scheduler,
+ *     and the dependency cruiser named the cycle the day feat/ai-jobs was merged.
  *   v2.14.0 — 2026-08-31 — The extension-job semaphore moved to services/slot-pool.ts. A pure move:
  *     two slots, FIFO, same acquire/release points. It left because AI jobs need the same primitive
  *     with a different ordering, and a second copy of a concurrency guard is how one of them ends up
@@ -77,7 +80,7 @@ import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
 import { emitChange } from './event-bus.js';
-import { emitResourceUpdated } from '../mcp/index.js';
+import { emitResourceUpdated } from '../mcp/resource-events.js';
 import { logger } from '../utils/logger.js';
 import { SlotPool } from './slot-pool.js';
 import { runExtensionJob } from './scheduler-extension-job.js';

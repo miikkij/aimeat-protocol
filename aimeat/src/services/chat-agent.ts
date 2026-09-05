@@ -22,6 +22,8 @@
  *   const agent = await ensureChatAgent(storage, config, ownerName);
  *   const { token } = await mintChatAgentToken(storage, config, agent);
  * @version-history
+ *   v1.1.1 — 2026-09-05 — Notifies MCP through mcp/resource-events.ts, the leaf, not mcp/index.ts,
+ *     which assembles the registry that imports services back (a cycle the dependency cruiser refuses).
  *   v1.1.0 — 2026-08-22 — It gets the scopes of the mode it registers in, which is the same list a
  *     Claude Desktop gets from the same person. The record said `interactive` and the scopes were
  *     asked for a profile named `agent`, which is in no profile table, so the lookup fell through to
@@ -43,7 +45,7 @@ import { generateKeyPair } from '../auth/keypair.js';
 import { issueJWT } from '../auth/jwt.js';
 import { scopesForProfile } from '../mcp/catalog/scopes.js';
 import { emitChange } from './event-bus.js';
-import { emitToolListChanged } from '../mcp/index.js';
+import { emitToolListChanged } from '../mcp/resource-events.js';
 import { logger } from '../utils/logger.js';
 
 /** The agent's name component. One place, because it appears in a GAII, a UI and a log line. */
