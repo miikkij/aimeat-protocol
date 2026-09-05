@@ -13,6 +13,10 @@
  * @structure SecurityTabService.overview(owner, currentSessionId) → { ghii, agents, sessions, two_factor }
  * @usage const ov = await createSecurityTabService(storage, config).overview(owner, req.auth.sessionId);
  * @version-history
+ *   v1.3.1 — 2026-09-05 — Sessions past their expiry are left out as well (merge of the access-page
+ *     branch): a row past its expiry opens nothing, and on aimeat.io 2 848 of the 3 290 rows served
+ *     here were of that kind. The Access page took over the sign-in state; two_factor stays here
+ *     for the Security tab's own read.
  *   v1.3.0 — 2026-09-05 — The session list is the person's own devices, as GET /v1/auth/sessions
  *     has always been: this fold was written from the individual reads and dropped their
  *     `!isExternalPrincipal` filter, so the Security tab listed every agent session too.
@@ -61,6 +65,7 @@ export class SecurityTabService {
    */
   overview(owner: string, currentSessionId: string | undefined): Promise<SecurityOverview> {
     return runInReadScope(async () => {
+      const now = Date.now();
       const [agents, ghiiRecord, sessions, ownerRecord] = await Promise.all([
         this.storage.getAgentsByOwner(owner),
         this.storage.getGHIIByOwner(owner),
@@ -112,7 +117,9 @@ export class SecurityTabService {
         // there is something to say about it. This fold was written from the individual reads and
         // dropped the rule, so the Security tab showed thirty agent rows the dedicated route hides
         // — measured on aimeat.io 2026-09-05, and reproduced in a sandbox as 1 row against 2.
-        sessions: sessions.filter(s => !isExternalPrincipal(s.gaii)).map(s => ({
+        // And open sessions only: the store keeps a row until its sweep; a row past its expiry
+        // opens nothing, and on aimeat.io 2 848 of the 3 290 rows served here were of that kind.
+        sessions: sessions.filter(s => !isExternalPrincipal(s.gaii) && new Date(s.expiresAt).getTime() > now).map(s => ({
           session_id: s.sessionId, gaii: s.gaii, issued_at: s.issuedAt, expires_at: s.expiresAt,
           last_used_at: s.lastUsedAt ?? null, device_label: s.deviceLabel ?? null,
           current: s.sessionId === currentSessionId,

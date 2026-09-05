@@ -96,6 +96,8 @@ export function initializeSchema(db: Database.Database): void {
   // What a granted app may spend of its owner's money, and what it has spent so far.
   safeAddColumn('app_grants', 'spendCapMorsels', 'INTEGER');
   safeAddColumn('app_grants', 'spentMorsels', 'INTEGER NOT NULL DEFAULT 0');
+  // The owner narrowed this grant by hand; the boot-time vocabulary migration leaves it alone (0069).
+  safeAddColumn('app_grants', 'scopesFixedAt', 'TEXT');
 
   // Owner session refresh tokens — add columns to existing sessions tables, then
   // index the lookup columns (must run AFTER the ALTERs so the columns exist).

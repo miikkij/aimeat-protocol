@@ -847,6 +847,7 @@ export interface AppGrant {
   refreshTokenHash: string | null;
   revoked: Generated<boolean>;
   scopes: string[] | null;
+  scopesFixedAt: Timestamp | null;
   spendCapMorsels: number | null;
   spentMorsels: Generated<number>;
 }

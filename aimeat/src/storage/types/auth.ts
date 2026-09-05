@@ -64,6 +64,12 @@ export interface AppGrantRecord {
   spendCapMorsels?: number | null;
   /** Spent so far under this grant, in morsels. Only moves when the app itself causes a charge. */
   spentMorsels?: number;
+  /**
+   * When the owner last narrowed this grant's scopes by hand (PATCH /v1/app-grants/:id). The boot
+   * migration that writes the 2026-08-10 vocabulary onto old grants leaves a stamped grant alone:
+   * a right the person took away must not come back at the next restart.
+   */
+  scopesFixedAt?: string | null;
   refreshTokenHash: string | null;  // SHA-256 of current refresh token; null once revoked
   createdAt: string;          // ISO
   lastUsedAt: string | null;  // ISO

@@ -87,6 +87,7 @@ import { registerAgentManagementTools } from './agent-management.js';
 import { registerInvokeTool } from './invoke.js';
 import { registerAgentCrewTools } from './agent-crew.js';
 import { registerConnectionTools } from './connections.js';
+import { registerAccessTools } from './access.js';
 
 /** What every tool group needs. The two emitters are passed in so this file has no cycle home. */
 export interface ServerToolDeps {
@@ -136,6 +137,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerMemoryExtendedTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerWalletExtendedTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerConsentTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+    registerAccessTools(mcp, storage, config, agentGaii);
     registerCommerceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerExchangeTools(mcp, storage, config, agentGaii);
     registerExchangeRunTools(mcp, storage, config, agentGaii, getToken);

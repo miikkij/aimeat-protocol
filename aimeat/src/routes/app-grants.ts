@@ -16,9 +16,13 @@
  *   - APP_GRANTABLE_SCOPES — the scope vocabulary an app may request (+ i18n-able descriptions)
  *   - in-memory pendingRequests / authCodes maps (short-TTL, like MCP auth codes)
  *   - appGrantsRouter(config, storage): GET /authorize, GET /request/:id, POST /authorize-consent,
- *     POST /token, GET /v1/app-grants, DELETE /v1/app-grants/:grantId
+ *     POST /token, the silent bridge. The owner's list / narrow / spend-cap / revoke doors are
+ *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.13.0 — 2026-09-05 — GET /v1/app-grants, PATCH /:grantId/spend-cap and DELETE /:grantId moved by
+ *     pure extraction to routes/app-grants-manage.ts, where the narrowing door joined them; this file
+ *     was one route short of 800 lines.
  *   v1.12.0 — 2026-08-23 — A company address (`<slug>.co.<apex>`) is a valid redirect origin, and it
  *     binds to its company's front-page app the way a per-app subdomain binds to its app. The co
  *     host is a SIBLING of the app host rather than a child, so the one endsWith test admitted
@@ -706,67 +710,9 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     return res.status(400).json(error(config.nodeId, 'UNSUPPORTED_GRANT_TYPE', 'grant_type must be authorization_code or refresh_token'));
   });
 
-  // ── GET /v1/app-grants ── the owner lists the apps they've granted access to.
-  router.get('/v1/app-grants', requireAuth(), requireRole('owner'), async (req: Request, res: Response) => {
-    const owner = req.auth!.owner;
-    const grants = (await storage.listAppGrantsByOwner(owner)).filter(g => !g.revoked);
-    res.json(success(config.nodeId, {
-      grants: grants.map(g => ({
-        grant_id: g.grantId, app: g.app, app_name: g.appName, app_origin: g.appOrigin,
-        scopes: g.scopes, granted_at: g.createdAt, last_used_at: g.lastUsedAt,
-        // Only meaningful for an app that may spend at all; the UI hides the control otherwise.
-        can_spend: (g.scopes ?? []).includes('contract:spend'),
-        spend_cap_morsels: g.spendCapMorsels ?? null,
-        spent_morsels: g.spentMorsels ?? 0,
-      })),
-      total: grants.length,
-    }));
-  });
-
-  /**
-   * PATCH /v1/app-grants/:grantId/spend-cap — how much of your money this app may spend.
-   *
-   * The `contract:spend` scope answers whether an app may buy on your behalf. This answers how much,
-   * which is the answer most people actually want: a yes with no number is a blank cheque. Body:
-   * `{ cap_morsels: number | null }` — null clears the ceiling, 0 stops it without revoking anything
-   * else it was trusted with. `{ reset: true }` puts the counter back to zero (a new month, say).
-   */
-  router.patch('/v1/app-grants/:grantId/spend-cap', requireAuth(), requireRole('owner'), async (req: Request, res: Response) => {
-    const owner = req.auth!.owner;
-    const grant = await storage.getAppGrant(req.params.grantId as string);
-    if (!grant || grant.owner !== owner) {
-      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Grant not found'));
-    }
-    const b = (req.body ?? {}) as Record<string, unknown>;
-    const raw = b.cap_morsels;
-    if (raw !== undefined && raw !== null && !(typeof raw === 'number' && Number.isInteger(raw) && raw >= 0)) {
-      return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'cap_morsels must be a whole number of morsels, or null to remove the ceiling'));
-    }
-    const updates: Parameters<typeof storage.updateAppGrant>[1] = {};
-    if (raw !== undefined) updates.spendCapMorsels = raw === null ? null : (raw as number);
-    if (b.reset === true) updates.spentMorsels = 0;
-    if (!Object.keys(updates).length) {
-      return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'Nothing to change — pass cap_morsels and/or reset'));
-    }
-    const updated = await storage.updateAppGrant(grant.grantId, updates);
-    return res.json(success(config.nodeId, {
-      grant_id: grant.grantId, app: grant.app,
-      cap_morsels: updated?.spendCapMorsels ?? null,
-      spent_morsels: updated?.spentMorsels ?? 0,
-      can_spend: (updated?.scopes ?? []).includes('contract:spend'),
-    }));
-  });
-
-  // ── DELETE /v1/app-grants/:grantId ── the owner revokes an app's access.
-  router.delete('/v1/app-grants/:grantId', requireAuth(), requireRole('owner'), async (req: Request, res: Response) => {
-    const owner = req.auth!.owner;
-    const grant = await storage.getAppGrant(req.params.grantId as string);
-    if (!grant || grant.owner !== owner) {
-      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Grant not found'));
-    }
-    await storage.updateAppGrant(grant.grantId, { revoked: true, refreshTokenHash: null });
-    res.json(success(config.nodeId, { revoked: true, grant_id: grant.grantId }));
-  });
+  // The owner's side once a grant exists — GET /v1/app-grants, PATCH /:grantId (narrow), PATCH
+  // /:grantId/spend-cap and DELETE /:grantId — moved by pure extraction to routes/app-grants-manage.ts
+  // on 2026-09-05, when the narrowing door would have taken this file past 800 lines.
 
   return router;
 }

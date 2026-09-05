@@ -420,7 +420,7 @@ export const appsMethods = {
 
   async updateAppGrant(this: SqliteStorage, 
     grantId: string,
-    updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels'>>,
+    updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels' | 'scopesFixedAt'>>,
   ): Promise<AppGrantRecord | null> {
     const sets: string[] = [];
     const params: unknown[] = [];
@@ -430,6 +430,7 @@ export const appsMethods = {
     if (updates.scopes !== undefined) { sets.push('scopes = ?'); params.push(JSON.stringify(updates.scopes)); }
     if (updates.spendCapMorsels !== undefined) { sets.push('spendCapMorsels = ?'); params.push(updates.spendCapMorsels); }
     if (updates.spentMorsels !== undefined) { sets.push('spentMorsels = ?'); params.push(updates.spentMorsels); }
+    if (updates.scopesFixedAt !== undefined) { sets.push('scopesFixedAt = ?'); params.push(updates.scopesFixedAt); }
     if (sets.length === 0) return this.getAppGrant(grantId);
     params.push(grantId);
     const result = this.db.prepare(`UPDATE app_grants SET ${sets.join(', ')} WHERE grantId = ?`)
@@ -448,6 +449,7 @@ export const appsMethods = {
       grantId: row.grantId as string,
       spendCapMorsels: (row.spendCapMorsels as number | null) ?? null,
       spentMorsels: (row.spentMorsels as number | null) ?? 0,
+      scopesFixedAt: (row.scopesFixedAt as string | null) ?? null,
       app: row.app as string,
       appName: row.appName as string,
       appOrigin: row.appOrigin as string,

@@ -23,6 +23,10 @@
  * @usage registered in views/profile.js TABS as `fleet`, listed in the Automation group of
  *   SIDEBAR_GROUPS (landing-page.cards.js).
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The agent defaults (the rules every agent carries, the token budget) sit
+ *     at the foot of this page. They lived on the Access page, which is about who holds a key to
+ *     the account; a rule that says "always answer in Finnish" is about the agents, and this is
+ *     where the agents are (design canvas "AIMEAT Pääsy-sivu", decision 9).
  *   v1.0.0 — 2026-09-03 — Initial: the Agents v2 section moves into Settings & Controls.
  */
 import { h } from 'preact';
@@ -31,6 +35,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import FleetView from '/views/fleet.js';
 import BasicAgentsPanel from '/views/profile/agents/basic-agents-panel.js';
+import { AgentDefaultsSection } from './agents/agent-defaults-section.js';
 
 export default function FleetTab({ session, showToast }) {
   return html`
@@ -48,6 +53,10 @@ export default function FleetTab({ session, showToast }) {
             leads, not what either says. The old Agents tab passes nothing and keeps its primary. */''}
       ${/* `embedded`: the section header above is this view's heading, so it does not bring its own. */''}
       <${FleetView} embedded starter=${html`<${BasicAgentsPanel} session=${session} showToast=${showToast} emphasis="secondary" />`} />
+      ${/* The rules every agent carries unless its own directives say otherwise, and the token budget.
+            At the foot: a person comes here for the agents first, and the defaults are the one thing
+            on this page that is about all of them at once. */''}
+      <${AgentDefaultsSection} showToast=${showToast} />
     </div>
   `;
 }
