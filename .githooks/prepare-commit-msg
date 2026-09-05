@@ -25,9 +25,10 @@ if grep -qi '^Session:' "$MSG" 2>/dev/null; then
 fi
 
 if [ -z "$AIMEAT_SESSION" ]; then
-  echo "[prepare-commit-msg] AIMEAT_SESSION is not set: this commit carries no Session: trailer." >&2
-  echo "[prepare-commit-msg] Set it to the session's agent name (cc-<owner>-<tag>), see skill aimeat-dev-session." >&2
-  exit 0
+  echo "[prepare-commit-msg] refused: AIMEAT_SESSION is not set, so this commit would carry no Session: trailer." >&2
+  echo "[prepare-commit-msg] Set it to the session's name (cc-<owner>-<tag>) in the shell that commits: export AIMEAT_SESSION=cc-jouni-18bd" >&2
+  echo "[prepare-commit-msg] or \$env:AIMEAT_SESSION = 'cc-jouni-18bd' in PowerShell. Skill aimeat-dev-session on the node has the ritual." >&2
+  exit 1
 fi
 
 git interpret-trailers --in-place --if-exists addIfDifferent --trailer "Session: $AIMEAT_SESSION" "$MSG"
