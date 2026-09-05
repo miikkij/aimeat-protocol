@@ -365,7 +365,9 @@ function report(s: SandboxState): void {
         console.log(`    ${s.agent.token}`);
     }
     console.log('');
-    if (s.apps.length) console.log(`  apps          ${s.apps.map(a => `${s.baseUrl}/apps/${a}`).join('\n                ')}`);
+    // The runnable address: /v1/apps/<owner>/<file> alone is the download (an attachment), and
+    // /apps/... exists only on a node with an app origin, which the sandbox pins off.
+    if (s.apps.length) console.log(`  apps          ${s.apps.map(a => `${s.baseUrl}/v1/apps/${a}?mode=inline`).join('\n                ')}`);
     if (s.agent) console.log(`  mcp           ${s.baseUrl}/v1/mcp   with the ${s.agent.name} token above`);
     console.log(`  data          ${s.dbPath}`);
     console.log(`  log           ${LOG_FILE}`);
