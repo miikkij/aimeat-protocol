@@ -39,12 +39,30 @@ function everyTsFile(dir: string, out: string[] = []): string[] {
 
 const SOURCE = everyTsFile(SRC).map(f => readFileSync(f, 'utf8')).join('\n');
 
+/**
+ * The same source with its comments removed.
+ *
+ * A DOC COMMENT IS NOT A GATE. The scan below reads text, so a comment that QUOTES a call reads as
+ * the call itself: `routes/boards.ts` explains its own gating with the words
+ * `requireScope('social:*')`, and this test then reported `social:*` as an enforced scope with no
+ * owner checkbox — a wrong answer about the permission vocabulary, produced by a sentence. It broke
+ * main for everyone until it was read carefully enough to see that the string appears nowhere else
+ * in src/.
+ *
+ * Crude on purpose: a quote containing `//` or a regex holding `/*` would be mangled, and neither
+ * would change what this finds, because what it finds is a call shape. The alternative — asking
+ * every author to phrase comments so a regex is not fooled — is the rule nobody can remember.
+ */
+const CODE = SOURCE
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
 /** Every scope string reached through the requireScope family — the load-bearing gates. */
 function enforcedScopes(): Set<string> {
     const found = new Set<string>();
-    for (const m of SOURCE.matchAll(/requireScope\(\s*'([a-z][a-z-]*:[a-z*-]+)'/g)) found.add(m[1]);
-    for (const m of SOURCE.matchAll(/requireRoleOrScope\(\s*'[a-z]+'\s*,\s*'([a-z][a-z-]*:[a-z*-]+)'/g)) found.add(m[1]);
-    for (const m of SOURCE.matchAll(/requireAnyScope\(\s*\[([^\]]*)\]/g)) {
+    for (const m of CODE.matchAll(/requireScope\(\s*'([a-z][a-z-]*:[a-z*-]+)'/g)) found.add(m[1]);
+    for (const m of CODE.matchAll(/requireRoleOrScope\(\s*'[a-z]+'\s*,\s*'([a-z][a-z-]*:[a-z*-]+)'/g)) found.add(m[1]);
+    for (const m of CODE.matchAll(/requireAnyScope\(\s*\[([^\]]*)\]/g)) {
         for (const s of m[1].matchAll(/'([a-z][a-z-]*:[a-z*-]+)'/g)) found.add(s[1]);
     }
     found.delete('*');
