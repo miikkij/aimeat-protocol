@@ -21,9 +21,12 @@
  *   read by a model, not by the operator, and the tool names inside it are the node's own.
  * @structure
  *   - buildCompliancePrompt(opts) — the paste
- *   - CompliancePromptSection — the section offering it
- * @usage imported by compliance-tab.js, rendered under "How to start"
+ *   - CompliancePromptSection — section 07, the paste in the dashed box with a door that copies it
+ * @usage imported by compliance-tab.js, rendered beside the kept reports
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The section in the poster face: the whole paste sits in the dashed coral
+ *     box under section 07 and the copy is a door in the section's header. The paste itself is
+ *     unchanged.
  *   v1.0.0 — 2026-08-23 — BR-02. The MCP path onto a page that only had a form.
  */
 import { h } from 'preact';
@@ -32,7 +35,6 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { CopyButton } from '/components/CopyButton.js';
-import { ExpandableHelp } from './shared.js';
 
 /**
  * The paste.
@@ -86,25 +88,24 @@ A write replaces the whole register, so send every entry you want kept. Afterwar
 }
 
 /**
- * The section offering the paste.
+ * Section 07: the paste, whole, in the dashed coral box.
  *
- * The button is visible without opening anything, because it is the primary action of this page for
- * anyone who works through chat. The text itself sits behind a disclosure: it is long, and it is
- * written for a model rather than for the person reading the page. Excluded from print, since a
- * chat paste in an audit PDF is noise.
+ * The copy is a door in the section's header, so it is reachable without scrolling through the
+ * text, and the text is on the page rather than behind a disclosure: a person deciding whether to
+ * hand their AI this job reads what it will be told first. Excluded from print, since a chat paste
+ * in an audit PDF is noise.
  */
 export function CompliancePromptSection({ nodeId, days }) {
   const prompt = buildCompliancePrompt({ nodeId, days });
   return html`
-    <section class="adm-cmp-section adm-cmp-no-print">
-      <h3>${t('admin.compliance.promptTitle')}</h3>
-      <p class="adm-cmp-note">${t('admin.compliance.promptNote')}</p>
-      <div class="adm-cmp-actions">
-        <${CopyButton} text=${prompt} className="btn-primary" label=${t('common.copyPrompt')} />
+    <section class="og-sec adm-cmp-no-print" id="adm-cmp-07">
+      <div class="og-sec-h"><h2>${t('admin.compliance.promptTitle')}<small>07</small></h2>
+        <div class="og-doors"><${CopyButton} text=${prompt} label=${t('admin.compliance.promptCopy')} className="og-door og-door--quiet" /></div></div>
+      <p class="adm-cmp-lead">${t('admin.compliance.promptNote')}</p>
+      <div class="og-box">
+        <span class="og-box-label">${t('admin.compliance.promptLabel')}</span>
+        <div class="adm-cmp-paste">${prompt}</div>
       </div>
-      <${ExpandableHelp} title=${t('admin.compliance.promptShow')}>
-        <div class="adm-cmp-prompt-box">${prompt}</div>
-      <//>
     </section>
   `;
 }
