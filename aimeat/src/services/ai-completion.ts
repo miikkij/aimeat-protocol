@@ -21,6 +21,11 @@
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.1.0 — 2026-08-31 — `signal` on the options, threaded to complete(), which composes it with
+ *     its own timeout. It is what lets a background AI job be cancelled while it is running instead
+ *     of waiting out the transport timeout. Nothing about the settlement changes: a cancel that
+ *     lands after the provider answered leaves the usage row where it is, because a cancelled call
+ *     is not a free call.
  *   v3.0.0 — 2026-08-16 — The decision and the bookkeeping are their own functions, prepareAiCall
  *     and settleAiCall, and completeForOwner runs both. Nothing changed about what either does; the
  *     chat proxy needs the same key choice, the same budget gate, the same free-model fallback and
@@ -332,6 +337,15 @@ export interface CompleteForOwnerOptions {
   appId?: string;
   /** Optional image attachments (data: or https URLs) for vision-capable models. */
   images?: string[];
+  /**
+   * An outside reason to stop waiting — a cancelled AI job. Composed with the transport's own
+   * timeout inside `complete()`, never replacing it.
+   *
+   * A cancel that lands AFTER the provider has answered does not undo the bookkeeping: the
+   * settlement below has already run, and a cancelled call is not a free call. The usage row must
+   * not silently disappear or the spend charts lie.
+   */
+  signal?: AbortSignal;
 }
 
 export interface CompleteForOwnerResult {
@@ -717,6 +731,7 @@ export async function completeForOwner(
     max_tokens: typeof opts.maxTokens === 'number' && opts.maxTokens > 0
       ? (opts.maxTokens | 0)
       : (typeof prefs.max_tokens === 'number' ? (prefs.max_tokens as number) : undefined),
+    ...(opts.signal ? { signal: opts.signal } : {}),
   };
 
   let result;

@@ -9,6 +9,10 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.31.0 -- 2026-09-05 -- Add e2e-ai-jobs.ts (written 2026-08-31 on branch feat/ai-jobs, merged
+ *            today): background model calls with a handle. It owns its server, because every refusal
+ *            it measures is a boot-time number, and it follows the runner's backend so what it proves
+ *            it proves on both.
  *   v1.30.0 -- 2026-09-05 -- Add e2e-extension-workspace.ts, in ALL_SUITES and in the guard tier:
  *            ctx.workspace, a sandboxed script acting on a workspace as its caller. Seven of its
  *            assertions are refusals (membership, scope, the manifest flag, schema, version, budget,
@@ -326,6 +330,7 @@ const ALL_SUITES = [
     'test/e2e-saml-login.ts',
     // BR-04: SCIM provisioning — the directory's lifecycle, and every isolation boundary as a refusal.
     'test/e2e-scim-users.ts',
+    'test/e2e-ai-jobs.ts',
     'test/e2e-ai-usage-history.ts',
     'test/e2e-ai-provenance.ts',
     'test/e2e-ai-provenance-surfaces.ts',

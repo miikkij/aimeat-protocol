@@ -18,6 +18,11 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.7.0 — 2026-08-31 — `ai.jobs.` joins the list. A job record is an INSTRUCTION the server reads
+ *     back: which model, whose key, what prompt, which key to write the answer to. Writing one is
+ *     asking this node to spend the owner's money, so it is the same class as `ai-usage.` one step
+ *     earlier in the same path. Cost of adding it, measured rather than assumed: nothing writes the
+ *     prefix through the memory API, and the service writes it server-side without this gate.
  *   v1.6.0 — 2026-08-29 — `audit.` joins the list: the per-app audit log a granted app must not rewrite.
  *   v1.5.0 — 2026-08-24 — `signals.` joins the list. `signals.stream.*` is what an UNAUTHENTICATED
  *     public door reads before it agrees to write into this owner's namespace: it decides whether
@@ -94,6 +99,14 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // and the owner approving a name and a purpose would mint it. Only the propose route writes this
   // prefix; the owner reads and settles through the agent-proposals routes.
   'agents.proposals.',
+  // `ai.jobs.<id>` is a live AI job and `ai.jobs.log.<day>` is the record of what the finished ones
+  // cost. Both are read by the server as fact: a job record says which model to call, whose key
+  // pays, what prompt to send and which key to write the answer to. A granted app that could write
+  // one could enqueue spending the owner never asked for, or rewrite the record of what it already
+  // spent — the same reasoning that put `ai-usage.` on this list, one step earlier in the same path.
+  // Measured 2026-08-31: nothing writes this prefix through the memory API. The legitimate writer is
+  // services/ai-jobs/, server-side, which never passes through this gate.
+  'ai.jobs.',
 ] as const;
 
 /** True iff `key` falls under a reserved, server-trusted owner-namespace prefix. */

@@ -209,6 +209,14 @@ export const TOOL_SCOPES: Record<string, string> = {
     // vocabulary and the demands whether they are the same list.
     aimeat_seo_status:                        'app:write',
     aimeat_image_generate:                    'ai:use',
+    // Background AI jobs. The same word as every other door that spends the owner's AI budget --
+    // starting one IS a completion, only with a handle instead of a held request. Reading and
+    // cancelling take it too: a job is the owner's own AI activity, and the routes admit exactly
+    // who assertAiUseAllowed admits.
+    aimeat_ai_job_start:                      'ai:use',
+    aimeat_ai_job_list:                       'ai:use',
+    aimeat_ai_job_get:                        'ai:use',
+    aimeat_ai_job_cancel:                     'ai:use',
     aimeat_app_fork:                          'app:write',
     aimeat_app_publish:                       'app:write',
     aimeat_package_publish:                   'app:write',

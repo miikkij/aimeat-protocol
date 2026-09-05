@@ -88,4 +88,46 @@ export interface AiCapabilityConfig {
    *  expensive thing this node does per request, and an unthrottled render is a denial-of-service
    *  shape, which is why the batch job never had a request path at all until this existed. */
   screenshotOnDemandPerHour: number;
+
+  // ── AI jobs (a model call with a handle, running in the background) ──
+  /**
+   * How many AI jobs may be calling a provider at once, node-wide. This protects the PROCESS
+   * against a pathological case and nothing else: a running job holds one HTTPS socket and its
+   * prompt, no sandbox and no CPU.
+   *
+   * There is deliberately no per-owner or per-app concurrency cap beside it. Every owner spends
+   * their own key, so one owner's fifty jobs cost no other owner anything; a per-owner cap would
+   * punish someone with thirty apps for having thirty apps, and a per-app cap would punish an app
+   * for fanning out ten perspectives on one question, which is the point of the feature. The right
+   * currency for "this app is using too much" is money, and that control already exists
+   * (`app_quotas.<app>.daily_usd` and the daily budget in services/ai-completion.ts).
+   */
+  aiJobSlots: number;
+  /**
+   * The node-wide wait line. `AI_JOB_QUEUE_FULL` (503 + Retry-After) fires here, which is the one
+   * refusal of the four that means "come back shortly" rather than "something is wrong".
+   *
+   * It exists because the per-owner brake below cannot bound a node: owners × 200 is unbounded, and
+   * a queued job still holds its assembled prompt. Sized above the per-owner brake on purpose, so
+   * one owner looping trips their own cap first and everyone else keeps being served.
+   */
+  aiJobMaxQueued: number;
+  /**
+   * The biggest assembled prompt (the prompt text plus every `input_keys` record read into it) one
+   * job may carry. THIS is the number that multiplies with concurrency: one memory value may be
+   * 1024 kB, so an unbounded assembly is megabytes of live heap held for the whole call.
+   */
+  aiJobMaxPromptBytes: number;
+  /**
+   * How many jobs one owner may have QUEUED. Not a fairness knob — fairness is the round-robin
+   * ordering in services/slot-pool.ts — but an abuse brake that sits high and is only expected to
+   * fire when something is looping. The message says so.
+   */
+  aiJobMaxQueuedPerOwner: number;
+  /** How deep an on_done chain may go before it is stopped. A chain that called itself this many
+   *  times is looping, and the parent records why it stopped rather than reporting success. */
+  aiJobMaxChain: number;
+  /** How many days of `ai.jobs.log.<YYYY-MM-DD>` to keep. The key ceiling is 1000 per principal by
+   *  default, so a finished job folds into a per-day record and the per-day records are pruned. */
+  aiJobLogRetentionDays: number;
 }

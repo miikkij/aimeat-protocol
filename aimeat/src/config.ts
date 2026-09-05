@@ -15,6 +15,9 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.12.0 — 2026-09-05 — The six AI job settings (feat/ai-jobs, 2026-08-31) arrive with the merge
+ *     and move straight out to config-ai-jobs.ts, spread in as aiJobDefaults(): the file was at 801
+ *     lines with them inline. A pure move.
  *   v1.11.0 — 2026-09-05 — mcpSessionSweepMs (AIMEAT_MCP_SESSION_SWEEP_MS): how often the MCP idle
  *     sweep looks, 10 s shipped, pinned to 1 s by the E2E runner so the expiry proof waits 8 s not 18.
  *   v1.10.0 — 2026-08-28 — AIMEAT_SITE_STORE_URL and AIMEAT_SITE_INCUBATOR_URL join the site links;
@@ -55,6 +58,7 @@
 import { deriveAppHost, derivePortfolioHost, deriveCoHost } from './config-hosts.js';
 import { parseSiteContacts } from './config-site-contacts.js';
 import { securityDoorDefaults } from './config-security.js';
+import { aiJobDefaults } from './config-ai-jobs.js';
 import { accountSecurityDefaults } from './config-types-account-security.js';
 import { seoDefaults } from './config-site-presence.js';
 import { loadFileSource } from './services/config-loader.js';
@@ -322,6 +326,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     modelDefaultImage: process.env.AIMEAT_MODEL_DEFAULT_IMAGE ?? '',
     sttLanguageDefault: process.env.AIMEAT_STT_LANGUAGE_DEFAULT ?? '',
     screenshotOnDemandPerHour: parseInt(process.env.AIMEAT_SCREENSHOT_ONDEMAND_PER_HOUR ?? '20', 10),
+
+    // AI jobs — a model call with a handle (config-ai-jobs.ts, a pure move under the 800-line ceiling).
+    ...aiJobDefaults(),
     maxActionsPerAgent: parseInt(process.env.AIMEAT_MAX_ACTIONS_PER_AGENT ?? '20', 10),
     minTrustForPaidActions: parseInt(process.env.AIMEAT_MIN_TRUST_PAID_ACTIONS ?? '10', 10),
     appMaxSizeMb: parseInt(process.env.AIMEAT_APP_MAX_SIZE_MB ?? '5', 10),

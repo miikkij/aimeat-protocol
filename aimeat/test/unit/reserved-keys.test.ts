@@ -28,6 +28,9 @@
  *   v1.x — 2026-08-16 — `chat.` is the sixth. A conversation is what the person said and what the
  *     agent did for them; an app-grant token able to append to one could put words in either
  *     mouth, including instructions the next turn would read as the person's own.
+ *   v1.3.0 — 2026-08-31 — `ai.jobs.` joins the inventory. The list assertion went RED on the day the
+ *     prefix was added, which is the assertion doing its job: this test exists so the set can only
+ *     change on purpose.
  *   v1.0.0 — 2026-08-11 — Initial, with the August 2026 audit fix (H-6 finance., H-23 commerce.).
  */
 import { describe, it, expect } from 'vitest';
@@ -49,9 +52,22 @@ describe('the list holds every prefix the server reads and acts on', () => {
         // route reads the scopes out of that record and creates a principal carrying them, and the
         // proposer's ceiling is checked when the proposal is written — so an app that could write
         // the key would skip the ceiling and have the owner mint whatever it asked for.
+        // `ai.jobs.` (2026-08-31): a background AI job record is an INSTRUCTION the server reads
+        // back — which model, whose key, what prompt, which key to write the answer to — so writing
+        // one is asking this node to spend the owner's money. Same class as `ai-usage.`, one step
+        // earlier in the same path.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['agents.proposals.', 'ai-usage.', 'audit.', 'chat.', 'commerce.', 'finance.', 'notifications.', 'openrouter.', 'profile.', 'signals.'],
+            ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'audit.', 'chat.', 'commerce.', 'finance.', 'notifications.', 'openrouter.', 'profile.', 'signals.'],
         );
+    });
+
+    it('refuses a granted app the AI-job records, and leaves ordinary ai-shaped keys alone', () => {
+        expect(isReservedServerKey('ai.jobs.7f3c')).toBe(true);
+        expect(isReservedServerKey('ai.jobs.log.2026-08-31')).toBe(true);
+        // The dot matters here as much as anywhere: an app's own `ai.summary` is user data.
+        expect(isReservedServerKey('ai.summary')).toBe(false);
+        expect(appMayWriteKey(['app'], 'ai.jobs.7f3c')).toBe(false);
+        expect(appMayWriteKey(['owner'], 'ai.jobs.7f3c')).toBe(true);
     });
 
     it('every entry ends in a dot, so a prefix can never swallow a neighbouring namespace', () => {

@@ -176,6 +176,8 @@ import { statsRouter } from '../routes/stats.js';
 import { calibratorRouter } from '../routes/calibrator.js';
 import { openrouterRouter } from '../routes/openrouter.js';
 import { aiRouter } from '../routes/ai.js';
+import { aiJobsRouter } from '../routes/ai-jobs.js';
+import type { AiJobService } from '../services/ai-jobs/index.js';
 import { chatRouter } from '../routes/chat.js';
 import { llmProxyRouter } from '../routes/llm-proxy.js';
 import { aiProvenanceRouter } from '../routes/ai-provenance.js';
@@ -255,6 +257,7 @@ export interface MountRoutesOptions {
   mailboxNotificationService: MailboxNotificationService | null;
   scheduler: Scheduler;
   workflowEngine: WorkflowEngine;
+  aiJobService: AiJobService;
   invalidateHasOwnersCache: () => void;
 }
 
@@ -275,7 +278,7 @@ export async function mountRoutes(
     rejectForRelay, mirrorReadOnly, maintenanceState,
     provenance, consulService, directoryService,
     peers, networkDirectory, tunnelManager, mailboxNotificationService,
-    scheduler, workflowEngine, invalidateHasOwnersCache,
+    scheduler, workflowEngine, aiJobService, invalidateHasOwnersCache,
   } = opts;
 
   // The webhook dispatcher, the stats collector, the refusal log, the write buffers and the
@@ -498,6 +501,9 @@ export async function mountRoutes(
   }
   app.use(openrouterRouter(config, storage));   // OpenRouter AI autopilot
   app.use(aiRouter(config, storage));            // App-level AI completion (user's key, budget-gated)
+  // The same key and the same budget, with a handle instead of a held request: a model call that
+  // may take half an hour cannot be an HTTP request anybody waits on.
+  app.use(aiJobsRouter(config, storage, aiJobService));
   app.use(chatRouter(config, storage));         // The person's own chat with their built-in agent
   app.use(llmProxyRouter(config, storage));   // The OpenAI-shaped door the chat agent's model calls come through
   // AI provenance (TARGET-058). The by-hash detection lookup is PUBLIC + unauthenticated by
@@ -745,7 +751,8 @@ export async function mountRoutes(
 
   // The node's own recurring work: scheduler, workflow watchdog, sync, tracked responses.
   startBackgroundJobs({
-    config, storage, peers, scheduler, workflowEngine, webhookDispatcher, pushService, emailService,
+    config, storage, peers, scheduler, workflowEngine, aiJobService,
+    webhookDispatcher, pushService, emailService,
   });
 
   app.use(specRouter(config));

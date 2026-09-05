@@ -57,6 +57,7 @@ import type { Storage } from '../storage/interface.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
 import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, unavailableEmail, sandboxLimits } from '../services/extension-ctx.js';
 import { attachExtensionWorkspace } from '../services/extension-workspace.js';
+import { maybeExtensionAi, getActiveAiJobService } from '../services/ai-jobs/index.js';
 import { enforcePaywall } from '../routes/extensions/paywall.js';
 import { createRefusalRecorder, refusalText } from '../routes/extensions/metered-response.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
@@ -322,6 +323,12 @@ export function registerExtensionsTools(
                 // refused a negative amount but had no ceiling, which is the guard that bounds how
                 // much a single call can take from the caller's balance.
                 wallet: buildExtensionWallet({ config, storage, callerGaii: agentGaii, extName: ext.name }),
+                // Background model calls, on the same terms as the REST road: billed to the
+                // extension's INSTALLER, read from the record and never from the caller.
+                ai: maybeExtensionAi({
+                    service: getActiveAiJobService(), extName: ext.name, extOwner: ext.installedBy,
+                    nodeId: config.nodeId, createdBy: agentGaii,
+                }),
                 notify: buildExtensionNotify({
                     storage, config, extName: ext.name,
                     recipientGaii: agentGaii,
