@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.7.0 — 2026-09-05 — mcpSessionSweepMs: the MCP idle sweep's interval, read at boot.
  *   v1.6.0 — 2026-08-28 — siteLinks.store and siteLinks.incubator, and storeEnabled derived from the
  *     first: the store is its own AIMEAT instance and the one place a price exists, so this node
  *     shows a store section only when told where the store is. The two site-link interfaces moved
@@ -656,6 +657,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
    *  holds a full tool catalog in memory, and most clients never send the DELETE that would
    *  end it — they just stop talking. A reaped client re-initializes on its next call. */
   mcpSessionIdleMinutes: number;
+  /** How often the idle sweep looks, in ms. Read once at boot; the E2E runner pins it to 1000. */
+  mcpSessionSweepMs: number;
 
   // Ecosystem application (GEAI) scope bounds — parallel to the agent knobs above, so an operator
   // can bound ecosystem connections independently of agents.

@@ -11,6 +11,7 @@
  *   - schemaKeys(schema): summarizes a JSON schema's property keys + types for the compact columns
  *
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The callable column says ✓ or ✗ instead of two emoji: no emoji anywhere in the interface.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
@@ -94,7 +95,7 @@ export default function CapabilitiesTab({ session }) {
                   <td style="font-size:.7rem;font-family:monospace;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${inputKeys || html`<span style="opacity:.4">—</span>`}</td>
                   <td style="font-size:.7rem;font-family:monospace;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${outputKeys || html`<span style="opacity:.4">—</span>`}</td>
                   <td><${Badge} type=${c.source?.type || 'manual'} /></td>
-                  <td>${c.callable ? '✅' : '➖'}</td>
+                  <td>${c.callable ? '✓' : '✗'}</td>
                   <td>${num(s.totalInvocations || 0)}</td>
                   <td style=${s.errorCount > 0 ? 'color:#E8564A' : ''}>${num(s.errorCount || 0)}</td>
                 </tr>

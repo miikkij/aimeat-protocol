@@ -15,7 +15,7 @@
  *     /lib/ for published apps and the Atelier kit (wish-atelier-motion-libraries-and-parts).
  *   v1.1.0 — 2026-09-03 — showcaseUrl on motion, anime and lenis: their Design Book sections.
  */
-import type { LibraryPack } from './types.js';
+import type { LibraryPack } from '../library-packs.js';
 
 export const MOTION_PACKS: LibraryPack[] = [
   {

@@ -88,7 +88,9 @@ describe('the false pass we are replacing', () => {
   });
 });
 
-describe('the CLI over real files', () => {
+// Each case here starts the real CLI as a child process: about a second alone, over five when
+// another session's gate runs beside it, against vitest's five-second default (seen 2026-09-05).
+describe('the CLI over real files', { timeout: 30_000 }, () => {
   it('fails a broken file and passes a good one', () => {
     const dir = mkdtempSync(join(tmpdir(), 'aimeat-syntax-'));
     try {

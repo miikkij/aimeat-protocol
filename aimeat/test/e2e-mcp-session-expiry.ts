@@ -6,6 +6,8 @@
  *   works. The idle knob is runtime config; the suite drops it to 6 seconds, proves both sides,
  *   and restores it. Also: the knob itself is operator-only.
  * @version-history
+ *   v1.1.0 -- 2026-09-05 -- The sweep interval is pinned to 1 s by the runner (AIMEAT_MCP_SESSION_SWEEP_MS),
+ *            so the reap proof waits 8 s and the survive proof 8 s, instead of 18 + 18 for a 10 s sweep.
  *   v1.0.0 -- 2026-08-19 -- Initial: reap + survive + re-init + operator gate.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-session-expiry
@@ -124,14 +126,14 @@ await test('The idle knob is operator-only (non-operator 403, anonymous 401)', a
     assert(anon.status === 401, `anonymous expected 401, got ${anon.status}`);
 });
 
-await test('An idle session is reaped (6 s idle, 10 s sweep) and answers the spec 404', async () => {
+await test('An idle session is reaped (6 s idle, 1 s sweep) and answers the spec 404', async () => {
     const r = await setIdle(ownerToken, 0.1);   // 6 seconds
     assert(r.status === 200, `set idle: ${r.status}: ${JSON.stringify(r.body.error)}`);
 
     const s: Session = { token: mcpAccessToken, sessionId: '', nextId: 1 };
     await initSession(s);
-    // Idle past the 6 s floor plus one full sweep interval.
-    await sleep(18_000);
+    // Idle past the 6 s floor plus one full sweep interval (1 s under the runner) and a margin.
+    await sleep(8_000);
     const after = await rpcRaw(s, 'tools/list');
     assert(after.status === 404, `reaped session must answer 404, got ${after.status}`);
 });
@@ -139,9 +141,10 @@ await test('An idle session is reaped (6 s idle, 10 s sweep) and answers the spe
 await test('An ACTIVE session survives the same window', async () => {
     const s: Session = { token: mcpAccessToken, sessionId: '', nextId: 1 };
     await initSession(s);
-    // Keep touching it every 3 s for 18 s — activity resets the idle clock each time.
-    for (let i = 0; i < 6; i++) {
-        await sleep(3_000);
+    // Keep touching it every 2 s for 8 s, the same window the reap above needed — activity resets
+    // the idle clock each time, and every ping lands inside the 6 s floor.
+    for (let i = 0; i < 4; i++) {
+        await sleep(2_000);
         const ping = await rpcRaw(s, 'tools/list');
         assert(ping.status === 200, `active session ping ${i}: ${ping.status}`);
     }

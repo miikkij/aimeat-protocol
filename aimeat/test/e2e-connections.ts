@@ -1107,7 +1107,11 @@ async function main(): Promise<void> {
 
       const run = (guard: any, auth: any): number | 'next' => {
         let code: number | 'next' = 'next';
-        const res: any = { status: (c: number) => { code = c; return res; }, json: () => res };
+        // setHeader too: since 4b58d3b04 a scope refusal carries WWW-Authenticate (RFC 6750 §3.1),
+        // so the guard writes a header before the status. A stub with only status() and json()
+        // threw `res.setHeader is not a function` INSIDE the guard, and the assertion below never
+        // got its code. deny401 makes the same call, so the stub carries it for both paths.
+        const res: any = { status: (c: number) => { code = c; return res; }, json: () => res, setHeader: () => res };
         guard({ auth, method: 'GET', path: '/v1/connections', headers: {} } as any, res, () => { code = 'next'; });
         return code;
       };

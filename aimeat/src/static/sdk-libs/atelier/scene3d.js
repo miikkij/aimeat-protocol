@@ -20,6 +20,9 @@
  * @structure scene3d(spec) → { el, set, destroy }
  * @usage  AIMEAT.atelier.scene3d({ target: host, kind: 'bars', data: { items: rows } });
  * @version-history
+ *   v0.36.1 — 2026-09-05 — The token-colour probe moved out to token-color.js (a pure extraction):
+ *     the ambient layer reads its palette through the same probe, and the copied-logic gate
+ *     wants one copy. Nothing here changes but the import.
  *   v0.36.0 — 2026-08-30 — kind "globe": the abstract earth — a graticule sphere, points at
  *     lat/lon, routes as lifted arcs — on the base bundle alone (no loaders, no new library).
  *   v0.35.0 — 2026-08-29 — kind "model": any .glb/.gltf by URL — fitted whole, grounded on a
@@ -31,6 +34,7 @@
 import { el, clear, resolve, reducedMotion } from './dom.js';
 import { NODE_URL } from '../_core/config.js';
 import { skeleton, emptyState } from './state.js';
+import { tokenColor } from './token-color.js';
 
 /** One shared load of the three-world bundle, whoever asks first. */
 let threePromise = null;
@@ -63,31 +67,6 @@ function ensureLoaders() {
     });
     return loadersPromise;
   });
-}
-
-/**
- * Read a token colour off the live element — the look, palette and mode all answered at once.
- * A custom property's computed value is the raw token stream, so a color-mix() expression comes
- * back UNRESOLVED and THREE.Color cannot parse it. The probe span makes the browser do the
- * resolving: its `color` computes all the way to an rgb() whatever the expression was.
- */
-let colorCtx = null;
-function tokenColor(node, name, fallbackName) {
-  const probe = document.createElement('span');
-  probe.style.display = 'none';
-  probe.style.color = fallbackName
-    ? 'var(' + name + ', var(' + fallbackName + ', currentColor))'
-    : 'var(' + name + ', currentColor)';
-  node.appendChild(probe);
-  const resolved = getComputedStyle(probe).color;
-  probe.remove();
-  // The computed colour can come back in oklab() (color-mix's home space), which THREE.Color
-  // cannot parse — a 1×1 canvas fill settles any CSS colour the browser knows into sRGB bytes.
-  if (!colorCtx) colorCtx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
-  colorCtx.fillStyle = resolved;
-  colorCtx.fillRect(0, 0, 1, 1);
-  const px = colorCtx.getImageData(0, 0, 1, 1).data;
-  return 'rgb(' + px[0] + ',' + px[1] + ',' + px[2] + ')';
 }
 
 /** An entrance eased the kit's way: 0→1 over ms, cubic-out. */

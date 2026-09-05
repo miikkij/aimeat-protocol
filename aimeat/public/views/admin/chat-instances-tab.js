@@ -11,6 +11,7 @@
  *   - ChatInstancesTab({ data, reload }): operator-channel CRUD + chat-session table
  *
  * @version-history
+ *   v1.1.0 — 2026-09-05 — The speech-bubble emoji before a channel name and the cross-mark emoji on the delete button go: no emoji anywhere in the interface.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
@@ -172,7 +173,6 @@ export default function ChatInstancesTab({ data, reload }) {
               <div style="border:1px solid ${isOpen ? '#06b6d4' : 'var(--glass-border)'};border-radius:10px;padding:12px 14px;background:${isOpen ? 'rgba(6,182,212,0.04)' : 'rgba(255,255,255,0.02)'};transition:all .2s ease">
                 <div class="adm-flex-between">
                   <div class="adm-flex-center" style="gap:10px">
-                    <span style="font-size:1.1rem">\u{1F4AC}</span>
                     <div>
                       <div style="font-weight:700;font-size:.95rem"># ${escHtml(displayName)}</div>
                       ${ch.post_count != null ? html`<div class="adm-text-xs adm-text-dim">${ch.post_count} messages</div>` : null}
@@ -212,7 +212,7 @@ export default function ChatInstancesTab({ data, reload }) {
             <td class="mono adm-text-sm">${escHtml(String(s.ghii || '').substring(0, 20))}</td>
             <td class="adm-text-dim">${dt(s.created_at)}</td>
             <td><span class="badge ${s.is_anonymous ? 'bg-dim' : 'bg-green'}">${s.is_anonymous ? 'anon' : t('dashboard.active')}</span></td>
-            <td><button class="adm-btn-sm" onClick=${() => doDeleteInstance(s.id)} title="Delete">\u274C</button></td>
+            <td><button class="adm-btn-sm" onClick=${() => doDeleteInstance(s.id)} title="Delete">\u2717</button></td>
           </tr>`)}
         </tbody>
       </table></div></div>`

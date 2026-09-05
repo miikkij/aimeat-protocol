@@ -13,6 +13,9 @@
  *   decide whether a failure is a verdict or a hiccup, and the one pure function. What does not:
  *   anything that reads `this`. That line is what keeps the split a move rather than a rewrite.
  * @version-history
+ *   v1.1.0 — 2026-09-05 — `gaii` on the options: the socket's own identity, so a frame for a name
+ *     the client does not hold can be told apart from a frame for itself and dropped rather than
+ *     handed to the opener's handlers.
  *   v1.0.0 — 2026-09-04 — Extracted from tunnel-client.ts, verbatim.
  */
 
@@ -45,6 +48,18 @@ export type TunnelStartOutcome = 'online' | 'unsupported' | 'auth_failed' | 'unr
 export interface ConnectTunnelClientOptions {
   /** Base HTTP(S) URL of the AIMEAT node (e.g. https://aimeat.io). */
   nodeUrl: string;
+  /**
+   * The identity that OPENS this socket, so a frame can be told apart three ways: for me, for an
+   * identity riding my socket, or for an identity I no longer hold.
+   *
+   * Without it the third looked like the first. The node stamps every outbound frame with the
+   * principal it is for; an identity evicted on a dead credential left the map; and a frame for it
+   * then missed the map and fell back to the OPENER's handlers, which is how one owner's task landed
+   * in another owner's queue and started its runner. Found by an adversarial review on 2026-09-05.
+   * Optional only so a pre-existing caller keeps compiling; the hub and the private socket both
+   * set it, and a client without it keeps the old fallback for a legacy node that never stamps.
+   */
+  gaii?: string;
   /**
    * Full WebSocket endpoint to dial (connector profile §6). When set, it is used verbatim instead of
    * deriving `{nodeUrl}/v1/connect/tunnel` — lets the same client target a non-AIMEAT, ecosystem-hosted

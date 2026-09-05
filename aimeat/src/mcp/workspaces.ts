@@ -17,6 +17,10 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   v1.22.0 -- 2026-09-05 -- The bodies of _read, _write and _publish move to
+ *     services/workspace-tool-ops.ts, a pure extraction, so the extension sandbox's ctx.workspace
+ *     runs the same three operations as its caller instead of a fourth copy of who may write a
+ *     workspace record. The tools render the same messages they always did.
  *   v1.21.0 -- 2026-09-03 -- The index read returns `schemas`, the locked JSON Schemas keyed by
  *     namespace, in the shape _update takes back. An agent could replace a workspace's schemas but
  *     had no way to read them: _update's own advice was GET /v1/memory/{key}/schema, a call an
@@ -126,35 +130,27 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { canWriteNamespaceRule, readOrganismConfig, createOrganismHelpers, fresherRec } from '../routes/organisms/shared.js';
+import { canWriteNamespaceRule, createOrganismHelpers } from '../routes/organisms/shared.js';
 import { registerWorkspaceCreateTool } from './workspace-create.js';
-import { checkOrganismNamespaceAccess } from '../services/organism-namespace-access.js';
-import { workspaceRowIndex } from '../services/workspace-rows/row-service.js';
-import type { RowObjectType } from '../services/workspace-rows/row-space.js';
 import { registerWorkspaceRowTools } from './workspace-rows.js';
 import { registerWorkspaceDocumentTools } from './workspace-documents.js';
-import { archivedRefusal, checkWorkspaceWriteLimits } from '../services/workspace-write-guards.js';
-import { parseGAII, isSameOwner } from '../utils/gaii.js';
+import { archivedRefusal } from '../services/workspace-write-guards.js';
+import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { validateMemoryWrite } from '../services/schema-validator.js';
 import { checkDeleteGuard } from '../services/write-guards.js';
-import { authorizeRead } from '../services/access-guard.js';
 import { canReadWorkspace } from '../services/workspace-access.js';
-import { buildOrganismOverview, buildWorkspaceOverview, entryTitle } from '../services/structure-overview.js';
-import { updateWorkspaceMeta, WorkspaceMetaError, isMemoryBackedSpace, listOrganismWorkspaceEntries, readWorkspaceSchemas } from '../services/workspace-meta.js';
+import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
+import { updateWorkspaceMeta, WorkspaceMetaError, listOrganismWorkspaceEntries } from '../services/workspace-meta.js';
 import { emitChange } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
-import { normalizeDocValueImages } from '../services/doc-images.js';
-import { normalizeWriteItems, resolveWriteItem, MAX_BATCH_ITEMS, type ResolvedWriteItem } from '../services/workspace-write-items.js';
+import { MAX_BATCH_ITEMS } from '../services/workspace-write-items.js';
 import { findWorkspaceRecord, writeWorkspaceRecord, deleteWorkspaceInstance } from '../services/workspace-write.js';
+import { workspaceCallerOf, readWorkspaceOp, writeWorkspaceDraftsOp, publishWorkspaceOp } from '../services/workspace-tool-ops.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, type WsRole } from '../services/workspace-roles.js';
 import { registerWorkspaceMemberTools } from './workspace-members.js';
 import { registerWorkspaceTransferTool } from './workspace-transfer.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
-import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
-import { provenanceForWrite } from '../services/ai-provenance.js';
-import { memoryContentBytes } from '../routes/memory/shared.js';
 import { logger } from '../utils/logger.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string; versioned?: boolean; create_only?: boolean; maxVersions?: number };
@@ -185,19 +181,14 @@ export function registerWorkspaceTools(
     // write everything under ownerGhii, collapsing every agent action onto the owner), else the owner
     // GHII. Workspace META (manifest / registry / schemas / sections) stays under ownerGhii.
     const writerGaii = parsed ? agentGaii : ownerGhii;
+    // The same caller, in the shape services/workspace-tool-ops.ts takes: the read, the draft
+    // write and the publish run there, so the extension sandbox can run them as its caller too.
+    // Roles stay ['agent'] — an MCP session is always an agent record (mcp/index.ts).
+    const opsCaller = workspaceCallerOf({ principal: agentGaii, ownerName, roles: ['agent'] }, config);
     const wsRoot = (orgId: string, ws: string) => `organism.${orgId}.w.${ws}`;
 
     const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
     const fail = (msg: string): TextResult => ({ content: [{ type: 'text', text: msg }], isError: true });
-
-    /** A draft value should be an object; tolerate a JSON-string (some clients stringify object
-     *  params) by parsing it, then stamp the instance id so the stored record/document carries it. */
-    const coerceValue = (value: unknown, id: string): unknown => {
-        let v = value;
-        // eslint-disable-next-line aimeat/no-silent-catch -- leave as string → schema rejects clearly
-        if (typeof v === 'string') { try { const p = JSON.parse(v); if (p && typeof p === 'object') v = p; } catch { /* leave as string → schema rejects clearly */ } }
-        return (v && typeof v === 'object' && !Array.isArray(v)) ? { ...(v as Record<string, unknown>), id } : v;
-    };
 
     /** Parse a possibly-JSON-stringified object param (manifest / schemas) back to an object. */
     const parseObj = (v: unknown): unknown => {
@@ -272,22 +263,6 @@ export function registerWorkspaceTools(
         const m = await storage.getMembership(orgId, ownerName);
         return m && m.status === 'active' ? m.role : null;
     };
-    /**
-     * May the caller WRITE this workspace's content?
-     *
-     * The rule is services/organism-namespace-access.ts, the one the HTTP door answers to. This used
-     * to be a local retelling of it, and the retelling was looser in two places that mattered:
-     * a workspace with no registry entry returned true outright ("bootstrap"), so any active
-     * member's agent wrote into an unregistered workspace the HTTP door refuses; and it never asked
-     * whether the caller was an ORGANISM agent, which may write under .shared. and nowhere else, so
-     * one wrote workspace content here that /v1/memory answers 403 to.
-     */
-    const canWriteWs = async (orgId: string, ws: string): Promise<boolean> => {
-        const refusal = await checkOrganismNamespaceAccess({ storage, config }, {
-            principal: agentGaii, owner: ownerName, roles: ['agent'],
-        }, `${wsRoot(orgId, ws)}.probe`, 'write');
-        return refusal === null;
-    };
     /** Create a consent grant if no equivalent active one exists (idempotent) — the same function the
      *  workspace-access REST routes call, so the request half of membership has one implementation. */
     const ensureConsent = H.ensureConsent;
@@ -334,116 +309,12 @@ export function registerWorkspaceTools(
           include_archived: z.boolean().optional().describe('Include archived (hidden) content. Default false — archived content is excluded from normal reads.') },
         annotationsFor('aimeat_workspace_read'),
         async ({ organism_id, ws, ids, space, include_archived }): Promise<TextResult> => {
-            const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const root = wsRoot(organism_id, ws);
-            // A workspace is SHARED: authorization is at the workspace level, not per record. If the caller
-            // can read the manifest (creator / same-owner agent / a viewer|contributor grant), they see ALL
-            // of the workspace's content whoever wrote it — so a contributor's writes are visible to the
-            // creator + other members. Otherwise nothing (org membership alone is discovery-only).
-            // excludeVersionRows: this read never surfaces `.version.N` history — dropping those rows in
-            // SQL avoids loading every historic full-copy value only to discard it below.
-            const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000, archived: include_archived ? 'include' : undefined, excludeVersionRows: true });
-            const manRec = items.find(r => r.key === `${root}.meta.manifest`);
-            let canRead = false;
-            if (manRec) {
-                canRead = manRec.ownerGaii === ownerGhii || isSameOwner(manRec.ownerGaii, ownerGhii);
-                if (!canRead) {
-                    const d = await authorizeRead(storage, config, { ownerGaii: manRec.ownerGaii, accessorGaii: ownerGhii, resourceKey: manRec.key, visibility: manRec.visibility, groupId: manRec.groupId, action: 'read' });
-                    canRead = d.allowed;
-                }
-            }
-            if (!manRec || !canRead) return fail(`No manifest at ${root}.meta.manifest — empty workspace, wrong ws id, or no access (request access with aimeat_workspace_access).`);
-            const manifest = manRec.value as Manifest;
-
-            // Collapse each space's instances to their freshest { latest, draft } ONCE — reused by both
-            // the index and the batch-open. `latest` wins over a bare (un-suffixed) write; fresher()
-            // guards a key forked into duplicate-owner copies. Version history (.version.N) is never
-            // surfaced here (it is the main bloat source) — read a specific version via the memory API.
-            type Slot = { latest?: MemoryRecord; draft?: MemoryRecord };
-            const spaces = new Map<string, { ot: ObjType; inst: Map<string, Slot> }>();
-            for (const ot of manifest.objectTypes ?? []) {
-                if (!ot.namespace || !isMemoryBackedSpace(ot)) continue;
-                const nsPrefix = `${root}.${ot.namespace}.`;
-                const inst = new Map<string, Slot>();
-                for (const r of items) {
-                    if (!r.key.startsWith(nsPrefix)) continue;
-                    const parts = r.key.slice(nsPrefix.length).split('.');
-                    const role = parts.slice(1).join('.');
-                    const slot = inst.get(parts[0]) ?? {};
-                    if (role === '' || role === 'latest') slot.latest = fresherRec(slot.latest, r);
-                    else if (role === 'draft') slot.draft = fresherRec(slot.draft, r);
-                    inst.set(parts[0], slot);
-                }
-                spaces.set(ot.name, { ot, inst });
-            }
-            const byteLen = (v: unknown): number => (typeof v === 'string' ? v.length : JSON.stringify(v ?? null).length);
-
-            // ── BATCH-OPEN: the full value of the requested ids only. ──
-            if (ids && ids.length) {
-                const scoped = space ? [...spaces.values()].filter(s => s.ot.name === space || s.ot.namespace === space) : [...spaces.values()];
-                const found: unknown[] = [];
-                const missing: string[] = [];
-                // TARGET-058: the provenance for everything this call is about to return, in ONE
-                // query. Deliberately only on the batch-open branch — the index is titles, and an
-                // agent that needs to know how something was made is opening it anyway. Attaching a
-                // second, thinner shape of the same fact to every index row is how one document ends
-                // up with two spellings.
-                const provFor = await readProvenanceMany(storage, config, items.map(r => r.aiProvenanceId));
-                for (const id of new Set(ids.map(String))) {
-                    let hit = false;
-                    for (const s of scoped) {
-                        const slot = s.inst.get(id);
-                        const cur = slot?.latest ?? slot?.draft;
-                        if (!slot || !cur) continue;
-                        found.push({
-                            space: s.ot.name, id, value: cur.value,
-                            published: !!slot.latest, _version: cur.version, _createdAt: cur.createdAt, _updatedAt: cur.updatedAt,
-                            ...(slot.draft ? { draft: slot.draft.value } : {}),
-                            ...provFor(cur.aiProvenanceId),
-                        });
-                        hit = true; break;
-                    }
-                    if (!hit) missing.push(id);
-                }
-                return ok({ organism_id, ws, mode: 'content', items: found, ...(missing.length ? { missing } : {}) });
-            }
-
-            // ── INDEX (default): titles + ids, NO bodies. Every instance (uncapped). ──
-            const apps = ((items.find(r => r.key === `${root}.meta.apps`)?.value as { apps?: unknown[] } | undefined)?.apps) ?? [];
-            const index: Record<string, unknown[]> = {};
-            const counts: Record<string, number> = {};
-            for (const [name, s] of spaces) {
-                const entries = [...s.inst.entries()]
-                    .map(([id, slot]) => {
-                        const cur = slot.latest ?? slot.draft!;
-                        return { id, title: entryTitle(cur.value, id), updated: cur.updatedAt, version: slot.latest?.version ?? 0, bytes: byteLen(cur.value), published: !!slot.latest, has_draft: !!slot.draft };
-                    })
-                    .sort((a, b) => (a.updated < b.updated ? 1 : a.updated > b.updated ? -1 : a.id < b.id ? -1 : 1));
-                index[name] = entries;
-                counts[name] = entries.length;
-            }
-
-            // ROW SPACES ANSWER WITH A COUNT, NEVER WITH ROWS. That is the whole reason the backing
-            // exists: this index materialises every memory value to derive a title and silently
-            // truncates at 5000 rows, so a space holding a group's accumulated rows would be both
-            // expensive and quietly incomplete here. One aggregate per space instead, honest at any
-            // size, and the rows themselves are read through aimeat_workspace_rows_read.
-            const rowSpaces = await workspaceRowIndex({ storage, config }, organism_id, ws,
-                manifest.objectTypes as RowObjectType[] | undefined);
-            for (const [name, s] of Object.entries(rowSpaces)) counts[name] = s.rows;
-
-            // The locked schemas, keyed by namespace, in the shape aimeat_workspace_update takes
-            // back. On the index only: it belongs beside the manifest, and the batch-open branch is
-            // about one record's content. This is the read that makes a safe schema edit possible —
-            // `schemas` replaces rather than merges, and there is no other way to see the current one.
-            const schemas = await readWorkspaceSchemas(storage, organism_id, ws);
-
-            return ok({ organism_id, ws, mode: 'index', manifest, apps, counts, index,
-                ...(Object.keys(schemas).length ? { schemas } : {}),
-                ...(Object.keys(rowSpaces).length ? { row_spaces: rowSpaces } : {}),
-                hint: 'Titles only. Open the ones you need with aimeat_workspace_read(ids:["<id>", ...]) to get their full values.'
-                    + (Object.keys(schemas).length ? ' `schemas` is what is locked on each records space now — edit that map and send it back through aimeat_workspace_update, which REPLACES it.' : '')
-                    + (Object.keys(rowSpaces).length ? ' Row spaces show a count and a span here; read their rows with aimeat_workspace_rows_read.' : '') });
+            // The work is services/workspace-tool-ops.ts, which the extension sandbox's
+            // ctx.workspace calls as well: a workspace is SHARED, authorization is at the workspace
+            // level (whoever may read the manifest sees all of its content), version history is
+            // never surfaced, and row spaces answer with a count.
+            const r = await readWorkspaceOp({ storage, config }, opsCaller, { organismId: organism_id, ws, ids, space, includeArchived: include_archived });
+            return r.ok ? ok(r.data) : fail(r.message);
         });
 
     // ── aimeat_organism_overview ── (OKF-style structure map of the whole organism)
@@ -482,90 +353,16 @@ export function registerWorkspaceTools(
         },
         annotationsFor('aimeat_workspace_write'),
         async ({ organism_id, ws, space, value, id, section, items, ai_provenance, ai_provenance_id }): Promise<TextResult> => {
-            const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            if (!(await canWriteWs(organism_id, ws))) return fail('You are not approved to write to this workspace. Request access with aimeat_workspace_access(action:"request") and wait for the creator to approve.');
-            const norm = normalizeWriteItems({ space, value, id, section, items });
-            if ('error' in norm) return fail(norm.error);
-            const batch = items !== undefined && items !== null;
-            const root = wsRoot(organism_id, ws);
-            // Aggregate the manifest across members so a member who didn't create the workspace can write,
-            // and accept either the space NAME or its namespace (small models often pass the namespace).
-            const types = (await readManifest(organism_id, ws))?.objectTypes ?? [];
-            // Resolve and validate EVERY item before writing ANY of them. A document with no id gets a
-            // generated one, so a batch that half-lands and is then retried would duplicate what landed.
-            const planned: { key: string; v: unknown; item: ResolvedWriteItem }[] = [];
-            for (const [i, want] of norm.items.entries()) {
-                const item = resolveWriteItem(want, types, batch ? `items[${i}]` : undefined);
-                if ('error' in item) return fail(item.error);
-                const key = `${root}.${item.namespace}.${item.instanceId}.draft`;
-                let v = coerceValue(item.value, item.instanceId);
-                // Rewrite embedded image URLs to the owner-addressed /v1/pub form and scope those files to
-                // THIS workspace (members-only). MCP-authored docs otherwise store raw /v1/storage URLs that
-                // load for nobody but the file owner — the exact reason chat-written docs showed broken images.
-                if (item.isDoc) v = await normalizeDocValueImages(storage, config, v, ownerName, `${organism_id}/${ws}`);
-                const valid = await validateMemoryWrite(key, v, storage);
-                if (!valid.valid) return fail(`${batch ? `items[${i}]: ` : ''}Draft rejected by schema: ` + JSON.stringify(valid.errors));
-                planned.push({ key, v, item });
-            }
-            // Archived is read-only. This path had no check, so an agent kept filing drafts into a
-            // workspace the owner had closed, and the view then showed fresh material in something
-            // marked finished.
-            const wsArchived = await archivedRefusal(storage, `${root}.`);
-            if (wsArchived) return fail(wsArchived);
-            // And the RECORD's own archive flag, which is a separate fact from the workspace's:
-            // "this document is finished" was honoured by /v1/memory and not by a draft written here.
-            for (const [i, p] of planned.entries()) {
-                const rowArchived = await archivedRefusal(storage, `${root}.`, { ownerGhii, key: p.key });
-                if (rowArchived) return fail(`${batch ? `items[${i}]: ` : ''}${rowArchived}`);
-            }
-
-            const overLimit = await checkWorkspaceWriteLimits(
-                storage, config, ownerGhii, planned, i => (batch ? `items[${i}]: ` : ''),
-            );
-            if (overLimit) return fail(overLimit);
-            const written: Record<string, unknown>[] = [];
-            let lastProvenanceId: string | undefined;
-            for (const { key, v, item } of planned) {
-                // TARGET-058. A workspace record is a memory record, and this path does not go through
-                // /v1/memory (one owner per key, which a general write would undo), so for a long time
-                // it inherited nothing and an agent's workspace write carried no provenance at all. It
-                // goes through the same one decision function every other write surface uses. Per
-                // ITEM, not per call — a batch of twenty records is twenty different sets of bytes,
-                // and one record covering all of them would be a statement about content it cannot
-                // identify.
-                const provenanceId = await provenanceForWrite(storage, {
-                    principal: agentGaii,
-                    content: memoryContentBytes(v),
-                    declaredId: ai_provenance_id,
-                    declared: toDeclaredProvenance(ai_provenance),
-                    pipeline: 'mcp.workspace_write',
-                    // A draft lands private; publishing is what makes it readable, and the publish
-                    // path re-derives the label from the record then.
-                    surface: { visibility: 'private', humanAudience: true },
-                    labelPolicy: config.aiLabelPublic,
-                    nodeId: config.nodeId,
-                    baseUrl: config.baseUrl,
-                    enabled: config.aiProvenance,
-                });
-                lastProvenanceId = provenanceId ?? lastProvenanceId;
-                await writeRecord(key, v, await findByKey(key), ownerGhii, provenanceId);   // content → authored by the calling agent
-                if (item.isDoc && item.section) {
-                    const secKey = `${root}.meta.sections.${item.space}`;
-                    const secRec = await findByKey(secKey);
-                    const sections = ((secRec?.value as { sections?: { id: string; name?: string; documents?: string[] }[] } | undefined)?.sections) ?? [];
-                    const target = sections.find(s => s.id === item.section || s.name === item.section);
-                    if (target) { target.documents = [...(target.documents ?? []).filter(d => d !== item.instanceId), item.instanceId]; await writeRecord(secKey, { sections }, secRec, ownerGhii); }  // section tree = creator meta
-                }
-                written.push({ written: key, id: item.instanceId, space: item.space, mode: item.isDoc ? 'document' : 'records', section: item.section ?? null });
-            }
-            emitChange('organisms');
-            // The echo is the LAST item's record on a batch: every item was stamped, and repeating
-            // twenty near-identical documents in a tool result would cost the agent more context than
-            // the fact is worth. The per-record ids are on the records themselves.
-            const echo = await writeProvenanceEcho(storage, config, lastProvenanceId);
-            return ok(batch
-                ? { count: written.length, items: written, ...echo }
-                : { ...written[0], ...echo });
+            // services/workspace-tool-ops.ts: membership, the organism namespace rule, every item
+            // resolved and schema-validated before any is written, the archive flags, the memory
+            // ceilings, one provenance record per item, and the fan-out a workspace write sets off.
+            // The extension sandbox's ctx.workspace.write is the same function.
+            const r = await writeWorkspaceDraftsOp({ storage, config }, opsCaller, {
+                organismId: organism_id, ws, space, value, id, section, items,
+                aiProvenance: toDeclaredProvenance(ai_provenance), aiProvenanceId: ai_provenance_id,
+                pipeline: 'mcp.workspace_write',
+            });
+            return r.ok ? ok(r.data) : fail(r.message);
         });
 
     // ── aimeat_workspace_publish ──
@@ -575,48 +372,11 @@ export function registerWorkspaceTools(
         { organism_id: z.string(), ws: z.string(), namespace: z.string(), id: z.string(), expected_version: z.number().optional() },
         annotationsFor('aimeat_workspace_publish'),
         async ({ organism_id, ws, namespace, id, expected_version }): Promise<TextResult> => {
-            const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const role = await memberRoleOf(organism_id);
-            if (!role || !canWriteNamespaceRule(role, namespace)) {
-                return fail('Admin/creator role required to publish in a meta.* namespace');
-            }
-            const archived = await archivedRefusal(storage, `${wsRoot(organism_id, ws)}.`);
-            if (archived) return fail(archived);
-            // Read across every owner, as routes/organisms/shared.ts does. The config normally
-            // belongs to the organism's creator, so the per-owner read this used to do returned
-            // nothing for any OTHER member — the gate read as absent and the publish went through.
-            const cfg = await readOrganismConfig(storage, organism_id);
-            const gate = (cfg as { gates?: { publish?: { enabled?: boolean } } } | null)?.gates?.publish?.enabled;
-            if (gate) return fail('Publishing requires human approval (the publish gate is on). Leave it as a draft for the owner to review and publish.');
-            const base = `${wsRoot(organism_id, ws)}.${namespace}.${id}`;
-            // The publish itself: the same publishDraft POST /v1/organisms/:id/publish calls. It reads
-            // the draft, scopes its embedded images, validates through the write guards with the
-            // optimistic lock, honours the manifest's `versioned` flag, skips a byte-identical
-            // re-publish, writes `.version.N` under the publisher and `.latest` under the member GHII,
-            // prunes past the retention window and consumes the draft. This tool used to do all of it
-            // again, and the copy had drifted: it refused a co-member's draft with "No draft at …"
-            // where the web door published it.
-            const result = await H.publishDraft(organism_id, ws, namespace, id, writerGaii, expected_version ?? null);
-            if (!result.ok) {
-                return fail(result.code === 'NO_DRAFT'
-                    ? `No draft at ${base}.draft`
-                    : 'Publish refused: ' + JSON.stringify(result.violations));
-            }
-            emitChange('organisms');
-            // A no-op re-publish (a contract agent re-publishes the same draft every poll cycle) left
-            // no new version, so it earns no audit entry and no timeline snapshot either.
-            if (result.skipped) return ok({ published: base, version: result.version, skipped: true });
-            // The gate/Prove trail. Without this the organism's decision log recorded web publishes
-            // and not agent publishes, so the trail read as if nothing shipped on the days an agent
-            // did the work.
-            await H.writeDecision(organism_id, writerGaii, `published ${namespace}.${id} v${result.version}`, [`${namespace}.${id}`]);
-            void updateOrganismStructure(storage, config, organism_id, { event: 'content published', actor: writerGaii }).catch(err => { logger.warn('publish: timeline best-effort', { error: String(err) }); });
-            // Activation: published workspace content is the account's first durable output whichever
-            // door produced it. Fire-and-forget — measuring a publish must never fail it.
-            void import('../services/onboarding-funnel.js')
-                .then(m => m.recordActivation(storage, config, ownerName, 'workspace'))
-                .catch(err => { logger.warn('publish: activation marker is best-effort', { error: String(err) }); });
-            return ok({ published: base, version: result.version });
+            // services/workspace-tool-ops.ts: membership, the meta.* role, the archive flag, the
+            // publish gate (read across every owner), then the same publishDraft POST
+            // /v1/organisms/:id/publish calls, the decision-log entry and the timeline snapshot.
+            const r = await publishWorkspaceOp({ storage, config }, opsCaller, { organismId: organism_id, ws, namespace, id, expectedVersion: expected_version ?? null });
+            return r.ok ? ok(r.data) : fail(r.message);
         });
 
     // ── aimeat_workspace_revert_to_draft ──

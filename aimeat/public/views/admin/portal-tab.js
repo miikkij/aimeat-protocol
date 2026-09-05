@@ -7,6 +7,7 @@
  * @structure PortalTab (default)
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v1.2.0 — 2026-09-05 — The eleven emoji on headings and buttons go: no emoji anywhere in the interface.
  *   v1.1.0 — 2026-06-02 — Admin design unification: raw template textarea →
  *     adm-textarea adm-input-full (drop inline mono/border/background styles).
  *   v1.2.0 — 2026-06-03 — Active-source status (custom template vs built-in SPA)
@@ -278,12 +279,12 @@ export default function PortalTab({ data, reload }) {
     <!-- LB mode banner -->
     ${surface === 'portal' && isLb && html`
       <div class="adm-card adm-mb-lg" style="border:1px solid #eab308">
-        <h3>\u{1F504} ${t('dashboard.portalLbMode')}</h3>
+        <h3>${t('dashboard.portalLbMode')}</h3>
         <p class="adm-text-dim adm-mb-sm">${t('dashboard.portalLbReadOnly')}</p>
         <div class="adm-erow"><span class="adm-elabel">${t('dashboard.portalLbOrigin')}</span><span class="adm-eval">${escHtml(meta.lb_mode.origin_url || '-')}</span></div>
         <div class="adm-erow"><span class="adm-elabel">${t('dashboard.portalLbLastSync')}</span><span class="adm-eval">${meta.lb_mode.last_sync ? dt(meta.lb_mode.last_sync) : '-'}</span></div>
         ${meta.lb_mode.last_error && html`<div class="adm-erow"><span class="adm-elabel">${t('dashboard.portalLbError')}</span><span class="adm-text-error">${escHtml(meta.lb_mode.last_error)}</span></div>`}
-        <button class="adm-btn-action adm-mt-sm" onClick=${doLbSync}>\u{1F504} ${t('dashboard.portalLbSyncNow')}</button>
+        <button class="adm-btn-action adm-mt-sm" onClick=${doLbSync}>${t('dashboard.portalLbSyncNow')}</button>
       </div>
     `}
 
@@ -307,7 +308,7 @@ export default function PortalTab({ data, reload }) {
         <a href=${hasCustom ? '/' : '/v1/portal'} target="_blank" rel="noopener">${t('dashboard.portalPreviewOpen')}</a>
       </p>
       <div class="adm-flex adm-mt-sm">
-        <button class="adm-btn-action" onClick=${doClearCache}>\u{1F6AB} ${t('dashboard.portalClearCache')}</button>
+        <button class="adm-btn-action" onClick=${doClearCache}>${t('dashboard.portalClearCache')}</button>
       </div>
     </div>
 
@@ -341,7 +342,7 @@ export default function PortalTab({ data, reload }) {
             </tbody>
           </table>
           <div class="adm-flex adm-mt-sm">
-            <button class="adm-btn-action" disabled=${navSaving} onClick=${saveNav}>\u{1F4BE} ${t('dashboard.portalNavSave')}</button>
+            <button class="adm-btn-action" disabled=${navSaving} onClick=${saveNav}>${t('dashboard.portalNavSave')}</button>
           </div>
         `}
     </div>
@@ -363,7 +364,7 @@ export default function PortalTab({ data, reload }) {
           : t('dashboard.portalDefaultExplain').replace('{action}', t('dashboard.portalLoadCurrent'))}
       </p>
       <div class="adm-mb-sm">
-        <button class="adm-btn-action" onClick=${loadCurrentAsTemplate}>\u{1F4C4} ${t('dashboard.portalLoadCurrent')}</button>
+        <button class="adm-btn-action" onClick=${loadCurrentAsTemplate}>${t('dashboard.portalLoadCurrent')}</button>
       </div>
       <${ExpandableHelp} title=${t('dashboard.portalTagHelpTitle')}>
         <p>${t('dashboard.portalTagHelpDetail')}</p>
@@ -381,9 +382,9 @@ export default function PortalTab({ data, reload }) {
       <textarea class="adm-textarea adm-input-full" rows="20" value=${template} onInput=${e => setTemplate(e.target.value)}
         style="font-size:13px"></textarea>
       <div class="adm-flex adm-mt-sm">
-        <button class="adm-btn-action" onClick=${saveTemplate}>\u{1F4BE} ${t('dashboard.portalSaveTemplate')}</button>
-        <button class="adm-btn-action" onClick=${downloadTemplate}>\u{1F4E5} ${t('dashboard.portalDownload')}</button>
-        <button class="adm-btn-action" onClick=${resetTemplate}>\u{1F504} ${t('dashboard.portalResetDefault')}</button>
+        <button class="adm-btn-action" onClick=${saveTemplate}>${t('dashboard.portalSaveTemplate')}</button>
+        <button class="adm-btn-action" onClick=${downloadTemplate}>${t('dashboard.portalDownload')}</button>
+        <button class="adm-btn-action" onClick=${resetTemplate}>${t('dashboard.portalResetDefault')}</button>
       </div>
     </div>
 
@@ -401,7 +402,7 @@ export default function PortalTab({ data, reload }) {
               ${memKeys.map(k => html`<tr>
                 <td><code>${escHtml(k.key)}</code></td>
                 <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${escHtml(String(k.value || ''))}</td>
-                <td><button class="adm-btn-sm" onClick=${() => delMem(k.key)}>\u274C</button></td>
+                <td><button class="adm-btn-sm" onClick=${() => delMem(k.key)}>\u2717</button></td>
               </tr>`)}
             </tbody>
           </table>`
@@ -431,14 +432,14 @@ export default function PortalTab({ data, reload }) {
       <h3>${t('dashboard.portalAiChat')}</h3>
       <p class="adm-text-dim adm-text-base">${t('dashboard.portalAiExplain')}</p>
       <div class="adm-mt-sm adm-mb-sm">
-        <button class="adm-btn-action" onClick=${copyPrompt}>\u{1F4CB} ${t('dashboard.portalAiLoadPrompt')}</button>
+        <button class="adm-btn-action" onClick=${copyPrompt}>${t('dashboard.portalAiLoadPrompt')}</button>
       </div>
       <p class="adm-text-dim adm-text-base adm-mb-sm">${t('dashboard.portalAiBundleExplain')}</p>
       <textarea class="adm-textarea adm-input-full" rows="6" value=${aiBundle}
         onInput=${e => setAiBundle(e.target.value)}
         placeholder=${t('dashboard.portalAiBundlePlaceholder')} style="font-size:13px"></textarea>
       <div class="adm-flex adm-mt-sm">
-        <button class="adm-btn-action" onClick=${importAiBundle}>\u{1F4E5} ${t('dashboard.portalAiImport')}</button>
+        <button class="adm-btn-action" onClick=${importAiBundle}>${t('dashboard.portalAiImport')}</button>
       </div>
     </div>
 

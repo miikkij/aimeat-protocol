@@ -20,6 +20,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.18.0 -- 2026-09-05 -- aimeat_admin_security_overview and aimeat_admin_incident_resolve join
+ *     the operator-gated list: the handler checks the role, no scope word narrows them.
  *   v1.17.0 -- 2026-08-29 -- aimeat_app_legal_set and aimeat_app_audit → app:write (the one app
  *     scope the owner's checkboxes carry; the routes behind every door are gated on it).
  *   v1.16.0 -- 2026-08-29 -- aimeat_app_marks_set → app:write.
@@ -111,6 +113,10 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     'aimeat_admin_owner_disable',
     'aimeat_admin_owner_enable',
     'aimeat_admin_totp_reset',
+    // The Security page's read and its one action: gated in the handler on the operator role, like
+    // the admin tools above them.
+    'aimeat_admin_security_overview',
+    'aimeat_admin_incident_resolve',
     // Reading how a page is arranged, and the catalogue of blocks this node can serve. Gated in the
     // handler on the operator, like the admin tools above it, and there is nothing here to narrow:
     // a layout is a list of block names, and the front page's describes a page anyone can look at.

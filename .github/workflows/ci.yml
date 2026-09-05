@@ -10,39 +10,28 @@ on:
 permissions:
   contents: read
 
+# FOUR JOBS, SIDE BY SIDE. Until 2026-09-05 this was one job that ran everything in a row and took
+# 82 minutes, most of it the two full E2E sweeps, which were advisory (continue-on-error) and so
+# decided nothing while deciding the wall clock. The sweeps now run nightly and on demand in
+# e2e-full.yml, with an issue opened when one is red; what a push waits for is the four things that
+# block a merge, each in its own job so the clock is the longest of them rather than their sum, and
+# so a red run names itself in the job list.
 jobs:
-  build-and-test:
+  # The static gates: what the pre-commit hook runs, uncached and over the whole tree. The hook
+  # exists to fail fast on a developer's machine; `--no-verify` walks straight past it, and this is
+  # the copy that guards the branch.
+  checks:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [24.x]
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: appuser
-          POSTGRES_PASSWORD: devpassword123
-          POSTGRES_DB: aimeat_kysely_e2e
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 24.x
           cache: 'pnpm'
           cache-dependency-path: aimeat/pnpm-lock.yaml
 
@@ -66,154 +55,144 @@ jobs:
         working-directory: aimeat
         run: pnpm typecheck:sdk
 
-      - name: Importmap consistency (spa.html ↔ absolute imports)
-        working-directory: aimeat
-        run: pnpm check:importmap
-
-      - name: Every profile tab reachable from the menu
-        working-directory: aimeat
-        run: pnpm check:profile-tabs
-
-      - name: Shipped crew definitions match the runtime's rules
-        working-directory: aimeat
-        run: pnpm check:crew-defs
-
-      - name: Config coverage (every setting reachable in the admin Config tab)
-        working-directory: aimeat
-        run: pnpm check:config-coverage
-
-      - name: No max_tokens caps on AI calls
-        working-directory: aimeat
-        run: pnpm check:no-max-tokens
-
       - name: Vendored /lib assets present and hash-verified (fetched, not committed)
         working-directory: aimeat
         run: pnpm check:vendored
 
-      - name: Library-pack doc-truth (assets exist + ai_doc claims executed)
-        working-directory: aimeat
-        run: pnpm check:packs-doc
-
-      - name: openapi.yaml parses + every $ref resolves (Rule 3 contract health)
-        working-directory: aimeat
-        run: pnpm check:openapi
-
-      - name: app-catalog.html in sync with its sources
-        working-directory: aimeat
-        run: pnpm check:app-catalog
-
-      - name: SDK-libs dist bundles in sync with their sources
-        working-directory: aimeat
-        run: pnpm check:sdk
-
-      - name: Atelier look matrix — every preset × palette × mode (check:atelier)
-        working-directory: aimeat
-        run: pnpm check:atelier
-
-      - name: No silent exception handlers in the cleaned areas (check:silent-catch)
+      # The whole tree, which the hook no longer does: there it lints only the staged files, because
+      # a new silent handler can only be in a file the commit touches. Here every file is on trial.
+      - name: No silent exception handlers in the cleaned areas (check:silent-catch, whole tree)
         working-directory: .
         run: pnpm check:silent-catch -- --strict
 
-      - name: MCP tool surface/handler parity (check:mcp-tools)
+      # Thirty-odd read-only checks, four at a time: importmap, profile tabs, crew definitions,
+      # config coverage, openapi, the catalogue and SDK builds, MCP tool and schema parity, plain
+      # language, cortex packs, AI disclosure, locales, licences and notices, protocol versions, and
+      # the August 2026 audit ratchets (route scopes, denial coverage, outbound fetch, trusted keys,
+      # storage parity, sandbox entry points, shared implementation, surface focus, dependency
+      # cruiser, SSE parity, copied logic, doc counts, scope parity, the liaison surface). Each is a
+      # ratchet seeded with its day's count, so it fails only on a NEW offender. `pnpm check:fast
+      # --list` prints the set; a red one prints its own output whole.
+      - name: The read-only gates, four at a time (check:fast)
         working-directory: aimeat
-        run: pnpm check:mcp-tools
+        run: pnpm check:fast
 
-      - name: MCP tool input-schema parity (check:mcp-schemas)
+      # The five gates that read the compiler's own program — runtime read targets, identity
+      # resolution, owner-principal refusals, federation write signatures, credential-free write
+      # doors — on one program built once. All five run before any of them exits.
+      - name: The five program-reading gates (check:invariants)
         working-directory: aimeat
-        run: pnpm check:mcp-schemas
-
-      - name: Plain language for the messages a person hears (check:plain-language)
-        working-directory: aimeat
-        run: pnpm check:plain-language
-
-      - name: Cortex pack integrity (embedded viewport + VERSION constants)
-        working-directory: aimeat
-        run: pnpm check:viewport
-
-      # TARGET-058: one LLM path, one publish path, every label still where it has to be.
-      - name: AI disclosure gates (check:ai-disclosure)
-        working-directory: aimeat
-        run: pnpm check:ai-disclosure
-
-      # Three language files now, so "they change together" cannot rest on a person seeing both.
-      - name: Language files agree with en.json (check:locales)
-        working-directory: aimeat
-        run: pnpm check:locales
-
-      # MIT plus commercial users means "can a company ship this" has to keep being answerable, and
-      # the answer had been wrong: every release up to 3.10.0 published a GPL ffmpeg build inside
-      # the MIT package. This reads the production tree AND public/lib/, which no npm licence tool
-      # looks at, and proves THIRD-PARTY-NOTICES.md followed whatever changed.
-      - name: Licences and third-party notices (check:licenses, check:notices)
-        working-directory: aimeat
-        run: pnpm check:licenses && pnpm check:notices
-
-      # The August 2026 audit gates. Each is a ratchet seeded with that day's count, so it fails only
-      # on a NEW offender: route authorization, outbound fetch through safeFetch, server-trusted
-      # memory keys, owner-scoped tables in both deletion cascades, and every sandbox entry point
-      # taking its capability object from the shared builder. They went into the pre-commit hook
-      # first, which `--no-verify` walks straight past; this is the copy that guards the branch.
-      - name: Security ratchets (check:audit-gates)
-        working-directory: aimeat
-        run: pnpm check:audit-gates
-
-      # The numbers this repo states about itself. Cheap, and it is here because the guard-tier size
-      # was written in three places and wrong in all three for three weeks.
-      - name: Stated counts match the code (check:doc-counts)
-        working-directory: aimeat
-        run: pnpm check:doc-counts -- --strict
-
-      # A permission word on one side only: offered to the owner and asked by nothing, or demanded
-      # by a door and offered to nobody. Also in check:audit-gates; here so a red run names itself.
-      - name: One permission word, every door (check:scope-parity)
-        working-directory: aimeat
-        run: pnpm check:scope-parity
-
-      - name: Unit tests (vitest)
-        working-directory: aimeat
-        run: pnpm test
+        run: pnpm check:invariants
 
       - name: Build
         working-directory: aimeat
         run: pnpm build
 
-      - name: Prepare E2E env files (from committed examples)
-        working-directory: aimeat
-        run: |
-          cp .env.test.sqlite.example .env.test.sqlite
-          cp .env.test.postgres-kysely.example .env.test.postgres-kysely
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # THE GUARD TIER BLOCKS. 64 suites, chosen on one question: does a failure here mean a
-      # principal can reach money, an identity, or another account's data that they must not? The
-      # list and the reason for each entry are in test/run-e2e-ci.ts (GUARD_SUITES). The runner
-      # prints the assertion total and takes a few minutes per backend — it was 20 suites and under a
-      # minute until the 44 promoted on 2026-09-04, each one earned by running it alone on a freshly
-      # deleted database, three consecutive identical green runs on BOTH backends.
-      # The total itself is deliberately NOT written down here or in CLAUDE.md. check:doc-counts
-      # holds the suite COUNT against GUARD_SUITES.length, and nothing can hold a total that changes
-      # every time somebody adds an assertion to a guard suite — which this repo asks people to do
-      # freely. It was written down for one day, 2026-09-04, and needed correcting twice within it.
-      # No continue-on-error — a red run here is a hole, and merging
-      # on top of it is the thing this repo spent August discovering it had been doing.
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+          cache-dependency-path: aimeat/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: aimeat
+        run: pnpm install --frozen-lockfile
+
+      # The whole suite. The hook runs only the files reachable from what changed (vitest --changed);
+      # the pre-push hook and this job run all of it.
+      - name: Unit tests (vitest)
+        working-directory: aimeat
+        run: pnpm test
+
+  # THE GUARD TIER BLOCKS. 65 suites, chosen on one question: does a failure here mean a
+  # principal can reach money, an identity, or another account's data that they must not? The
+  # list and the reason for each entry are in test/run-e2e-ci.ts (GUARD_SUITES). The runner
+  # prints the assertion total and runs the tier over four lanes — four nodes at once, each suite
+  # still alone on an empty database — which is what brought a backend from six minutes to under
+  # two. It was 20 suites and under a minute until the 44 promoted on 2026-09-04, each one earned
+  # by running it alone on a freshly deleted database, three consecutive identical green runs on
+  # BOTH backends.
+  # The total itself is deliberately NOT written down here or in CLAUDE.md. check:doc-counts
+  # holds the suite COUNT against GUARD_SUITES.length, and nothing can hold a total that changes
+  # every time somebody adds an assertion to a guard suite — which this repo asks people to do
+  # freely. It was written down for one day, 2026-09-04, and needed correcting twice within it.
+  # No continue-on-error — a red run here is a hole, and merging
+  # on top of it is the thing this repo spent August discovering it had been doing.
+  guards-sqlite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+          cache-dependency-path: aimeat/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: aimeat
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare E2E env file (from the committed example)
+        working-directory: aimeat
+        run: cp .env.test.sqlite.example .env.test.sqlite
+
       - name: E2E guard tier (SQLite) — blocking
         working-directory: aimeat
         run: pnpm test:e2e:guards:sqlite
 
+  guards-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: appuser
+          POSTGRES_PASSWORD: devpassword123
+          POSTGRES_DB: aimeat_kysely_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+          cache-dependency-path: aimeat/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: aimeat
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare E2E env file (from the committed example)
+        working-directory: aimeat
+        run: cp .env.test.postgres-kysely.example .env.test.postgres-kysely
+
+      # The runner's lanes 1–3 each create a sibling database (aimeat_kysely_e2e_w1 …) beside the
+      # service's; POSTGRES_USER is the superuser here, so CREATE DATABASE is allowed.
       - name: E2E guard tier (PostgreSQL + Kysely — primary backend) — blocking
         working-directory: aimeat
         run: pnpm test:e2e:guards:postgres-kysely
-
-      # The full sweep stays advisory, deliberately and not by neglect: it takes about two hours, and
-      # the runner's database cleanup can hand one suite the previous one's data when a server
-      # shutdown slips past its fixed wait (docs/pitfalls.md §18), which produces hundreds of
-      # unrelated 403s. A gate that is slow and occasionally wrong gets switched off within a week, so
-      # it reports instead — and the way OUT of advisory is to move a suite up into the guard tier.
-      - name: E2E tests (SQLite) — full sweep, advisory
-        continue-on-error: true
-        working-directory: aimeat
-        run: pnpm test:e2e:sqlite
-
-      - name: E2E tests (PostgreSQL + Kysely — primary backend) — full sweep, advisory
-        continue-on-error: true
-        working-directory: aimeat
-        run: pnpm test:e2e:postgres-kysely

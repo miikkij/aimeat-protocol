@@ -3044,6 +3044,20 @@ components:
               type: array
               items:
                 type: string
+        workspace:
+          type: object
+          nullable: true
+          description: |
+            What the manifest declared under `workspace:`, or null. When present, the sandbox
+            exposes `ctx.workspace`, through which an action reads or writes the CALLER's organism
+            workspace as the caller (the same operations aimeat_workspace_read / _write / _publish
+            perform, behind the same membership, scope, schema and publish-gate checks). A
+            scheduled run never gets it. Stored on the record as `config.__workspace`.
+          properties:
+            read:
+              type: boolean
+            write:
+              type: boolean
         installedBy:
           type: string
         installedAt:
@@ -22685,9 +22699,12 @@ paths:
         '422':
           description: >-
             APP_ARTIFACT_BROKEN — the app cannot run as published, so nothing was written. Exactly
-            two findings reach here, both provable from the bytes: an inline `<script>` that does not
-            parse, and a script/stylesheet URL this node answers 404 for. `error.details.findings`
-            lists them. A staged draft is left in place.
+            three findings reach here, each provable from the bytes: an inline `<script>` that does
+            not parse, a script/stylesheet URL this node answers 404 for, and an Atelier app that
+            names no register (`<meta name="aimeat-register">` absent, still the shell's REPLACE-ME
+            placeholder, or `custom:default`; finding id `atelier-register`, pitfall url
+            `/v1/appdev/pitfalls/atelier-register`). `error.details.findings` lists them. A staged
+            draft is left in place.
           content:
             application/json:
               schema:
@@ -23457,12 +23474,14 @@ paths:
       operationId: getAppUiCatalogue
       summary: The Atelier mosaic vocabulary
       description: >-
-        Every mosaic component this node knows with the settings each takes, the navigation modes
-        and the look presets (TARGET-074). An AI asked to change an app's layout reads this first,
-        so the first write is never a refusal. Public — build guidance, like the prompts.
+        Every mosaic component this node knows with the settings each takes, the navigation modes,
+        the look presets with their data sheets (each saying which ambient it runs at idle), the
+        pattern shelf and the ambient shelf (TARGET-074). An AI asked to change an app's layout
+        reads this first, so the first write is never a refusal. Public — build guidance, like
+        the prompts.
       tags: [Apps]
       responses:
-        '200': { description: "The catalogue: components (id, summary, props), nav_modes, looks" }
+        '200': { description: "The catalogue: components (id, summary, props), nav_modes, looks, look_sheets (with `ambient`), structures, layouts, signature_tokens, dialog, imagery, patterns, ambients (the six presets: feel, evokes, technique, proof, fits_looks, default_alpha, default_speed, peak)" }
 
   /v1/apps/ui/validate:
     post:
@@ -23481,7 +23500,7 @@ paths:
             schema:
               type: object
               properties:
-                layout: { type: object, description: "The whole layout: { v: 1, look?, nav?, blocks: [...] }" }
+                layout: { type: object, description: "The whole layout: { v: 1, look?, nav?, choreography?, tokens?, imagery?, ambient?: { preset, alpha?, speed? }, dialog?, blocks: [...] }" }
       responses:
         '200': { description: "{ ok: true, blocks } or { ok: false, code, message }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -23590,8 +23609,11 @@ paths:
         The node's shared library of PROVEN parts (TARGET-074 phase 5). Each part is a `layout`
         (a complete Atelier mosaic arrangement), a `fill` (the same shape with <placeholder>
         slots — a starting shape), a `look` (a signature token sheet with an optional preset), a
-        `motion` (a motion-token recipe) or an `illustration` (art direction for the imagery
-        pipeline), with its lifecycle status and how many builds have adopted it. Published parts
+        `motion` (a motion-token recipe), an `illustration` (art direction for the imagery
+        pipeline), a `genre` (one of the node's served page templates, shown and forked rather
+        than adopted) or an `ambient` (the one layer allowed to move at idle — a preset with its
+        alpha and speed, proven on a look), with its lifecycle status and how many builds have
+        adopted it. Published parts
         are what everyone builds from. PUBLIC for the published shelf — a caller without a
         session sees published parts only; signing in adds the parts still in proposal.
         Retired parts appear in NO default listing (dead is invisible); ask for them by name
@@ -23599,12 +23621,12 @@ paths:
       tags: [Apps]
       security: []
       parameters:
-        - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration, genre] } }
+        - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration, genre, ambient] } }
         - { name: status, in: query, schema: { type: string, enum: [proposed, published, aging, retired] } }
         - { name: q, in: query, schema: { type: string }, description: Matched against id, title, summary and tags }
         - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
       responses:
-        '200': { description: "{ parts: [{ id, kind, title, summary, tags, status, proposed_by, updated_at, version, usage }], count }" }
+        '200': { description: "{ parts: [{ id, kind, title, summary, tags, status, proposed_by, updated_at, version, usage, published_at? }], count }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       operationId: proposeDesignbookPart
@@ -23613,8 +23635,10 @@ paths:
         Propose a part into the Book, or update one you already proposed. The body goes through
         the kind's own bench before anything lands — the layout validator for layout/fill, the
         signature-token bench (contrast-matrix pair proof included) for look/motion, the
-        imagery-style bench for illustration — and a refusal is worded, with the nearest real
-        name suggested. A new part lands as `proposed`; publishing
+        imagery-style bench for illustration, the template registry for genre, the ambient bench
+        for ambient (the preset proven on the part's look through the contrast matrix, so a
+        layer too loud for its ground refuses with numbers) — and a refusal is worded, with the
+        nearest real name suggested. A new part lands as `proposed`; publishing
         it into the shared catalogue is the node operator's call. A part id is a node-wide
         address: once claimed, it answers the same part for everyone, forever, and updating your
         own re-runs the bench and flows as a minor. Requires memory:write.
@@ -23630,10 +23654,13 @@ paths:
                 part:
                   type: object
                   description: >-
-                    { id, kind: layout|fill|look|motion|illustration|genre, title, summary, body,
-                    tags? } — the kind decides the body: a whole mosaic layout (layout/fill),
-                    { tokens, look? } (look), { tokens } of motion tokens only (motion), or
-                    { style, palette_words? } (illustration)
+                    { id, kind: layout|fill|look|motion|illustration|genre|ambient, title,
+                    summary, body, tags? } — the kind decides the body: a whole mosaic layout
+                    (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only
+                    (motion), { style, palette_words? } (illustration), { template } naming a
+                    served genre template (genre), or { ambient, alpha?, speed?, look?, tokens? }
+                    (ambient — one of waves, aurora, dust, grid, static, ink; "none" is an
+                    arrangement's choice, never a part)
                 ai_provenance:
                   allOf:
                     - $ref: '#/components/schemas/AiProvenanceDeclaration'
@@ -23713,11 +23740,15 @@ paths:
       operationId: adoptDesignbookPart
       summary: Adopt a part into one of your apps
       description: >-
-        A layout or fill REPLACES the named app's stored mosaic layout; a look, motion or
-        illustration part MERGES into the arrangement the app already has (and refuses with
-        words when there is none). Every path writes through the same validated, versioned,
-        provenance-stamped door — the replaced layout is archived, so putting it back is one
-        restore. Published parts are adoptable by anyone; a proposed one only by its own
+        A layout or fill REPLACES the named app's stored mosaic layout; a look, motion,
+        illustration or ambient part MERGES into the arrangement the app already has (and
+        refuses with words when there is none). An ambient lands as the arrangement's `ambient`
+        with its tokens beside the existing ones, never its look, and is proven again on the
+        app's own look at the write — a wave proven loud on a night world is refused with the
+        numbers on an editorial app. A genre is never adopted: it is forked from its template,
+        and the refusal carries the address. Every path writes through the same validated,
+        versioned, provenance-stamped door — the replaced layout is archived, so putting it back
+        is one restore. Published parts are adoptable by anyone; a proposed one only by its own
         proposer. Adopting is the usage signal that keeps a part alive. Requires memory:write,
         and the app must belong to the caller's owner.
       tags: [Apps]
@@ -23741,6 +23772,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not published and not yours, or the app belongs to another owner }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'GENRE_IS_FORKED — a genre is forked from its template, never adopted; NO_LAYOUT — the app has no stored arrangement to season' }
+        '422': { description: The merged arrangement failed the validator on the app's own look (an ambient too loud for it), in the validator's words }
 
   /v1/designbook/{id}/bench:
     post:
@@ -23751,17 +23784,19 @@ paths:
         1280×460) with the guarantees MEASURED — horizontal overflow zero, units actually
         painted, every control at the touch minimum — and the numbers stamped onto the part's
         bench field. "Ajetaan, ei luvata." A look or motion part is benched by rendering the
-        demo arrangement wearing its token sheet; an illustration answers ran:false with the
-        reason (its bench is the field validation at propose time). A node with no browser
-        answers ran:false with the reason and stamps nothing. The operator's or the part's own
-        proposer's call (its result changes what the gallery says about the part). Requires
-        memory:write.
+        demo arrangement wearing its token sheet; an ambient by rendering it with the layer
+        running behind it on the part's look, and it passes only when the layer painted its
+        first frame at every viewport (ambient_layers, ambient_painted — counts, never pixels);
+        an illustration answers ran:false with the reason (its bench is the field validation at
+        propose time). A node with no browser answers ran:false with the reason and stamps
+        nothing. The operator's or the part's own proposer's call (its result changes what the
+        gallery says about the part). Requires memory:write.
       tags: [Apps]
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: "{ ran, passed?, viewports?: [{ viewport, overflow_px, units_rendered, controls_below_touch_min }], reason?, at }" }
+        '200': { description: "{ ran, passed?, viewports?: [{ viewport, overflow_px, units_rendered, controls_below_touch_min, ambient_layers, ambient_painted }], reason?, at }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not the operator and not the proposer }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -26110,115 +26145,6 @@ paths:
                         type: array
                         items:
                           type: string
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  /v1/worksheet/evaluate:
-    post:
-      operationId: evaluateWorksheet
-      tags: [Worksheet]
-      summary: Work out every cell of a worksheet
-      description: |
-        A worksheet in, an answer per cell out. A cell is DATA — a quantity carries a number and a
-        unit, a formula is MathJSON standing on other cells by name — so nothing here runs code and
-        an agent may write a sheet as safely as it writes a table row.
-
-        The dependency graph is read out of the formulas' own free symbols and evaluated in
-        topological order, so moving one input recomputes exactly what stands on it. A failing cell
-        does not fail the sheet: each cell answers for itself, and a cell whose dependency failed
-        says so rather than repeating the dependency's complaint.
-
-        Reads no storage and reaches no network: the body carries the sheet, so a surface can
-        evaluate one a person is still typing. Signed in is the only gate.
-
-        Units are checked. An unknown unit, a mismatch (metres plus seconds) and a conversion between
-        different things are each refused by name. A difference of two readings on an affine scale
-        (`degC`, `degF`) answers on the matching absolute scale (`K`, `R`), because a gap between two
-        temperatures is a span rather than a reading.
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [sheet]
-              properties:
-                sheet:
-                  type: object
-                  required: [cells]
-                  properties:
-                    spec: { type: string, enum: ['aimeat.worksheet/v1'] }
-                    title: { type: string, maxLength: 160 }
-                    summary: { type: string, maxLength: 600 }
-                    locale: { type: string, enum: [en, fi, es] }
-                    cells:
-                      type: array
-                      maxItems: 200
-                      items:
-                        type: object
-                        required: [id, kind]
-                        properties:
-                          id: { type: string, description: 'A name a formula can stand on: a letter, then letters, digits and underscores' }
-                          kind: { type: string, enum: [quantity, input, formula, view, text] }
-                          value: { type: number }
-                          unit: { type: string, description: 'A name (degC, km) or an expression (W/(m^2*K))' }
-                          label: { type: string }
-                          note: { type: string }
-                          live: { type: string, description: 'quantity: a memory key this cell follows' }
-                          math: { description: 'formula: MathJSON standing on other cells by name' }
-                          latex: { type: string, description: 'formula: what a person typed, when no math is given' }
-                          as: { type: string, description: 'input: slider | field | stepper. view: figure | chip | gauge | sparkline | thermometer | series | table' }
-                          of: { type: string, description: 'view: the cell it draws' }
-                          source: { type: string, description: 'view: the memory key it draws' }
-                          text: { type: string, description: 'text: the words' }
-                values:
-                  type: object
-                  additionalProperties: { type: number }
-                  description: Cell id → the number a following cell currently reads from its memory key
-                locale: { type: string, enum: [en, fi, es] }
-      responses:
-        '200':
-          description: One answer per cell
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          cells:
-                            type: array
-                            items:
-                              type: object
-                              properties:
-                                id: { type: string }
-                                kind: { type: string }
-                                ok: { type: boolean }
-                                value: { type: number }
-                                unit: { type: string, nullable: true, description: 'As it is written: degC, W/(K·m²)' }
-                                unitJson: { description: 'The same unit as the maths library writes it' }
-                                formatted: { type: string, description: "The answer in the reader's own number format" }
-                                latex: { type: string }
-                                workLatex: { type: string, description: 'The expression with its dependencies filled in' }
-                                dependsOn: { type: array, items: { type: string } }
-                                error:
-                                  type: object
-                                  properties:
-                                    code: { type: string, enum: [NO_VALUE, UNKNOWN_UNIT, UNKNOWN_SYMBOL, CYCLE, INCOMPATIBLE_UNITS, NOT_A_NUMBER, NO_FORMULA, BAD_LATEX, UPSTREAM] }
-                                    message: { type: string }
-                                    names: { type: array, items: { type: string } }
-                          order:
-                            type: array
-                            items: { type: string }
-                            description: The order the cells were worked out in
-                          errors: { type: integer, description: How many cells have no answer }
-        '400':
-          description: The worksheet could not be read
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -33931,7 +33857,13 @@ paths:
                     happen in one command so the upload token is never transcribed.
                 manifest:
                   type: string
-                  description: YAML manifest defining the extension metadata, actions, and limits (required unless mode=presigned)
+                  description: |
+                    YAML manifest defining the extension metadata, actions, and limits (required
+                    unless mode=presigned). A top-level `workspace: { read: bool, write: bool }`
+                    block declares that the extension may act on its CALLER's organism workspace
+                    through `ctx.workspace`; without it the sandbox has no such capability. The
+                    caller's own scopes still apply (`organism:read` to read, `memory:write` to
+                    write or publish, an owner session needs neither).
                 scripts:
                   type: object
                   additionalProperties:
@@ -46936,6 +46868,68 @@ paths:
                         properties:
                           pruned: { type: integer }
                           cutoffDate: { type: string, format: date-time }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/admin/security/overview:
+    get:
+      operationId: adminSecurityOverview
+      tags: [Admin]
+      summary: The Security page in one read (operator)
+      description: |
+        Operator-only. What is happening at the door in the last 24 hours (refusals, distinct
+        sources, walled addresses, each with a zone decided from this instance's own readable
+        history), the refusal log grouped by door, source, credential kind and credential
+        fingerprint plus its newest 200 lines, the refused-and-kept incidents with the open count,
+        who holds the operator role and which accounts are deactivated or use two-step sign-in,
+        and the door settings. The same data the `aimeat_admin_security_overview` tool returns.
+        Requires the `operator` role.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The overview
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          generated_at: { type: string, format: date-time }
+                          now:
+                            type: object
+                            description: The headline numbers, each with a zone (healthy, watch, critical), and the status word (quiet, watch, open)
+                            properties:
+                              status: { type: string, enum: [quiet, watch, open] }
+                              refusals: { type: object }
+                              sources: { type: object }
+                              rate_limit_hits: { type: object }
+                              scope_denials: { type: object }
+                              auth_failures_total: { type: integer }
+                              open_incidents: { type: object }
+                              counters_since: { type: string, nullable: true }
+                              uptime_seconds: { type: integer, nullable: true }
+                              log: { type: object, description: Whether the refusal log is on, its file, its size and its older generation's }
+                          refusals:
+                            type: object
+                            description: The last 24 hours grouped by door, source, credential kind and fingerprint; the readable span and its mean per day; the newest 200 lines
+                          incidents:
+                            type: object
+                            properties:
+                              items: { type: array, items: { type: object } }
+                              open: { type: integer }
+                              total: { type: integer }
+                          accounts:
+                            type: object
+                            description: Owners in all, the operator names, the deactivated accounts, how many use two-step sign-in, registration mode and organisation sign-in
+                          settings:
+                            type: object
+                            description: The door settings as configured (rate limits, tarpit, lockout, TOTP, passkeys, CORS origins, federation sign-in, body limits, the log file)
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
