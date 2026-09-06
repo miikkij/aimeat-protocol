@@ -36,6 +36,17 @@ class _FakeApi:
         self._responses = responses or {}
         self.gets: list[tuple[str, dict]] = []
         self.posts: list[tuple[str, dict]] = []
+        # The real _Api carries these since 0.26.0, and the helpers below call `refused()` on every
+        # non-200. Without them the AttributeError would be swallowed by each helper's own
+        # `except Exception`, so these tests would still pass -- while exercising an error path
+        # they never meant to take. Same reasoning as the gaii line above.
+        self.refusals: dict[str, str] = {}
+
+    def refused(self, r: _FakeResp, call: str) -> bool:
+        if r.status_code not in (401, 403):
+            return False
+        self.refusals[call] = str((r.json().get("error") or {}).get("code") or f"HTTP_{r.status_code}")
+        return True
 
     def get(self, path: str, **kwargs: Any) -> _FakeResp:
         self.gets.append((path, kwargs))
