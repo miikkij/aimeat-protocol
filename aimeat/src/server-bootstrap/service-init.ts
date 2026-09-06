@@ -16,6 +16,10 @@
  *     reunite agent-published apps with the owner's "Published Apps".
  *   v1.2.0 — 2026-06-09 — Chain storage.mergeForkedAppBuckets() after the
  *     ownerName normalization to consolidate forked ownerGaii app buckets.
+ *   v1.3.0 — 2026-09-06 — seedBuiltinExtensions(): the extensions the node ships are installed and
+ *     switched on at boot, and updated when the build moves past what is stored. Nothing was
+ *     seeded here before, so an extension a feature depends on arrived only if somebody uploaded
+ *     it — which for a living document's hooks means the feature did not exist on a fresh node.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
@@ -38,6 +42,7 @@ import { seedKnowledgeTemplates } from '../services/knowledge.js';
 import { seedDesignBook } from '../services/design-book/lifecycle.js';
 import { seedSystemPrompts } from '../services/prompt-seeder.js';
 import { seedBundledCortexes } from '../services/cortex-seeder.js';
+import { seedBuiltinExtensions } from '../services/builtin-extension-seeder.js';
 import { seedExamplePackages } from '../services/package-seeder.js';
 import { migrateScopeVocabulary } from '../services/scope-vocabulary-migration.js';
 import { seedBuiltinSkills } from '../services/skill-seeds.js';
@@ -164,6 +169,16 @@ export async function initializeServices(
   seedBundledCortexes(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info(`Auto-installed ${count} bundled cortex extensions`); })
     .catch(err => logger.error('Failed to seed bundled cortexes', { error: String(err) }));
+
+  // The extensions the node SHIPS (living-hooks). Installed and switched on when missing, updated
+  // in place when this build is newer, and every value an owner set is carried across the update.
+  seedBuiltinExtensions(storage, config, scheduler)
+    .then(r => {
+      if (r.installed.length) logger.info(`Built-in extensions installed: ${r.installed.join(', ')}`);
+      if (r.updated.length) logger.info(`Built-in extensions updated: ${r.updated.join(', ')}`);
+      if (r.refused.length) logger.error(`Built-in extensions NOT available: ${r.refused.join(', ')}`);
+    })
+    .catch(err => logger.error('Failed to seed built-in extensions', { error: String(err) }));
 
   // Auto-seed bundled example packages (digital-signage, aimeat-iam, …) into the catalog so
   // every user can install them without an operator running `aimeat seed`. Idempotent.

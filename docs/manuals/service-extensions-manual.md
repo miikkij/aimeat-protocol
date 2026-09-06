@@ -325,6 +325,28 @@ Information about who is calling the action. Always available, not async.
 | `gaii` | `string` | Caller's GAII (agent identifier) |
 | `owner` | `string` | Caller's owner name |
 | `roles` | `string[]` | Caller's roles (`['owner']`, `['agent']`, `['operator']`) |
+| `scopes` | `string[]` | The permission words this credential carries |
+
+`scopes` is what the token was granted, the same list `requireScope` reads on an ordinary route. An
+extension action is one route for every action there will ever be, so a script that must hold a
+permission word can only do it here. Three shapes, and the order matters:
+
+- A person signed in at their own screen has `roles: ['owner']` and **no scopes at all**, because
+  owner sessions bypass them everywhere on this node. Empty is not "nothing allowed".
+- An unattended run (a schedule, a workflow step) has `roles: ['operator']` and no scopes: there is
+  no session, so there is no list anybody granted.
+- Everything else is a scoped credential — an agent token, an app grant — and is held to the word.
+
+```javascript
+const roles = ctx.caller.roles || [];
+const scopes = ctx.caller.scopes || [];
+const inPerson = roles.indexOf('owner') >= 0 && roles.indexOf('agent') < 0;
+const unattended = roles.indexOf('operator') >= 0;
+const allowed = scopes.indexOf('*') >= 0 || scopes.indexOf('memory:write') >= 0;
+if (!inPerson && !unattended && !allowed) {
+  return { error: { code: 'SCOPE_DENIED', message: 'This needs the memory:write permission.' } };
+}
+```
 
 #### ctx.config
 
@@ -425,6 +447,75 @@ This means:
 - Instances are fully isolated from each other
 - Data can be queried with `ctx.memory.search('listing.')` within an instance (the runtime adds the namespace prefix automatically)
 - Operators can inspect extension data via the standard Memory API using the full namespaced key
+
+## Extensions the node ships
+
+Most extensions arrive because somebody uploaded them. A few arrive with the build, because a
+feature depends on them and asking a person to find the Extensions page first would mean the
+feature does not exist for the people it was written for.
+
+The list is `BUILTIN_EXTENSIONS` in `src/data/builtin-extensions/index.ts`, and
+`services/builtin-extension-seeder.ts` runs at boot. It is source in that directory rather than
+files on disk because `tsc` emits TypeScript and copies nothing: a `.js` sitting beside a `.ts`
+would be there in development and missing from `dist`.
+
+Three rules:
+
+1. **Missing** → install it and switch it on.
+2. **Installed at the same version or newer** → leave it alone. An operator who deployed their own
+   copy keeps it.
+3. **Installed at an older version** → swap the code, **keep the config**. Every value an owner set
+   survives; only the `__`-prefixed keys the node writes from validated manifest sections come from
+   the new manifest. The status is theirs too: a builtin somebody switched off stays off.
+
+A builtin goes through the same manifest validator and the same write path an upload does, so there
+is no side door: a mistake in the shipped YAML is a refusal at boot naming the field, logged, and
+the node boots without it rather than failing to boot. `installedBy` is `system`, which is not an
+account anyone signs in as, so only an operator can manage one.
+
+### living-hooks
+
+The one builtin today: the two doors a living document uses to talk to the world.
+
+- `POST /v1/ext/living-hooks/send` — `{ url, method?, headers?, body }` → `{ ok, status, ms }`.
+  Sends the whole state of a document to an address its owner allowed. Needs `memory:write`.
+- `POST /v1/ext/living-hooks/read` — `{ url, path?, raw?, headers? }` →
+  `{ value, fetchedAt, contentType, cached }`. Reads one value back, raw or through a JSON path
+  written in dots and brackets (`prices[0].price`). Needs `memory:read`. The same address is
+  fetched at most once every ten seconds per owner.
+
+A refusal is a normal answer carrying `{ error: { code, message } }`, not a thrown error, so the
+browser half can show the words: `ALLOWLIST_REFUSED`, `RATE_LIMITED` (60 sends and 120 reads a
+minute per owner), `PAYLOAD_TOO_LARGE` (256 kB), `TOO_LARGE` (1 MB read), `UPSTREAM_FAILED` (with
+the far end's status), `BAD_PATH`, plus `NOT_AUTHORIZED`, `SCOPE_DENIED`, `HEADER_REFUSED`,
+`SECRET_UNKNOWN` and `INVALID_INPUT`.
+
+**Where a person says which addresses may be called.** One record in their own memory:
+
+```json
+// key: living-hooks.settings   visibility: public
+{ "allow_hosts": ["api.example.com", ".porssisahko.net"] }
+```
+
+An entry is a whole host, or a leading dot for that host and everything under it. The node's own
+`allow_hosts` in the extension config is added to it, and is empty by default — so a fresh install
+calls nowhere until somebody says where. Loopback and private ranges are refused by `safeFetch`
+regardless of the list, except on a node running with `AIMEAT_ALLOW_PRIVATE_EGRESS`.
+
+**A key that should not be written into a document.** Store it in the extension's `secrets` config
+(one encrypted string holding JSON, `{"NAME": "value"}`) and name it in a header:
+
+```json
+{ "headers": { "Authorization": "Bearer {{secret:HOOK_TOKEN}}" } }
+```
+
+It is resolved on the way out and appears in no answer the caller receives. Only these header names
+may be sent at all: `Authorization`, `Content-Type`, `Accept`, `X-Api-Key`, `X-Requested-With`, and
+anything beginning `X-Living-`.
+
+`secrets` is node-level, because extension config is: there is no per-owner config for a plain
+extension, so on a shared node the operator sets what everyone's documents may use. `allow_hosts`
+is per owner because it lives in the owner's own record, and a list of hostnames is not a secret.
 
 ## Installation and Management
 

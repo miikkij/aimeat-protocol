@@ -7,6 +7,8 @@
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-09-06 — Both handlers pass the session's scopes into ctx.caller, so a script can
+ *     hold a permission word the way a route holds one. Nothing reads it unless a script asks.
  *   v1.10.0 — 2026-09-05 — Both handlers attach ctx.workspace when the manifest declares it
  *     (services/extension-workspace.ts), as the caller with the caller's scopes, and answer a
  *     workspace refusal the script let through with the service's own status and code instead of
@@ -179,6 +181,10 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         workspace: wsCap.workspace,
         caller: {
           gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles,
+          // What this credential may do, as the token granted it — the same list requireScope reads
+          // on an ordinary route. An extension action is one route for every action there will be,
+          // so a script that must hold a scope word can only do it from here.
+          scopes: req.auth!.scopes ?? [],
           // The caller's standing in the app this extension gates, resolved BEFORE the sandbox and
           // handed in. A gate needs the role, but the roster is private and must stay that way, so
           // the node reads it here rather than opening a lookup the sandbox could call. An
@@ -358,6 +364,10 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         workspace: wsCap.workspace,
         caller: {
           gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles,
+          // What this credential may do, as the token granted it — the same list requireScope reads
+          // on an ordinary route. An extension action is one route for every action there will be,
+          // so a script that must hold a scope word can only do it from here.
+          scopes: req.auth!.scopes ?? [],
           // The caller's standing in the app this extension gates, resolved BEFORE the sandbox and
           // handed in. A gate needs the role, but the roster is private and must stay that way, so
           // the node reads it here rather than opening a lookup the sandbox could call. An
