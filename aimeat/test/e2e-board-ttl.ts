@@ -745,6 +745,41 @@ await test('35b. The eleventh public board of one account is refused', async () 
     await json(`/v1/owners/${encodeURIComponent(name)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
 });
 
+await test('35c. …and the eleventh cannot be reached by making it private and flipping it', async () => {
+    // A CEILING ENFORCED ONLY WHERE A BOARD IS BORN IS NOT A CEILING. The count lived inside
+    // createBoard() and PATCH /v1/boards/:id/visibility wrote straight to storage, so ten private
+    // boards flipped to public got past a maximum of ten. Review item 3.3, 2026-09-06.
+    const name = `bd-flip-${Date.now()}`;
+    const { body: oBody } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
+    const token = await getToken(name, oBody.data.private_key, false);
+    const mk = async (n: string, visibility: string) => {
+        const { status, body } = await json('/v1/boards', {
+            method: 'POST', headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ name: n, visibility }),
+        });
+        assert(status === 201, `${n}: expected 201, got ${status} ${JSON.stringify(body.error)}`);
+        return body.data.id as string;
+    };
+    for (let i = 1; i <= 10; i++) await mk(`Flip board ${i}`, 'public');
+    const spare = await mk('The eleventh, made private', 'private');
+
+    const flip = await json(`/v1/boards/${spare}/visibility`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ visibility: 'public' }),
+    });
+    assert(flip.status === 403 && flip.body.error?.code === 'BOARD_QUOTA',
+        `the flip must hit the same ceiling as the create: expected 403 BOARD_QUOTA, got ${flip.status} ${flip.body.error?.code}`);
+
+    // …and a flip that does NOT reach for public is untouched, so the check costs nothing else.
+    const shared = await json(`/v1/boards/${spare}/visibility`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ visibility: 'shared' }),
+    });
+    assert(shared.status === 200, `a flip to shared must still work: got ${shared.status} ${JSON.stringify(shared.body.error)}`);
+
+    await json(`/v1/owners/${encodeURIComponent(name)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+});
+
 await test('36. Unsubscribe when not subscribed → 404', async () => {
     const { status } = await json(`/v1/boards/${privateBoardId}/subscribe`, {
         method: 'DELETE',

@@ -75,6 +75,7 @@ import { boardReadRefusal } from '../services/board-read-access.js';
 import { hiddenBoardPostIds, maySeeHiddenPost, withoutHiddenPosts } from '../services/board-moderation.js';
 import {
   createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules, deleteBoardById, boardRulesBlock,
+  publicBoardCeiling,
 } from '../services/board-write.js';
 import { resolveIdentity, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import {
@@ -189,7 +190,11 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // PATCH /v1/boards/:boardId/visibility — update board visibility (owner only)
-  router.patch('/v1/boards/:boardId/visibility', requireAuth(), requireRole('agent'), async (req, res) => {
+  //
+  // `social:write` because this is a write and POST /v1/boards beside it has always said so, and the
+  // public-board ceiling below because a limit enforced only where a board is BORN is not a limit:
+  // ten private boards flipped to public got past a maximum of ten.
+  router.patch('/v1/boards/:boardId/visibility', requireAuth(), requireRole('agent'), requireScope('social:write'), async (req, res) => {
     const boardId = req.params.boardId as string;
     const gaii = resolve(req);
     const board = await storage.getBoard(boardId);
@@ -209,6 +214,15 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     if (visibility === undefined && typeof federate !== 'boolean') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility or federate must be provided'));
       return;
+    }
+    // Only when this flip is INTO public and the board is not already there — re-saving a board that
+    // is public counts itself and would refuse an edit that changes nothing.
+    if (visibility === 'public' && board.visibility !== 'public') {
+      const ceiling = await publicBoardCeiling({ storage, config }, { gaii, roles: req.auth!.roles ?? [] }, 'public');
+      if (ceiling) {
+        res.status(ceiling.status).json(error(config.nodeId, ceiling.code, ceiling.message));
+        return;
+      }
     }
     const updated = await storage.updateBoardVisibility(boardId, visibility || board.visibility, typeof federate === 'boolean' ? federate : undefined);
     if (!updated) {

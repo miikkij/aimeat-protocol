@@ -11,6 +11,9 @@
  *   - ALLOWED_CATEGORIES: whitelist validated on publish/update
  *
  * @version-history
+ *   v1.3.0 -- 2026-09-06 -- Review item 3.1: PUT runs the two checks POST runs. `category` was
+ *     validated against ALLOWED_CATEGORIES and the trust floor for a PAID listing applied only at
+ *     publish, so publish-free-then-edit was the way around both.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -168,6 +171,27 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
     const gaii = req.auth!.sub;
     const id = req.params.id as string;
     const { display_name, description, category, input_schema, output_schema, pricing, estimated_time_seconds, max_input_size_bytes, tags, semantic, federate } = req.body ?? {};
+
+    // THE TWO CHECKS PUBLISH MAKES, MADE HERE TOO. They were on POST alone, so the way past both was
+    // to publish a free action in an allowed category and then edit it: `category` was validated
+    // against ALLOWED_CATEGORIES only at publish, and the trust floor for a PAID listing only at
+    // publish, which made "publish free, then set a price" the way around a floor the node advertises.
+    if (category !== undefined && !ALLOWED_CATEGORIES.includes(category)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        `category must be one of: ${ALLOWED_CATEGORIES.join(', ')}`));
+      return;
+    }
+    // Only when this update WRITES a paid price. An edit that does not touch pricing leaves a
+    // listing that already cleared the floor alone: a trust score that has since drifted should make
+    // a listing unlisted by some other decision, not make it uneditable by this one.
+    if (pricing !== undefined && pricing.base_morsels > 0) {
+      const trust = await calculateTrustScore(gaii, storage);
+      if (trust.score < config.minTrustForPaidActions) {
+        res.status(403).json(error(config.nodeId, 'TRUST_TOO_LOW',
+          `Trust score ${trust.score} is below minimum ${config.minTrustForPaidActions} for paid actions`));
+        return;
+      }
+    }
 
     const updates: Partial<ActionRecord> = { updatedAt: new Date().toISOString() };
     if (display_name !== undefined) updates.displayName = display_name;

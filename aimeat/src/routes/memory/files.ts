@@ -5,6 +5,9 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 -- 2026-09-06 -- Review item 3.2: the tag PATCH, the listing and the DELETE take the
+ *     storage words their siblings already carried, and the DELETE goes through the shared
+ *     removeStorageFile -- it had reimplemented the removal inline and skipped the key fence.
  *   v1.1.0 — 2026-08-10 — Security audit H-12: upload, visibility and download enforce storage:write /
  *     storage:read, matching the /v1/storage twin over the same store. This route was the unscoped way in.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
@@ -17,7 +20,7 @@
 import type { Router } from 'express';
 import type { StorageFileRecord } from '../../storage/interface.js';
 import { normalizeWorkspaceRefs } from '../../utils/workspace-ref.js';
-import { requireAuth, requireRole, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
+import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { checkStorageQuota, chargeOverage } from '../../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
@@ -26,6 +29,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sniffedContentType } from '../../utils/app-content-type.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
+import { removeStorageFile } from '../../services/storage-file-write.js';
 import type { MemoryRouteCtx } from './shared.js';
 
 export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
@@ -173,7 +177,8 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
   });
 
   // PATCH /v1/memory/files/:key — update file tags
-  router.patch('/v1/memory/files/:key', requireAuth(), requireRole('agent'), async (req, res) => {
+  // Writing tags is a write, and the visibility door beside it has always said so.
+  router.patch('/v1/memory/files/:key', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
     const gaii = resolve(req);
     const key = req.params.key as string;
     const { tags } = req.body ?? {};
@@ -206,7 +211,8 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
   });
 
   // GET /v1/memory/files — list files (owner sees all agents' files + GHII files)
-  router.get('/v1/memory/files', requireAuth(), requireRole('agent'), async (req, res) => {
+  // ...and listing them is a read, which GET /v1/memory/files/:key beside it has always said.
+  router.get('/v1/memory/files', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     let files: Awaited<ReturnType<typeof storage.listStorageFiles>>;
     if (isOwnerSession) {
@@ -266,24 +272,22 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
   });
 
   // DELETE /v1/memory/files/:key — delete file
-  router.delete('/v1/memory/files/:key', requireAuth(), requireRole('agent'), async (req, res) => {
+  //
+  // TWO DOORS ONTO ONE DELETION, and only one of them was gated. Its twin,
+  // DELETE /v1/storage/{*key}, has taken storage:write and run the shared removeStorageFile since
+  // that service was written; this one took requireRole('agent') alone — which every agent satisfies
+  // by being an agent — and reimplemented the deletion inline, so it also skipped the key fence that
+  // stops an anonymous principal reaching outside `anonymous/`. Same word, same service, one
+  // implementation.
+  router.delete('/v1/memory/files/:key', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
     const gaii = resolve(req);
     const key = req.params.key as string;
 
-    const existing = await storage.getStorageFile(gaii, key);
-    if (!existing) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));
+    const removed = await removeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, gaii, key);
+    if (!removed.ok) {
+      res.status(removed.status).json(error(config.nodeId, removed.code, removed.message));
       return;
     }
-    if (existing.ownerGaii !== gaii) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own files'));
-      return;
-    }
-
-    await storage.deleteStorageFile(gaii, key);
-
-    emitResourceUpdated(gaii, `aimeat://storage/${encodeURIComponent(key)}`);
-    emitResourceListChanged(gaii);
 
     res.json(success(config.nodeId, { deleted: key }));
     emitChange('memory');

@@ -243,6 +243,29 @@ await test('2. Provider publishes action', async () => {
     assert(body.data.id === 'test-scrape', `action id: ${body.data.id}`);
 });
 
+await test('2b. An UPDATE cannot slip a category past the list publish checks it against', async () => {
+    // BOTH CHECKS WERE ON PUBLISH ALONE. `category` was validated against ALLOWED_CATEGORIES and the
+    // trust floor for a PAID listing was applied only at POST, so "publish clean, then edit" was the
+    // way around each. Review item 3.1, 2026-09-06.
+    const { status, body } = await json('/v1/actions/test-scrape', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${providerToken}` },
+        body: JSON.stringify({ category: 'not-a-real-category' }),
+    });
+    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+    assert((body.error?.message ?? '').includes('category must be one of'),
+        `the refusal must name the list: ${JSON.stringify(body.error)}`);
+});
+
+await test('2c. …and a legitimate update still goes through, so the check costs the real path nothing', async () => {
+    const { status, body } = await json('/v1/actions/test-scrape', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${providerToken}` },
+        body: JSON.stringify({ category: 'data', description: 'Scrapes a URL and returns its content, tidily' }),
+    });
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+});
+
 // ─── Phase 3: Work Request & Accept ───
 console.log('\nPhase 3 -- Work Request & Accept');
 

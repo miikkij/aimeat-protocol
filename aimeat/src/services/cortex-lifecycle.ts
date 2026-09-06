@@ -308,7 +308,7 @@ export async function activateCortex(
         return { ok: true, value: { extension: ext, activatedAt: ext.activatedAt, alreadyActive: true } };
     }
 
-    const artifacts = await activateExtension(ext, config, storage, caller.gaii);
+    const artifacts = await activateExtension(ext, config, storage, caller.gaii, caller.isOperator);
     const activatedAt = new Date().toISOString();
     await storage.updateCortexExtension(name, {
         status: 'active',

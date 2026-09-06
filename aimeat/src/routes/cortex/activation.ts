@@ -12,6 +12,7 @@ import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
+import { publicBoardCeiling } from '../../services/board-write.js';
 
 // ── Activation Logic ──
 
@@ -20,6 +21,9 @@ export async function activateExtension(
   config: AimeatConfig,
   storage: Storage,
   gaii: string,
+  // Whether the person activating counts as an operator, for the one component type that has a
+  // ceiling. Defaults to false, which is the stricter answer: a caller that cannot say is bounded.
+  isOperator = false,
 ): Promise<CortexActivationArtifacts> {
   const artifacts: CortexActivationArtifacts = {
     schemaKeys: [],
@@ -126,6 +130,13 @@ export async function activateExtension(
         const boardId = `cortex-${ext.name}-${comp.name}`;
         const existingBoard = await storage.getBoard(boardId);
         if (!existingBoard) {
+          // THE CEILING ON PUBLIC BOARDS APPLIES HERE TOO. A board-template defaults to `public`
+          // and this wrote straight to storage, so activating cortexes was an unbounded way to fill
+          // the catalogue that createBoard() bounds at ten per account. Refusing the activation is
+          // the honest answer: the cortex asked for a public board and cannot have one, and a board
+          // quietly downgraded to private would be a cortex that does not work as it says.
+          const ceiling = await publicBoardCeiling({ storage, config }, { gaii, roles: isOperator ? ['operator'] : [] }, comp.visibility);
+          if (ceiling) throw new Error(ceiling.message);
           await storage.createBoard({
             id: boardId,
             name: comp.title,
