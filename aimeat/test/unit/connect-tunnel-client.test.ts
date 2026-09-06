@@ -591,3 +591,64 @@ describe('a frame for an evicted identity', () => {
     expect(client.isOnline()).toBe(true);
   });
 });
+
+/**
+ * A GRANT MUST NOT TRAVEL DOWN THE REVOCATION CHANNEL.
+ *
+ * crewaimeat, 2026-09-06, and this is the load-bearing half of their report: `auth_revoked` STOPS an
+ * identity, which is right for a dead credential. A permission change is the opposite kind of news —
+ * the agent carries on, it just needs a token minted after the change. Carried as `auth_revoked`,
+ * ADDING a permission would kill the agent that gained it.
+ */
+describe('scopes_changed is not auth_revoked', () => {
+  const OPENER = 'concierge#alice@node';
+  const SUBJECT = 'news-fetcher#alice@node';
+
+  async function attachedFixture() {
+    const server = await startServer({
+      welcome: { multiplex: true },
+      onRequest: (frame, ws) => {
+        ws.send(JSON.stringify({ type: 'response', id: frame.id, agent: frame.agent, status: 200, body: { ok: true } }));
+      },
+    });
+    const { client } = makeClient(server, { gaii: OPENER });
+    await client.start();
+    const failures: string[] = [];
+    await client.attachIdentity({ gaii: SUBJECT, getToken: async () => 'tok', onAuthFailure: (m) => failures.push(m) });
+    return { server, client, failures };
+  }
+
+  it('leaves the identity attached and running', async () => {
+    const { server, client, failures } = await attachedFixture();
+    const ws = server.sockets[server.sockets.length - 1];
+    ws.send(JSON.stringify({ type: 'scopes_changed', agent: SUBJECT, message: 'Permissions changed' }));
+    await new Promise(r => setTimeout(r, 150));
+
+    // The three things auth_revoked would have done, and none of them may happen here.
+    expect(failures).toEqual([]);
+    expect(server.framesOfType('detach').length).toBe(0);
+    expect(client.isOnline()).toBe(true);
+
+    // And it can still work: a forward for that identity is answered, not refused locally.
+    const r = await client.forward('GET', '/v1/memory', {}, SUBJECT);
+    expect(r.status).toBe(200);
+  });
+
+  it('does not touch the socket when it names the opener itself', async () => {
+    const { server, client } = await attachedFixture();
+    const ws = server.sockets[server.sockets.length - 1];
+    ws.send(JSON.stringify({ type: 'scopes_changed', agent: OPENER, message: 'Permissions changed' }));
+    await new Promise(r => setTimeout(r, 150));
+    expect(client.isOnline()).toBe(true);
+    expect(server.framesOfType('detach').length).toBe(0);
+  });
+
+  it('auth_revoked for the same identity DOES stop it — the contrast is the point', async () => {
+    const { server, client, failures } = await attachedFixture();
+    const ws = server.sockets[server.sockets.length - 1];
+    ws.send(JSON.stringify({ type: 'auth_revoked', agent: SUBJECT, message: 'Token revoked' }));
+    await waitFor(() => failures.length === 1);
+    expect(failures.length).toBe(1);
+    expect(client.isOnline()).toBe(true);   // the socket the opener rides is untouched
+  });
+});

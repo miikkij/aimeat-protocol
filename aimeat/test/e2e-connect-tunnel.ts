@@ -335,6 +335,48 @@ await test('16. The socket is read per agent, so a sibling\'s connection says no
   await sleep(300);
 });
 
+// ─── A permission granted reaches the agent that is already running ───
+console.log('\nPhase 8 — a scope change reaches a live socket');
+// crewaimeat, 2026-09-06: an owner granted `messages:read` from the dashboard and the running agent
+// never got it. A minted token carries the scopes of the moment it was minted and the connector holds
+// it for up to an hour, so GET /v1/agents said the agent held the word while every call it made was
+// refused for lacking it. The remedy found in the field was restarting the serve daemon.
+
+await test('19. Granting a scope pushes scopes_changed to that identity, and NOT auth_revoked', async () => {
+    const t = await TunnelClient.connect(BASE, liteAgentToken);
+    const before = t.authRevokeds.length;
+
+    const patch = await json('/v1/agents/litebot/scopes', {
+        method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ scopes: ['memory:read', 'messages:read'] }),
+    });
+    assert(patch.status === 200, `scope patch ${patch.status}: ${JSON.stringify(patch.body)}`);
+
+    const frame = await t.waitForScopesChanged(2000);
+    assert(frame !== null, 'the live socket must be told its permissions changed');
+    assert(frame!.agent === `litebot#${ownerName}@${NODE_ID}`, `the frame names the identity, got ${frame!.agent}`);
+
+    // THE HALF THAT MATTERS MOST. auth_revoked stops an identity, and this is a GRANT: carrying it
+    // on the revocation channel would kill the agent for gaining a permission.
+    assert(t.authRevokeds.length === before, `a grant must not arrive as auth_revoked (${before} → ${t.authRevokeds.length})`);
+    await t.close();
+});
+
+await test('20. REMOVING a scope pushes it too — the direction nobody reported', async () => {
+    // The gap is two-way and this is the serious half: without the push, a permission taken away
+    // went on being honoured for the rest of the token's life.
+    const t = await TunnelClient.connect(BASE, liteAgentToken);
+    const patch = await json('/v1/agents/litebot/scopes', {
+        method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ scopes: ['memory:read'] }),
+    });
+    assert(patch.status === 200, `scope patch ${patch.status}`);
+    const frame = await t.waitForScopesChanged(2000);
+    assert(frame !== null, 'a revocation of one word is told the same way');
+    assert(t.authRevokeds.length === 0, 'still not auth_revoked — the agent keeps running, it re-mints');
+    await t.close();
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('Cascade-delete owner', async () => {

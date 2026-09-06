@@ -25,6 +25,8 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   v1.14.0 -- 2026-09-06 -- notifyScopesChanged(): tell one live identity its permissions changed,
+ *     without detaching it. Deliberately not a fourth revocation predicate.
  *   v2.1.0 -- 2026-09-05 -- One heartbeat refreshes EVERY identity on its socket. The connector
  *     sends one unstamped heartbeat per connection, which resolved to the opener alone; every
  *     attached identity kept its attach-time timestamp, aged past the threshold, and the monitor
@@ -96,7 +98,7 @@ import type { Storage } from '../storage/interface.js';
 import { setTokenRevokedHook, type VerifiedToken } from '../auth/jwt.js';
 import { SocketIndex, Fairness } from './connect-tunnel-multiplex.js';
 import { forwardRequest } from './connect-tunnel-forward.js';
-import { sendBacklog, pushTaskCancellations, onMemoryWrite } from './connect-tunnel-push.js';
+import { sendBacklog, pushTaskCancellations, onMemoryWrite, notifyScopesChanged } from './connect-tunnel-push.js';
 import { logger } from '../utils/logger.js';
 import {
   principalsForOwner as rosterPrincipalsForOwner,
@@ -674,6 +676,11 @@ export class ConnectTunnelManager {
 
   /** Deactivating an account: every principal acting for that owner. */
   closeForOwner(owner: string): void { revokeByOwner(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), owner); }
+
+  /** A permission change told to one live identity WITHOUT detaching it. Body in
+   *  ./connect-tunnel-push.ts, beside the other server→client pushes — it closes nothing, which is
+   *  what keeps it out of the revocation file above. */
+  notifyScopesChanged(gaii: string): void { notifyScopesChanged(this.pushCtx(), gaii); }
   /** A cancel marker resolved to its agents and pushed. Body in ./connect-tunnel-push.ts. */
   private async pushTaskCancellations(ownerGaii: string, key: string): Promise<void> {
     await pushTaskCancellations(this.pushCtx(), ownerGaii, key);

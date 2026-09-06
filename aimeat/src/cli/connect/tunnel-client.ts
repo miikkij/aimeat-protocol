@@ -30,6 +30,9 @@
  *   if (outcome === 'online') { const { status, body } = await client.forward('GET', '/v1/memory'); }
  *   await client.close();
  * @version-history
+ *   v1.9.0 -- 2026-09-06 -- `scopes_changed`: forget the cached token and nothing else. It sits beside
+ *     auth_revoked and must never act like it -- that one stops the identity, and this news is often
+ *     a GRANT, so an agent would be killed for gaining a permission.
  *   2026-09-05 — A frame for an identity this socket no longer holds goes NOWHERE. `handlersFor`
  *     fell back to the opener's handlers for any name not in the map, and the 401 eviction removed a
  *     name from the map without telling the node, which kept pushing — so an evicted agent's next
@@ -73,6 +76,8 @@ import { WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
 import { logger } from '../../utils/logger.js';
 import { getInstallId } from './install-id.js';
+import { gaiiParts } from './agent-gaii.js';
+import { forgetCachedToken } from './agent-key.js';
 
 import type {
   ConnectTunnelClientOptions, ForwardOptions, ForwardResult, PendingForward,
@@ -611,6 +616,20 @@ export class ConnectTunnelClient {
         const acc = p.accepted?.length ?? 0;
         const rej = p.rejected?.length ?? 0;
         if (rej > 0) console.error(`[${this.label}] Record subscribe: ${acc} accepted, ${rej} rejected (access)`);
+        break;
+      }
+      case 'scopes_changed': {
+        // ONE THING ONLY: forget the cached credential. The next call mints a fresh one carrying the
+        // permissions the owner just set. This case sits beside auth_revoked and must never behave
+        // like it — auth_revoked detaches the identity and calls onAuthFailure, which is correct for
+        // a dead credential and exactly wrong here, where the owner ADDED a permission. An agent
+        // must not be stopped for gaining one.
+        const who = typeof frame.agent === 'string' ? frame.agent : '';
+        const parts = who ? gaiiParts(who) : null;
+        if (parts) {
+          forgetCachedToken(parts.agent, parts.owner);
+          console.error(`[${this.label}] Permissions changed for ${who} — the next call mints a fresh token`);
+        }
         break;
       }
       case 'auth_revoked': {

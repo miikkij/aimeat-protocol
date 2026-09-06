@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 -- 2026-09-06 -- PATCH scopes pushes scopes_changed down the live tunnel as well as
+ *     emitting the tool-list change: an MCP session re-lists its tools on that signal, but a
+ *     connector holding a minted token heard nothing at all, in either direction.
  *   v1.3.0 — 2026-09-02 — Deleting an agent closes its connector socket. Revoking its sessions
  *     already made the node refuse it correctly; nothing told the connector, so a deleted agent
  *     went on reading `online` on `/local/status` until some call forced a 401. `closeForGaii()`
@@ -356,6 +359,13 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     // hold is now wrong. Saying so is the difference between the person reconnecting the connector
     // by hand after every permission change and not having to think about it at all.
     emitToolListChanged(updated.gaii);
+    // …and the tool list is only half of it. An open MCP session re-lists its tools on that signal,
+    // but a connector holds a MINTED token whose scopes were fixed when it was minted, for up to an
+    // hour, and nothing told it otherwise: the node's own /v1/agents said the agent held the new
+    // word while every call it made was refused for lacking it. This frame asks for a fresh mint and
+    // nothing else — it must never be auth_revoked, which stops the identity, because then ADDING a
+    // permission would kill the agent.
+    getActiveConnectTunnelManager()?.notifyScopesChanged(updated.gaii);
 
     res.json(success(config.nodeId, {
       gaii: updated.gaii,

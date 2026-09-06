@@ -11,6 +11,7 @@
  *   spaceKeyOf(); coerceSpaceRef()
  * @usage import type { ConnectFrame } from './connect-tunnel-wire.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-06 -- `scopes_changed` frame: a stale credential, not a dead one.
  *   v1.1.0 -- 2026-08-28 -- `timeout_ms` on the invoke frame, so a connector daemon can drop an
  *     invoke nobody collected once the server has stopped waiting for it.
  *   v1.0.0 -- 2026-08-19 -- Pure extraction from connect-tunnel.ts, which passed the 800-line cap.
@@ -32,6 +33,12 @@ export interface ConnectFrame {
     | 'subscribe'      // C→S: subscribe to workspace record events for one or more (organism, ws, space)
     | 'subscribed'     // S→C: subscribe ack — which space refs were accepted vs rejected
     | 'auth_revoked'   // S→C: the connected principal's bearer was revoked — stop + re-auth
+    // S→C: this identity's permissions changed, so the token it holds is stale. NOT auth_revoked,
+    // and the difference is the whole reason it is a separate frame: auth_revoked stops the
+    // identity, which is right for a dead credential and catastrophic for a granted one — sending
+    // a GRANT down the revocation channel would kill an agent for gaining a permission. This one
+    // asks for nothing but a fresh mint; the identity keeps running throughout.
+    | 'scopes_changed'
     | 'backlog'        // S→C: on-connect snapshot of queued+active tasks + pending messages
     | 'attach'         // C→S: prove one more identity's credential on THIS socket
     | 'attached'       // S→C: attach accepted — that identity now rides this socket
