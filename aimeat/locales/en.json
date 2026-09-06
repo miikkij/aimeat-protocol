@@ -11340,6 +11340,7 @@
         "deliveryMcp": "MCP notifications",
         "deliveryWebhook": "Webhook",
         "deliveryPolling": "Polling",
+        "deliverySocket": "Live link",
         "deliveryMcpWh": "MCP+WH",
         "deliveryWh": "WH",
         "tokensToday": "Tokens",
@@ -11550,7 +11551,8 @@
             "mcpLabel": "MCP"
           },
           "notReported": "not reported",
-          "deliveryPollingLine": "Delivery: polling"
+          "deliveryPollingLine": "Delivery: polling",
+          "deliverySocketLine": "Delivery: live link"
         },
         "directives": {
           "footer": "Directives are included in every skill bundle update. The agent receives these as behavioral constraints.",

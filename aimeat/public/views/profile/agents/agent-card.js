@@ -5,6 +5,9 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.25.0 -- 2026-09-06 -- The delivery word reads the server's channel, so an agent reached down
+ *     a held connection says so instead of claiming a poll it never makes. One helper now, used by
+ *     both the collapsed row and the open card, which had the same two-branch copy each.
  *   v1.24.0 -- 2026-08-31 -- Run-mode badge beside the mode badge: spawn (data on the node until
  *     work arrives) or resident (the runtime keeps it up). Shown only when the field is set, because
  *     an agent nobody has decided about must not be displayed as though somebody had.
@@ -436,6 +439,18 @@ function renderChangeBadge(changes) {
 }
 
 /**
+ * The word for how work reaches this agent, from the server's own channel verdict
+ * (services/agent-health.ts). `socket` is a daemon holding this agent's connection open, which is
+ * how an agent that starts a runtime per job is reached; saying "polling" about it named something
+ * that never happens.
+ */
+function deliveryLabel(delivery) {
+  if (delivery.webhook_configured) return t('profile.agents.detail.deliveryWh');
+  if (delivery.channel === 'socket') return t('profile.agents.detail.deliverySocket');
+  return t('profile.agents.detail.deliveryPolling');
+}
+
+/**
  * How this agent is reached, from the server's verdict.
  *
  * Was computed here from `agent.webhookUrl` (not in the response), `agent.mcpEnabled` (not a field
@@ -446,9 +461,7 @@ function renderChangeBadge(changes) {
 function renderDeliveryIndicator(agent) {
   const delivery = agent?.health?.delivery;
   if (!delivery) return null;
-  const label = delivery.webhook_configured
-    ? t('profile.agents.detail.deliveryWh')
-    : t('profile.agents.detail.deliveryPolling');
+  const label = deliveryLabel(delivery);
   const icon = delivery.webhook_configured ? (delivery.channel === 'webhook-failing' ? '⚠' : '✓') : '';
 
   return html`<span class="pf-agd-delivery-indicator">${label}${icon ? ` ${icon}` : ''} · </span>`;
@@ -575,14 +588,14 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
     default: {
       // Same source as the header indicator — see renderDeliveryIndicator for why the MCP branch
       // is gone rather than rewired.
-      const deliveryLabel = agent?.health?.delivery?.webhook_configured
-        ? t('profile.agents.detail.deliveryWh')
+      const zoneDelivery = agent?.health?.delivery
+        ? deliveryLabel(agent.health.delivery)
         : t('profile.agents.detail.deliveryPolling');
       const stats = agent.taskStats;
       return html`
         <div class="pf-agd-zone2 pf-agd-zone2--production">
           <div class="pf-agd-zone2-stats">
-            <span>${deliveryLabel}</span>
+            <span>${zoneDelivery}</span>
             ${agent.last_seen ? html`<span>${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}</span>` : ''}
             ${stats && (stats.done || stats.active) ? html`<span>${t('profile.agents.detail.today')}: ${stats.done || 0} ${t('profile.agents.detail.done')}${stats.active ? `, ${stats.active} ${t('profile.agents.detail.active')}` : ''}</span>` : ''}
             ${agent.tokensUsedToday != null ? html`<span>${t('profile.agents.detail.tokensToday')}: ${agent.tokensUsedToday.toLocaleString()}</span>` : ''}

@@ -22,6 +22,8 @@
  *   import { readHomeState } from '../services/home-state.js';
  *   const state = await readHomeState(storage, config, req.auth!.owner);
  * @version-history
+ *   v1.3.0 — 2026-09-06 — The card's verdict reads the owner's live sockets too, so a home whose
+ *     agents all run on a spawner stops reporting trouble the moment they finish a job.
  *   v1.2.0 — 2026-08-27 — `switched` left the state with the home-or-profile switch it counted.
  *   v1.1.0 — 2026-08-09 — The agent card carries the SAME health verdict the Agents tab shows
  *     (services/agent-health.ts), plus how many agents there are and how many are in trouble.
@@ -44,6 +46,7 @@ import { resolveAiClient, decideBranch } from './ai-tool-setup.js';
 import { portfolioReadGaiis, PORTFOLIO_HTML_KEY, portfolioStandaloneUrl } from '../routes/portfolio.js';
 import { logger } from '../utils/logger.js';
 import { computeAgentHealthMany, isLiveState, type AgentHealth } from './agent-health.js';
+import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import type { AgentOnboardingRecord } from '../storage/types/agents-messaging.js';
 import { loadOwnerAgents } from './db/owner-identity.js';
 import { runInReadScope } from '../storage/read-scope/read-scope.js';
@@ -187,7 +190,11 @@ async function readHomeStateInScope(
         })));
     const onboardingByGaii: Record<string, AgentOnboardingRecord | null> = {};
     agents.forEach((a, i) => { onboardingByGaii[a.gaii] = onboardings[i] ?? null; });
-    const healthByGaii = computeAgentHealthMany(agents, onboardingByGaii, nowMs);
+    // A daemon holding an agent's socket is that agent being available right now, which the home
+    // has to know before it calls anybody stale: a spawn agent's runtime lives only while a worker
+    // runs, so its lastSeen is old whenever it is between jobs.
+    const connected = new Set(getActiveConnectTunnelManager()?.principalsForOwner(owner) ?? []);
+    const healthByGaii = computeAgentHealthMany(agents, onboardingByGaii, nowMs, connected);
 
     const worst = agents.length
         ? agents.reduce((best, a) =>

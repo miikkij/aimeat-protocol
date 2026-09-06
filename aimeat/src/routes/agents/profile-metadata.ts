@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-09-06 — The health verdict is given the owner's connected principals, so an agent
+ *     parked on its daemon's socket reads as available instead of stale. Nine of this owner's
+ *     agents were being called problems while a socket was open for each of them.
  *   v1.7.0 — 2026-09-04 — An APP principal needs task:read for GET /v1/agents, and only an app
  *     principal does. The bypass this closes sat inside one feature: ?include=stats returns the
  *     active task ids and titles that GET /v1/agents/:name/tasks had just refused the same grant for
@@ -48,6 +51,7 @@ import {
 } from '../../services/agent-profile-write.js';
 import { logger } from '../../utils/logger.js';
 import { computeAgentHealthMany } from '../../services/agent-health.js';
+import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging.js';
 import { credentialHealthForOwner, summariseCredentialHealth } from '../../services/agent-credential-health.js';
 
@@ -174,8 +178,10 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
       agents.forEach((a, i) => { onboardingByGaii[a.gaii] = obs[i] ?? null; });
     }
     // One clock for the whole page: two cards in one response must not straddle a threshold and
-    // then disagree about what time it is.
-    const health = computeAgentHealthMany(agents, onboardingByGaii, Date.now());
+    // then disagree about what time it is. The connected set comes with it, because a spawn agent
+    // parked on its daemon's socket is available now and its lastSeen is days old by design.
+    const connected = new Set(getActiveConnectTunnelManager()?.principalsForOwner(req.auth!.owner) ?? []);
+    const health = computeAgentHealthMany(agents, onboardingByGaii, Date.now(), connected);
 
     // Whether the credential still works is a different question from whether the agent is healthy:
     // the first is about signing in at all, the second about webhooks and onboarding. Kept apart on
