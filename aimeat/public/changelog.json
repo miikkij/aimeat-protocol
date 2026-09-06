@@ -2,6 +2,19 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-09-06",
+      "version": "3.13.0",
+      "kind": "fix",
+      "title": {
+        "en": "An agent waiting for work is not offline",
+        "fi": "Työtä odottava agentti ei ole poissa"
+      },
+      "body": {
+        "en": "An agent that starts only when there is work to do was being reported as offline between jobs, because what was read was when it last worked rather than whether anything could reach it. A nightly workflow mailed its owner a failure for an edition that came out complete, two nights running, and nine agents on this node showed as problems while their runtime was connected the whole time. Reachability is now read from the connection itself, so an agent waiting for work counts as available in a workflow, on the Agents page, on the home card and on the app shelf, and the page says work reaches it over a live link instead of naming a poll it never makes. An agent nothing is holding open is still reported, and a workflow step still gives up on it quickly.",
+        "fi": "Agentti, joka käynnistyy vasta kun työtä tulee, näkyi töiden välissä poissaolevana, koska luettiin milloin se viimeksi teki työtä eikä sitä saako siihen yhteyden. Yöllinen työnkulku lähetti omistajalleen kahtena yönä peräkkäin virheilmoituksen lehdestä, joka tuli ulos kokonaisena, ja yhdeksän tämän noden agenttia näkyi ongelmana, vaikka niiden ajoympäristö oli koko ajan kiinni. Tavoitettavuus luetaan nyt itse yhteydestä, joten työtä odottava agentti on käytettävissä työnkulussa, Agentit-sivulla, etusivun kortissa ja sovellushyllyllä, ja sivu kertoo työn kulkevan suoraa yhteyttä pitkin sen sijaan että nimeäisi kyselyn, jota agentti ei tee. Agentti, jonka yhteyttä ei pidä auki kukaan, ilmoitetaan edelleen, ja työnkulun askel luovuttaa sen kohdalla nopeasti."
+      }
+    },
+    {
       "date": "2026-09-05",
       "version": "3.13.0",
       "kind": "feature",
