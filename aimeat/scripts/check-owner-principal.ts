@@ -41,6 +41,7 @@
  * @version-history
  *   v1.0.0 — 2026-09-04 — Initial, the fourth of the four written rules that had no gate.
  */
+import { staleTriage, reportTriageClock } from './inventory/triage-clock.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,6 +54,8 @@ const EXEMPTIONS = join(AIMEAT, 'security', 'owner-principal-exemptions.json');
 
 interface ExemptionFile {
     note: string;
+    /** How long a triaged clearance may go without being re-read. */
+    maxAgeDays?: number;
     /** `file:unit` → one line. No line number: it would go stale on the next edit above it. */
     exempt: Record<string, string>;
 }
@@ -127,6 +130,12 @@ export function main(): boolean {
         console.error('  security/owner-principal-exemptions.json with the sentence that says so.');
         return false;
     }
+
+    // THE CLOCK ON THE CLEARANCES. A triaged entry is a claim about code, and code moves; nothing
+    // re-read the reasoning written into these files until 2026-09-06, when a clearance in a sibling
+    // ratchet was found to have gone false three weeks earlier with the gate still green.
+    const clock = staleTriage(exempt.exempt, exempt.maxAgeDays ?? 90);
+    if (reportTriageClock('owner-principal', clock, exempt.maxAgeDays ?? 90)) return false;
 
     if (stale.length > 0) {
         console.log(`  ✓ ${stale.length} listed door${stale.length === 1 ? '' : 's'} gone. Remove to lock the gain in:`);
