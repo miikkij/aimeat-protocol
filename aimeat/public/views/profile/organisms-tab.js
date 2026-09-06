@@ -19,6 +19,10 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.7.0 — 2026-09-06 — The counts and the date always render, empty cell and all, because the
+ *     row's trailing block is now a fixed grid and a missing cell would slide the rest into the
+ *     wrong track. The door gets a cell of its own so Open on one row and Join on the next cannot
+ *     drag the columns to their left.
  *   v2.6.0 — 2026-09-06 — The row's marks (type, lock, archived) leave the title row for a fixed
  *     column of their own, so they stand in one line down the list instead of trailing each name at
  *     a different place. The padlock is an outline SVG and the archived pill a plain badge, both
@@ -446,16 +450,27 @@ export default function OrganismsTab({ session, showToast, onStats }) {
           ${org.visibility !== 'public' ? html`<span class="pj-org-lock" title=${visLabel}>${LockMark}</span>` : null}
           ${org.archived ? html`<span class="badge badge-warn pj-org-arch" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${t('organisms.archived') || 'archived'}</span>` : null}
         </div>
+        ${/* Four cells, always four: the grid's tracks are what hold the row still, and a cell left
+              out would slide the ones after it into the wrong track. An absent count shows nothing
+              and still holds its place. */ ''}
         <div class="pj-org-stats">
-          ${isMine && wsCounts[org.id] !== undefined ? html`
-            <span class="pj-org-stat" title=${t('organisms.tabWorkspaces') || 'Workspaces'}>${'📁'} ${wsCounts[org.id]}</span>` : null}
+          ${isMine && wsCounts[org.id] !== undefined
+            ? html`<span class="pj-org-stat" title=${t('organisms.tabWorkspaces') || 'Workspaces'}>${'📁'} ${wsCounts[org.id]}</span>`
+            : html`<span class="pj-org-stat"></span>`}
           <span class="pj-org-stat" title=${t('organisms.members') || 'Members'}>${'👥'} ${org.member_count ?? (org.members || []).length}</span>
           <span class="pj-org-stat" title=${t('organisms.attachedAgents') || 'Attached agents'}>${'🤖'} ${(org.agentGaiis || []).length}</span>
-          ${org.createdAt ? html`<span class="pj-org-stat pj-org-date" title=${t('organisms.createdAt') || 'Created'}>${fmtDate(org.createdAt)}</span>` : null}
+          ${org.createdAt
+            ? html`<span class="pj-org-stat pj-org-date" title=${t('organisms.createdAt') || 'Created'}>${fmtDate(org.createdAt)}</span>`
+            : html`<span class="pj-org-stat pj-org-date"></span>`}
         </div>
-        ${(isMine || isMember)
-          ? html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => openHome(false)}>${t('organisms.open') || 'Open'}</button>`
-          : html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => handleJoin(org.id)}>${t('organisms.join') || 'Join'}</button>`}
+        ${/* The door sits in a cell of its own so that Open on one row and Join on the next, or
+              UNIRSE in Spanish, cannot drag the columns to their left. The button keeps its own
+              width, and with it the rule under exactly as many letters as the word has. */ ''}
+        <span class="pj-org-door">
+          ${(isMine || isMember)
+            ? html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => openHome(false)}>${t('organisms.open') || 'Open'}</button>`
+            : html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => handleJoin(org.id)}>${t('organisms.join') || 'Join'}</button>`}
+        </span>
         ${isMine ? html`<${KebabMenu} label=${t('organisms.moreActions') || 'More actions'} items=${menuItems} />` : null}
         ${isExpanded ? renderDiscoverDetail(org) : null}
       </div>
