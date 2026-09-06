@@ -10154,6 +10154,15 @@
       "mapTitle": "Kartta siitä mitä voit tehdä",
       "mapDesc": "Lintuperspektiivi tarjouksistasi ryhmiteltynä: hahmota tästä, toimi listassa.",
       "mapNote": "Klikkaa solmua avataksesi sen kortin.",
+      "mapNoteTab": "Laatta avaa tarjouksen uuteen välilehteen.",
+      "mapSearch": "Kavenna karttaa: nimi, agentti tai tarve…",
+      "mapShown": "{n} näkyvissä",
+      "mapView": {
+        "tree": "Puu",
+        "columns": "Sarakkeet",
+        "grid": "Ruudukko",
+        "tiles": "Laatat"
+      },
       "groupBy": "Ryhmittele",
       "sortBy": "Järjestä",
       "clearFilters": "Tyhjennä",

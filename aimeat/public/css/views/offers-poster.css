@@ -9,6 +9,8 @@
  *   field and the framed sample on an offer's page, the selling editor, the rating row and the map.
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.1.0 — 2026-09-06 — The map's three flat views (columns, grid, tiles): the tile that is a link, the
+ *     need head, the matrix with a modifier per column count, the blocks that grow with what they hold.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
@@ -109,7 +111,46 @@
 .op-star.on { color: var(--sun); }
 .op-rate-note { flex: 1 1 14rem; min-width: 10rem; border: 0; border-bottom: 2px solid var(--text); background: transparent; padding: .35rem 0; font: inherit; color: var(--text); }
 .op-rate-note:focus { outline: none; border-bottom-color: var(--accent); }
+
+/* ── The map: four views of the same offers, and the search that narrows them ──────────────── */
 .op-map { overflow-x: auto; }
+.op-map-search { margin-bottom: 0; }
+.op-tile { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: .4rem .6rem .45rem; border: 2px solid var(--text); background: var(--card-bg); color: var(--text); text-decoration: none; font-family: var(--font-showroom-body); font-weight: 700; font-size: .78rem; line-height: 1.3; }
+.op-tile:hover { border-color: var(--accent); color: var(--text); }
+.op-tile:hover .op-tile-out { color: var(--accent); }
+.op-tile-t { display: flex; align-items: flex-start; gap: .5rem; min-width: 0; }
+.op-tile-t > span { flex: 1 1 auto; min-width: 0; overflow-wrap: break-word; }
+.op-tile-out { flex: none; margin-top: 2px; color: var(--text-dim); }
+.op-tile .op-agent { font-size: .68rem; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.op-tile--line { padding: .25rem .5rem; font-size: .74rem; }
+.op-tile--line .op-tile-t { align-items: center; }
+.op-tile--line .op-tile-t > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.op-tile--compact { padding: .3rem .5rem; font-size: .74rem; }
+.op-col-h { display: flex; align-items: baseline; gap: .5rem; padding: 0 0 .25rem; border-bottom: 1px solid var(--text); font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .82rem; letter-spacing: .05em; text-transform: uppercase; line-height: 1.2; color: var(--accent); }
+.op-col-h > span { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.op-col-h em { font-family: var(--font-mono); font-size: .7rem; font-style: normal; letter-spacing: 0; text-transform: none; color: var(--text-dim); }
+/* As many columns as fit at 10rem each; the rest wrap under, in the same order. A narrow main gets three per row. */
+.op-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 1rem; }
+.op-col { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+/* The matrix keeps a width its cells can be read at and scrolls inside .op-map when the main is narrower. */
+.op-matrix { display: grid; gap: 0 .75rem; align-items: stretch; min-width: 56rem; }
+.op-matrix--n1 { grid-template-columns: minmax(8rem, 10rem) repeat(1, minmax(0, 1fr)); }
+.op-matrix--n2 { grid-template-columns: minmax(8rem, 10rem) repeat(2, minmax(0, 1fr)); }
+.op-matrix--n3 { grid-template-columns: minmax(8rem, 10rem) repeat(3, minmax(0, 1fr)); }
+.op-matrix--n4 { grid-template-columns: minmax(8rem, 10rem) repeat(4, minmax(0, 1fr)); }
+.op-matrix--n5 { grid-template-columns: minmax(8rem, 10rem) repeat(5, minmax(0, 1fr)); }
+.op-matrix--n6 { grid-template-columns: minmax(8rem, 10rem) repeat(6, minmax(0, 1fr)); }
+.op-mx-head, .op-mx-agent, .op-mx-cell { display: flex; flex-direction: column; justify-content: center; gap: .25rem; min-width: 0; padding: .35rem 0; border-bottom: 1px solid var(--border); }
+.op-mx-head { flex-direction: row; align-items: baseline; gap: .5rem; padding: 0 0 .25rem; border-bottom: 1px solid var(--text); font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .82rem; letter-spacing: .05em; text-transform: uppercase; line-height: 1.2; color: var(--accent); }
+.op-mx-head > span { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.op-mx-head em { font-family: var(--font-mono); font-size: .7rem; font-style: normal; letter-spacing: 0; text-transform: none; color: var(--text-dim); }
+.op-mx-head--agent { font-family: var(--font-showroom-body); font-size: .66rem; font-weight: 800; letter-spacing: .12em; }
+.op-mx-agent .op-agent { color: var(--text); font-weight: 500; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.op-mx-agent--off .op-agent { color: var(--text-dim); }
+.op-blocks { display: flex; flex-wrap: wrap; gap: 1rem; }
+.op-block { flex: var(--op-n, 1) 1 16rem; max-width: 100%; display: flex; flex-direction: column; gap: .6rem; min-width: 0; padding: .6rem .75rem .75rem; border: 2px solid var(--text); background: var(--bg-dim); }
+.op-block-tiles { display: flex; flex-wrap: wrap; gap: .4rem; align-content: flex-start; }
+.op-block-tiles .op-tile { flex: 0 1 auto; max-width: 100%; }
 
 @media (max-width: 1100px) {
   .op-back { grid-template-columns: 5rem minmax(0, 1fr) 3.5rem; }

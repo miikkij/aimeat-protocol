@@ -7,10 +7,11 @@
  *   came back last, what runs on its own (the production lines as step chains), what can be asked
  *   (a search field first, then the catalogue with one door per row), whose agent is away, and what
  *   is for sale. An offer opens as its own page (offer-page.js), a delivery as its own page
- *   (inbox.js); the inbox, the map and the selling register are pages from the rail.
- * @structure renderOffersView · renderCover · secBack · secAuto · secAsk · catalogue · aiResults · sellPage · mapPage
+ *   (inbox.js); the inbox, the map (map-page.js) and the selling register are pages from the rail.
+ * @structure renderOffersView · renderCover · secBack · secAuto · secAsk · catalogue · aiResults · sellPage
  * @usage import { renderOffersView } from './offers/cover.js';
  * @version-history
+ *   v1.1.0 — 2026-09-06 — The map moves to map-page.js, where it gains three flat views and a search field.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces the segment tabs, the facet panel and the wall of cards.
  */
 import { h } from 'preact';
@@ -18,12 +19,11 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Section, Fold, scrollTo } from '/views/profile/organisms/poster-parts.js';
-import { Mermaid } from '/components/Mermaid.js';
-import { buildMermaid } from '/js/services/offers-grouping.js';
 import { groupItems } from './model.js';
 import { c, word, agentMark, getWord, costTime, statusWord, deliveryRows, deliveryHead, rel, crumb, pageLinks, renderPage } from './frame.js';
 import { renderOffer } from './offer-page.js';
 import { renderInbox, renderDeliverable } from './inbox.js';
+import { MapPage } from './map-page.js';
 
 const BACK_ROWS = 6;
 const needLabel = (k) => t('profile.offers.need.' + k) || k;
@@ -35,7 +35,7 @@ export function renderOffersView(ctx) {
   if (v.kind === 'deliverable') { const d = ctx.model.latest.find(x => x.task_id === v.taskId); if (d) return renderDeliverable(ctx, d); }
   if (v.kind === 'page') {
     if (v.id === 'inbox') return renderInbox(ctx);
-    if (v.id === 'map') return mapPage(ctx);
+    if (v.id === 'map') return html`<${MapPage} ctx=${ctx} />`;
     if (v.id === 'sell') return sellPage(ctx);
   }
   return renderCover(ctx);
@@ -202,7 +202,7 @@ function secSelling(ctx) {
   <//>`;
 }
 
-/* ── Pages: the selling register and the map ───────────────────────────────────────────────── */
+/* ── Pages: the selling register (the map is map-page.js) ──────────────────────────────────── */
 function sellPage(ctx) {
   const m = ctx.model;
   const list = [...m.items].sort((a, b) => (m.selling.includes(b) ? 1 : 0) - (m.selling.includes(a) ? 1 : 0) || a.offer.title.localeCompare(b.offer.title));
@@ -220,23 +220,6 @@ function sellPage(ctx) {
           <div class="op-m" key=${'p' + it.key}>${price(it.offer)}</div>
           <div class="og-tbl-door" key=${'d' + it.key}><button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'offer', key: it.key, sell: true })}>${c('setPrice')}</button></div>`)}
       </div>`,
-  });
-}
-function mapPage(ctx) {
-  const m = ctx.model;
-  const groups = groupItems(m.items, 'need').map(g => ({ label: needLabel(g.key), items: g.items }));
-  const src = buildMermaid(t('profile.tabs.offers'), groups);
-  const onMapClick = (e) => {
-    const id = e.target?.closest?.('.node')?.id || '';
-    const leaf = /g(\d+)o(\d+)/.exec(id);
-    const it = leaf ? groups[+leaf[1]]?.items?.[+leaf[2]] : null;
-    if (it) openOffer(ctx, it);
-  };
-  return renderPage(ctx, {
-    id: 'map', crumbs: [c('map')], title: t('profile.offers.mapTitle'),
-    children: html`
-      <p class="og-desc og-desc--page">${t('profile.offers.mapDesc')}</p>
-      <div class="op-map" onClick=${onMapClick}><${Mermaid} chart=${src} /><p class="op-hint">${t('profile.offers.mapNote')}</p></div>`,
   });
 }
 

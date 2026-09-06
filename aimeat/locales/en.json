@@ -10139,6 +10139,15 @@
       "mapTitle": "Map of what you can do",
       "mapDesc": "A bird's-eye map of your offers, grouped: orient here, act in the list.",
       "mapNote": "Click a node to open its card.",
+      "mapNoteTab": "A tile opens the offer in a new tab.",
+      "mapSearch": "Narrow the map: a name, an agent, a need…",
+      "mapShown": "{n} shown",
+      "mapView": {
+        "tree": "Tree",
+        "columns": "Columns",
+        "grid": "Grid",
+        "tiles": "Tiles"
+      },
       "groupBy": "Group",
       "sortBy": "Sort",
       "clearFilters": "Clear",

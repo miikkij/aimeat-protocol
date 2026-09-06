@@ -10,6 +10,8 @@
  *   router, the builder, billing, rating, and a delivery's content.
  * @structure default OffersTab({ session, showToast }) — state, loads, handlers, the ctx bag, render
  * @version-history
+ *   v2.1.0 -- 2026-09-06 -- Deep link: ?offer=<agent>/<id> opens that offer's page on a cold navigation,
+ *     which is what a map tile opens in a new tab (offers/map-page.js).
  *   v2.0.0 -- 2026-08-30 -- The poster face (design canvas "AIMEAT Tarjoaman sivu", direction A). The
  *     Do/Map/Inbox segments, the facet panel and the wall of opened cards are replaced by the cover
  *     and the pages; grouping honours an offer's own `need`. Every service call is unchanged.
@@ -51,6 +53,15 @@ export default function OffersTab({ session, showToast }) {
   const [askInput, setAskInputAll] = useState({});   // offer key → the request text
   const [askResult, setAskResultAll] = useState({}); // offer key → what the ask returned
   const [contents, setContents] = useState({});      // task id → value | 'loading' | null
+  // A deep link to one offer (?offer=<agent>/<id>), which is what a map tile opens in a new tab.
+  // Read during the first RENDER, not in an effect: the profile shell replaces the URL with a bare
+  // `/v1/profile?tab=<id>` on its own first-mount effect (agents-tab.js reads ?agent= the same way).
+  const [urlOffer] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('offer'); }
+    // eslint-disable-next-line aimeat/no-silent-catch -- no query string, no deep link
+    catch { return null; }
+  });
+  const urlOfferDone = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -72,6 +83,14 @@ export default function OffersTab({ session, showToast }) {
   }, []);
 
   const model = useMemo(() => buildModel({ feed: feed || [], deliverables: deliverables || [], now: new Date() }), [feed, deliverables]);
+
+  // The deep link is consumed once the feed is here, and once only: a later reload of the feed must
+  // not drag the person back to the offer they have already left.
+  useEffect(() => {
+    if (urlOfferDone.current || !urlOffer || feed === null) return;
+    urlOfferDone.current = true;
+    if (model.byKey.has(urlOffer)) setView({ kind: 'offer', key: urlOffer });
+  }, [feed, urlOffer, model]);
 
   // The builder offer (crew-forge): the "no match → make one" path.
   const builder = model.items.find(it => (it.offer.consequences || []).some(x => x.type === 'creates-agent')) || model.items.find(it => /forge/i.test(it.agent)) || null;
