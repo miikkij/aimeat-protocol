@@ -28,6 +28,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { isVersionKey, searchHitShape } from '../services/memory-search-shape.js';
 
 export function registerMemoryExtendedTools(
     mcp: McpServer,
@@ -45,14 +46,10 @@ export function registerMemoryExtendedTools(
     // `.version.N` workspace snapshots (owned by the agent GAII), blowing past a sane MCP payload. So:
     // cap the count (`limit`, default 50), skip version history unless asked, and hand back a short
     // window around the match. The agent reads a specific hit's full value via aimeat_memory_read(key).
-    const SNIPPET_RADIUS = 90;   // chars of context on each side of the match (≈200-char window)
-    const isVersionKey = (key: string): boolean => /\.version\.\d+$/.test(key);
-    const snippetOf = (text: string, needle: string): string => {
-        const i = text.toLowerCase().indexOf(needle.toLowerCase());
-        if (i < 0) return text.slice(0, SNIPPET_RADIUS * 2).trim() + (text.length > SNIPPET_RADIUS * 2 ? '…' : '');
-        const s = Math.max(0, i - SNIPPET_RADIUS), e = i + needle.length + SNIPPET_RADIUS;
-        return (s > 0 ? '…' : '') + text.slice(s, e).trim() + (e < text.length ? '…' : '');
-    };
+    // The snippet window and the version-key test moved to services/memory-search-shape.ts on
+    // 2026-09-06. They were closures here, which is why GET /v1/memory/search could not answer this
+    // way and both connector doors returned whole records instead — the same tool name meaning two
+    // different searches (review item 6.4). One shape, one place, every door.
 
     mcp.tool(
         'aimeat_memory_search',
@@ -78,17 +75,7 @@ export function registerMemoryExtendedTools(
                         query: q,
                         total: hits.length,
                         truncated: (include_versions ? candidates.length : candidates.filter(r => !isVersionKey(r.key)).length) > hits.length,
-                        hits: hits.map(r => {
-                            const valStr = typeof r.value === 'string' ? r.value : JSON.stringify(r.value);
-                            return {
-                                key: r.key,
-                                snippet: snippetOf(valStr, q),
-                                bytes: valStr.length,
-                                visibility: r.visibility,
-                                tags: r.tags,
-                                updated_at: r.updatedAt,
-                            };
-                        }),
+                        hits: hits.map(r => searchHitShape(r, q)),
                         hint: 'Snippets only. Read a full value with aimeat_memory_read(key).',
                     }, null, 2),
                 }],

@@ -187,10 +187,13 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     //
     // This list is a DEBT REGISTER, not an approval. Each entry names what a connector caller
     // cannot currently reach.
-    // memory_read is RECONCILED and off this list. The other two keep one parameter each, and both
-    // need a REST change first rather than a connector line:
+    // memory_read is RECONCILED and off this list, and so is memory_search as of 2026-09-06: the
+    // REST change this entry asked for is made. GET /v1/memory/search reads `include_versions` and
+    // answers with snippets under `include=meta`, which is what the server MCP had been doing in
+    // the tool — so the same tool name had meant two different searches, one returning windows and
+    // one returning whole records (review item 6.4). One left, and it needs the same kind of REST
+    // change before its connector line is worth writing:
     'aimeat_memory_write',       // expected_version — POST /v1/memory has no optimistic lock at all; the server MCP calls the write service directly and the PUT route spells it `version`
-    'aimeat_memory_search',      // include_versions — GET /v1/memory/search does not read it; the server MCP applies the filter itself
     'aimeat_extension_install',  // activate, update
     'aimeat_knowledge_contribute', // model
     'aimeat_capabilities_create',  // status

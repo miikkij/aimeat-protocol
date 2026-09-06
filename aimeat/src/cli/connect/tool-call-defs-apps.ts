@@ -8,6 +8,9 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.7.0 -- 2026-09-06 -- Review item 6.3: aimeat_extension_invoke puts the instance in the PATH.
+ *     It appended ?instance_id= to the extension-scoped route, which reads no query, so an
+ *     instance-scoped call ran against the shared namespace and answered ok.
  *   v1.6.0 -- 2026-09-06 -- aimeat_app_list stops reading a `query` alias nothing declares:
  *     withDeclaredInputOnly refuses the name before the handler runs, so it was dead code posing
  *     as compatibility.
@@ -331,10 +334,20 @@ export const appTools: ConnectCliToolDefinition[] = [
             input: { type: 'object', description: 'Input parameters.' },
             instance_id: { type: 'string', description: 'Which installed instance to invoke, when the extension has more than one.' },
         },
-        handler: ({ client }, input) => client.post(
-            `/v1/ext/${encodeURIComponent(optionalString(input, 'extension_name') ?? requiredString(input, 'name'))}/${encodeURIComponent(requiredString(input, 'action_id'))}${query({ instance_id: optionalString(input, 'instance_id') })}`,
-            optionalRecord(input, 'input') ?? {},
-        ),
+        // AN INSTANCE IS A PATH SEGMENT, NOT A QUERY PARAMETER. This appended `?instance_id=` to the
+        // extension-scoped route, which reads no query at all — so a fleet agent invoking a
+        // two-instance extension ran against the SHARED `ext:{name}` namespace, with the wrong
+        // config and the wrong wallet scope, and got ok back. The instance-scoped route has existed
+        // beside it throughout, and the connector-MCP door has always used it. Review item 6.3.
+        handler: ({ client }, input) => {
+            const ext = encodeURIComponent(optionalString(input, 'extension_name') ?? requiredString(input, 'name'));
+            const actionId = encodeURIComponent(requiredString(input, 'action_id'));
+            const instanceId = optionalString(input, 'instance_id');
+            return client.post(
+                instanceId ? `/v1/ext/${ext}/${encodeURIComponent(instanceId)}/${actionId}` : `/v1/ext/${ext}/${actionId}`,
+                optionalRecord(input, 'input') ?? {},
+            );
+        },
     },
     {
         name: 'aimeat_extension_install',

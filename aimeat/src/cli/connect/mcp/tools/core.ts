@@ -159,9 +159,13 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     query: z.string().describe('Search query'),
     visibility: z.string().optional().describe('Optional visibility filter'),
     limit: z.number().optional().describe('Max hits to return (default 50, cap 200).'),
-  }, annotationsFor('aimeat_memory_search'), async ({ agent_name, query, visibility, limit }) => {
+    include_versions: z.boolean().optional().describe('Include `.version.N` history snapshots (skipped by default -- they are immutable history and the main source of bloat).'),
+  }, annotationsFor('aimeat_memory_search'), async ({ agent_name, query, visibility, limit, include_versions }) => {
     const { client } = pickAgent(registry, agent_name);
-    const params = new URLSearchParams({ q: query });
+    // SNIPPETS, like the node MCP tool of the same name. This asked for the plain search, which
+    // answers with the FULL value of every hit, so a broad query pulled whole records across the
+    // wire and through a model's context to answer "which keys mention this". Review item 6.4.
+    const params = new URLSearchParams({ q: query, include: 'meta', include_versions: include_versions ? 'true' : 'false' });
     if (visibility) params.set('visibility', visibility);
     if (limit !== undefined) params.set('limit', String(limit));
     const resp = await client.get(`/v1/memory/search?${params.toString()}`);
