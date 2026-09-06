@@ -25,13 +25,20 @@
  * @usage
  *   import { LIVING_HOOKS } from '../data/builtin-extensions/index.js';
  * @version-history
+ *   v1.1.0 — 2026-09-06 — The secret is the PLATFORM's now. This extension resolved
+ *     {{secret:NAME}} inside its own sandbox until today, which meant the credential was handed to
+ *     the guest; ctx.fetch does it instead, after the script has let go of the request. Two things
+ *     change for a person: their own vault entry beats the operator's shared map, and a key stored
+ *     once under Access serves every extension rather than this one. The header allowlist stays
+ *     here, because which headers may leave is a living-hooks decision. The `secrets` config field
+ *     stays too, as the fallback, so nobody's existing setup stops working.
  *   v1.0.0 — 2026-09-06 — Initial (living hooks, the node-side half).
  */
 import { LIVING_HOOKS_LIB_JS } from './living-hooks-lib.js';
 import { LIVING_HOOKS_GATE_JS } from './living-hooks-gate.js';
 
 /** The version the node ships. The seeder compares this against what is installed. */
-export const LIVING_HOOKS_VERSION = '1.0.0';
+export const LIVING_HOOKS_VERSION = '1.1.0';
 
 /**
  * The manifest, in the same YAML the install route reads from anybody else. It goes through
@@ -46,12 +53,13 @@ export const LIVING_HOOKS_MANIFEST = `extension: "1.0"
 #
 # The whole security model is two lines: the owner names which hosts may be reached, and the node
 # refuses everything else; a secret the owner does not want written into a document is named in the
-# header as {{secret:NAME}} and resolved here, out of sight of the page.
+# header as {{secret:NAME}} and filled in by the node itself, out of sight of the page AND out of
+# sight of this script.
 
 metadata:
   name: "living-hooks"
   version: "${LIVING_HOOKS_VERSION}"
-  description: "Lets a living document talk to the world: send the whole state of the document to an address you allowed when something changes, and read a value back in from an address, raw or picked out of JSON. You say which addresses are allowed; nothing else is called. A password or key you would rather not write into the document is stored here and named in a header as {{secret:NAME}}."
+  description: "Lets a living document talk to the world: send the whole state of the document to an address you allowed when something changes, and read a value back in from an address, raw or picked out of JSON. You say which addresses are allowed; nothing else is called. A password or key you would rather not write into the document is stored once in your own vault and named in a header as {{secret:NAME}}, and it is filled in on the way out."
   author: "AIMEAT"
   license: "MIT"
 
@@ -66,7 +74,7 @@ config:
   secrets:
     type: secret
     default: ""
-    description: "A JSON object of the keys and passwords your documents use, as {\\"NAME\\": \\"value\\"}. A header written as {{secret:NAME}} is filled in here on the way out, so the document never carries the value and nothing sends it back to the page. Stored encrypted."
+    description: "A JSON object of keys and passwords for everyone on this node, as {\\"NAME\\": \\"value\\"}. Usually empty: each person stores their own under Access, and theirs is used first. This is the operator's shared fallback, for a key every document on the node should be able to use. Stored encrypted."
 
 limits:
   # timeout_ms is BOTH ceilings: the sandbox interrupts the script at it, and the outbound call is
@@ -92,7 +100,7 @@ actions:
         description: "POST or PUT. POST when omitted."
       headers:
         type: object
-        description: "Header names and values. Authorization, Content-Type, Accept, X-Api-Key, X-Requested-With, and any name starting with X-Living-. A value may name a stored secret as {{secret:NAME}}."
+        description: "Header names and values. Authorization, Content-Type, Accept, X-Api-Key, X-Requested-With, and any name starting with X-Living-. A value may name a secret from your vault as {{secret:NAME}}; the node fills it in on the way out and it never reaches this document."
       body:
         type: object
         description: "What the receiver reads: the whole state of the document, the transition that fired, and the time."
@@ -170,7 +178,7 @@ export default async function (ctx, input) {
       + 'or send an address the receiver can read them from.', { bytes: size, limit: 262144 });
   }
 
-  var head = livingHeaders(input.headers, open.secrets, { 'Content-Type': 'application/json' });
+  var head = livingHeaders(input.headers, { 'Content-Type': 'application/json' });
   if (head.refusal) return head.refusal;
 
   // The pacer moves here, after every refusal and before the call goes out — and it is written
@@ -187,8 +195,15 @@ export default async function (ctx, input) {
   try {
     res = await ctx.fetch(open.url, { method: method, headers: head.headers, body: payload });
   } catch (err) {
-    return livingRefuse('UPSTREAM_FAILED',
-      'The call to ' + open.host + ' did not complete: ' + (err && err.message ? err.message : String(err)));
+    // The node fills {{secret:NAME}} inside ctx.fetch and throws when a name is not set, so a
+    // missing secret arrives here as an error rather than as a refusal this script built. It keeps
+    // its own code: "you named a secret nobody stored" and "the far end did not answer" are two
+    // different problems, and only one of them is fixed by looking at the receiver.
+    var lhMsg = err && err.message ? err.message : String(err);
+    if (lhMsg.indexOf('SECRET_UNKNOWN:') === 0) {
+      return livingRefuse('SECRET_UNKNOWN', lhMsg.slice(15).replace(/^\s+/, ''));
+    }
+    return livingRefuse('UPSTREAM_FAILED', 'The call to ' + open.host + ' did not complete: ' + lhMsg);
   }
   var ms = Date.now() - startedAt;
   if (!res.ok) {
@@ -223,7 +238,7 @@ export default async function (ctx, input) {
     return { value: reshaped.value, fetchedAt: hit.fetchedAt, contentType: hit.contentType, cached: true };
   }
 
-  var head = livingHeaders(input.headers, open.secrets,
+  var head = livingHeaders(input.headers,
     { Accept: 'application/json, text/plain;q=0.9, */*;q=0.8' });
   if (head.refusal) return head.refusal;
 
@@ -238,8 +253,13 @@ export default async function (ctx, input) {
   try {
     res = await ctx.fetch(open.url, { method: 'GET', headers: head.headers });
   } catch (err) {
-    return livingRefuse('UPSTREAM_FAILED',
-      'The call to ' + open.host + ' did not complete: ' + (err && err.message ? err.message : String(err)));
+    // Same as send: a secret the vault does not hold arrives as a throw from ctx.fetch and keeps
+    // its own code, because it is fixed in the vault and not at the far end.
+    var lhMsg = err && err.message ? err.message : String(err);
+    if (lhMsg.indexOf('SECRET_UNKNOWN:') === 0) {
+      return livingRefuse('SECRET_UNKNOWN', lhMsg.slice(15).replace(/^\s+/, ''));
+    }
+    return livingRefuse('UPSTREAM_FAILED', 'The call to ' + open.host + ' did not complete: ' + lhMsg);
   }
   if (!res.ok) {
     return livingRefuse('UPSTREAM_FAILED', open.host + ' answered ' + res.status + '.', { status: res.status });

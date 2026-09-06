@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.12.0 — 2026-09-06 — Mounts the secrets router (/v1/secrets: the owner's credential vault).
  *   v1.11.0 — 2026-09-03 — Mounts the dependencies router (GET /v1/dependencies).
  *   v1.10.0 — 2026-08-27 — Mount connectInstallRouter (GET /v1/connect/mcp.json — the downloadable
  *     MCP config file, so a client can be attached without walking its settings menu). To make room
@@ -134,6 +135,7 @@ import { ghiiRouter } from '../routes/ghii.js';
 import { chatInstancesRouter } from '../routes/chat-instances.js';
 import { totpRouter } from '../routes/totp.js';
 import { passkeysRouter } from '../routes/passkeys.js';
+import { secretsRouter } from '../routes/secrets.js';
 import { libsRouter } from '../routes/libs.js';
 import { appTemplatesRouter } from '../routes/app-templates.js';
 import { appUiRouter } from '../routes/app-ui.js';
@@ -358,6 +360,7 @@ export async function mountRoutes(
 
   app.use(authRouter(config, storage));
   app.use(accessTokensRouter(config, storage));
+  app.use(secretsRouter(config, storage));     // the owner's write-only credential vault (/v1/secrets)
   app.use(appGrantsRouter(config, storage));   // H-2: explicit scoped app grants (OAuth-like)
   app.use(appGrantsManageRouter(config, storage));   // the owner's list / narrow / cap / revoke of those grants
   app.use(sseRouter(config, storage));

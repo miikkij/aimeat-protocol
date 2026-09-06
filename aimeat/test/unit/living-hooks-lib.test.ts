@@ -13,6 +13,10 @@
  *   FIRST FAIL: against the tree before living-hooks existed, this file cannot even import
  *   `LIVING_HOOKS_LIB_JS` — the module is not there. Every assertion below is new behaviour.
  * @version-history
+ *   v1.1.0 — 2026-09-06 — The secret resolver left this script for the platform (ctx.fetch), so the
+ *     tests that exercised livingSecrets/livingResolveSecret are replaced by the property that
+ *     replaced them: the shipped source defines neither and never reads ctx.config.secrets, and
+ *     livingHeaders passes a {{secret:NAME}} placeholder through untouched.
  *   v1.0.0 — 2026-09-06 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -26,7 +30,7 @@ const lib = new Function(`
   ${LIVING_HOOKS_GATE_JS}
   return {
     livingHost, livingHostAllowed, livingHosts, livingPath, livingHeaderAllowed,
-    livingBytes, livingSecrets, livingResolveSecret, livingShape, livingPrune,
+    livingBytes, livingShape, livingPrune,
     livingCount, livingStateKey, livingHeaders, livingRefuse,
   };
 `)() as Record<string, (...args: any[]) => any>;
@@ -193,39 +197,24 @@ describe('livingBytes — UTF-8 bytes, not characters', () => {
   });
 });
 
-describe('livingSecrets and livingResolveSecret — the placeholder that keeps a key out of a document', () => {
-  it('reads the secret map out of the one encrypted string', () => {
-    expect(lib.livingSecrets('{"KEY":"abc"}')).toEqual({ KEY: 'abc' });
-    expect(lib.livingSecrets({ KEY: 'abc' })).toEqual({ KEY: 'abc' });
+describe('the secret resolver is NOT in this script any more', () => {
+  // The property, stated as a test because it is the whole security argument for the 2026-09-06
+  // change: a script that resolves its own secret HOLDS it, in a variable, inside the VM, for the
+  // length of the call. Nothing in the shipped source may name a stored value again — ctx.fetch
+  // fills the placeholder after this script has handed the request over
+  // (services/extension-ctx.ts → services/owner-secrets.ts).
+  it('defines neither helper, so nothing here can read a stored value', () => {
+    expect(lib.livingSecrets).toBeUndefined();
+    expect(lib.livingResolveSecret).toBeUndefined();
   });
 
-  it('answers an empty map for anything unreadable, so a placeholder refuses by name', () => {
-    expect(lib.livingSecrets('not json')).toEqual({});
-    expect(lib.livingSecrets('[1,2]')).toEqual({});
-    expect(lib.livingSecrets('')).toEqual({});
-    expect(lib.livingSecrets(null)).toEqual({});
-  });
-
-  it('substitutes a named secret into a header value', () => {
-    expect(lib.livingResolveSecret('Bearer {{secret:TOKEN}}', { TOKEN: 's3cret' }))
-      .toEqual({ ok: true, value: 'Bearer s3cret' });
-    expect(lib.livingResolveSecret('{{secret:A}}-{{secret:B}}', { A: '1', B: '2' }))
-      .toEqual({ ok: true, value: '1-2' });
-  });
-
-  it('leaves a value with no placeholder alone', () => {
-    expect(lib.livingResolveSecret('application/json', {})).toEqual({ ok: true, value: 'application/json' });
-  });
-
-  it('refuses by NAME when the secret is not set, and never half-builds the credential', () => {
-    const out = lib.livingResolveSecret('Bearer {{secret:MISSING}}', { OTHER: 'x' });
-    expect(out.ok).toBe(false);
-    expect(out.missing).toBe('MISSING');
-    expect(out.value).toBeUndefined();
-  });
-
-  it('treats an empty stored secret as not set', () => {
-    expect(lib.livingResolveSecret('{{secret:E}}', { E: '' }).ok).toBe(false);
+  it('the shipped source never reads ctx.config.secrets', () => {
+    const shipped = LIVING_HOOKS_LIB_JS + LIVING_HOOKS_GATE_JS;
+    expect(shipped).not.toContain('config.secrets');
+    // The DECLARATIONS, not the word: the source carries a comment saying where the resolver went,
+    // and a test that forbade the name would forbid explaining the change.
+    expect(shipped).not.toContain('function livingSecrets');
+    expect(shipped).not.toContain('function livingResolveSecret');
   });
 });
 
@@ -321,40 +310,41 @@ describe('livingStateKey — one record per owner, and a safe key name', () => {
   });
 });
 
-describe('livingHeaders — building the outbound header set', () => {
+describe('livingHeaders — which headers may leave, and nothing about what is in them', () => {
   it('carries the defaults through when the caller sent none', () => {
-    expect(lib.livingHeaders(null, {}, { 'Content-Type': 'application/json' }))
+    expect(lib.livingHeaders(null, { 'Content-Type': 'application/json' }))
       .toEqual({ ok: true, headers: { 'Content-Type': 'application/json' } });
   });
 
   it('refuses a header nobody allowed, naming it', () => {
-    const out = lib.livingHeaders({ Cookie: 'a=b' }, {}, {});
+    const out = lib.livingHeaders({ Cookie: 'a=b' }, {});
     expect(out.refusal.error.code).toBe('HEADER_REFUSED');
     expect(out.refusal.error.message).toContain('Cookie');
   });
 
-  it('refuses a placeholder whose secret is not set, naming the secret and not its value', () => {
-    const out = lib.livingHeaders({ Authorization: 'Bearer {{secret:NOPE}}' }, { OTHER: 'zzTOPSECRETzz' }, {});
-    expect(out.refusal.error.code).toBe('SECRET_UNKNOWN');
-    expect(out.refusal.error.message).toContain('NOPE');
-    expect(out.refusal.error.message).not.toContain('zzTOPSECRETzz');
-    expect(out.headers).toBeUndefined();
+  it('passes a {{secret:NAME}} placeholder through UNTOUCHED, for ctx.fetch to fill', () => {
+    // The point of the 2026-09-06 change. The value never enters this VM, so what leaves this
+    // function is the placeholder — and the node substitutes it after the script has let go.
+    const out = lib.livingHeaders({ Authorization: 'Bearer {{secret:T}}' }, {});
+    expect(out.headers.Authorization).toBe('Bearer {{secret:T}}');
+    expect(out.refusal).toBeUndefined();
   });
 
-  it('resolves a secret into the value that goes out', () => {
-    const out = lib.livingHeaders({ Authorization: 'Bearer {{secret:T}}' }, { T: 'tok' }, {});
-    expect(out.headers.Authorization).toBe('Bearer tok');
+  it('does not judge whether a secret exists: that answer lives where the vault does', () => {
+    const out = lib.livingHeaders({ Authorization: 'Bearer {{secret:NOPE}}' }, {});
+    expect(out.ok).toBe(true);
+    expect(out.headers.Authorization).toBe('Bearer {{secret:NOPE}}');
   });
 
   it('refuses a non-string value and an over-long one', () => {
-    expect(lib.livingHeaders({ Accept: 5 }, {}, {}).refusal.error.code).toBe('INVALID_INPUT');
-    expect(lib.livingHeaders({ Accept: 'x'.repeat(5000) }, {}, {}).refusal.error.code).toBe('INVALID_INPUT');
+    expect(lib.livingHeaders({ Accept: 5 }, {}).refusal.error.code).toBe('INVALID_INPUT');
+    expect(lib.livingHeaders({ Accept: 'x'.repeat(5000) }, {}).refusal.error.code).toBe('INVALID_INPUT');
   });
 
   it('refuses more than sixteen names', () => {
     const many: Record<string, string> = {};
     for (let i = 0; i < 20; i++) many['x-living-' + i] = 'v';
-    expect(lib.livingHeaders(many, {}, {}).refusal.error.code).toBe('INVALID_INPUT');
+    expect(lib.livingHeaders(many, {}).refusal.error.code).toBe('INVALID_INPUT');
   });
 });
 

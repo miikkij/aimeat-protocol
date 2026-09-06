@@ -11,6 +11,8 @@
  *   v1.1.0 -- 2026-05-28 -- Register Hello Integration onboarding MCP tools
  *   v1.1.1 -- 2026-05-28 -- Register connector telemetry reporting MCP tool
  *   v2.0.0 -- 2026-05-29 -- Multi-agent: tool modules now take AgentRegistry
+ *   v2.1.0 -- 2026-09-06 -- Register the secrets-vault tools, so a desktop client can store the key
+ *     an integration needs instead of the person pasting it into the chat.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AgentRegistry } from '../../agent-registry.js';
@@ -40,6 +42,7 @@ import { registerWorkflowTools } from './workflows.js';
 import { registerAiJobTools } from './ai-jobs.js';
 import { registerConsentTools } from './consent.js';
 import { registerAccessTools } from './access.js';
+import { registerSecretTools } from './secrets.js';
 import { registerGroupsTools } from './groups.js';
 import { registerInstancesTools } from './instances.js';
 import { registerMemoryExtTools } from './memory-ext.js';
@@ -86,6 +89,7 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerAiJobTools(mcp, registry);
   registerConsentTools(mcp, registry);
   registerAccessTools(mcp, registry);
+  registerSecretTools(mcp, registry);
   registerGroupsTools(mcp, registry);
   registerInstancesTools(mcp, registry);
   registerMemoryExtTools(mcp, registry);

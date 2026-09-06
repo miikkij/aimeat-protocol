@@ -22,6 +22,9 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-06 — The three secrets-vault tools on the agent and admin surfaces: setting up an
+ *     integration is the work an owner's own agent does, and a key it stores is one the owner never
+ *     has to paste anywhere. Nothing anywhere reads a value back.
  *   2026-09-05 — aimeat_admin_security_overview and aimeat_admin_incident_resolve on the operator
  *     surface, beside the account-lifecycle tools.
  *   2026-09-03 — A seventh surface, `full`, computed rather than listed: the catalog minus
@@ -209,6 +212,10 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // Who holds a key to the owner's account: the Access page's read, for the agent the owner
         // trusted with account:security. Read-only; every revoke stays on the page.
         'aimeat_access_list',
+        // The owner's secrets vault. On the agent surface because setting up an integration is
+        // exactly the work an owner's own agent does, and a key it stores is one the owner never
+        // has to paste anywhere. It can store and remove; nothing anywhere reads a value back.
+        'aimeat_secret_list', 'aimeat_secret_set', 'aimeat_secret_delete',
         'aimeat_onboarding_status', 'aimeat_onboarding_identify_platform', 'aimeat_onboarding_confirm_skill_installed',
         'aimeat_onboarding_confirm_directives_read', 'aimeat_onboarding_declare_services',
         'aimeat_handbook_get',
@@ -288,6 +295,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_share_create', 'aimeat_share_list', 'aimeat_share_revoke',
         'aimeat_consent_grant', 'aimeat_consent_list', 'aimeat_consent_revoke',
         'aimeat_access_list',
+        'aimeat_secret_list', 'aimeat_secret_set', 'aimeat_secret_delete',
         'aimeat_agent_mode_set', 'aimeat_agent_run_mode_set', 'aimeat_agent_runtime_report', 'aimeat_agent_description_set',
         'aimeat_agent_tags_set', 'aimeat_agent_console_set',
         // Read-only: what the one-press basic agents would give this account, and whether the

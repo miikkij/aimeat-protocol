@@ -8,6 +8,15 @@
  *   Node.js globals (process, require, Buffer, etc.) -- only a controlled
  *   `ctx` API proxy.
  * @version-history
+ *   v2.8.0 — 2026-09-06 — The `__fetch` bridge calls ctx.fetch instead of running its own safeFetch
+ *     and its own body decoder. Those forty lines were a second implementation of a capability the
+ *     builder already owned, which made buildExtensionCtx's fetch dead code — and the two had
+ *     drifted: this copy threw on a charset it could not name where the builder falls back with a
+ *     warning, and it never honoured `strictCharset`. It also could not have resolved the owner's
+ *     vault, so {{secret:NAME}} would have had to be implemented twice, once for a road nothing
+ *     calls. What the copy really existed for is now a host-only third argument: the run's deadline
+ *     (min(timeout_ms, 30s)) and the teardown signal, which the guest cannot supply because the
+ *     bridge crosses JSON.
  *   v2.7.0 — 2026-09-05 — `ctx.workspace`: an organism workspace, as the CALLER, through the same
  *     functions aimeat_workspace_read/_write/_publish run (services/extension-workspace.ts builds
  *     it; a road attaches it only when the manifest declares `workspace:` and a real caller is
@@ -53,7 +62,6 @@
  */
 import { newQuickJSWASMModule, shouldInterruptAfterDeadline } from 'quickjs-emscripten';
 import type { QuickJSContext, QuickJSHandle, QuickJSWASMModule } from 'quickjs-emscripten';
-import { safeFetch } from '../utils/url-validator.js';
 
 // ── Public interfaces (UNCHANGED) ──────────
 
@@ -377,47 +385,20 @@ export async function executeExtensionAction(
                 const opts = JSON.parse(optsJson || '{}') as {
                     method?: string; headers?: Record<string, string>; body?: string;
                 };
-                // safeFetch validates the URL AND re-validates every redirect hop (redirect:'manual'),
-                // so an allowed host cannot 3xx-bounce the guest's request to an internal target.
-                // Throws `Fetch blocked: <reason>` on a blocked URL/hop (surfaced to the guest as an error).
-                const resp = await safeFetch(url, {
-                    method: opts.method || 'GET',
-                    headers: opts.headers,
-                    body: opts.body,
+                // ctx.fetch, not a second copy of it. This bridge used to call safeFetch itself and
+                // decode the body itself, which made buildExtensionCtx's fetch dead code and the two
+                // drifted where you would expect: the copy here threw on a charset it could not name
+                // (where the builder falls back with a warning), never honoured `strictCharset`, and
+                // could never have resolved a {{secret:NAME}} placeholder — the vault would have had
+                // to be implemented twice, once for a road nothing calls.
+                //
+                // The host argument is what the copy existed for: the run's own deadline
+                // (min(timeout_ms, 30s), which the manifest documents as BOTH ceilings) and the
+                // teardown signal, so a fetch cannot outlive the VM that started it. The guest
+                // cannot supply it — the bridge crosses JSON, and a signal does not.
+                return ctx.fetch(url, opts, {
                     signal: AbortSignal.any([teardown.signal, AbortSignal.timeout(Math.min(limits.timeoutMs, 30_000))]),
                 });
-                const buf = await resp.arrayBuffer();
-                const ct = resp.headers.get('content-type') || '';
-                const ctCharsetMatch = /charset=([^\s;]+)/i.exec(ct);
-                let charset = ctCharsetMatch ? ctCharsetMatch[1].toLowerCase() : '';
-
-                if (!charset) {
-                    const peek = new TextDecoder('ascii').decode(buf.slice(0, 512));
-                    const xmlMatch = /encoding=['"]([^'"]+)['"]/i.exec(peek);
-                    const metaMatch = /<meta[^>]+charset=["']?([^\s"';>]+)/i.exec(peek);
-                    charset = (xmlMatch?.[1] || metaMatch?.[1] || 'utf-8').toLowerCase();
-                }
-
-                if (charset && charset !== 'utf-8' && charset !== 'utf8') {
-                    const bytes = new Uint8Array(buf);
-                    let hasMultibyte = false;
-                    for (let i = 0; i < bytes.length - 1; i++) {
-                        if (bytes[i] >= 0xC2 && bytes[i] <= 0xDF && (bytes[i + 1] & 0xC0) === 0x80) {
-                            hasMultibyte = true; break;
-                        }
-                        if (bytes[i] >= 0xE0 && bytes[i] <= 0xEF && i + 2 < bytes.length &&
-                            (bytes[i + 1] & 0xC0) === 0x80 && (bytes[i + 2] & 0xC0) === 0x80) {
-                            hasMultibyte = true; break;
-                        }
-                    }
-                    if (hasMultibyte) charset = 'utf-8';
-                }
-
-                const decoder = new TextDecoder(charset === 'utf8' ? 'utf-8' : charset);
-                const text = decoder.decode(buf);
-                const headers: Record<string, string> = {};
-                resp.headers.forEach((v, k) => { headers[k] = v; });
-                return { status: resp.status, ok: resp.ok, text, headers };
             },
             counter, limits.maxApiCalls, inflight);
 

@@ -32,6 +32,7 @@
  *   v1.5.0 — 2026-07-13 — Split the method bodies into ./methods/<group>.ts modules
  *     (prototype-assignment + interface-merge) so every file is ≤800 lines; bodies
  *     are byte-identical, `db`/`chunkedUploads` widened to public for the groups.
+ *   v1.9.0 — 2026-09-06 — secretMethods bound (the owner's secrets vault).
  *   v1.8.0 — 2026-09-04 — passkeyMethods bound.
  *   v1.7.0 — 2026-09-03 — dependencyMethods and componentVersionMethods bound.
  */
@@ -76,6 +77,7 @@ import { agentV2TasksMethods } from './methods/agent-v2-tasks.js';
 import { dependencyMethods } from './methods/dependencies.js';
 import { componentVersionMethods } from './methods/component-versions.js';
 import { passkeyMethods } from './methods/passkeys.js';
+import { secretMethods } from './methods/secrets.js';
 
 /**
  * Marks the async context of an open transaction, so a write can tell whether it is a step OF the
@@ -226,6 +228,7 @@ Object.assign(
   dependencyMethods,
   componentVersionMethods,
   passkeyMethods,
+  secretMethods,
   agentV2MessagingMethods,
   agentV2TasksMethods,
 );

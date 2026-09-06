@@ -17,6 +17,11 @@
  *   v2.1.0 — 2026-07-10 — Loopback egress now gated by AIMEAT_ALLOW_PRIVATE_EGRESS (config resolves
  *     it from the security profile; AIMEAT_DEV_MODE kept as a back-compat alias). RFC1918/link-local
  *     stay blocked regardless.
+ *   v2.4.0 — 2026-09-06 — `sensitiveHeaders`: names the caller drops when a redirect leaves the
+ *     origin they were meant for. The hop was re-validated for SSRF and then followed with the same
+ *     headers, so an allowed address could 302 and collect whatever was in Authorization. It
+ *     matters now because ctx.fetch resolves the owner's vault into that header, and the script
+ *     that sent it was never allowed to see the value it would be handing away.
  *   v2.3.0 — 2026-09-06 — stripTrailingSlashes, for the callers that normalise an address someone
  *     else supplied before appending a path. `replace(/\/+$/, '')` on such an address is quadratic
  *     on a long run of slashes (CodeQL js/polynomial-redos, alerts 1609 and 1610).
@@ -141,6 +146,21 @@ export function stripTrailingSlashes(url: string): string {
 export interface SafeFetchInit extends RequestInit {
   /** Max redirect hops to follow (each re-validated). Default 5. */
   maxRedirects?: number;
+  /**
+   * Header names to DROP the moment a redirect leaves the origin they were meant for.
+   *
+   * A redirect is re-validated for SSRF and then followed with the same headers, which is fine for
+   * `Accept` and wrong for a credential: an address the caller allowed can answer 302 and collect
+   * whatever was in `Authorization`. curl and every browser drop the credential on a cross-host
+   * redirect for exactly this reason.
+   *
+   * Opt-in rather than always-on, and named by the CALLER, because only the caller knows which of
+   * its headers carry a secret. `ctx.fetch` passes the headers it resolved a `{{secret:NAME}}` into
+   * — the ones that hold somebody's key and that the script itself was never allowed to see.
+   *
+   * Compared case-insensitively; the origin is scheme + host + port.
+   */
+  sensitiveHeaders?: string[];
 }
 
 /**
@@ -167,17 +187,41 @@ export function setOutboundRequestSigner(signer: OutboundRequestSigner | null): 
  * vector — the practically exploitable one — is closed.
  */
 export async function safeFetch(urlStr: string, init: SafeFetchInit = {}): Promise<Response> {
-  const { maxRedirects = 5, ...fetchInit } = init;
+  const { maxRedirects = 5, sensitiveHeaders = [], ...fetchInit } = init;
   let target = urlStr;
+  // The origin the caller's headers were meant for. Once a redirect leaves it, anything the caller
+  // named as sensitive is dropped: the SSRF re-validation below proves the new host is not
+  // internal, and proves nothing at all about whether it should be handed somebody's credential.
+  const originOf = (u: string): string => {
+    try { return new URL(u).origin; } catch (err) {
+      // Unparseable: treat the whole string as its own origin, which makes the comparison below
+      // FAIL and therefore drops the sensitive headers. The safe direction when we cannot tell.
+      logger.warn('safeFetch: could not read an origin from this URL', { error: String(err) });
+      return u;
+    }
+  };
+  const firstOrigin = originOf(urlStr);
+  const sensitive = sensitiveHeaders.map(h => h.toLowerCase());
   for (let hop = 0; hop <= maxRedirects; hop++) {
     const check = await validateOutboundUrl(target);
     if (!check.valid) throw new Error(`Fetch blocked: ${check.reason}`);
-    let hopInit: RequestInit = { ...fetchInit, redirect: 'manual' };
+    let hopHeaders = fetchInit.headers;
+    if (sensitive.length && originOf(target) !== firstOrigin) {
+      const stripped = new Headers(fetchInit.headers);
+      for (const name of sensitive) stripped.delete(name);
+      hopHeaders = stripped;
+      logger.warn('safeFetch: a redirect left the original origin, so the sensitive headers were dropped', {
+        from: firstOrigin, to: originOf(target), dropped: sensitive.join(', '),
+      });
+    }
+    let hopInit: RequestInit = { ...fetchInit, headers: hopHeaders, redirect: 'manual' };
     if (outboundSigner) {
       try {
         const sigHeaders = await outboundSigner(target);
         if (sigHeaders) {
-          const headers = new Headers(fetchInit.headers);
+          // From hopHeaders, not fetchInit.headers: signing must not resurrect a credential the
+          // cross-origin rule above just dropped.
+          const headers = new Headers(hopHeaders);
           for (const [k, v] of Object.entries(sigHeaders)) headers.set(k, v);
           hopInit = { ...hopInit, headers };
         }

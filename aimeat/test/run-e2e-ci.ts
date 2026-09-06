@@ -9,6 +9,11 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.34.0 -- 2026-09-06 -- Add e2e-secrets.ts: the owner's write-only credential vault, and the
+ *            resolution of {{secret:NAME}} inside ctx.fetch. It binds 40672 for a real receiver, so
+ *            it is a fixed-port suite and lands in lane 0 beside e2e-living-hooks; what arrives at
+ *            that receiver is the only proof that the node substituted the right owner's value, and
+ *            what a probe extension answers with is the only proof the sandbox never held it.
  *   v1.33.0 -- 2026-09-06 -- Add e2e-living-hooks.ts: the two doors a living document uses to talk
  *            to the world (living-hooks, shipped with the node). It binds 40665 for a real receiver,
  *            so it is a fixed-port suite and lands in lane 0; the body that arrives there is what
@@ -163,6 +168,10 @@ const ALL_SUITES = [
     'test/e2e-oauth-login.ts',
     'test/e2e-session-refresh.ts',
     'test/e2e-access-tokens.ts',
+    // The owner's secrets vault. Starts a real receiver on 127.0.0.1:40672 (E2E_SECRETS_PORT),
+    // reachable because the runner pins AIMEAT_ALLOW_PRIVATE_EGRESS — so the header that arrives is
+    // the header the node actually built, which is the only way to prove the resolution at all.
+    'test/e2e-secrets.ts',
     'test/e2e-apps.ts',
     'test/e2e-app-agent-deploy.ts',
     'test/e2e-app-draft.ts',
@@ -693,6 +702,14 @@ const GUARD_SUITES = [
     // it, so its allowlist, its scope gate, its per-owner separation and its secret handling are
     // exactly what must not regress.
     'test/e2e-living-hooks.ts',             // where the node may call out, on whose word, with whose secret
+    // Earned 2026-09-06 the way the rule says: alone, on a freshly deleted database, three
+    // consecutive 33-of-33 runs on BOTH backends, counts identical. Twenty-four of its assertions
+    // are a refusal or an isolation boundary, and the tier's question is answered yes twice over —
+    // a row here is a live credential to somebody else's service, so its scope gate, its per-owner
+    // separation and the promise that no surface reads a value back are the whole of it. The
+    // resolution half is the other half: the node carries the owner's key out through a sandboxed
+    // script that must never be able to see it.
+    'test/e2e-secrets.ts',                  // the owner's vault: what is stored, who may touch it, and who never sees it
 ];
 
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone

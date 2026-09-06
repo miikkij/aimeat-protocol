@@ -30,6 +30,8 @@
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.2.0 — 2026-09-06 — Secret joins the cascade. A row there is a live credential to somebody
+ *     else's service, held under a username that is released for reuse.
  *   v1.1.0 — 2026-09-04 — Seven tables join the cascade: MemoryVersion, OwnerAgentDefault,
  *     GroupShare, AgentUsageEvent, AgentUsageEventArchive, AgentUsageDaily and (owner-level) EcoAuth.
  *     All seven had sat in security/storage-parity-exemptions.json since 2026-08-10 as "decide", and
@@ -163,6 +165,12 @@ export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<v
   const groupIds = groups.map(g => g.id);
   if (groupIds.length) await db.deleteFrom('GroupShare').where('groupId', 'in', groupIds).execute();
   await db.deleteFrom('SharingGroup').where('ownerGaii', '=', gaii).execute();
+
+  // The secrets vault. A row here is a LIVE credential to somebody else's service, and a deleted
+  // username is released for reuse — so a surviving row would hand the next person to register that
+  // name a working key to the previous person's accounts. The same argument the Connection rows
+  // carry, one step sharper: nothing about this row identifies whose key it is.
+  await db.deleteFrom('Secret').where('ownerGaii', '=', gaii).execute();
 }
 
 /**

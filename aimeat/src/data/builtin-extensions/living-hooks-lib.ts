@@ -19,10 +19,14 @@
  *   here would still be interpolation, so there is none.
  * @structure
  *   - LIVING_HOOKS_LIB_JS — livingHost, livingHostAllowed, livingPath, livingHeaderAllowed,
- *     livingBytes, livingSecrets, livingResolveSecret, livingHosts, livingShape, livingPrune
+ *     livingBytes, livingHosts, livingShape, livingPrune
  * @usage
  *   const script = LIVING_HOOKS_LIB_JS + '\n\n' + SEND_ACTION_JS;
  * @version-history
+ *   v1.1.0 — 2026-09-06 — livingSecrets and livingResolveSecret are gone: resolving a secret inside
+ *     the VM means handing the credential to the guest, and the platform now does it in ctx.fetch
+ *     after this script has let go of the request. The header ALLOWLIST stays, because which
+ *     headers may leave here is a living-hooks decision and not the platform's.
  *   v1.0.0 — 2026-09-06 — Initial (living hooks, the node-side half).
  */
 
@@ -203,40 +207,24 @@ function livingBytes(s) {
   return n;
 }
 
-/**
- * The owner's secret map, from the extension's one encrypted "secrets" config field.
+/*
+ * THE SECRET RESOLVER USED TO LIVE HERE, and it was moved to the node on 2026-09-06.
  *
- * It is a single string holding JSON because the node encrypts STRING config values and nothing
- * else, so a map of secrets has to travel as one. A value that will not parse yields an empty
- * map, and the placeholder that wanted it then refuses by name — which says "that secret is not
- * set" rather than sending a header with the word undefined in it.
- */
-function livingSecrets(raw) {
-  if (raw === null || raw === undefined || raw === '') return {};
-  if (typeof raw === 'object' && !Array.isArray(raw)) return raw;
-  var parsed = null;
-  try { parsed = JSON.parse(String(raw)); } catch (err) { parsed = null; }
-  return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
-}
-
-/**
- * Replace every {{secret:NAME}} in a header value with what the owner stored under NAME.
+ * livingSecrets read the extension's encrypted "secrets" config into a map and livingResolveSecret
+ * substituted it into a header value — inside the VM, which means the credential was handed to the
+ * guest and held in a variable for the length of the call. The script was ours and the reasoning
+ * was that ours is safe, which is the reasoning that ends badly once a second extension wants the
+ * same thing and writes its own version.
  *
- * Returns { ok: false, missing } when a placeholder names a secret that is not set, so the caller
- * refuses instead of sending a half-built credential. The resolved value is never returned to the
- * caller by either action: the whole point of the placeholder is that the secret stays out of the
- * document that names it.
+ * ctx.fetch does it now (services/extension-ctx.ts, services/owner-secrets.ts), AFTER this script
+ * has handed the request over: it fills the {{secret:NAME}} placeholder in header VALUES from the
+ * caller's own vault, falls back to this extension's secrets config, and refuses by name when
+ * neither has it. So this file still validates WHICH headers may be sent — that is a living-hooks
+ * decision — and no longer knows what any of them contain.
+ *
+ * (No backticks in this comment on purpose: the whole file is a template literal, and one would
+ * end it.)
  */
-function livingResolveSecret(value, secrets) {
-  var s = String(value === null || value === undefined ? '' : value);
-  var missing = null;
-  var out = s.replace(/\{\{secret:([A-Za-z0-9_.\-]{1,64})\}\}/g, function (whole, name) {
-    var v = secrets[name];
-    if (typeof v !== 'string' || !v) { if (!missing) missing = name; return ''; }
-    return v;
-  });
-  return missing ? { ok: false, missing: missing } : { ok: true, value: out };
-}
 
 /**
  * Turn an answer's BODY TEXT into the value a document node will hold.

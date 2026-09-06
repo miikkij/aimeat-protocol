@@ -30,6 +30,10 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.5.0 — 2026-09-06 — SECRETS_MANAGE_SCOPE, the owner's credential vault. Outside the wildcard
+ *     from the day it exists, and a NEW word rather than memory:write-as-owner precisely because
+ *     that one is already held: reusing it would have handed every live agent and app grant the
+ *     power to rotate the owner's credentials, with nobody ever asked.
  *   v1.4.0 — 2026-08-26 — SURFACE_LAYOUT_WRITE_SCOPE, the word that arranges the node's front page
  *     and every member's home. Outside the wildcard from the day it exists: it is the widest-reach
  *     write here that is not money or an identity, because what it changes is what everyone sees on
@@ -136,6 +140,36 @@ export const COMPLIANCE_WRITE_SCOPE = 'compliance:write';
 export const SURFACE_LAYOUT_WRITE_SCOPE = 'site:layout-write';
 
 /**
+ * The owner's secrets vault: the named credentials this account holds so the things acting in its
+ * name can use them without holding them.
+ *
+ * WHY A NEW WORD RATHER THAN memory:write-as-owner AND memory:read. Two reasons, and either alone
+ * would decide it. The first is that a secret is not a memory record and never becomes one: memory
+ * can be read back by whoever holds the right to read that namespace, and this cannot be read back
+ * by anyone, so a word whose sentence is "write your memories as you" would be describing a
+ * different power than the one it grants. The second is worse: `memory:write` is the second most
+ * commonly granted word on this node, held by live agents and by every app grant that saves
+ * anything. Putting the vault behind it would hand every one of those, retroactively and with no
+ * owner ever asked, the ability to replace the token an extension uses to call the owner's bank —
+ * which is the escalation-through-an-existing-grant shape invariant 12 is about.
+ *
+ * ONE WORD RATHER THAN A READ AND A WRITE. Every door here is the owner administering the vault,
+ * and the list carries no value: it is names and dates. An app that could see STRIPE_KEY exists and
+ * could not set it has learned nothing it can act on, and no caller has asked for that half. If one
+ * ever does, `secrets:read` can be added beneath this without moving what this word means.
+ *
+ * OUT OF EVERY WILDCARD, for the same reason `commerce:psp` is: "Full access" is one click, and
+ * nobody clicking it is deciding that an agent may rotate or destroy the credentials their
+ * extensions call the world with. Nobody is grandfathered onto it
+ * (services/scope-vocabulary-migration.ts has no entry), because it names a capability that did not
+ * exist before — no agent can lose one it had.
+ *
+ * Enforced by requireScope on the three REST doors and by the same word in the MCP scope table, so
+ * the tool surface and the HTTP door answer alike (invariant 15).
+ */
+export const SECRETS_MANAGE_SCOPE = 'secrets:manage';
+
+/**
  * Scopes no wildcard carries — neither `*` nor `{domain}:*`. Only the exact string counts, anywhere
  * a scope is checked, proposed, or approved.
  *
@@ -168,7 +202,8 @@ const OWN_TICK_SCOPES = [
 
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [
     WRITE_RESERVED_SCOPE, ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE,
-    COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, ...OWN_TICK_SCOPES,
+    COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, SECRETS_MANAGE_SCOPE,
+    ...OWN_TICK_SCOPES,
 ];
 
 /** True when `scope` is one of the scopes only an exact grant can confer. */

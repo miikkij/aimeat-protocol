@@ -16,6 +16,9 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-13 — Moved record/type declarations into ./types/* and re-exported them
  *     (max-file-lines); Storage interface + repository wiring stay here
+ *   v1.4.0 — 2026-09-06 — SecretRepository joins the Storage composite: a credential the owner
+ *     stores must be readable by nobody, including its owner, which a namespace whose contract is
+ *     "the owner can read this back" cannot express.
  *   v1.3.0 — 2026-09-04 — PasskeyRepository joins the Storage composite: a WebAuthn credential is
  *     looked up before anyone is signed in, so it cannot live in the person's own memory namespace.
  *   v1.2.0 — 2026-09-03 — DependencyRepository and ComponentVersionRepository join the Storage composite; their types re-exported.
@@ -34,6 +37,7 @@ export * from './types/organisms-federation.js';
 export * from './types/dependencies.js';
 export * from './types/component-versions.js';
 export * from './types/passkeys.js';
+export * from './types/secrets.js';
 export * from './types/agents-messaging.js';
 export * from './types/agent-v2-messaging.js';
 export * from './types/agent-v2-tasks.js';
@@ -81,6 +85,7 @@ import type { ExtensionInstanceRepository } from './repositories/extension-insta
 import type { DependencyRepository } from './repositories/dependency.repository.js';
 import type { ComponentVersionRepository } from './repositories/component-version.repository.js';
 import type { PasskeyRepository } from './repositories/passkey.repository.js';
+import type { SecretRepository } from './repositories/secret.repository.js';
 import type { ReplicationQueueRepository } from './repositories/replication-queue.repository.js';
 import type { DeviceAuthRepository } from './repositories/device-auth.repository.js';
 import type { AgentEnrolmentRepository } from './repositories/agent-enrolment.repository.js';
@@ -129,6 +134,7 @@ export interface Storage extends
   KnowledgeRepository, SchedulerRepository,
   ExtensionInstanceRepository, ReplicationQueueRepository, DependencyRepository, ComponentVersionRepository,
   PasskeyRepository,
+  SecretRepository,
   DeviceAuthRepository,
   AgentEnrolmentRepository,
   AgentV2MessagingRepository,

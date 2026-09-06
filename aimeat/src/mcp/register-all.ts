@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.1.0 — 2026-09-06 — registerSecretTools: the owner's secrets vault on the chat path.
  *   v1.0.0 — 2026-09-03 — Extracted from index.ts so the schema audit registers what the server
  *     registers instead of a hand-kept copy that had drifted to half.
  */
@@ -89,6 +90,7 @@ import { registerInvokeTool } from './invoke.js';
 import { registerAgentCrewTools } from './agent-crew.js';
 import { registerConnectionTools } from './connections.js';
 import { registerAccessTools } from './access.js';
+import { registerSecretTools } from './secrets.js';
 
 /** What every tool group needs. The two emitters are passed in so this file has no cycle home. */
 export interface ServerToolDeps {
@@ -139,6 +141,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerWalletExtendedTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerConsentTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerAccessTools(mcp, storage, config, agentGaii);
+    registerSecretTools(mcp, storage, config, agentGaii);
     registerCommerceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerExchangeTools(mcp, storage, config, agentGaii);
     registerExchangeRunTools(mcp, storage, config, agentGaii, getToken);
