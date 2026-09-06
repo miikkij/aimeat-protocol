@@ -59,6 +59,10 @@ export interface JWTPayload {
   node: string;
   roles: string[];
   scopes?: string[];  // omitted = [] — an agent token that says nothing may do nothing
+  // The shared anonymous principal, which VerifiedToken has always carried and no MINT ever set.
+  // Every guard that reads it -- the board roster, the agent card, the app legal pages -- was
+  // therefore treating a minted anonymous token as an ordinary agent. Review item 2.9.
+  anonymous?: boolean;
   mcp_client?: string; // OAuth client name for MCP sessions (e.g. "Claude", "Cursor")
   federated?: boolean;  // true for federated login sessions
   homeNode?: string;    // home node ID for federated sessions
@@ -163,6 +167,9 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       // The other end of the same door. issueJWT has always written this claim, so a token
       // without one is not an old token — it is not one of ours.
       scopes: (payload.scopes as string[]) ?? [],
+      // Carried through, so the guards that read it on the INJECTED identity see the same fact
+      // on the minted one. It was written by no mint and read off no token until 2026-09-07.
+      anonymous: (payload.anonymous as boolean | undefined) ?? undefined,
       sessionId: payload.jti as string | undefined,
       mcp_client: payload.mcp_client as string | undefined,
       federated: (payload.federated as boolean) ?? false,

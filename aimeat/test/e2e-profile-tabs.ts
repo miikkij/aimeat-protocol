@@ -738,7 +738,18 @@ await test('GET /v1/agents — list agents', async () => {
 // A no-op updateAgent that still echoed the requested scopes would have passed both: the owner is
 // told the agent is read-only while it keeps everything it had.
 const READONLY_SCOPES = ['memory:read', 'wallet:read', 'work:read'];
-const STANDARD_SCOPES = ['memory:read', 'memory:write', 'memory:delete', 'wallet:read', 'work:read', 'work:request', 'work:accept', 'consent:manage'];
+/**
+ * What this agent is put back to, and what the 39 tests AFTER this block then run with.
+ *
+ * IT HAS TO COVER THEM, and until 2026-09-07 it did not have to. A token used to keep the
+ * permissions it was minted with whatever the owner later did to the record, so narrowing the
+ * agent mid-suite cost the tests below nothing. auth/effective-scopes.ts ended that on purpose:
+ * an agent's permissions are its RECORD's, resolved per request, so a scope this list leaves out
+ * is one the rest of the suite no longer has. app:write, app:manage and social:write are here
+ * because the app and board tests below need them -- not to make anything pass, but because
+ * `standard` has to mean an agent that can still do what this suite goes on to ask of it.
+ */
+const STANDARD_SCOPES = ['memory:read', 'memory:write', 'memory:delete', 'wallet:read', 'work:read', 'work:request', 'work:accept', 'consent:manage', 'app:write', 'app:manage', 'social:read', 'social:write', 'catalogue:read', 'storage:write'];
 
 /** A FRESH agent JWT — scopes are copied from the record at mint time, so an old token proves nothing. */
 async function mintProfileAgentToken(): Promise<string> {
@@ -799,6 +810,12 @@ await test('PATCH /v1/agents/:name/scopes — widening back to standard is store
         method: 'POST', body: JSON.stringify({ key: 'profiletabs.scope.probe', value: { ok: true }, visibility: 'owner' }),
     });
     assert(write.status === 200 || write.status === 201, `the widened agent may write again, got ${write.status}: ${JSON.stringify(write.body.error)}`);
+
+    // The suite's shared token was minted before the narrowing above and is now the WIDEST the
+    // record allows rather than what it was issued with, which is the point of
+    // auth/effective-scopes.ts. Re-mint it so the 39 tests below run as the agent the record now
+    // describes, instead of on a credential this block deliberately reduced.
+    agentToken = wideToken;
 });
 
 // ══════════════════════════════════════════════════════════════════

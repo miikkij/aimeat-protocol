@@ -62,6 +62,7 @@ import { sweepUndisclosedPublicContent } from '../services/ai-disclosure-sweep.j
 import { sweepHeldPushes, sweepNotificationDigests } from '../services/notification-sweeps.js';
 import { getNotifyPushService } from '../services/notify.js';
 import { registerCoreHandlers } from '../services/core-jobs.js';
+import { ANONYMOUS_SCOPES } from '../auth/anonymous-scopes.js';
 
 export interface ServiceInitResult {
   maintenanceCache: MaintenanceState;
@@ -468,6 +469,12 @@ async function setupAnonymousIdentity(config: AimeatConfig, storage: Storage): P
         displayName: 'Shared Anonymous Agent',
         description: 'Shared agent for anonymous mode — all AI agents share this identity and memory space',
         capabilities: ['memory', 'actions', 'catalogue'],
+        // THE RECORD CARRIES WHAT THE MINT HANDS OUT. It carried nothing, which was invisible while
+        // a token's own scopes were the answer; auth/effective-scopes.ts made the record the truth
+        // for every agent, so an empty list here meant the anonymous token was refused everywhere
+        // it had worked the day before. Named in one place (ANONYMOUS_SCOPES) so the two cannot
+        // drift again.
+        defaultScopes: [...ANONYMOUS_SCOPES],
         publicKey: kp.publicKey,
         trustScore: 50,
         morselBalance: config.welcomeBonus,
