@@ -67,11 +67,16 @@ export function layoutWithSources(layout, plan) {
   return out;
 }
 
-/** What a block prop takes from a node's value: a quantity gives its number, a refusal gives null. */
+/**
+ * What a block prop takes from a node's value: a quantity gives its number, a refusal gives null,
+ * and a ROW gives a row of the same — a chart's `values` is numbers, and the unit is a fact about
+ * the series rather than about each mark on it.
+ */
 export function plainValue(v) {
   if (v == null) return null;
   if (isError(v)) return null;
   if (isQuantity(v)) return v.n;
+  if (Array.isArray(v)) return v.map(plainValue);
   return v;
 }
 

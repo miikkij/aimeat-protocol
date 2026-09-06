@@ -45,6 +45,15 @@
  *   doc.set('t', 31);
  *   doc.setLanguage('en');   // …or just let the login pill do it
  * @version-history
+ *   v0.5.0 — 2026-09-06 — A ROW IS A VALUE, which is the half of a spreadsheet this language did
+ *     not have. Arithmetic and comparison broadcast over a list, min and max go element-wise on
+ *     two or more arguments, and range · map · fold · scan · cumsum · index · at · where build a
+ *     row and read it back, alongside the trigonometry and π a physical model is written in
+ *     (formula-parse.js, formula-arrays.js, formula-eval.js, tex.js). A day of twenty-four hours,
+ *     a battery simulated hour by hour and a year of irradiation on a tilted plane are now three
+ *     formulas in a record rather than three hundred nodes — which is what a living document was
+ *     for, and what it could not do until this version. describe("formula") answers with the whole
+ *     function vocabulary, generated from the node module the way everything else here is.
  *   v0.4.1 — 2026-09-06 — A control says its answer once: the reading beside it is drawn only for
  *     the slider and the number field, the two that cannot show it themselves. A pick used to
  *     print the value the document STORES beside a select showing the option's words, so the same
@@ -99,7 +108,7 @@ import {
   onLanguageChange, preference,
 } from './i18n.js';
 
-const VERSION = '0.4.1';
+const VERSION = '0.5.0';
 
 /** The node types whose rendering this library does itself, when the node names a block. */
 const DRAWN = ['control', 'formula', 'text', 'machine', 'value', 'source'];

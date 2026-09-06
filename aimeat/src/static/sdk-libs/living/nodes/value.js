@@ -34,7 +34,11 @@ import { isError } from '../formula-eval.js';
 export function wrapValue(raw, unit) {
   if (raw == null) return unit ? { n: 0, u: unit } : 0;
   if (typeof raw === 'number') return unit ? { n: raw, u: unit } : raw;
-  if (typeof raw === 'boolean' || typeof raw === 'string' || Array.isArray(raw)) return raw;
+  // A ROW OF NUMBERS WITH A UNIT IS A ROW OF QUANTITIES. Twenty-four readings in kWh are one node
+  // declaring kWh once, and every element carries it, so the checking downstream is the same
+  // checking a single reading gets.
+  if (Array.isArray(raw)) return unit ? raw.map((x) => wrapValue(x, unit)) : raw;
+  if (typeof raw === 'boolean' || typeof raw === 'string') return raw;
   if (typeof raw === 'object' && typeof raw.n === 'number') return raw;
   return raw;
 }

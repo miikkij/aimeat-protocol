@@ -192,6 +192,19 @@ export function formatParts(value, spec, defaultPlace, lang) {
     const cased = f.word === 'upper' ? asText(value).toUpperCase() : asText(value).toLowerCase();
     return { number: cased, unit: '', place: 'none', text: cased, refused: false };
   }
+  // A ROW PRINTS AS A ROW, AND A LONG ONE SAYS SO RATHER THAN FILLING THE PAGE. A formula that
+  // answers with 288 hours of irradiation is a formula worth putting on the screen — its
+  // MATHEMATICS is the point — but printing 288 numbers under it is not a reading, it is a wall.
+  // The three at the front, the one at the back, and how many there are: that is what a person
+  // checks a row by.
+  if (Array.isArray(value)) {
+    const one = (x) => formatParts(x, spec, defaultPlace, lang).text;
+    const body = value.length <= 5
+      ? value.map(one).join(', ')
+      : value.slice(0, 3).map(one).join(', ') + ' … ' + one(value[value.length - 1]);
+    const text = body + (value.length > 5 ? '  (' + value.length + ')' : '');
+    return { number: text, unit: '', place: 'none', text: text, refused: false };
+  }
   if (isQuantity(value) || typeof value === 'number') {
     const n = isQuantity(value) ? value.n : value;
     const unit = isQuantity(value) ? unitLabel(value.u) : '';

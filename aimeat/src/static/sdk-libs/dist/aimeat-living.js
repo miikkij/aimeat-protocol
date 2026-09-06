@@ -52,6 +52,12 @@
     mi: u({ m: 1 }, 1609.344),
     ft: u({ m: 1 }, 0.3048),
     in: u({ m: 1 }, 0.0254),
+    // area and volume, WRITTEN THE WAY A PERSON WRITES THEM. "m^2" parses because the power syntax
+    // is general, and it is then what a sheet PRINTS, since a unit's label is the text it was
+    // declared with — a caret in the middle of a designed page. The superscript spellings are the
+    // same units under another name, so a record may say either.
+    "m²": u({ m: 2 }),
+    "m³": u({ m: 3 }),
     // mass
     kg: u({ kg: 1 }),
     g: u({ kg: 1 }, 1e-3),
@@ -250,6 +256,414 @@
     return { n: fromBase(toBase(q.n, q.u), target), u: target };
   }
 
+  // src/static/sdk-libs/living/formula-parse.js
+  var FUNCTIONS = {
+    if: "If",
+    min: "Min",
+    max: "Max",
+    abs: "Abs",
+    sqrt: "Sqrt",
+    pow: "Power",
+    log: "Log",
+    ln: "Ln",
+    exp: "Exp",
+    round: "Round",
+    floor: "Floor",
+    ceil: "Ceiling",
+    sum: "Sum",
+    avg: "Mean",
+    mean: "Mean",
+    count: "Count",
+    clamp: "Clamp",
+    convert: "Convert",
+    text: "Text",
+    number: "Number",
+    and: "And",
+    or: "Or",
+    not: "Not",
+    first: "First",
+    last: "Last",
+    // The two doors between a percentage and a fraction of one. They are asked for out loud
+    // because a percentage is a LABEL on a face number here, never a hidden factor — units.js
+    // carries the rule and why it had to be written down.
+    fraction: "Fraction",
+    percent: "Percent",
+    // ── ROWS ── build one, walk one, read one back.
+    range: "Range",
+    map: "Map",
+    fold: "Fold",
+    scan: "Scan",
+    cumsum: "CumSum",
+    index: "Index",
+    at: "At",
+    where: "Where",
+    // ── The trigonometry a physical model is written in. Angles are RADIANS, and deg()/rad() are
+    // the two doors, for the same reason fraction()/percent() are: a hidden conversion is a
+    // conversion nobody can see.
+    sin: "Sin",
+    cos: "Cos",
+    tan: "Tan",
+    asin: "Asin",
+    acos: "Acos",
+    atan: "Atan",
+    atan2: "Atan2",
+    deg: "Deg",
+    rad: "Rad",
+    log10: "Log10"
+  };
+  var LITERALS = { true: true, false: false };
+  var CONSTANTS = { pi: "Pi" };
+  var BINDERS = { Map: 2, Fold: 3, Scan: 3 };
+  var BOUND = { Map: ["x", "i"], Fold: ["acc", "x", "i"], Scan: ["acc", "x", "i"] };
+  var PUNCT = ["<=", ">=", "<>", "!=", "==", "+", "-", "*", "/", "^", "&", "(", ")", ",", "<", ">", "="];
+  function tokenize(src) {
+    const out = [];
+    let i = 0;
+    while (i < src.length) {
+      const c = src[i];
+      if (c === " " || c === "	" || c === "\n" || c === "\r") {
+        i++;
+        continue;
+      }
+      if (c === '"' || c === "'") {
+        const quote = c;
+        let j = i + 1;
+        let text = "";
+        while (j < src.length && src[j] !== quote) {
+          if (src[j] === "\\" && j + 1 < src.length) {
+            text += src[j + 1];
+            j += 2;
+            continue;
+          }
+          text += src[j];
+          j++;
+        }
+        if (j >= src.length) return { error: "a text that never closes", at: i };
+        out.push({ t: "str", v: text, at: i });
+        i = j + 1;
+        continue;
+      }
+      if (c >= "0" && c <= "9" || c === "." && src[i + 1] >= "0" && src[i + 1] <= "9") {
+        let j = i;
+        while (j < src.length && (src[j] >= "0" && src[j] <= "9" || src[j] === ".")) j++;
+        if (src[j] === "e" || src[j] === "E") {
+          let k = j + 1;
+          if (src[k] === "+" || src[k] === "-") k++;
+          if (src[k] >= "0" && src[k] <= "9") {
+            j = k;
+            while (j < src.length && src[j] >= "0" && src[j] <= "9") j++;
+          }
+        }
+        const n = Number(src.slice(i, j));
+        if (!Number.isFinite(n)) return { error: "a number I cannot read: " + src.slice(i, j), at: i };
+        out.push({ t: "num", v: n, at: i });
+        i = j;
+        continue;
+      }
+      if (/[A-Za-z_À-ɏ]/.test(c)) {
+        let j = i;
+        while (j < src.length && /[A-Za-z0-9_.À-ɏ]/.test(src[j])) j++;
+        out.push({ t: "name", v: src.slice(i, j), at: i });
+        i = j;
+        continue;
+      }
+      const punct = PUNCT.find((p) => src.slice(i, i + p.length) === p);
+      if (punct) {
+        out.push({ t: "op", v: punct, at: i });
+        i += punct.length;
+        continue;
+      }
+      return { error: "a character that does not belong in a formula: " + c, at: i };
+    }
+    return out;
+  }
+  function parse(src) {
+    const tokens = tokenize(String(src == null ? "" : src));
+    if (!Array.isArray(tokens)) return tokens;
+    let p = 0;
+    let failed = null;
+    function fail(message, at) {
+      if (!failed) failed = { error: message, at: at == null ? tokens[p] ? tokens[p].at : String(src).length : at };
+      return null;
+    }
+    function peek() {
+      return tokens[p];
+    }
+    function isOp(v) {
+      const tk = tokens[p];
+      return tk && tk.t === "op" && tk.v === v;
+    }
+    function isWord(v) {
+      const tk = tokens[p];
+      return tk && tk.t === "name" && tk.v.toLowerCase() === v;
+    }
+    function eat(v) {
+      if (isOp(v)) {
+        p++;
+        return true;
+      }
+      return false;
+    }
+    function primary() {
+      const tk = peek();
+      if (!tk) return fail("a formula that stops in the middle");
+      if (tk.t === "num") {
+        p++;
+        return tk.v;
+      }
+      if (tk.t === "str") {
+        p++;
+        return { str: tk.v };
+      }
+      if (eat("(")) {
+        const inner = orExpr();
+        if (!eat(")")) return fail("a missing )");
+        return inner;
+      }
+      if (eat("-")) {
+        const v = power();
+        return v == null ? null : ["Negate", v];
+      }
+      if (eat("+")) return power();
+      if (tk.t === "name") {
+        const name = tk.v;
+        p++;
+        const lower = name.toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(LITERALS, lower) && !isOp("(")) return LITERALS[lower];
+        if (Object.prototype.hasOwnProperty.call(CONSTANTS, lower) && !isOp("(")) return [CONSTANTS[lower]];
+        if (isOp("(")) {
+          p++;
+          const head = FUNCTIONS[lower];
+          if (!head) return fail("a function this document does not have: " + name + ". It knows " + Object.keys(FUNCTIONS).join(", ") + ".", tk.at);
+          const args = [];
+          if (!isOp(")")) {
+            for (; ; ) {
+              const a = orExpr();
+              if (a === null && failed) return null;
+              args.push(a);
+              if (eat(",")) continue;
+              break;
+            }
+          }
+          if (!eat(")")) return fail("a missing ) after " + name);
+          return [head].concat(args);
+        }
+        return name;
+      }
+      return fail("something I cannot read here");
+    }
+    function power() {
+      const left = primary();
+      if (left === null && failed) return null;
+      if (eat("^")) {
+        const right = power();
+        if (right === null && failed) return null;
+        return ["Power", left, right];
+      }
+      return left;
+    }
+    function product() {
+      let left = power();
+      if (left === null && failed) return null;
+      while (isOp("*") || isOp("/")) {
+        const op = peek().v;
+        p++;
+        const right = power();
+        if (right === null && failed) return null;
+        left = [op === "*" ? "Multiply" : "Divide", left, right];
+      }
+      return left;
+    }
+    function sum() {
+      let left = product();
+      if (left === null && failed) return null;
+      while (isOp("+") || isOp("-")) {
+        const op = peek().v;
+        p++;
+        const right = product();
+        if (right === null && failed) return null;
+        left = [op === "+" ? "Add" : "Subtract", left, right];
+      }
+      return left;
+    }
+    function join() {
+      let left = sum();
+      if (left === null && failed) return null;
+      while (eat("&")) {
+        const right = sum();
+        if (right === null && failed) return null;
+        left = ["Concat", left, right];
+      }
+      return left;
+    }
+    const COMPARE = { "=": "Equal", "==": "Equal", "<>": "NotEqual", "!=": "NotEqual", "<": "Less", "<=": "LessEqual", ">": "Greater", ">=": "GreaterEqual" };
+    function compare() {
+      let left = join();
+      if (left === null && failed) return null;
+      while (peek() && peek().t === "op" && COMPARE[peek().v]) {
+        const head = COMPARE[peek().v];
+        p++;
+        const right = join();
+        if (right === null && failed) return null;
+        left = [head, left, right];
+      }
+      return left;
+    }
+    function notExpr() {
+      if (isWord("not") && tokens[p + 1] && !(tokens[p + 1].t === "op" && tokens[p + 1].v === "(")) {
+        p++;
+        const v = notExpr();
+        return v === null && failed ? null : ["Not", v];
+      }
+      return compare();
+    }
+    function andExpr() {
+      let left = notExpr();
+      if (left === null && failed) return null;
+      while (isWord("and")) {
+        p++;
+        const right = notExpr();
+        if (right === null && failed) return null;
+        left = ["And", left, right];
+      }
+      return left;
+    }
+    function orExpr() {
+      let left = andExpr();
+      if (left === null && failed) return null;
+      while (isWord("or")) {
+        p++;
+        const right = andExpr();
+        if (right === null && failed) return null;
+        left = ["Or", left, right];
+      }
+      return left;
+    }
+    const tree = orExpr();
+    if (failed) return failed;
+    if (p < tokens.length) return { error: "something left over after the formula ended", at: tokens[p].at };
+    if (tree === null) return { error: "an empty formula", at: 0 };
+    return tree;
+  }
+  function symbolsOf(tree, into, bound) {
+    const out = into || [];
+    const hidden = bound || [];
+    if (typeof tree === "string") {
+      if (hidden.indexOf(tree.split(".")[0]) < 0 && out.indexOf(tree) < 0) out.push(tree);
+      return out;
+    }
+    if (Array.isArray(tree)) {
+      const bodyAt = BINDERS[String(tree[0])];
+      for (let i = 1; i < tree.length; i++) {
+        symbolsOf(tree[i], out, bodyAt === i ? hidden.concat(BOUND[String(tree[0])]) : hidden);
+      }
+    }
+    return out;
+  }
+
+  // src/static/sdk-libs/living/formula-arrays.js
+  var MAX_ROW = 2e4;
+  function isList(v) {
+    return Array.isArray(v);
+  }
+  function isErr(v) {
+    return !!v && typeof v === "object" && !Array.isArray(v) && typeof v.error === "string";
+  }
+  function broadcast(args, apply) {
+    let n = -1;
+    for (const a of args) {
+      if (!isList(a)) continue;
+      if (n < 0) {
+        n = a.length;
+        continue;
+      }
+      if (a.length !== n) {
+        return {
+          error: "These lists are not the same length: one has " + n + " values and another has " + a.length + ". Working an expression out down a row needs them to line up."
+        };
+      }
+    }
+    if (n < 0) return apply(args);
+    const out = [];
+    for (let k = 0; k < n; k++) {
+      const one = [];
+      for (const a of args) one.push(isList(a) ? a[k] : a);
+      const got = apply(one);
+      if (isErr(got)) return { error: got.error + " That is at position " + k + " of the list." };
+      out.push(got);
+    }
+    return out;
+  }
+  function rangeOf(args) {
+    const one = args.length === 1;
+    const from = one ? 0 : args[0];
+    const to = one ? args[0] : args[1];
+    const step = args.length > 2 ? args[2] : 1;
+    if (!Number.isFinite(from) || !Number.isFinite(to) || !Number.isFinite(step)) {
+      return { error: "range() counts with plain numbers, and one of the three it was given is not one." };
+    }
+    if (step === 0) return { error: "range() was given a step of 0, and would never reach the end." };
+    const count = Math.ceil((to - from) / step);
+    if (count <= 0) return [];
+    if (count > MAX_ROW) {
+      return {
+        error: "range() was asked for " + count + " values, and one row in this document holds at most " + MAX_ROW + "."
+      };
+    }
+    const out = [];
+    for (let k = 0; k < count; k++) out.push(from + k * step);
+    return out;
+  }
+  function indexAt(list, i) {
+    if (!Number.isFinite(i)) return { error: "index() needs a position that is a number." };
+    if (!Number.isInteger(i)) {
+      return { error: "index() reads a whole position, and got " + i + ". To read BETWEEN two positions, say at()." };
+    }
+    if (i < 0 || i >= list.length) {
+      return {
+        error: "This list holds " + list.length + " values, counted from 0, so there is nothing at position " + i + "."
+      };
+    }
+    return list[i];
+  }
+  function readAt(list, t, blend) {
+    if (!list.length) return { error: "at() was given an empty list." };
+    if (!Number.isFinite(t)) return { error: "at() needs a position that is a number." };
+    if (t <= 0) return list[0];
+    const lo = Math.floor(t);
+    if (lo >= list.length - 1) return list[list.length - 1];
+    const f = t - lo;
+    if (f === 0) return list[lo];
+    return blend(list[lo], list[lo + 1], f);
+  }
+  function cumsumOf(list, add) {
+    const out = [];
+    let acc = null;
+    for (let k = 0; k < list.length; k++) {
+      acc = k === 0 ? list[0] : add(acc, list[k]);
+      if (isErr(acc)) return { error: acc.error + " That is at position " + k + " of the list." };
+      out.push(acc);
+    }
+    return out;
+  }
+  function childScope(parent, names, values) {
+    return {
+      get(symbol) {
+        const whole = String(symbol);
+        const head = whole.split(".")[0];
+        const k = names.indexOf(head);
+        if (k < 0) return parent.get(symbol);
+        let at = values[k];
+        if (whole === head) return at;
+        for (const part of whole.slice(head.length + 1).split(".")) {
+          if (at == null || typeof at !== "object") return void 0;
+          at = at[part];
+        }
+        return at;
+      }
+    };
+  }
+
   // src/static/sdk-libs/living/formula-eval.js
   var PERCENT = (
     /** @type {any} */
@@ -396,6 +810,85 @@
     }
     return tidy({ n: fold(values), u: unit });
   }
+  function pairPick(a, b, wantMax) {
+    const name = wantMax ? "max" : "min";
+    const qa = num(a, name);
+    if (isError(qa)) return qa;
+    const qb = num(b, name);
+    if (isError(qb)) return qb;
+    if (qa.u && qb.u && !sameDim(qa.u, qb.u)) {
+      return { error: "I cannot take the " + name + " of " + unitLabel(qa.u) + " and " + unitLabel(qb.u) + ": those measure different things." };
+    }
+    const moved = qa.u && qb.u && unitLabel(qb.u) !== unitLabel(qa.u) ? convert(qb, qa.u) : qb;
+    if (isError(moved)) return moved;
+    const takeB = wantMax ? moved.n > qa.n : moved.n < qa.n;
+    const unit = qa.u || moved.u;
+    return tidy({ n: takeB ? moved.n : qa.n, u: unit });
+  }
+  var MATH1 = {
+    Sin: Math.sin,
+    Cos: Math.cos,
+    Tan: Math.tan,
+    Atan: Math.atan,
+    Deg: (x) => x * 180 / Math.PI,
+    Rad: (x) => x * Math.PI / 180,
+    Log10: null,
+    Asin: null,
+    Acos: null
+  };
+  var ELEMENTWISE = {
+    Add: 1,
+    Subtract: 1,
+    Negate: 1,
+    Multiply: 1,
+    Divide: 1,
+    Power: 1,
+    Equal: 1,
+    NotEqual: 1,
+    Less: 1,
+    LessEqual: 1,
+    Greater: 1,
+    GreaterEqual: 1,
+    Not: 1,
+    Concat: 1,
+    Text: 1,
+    Number: 1,
+    Where: 1,
+    Abs: 1,
+    Sqrt: 1,
+    Exp: 1,
+    Ln: 1,
+    Log: 1,
+    Log10: 1,
+    Round: 1,
+    Floor: 1,
+    Ceiling: 1,
+    Clamp: 1,
+    Convert: 1,
+    Fraction: 1,
+    Percent: 1,
+    Min: 1,
+    Max: 1,
+    Sin: 1,
+    Cos: 1,
+    Tan: 1,
+    Asin: 1,
+    Acos: 1,
+    Atan: 1,
+    Atan2: 1,
+    Deg: 1,
+    Rad: 1
+  };
+  function addValues(a, b) {
+    return addLike(a, b, 1, "Add");
+  }
+  function blendValues(a, b, f) {
+    const gap = addLike(b, a, -1, "Subtract");
+    if (isError(gap)) return gap;
+    const part = mulLike(gap, f, false);
+    if (isError(part)) return part;
+    return addLike(a, part, 1, "Add");
+  }
   function evaluate(tree, scope) {
     if (tree == null) return { error: "an empty formula" };
     if (typeof tree === "number" || typeof tree === "boolean") return tree;
@@ -411,6 +904,33 @@
     }
     const head = tree[0];
     const arg = (i) => evaluate(tree[i], scope);
+    if (head === "Map" || head === "Fold" || head === "Scan") {
+      const row = evaluate(tree[1], scope);
+      if (isError(row)) return row;
+      if (!isList(row)) {
+        return { error: head.toLowerCase() + "() walks a list, and was given " + describeValue(row) + "." };
+      }
+      const body = tree[head === "Map" ? 2 : 3];
+      const names = BOUND[head];
+      if (head === "Map") {
+        const out = [];
+        for (let k = 0; k < row.length; k++) {
+          const got = evaluate(body, childScope(scope, names, [row[k], k]));
+          if (isError(got)) return { error: got.error + " That is at position " + k + " of the list." };
+          out.push(got);
+        }
+        return out;
+      }
+      let acc = evaluate(tree[2], scope);
+      if (isError(acc)) return acc;
+      const trail = [acc];
+      for (let k = 0; k < row.length; k++) {
+        acc = evaluate(body, childScope(scope, names, [acc, row[k], k]));
+        if (isError(acc)) return { error: acc.error + " That is at position " + k + " of the list." };
+        trail.push(acc);
+      }
+      return head === "Scan" ? trail : acc;
+    }
     if (head === "If") {
       const cond = truth(arg(1));
       if (isError(cond)) return cond;
@@ -432,9 +952,111 @@
       if (isError(v)) return v;
       args.push(v);
     }
+    switch (head) {
+      case "Range": {
+        const plain = [];
+        for (const one of args) {
+          const q = num(one, "range");
+          if (isError(q)) return q;
+          plain.push(q.n);
+        }
+        return rangeOf(plain);
+      }
+      case "Index": {
+        if (!isList(args[0])) return { error: "index() reads a list, and was given " + describeValue(args[0]) + "." };
+        const at = num(args[1], "index");
+        if (isError(at)) return at;
+        return indexAt(args[0], at.n);
+      }
+      case "At": {
+        if (!isList(args[0])) return { error: "at() reads a list, and was given " + describeValue(args[0]) + "." };
+        const at = num(args[1], "at");
+        if (isError(at)) return at;
+        return readAt(args[0], at.n, blendValues);
+      }
+      case "CumSum": {
+        if (!isList(args[0])) return { error: "cumsum() adds along a list, and was given " + describeValue(args[0]) + "." };
+        return cumsumOf(args[0], addValues);
+      }
+      // One argument is the aggregate min and max this language has always had; two or more is the
+      // element-wise pair, which falls through to the scalar table below.
+      case "Min":
+        if (args.length === 1) return aggregate(args, (v) => Math.min.apply(null, v), "min");
+        break;
+      case "Max":
+        if (args.length === 1) return aggregate(args, (v) => Math.max.apply(null, v), "max");
+        break;
+      case "Sum":
+        return aggregate(args, (v) => v.reduce((x, y) => x + y, 0), "sum");
+      case "Mean":
+        return aggregate(args, (v) => v.reduce((x, y) => x + y, 0) / v.length, "avg");
+      case "Count": {
+        const items = spread(args);
+        return isError(items) ? items : items.length;
+      }
+      case "First": {
+        const items = spread(args);
+        return isError(items) ? items : items.length ? items[0] : { error: "first() was given an empty list." };
+      }
+      case "Last": {
+        const items = spread(args);
+        return isError(items) ? items : items.length ? items[items.length - 1] : { error: "last() was given an empty list." };
+      }
+      default:
+        break;
+    }
+    if (ELEMENTWISE[head] && args.some(isList)) {
+      return broadcast(args, function(one) {
+        return applyScalar(head, one);
+      });
+    }
+    return applyScalar(head, args);
+  }
+  function applyScalar(head, args) {
     const a = args[0];
     const b = args[1];
+    if (MATH1[head] || head === "Asin" || head === "Acos" || head === "Log10") {
+      const q = num(a, head.toLowerCase());
+      if (isError(q)) return q;
+      if (head === "Asin" || head === "Acos") {
+        if (q.n < -1 || q.n > 1) {
+          return { error: "There is no " + head.toLowerCase() + " of " + trimNumber(q.n) + ": it takes a number between -1 and 1." };
+        }
+        return head === "Asin" ? Math.asin(q.n) : Math.acos(q.n);
+      }
+      if (head === "Log10") {
+        if (q.n <= 0) return { error: "There is no logarithm of " + trimNumber(q.n) + "." };
+        return Math.log10(q.n);
+      }
+      return MATH1[head](q.n);
+    }
     switch (head) {
+      case "Pi":
+        return Math.PI;
+      case "Atan2": {
+        const qy = num(a, "atan2");
+        if (isError(qy)) return qy;
+        const qx = num(b, "atan2");
+        if (isError(qx)) return qx;
+        return Math.atan2(qy.n, qx.n);
+      }
+      // where() is the element-wise door if(): it takes all three sides as values, so a row of
+      // conditions picks from a row of answers. if() cannot do that — it works one side out and
+      // leaves the other alone, which is what a lazy branch is for.
+      case "Where": {
+        const cond = truth(a);
+        if (isError(cond)) return cond;
+        return cond ? b : args[2];
+      }
+      case "Min":
+      case "Max": {
+        let best = args[0];
+        for (let i = 1; i < args.length; i++) {
+          best = pairPick(best, args[i], head === "Max");
+          if (isError(best)) return best;
+        }
+        return best;
+      }
       case "Add":
         return addLike(a, b, 1, "Add");
       case "Subtract":
@@ -553,26 +1175,6 @@
         }
         return { n: q.n * 100, u: PERCENT };
       }
-      case "Min":
-        return aggregate(args, (v) => Math.min.apply(null, v), "min");
-      case "Max":
-        return aggregate(args, (v) => Math.max.apply(null, v), "max");
-      case "Sum":
-        return aggregate(args, (v) => v.reduce((x, y) => x + y, 0), "sum");
-      case "Mean":
-        return aggregate(args, (v) => v.reduce((x, y) => x + y, 0) / v.length, "avg");
-      case "Count": {
-        const items = spread(args);
-        return isError(items) ? items : items.length;
-      }
-      case "First": {
-        const items = spread(args);
-        return isError(items) ? items : items.length ? items[0] : { error: "first() was given an empty list." };
-      }
-      case "Last": {
-        const items = spread(args);
-        return isError(items) ? items : items.length ? items[items.length - 1] : { error: "last() was given an empty list." };
-      }
       default:
         return { error: "a function this document does not have: " + head };
     }
@@ -667,6 +1269,12 @@
       const cased = f.word === "upper" ? asText(value2).toUpperCase() : asText(value2).toLowerCase();
       return { number: cased, unit: "", place: "none", text: cased, refused: false };
     }
+    if (Array.isArray(value2)) {
+      const one = (x) => formatParts(x, spec, defaultPlace, lang).text;
+      const body = value2.length <= 5 ? value2.map(one).join(", ") : value2.slice(0, 3).map(one).join(", ") + " … " + one(value2[value2.length - 1]);
+      const text = body + (value2.length > 5 ? "  (" + value2.length + ")" : "");
+      return { number: text, unit: "", place: "none", text, refused: false };
+    }
     if (isQuantity(value2) || typeof value2 === "number") {
       const n = isQuantity(value2) ? value2.n : value2;
       const unit = isQuantity(value2) ? unitLabel(value2.u) : "";
@@ -675,8 +1283,8 @@
       const text = !unit || place === "none" ? number : place === "before" ? unit + " " + number : number + " " + unit;
       return { number, unit, place, text, refused: false };
     }
-    const words = asText(value2);
-    return { number: words, unit: "", place: "none", text: words, refused: false };
+    const words2 = asText(value2);
+    return { number: words2, unit: "", place: "none", text: words2, refused: false };
   }
   function formatValue(value2, spec, lang) {
     return formatParts(value2, spec, void 0, lang).text;
@@ -686,7 +1294,8 @@
   function wrapValue(raw, unit) {
     if (raw == null) return unit ? { n: 0, u: unit } : 0;
     if (typeof raw === "number") return unit ? { n: raw, u: unit } : raw;
-    if (typeof raw === "boolean" || typeof raw === "string" || Array.isArray(raw)) return raw;
+    if (Array.isArray(raw)) return unit ? raw.map((x) => wrapValue(x, unit)) : raw;
+    if (typeof raw === "boolean" || typeof raw === "string") return raw;
     if (typeof raw === "object" && typeof raw.n === "number") return raw;
     return raw;
   }
@@ -698,19 +1307,19 @@
       return [];
     },
     /** Read the unit once and seed the store, so a rebuild does not forget where the slider was. */
-    prepare(node, ctx) {
+    prepare(node2, ctx) {
       const errors = [];
-      const unit = parseUnit(node.unit);
+      const unit = parseUnit(node2.unit);
       if (isError(unit)) errors.push(unit.error);
       ctx.compiled.unit = isError(unit) ? null : unit;
-      const badFormat = formatError(node.format);
+      const badFormat = formatError(node2.format);
       if (badFormat) errors.push(badFormat);
       if (!ctx.state.values.has(ctx.id)) {
-        ctx.state.values.set(ctx.id, wrapValue(node.value, ctx.compiled.unit));
+        ctx.state.values.set(ctx.id, wrapValue(node2.value, ctx.compiled.unit));
       }
       return errors;
     },
-    evaluate(node, ctx) {
+    evaluate(node2, ctx) {
       return ctx.state.values.get(ctx.id);
     },
     /**
@@ -718,293 +1327,20 @@
      * inside min and max when the node declared them, and the unit is the node's own — a slider
      * reports 31, not 31 of whatever it thought the unit was.
      */
-    coerce(node, ctx, raw) {
+    coerce(node2, ctx, raw) {
       let v = raw;
       if (v != null && typeof v === "object" && typeof v.n === "number") v = v.n;
       if (typeof v === "number") {
-        if (typeof node.min === "number") v = Math.max(node.min, v);
-        if (typeof node.max === "number") v = Math.min(node.max, v);
+        if (typeof node2.min === "number") v = Math.max(node2.min, v);
+        if (typeof node2.max === "number") v = Math.min(node2.max, v);
         return wrapValue(v, ctx.compiled.unit);
       }
-      if (typeof node.value === "number" && typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) {
-        return this.coerce(node, ctx, Number(v));
+      if (typeof node2.value === "number" && typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) {
+        return this.coerce(node2, ctx, Number(v));
       }
       return v;
     }
   };
-
-  // src/static/sdk-libs/living/formula-parse.js
-  var FUNCTIONS = {
-    if: "If",
-    min: "Min",
-    max: "Max",
-    abs: "Abs",
-    sqrt: "Sqrt",
-    pow: "Power",
-    log: "Log",
-    ln: "Ln",
-    exp: "Exp",
-    round: "Round",
-    floor: "Floor",
-    ceil: "Ceiling",
-    sum: "Sum",
-    avg: "Mean",
-    mean: "Mean",
-    count: "Count",
-    clamp: "Clamp",
-    convert: "Convert",
-    text: "Text",
-    number: "Number",
-    and: "And",
-    or: "Or",
-    not: "Not",
-    first: "First",
-    last: "Last",
-    // The two doors between a percentage and a fraction of one. They are asked for out loud
-    // because a percentage is a LABEL on a face number here, never a hidden factor — units.js
-    // carries the rule and why it had to be written down.
-    fraction: "Fraction",
-    percent: "Percent"
-  };
-  var LITERALS = { true: true, false: false };
-  var PUNCT = ["<=", ">=", "<>", "!=", "==", "+", "-", "*", "/", "^", "&", "(", ")", ",", "<", ">", "="];
-  function tokenize(src) {
-    const out = [];
-    let i = 0;
-    while (i < src.length) {
-      const c = src[i];
-      if (c === " " || c === "	" || c === "\n" || c === "\r") {
-        i++;
-        continue;
-      }
-      if (c === '"' || c === "'") {
-        const quote = c;
-        let j = i + 1;
-        let text = "";
-        while (j < src.length && src[j] !== quote) {
-          if (src[j] === "\\" && j + 1 < src.length) {
-            text += src[j + 1];
-            j += 2;
-            continue;
-          }
-          text += src[j];
-          j++;
-        }
-        if (j >= src.length) return { error: "a text that never closes", at: i };
-        out.push({ t: "str", v: text, at: i });
-        i = j + 1;
-        continue;
-      }
-      if (c >= "0" && c <= "9" || c === "." && src[i + 1] >= "0" && src[i + 1] <= "9") {
-        let j = i;
-        while (j < src.length && (src[j] >= "0" && src[j] <= "9" || src[j] === ".")) j++;
-        if (src[j] === "e" || src[j] === "E") {
-          let k = j + 1;
-          if (src[k] === "+" || src[k] === "-") k++;
-          if (src[k] >= "0" && src[k] <= "9") {
-            j = k;
-            while (j < src.length && src[j] >= "0" && src[j] <= "9") j++;
-          }
-        }
-        const n = Number(src.slice(i, j));
-        if (!Number.isFinite(n)) return { error: "a number I cannot read: " + src.slice(i, j), at: i };
-        out.push({ t: "num", v: n, at: i });
-        i = j;
-        continue;
-      }
-      if (/[A-Za-z_À-ɏ]/.test(c)) {
-        let j = i;
-        while (j < src.length && /[A-Za-z0-9_.À-ɏ]/.test(src[j])) j++;
-        out.push({ t: "name", v: src.slice(i, j), at: i });
-        i = j;
-        continue;
-      }
-      const punct = PUNCT.find((p) => src.slice(i, i + p.length) === p);
-      if (punct) {
-        out.push({ t: "op", v: punct, at: i });
-        i += punct.length;
-        continue;
-      }
-      return { error: "a character that does not belong in a formula: " + c, at: i };
-    }
-    return out;
-  }
-  function parse(src) {
-    const tokens = tokenize(String(src == null ? "" : src));
-    if (!Array.isArray(tokens)) return tokens;
-    let p = 0;
-    let failed = null;
-    function fail(message, at) {
-      if (!failed) failed = { error: message, at: at == null ? tokens[p] ? tokens[p].at : String(src).length : at };
-      return null;
-    }
-    function peek() {
-      return tokens[p];
-    }
-    function isOp(v) {
-      const tk = tokens[p];
-      return tk && tk.t === "op" && tk.v === v;
-    }
-    function isWord(v) {
-      const tk = tokens[p];
-      return tk && tk.t === "name" && tk.v.toLowerCase() === v;
-    }
-    function eat(v) {
-      if (isOp(v)) {
-        p++;
-        return true;
-      }
-      return false;
-    }
-    function primary() {
-      const tk = peek();
-      if (!tk) return fail("a formula that stops in the middle");
-      if (tk.t === "num") {
-        p++;
-        return tk.v;
-      }
-      if (tk.t === "str") {
-        p++;
-        return { str: tk.v };
-      }
-      if (eat("(")) {
-        const inner = orExpr();
-        if (!eat(")")) return fail("a missing )");
-        return inner;
-      }
-      if (eat("-")) {
-        const v = power();
-        return v == null ? null : ["Negate", v];
-      }
-      if (eat("+")) return power();
-      if (tk.t === "name") {
-        const name = tk.v;
-        p++;
-        const lower = name.toLowerCase();
-        if (Object.prototype.hasOwnProperty.call(LITERALS, lower) && !isOp("(")) return LITERALS[lower];
-        if (isOp("(")) {
-          p++;
-          const head = FUNCTIONS[lower];
-          if (!head) return fail("a function this document does not have: " + name + ". It knows " + Object.keys(FUNCTIONS).join(", ") + ".", tk.at);
-          const args = [];
-          if (!isOp(")")) {
-            for (; ; ) {
-              const a = orExpr();
-              if (a === null && failed) return null;
-              args.push(a);
-              if (eat(",")) continue;
-              break;
-            }
-          }
-          if (!eat(")")) return fail("a missing ) after " + name);
-          return [head].concat(args);
-        }
-        return name;
-      }
-      return fail("something I cannot read here");
-    }
-    function power() {
-      const left = primary();
-      if (left === null && failed) return null;
-      if (eat("^")) {
-        const right = power();
-        if (right === null && failed) return null;
-        return ["Power", left, right];
-      }
-      return left;
-    }
-    function product() {
-      let left = power();
-      if (left === null && failed) return null;
-      while (isOp("*") || isOp("/")) {
-        const op = peek().v;
-        p++;
-        const right = power();
-        if (right === null && failed) return null;
-        left = [op === "*" ? "Multiply" : "Divide", left, right];
-      }
-      return left;
-    }
-    function sum() {
-      let left = product();
-      if (left === null && failed) return null;
-      while (isOp("+") || isOp("-")) {
-        const op = peek().v;
-        p++;
-        const right = product();
-        if (right === null && failed) return null;
-        left = [op === "+" ? "Add" : "Subtract", left, right];
-      }
-      return left;
-    }
-    function join() {
-      let left = sum();
-      if (left === null && failed) return null;
-      while (eat("&")) {
-        const right = sum();
-        if (right === null && failed) return null;
-        left = ["Concat", left, right];
-      }
-      return left;
-    }
-    const COMPARE = { "=": "Equal", "==": "Equal", "<>": "NotEqual", "!=": "NotEqual", "<": "Less", "<=": "LessEqual", ">": "Greater", ">=": "GreaterEqual" };
-    function compare() {
-      let left = join();
-      if (left === null && failed) return null;
-      while (peek() && peek().t === "op" && COMPARE[peek().v]) {
-        const head = COMPARE[peek().v];
-        p++;
-        const right = join();
-        if (right === null && failed) return null;
-        left = [head, left, right];
-      }
-      return left;
-    }
-    function notExpr() {
-      if (isWord("not") && tokens[p + 1] && !(tokens[p + 1].t === "op" && tokens[p + 1].v === "(")) {
-        p++;
-        const v = notExpr();
-        return v === null && failed ? null : ["Not", v];
-      }
-      return compare();
-    }
-    function andExpr() {
-      let left = notExpr();
-      if (left === null && failed) return null;
-      while (isWord("and")) {
-        p++;
-        const right = notExpr();
-        if (right === null && failed) return null;
-        left = ["And", left, right];
-      }
-      return left;
-    }
-    function orExpr() {
-      let left = andExpr();
-      if (left === null && failed) return null;
-      while (isWord("or")) {
-        p++;
-        const right = andExpr();
-        if (right === null && failed) return null;
-        left = ["Or", left, right];
-      }
-      return left;
-    }
-    const tree = orExpr();
-    if (failed) return failed;
-    if (p < tokens.length) return { error: "something left over after the formula ended", at: tokens[p].at };
-    if (tree === null) return { error: "an empty formula", at: 0 };
-    return tree;
-  }
-  function symbolsOf(tree, into) {
-    const out = into || [];
-    if (typeof tree === "string") {
-      if (out.indexOf(tree) < 0) out.push(tree);
-      return out;
-    }
-    if (Array.isArray(tree)) for (let i = 1; i < tree.length; i++) symbolsOf(tree[i], out);
-    return out;
-  }
 
   // src/static/sdk-libs/living/tex.js
   var RANK = {
@@ -1036,7 +1372,6 @@
   var OPERATORS = {
     Min: "min",
     Max: "max",
-    Sum: "sum",
     Mean: "avg",
     Count: "count",
     Clamp: "clamp",
@@ -1048,9 +1383,20 @@
     Ceiling: "ceil",
     First: "first",
     Last: "last",
-    Exp: "exp",
-    Ln: "ln",
-    Log: "log"
+    CumSum: "cumsum"
+  };
+  var MACROS = {
+    Sin: "\\sin",
+    Cos: "\\cos",
+    Tan: "\\tan",
+    Asin: "\\arcsin",
+    Acos: "\\arccos",
+    Atan: "\\arctan",
+    Exp: "\\exp",
+    Ln: "\\ln",
+    Log: "\\log",
+    Log10: "\\log_{10}",
+    Deg: "\\deg"
   };
   function escapeText(s) {
     return String(s).replace(/([\\{}$&#^_%~])/g, "\\$1");
@@ -1112,51 +1458,94 @@
         const other = tree.length > 3 ? toTex(tree[3], 0) : "";
         return "\\begin{cases} " + then + " & " + toTex(tree[1], 0) + " \\\\ " + other + " & \\text{otherwise} \\end{cases}";
       }
+      // ── THE ROW, SET AS A ROW. A sigma is a sigma, a map is the bracketed set-builder mathematics
+      // already writes, and a position is a subscript. The alternative — \operatorname{index}(pv, i)
+      // — is the source code printed in a serif face, which teaches a reader nothing they could not
+      // read in the formula box above it.
+      case "Pi":
+        return "\\pi";
+      case "Sum": {
+        if (tree.length === 2) return wrap("\\sum " + toTex(tree[1], 10), 10, outer);
+        return "\\sum\\left(" + tree.slice(1).map((t) => toTex(t, 0)).join(",\\; ") + "\\right)";
+      }
+      case "Index":
+        return toTex(tree[1], 10) + "_{" + toTex(tree[2], 0) + "}";
+      case "At":
+        return toTex(tree[1], 10) + "\\!\\left(" + toTex(tree[2], 0) + "\\right)";
+      case "Range": {
+        const from = tree.length > 2 ? toTex(tree[1], 0) : "0";
+        const to = toTex(tree[tree.length > 2 ? 2 : 1], 0);
+        const step = tree.length > 3 ? "_{\\,\\Delta " + toTex(tree[3], 0) + "}" : "";
+        return "\\left[" + from + " \\ldots " + to + "\\right)" + step;
+      }
+      case "Map":
+        return "\\left[\\, " + toTex(tree[2], 0) + " \\;\\middle|\\; x \\in " + toTex(tree[1], 0) + " \\,\\right]";
+      case "Fold":
+      case "Scan": {
+        const name = head === "Fold" ? "fold" : "scan";
+        return "\\operatorname{" + name + "}_{x \\in " + toTex(tree[1], 0) + "}\\left(\\mathrm{acc}_{0} = " + toTex(tree[2], 0) + ",\\; " + toTex(tree[3], 0) + "\\right)";
+      }
+      case "Where": {
+        return "\\begin{cases} " + toTex(tree[2], 0) + " & " + toTex(tree[1], 0) + " \\\\ " + toTex(tree[3], 0) + " & \\text{otherwise} \\end{cases}";
+      }
       default: {
         if (RELATION[head]) return wrap(at(1) + " " + RELATION[head] + " " + at(2), rank, outer);
-        const name = OPERATORS[head] || String(head).toLowerCase();
         const args = tree.slice(1).map((t) => toTex(t, 0)).join(",\\; ");
+        if (MACROS[head]) return MACROS[head] + "\\left(" + args + "\\right)";
+        const name = OPERATORS[head] || String(head).toLowerCase();
         return "\\operatorname{" + escapeText(name) + "}\\left(" + args + "\\right)";
       }
     }
   }
 
   // src/static/sdk-libs/living/nodes/formula.js
+  function wear(out, unit) {
+    if (Array.isArray(out)) {
+      const row = [];
+      for (const one of out) {
+        const got = wear(one, unit);
+        if (isError(got)) return got;
+        row.push(got);
+      }
+      return row;
+    }
+    if (isQuantity(out)) return convert(out, unit);
+    if (typeof out === "number") return { n: out, u: unit };
+    return out;
+  }
   var formula = {
     id: "formula",
     /** Every name the expression reads. A name this document does not have is caught in validate. */
-    dependsOn(node, ctx) {
+    dependsOn(node2, ctx) {
       const tree = ctx.compiled.tree;
       return tree ? symbolsOf(tree).map((s) => s.split(".")[0]) : [];
     },
     /** Parse the expression and the unit ONCE — a formula is re-evaluated on every move. */
-    prepare(node, ctx) {
+    prepare(node2, ctx) {
       const errors = [];
-      const tree = parse(node.expr);
+      const tree = parse(node2.expr);
       if (isError(tree)) {
-        errors.push("the formula " + String(node.expr) + " has " + tree.error);
+        errors.push("the formula " + String(node2.expr) + " has " + tree.error);
         ctx.compiled.tree = null;
       } else {
         ctx.compiled.tree = tree;
         ctx.compiled.tex = toTex(tree);
       }
-      const unit = parseUnit(node.unit);
+      const unit = parseUnit(node2.unit);
       if (isError(unit)) errors.push(unit.error);
       ctx.compiled.unit = isError(unit) ? null : unit;
-      const badFormat = formatError(node.format);
+      const badFormat = formatError(node2.format);
       if (badFormat) errors.push(badFormat);
       return errors;
     },
-    evaluate(node, ctx) {
+    evaluate(node2, ctx) {
       if (!ctx.compiled.tree) return { error: "This formula could not be read." };
       const out = evaluate(ctx.compiled.tree, ctx.scope);
       if (isError(out) || !ctx.compiled.unit) return out;
-      if (isQuantity(out)) return convert(out, ctx.compiled.unit);
-      if (typeof out === "number") return { n: out, u: ctx.compiled.unit };
-      return out;
+      return wear(out, ctx.compiled.unit);
     },
     /** The second output: the expression, set. */
-    fields(node, ctx) {
+    fields(node2, ctx) {
       return { tex: ctx.compiled.tex || "" };
     }
   };
@@ -1166,44 +1555,44 @@
   var control = {
     id: "control",
     /** A control READS its target so it can show where the value is now. */
-    dependsOn(node) {
-      return node.target ? [String(node.target)] : [];
+    dependsOn(node2) {
+      return node2.target ? [String(node2.target)] : [];
     },
-    prepare(node, ctx) {
+    prepare(node2, ctx) {
       const errors = [];
-      const kind = String(node.kind || "slider");
+      const kind = String(node2.kind || "slider");
       if (CONTROL_KINDS.indexOf(kind) < 0) {
         errors.push('a control of kind "' + kind + '"; this document has ' + CONTROL_KINDS.join(", "));
       }
-      if (!node.target) errors.push("a control with no target to move");
-      if (kind === "pick" && !Array.isArray(node.options)) {
+      if (!node2.target) errors.push("a control with no target to move");
+      if (kind === "pick" && !Array.isArray(node2.options)) {
         errors.push("a pick control with no options to pick from");
       }
       ctx.compiled.kind = kind;
       return errors;
     },
     /** A control's own output is its target's value: the control IS that quantity, seen. */
-    evaluate(node, ctx) {
-      return node.target ? ctx.scope.get(String(node.target)) : void 0;
+    evaluate(node2, ctx) {
+      return node2.target ? ctx.scope.get(String(node2.target)) : void 0;
     }
   };
 
   // src/static/sdk-libs/living/nodes/binding.js
   var binding = {
     id: "binding",
-    dependsOn(node) {
-      return node.from ? [String(node.from)] : [];
+    dependsOn(node2) {
+      return node2.from ? [String(node2.from)] : [];
     },
-    prepare(node, ctx) {
+    prepare(node2, ctx) {
       const errors = [];
-      if (!node.block) errors.push("a binding with no block to write to");
-      if (!node.prop) errors.push("a binding with no prop to write");
-      if (!node.from) errors.push("a binding with no node to read");
-      ctx.compiled.path = String(node.prop || "").split(".").filter(Boolean);
+      if (!node2.block) errors.push("a binding with no block to write to");
+      if (!node2.prop) errors.push("a binding with no prop to write");
+      if (!node2.from) errors.push("a binding with no node to read");
+      ctx.compiled.path = String(node2.prop || "").split(".").filter(Boolean);
       return errors;
     },
-    evaluate(node, ctx) {
-      return node.from ? ctx.scope.get(String(node.from)) : void 0;
+    evaluate(node2, ctx) {
+      return node2.from ? ctx.scope.get(String(node2.from)) : void 0;
     }
   };
   function unboundBlocks(surface, blockIds) {
@@ -1498,12 +1887,12 @@
   // src/static/sdk-libs/living/nodes/text-node.js
   var textNode = {
     id: "text",
-    dependsOn(node, ctx) {
+    dependsOn(node2, ctx) {
       return symbolsOfTemplate(ctx.compiled.parts).map((s) => s.split(".")[0]);
     },
-    prepare(node, ctx) {
+    prepare(node2, ctx) {
       const langs = ctx.langs ? ctx.langs() : [];
-      const parts = parseTemplate(textOf(node.template, langs));
+      const parts = parseTemplate(textOf(node2.template, langs));
       ctx.compiled.lang = langs[0] || "";
       if (isError(parts)) {
         ctx.compiled.parts = [];
@@ -1513,10 +1902,10 @@
       return [];
     },
     /** The page changed language: read the sentence again, from the same record. */
-    relanguage(node, ctx) {
-      this.prepare(node, ctx);
+    relanguage(node2, ctx) {
+      this.prepare(node2, ctx);
     },
-    evaluate(node, ctx) {
+    evaluate(node2, ctx) {
       return renderTemplate(ctx.compiled.parts, ctx.scope, ctx.compiled.lang);
     }
   };
@@ -1560,11 +1949,11 @@
     function walk(states, prefix) {
       if (!states || typeof states !== "object") return;
       for (const name of Object.keys(states)) {
-        const node = states[name] || {};
+        const node2 = states[name] || {};
         const path = prefix ? prefix + "." + name : name;
-        walkAssign(node.entry, "entry of " + path, "entry:" + path);
-        walkAssign(node.exit, "exit of " + path, "exit:" + path);
-        const on = node.on || {};
+        walkAssign(node2.entry, "entry of " + path, "entry:" + path);
+        walkAssign(node2.exit, "exit of " + path, "exit:" + path);
+        const on = node2.on || {};
         for (const event of Object.keys(on)) {
           const h = on[event];
           if (h && typeof h === "object" && h.guard) {
@@ -1572,7 +1961,7 @@
             if (tree) guards.set(path + "|" + event, tree);
           }
         }
-        if (node.states) walk(node.states, path);
+        if (node2.states) walk(node2.states, path);
       }
     }
     walk(def.states, "");
@@ -1583,21 +1972,21 @@
     return { guards, assigns, whens };
   }
   function stateAt(def, path) {
-    let node = def;
+    let node2 = def;
     for (const part of path) {
-      const kids = node.states || {};
+      const kids = node2.states || {};
       if (!kids[part]) return null;
-      node = kids[part];
+      node2 = kids[part];
     }
-    return node;
+    return node2;
   }
   function settleInto(def, path) {
     const out = path.slice();
     for (; ; ) {
-      const node = stateAt(def, out);
-      if (!node || !node.states || !node.initial) return out;
-      if (!node.states[node.initial]) return out;
-      out.push(node.initial);
+      const node2 = stateAt(def, out);
+      if (!node2 || !node2.states || !node2.initial) return out;
+      if (!node2.states[node2.initial]) return out;
+      out.push(node2.initial);
     }
   }
   function createMachine(def, opts) {
@@ -1693,8 +2082,8 @@
         const clock = now == null ? 0 : now;
         for (let depth = active.length; depth >= 1; depth--) {
           const path = active.slice(0, depth);
-          const node = stateAt(model, path);
-          const handler = node && node.on ? node.on[event] : null;
+          const node2 = stateAt(model, path);
+          const handler = node2 && node2.on ? node2.on[event] : null;
           if (!handler) continue;
           const target = typeof handler === "string" ? handler : handler.target;
           if (!target) continue;
@@ -1716,13 +2105,13 @@
       tick(now) {
         for (let depth = active.length; depth >= 1; depth--) {
           const path = active.slice(0, depth);
-          const node = stateAt(model, path);
-          if (!node || !node.after) continue;
+          const node2 = stateAt(model, path);
+          if (!node2 || !node2.after) continue;
           const since = enteredAt.get(path.join("."));
           if (since == null) continue;
-          for (const ms of Object.keys(node.after).map(Number).sort((a, b) => a - b)) {
+          for (const ms of Object.keys(node2.after).map(Number).sort((a, b) => a - b)) {
             if (!Number.isFinite(ms) || now - since < ms) continue;
-            const handler = node.after[String(ms)];
+            const handler = node2.after[String(ms)];
             const target = typeof handler === "string" ? handler : handler && handler.target;
             if (!target) continue;
             const assigns = move(resolveTarget(target, depth), depth - 1, now);
@@ -1736,11 +2125,11 @@
         let best = null;
         for (let depth = active.length; depth >= 1; depth--) {
           const path = active.slice(0, depth);
-          const node = stateAt(model, path);
-          if (!node || !node.after) continue;
+          const node2 = stateAt(model, path);
+          if (!node2 || !node2.after) continue;
           const since = enteredAt.get(path.join("."));
           if (since == null) continue;
-          for (const ms of Object.keys(node.after).map(Number)) {
+          for (const ms of Object.keys(node2.after).map(Number)) {
             if (!Number.isFinite(ms)) continue;
             const left = Math.max(0, since + ms - now);
             if (best == null || left < best) best = left;
@@ -1802,7 +2191,7 @@
   }
 
   // src/static/sdk-libs/living/nodes/machine-node.js
-  function referenced(node) {
+  function referenced(node2) {
     const out = [];
     const add = (src) => {
       if (isPlainObject(src)) {
@@ -1827,11 +2216,11 @@
         if (s.states) walk(s.states);
       }
     };
-    walk(node.states);
-    for (const w of node.when || []) add(w.expr);
+    walk(node2.states);
+    for (const w of node2.when || []) add(w.expr);
     return out;
   }
-  function writesOf(node) {
+  function writesOf(node2) {
     const out = [];
     const walk = (states) => {
       for (const name of Object.keys(states || {})) {
@@ -1842,25 +2231,25 @@
         if (s.states) walk(s.states);
       }
     };
-    walk(node.states);
+    walk(node2.states);
     return out;
   }
   var machineNode = {
     id: "machine",
     /** A machine reads what its guards and crossings read. What it WRITES is an edge the graph
      *  adds in the other direction, so the machine is recomputed before the values it assigns. */
-    dependsOn(node) {
-      return referenced(node);
+    dependsOn(node2) {
+      return referenced(node2);
     },
-    prepare(node, ctx) {
+    prepare(node2, ctx) {
       if (!ctx.state.machines.has(ctx.id)) {
-        ctx.state.machines.set(ctx.id, createMachine(node, { langs: ctx.langs }));
+        ctx.state.machines.set(ctx.id, createMachine(node2, { langs: ctx.langs }));
       }
       const m = ctx.state.machines.get(ctx.id);
       ctx.compiled.machine = m;
       return m.errors.slice();
     },
-    evaluate(node, ctx) {
+    evaluate(node2, ctx) {
       const m = ctx.state.machines.get(ctx.id);
       return m ? m.path() : "";
     }
@@ -1883,23 +2272,23 @@
     dependsOn() {
       return [];
     },
-    prepare(node, ctx) {
+    prepare(node2, ctx) {
       const errors = [];
-      const unit = parseUnit(node.unit);
+      const unit = parseUnit(node2.unit);
       if (isError(unit)) errors.push(unit.error);
       ctx.compiled.unit = isError(unit) ? null : unit;
-      const badFormat = formatError(node.format);
+      const badFormat = formatError(node2.format);
       if (badFormat) errors.push(badFormat);
-      if (!ctx.state.values.has(ctx.id)) ctx.state.values.set(ctx.id, wrapValue(node.value, ctx.compiled.unit));
+      if (!ctx.state.values.has(ctx.id)) ctx.state.values.set(ctx.id, wrapValue(node2.value, ctx.compiled.unit));
       return errors;
     },
-    evaluate(node, ctx) {
+    evaluate(node2, ctx) {
       return ctx.state.values.get(ctx.id);
     },
-    coerce(node, ctx, raw) {
+    coerce(node2, ctx, raw) {
       let v = raw;
       if (v != null && typeof v === "object" && !Array.isArray(v) && typeof v.n !== "number") {
-        const dug = dig(v, node.path);
+        const dug = dig(v, node2.path);
         v = dug;
         if (v != null && typeof v === "object" && !Array.isArray(v)) {
           for (const f of COMMON_FIELDS) if (typeof v[f] === "number") {
@@ -1907,8 +2296,8 @@
             break;
           }
         }
-      } else if (node.path && v != null && typeof v === "object") {
-        v = dig(v, node.path);
+      } else if (node2.path && v != null && typeof v === "object") {
+        v = dig(v, node2.path);
       }
       if (v != null && typeof v === "object" && typeof v.n === "number") v = v.n;
       return wrapValue(v, ctx.compiled.unit);
@@ -1919,13 +2308,13 @@
      * @param {any} node
      * @returns {Promise<any>}
      */
-    read(node) {
+    read(node2) {
       const ns = (
         /** @type {any} */
         window.AIMEAT
       );
-      if (!node.key || !ns || !ns.data) return Promise.resolve(void 0);
-      const call = node.scope === "public" && typeof ns.data.getPublic === "function" ? ns.data.getPublic(node.owner, node.key) : typeof ns.data.get === "function" ? ns.data.get(node.key) : null;
+      if (!node2.key || !ns || !ns.data) return Promise.resolve(void 0);
+      const call = node2.scope === "public" && typeof ns.data.getPublic === "function" ? ns.data.getPublic(node2.owner, node2.key) : typeof ns.data.get === "function" ? ns.data.get(node2.key) : null;
       if (!call) return Promise.resolve(void 0);
       return Promise.resolve(call).catch(() => void 0);
     }
@@ -2010,22 +2399,22 @@
       };
     }
     for (const id of ids) {
-      const node = nodes[id] || {};
-      const type = typeOf(node.type);
+      const node2 = nodes[id] || {};
+      const type = typeOf(node2.type);
       if (!type) {
-        errors.push('Node "' + id + '" is of type "' + String(node.type) + '", which this document does not have. It knows ' + Object.keys(NODE_TYPES).join(", ") + ".");
+        errors.push('Node "' + id + '" is of type "' + String(node2.type) + '", which this document does not have. It knows ' + Object.keys(NODE_TYPES).join(", ") + ".");
         continue;
       }
-      const found = type.prepare ? type.prepare(node, ctxFor(id)) : [];
+      const found = type.prepare ? type.prepare(node2, ctxFor(id)) : [];
       for (const e of found || []) errors.push('Node "' + id + '" has ' + e + ".");
     }
     const deps = /* @__PURE__ */ new Map();
     for (const id of ids) {
-      const node = nodes[id] || {};
-      const type = typeOf(node.type);
+      const node2 = nodes[id] || {};
+      const type = typeOf(node2.type);
       const list = [];
       if (type && type.dependsOn) {
-        for (const on of type.dependsOn(node, ctxFor(id)) || []) {
+        for (const on of type.dependsOn(node2, ctxFor(id)) || []) {
           if (!Object.prototype.hasOwnProperty.call(nodes, on)) {
             errors.push('Node "' + id + '" reads "' + on + '", which this document does not have.');
             continue;
@@ -2070,28 +2459,28 @@
       for (const id of stuck) order.push(id);
     }
     function computeOne(id) {
-      const node = nodes[id] || {};
-      const type = typeOf(node.type);
+      const node2 = nodes[id] || {};
+      const type = typeOf(node2.type);
       if (!type) return false;
       const ctx = ctxFor(id);
       let out;
       try {
-        out = type.evaluate(node, ctx);
+        out = type.evaluate(node2, ctx);
       } catch (e) {
         out = { error: 'Node "' + id + '" could not be worked out: ' + (e && e.message || String(e)) };
       }
-      if (type.fields) fields.set(id, type.fields(node, ctx));
+      if (type.fields) fields.set(id, type.fields(node2, ctx));
       const before = outputs.get(id);
       if (outputs.has(id) && same(before, out)) return false;
       outputs.set(id, out);
       return true;
     }
     function put(id, raw) {
-      const node = nodes[id] || {};
-      const type = typeOf(node.type);
+      const node2 = nodes[id] || {};
+      const type = typeOf(node2.type);
       if (!type || !type.settable) return false;
       const ctx = ctxFor(id);
-      const next = type.coerce ? type.coerce(node, ctx, raw) : raw;
+      const next = type.coerce ? type.coerce(node2, ctx, raw) : raw;
       if (same(state.values.get(id), next)) return false;
       state.values.set(id, next);
       return true;
@@ -2198,10 +2587,10 @@
         const changed = [];
         const seed = [];
         for (const id of order) {
-          const node = nodes[id] || {};
-          const type = typeOf(node.type);
+          const node2 = nodes[id] || {};
+          const type = typeOf(node2.type);
           if (!type || typeof type.relanguage !== "function") continue;
-          type.relanguage(node, ctxFor(id));
+          type.relanguage(node2, ctxFor(id));
           if (seed.indexOf(id) < 0) seed.push(id);
         }
         for (const id of order) {
@@ -2304,12 +2693,12 @@
     const nodes = (doc && doc.model || {}).nodes || {};
     const plan = /* @__PURE__ */ new Map();
     for (const id of Object.keys(nodes)) {
-      const node = nodes[id] || {};
-      if (node.type !== "binding" || !node.block) continue;
-      const list = plan.get(String(node.block)) || [];
-      const prop = String(node.prop == null ? "." : node.prop);
-      list.push({ id, path: prop === "." ? [] : prop.split(".").filter(Boolean), from: String(node.from) });
-      plan.set(String(node.block), list);
+      const node2 = nodes[id] || {};
+      if (node2.type !== "binding" || !node2.block) continue;
+      const list = plan.get(String(node2.block)) || [];
+      const prop = String(node2.prop == null ? "." : node2.prop);
+      list.push({ id, path: prop === "." ? [] : prop.split(".").filter(Boolean), from: String(node2.from) });
+      plan.set(String(node2.block), list);
     }
     return plan;
   }
@@ -2328,6 +2717,7 @@
     if (v == null) return null;
     if (isError(v)) return null;
     if (isQuantity(v)) return v.n;
+    if (Array.isArray(v)) return v.map(plainValue);
     return v;
   }
   function composeBlock(graph, entries, base) {
@@ -2354,33 +2744,33 @@
 
   // src/static/sdk-libs/living/dom.js
   function el(tag, attrs, kids) {
-    const node = document.createElement(tag);
+    const node2 = document.createElement(tag);
     for (const key of Object.keys(attrs || {})) {
       const v = attrs[key];
       if (v == null || v === false) continue;
       if (key === "text") {
-        node.textContent = String(v);
+        node2.textContent = String(v);
         continue;
       }
       if (key === "on") {
-        for (const ev of Object.keys(v)) node.addEventListener(ev, v[ev]);
+        for (const ev of Object.keys(v)) node2.addEventListener(ev, v[ev]);
         continue;
       }
       if (v === true) {
-        node.setAttribute(key, "");
+        node2.setAttribute(key, "");
         continue;
       }
-      node.setAttribute(key, String(v));
+      node2.setAttribute(key, String(v));
     }
     const list = kids == null ? [] : Array.isArray(kids) ? kids : [kids];
     for (const kid of list) {
       if (kid == null || kid === false) continue;
-      node.appendChild(typeof kid === "string" || typeof kid === "number" ? document.createTextNode(String(kid)) : kid);
+      node2.appendChild(typeof kid === "string" || typeof kid === "number" ? document.createTextNode(String(kid)) : kid);
     }
-    return node;
+    return node2;
   }
-  function clear(node) {
-    while (node && node.firstChild) node.removeChild(node.firstChild);
+  function clear(node2) {
+    while (node2 && node2.firstChild) node2.removeChild(node2.firstChild);
   }
   function resolve(target, fallback) {
     if (!target) return fallback || document.body;
@@ -2403,13 +2793,13 @@
       return false;
     }
   }
-  function countTo(node, from, to, format) {
+  function countTo(node2, from, to, format) {
     const k = kit();
     if (k && typeof k.countUp === "function" && !reducedMotion() && Number.isFinite(from) && Number.isFinite(to)) {
-      k.countUp(node, from, to, { format });
+      k.countUp(node2, from, to, { format });
       return;
     }
-    node.textContent = format(to);
+    node2.textContent = format(to);
   }
 
   // src/static/sdk-libs/_core/config.js
@@ -2631,16 +3021,16 @@
         if (Number.isFinite(n) && String(n) !== input.value) handle.setValues({ value: n });
       }
       if (!readoutEl) return;
-      const words = readout(v, target.format, langsOf(spec)[0]);
-      if (readoutEl.textContent !== words) readoutEl.textContent = words;
-      if (input.hasAttribute("aria-valuetext")) input.setAttribute("aria-valuetext", words);
+      const words2 = readout(v, target.format, langsOf(spec)[0]);
+      if (readoutEl.textContent !== words2) readoutEl.textContent = words2;
+      if (input.hasAttribute("aria-valuetext")) input.setAttribute("aria-valuetext", words2);
     }
     update(spec.value);
     function relabel(value2) {
       const langs = langsOf(spec);
       if (labelEl) {
-        const words = wording();
-        if (labelEl.textContent !== words) labelEl.textContent = words;
+        const words2 = wording();
+        if (labelEl.textContent !== words2) labelEl.textContent = words2;
       }
       if (kind === "pick" && input.options) {
         const wanted = (spec.node.options || []).map((o) => asOption(o, langs));
@@ -2762,25 +3152,25 @@
     return out;
   }
   function renderNodeInto(host, spec) {
-    const node = spec.node;
+    const node2 = spec.node;
     const graph = spec.graph;
     const langs = spec.langs || function() {
       return [];
     };
     const value2 = graph.valueOf(spec.id);
     const label = function() {
-      return textOf(node.label, langs());
+      return textOf(node2.label, langs());
     };
-    if (node.type === "control") {
-      const target = graph.nodeOf(String(node.target)) || {};
+    if (node2.type === "control") {
+      const target = graph.nodeOf(String(node2.target)) || {};
       const view = controlRow(host, {
         id: spec.id,
-        node,
+        node: node2,
         target,
         value: value2,
         langs,
         onSet(v) {
-          spec.set(String(node.target), v);
+          spec.set(String(node2.target), v);
         }
       });
       return {
@@ -2790,15 +3180,15 @@
         kind: "control"
       };
     }
-    if (node.type === "formula") {
+    if (node2.type === "formula") {
       const view = formulaView(host, {
         id: spec.id,
         label: label(),
         value: value2,
-        format: node.format,
+        format: node2.format,
         langs,
         tex: (graph.fieldsOf(spec.id) || {}).tex || "",
-        plain: spec.id + " = " + String(node.expr)
+        plain: spec.id + " = " + String(node2.expr)
       });
       return {
         el: view.el,
@@ -2807,7 +3197,7 @@
         kind: "formula"
       };
     }
-    if (node.type === "text") {
+    if (node2.type === "text") {
       const view = textView(host, { id: spec.id, label: label(), text: String(value2 == null ? "" : value2) });
       return {
         el: view.el,
@@ -2816,8 +3206,8 @@
         kind: "text"
       };
     }
-    if (node.type === "machine") {
-      const view = machineView(host, { id: spec.id, label: label(), states: statesOf(node), path: String(value2 || "") });
+    if (node2.type === "machine") {
+      const view = machineView(host, { id: spec.id, label: label(), states: statesOf(node2), path: String(value2 || "") });
       return {
         el: view.el,
         update: () => view.update(String(graph.valueOf(spec.id) || "")),
@@ -2825,16 +3215,140 @@
         kind: "machine"
       };
     }
-    if (node.type === "value" || node.type === "source") {
-      const view = valueRow(host, { id: spec.id, label: label(), value: value2, format: node.format, langs });
+    if (node2.type === "value" || node2.type === "source") {
+      const view = valueRow(host, { id: spec.id, label: label(), value: value2, format: node2.format, langs });
       return {
         el: view.el,
         update: () => view.update(graph.valueOf(spec.id)),
         relabel: () => view.relabel(label() || spec.id, graph.valueOf(spec.id)),
-        kind: node.type
+        kind: node2.type
       };
     }
     return null;
+  }
+
+  // src/static/sdk-libs/living/chain-draw.js
+  var NS = "http://www.w3.org/2000/svg";
+  var KIT_ROWS = 11;
+  var KIT_COLS = 7;
+  var PILL_H = 24;
+  var ROW = 32;
+  var GAP = 26;
+  var PAD = 22;
+  var LABEL_MAX = 26;
+  var CHAR_W = 6.6;
+  function words(label) {
+    const text = String(label == null ? "" : label);
+    return text.length > LABEL_MAX ? text.slice(0, LABEL_MAX - 1) + "…" : text;
+  }
+  function pillWidth(label) {
+    return Math.max(56, words(label).length * CHAR_W + 22);
+  }
+  function node(name, attrs) {
+    const el2 = document.createElementNS(NS, name);
+    for (const key of Object.keys(attrs || {})) el2.setAttribute(key, String(attrs[key]));
+    return el2;
+  }
+  function fitsKitFrame(data) {
+    const nodes = data && data.nodes || [];
+    if (!nodes.length) return true;
+    let cols = 0;
+    const perColumn = /* @__PURE__ */ new Map();
+    for (const n of nodes) {
+      const c = n.col || 0;
+      cols = Math.max(cols, c + 1);
+      perColumn.set(c, (perColumn.get(c) || 0) + 1);
+    }
+    return cols <= KIT_COLS && Math.max(...perColumn.values()) <= KIT_ROWS;
+  }
+  function drawChain(host, data, opts) {
+    const root = document.createElement("div");
+    root.className = "ak-root ak-graph ak-living__chain-draw";
+    root.setAttribute("role", "img");
+    host.appendChild(root);
+    function render(next) {
+      while (root.firstChild) root.removeChild(root.firstChild);
+      const nodes = next && next.nodes || [];
+      const edges = next && next.edges || [];
+      if (!nodes.length) return;
+      root.setAttribute("aria-label", ((opts || {}).title ? opts.title + " — " : "") + nodes.map((n) => n.label).join(", "));
+      const byColumn = /* @__PURE__ */ new Map();
+      for (const n of nodes) {
+        const c = n.col || 0;
+        const list = byColumn.get(c) || [];
+        list.push(n);
+        byColumn.set(c, list);
+      }
+      const columns = [...byColumn.keys()].sort((a, b) => a - b);
+      const width = /* @__PURE__ */ new Map();
+      for (const c of columns) width.set(c, Math.max(...byColumn.get(c).map((n) => pillWidth(n.label))));
+      const centre = /* @__PURE__ */ new Map();
+      let x = PAD;
+      for (const c of columns) {
+        centre.set(c, x + width.get(c) / 2);
+        x += width.get(c) + GAP;
+      }
+      const frameW = x - GAP + PAD;
+      const tallest = Math.max(...columns.map((c) => byColumn.get(c).length));
+      const frameH = PAD * 2 + Math.max(1, tallest) * ROW;
+      const place = /* @__PURE__ */ new Map();
+      for (const c of columns) {
+        const list = byColumn.get(c);
+        const top = (frameH - list.length * ROW) / 2 + ROW / 2;
+        list.forEach((n, i) => place.set(n.id, { x: centre.get(c), y: top + i * ROW, w: width.get(c) }));
+      }
+      const svg = node("svg", {
+        viewBox: "0 0 " + Math.round(frameW) + " " + Math.round(frameH),
+        width: Math.round(frameW),
+        height: Math.round(frameH),
+        class: "ak-graph__svg",
+        "aria-hidden": "true"
+      });
+      for (const edge of edges) {
+        const a = place.get(edge.from);
+        const b = place.get(edge.to);
+        if (!a || !b) continue;
+        const ax = a.x + a.w / 2;
+        const bx = b.x - b.w / 2;
+        const bend = Math.max(18, (bx - ax) / 2);
+        svg.appendChild(node("path", {
+          d: "M " + ax + " " + a.y + " C " + (ax + bend) + " " + a.y + ", " + (bx - bend) + " " + b.y + ", " + bx + " " + b.y,
+          fill: "none",
+          class: "ak-graph__edge"
+        }));
+      }
+      for (const n of nodes) {
+        const at = place.get(n.id);
+        if (!at) continue;
+        const g = node("g", {
+          class: "ak-graph__node ak-graph__node--" + (n.tone || "plain"),
+          transform: "translate(" + at.x + ", " + at.y + ")"
+        });
+        g.appendChild(node("rect", {
+          x: -at.w / 2,
+          y: -PILL_H / 2,
+          width: at.w,
+          height: PILL_H,
+          rx: PILL_H / 2,
+          class: "ak-graph__pill"
+        }));
+        const label = node("text", { x: 0, y: 4, class: "ak-graph__label", "text-anchor": "middle" });
+        label.textContent = words(n.label);
+        g.appendChild(label);
+        svg.appendChild(g);
+      }
+      root.appendChild(svg);
+    }
+    render(data);
+    return {
+      el: root,
+      set(patch) {
+        if (patch && patch.data) render(patch.data);
+      },
+      destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
   }
 
   // src/static/sdk-libs/living/chain.js
@@ -2864,12 +3378,12 @@
     const column = /* @__PURE__ */ new Map();
     for (const id of graph.ids) column.set(id, depth.get(id) || 0);
     for (const id of graph.ids) {
-      const node = graph.nodeOf(id) || {};
-      const words = textOf(node.label, langs || []);
-      nodes.push({ id, label: words ? words + " (" + id + ")" : id, tone: TONE[node.type] || "plain" });
-      if (node.type !== "machine") continue;
+      const node2 = graph.nodeOf(id) || {};
+      const words2 = textOf(node2.label, langs || []);
+      nodes.push({ id, label: words2 ? words2 + " (" + id + ")" : id, tone: TONE[node2.type] || "plain" });
+      if (node2.type !== "machine") continue;
       const active = String(graph.valueOf(id) || "").split(".");
-      for (const state of statesOf(node)) {
+      for (const state of statesOf(node2)) {
         const sid = id + ":" + state;
         nodes.push({ id: sid, label: state, tone: active.indexOf(state) >= 0 ? "accent" : "plain" });
         column.set(sid, (depth.get(id) || 0) + 1);
@@ -2889,6 +3403,8 @@
       for (let i = 0; i < list.length; i++) {
         list[i].x = last === 0 ? 50 : c / last * 100;
         list[i].y = list.length === 1 ? 50 : i / (list.length - 1) * 100;
+        list[i].col = c;
+        list[i].row = i;
       }
     }
     return { nodes, edges };
@@ -2901,11 +3417,23 @@
     let handle = null;
     let order = [];
     const timers = /* @__PURE__ */ new Set();
+    let drawnBig = false;
     function paint() {
       const data = chainData(spec.graph, spec.langs ? spec.langs() : []);
       order = data.nodes.map(function(n) {
         return n.id;
       });
+      const big = !fitsKitFrame(data);
+      if (handle && big !== drawnBig) {
+        handle.destroy();
+        handle = null;
+      }
+      drawnBig = big;
+      if (big) {
+        if (!handle) handle = drawChain(root, data, { title: spec.title });
+        else handle.set({ data });
+        return;
+      }
       if (k && typeof k.graph === "function") {
         if (!handle) handle = k.graph({ target: root, data, title: spec.title });
         else handle.set({ data });
@@ -2936,11 +3464,11 @@
         const drawn = nodeElements();
         for (const id of ids) {
           const at = order.indexOf(id);
-          const node = at >= 0 ? drawn[at] : null;
-          if (!node) continue;
-          node.setAttribute("data-living-flash", "yes");
+          const node2 = at >= 0 ? drawn[at] : null;
+          if (!node2) continue;
+          node2.setAttribute("data-living-flash", "yes");
           const timer = setTimeout(function() {
-            node.removeAttribute("data-living-flash");
+            node2.removeAttribute("data-living-flash");
             timers.delete(timer);
           }, FLASH_MS);
           timers.add(timer);
@@ -2963,6 +3491,7 @@
       outputs: ["value — the same value, so the chain view can show where it went"],
       options: ["block (a layout block id)", "prop (a prop path on that block, dots allowed)"],
       languages: [],
+      functions: [],
       example: { "type": "binding", "block": "dial", "prop": "value", "from": "t" },
       file: "nodes/binding.js"
     },
@@ -2972,15 +3501,17 @@
       outputs: ["value — what the target holds now, so a template can read the control by name"],
       options: ["kind=slider|toggle|pick|number|text", "label", "options (for pick)", "block (a section to put it in)"],
       languages: ["label", "options[].label"],
+      functions: [],
       example: { "type": "control", "kind": "slider", "target": "t", "label": { "fi": "Lämpötila", "en": "Temperature" }, "block": "controls" },
       file: "nodes/control.js"
     },
     "formula": {
       summary: "A spreadsheet expression over the other nodes, worked out with its units.",
-      inputs: ["expr (an expression naming other nodes)"],
+      inputs: ["expr (an expression naming other nodes; it may hold a whole ROW of values, and every operation goes down one)"],
       outputs: ["value — the result, with its unit", "tex — the same expression set as mathematics"],
       options: ["unit (convert the result, or name a plain one)", "format (how the answer is printed: 1", '"int"', '"unit"', '{ decimals, group, locale, style, currency, unit, prefix, suffix }; `locale: "auto"` writes the number in the page\'s language)', "label", "block (a section to print it in)"],
       languages: ["label"],
+      functions: ["if(cond, a, b)", "and", "or", "not", "= <> < <= > >=", "& joins text", "+ - * / ^", "min(xs) and max(xs) reduce a row to one value; min(a, b, …) and max(a, b, …) with two or more arguments go element by element, which is how a surplus is written: max(0, pv - load)", "sum", "avg", "count", "first", "last", "abs", "sqrt", "pow", "exp", "ln", "log", "log10", "round(x, decimals)", "floor", "ceil", "clamp(x, lo, hi)", 'convert(x, "K")', "fraction(x) and percent(x), the two doors of the percentage rule", "text", "number", "sin", "cos", "tan", "asin", "acos", "atan", "atan2(y, x)", "deg(radians) and rad(degrees), because every angle in this language is in RADIANS", "pi", "ROWS — a list is an ordinary value and every operation above goes down one, a plain number repeating against it and two lists of different lengths refused by name: range(n)", "range(from, to)", "range(from, to, step), counted from the first and stopping BEFORE the last", "map(xs, expr), where the element is `x` and its position `i`", "fold(xs, start, expr), where what is being built is `acc`, answering with the last one", "scan(xs, start, expr), the same step answering with EVERY accumulator INCLUDING the one it started from, so it is ONE LONGER than the list and a 24-hour battery gives 25 readings", "cumsum(xs)", "index(xs, i), counted from 0", "at(xs, t), which reads BETWEEN two positions and stops at the ends", "where(cond, a, b), the element-wise if"],
       example: { "type": "formula", "expr": "t * 9/5 + 32", "unit": "°F", "format": 1, "label": { "fi": "Fahrenheit", "en": "Fahrenheit" }, "block": "maths" },
       file: "nodes/formula.js"
     },
@@ -2990,6 +3521,7 @@
       outputs: ['value — the current state as a dotted path, e.g. "hot" or "hot.rising"'],
       options: ["on { EVENT: { target, guard } }", "entry", "exit", "after { ms: target }", "block (a section to show it in)"],
       languages: ["label", "the entry and exit assignments that write words"],
+      functions: [],
       example: { "type": "machine", "initial": "fine", "states": { "cold": { "on": { "WARM": "fine" } }, "fine": { "on": { "HOT": "hot", "COLD": "cold" } }, "hot": { "entry": { "note": { "fi": '"jäähdytä"', "en": '"cool it down"' } }, "on": { "COOL": { "target": "fine", "guard": "t < 30" } } } }, "when": [{ "expr": "t > 30", "send": "HOT" }, { "expr": "t < 30", "send": "COOL" }, { "expr": "t < 5", "send": "COLD" }] },
       file: "nodes/machine-node.js"
     },
@@ -2999,6 +3531,7 @@
       outputs: ["value — what the key holds now, with the node's unit on it"],
       options: ["unit", "format (how it is printed: 1", '"int"', '"unit"', 'an object; `locale: "auto"` writes the number in the page\'s language)', "scope=own|public", "owner (for a public read)", "label"],
       languages: ["label"],
+      functions: [],
       example: { "type": "source", "key": "sensors.livingroom", "path": "celsius", "unit": "°C", "format": 1, "value": 21, "label": { "fi": "Olohuone", "en": "Living room" } },
       file: "nodes/source.js"
     },
@@ -3008,6 +3541,7 @@
       outputs: ["value — the rendered sentence"],
       options: ["block (a section to render it into)", "label"],
       languages: ["template", "label"],
+      functions: [],
       example: { "type": "text", "template": { "fi": "Lämpötila on {{ t | 1 }} °C, {{ if t > 30 }}liian kuuma{{ else }}hyvä{{ end }}.", "en": "It is {{ t | 1 }} °C, {{ if t > 30 }}too hot{{ else }}fine{{ end }}." }, "block": "note" },
       file: "nodes/text-node.js"
     },
@@ -3017,20 +3551,21 @@
       outputs: ["value — the number with its unit, or the text, truth or list it holds"],
       options: ["unit", "min", "max", "step", "format (how it is printed: 1", '"int"', '"unit"', 'an object; `locale: "auto"` writes the number in the page\'s language)', "label"],
       languages: ["label"],
+      functions: [],
       example: { "type": "value", "value": 22, "unit": "°C", "min": -20, "max": 40, "step": 0.5, "format": 1, "label": { "fi": "Lämpötila", "en": "Temperature" } },
       file: "nodes/value.js"
     }
   };
 
   // src/static/sdk-libs/living/index.js
-  var VERSION = "0.4.1";
+  var VERSION = "0.5.0";
   var DRAWN = ["control", "formula", "text", "machine", "value", "source"];
-  function nodeLanguageRefusals(id, node, out) {
-    for (const field of (NODES[String(node.type)] || {}).languages || []) {
+  function nodeLanguageRefusals(id, node2, out) {
+    for (const field of (NODES[String(node2.type)] || {}).languages || []) {
       if (/[^A-Za-z0-9_[\].]/.test(field)) continue;
       const perItem = /^([A-Za-z0-9_]+)\[\]\.([A-Za-z0-9_]+)$/.exec(field);
       if (perItem) {
-        const items = node[perItem[1]];
+        const items = node2[perItem[1]];
         if (!Array.isArray(items)) continue;
         for (let i = 0; i < items.length; i++) {
           const item = items[i];
@@ -3040,11 +3575,11 @@
         }
         continue;
       }
-      const bad = langMapError(node[field]);
+      const bad = langMapError(node2[field]);
       if (bad) out.push('Node "' + id + '" has a ' + field + " that " + bad + ".");
     }
   }
-  function machineLanguageRefusals(id, node, out) {
+  function machineLanguageRefusals(id, node2, out) {
     const walk = (states, prefix) => {
       for (const name of Object.keys(states || {})) {
         const state = states[name] || {};
@@ -3060,18 +3595,18 @@
         if (state.states) walk(state.states, path);
       }
     };
-    walk(node.states, "");
+    walk(node2.states, "");
   }
-  function templateLanguageRefusals(id, node, out) {
-    const bad = langMapError(node.template);
+  function templateLanguageRefusals(id, node2, out) {
+    const bad = langMapError(node2.template);
     if (bad) {
       out.push('The sentence "' + id + '" has a template that ' + bad + ".");
       return;
     }
-    if (!isPlainObject(node.template)) return;
+    if (!isPlainObject(node2.template)) return;
     const perLang = /* @__PURE__ */ new Map();
-    for (const lang of langKeysOf(node.template)) {
-      const parts = parseTemplate(node.template[lang]);
+    for (const lang of langKeysOf(node2.template)) {
+      const parts = parseTemplate(node2.template[lang]);
       if (!Array.isArray(parts)) {
         out.push('The sentence "' + id + '" cannot be read in ' + lang + ": " + parts.error);
         continue;
@@ -3119,22 +3654,22 @@
     for (const block of (doc.layout || {}).blocks || []) if (block && block.id) blocks.set(String(block.id), block);
     for (const [blockId, block] of blocks) propLanguageRefusals(blockId, block.props, refusals, "");
     for (const id of Object.keys(nodes)) {
-      const node = nodes[id] || {};
-      nodeLanguageRefusals(id, node, refusals);
-      if (node.type === "machine") machineLanguageRefusals(id, node, refusals);
-      if (node.type === "text") templateLanguageRefusals(id, node, refusals);
-      if (node.type === "binding") {
-        const block2 = blocks.get(String(node.block));
+      const node2 = nodes[id] || {};
+      nodeLanguageRefusals(id, node2, refusals);
+      if (node2.type === "machine") machineLanguageRefusals(id, node2, refusals);
+      if (node2.type === "text") templateLanguageRefusals(id, node2, refusals);
+      if (node2.type === "binding") {
+        const block2 = blocks.get(String(node2.block));
         if (!block2) {
-          refusals.push('The binding "' + id + '" writes to block "' + String(node.block) + '", and the layout has no block by that name.');
+          refusals.push('The binding "' + id + '" writes to block "' + String(node2.block) + '", and the layout has no block by that name.');
         }
         continue;
       }
-      if (!node.block) continue;
-      if (DRAWN.indexOf(String(node.type)) < 0) continue;
-      const block = blocks.get(String(node.block));
+      if (!node2.block) continue;
+      if (DRAWN.indexOf(String(node2.type)) < 0) continue;
+      const block = blocks.get(String(node2.block));
       if (!block) {
-        refusals.push('Node "' + id + '" is drawn into block "' + String(node.block) + '", and the layout has no block by that name.');
+        refusals.push('Node "' + id + '" is drawn into block "' + String(node2.block) + '", and the layout has no block by that name.');
       } else if (String(block.component) !== "section") {
         refusals.push('Node "' + id + '" is drawn into block "' + block.id + '", which is a ' + block.component + ". A node is drawn into a section.");
       }
@@ -3226,11 +3761,11 @@
     const drawnByBlock = /* @__PURE__ */ new Map();
     const nodes = (doc.model || {}).nodes || {};
     for (const id of Object.keys(nodes)) {
-      const node = nodes[id] || {};
-      if (!node.block || DRAWN.indexOf(String(node.type)) < 0) continue;
-      const list = drawnByBlock.get(String(node.block)) || [];
+      const node2 = nodes[id] || {};
+      if (!node2.block || DRAWN.indexOf(String(node2.type)) < 0) continue;
+      const list = drawnByBlock.get(String(node2.block)) || [];
       list.push(id);
-      drawnByBlock.set(String(node.block), list);
+      drawnByBlock.set(String(node2.block), list);
     }
     const views = /* @__PURE__ */ new Map();
     let chainHandle = null;
@@ -3318,8 +3853,8 @@
       }
       const touched = /* @__PURE__ */ new Set();
       for (const id of changed) {
-        const node = nodes[id] || {};
-        if (node.type === "binding" && node.block) touched.add(String(node.block));
+        const node2 = nodes[id] || {};
+        if (node2.type === "binding" && node2.block) touched.add(String(node2.block));
         for (const next of graph.dependents(id)) {
           const dep = nodes[next] || {};
           if (dep.type === "binding" && dep.block) touched.add(String(dep.block));
@@ -3359,11 +3894,11 @@
         if (!root) continue;
         const props = localizeProps(block.props, wanted);
         for (const key of TEXT_KEYS) {
-          const words = props[key];
-          if (typeof words !== "string") continue;
+          const words2 = props[key];
+          if (typeof words2 !== "string") continue;
           const at = root.querySelector('[data-ak-part="' + key + '"]');
           if (!at || at.closest && at.closest('[data-ak-part="body"]')) continue;
-          if (at.textContent !== words) at.textContent = words;
+          if (at.textContent !== words2) at.textContent = words2;
         }
       }
     }

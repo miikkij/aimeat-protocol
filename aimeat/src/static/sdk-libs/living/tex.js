@@ -20,6 +20,12 @@
  *   import { toTex } from './tex.js';
  *   toTex(parse('p * v / (r * T)'));   // '\\frac{p \\cdot v}{r \\cdot T}'
  * @version-history
+ *   v0.5.0 — 2026-09-06 — THE ROW, SET AS A ROW. A sum is a sigma, a map is the bracketed
+ *     set-builder mathematics already writes, a position is a subscript and at() is a function
+ *     call on the row — because \operatorname{index}(pv, i) is the source code printed in a serif
+ *     face, which teaches a reader nothing the formula box above it did not already say. π is a
+ *     head rather than 3.141592653589793 for the same reason. The functions mathematics has its
+ *     own mark for (\sin, \arccos, \ln, \log_{10}) use it instead of \operatorname.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 
@@ -40,10 +46,21 @@ const RELATION = {
 
 /** Named functions that are set as an upright operator with its argument in brackets. */
 const OPERATORS = {
-  Min: 'min', Max: 'max', Sum: 'sum', Mean: 'avg', Count: 'count',
+  Min: 'min', Max: 'max', Mean: 'avg', Count: 'count',
   Clamp: 'clamp', Convert: 'convert', Text: 'text', Number: 'number',
   Round: 'round', Floor: 'floor', Ceiling: 'ceil', First: 'first', Last: 'last',
-  Exp: 'exp', Ln: 'ln', Log: 'log',
+  CumSum: 'cumsum',
+};
+
+/**
+ * The functions mathematics already has a mark for. \sin is not the same object as
+ * \operatorname{sin} — it carries the spacing the typesetter was built with — and a reader
+ * checking a solar model by hand is reading exactly these.
+ */
+const MACROS = {
+  Sin: '\\sin', Cos: '\\cos', Tan: '\\tan',
+  Asin: '\\arcsin', Acos: '\\arccos', Atan: '\\arctan',
+  Exp: '\\exp', Ln: '\\ln', Log: '\\log', Log10: '\\log_{10}', Deg: '\\deg',
 };
 
 /** Escape the characters TeX would otherwise read as instructions. */
@@ -119,10 +136,39 @@ export function toTex(tree, parentRank) {
       return '\\begin{cases} ' + then + ' & ' + toTex(tree[1], 0)
         + ' \\\\ ' + other + ' & \\text{otherwise} \\end{cases}';
     }
+    // ── THE ROW, SET AS A ROW. A sigma is a sigma, a map is the bracketed set-builder mathematics
+    // already writes, and a position is a subscript. The alternative — \operatorname{index}(pv, i)
+    // — is the source code printed in a serif face, which teaches a reader nothing they could not
+    // read in the formula box above it.
+    case 'Pi': return '\\pi';
+    case 'Sum': {
+      if (tree.length === 2) return wrap('\\sum ' + toTex(tree[1], 10), 10, outer);
+      return '\\sum\\left(' + tree.slice(1).map((t) => toTex(t, 0)).join(',\\; ') + '\\right)';
+    }
+    case 'Index': return toTex(tree[1], 10) + '_{' + toTex(tree[2], 0) + '}';
+    case 'At': return toTex(tree[1], 10) + '\\!\\left(' + toTex(tree[2], 0) + '\\right)';
+    case 'Range': {
+      const from = tree.length > 2 ? toTex(tree[1], 0) : '0';
+      const to = toTex(tree[tree.length > 2 ? 2 : 1], 0);
+      const step = tree.length > 3 ? '_{\\,\\Delta ' + toTex(tree[3], 0) + '}' : '';
+      return '\\left[' + from + ' \\ldots ' + to + '\\right)' + step;
+    }
+    case 'Map':
+      return '\\left[\\, ' + toTex(tree[2], 0) + ' \\;\\middle|\\; x \\in ' + toTex(tree[1], 0) + ' \\,\\right]';
+    case 'Fold': case 'Scan': {
+      const name = head === 'Fold' ? 'fold' : 'scan';
+      return '\\operatorname{' + name + '}_{x \\in ' + toTex(tree[1], 0) + '}\\left(\\mathrm{acc}_{0} = '
+        + toTex(tree[2], 0) + ',\\; ' + toTex(tree[3], 0) + '\\right)';
+    }
+    case 'Where': {
+      return '\\begin{cases} ' + toTex(tree[2], 0) + ' & ' + toTex(tree[1], 0)
+        + ' \\\\ ' + toTex(tree[3], 0) + ' & \\text{otherwise} \\end{cases}';
+    }
     default: {
       if (RELATION[head]) return wrap(at(1) + ' ' + RELATION[head] + ' ' + at(2), rank, outer);
-      const name = OPERATORS[head] || String(head).toLowerCase();
       const args = tree.slice(1).map((t) => toTex(t, 0)).join(',\\; ');
+      if (MACROS[head]) return MACROS[head] + '\\left(' + args + '\\right)';
+      const name = OPERATORS[head] || String(head).toLowerCase();
       return '\\operatorname{' + escapeText(name) + '}\\left(' + args + '\\right)';
     }
   }

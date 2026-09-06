@@ -13,6 +13,9 @@
  * @structure LIVING_PACKS: LibraryPack[]
  * @usage Imported by ./sdk.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.3.0 — 2026-09-06 — aimeat-living 0.5.0: the aiDoc gains "rows are arrays", because a
+ *     document that can hold a list is a different thing to write than one that cannot, and a
+ *     model that does not know range() and scan() exist will write twenty-four nodes for a day.
  *   v1.2.0 — 2026-09-06 — aimeat-living 0.4.0: a label is a language map, so the aiDoc teaches
  *     writing the record in every language it is meant to be read in.
  *   v1.1.0 — 2026-09-05 — aimeat-living 0.2.0: the three copies of kit behaviour dropped now that
@@ -141,6 +144,23 @@ export const LIVING_PACKS: LibraryPack[] = [
       'which writes the separators in whatever language the page is reading. Changing language moves the words',
       'only: values stay where the person left them and the machine stays in the state it reached.',
       '',
+      'ROWS ARE ARRAYS, and this is the half of a spreadsheet that makes a document worth writing. A node\'s',
+      'value may be a LIST, and every arithmetic and comparison goes down it element by element: `pv - load`',
+      'is a row of differences, `max(0, pv - load)` a row of surpluses, `sum(load * price)` the day\'s bill.',
+      'A plain number repeats against a list; two lists of different lengths are refused with both lengths; a',
+      'unit that will not add at element 7 is refused saying 7. Build a row with range(24) — counted from 0,',
+      'stopping BEFORE the last — and with map(xs, expr), where the element is `x` and its position `i`. Walk',
+      'one with fold(xs, start, expr) or scan(xs, start, expr), where what is being built is `acc`; scan',
+      'answers with EVERY accumulator INCLUDING the one it started from, so 24 hours in gives 25 readings —',
+      'the state of charge at each hour BOUNDARY, and the flow during hour i is position i+1 less position i.',
+      'Read a row back with index(xs, i) (counted from 0), at(xs, t) (which reads BETWEEN two positions and',
+      'stops at the ends, so a clock scrubbed to 13:30 reads an hourly curve), cumsum(xs) and where(cond, a, b),',
+      'the element-wise if. min(xs) and max(xs) still REDUCE a row to one value; min(a, b) and max(a, b) with',
+      'two or more arguments go element by element. The trigonometry is there too — sin cos tan asin acos atan',
+      'atan2 log10 and pi — and every angle is in RADIANS, with deg() and rad() as the two doors.',
+      'So a 24-hour day is ONE node, not twenty-four; a battery hour by hour is one scan; a year of irradiation',
+      'on a tilted plane is one 288-element vector. Ask describe("formula").functions for the whole list.',
+      '',
       'TEMPLATES: {{ node }} prints the NUMBER (the sentence around it carries the unit), {{ node | unit }}',
       'prints both, {{ node | 1 }} fixes the decimals, and int, percent, upper and lower are the rest.',
       '{{ if expr }}…{{ else }}…{{ end }} takes any expression. The output is TEXT, never markup.',
@@ -150,6 +170,7 @@ export const LIVING_PACKS: LibraryPack[] = [
       'reporting exactly which nodes changed.',
     ].join('\n'),
     changelog: [
+      { version: '0.5.0', date: '2026-09-06', summary: 'A row is a value, which is the half of a spreadsheet this language did not have. A node may hold a LIST, and every arithmetic and comparison goes down it element by element — `max(0, pv - load)` is a row of surpluses and `sum(load * price)` is the day\'s bill — with a plain number repeating against a list, two lists of different lengths refused with both lengths, and a unit that will not add at element 7 refused saying 7. range(n) builds a row, map(xs, expr) walks one with the element as `x` and its position as `i`, fold and scan walk one carrying `acc`, and scan answers with EVERY accumulator including the one it started from, so 24 hours in gives 25 readings and the flow during an hour is the difference between two of them. index(xs, i) reads a whole position counted from 0, at(xs, t) reads between two and stops at the ends, cumsum and where complete the set, and min/max reduce on one argument and go element-wise on more. The trigonometry and pi arrive with them, in radians, with deg() and rad() as the two doors. A day of twenty-four hours, a battery simulated hour by hour and a year of irradiation on a tilted plane are three formulas in a record now instead of three hundred nodes. describe("formula").functions answers with the whole vocabulary, generated from the source.' },
       { version: '0.4.0', date: '2026-09-06', summary: 'A record carries its own words. Any human-facing string may be a language map — { "fi": "Ilma ovella", "en": "Air at the door" } — on a label, a hint, a pick\'s option, a sentence template, the words a machine\'s entry action writes, or a layout block\'s title and sub, so one record is the document in every language it was written for instead of one record per language. The page\'s language decides which is read, the record\'s own "lang" is the fallback, and the map\'s first key is the last resort. A change of language moves the WORDS ONLY: the value a person moved is where they left it, the machine is in the state it reached, nothing is remounted and no entrance runs again. validate() refuses a map with no language in it and a sentence whose holes differ between languages, naming the node and the language; describe(type).languages says which fields take a map; and a `format` stays per record except `locale: "auto"`, which writes the separators in the page\'s language.' },
       { version: '0.2.0', date: '2026-09-05', summary: 'Nothing to change in a record: this release is three pieces of behaviour handed back to the Atelier kit, which now carries them (0.53.0). A control row is one of the kit\'s own form fields, so a slider gets the kit\'s track, its reading, its label wiring and a 40px hit area rather than markup this library built beside it. The chain view stops padding its columns to keep a long label inside the graph\'s frame; the graph keeps its own pills inside now, so an outer node reads whole at any width. And which layout components accept a bound record is asked of the mounted arrangement instead of being a copied list here — so a binding aimed at a block that cannot read one is refused in the kit\'s words on the mounted handle (`refusals`), where validate() alone could only guess.' },
       { version: '0.1.0', date: '2026-09-05', summary: 'Initial. One JSON record — { v, register, look, layout, model } — mounted as a living screen: seven node types (value, formula, control, binding, text, machine, source) in one dependency graph, spreadsheet formulas with units carried through multiplication and checked on addition, a TeX printer riding the same tree as the evaluator, an XState-vocabulary statechart with guards, entry and exit assignments, timers and crossings, bindings that refresh through the mosaic so the kit\'s own motion runs, templates that change with the state, live sources on the platform\'s own change event, describe() generated from the node modules\' JSDoc, and a chain view that flashes the path a change travelled.' },

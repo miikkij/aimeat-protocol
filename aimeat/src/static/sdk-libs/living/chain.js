@@ -27,7 +27,17 @@
  *   import { chain } from './chain.js';
  *   const view = chain(host, { graph: g });
  *   view.flash(['t', 'f']);
+ *   AND A GRAPH TOO BIG FOR THE KIT'S FRAME GETS ONE MEASURED FROM ITSELF. The kit draws in a
+ *   fixed 720 × 420 box and holds about eleven pills per column; the first document worth drawing
+ *   a chain of — a household's solar year — is 159 nodes in 18 columns, the tallest of them 38
+ *   deep, which wants three and a half times the area the frame has. chain-draw.js keeps the kit's
+ *   own markup, classes and stylesheet and changes only the geometry, so the tones, the colours
+ *   and the flash are still the kit's; a small document goes on using the kit's own layout, which
+ *   is the better picture at that size.
  * @version-history
+ *   v0.5.0 — 2026-09-06 — The frame grows when the drawing does (chain-draw.js), and chainData
+ *     hands out `col` and `row` beside the percentages so the measured frame knows how deep each
+ *     column is before it decides how tall to be.
  *   v0.4.0 — 2026-09-06 — A pill's label is read in the page's language; set() repaints it, which
  *     is what a language change calls.
  *   v0.2.0 — 2026-09-05 — The 6 % column inset is gone: atelier 0.53.0 measures its own pills and
@@ -38,6 +48,7 @@
 import { el, clear, kit, reducedMotion } from './dom.js';
 import { statesOf } from './render.js';
 import { textOf } from './i18n.js';
+import { fitsKitFrame, drawChain } from './chain-draw.js';
 
 /** How long a changed node stays lit. Short enough to read as a pulse, not as a state. */
 const FLASH_MS = 900;
@@ -115,6 +126,11 @@ export function chainData(graph, langs) {
     for (let i = 0; i < list.length; i++) {
       list[i].x = last === 0 ? 50 : (c / last) * 100;
       list[i].y = list.length === 1 ? 50 : (i / (list.length - 1)) * 100;
+      // The place as a WHOLE NUMBER as well as a percentage: the kit's frame is a fixed box and
+      // takes the percentage, and the drawing that measures its own frame needs to know how many
+      // there are in this column before it can decide how tall to be.
+      list[i].col = c;
+      list[i].row = i;
     }
   }
   return { nodes: nodes, edges: edges };
@@ -136,9 +152,26 @@ export function chain(host, spec) {
   let order = [];
   const timers = new Set();
 
+  /** Which of the two frames drew what is on the screen, so a redraw does not change horses. */
+  let drawnBig = false;
+
   function paint() {
     const data = chainData(spec.graph, spec.langs ? spec.langs() : []);
     order = data.nodes.map(function (n) { return n.id; });
+    // A GRAPH TOO BIG FOR THE KIT'S FRAME GETS ONE MEASURED FROM ITSELF. The kit draws in a fixed
+    // 720 × 420 box, which is right for a dozen relations and holds about eleven pills per column;
+    // a household's year is 159 nodes in 18 columns, the tallest 38 deep, and no arrangement fits
+    // three and a half times the area into it. chain-draw.js keeps the kit's own markup, classes
+    // and stylesheet and changes only the geometry — so the tones, the flash and the colours are
+    // still the kit's, at a size that can hold the drawing.
+    const big = !fitsKitFrame(data);
+    if (handle && big !== drawnBig) { handle.destroy(); handle = null; }
+    drawnBig = big;
+    if (big) {
+      if (!handle) handle = drawChain(root, data, { title: spec.title });
+      else handle.set({ data: data });
+      return;
+    }
     if (k && typeof k.graph === 'function') {
       if (!handle) handle = k.graph({ target: root, data: data, title: spec.title });
       else handle.set({ data: data });

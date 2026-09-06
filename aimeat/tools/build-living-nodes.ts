@@ -21,18 +21,24 @@
  *     @outputs    <type> <what it answers with> · <…>
  *     @options    <type> <the fields it may carry> · <…>
  *     @languages  <type> <the fields that may be a language map instead of a string> · <…>
+ *     @functions  <type> <the expression vocabulary this type's field is written in> · <…>
  *     @example    <type> <one line of JSON — parsed by this tool, so it cannot be wrong>
  * @structure readTags() → per-type records · emit() → the generated module · main(): write or --check
  * @usage cd aimeat && pnpm exec tsx tools/build-living-nodes.ts [--check]
  *   (or: pnpm build:living-nodes / pnpm check:living-nodes)
  * @version-history
+ *   v1.2.0 — 2026-09-06 — `@functions`: the expression vocabulary, in the declaration of the type
+ *     whose field is written in it. The functions a formula may call had lived nowhere an AI could
+ *     ask — the parser's own table is not served — so a model wrote range() or map() only if it
+ *     had guessed they existed. living 0.5.0 added twenty of them at once, which is what made the
+ *     absence expensive rather than merely untidy.
  *   v1.1.0 — 2026-09-06 — `@languages`: which of a node's fields may be written as a language map.
  *     It is generated for the same reason the rest is — the AI writing a bilingual record asks the
  *     library which fields take two languages, and a hand-kept answer would go stale on the next
  *     node type.
  *   v1.0.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
@@ -49,6 +55,8 @@ type Record_ = {
   options: string[];
   /** The fields this type may carry as `{ fi: …, en: … }` instead of a plain string. */
   languages: string[];
+  /** The expression vocabulary a field of this type is written in, when it has one. */
+  functions: string[];
   example: unknown;
   file: string;
 };
@@ -61,13 +69,13 @@ export function readTags(): Record_[] {
     const text = readFileSync(join(NODES_DIR, file), 'utf8');
     for (const raw of text.split(/\r?\n/)) {
       const line = raw.replace(/^\s*\*\s?/, '').trim();
-      const m = /^@(node|inputs|outputs|options|languages|example)\s+([a-z][A-Za-z0-9]*)\s+(.+)$/.exec(line);
+      const m = /^@(node|inputs|outputs|options|languages|functions|example)\s+([a-z][A-Za-z0-9]*)\s+(.+)$/.exec(line);
       if (!m) continue;
       const [, tag, id, rest] = m;
       let rec = found.get(id);
       if (!rec) {
         rec = {
-          id, summary: '', inputs: [], outputs: [], options: [], languages: [],
+          id, summary: '', inputs: [], outputs: [], options: [], languages: [], functions: [],
           example: null, file: 'nodes/' + file,
         };
         found.set(id, rec);
@@ -87,7 +95,7 @@ export function readTags(): Record_[] {
       const parts = /^none\b/i.test(rest.trim())
         ? []
         : rest.split('·').map(s => s.trim()).filter(Boolean);
-      rec[tag as 'inputs' | 'outputs' | 'options' | 'languages'] = parts;
+      rec[tag as 'inputs' | 'outputs' | 'options' | 'languages' | 'functions'] = parts;
     }
   }
   return [...found.values()].sort((a, b) => a.id.localeCompare(b.id));
@@ -102,6 +110,7 @@ function emit(records: Record_[]): string {
     + `    outputs: ${JSON.stringify(r.outputs)},\n`
     + `    options: ${JSON.stringify(r.options)},\n`
     + `    languages: ${JSON.stringify(r.languages)},\n`
+    + `    functions: ${JSON.stringify(r.functions)},\n`
     + `    example: ${JSON.stringify(r.example)},\n`
     + `    file: ${JSON.stringify(r.file)},\n`
     + `  },`
@@ -109,15 +118,16 @@ function emit(records: Record_[]): string {
   return `/**
  * @file living/describe-data.js
  * @description GENERATED — do not edit. Every node type's summary, inputs, outputs, options,
- *   language-map fields and worked example, read out of the node modules' own JSDoc by
- *   tools/build-living-nodes.ts.
+ *   language-map fields, expression vocabulary and worked example, read out of the node modules'
+ *   own JSDoc by tools/build-living-nodes.ts.
  *   \`AIMEAT.living.describe(type)\` answers from this, so what an AI reads at run time and what
  *   the source says are the same thing by construction. Run \`pnpm build:living-nodes\` after
- *   changing an @node / @inputs / @outputs / @options / @languages / @example line;
+ *   changing an @node / @inputs / @outputs / @options / @languages / @functions / @example line;
  *   \`pnpm check:living-nodes\` refuses a commit where the two have drifted.
  * @structure NODES: one entry per node type
  * @usage  import { NODES } from './describe-data.js';
  * @version-history
+ *   v1.2.0 — 2026-09-06 — Generated: \`functions\` joins each entry.
  *   v1.1.0 — 2026-09-06 — Generated: \`languages\` joins each entry.
  *   v1.0.0 — 2026-09-05 — Generated (the living document, stage 1).
  */
@@ -131,10 +141,10 @@ ${body}
 export function main(): void {
   const want = emit(readTags());
   if (process.argv.includes('--check')) {
-    let have = '';
-    try { have = readFileSync(OUT, 'utf8'); } catch { have = ''; }
+    // A file that is not there has drifted from anything, which is the same answer as a stale one.
+    const have = existsSync(OUT) ? readFileSync(OUT, 'utf8') : '';
     if (have.replace(/\r\n/g, '\n') !== want.replace(/\r\n/g, '\n')) {
-      console.error('\n✖ src/static/sdk-libs/living/describe-data.js drifts from the node modules\' @node/@inputs/@outputs/@options/@example lines — run `pnpm build:living-nodes` and commit the result.\n');
+      console.error('\n✖ src/static/sdk-libs/living/describe-data.js drifts from the node modules\' @node/@inputs/@outputs/@options/@languages/@functions/@example lines — run `pnpm build:living-nodes` and commit the result.\n');
       process.exit(1);
     }
     console.log(`  ok   describe-data.js matches the source (${readTags().length} node types)`);
