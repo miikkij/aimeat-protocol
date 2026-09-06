@@ -52,13 +52,37 @@ function git(...a: string[]): string {
     return execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' }).trim();
 }
 
+/**
+ * The working tree's changed paths.
+ *
+ * ITS OWN LINE ONE WAS BEING EATEN. `git status --porcelain` puts a two-character status in columns
+ * 1-2 and the path from column 4, and an unstaged modification's first column is a SPACE — so
+ * ` M aimeat/src/routes/x.ts`. Reading that through the trimming `git()` above removed the leading
+ * space of the FIRST line only, and `slice(3)` then cut three characters off `M aimeat/…`, leaving
+ * `imeat/…`, which matches no pattern. Whichever file sorted first was invisible to the plan.
+ *
+ * Found on 2026-09-06 by the gate reporting "no change under src/routes" for a change to
+ * src/routes/ghii/web-verify.ts, which is the same shape as the findings it exists to catch: a
+ * check that answers about less than it was asked, and says nothing about the difference.
+ *
+ * A rename arrives as `R  old -> new`; the NEW path is the one a test can reach.
+ */
+function workingTreeFiles(): string[] {
+    const raw = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: ROOT, encoding: 'utf8' });
+    return raw.split('\n')
+        .filter(line => line.length > 3)
+        .map(line => line.slice(3).trim())
+        .map(path => (path.includes(' -> ') ? path.slice(path.indexOf(' -> ') + 4) : path))
+        .map(path => path.replace(/^"|"$/g, ''))
+        .filter(Boolean);
+}
+
 function changedSince(base: string): { files: string[]; mergeBase: string } {
     try { execFileSync('git', ['fetch', '-q', 'origin', 'main'], { cwd: ROOT, stdio: 'ignore' }); } catch { /* offline is fine: the local ref is used */ }
     let mergeBase: string;
     try { mergeBase = git('merge-base', base, 'HEAD'); } catch { mergeBase = git('rev-parse', 'HEAD~1'); }
     const committed = git('diff', '--name-only', mergeBase, 'HEAD').split('\n');
-    const working = git('status', '--porcelain', '--untracked-files=all').split('\n').map(l => l.slice(3).trim());
-    const files = [...new Set([...committed, ...working].filter(Boolean).map(f => f.replace(/\\/g, '/')))].sort();
+    const files = [...new Set([...committed, ...workingTreeFiles()].filter(Boolean).map(f => f.replace(/\\/g, '/')))].sort();
     return { files, mergeBase };
 }
 

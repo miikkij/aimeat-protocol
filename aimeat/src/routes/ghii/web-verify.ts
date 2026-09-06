@@ -6,6 +6,11 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 -- 2026-09-06 -- Review item 2.5: both BR-04 refusals move ABOVE the writes they were
+ *     standing beside. The magic-link verify used to replace the owner's pinned public key and the
+ *     app agent's and THEN answer 403, so a refused sign-in destroyed the person's signing key and
+ *     handed the replacement to nobody. POST /v1/ghii/magic-link stops sending a link for a
+ *     deactivated account at all.
  *   v1.6.0 — 2026-08-23 — Both unauthenticated agent mints answer 403 ACCOUNT_DISABLED for a
  *     deactivated owner (BR-04): an emailed code must not outlive the account it belongs to.
  *   v1.5.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): register-web is a direct door, 403 REGISTRATION_CLOSED when the node is invite-only or closed.
@@ -308,6 +313,17 @@ export function registerWebVerifyRoutes(
             return;
         }
 
+        // REFUSE BEFORE YOU WRITE (invariant 14). The BR-04 refusal used to sit six writes further
+        // down, next to the mint it guards, so a deactivated account's correct code still burned the
+        // verification record, stamped emailVerifiedAt on the GHII, and ROTATED the app agent's
+        // signing key before answering 403. The check costs one read and it belongs here, above the
+        // first thing that changes.
+        const mintOwner = await storage.getOwner(record.ownerName);
+        if (mintOwner?.disabledAt) {
+            res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'The account this agent acts for has been deactivated'));
+            return;
+        }
+
         // Mark as verified
         const now = new Date().toISOString();
         await storage.updateEmailVerification(verification_id, {
@@ -382,13 +398,8 @@ export function registerWebVerifyRoutes(
         // this token as an owner session either: the SDK auth modal discards it and runs a password
         // login (src/static/sdk-libs/auth/modal.js), and no SPA view fetches this route.
         const roles = ['agent'];
-        // Deactivated owner (BR-04): an emailed code must not resurrect a credential in the name
-        // of an account the organisation has switched off.
-        const mintOwner = await storage.getOwner(record.ownerName);
-        if (mintOwner?.disabledAt) {
-            res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'The account this agent acts for has been deactivated'));
-            return;
-        }
+        // BR-04 was asked above, before the first write. An emailed code must not resurrect a
+        // credential in the name of an account the organisation has switched off.
         const token = await issueJWT({
             sub: agent.gaii,
             owner: record.ownerName,
@@ -430,8 +441,14 @@ export function registerWebVerifyRoutes(
         const emailHash = createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
         const ghiiRecord = await storage.getGHIIByEmailHash(emailHash);
 
+        // A DEACTIVATED ACCOUNT IS NOT SENT A SIGN-IN LINK. The verify step refuses one now, but
+        // sending it anyway means the person keeps getting login mail for an account the
+        // organisation has switched off, and it leaves a live token in a mailbox for an account
+        // nobody may enter. The answer below is the same either way, so nothing is disclosed.
+        const linkOwner = ghiiRecord ? await storage.getOwner(ghiiRecord.ownerName) : null;
+
         // Always return 200 to not reveal if user exists
-        if (ghiiRecord && ghiiRecord.magicLinkEnabled && emailService?.enabled) {
+        if (ghiiRecord && !linkOwner?.disabledAt && ghiiRecord.magicLinkEnabled && emailService?.enabled) {
             const token = randomBytes(32).toString('hex');
             const codeHash = createHash('sha256').update(token).digest('hex');
             const now = new Date().toISOString();
@@ -478,6 +495,18 @@ export function registerWebVerifyRoutes(
         if (new Date(record.expiresAt).getTime() < Date.now()) {
             await storage.updateEmailVerification(token, { status: 'expired' });
             res.status(401).json(error(config.nodeId, 'EXPIRED', 'Magic link has expired'));
+            return;
+        }
+
+        // REFUSE BEFORE YOU WRITE (invariant 14), and this is the sharpest instance of it in the
+        // repo. The BR-04 refusal used to sit below the re-key, so clicking a magic link for a
+        // DEACTIVATED account replaced the owner's pinned public key and the app agent's, and then
+        // answered 403. The person's own private key stopped authenticating on a request that was
+        // refused, and requesting another link is free, so it could be done again. The check is one
+        // read; it goes above everything that changes.
+        const linkMintOwner = await storage.getOwner(record.ownerName);
+        if (linkMintOwner?.disabledAt) {
+            res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'The account this agent acts for has been deactivated'));
             return;
         }
 
@@ -539,12 +568,7 @@ export function registerWebVerifyRoutes(
         // mailbox; it does not make the holder the account's owner or the node's operator, and those
         // are ROLES, which no scope list narrows.
         const roles = ['agent'];
-        // Deactivated owner (BR-04) — same refusal as the verify-email mint above.
-        const linkMintOwner = await storage.getOwner(record.ownerName);
-        if (linkMintOwner?.disabledAt) {
-            res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'The account this agent acts for has been deactivated'));
-            return;
-        }
+        // BR-04 was asked above, before the re-key. Same refusal as the verify-email mint.
         const jwtToken = await issueJWT({
             sub: agent.gaii,
             owner: record.ownerName,
