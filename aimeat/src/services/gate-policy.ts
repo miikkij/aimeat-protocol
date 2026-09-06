@@ -17,6 +17,8 @@
  *   const d = shouldGate({ action, risk, rule, policy: gatePolicyFromManifest(manifest) });
  *   if (d.gate) { ...create PendingApproval... } else { ...auto-approve + audit... }
  * @version-history
+ *   v1.1.0 -- 2026-09-06 -- rule:'approve' is honoured. It was in the declared union and read
+ *     nowhere, so a caller asking to be gated was auto-run instead.
  *   v1.0.0 -- 2026-06-07 -- Phase 4: gate decision (alwaysGate floor + autonomy L1–L5 × risk).
  */
 
@@ -75,9 +77,15 @@ export function gatePolicyFromManifest(manifest: unknown): GatePolicy {
 
 /**
  * Decide whether an action must be gated. Precedence:
- *   1. action ∈ alwaysGate → gate (the safety floor; wins over rule/autonomy).
- *   2. rule === 'auto'     → auto (explicit pass-through, still audited by the caller).
- *   3. autonomy × risk     → gate if risk ≥ the level's threshold; else auto.
+ *   1. action ∈ alwaysGate  → gate (the safety floor; wins over rule/autonomy).
+ *   2. rule === 'approve'   → gate (the caller asking for review; cannot be undone by autonomy).
+ *   3. rule === 'auto'      → auto (explicit pass-through, still audited by the caller).
+ *   4. autonomy × risk      → gate if risk ≥ the level's threshold; else auto.
+ *
+ * `rule` IS A CALLER-SUPPLIED VALUE, and that is the design rather than an oversight: the module's
+ * posture is "gate only consequential actions", and step 3 is the documented way to opt one out.
+ * What makes it safe is step 1, which no request can reach past — the 2026-09-06 review read step 3
+ * as bypassing the policy and it does not, because step 1 is evaluated first and is a policy value.
  */
 export function shouldGate(input: {
   action: string;
@@ -89,6 +97,10 @@ export function shouldGate(input: {
   const alwaysGate = input.policy?.alwaysGate ?? DEFAULT_ALWAYS_GATE;
 
   if (alwaysGate.includes(input.action)) return { gate: true, reason: 'always_gate' };
+  // `approve` was in the declared union and honoured nowhere, so a caller ASKING to be gated was
+  // auto-run instead — the union's safer half was decorative. It sits below the floor and above the
+  // pass-through, which is the only order that leaves both halves meaning what they say.
+  if (input.rule === 'approve') return { gate: true, reason: 'rule_approve' };
   if (input.rule === 'auto') return { gate: false, reason: 'rule_auto' };
 
   const autonomy = input.policy?.autonomy ?? 'L3';

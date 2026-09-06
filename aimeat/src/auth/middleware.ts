@@ -443,10 +443,17 @@ export function requireRole(role: string) {
  *
  * WHY NOT requireRole('owner'). The `owner` role does not say which principal is calling. The agent
  * branch of POST /v1/auth/token used to mint an agent session carrying the human's owner (and
- * operator) roles — the August 2026 audit removed that in the same run — and the two unauthenticated
- * mints in routes/ghii/web-verify.ts still do it today, so requireRole('owner') admits an agent JWT.
- * The exclusions below are what makes this gate hold regardless of who else stops copying roles onto
- * whom, and that is the reason to spell the test out here instead of leaning on a role name.
+ * operator) roles, and the August 2026 audit removed that in the same run.
+ *
+ * NO MINT DOES IT ANY MORE, as of 2026-09-06, and the sentence that stood here naming the two
+ * unauthenticated mints in routes/ghii/web-verify.ts was out of date: both have issued ['agent']
+ * since August. The last one was POST /v1/setup/init, which minted ['agent','owner','operator'] onto
+ * a token whose `sub` was an agent GAII; it issues an owner session now.
+ *
+ * WHICH CHANGES NOTHING ABOUT WHY THIS GATE IS SPELLED OUT. Every one of those was found after it
+ * shipped, by somebody reading a mint rather than by a check. The exclusions below hold regardless
+ * of who starts copying roles onto whom next, and that is the whole reason not to lean on a role
+ * name here.
  *
  * WHY NOT "does the token carry a session id". A Personal Access Token the human minted for their
  * own browser produces owner tokens with NO session id (the PAT branch of POST /v1/auth/refresh),

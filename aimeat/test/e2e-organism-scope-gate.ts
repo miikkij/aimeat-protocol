@@ -208,6 +208,102 @@ async function main() {
         });
     }
 
+    // ── The MUTATION doors, gated 2026-09-06 (review item 2.7) ──
+    //
+    // `organism:write` was on the CREATE door and on aimeat_organism_update, and on none of the doors
+    // that change or destroy an organism that already exists. So an agent granted memory:read could
+    // rename its owner's organism, rewrite the README, flip visibility to public, archive it, empty
+    // its workspace and DELETE it — every one of those behind requireRole('agent') alone, which every
+    // agent satisfies by being an agent. Invariant 15: a permission word is enforced on every door or
+    // it does not exist.
+    //
+    // Each door's word is the one its MCP twin already published, not a fresh judgement: update,
+    // leave, archive, unarchive, workspace update/delete and organism import take organism:write;
+    // join takes social:write, because that is what aimeat_organism_join declares and the two doors
+    // reach the same service.
+    const mutationDoors = (org: string, ws: string): Array<{ what: string; word: string; call: (t: string) => Promise<{ status: number; body: any }> }> => [
+        {
+            what: 'rename the organism', word: 'organism:write',
+            call: t => json(`/v1/organisms/${org}`, { method: 'PUT', headers: auth(t), body: JSON.stringify({ name: 'renamed by a narrow agent' }) }),
+        },
+        {
+            what: 'flip its visibility to public', word: 'organism:write',
+            call: t => json(`/v1/organisms/${org}`, { method: 'PUT', headers: auth(t), body: JSON.stringify({ visibility: 'public' }) }),
+        },
+        {
+            what: 'archive it', word: 'organism:write',
+            call: t => json(`/v1/organisms/${org}/archive`, { method: 'POST', headers: auth(t), body: JSON.stringify({ level: 'organism' }) }),
+        },
+        {
+            what: 'unarchive it', word: 'organism:write',
+            call: t => json(`/v1/organisms/${org}/unarchive`, { method: 'POST', headers: auth(t), body: JSON.stringify({ level: 'organism' }) }),
+        },
+        {
+            what: 'rename its workspace', word: 'organism:write',
+            call: t => json(`/v1/organisms/${org}/workspace?ws=${ws}`, { method: 'PUT', headers: auth(t), body: JSON.stringify({ name: 'renamed' }) }),
+        },
+        {
+            what: 'empty its workspace', word: 'organism:write',
+            call: t => json(`/v1/organisms/${org}/workspace?ws=${ws}`, { method: 'DELETE', headers: auth(t) }),
+        },
+        {
+            what: 'import a whole organism', word: 'organism:write',
+            call: t => json('/v1/organisms/import', { method: 'POST', headers: auth(t), body: JSON.stringify({ zip_base64: 'UEsFBgAAAAAAAAAAAAAAAAAAAAAAAA==' }) }),
+        },
+        {
+            what: 'leave it', word: 'organism:write',
+            call: t => json(`/v1/organisms/${org}/leave`, { method: 'POST', headers: auth(t) }),
+        },
+        {
+            what: 'join it', word: 'social:write',
+            call: t => json(`/v1/organisms/${org}/join`, { method: 'POST', headers: auth(t), body: JSON.stringify({}) }),
+        },
+        {
+            what: 'delete it outright', word: 'organism:write',
+            call: t => json(`/v1/organisms/${org}`, { method: 'DELETE', headers: auth(t) }),
+        },
+    ];
+
+    console.log('\nPhase 3b: The doors that CHANGE an organism ask the same word as the one that made it');
+
+    for (const door of mutationDoors(orgId, wsId)) {
+        await test(`an agent without the word cannot ${door.what}`, async () => {
+            // The narrow agent holds organism:read, so a refusal here is the WRITE word doing the
+            // work and not the absence of any organism permission at all. The membership check sits
+            // inside these handlers, so SCOPE_DENIED — not ACCESS_DENIED — is what proves the
+            // middleware refused before the handler ran. Every one of these is refused, so the
+            // organism this phase points at survives for the phases below.
+            const r = await door.call(narrowTokenBefore);
+            assert(r.status === 403, `expected 403, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+            assert(r.body.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${r.body.error?.code}: ${r.body.error?.message}`);
+            assert((r.body.error?.message ?? '').includes(door.word),
+                `the refusal must name ${door.word}, got: ${r.body.error?.message}`);
+        });
+    }
+
+    await test("a '*' agent still gets past every one of them, so nothing existing lost a door", async () => {
+        // Its own organism, because the last door on the list deletes what it is pointed at. Only the
+        // GATE is under test here, so the assertion is "not stopped by the scope"; what the handler
+        // then decides about membership or state is its own business and is covered elsewhere.
+        const o = await json('/v1/organisms', {
+            method: 'POST', headers: auth(ownerToken),
+            body: JSON.stringify({ name: 'Doomed Org', description: 'x', type: 'project', join_policy: 'open', visibility: 'public' }),
+        });
+        assert(o.status === 201, `throwaway organism: ${o.status} ${JSON.stringify(o.body.error)}`);
+        const doomedOrg = o.body.data!.organism.id as string;
+        const w = await json(`/v1/organisms/${doomedOrg}/workspaces`, {
+            method: 'POST', headers: auth(ownerToken),
+            body: JSON.stringify({ name: 'Doomed', manifest: MANIFEST, schemas: SCHEMAS }),
+        });
+        assert(w.status === 201, `throwaway workspace: ${w.status} ${JSON.stringify(w.body.error)}`);
+
+        for (const door of mutationDoors(doomedOrg, w.body.data!.ws as string)) {
+            const r = await door.call(wideToken);
+            assert(r.body?.error?.code !== 'SCOPE_DENIED',
+                `a '*' agent was refused the scope on "${door.what}": ${JSON.stringify(r.body?.error)}`);
+        }
+    });
+
     // ── The READ half of the same word pair, gated 2026-09-04 ──
     //
     // Eighteen organism read doors carried requireAuth() alone while the `organisms` SSE domain

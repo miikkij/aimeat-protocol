@@ -106,6 +106,7 @@ import { registerOrganismWorkspaceReadRoutes } from './organisms/workspace-read.
 import { registerOrganismWorkspaceAccessRoutes } from './organisms/workspace-access.js';
 import { inviteAcceptRouter } from './invite-accept.js';
 import { registerOrganismWorkspaceOpsRoutes } from './organisms/workspace-ops.js';
+import { registerOrganismWorkspaceTransferRoutes } from './organisms/workspace-transfer.js';
 import { registerOrganismWorkspaceRowRoutes } from './organisms/workspace-rows.js';
 import { registerOrganismWorkspaceDocumentRoutes } from './organisms/workspace-documents.js';
 import { registerOrganismGateRoutes } from './organisms/gates.js';
@@ -125,6 +126,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   // module of its own — mounted here because this is where the organism helper bag already lives.
   router.use(inviteAcceptRouter(config, storage, { findWsEntry: H.findWsEntry }));
   registerOrganismWorkspaceOpsRoutes(router, config, storage, H);
+  registerOrganismWorkspaceTransferRoutes(router, config, storage, H);
   // Row spaces. Registered after the ops routes so the existing, more specific
   // /workspace/records* and /workspace/public/* paths keep matching first.
   registerOrganismWorkspaceRowRoutes(router, config, storage);
