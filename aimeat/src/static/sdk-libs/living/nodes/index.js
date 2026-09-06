@@ -14,6 +14,9 @@
  * @structure NODE_TYPES: id → module · typeOf(name)
  * @usage  import { NODE_TYPES } from './nodes/index.js';
  * @version-history
+ *   v0.6.0 — 2026-09-06 — `trigger` joins: the one node type that moves outward. It arrived the way
+ *     this file's header said a later type would — one module, one line here — and appeared in
+ *     describe() without anybody editing the vocabulary.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { value } from './value.js';
@@ -23,6 +26,7 @@ import { binding } from './binding.js';
 import { textNode } from './text-node.js';
 import { machineNode } from './machine-node.js';
 import { sourceNode } from './source.js';
+import { trigger } from './trigger.js';
 
 /** Every node type this build knows, by the name a document writes in its `type` field. */
 export const NODE_TYPES = {
@@ -33,6 +37,7 @@ export const NODE_TYPES = {
   text: textNode,
   machine: machineNode,
   source: sourceNode,
+  trigger: trigger,
 };
 
 /** One type module, or null when a document names a type this build does not have. */

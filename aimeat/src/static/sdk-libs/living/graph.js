@@ -28,13 +28,19 @@
  *   words of the state it is already in again; then it recomputes only what those touched. No
  *   value is reset, no machine transitions, nothing is remounted: the numbers a person moved are
  *   exactly where they left them and only the words are different.
- * @structure createGraph(doc, opts) → { ids, errors, get, valueOf, fieldsOf, set, send, tick,
- *   refresh, relanguage, dependents, nodeOf, edges }
+ * @structure createGraph(doc, opts) → { ids, errors, get, valueOf, fieldsOf, setField, set, send,
+ *   tick, refresh, relanguage, dependents, nodeOf, edges }
  * @usage
  *   import { createGraph } from './graph.js';
  *   const g = createGraph(doc, { langs: () => ['fi', 'en'] });
  *   g.set('t', 31);   // { changed: ['t', 'f', 'note', 'state'] }
  * @version-history
+ *   v0.6.0 — 2026-09-06 — Every public operation answers with `transitions` beside `changed`: which
+ *     machine moved, from where, to where, on which event. A trigger fires on a TRANSITION and not
+ *     on a recompute, and without this the caller had to watch the machines itself and keep a
+ *     second copy of where each one had been. `setField(id, name, text)` is the other half: a URL
+ *     source whose read failed keeps its number and gains words, so `stale` is an extra output
+ *     written from outside rather than a value that moved.
  *   v0.4.0 — 2026-09-06 — `opts.langs` reaches every node's ctx, and relanguage() moves the words
  *     without moving the graph.
  *   v0.3.0 — 2026-09-05 — The first refresh runs each machine's initial entry actions, so a value
@@ -84,10 +90,23 @@ export function createGraph(doc, opts) {
   const ids = Object.keys(nodes);
   const errors = [];
 
-  const state = { values: new Map(), machines: new Map() };
+  const state = { values: new Map(), machines: new Map(), extra: new Map() };
   const compiled = new Map();
   const outputs = new Map();
   const fields = new Map();
+
+  /**
+   * EVERY TRANSITION THE LAST OPERATION ACTUALLY MADE, in the order the machines made them. A
+   * trigger fires on a transition and not on a recompute, and the difference is the whole feature:
+   * a document whose slider is dragged recomputes sixty times a second and crosses a threshold
+   * once. It is emptied at the top of each public operation and handed back with the changed list,
+   * so the caller reads one answer rather than subscribing to the machines.
+   * @type {Array<{ node: string, from: string, to: string, event: string }>}
+   */
+  let moves = [];
+  function note(id, from, to, event) {
+    moves.push({ node: id, from: String(from || ''), to: String(to || ''), event: String(event || '') });
+  }
 
   /** The scope every formula, template and guard is evaluated against. */
   const scope = {
@@ -266,6 +285,7 @@ export function createGraph(doc, opts) {
           const out = m.send(event, scope, Date.now());
           if (!out.changed) continue;
           moved = true;
+          note(id, out.from, out.path, event);
           for (const a of out.assigns) {
             const v = a.tree ? evaluateAssign(a.tree) : undefined;
             if (put(a.id, v) && seed.indexOf(a.id) < 0) seed.push(a.id);
@@ -308,12 +328,32 @@ export function createGraph(doc, opts) {
       return out;
     },
 
-    /** Work the whole document out from the top. @returns {{ changed: string[] }} */
+    /** Work the whole document out from the top. @returns {{ changed: string[], transitions: any[] }} */
     refresh() {
       const changed = [];
+      moves = [];
       pass(ids, changed);
       startMachines(changed);
       settleMachines(changed);
+      return { changed: changed, transitions: moves.slice() };
+    },
+
+    /**
+     * A NODE'S EXTRA OUTPUT, WRITTEN FROM OUTSIDE. A URL source that failed to refresh is still the
+     * number it last had, and what changed is the WORDS beside it — so the words are an extra
+     * output rather than a value, and everything that stands on the node is worked out again in
+     * case it reads them. Nothing else in this library writes here.
+     * @param {string} id @param {string} name @param {string} text
+     * @returns {{ changed: string[] }}
+     */
+    setField(id, name, text) {
+      const store = state.extra.get(id) || {};
+      const next = String(text == null ? '' : text);
+      if (String(store[name] == null ? '' : store[name]) === next) return { changed: [] };
+      store[name] = next;
+      state.extra.set(id, store);
+      const changed = [id];
+      pass([id], changed);
       return { changed: changed };
     },
 
@@ -350,24 +390,26 @@ export function createGraph(doc, opts) {
     /**
      * Move one writable node and recompute what stood on it.
      * @param {string} id @param {any} raw
-     * @returns {{ changed: string[] }}
+     * @returns {{ changed: string[], transitions: any[] }}
      */
     set(id, raw) {
       const changed = [];
-      if (!put(id, raw)) return { changed: changed };
+      moves = [];
+      if (!put(id, raw)) return { changed: changed, transitions: [] };
       pass([id], changed);
       settleMachines(changed);
-      return { changed: changed };
+      return { changed: changed, transitions: moves.slice() };
     },
 
     /**
      * Send an event to every machine that has a handler for it.
      * @param {string} event
-     * @returns {{ changed: string[] }}
+     * @returns {{ changed: string[], transitions: any[] }}
      */
     send(event) {
       const changed = [];
       const seed = [];
+      moves = [];
       for (const id of order) {
         if ((nodes[id] || {}).type !== 'machine') continue;
         const m = state.machines.get(id);
@@ -375,22 +417,24 @@ export function createGraph(doc, opts) {
         const out = m.send(event, scope, Date.now());
         if (!out.changed) continue;
         seed.push(id);
+        note(id, out.from, out.path, event);
         for (const a of out.assigns) { const v = evaluateAssign(a.tree); if (put(a.id, v)) seed.push(a.id); }
       }
-      if (!seed.length) return { changed: changed };
+      if (!seed.length) return { changed: changed, transitions: [] };
       pass(seed, changed);
       settleMachines(changed);
-      return { changed: changed };
+      return { changed: changed, transitions: moves.slice() };
     },
 
     /**
      * Fire whichever `after` timers are due.
      * @param {number} now
-     * @returns {{ changed: string[] }}
+     * @returns {{ changed: string[], transitions: any[] }}
      */
     tick(now) {
       const changed = [];
       const seed = [];
+      moves = [];
       for (const id of order) {
         if ((nodes[id] || {}).type !== 'machine') continue;
         const m = state.machines.get(id);
@@ -399,13 +443,15 @@ export function createGraph(doc, opts) {
           const out = m.tick(now);
           if (!out.changed) break;
           seed.push(id);
+          // A timer's transition carries no event name of its own, so it says what moved it.
+          note(id, out.from, out.path, 'after');
           for (const a of out.assigns) { const v = evaluateAssign(a.tree); if (put(a.id, v)) seed.push(a.id); }
         }
       }
-      if (!seed.length) return { changed: changed };
+      if (!seed.length) return { changed: changed, transitions: [] };
       pass(seed, changed);
       settleMachines(changed);
-      return { changed: changed };
+      return { changed: changed, transitions: moves.slice() };
     },
 
     /** How long until the earliest pending timer in any machine, or null. */

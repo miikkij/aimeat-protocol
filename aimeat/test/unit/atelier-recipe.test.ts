@@ -175,7 +175,7 @@ describe('the living section is held to living/describe-data.js', () => {
   });
 
   it('names exactly the node types the library carries, and no other', () => {
-    const clause = /THE SEVEN NODE TYPES([\s\S]*?)\n\n/.exec(LIVING);
+    const clause = /THE EIGHT NODE TYPES([\s\S]*?)\n\n/.exec(LIVING);
     expect(clause).toBeTruthy();
     const named = [...clause![1].matchAll(/`([a-z]+)`/g)].map((m) => m[1]).sort();
     expect(named).toEqual(TYPE_IDS);

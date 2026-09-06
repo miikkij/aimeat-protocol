@@ -11,6 +11,8 @@
  *   was wrong.
  * @usage cd aimeat && pnpm vitest run test/unit/living-describe.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-06 — The company an example keeps gains a machine, because a trigger watches
+ *     one (living 0.6.0).
  *   v1.0.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { describe, it, expect } from 'vitest';
@@ -59,6 +61,11 @@ describe('every worked example is a document the engine accepts', () => {
         t: { type: 'value', value: 22, unit: '°C', min: -20, max: 45 },
         note: { type: 'value', value: '' },
         advice: { type: 'value', value: '' },
+        // A trigger watches a machine, so the company an example keeps now includes one.
+        phase: {
+          type: 'machine', initial: 'charging',
+          states: { charging: { on: { EXPORT: 'exporting' } }, exporting: { on: { CHARGE: 'charging' } } },
+        },
         [id === 'value' ? 'example' : id]: example,
       };
       const g = createGraph({ v: 1, model: { nodes } });

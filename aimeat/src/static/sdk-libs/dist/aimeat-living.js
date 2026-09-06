@@ -13,6 +13,24 @@
     return ns;
   }
 
+  // src/static/sdk-libs/_core/config.js
+  function cfg() {
+    return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
+  }
+  function resolveNodeUrl() {
+    const meta = document.querySelector('meta[name="aimeat-node"]');
+    if (meta) return (meta.getAttribute("content") || "").replace(/\/$/, "");
+    if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
+    if (typeof self !== "undefined" && typeof self.origin === "string" && self.origin.indexOf("http") === 0) {
+      return self.origin;
+    }
+    return cfg().baseUrl;
+  }
+  var NODE_URL = resolveNodeUrl();
+  var APEX_URL = cfg().baseUrl;
+  var NODE_ID = cfg().nodeId;
+  var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
+
   // src/static/sdk-libs/living/units.js
   var PREFIXES = {
     T: 1e12,
@@ -2004,10 +2022,10 @@
     let active = errors.length ? [] : settleInto(model, [model.initial]);
     let started = false;
     let enteredAt = /* @__PURE__ */ new Map();
-    function markEntered(path, now) {
+    function markEntered(path, now2) {
       for (let i = 1; i <= path.length; i++) {
         const key = path.slice(0, i).join(".");
-        if (!enteredAt.has(key)) enteredAt.set(key, now);
+        if (!enteredAt.has(key)) enteredAt.set(key, now2);
       }
     }
     markEntered(active, 0);
@@ -2020,7 +2038,7 @@
       const list = compiled.assigns.get(kind + ":" + path) || [];
       return list.length ? list.map(resolveAssign) : list;
     }
-    function move(target, keep, now) {
+    function move(target, keep, now2) {
       const out = [];
       for (let i = active.length; i > keep; i--) {
         const path = active.slice(0, i).join(".");
@@ -2033,7 +2051,7 @@
         if (!enteredAt.has(path)) for (const a of assignsFor("entry", path)) out.push(a);
       }
       active = next;
-      markEntered(active, now);
+      markEntered(active, now2);
       return out;
     }
     function resolveTarget(target, ownerDepth) {
@@ -2075,11 +2093,17 @@
       },
       /**
        * Send an event. Looks for a handler from the deepest active state outward, honouring guards.
+       *
+       * IT SAYS WHERE IT CAME FROM as well as where it is. A trigger's whole reason for existing is
+       * "from charging to exporting", and a result that carried only the destination would leave the
+       * caller to remember the previous state itself — which is a second copy of the machine's state,
+       * kept somewhere else, going wrong the first time two machines move in one pass.
        * @param {string} event @param {{ get: (id: string) => any }} scope @param {number} [now]
-       * @returns {{ changed: boolean, path: string, assigns: Array<{ id: string, tree: any }> }}
+       * @returns {{ changed: boolean, from: string, path: string, assigns: Array<{ id: string, tree: any }> }}
        */
-      send(event, scope, now) {
-        const clock = now == null ? 0 : now;
+      send(event, scope, now2) {
+        const clock = now2 == null ? 0 : now2;
+        const from = active.join(".");
         for (let depth = active.length; depth >= 1; depth--) {
           const path = active.slice(0, depth);
           const node2 = stateAt(model, path);
@@ -2093,16 +2117,17 @@
             if (isError(v) || !truthy(v)) continue;
           }
           const assigns = move(resolveTarget(target, depth), depth - 1, clock);
-          return { changed: true, path: active.join("."), assigns };
+          return { changed: true, from, path: active.join("."), assigns };
         }
-        return { changed: false, path: active.join("."), assigns: [] };
+        return { changed: false, from, path: from, assigns: [] };
       },
       /**
        * Fire whichever `after` timer is due. Called by the runtime with the clock; in a test, with
        * whatever number the test wants.
        * @param {number} now
        */
-      tick(now) {
+      tick(now2) {
+        const from = active.join(".");
         for (let depth = active.length; depth >= 1; depth--) {
           const path = active.slice(0, depth);
           const node2 = stateAt(model, path);
@@ -2110,18 +2135,18 @@
           const since = enteredAt.get(path.join("."));
           if (since == null) continue;
           for (const ms of Object.keys(node2.after).map(Number).sort((a, b) => a - b)) {
-            if (!Number.isFinite(ms) || now - since < ms) continue;
+            if (!Number.isFinite(ms) || now2 - since < ms) continue;
             const handler = node2.after[String(ms)];
             const target = typeof handler === "string" ? handler : handler && handler.target;
             if (!target) continue;
-            const assigns = move(resolveTarget(target, depth), depth - 1, now);
-            return { changed: true, path: active.join("."), assigns };
+            const assigns = move(resolveTarget(target, depth), depth - 1, now2);
+            return { changed: true, from, path: active.join("."), assigns };
           }
         }
-        return { changed: false, path: active.join("."), assigns: [] };
+        return { changed: false, from, path: from, assigns: [] };
       },
       /** How long until the earliest pending `after`, or null when nothing is waiting. */
-      nextDue(now) {
+      nextDue(now2) {
         let best = null;
         for (let depth = active.length; depth >= 1; depth--) {
           const path = active.slice(0, depth);
@@ -2131,7 +2156,7 @@
           if (since == null) continue;
           for (const ms of Object.keys(node2.after).map(Number)) {
             if (!Number.isFinite(ms)) continue;
-            const left = Math.max(0, since + ms - now);
+            const left = Math.max(0, since + ms - now2);
             if (best == null || left < best) best = left;
           }
         }
@@ -2147,9 +2172,9 @@
         const out = [];
         for (const w of compiled.whens) {
           const v = evaluate(w.tree, scope);
-          const now = !isError(v) && truthy(v);
-          if (now && !w.was) out.push(w.send);
-          w.was = now;
+          const now2 = !isError(v) && truthy(v);
+          if (now2 && !w.was) out.push(w.send);
+          w.was = now2;
         }
         return out;
       },
@@ -2255,16 +2280,71 @@
     }
   };
 
-  // src/static/sdk-libs/living/nodes/source.js
-  function dig(record, path) {
-    if (!path) return record;
-    let at = record;
-    for (const key of String(path).split(".").filter(Boolean)) {
+  // src/static/sdk-libs/living/json-path.js
+  var NAME = /^[A-Za-z0-9_$-]+$/;
+  function pathParts(path) {
+    const text = String(path == null ? "" : path).trim();
+    if (!text) return [];
+    const out = [];
+    let at = 0;
+    while (at < text.length) {
+      if (text[at] === "[") {
+        const end2 = text.indexOf("]", at);
+        if (end2 < 0) return null;
+        const inner = text.slice(at + 1, end2);
+        if (!/^\d+$/.test(inner)) return null;
+        out.push(inner);
+        at = end2 + 1;
+        if (at < text.length && text[at] === ".") at += 1;
+        continue;
+      }
+      let end = at;
+      while (end < text.length && text[end] !== "." && text[end] !== "[") end += 1;
+      const name = text.slice(at, end);
+      if (!NAME.test(name)) return null;
+      out.push(name);
+      at = end;
+      if (at < text.length && text[at] === ".") at += 1;
+    }
+    return out;
+  }
+  function digPath(value2, path) {
+    const parts = pathParts(path);
+    if (!parts) return void 0;
+    let at = value2;
+    for (const part of parts) {
       if (at == null || typeof at !== "object") return void 0;
-      at = at[key];
+      at = at[part];
     }
     return at;
   }
+  function pathError(path) {
+    if (path == null || path === "") return null;
+    if (typeof path !== "string") return "a path that is not a line of text";
+    return pathParts(path) ? null : 'a path "' + path + '" that cannot be read as a path; a path is names joined by dots with positions in brackets, such as "prices[1].price"';
+  }
+  function shapeFor(path, sample) {
+    const parts = pathParts(path);
+    if (!parts || !parts.length) return sample;
+    let built = sample;
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const part = parts[i];
+      if (/^\d+$/.test(part)) {
+        const row = [];
+        for (let k = 0; k < Number(part); k++) row.push(null);
+        row.push(built);
+        built = row;
+        continue;
+      }
+      const box = {};
+      box[part] = built;
+      built = box;
+    }
+    return built;
+  }
+
+  // src/static/sdk-libs/living/nodes/source.js
+  var EVERY_FLOOR = 10;
   var COMMON_FIELDS = ["value", "reading", "n", "celsius", "temp", "amount"];
   var sourceNode = {
     id: "source",
@@ -2279,16 +2359,40 @@
       ctx.compiled.unit = isError(unit) ? null : unit;
       const badFormat = formatError(node2.format);
       if (badFormat) errors.push(badFormat);
+      const badPath = pathError(node2.path);
+      if (badPath) errors.push(badPath);
+      if (node2.key && node2.url) {
+        errors.push("a source naming both a key and a url; a reading comes from one place");
+      }
+      if (node2.every != null) {
+        const every = Number(node2.every);
+        if (!Number.isFinite(every) || every < EVERY_FLOOR) {
+          errors.push("a poll of " + String(node2.every) + " seconds; the shortest this document may ask an address for is " + EVERY_FLOOR);
+        }
+      }
       if (!ctx.state.values.has(ctx.id)) ctx.state.values.set(ctx.id, wrapValue(node2.value, ctx.compiled.unit));
       return errors;
     },
     evaluate(node2, ctx) {
       return ctx.state.values.get(ctx.id);
     },
+    /**
+     * The words a failed read left. It is an extra OUTPUT rather than part of the value, because the
+     * value did not move — that is the whole point of keeping it — and a sentence reads it as
+     * `{{ spot.stale }}`.
+     */
+    fields(node2, ctx) {
+      const extra = ctx.state.extra ? ctx.state.extra.get(ctx.id) || {} : {};
+      return { stale: String(extra.stale == null ? "" : extra.stale) };
+    },
     coerce(node2, ctx, raw) {
       let v = raw;
+      if (node2.url) {
+        if (v != null && typeof v === "object" && typeof v.n === "number") v = v.n;
+        return wrapValue(v, ctx.compiled.unit);
+      }
       if (v != null && typeof v === "object" && !Array.isArray(v) && typeof v.n !== "number") {
-        const dug = dig(v, node2.path);
+        const dug = digPath(v, node2.path);
         v = dug;
         if (v != null && typeof v === "object" && !Array.isArray(v)) {
           for (const f of COMMON_FIELDS) if (typeof v[f] === "number") {
@@ -2297,14 +2401,15 @@
           }
         }
       } else if (node2.path && v != null && typeof v === "object") {
-        v = dig(v, node2.path);
+        v = digPath(v, node2.path);
       }
       if (v != null && typeof v === "object" && typeof v.n === "number") v = v.n;
       return wrapValue(v, ctx.compiled.unit);
     },
     /**
      * Read the key through the platform's data library, when the page has one. Resolves to
-     * undefined where it cannot, and the fallback value stands.
+     * undefined where it cannot, and the fallback value stands. The URL road is not here: it needs a
+     * session and a runtime that can poll, so it lives in sources-url.js.
      * @param {any} node
      * @returns {Promise<any>}
      */
@@ -2320,6 +2425,83 @@
     }
   };
 
+  // src/static/sdk-libs/living/nodes/trigger.js
+  var TRIGGER_METHODS = ["POST", "PUT"];
+  function watchOf(node2) {
+    const on = node2 && node2.on;
+    if (typeof on === "string") return { node: on, when: "" };
+    if (on && typeof on === "object") return { node: String(on.node || ""), when: String(on.when || "") };
+    return { node: "", when: "" };
+  }
+  function readsOf(when) {
+    if (!when) return [];
+    const tree = parse(String(when));
+    if (isError(tree)) return [];
+    const out = [];
+    for (const s of symbolsOf(tree)) {
+      const head = s.split(".")[0];
+      if (out.indexOf(head) < 0) out.push(head);
+    }
+    return out;
+  }
+  var trigger = {
+    id: "trigger",
+    settable: true,
+    /** It stands on what it watches, so the chain draws it downstream of the machine. */
+    dependsOn(node2) {
+      const watch = watchOf(node2);
+      const out = watch.node ? [watch.node] : [];
+      for (const id of readsOf(watch.when)) if (out.indexOf(id) < 0) out.push(id);
+      return out;
+    },
+    prepare(node2, ctx) {
+      const errors = [];
+      const nodes = ((ctx.doc || {}).model || {}).nodes || {};
+      const watch = watchOf(node2);
+      if (!watch.node) {
+        errors.push("a trigger with no node to watch; `on` is a machine id, or { node, when }");
+      } else if (!Object.prototype.hasOwnProperty.call(nodes, watch.node)) {
+      } else if (!watch.when && String((nodes[watch.node] || {}).type) !== "machine") {
+        errors.push('a trigger watching "' + watch.node + '", which is a ' + String((nodes[watch.node] || {}).type) + " rather than a machine. A trigger fires on a machine's transition; to fire on a value crossing, write on: { node, when }");
+      }
+      if (watch.when) {
+        const tree = parse(String(watch.when));
+        if (isError(tree)) errors.push("a crossing that cannot be read: " + tree.error);
+      }
+      const target = node2.target || {};
+      const kind = String(target.kind || "");
+      if (kind === "url") {
+        if (!target.url) errors.push("a trigger aimed at a url with no url on it");
+        const method = String(target.method || "POST").toUpperCase();
+        if (TRIGGER_METHODS.indexOf(method) < 0) {
+          errors.push('a trigger sending with "' + method + '"; it may use ' + TRIGGER_METHODS.join(" or "));
+        }
+      } else if (kind === "agent") {
+        if (!target.agent) errors.push("a trigger aimed at an agent with no agent named on it");
+      } else {
+        errors.push('a trigger with no target to tell; a target is { kind: "url", url } or { kind: "agent", agent }');
+      }
+      if (Array.isArray(node2.include)) {
+        for (const id of node2.include) {
+          if (!Object.prototype.hasOwnProperty.call(nodes, String(id))) {
+            errors.push('an include naming "' + String(id) + '", which this document does not have');
+          }
+        }
+      } else if (node2.include != null && String(node2.include) !== "all") {
+        errors.push('an include of "' + String(node2.include) + '"; it is "all" or a list of node ids');
+      }
+      if (!ctx.state.values.has(ctx.id)) ctx.state.values.set(ctx.id, "");
+      return errors;
+    },
+    /** Its value is what the delivery runtime last wrote here: the time it spoke. */
+    evaluate(node2, ctx) {
+      return ctx.state.values.get(ctx.id);
+    },
+    coerce(node2, ctx, raw) {
+      return raw == null ? "" : String(raw);
+    }
+  };
+
   // src/static/sdk-libs/living/nodes/index.js
   var NODE_TYPES = {
     value,
@@ -2328,7 +2510,8 @@
     binding,
     text: textNode,
     machine: machineNode,
-    source: sourceNode
+    source: sourceNode,
+    trigger
   };
   function typeOf(name) {
     return Object.prototype.hasOwnProperty.call(NODE_TYPES, String(name)) ? NODE_TYPES[String(name)] : null;
@@ -2364,17 +2547,21 @@
     const nodes = model && model.nodes || {};
     const ids = Object.keys(nodes);
     const errors = [];
-    const state = { values: /* @__PURE__ */ new Map(), machines: /* @__PURE__ */ new Map() };
+    const state = { values: /* @__PURE__ */ new Map(), machines: /* @__PURE__ */ new Map(), extra: /* @__PURE__ */ new Map() };
     const compiled = /* @__PURE__ */ new Map();
     const outputs = /* @__PURE__ */ new Map();
-    const fields = /* @__PURE__ */ new Map();
+    const fields2 = /* @__PURE__ */ new Map();
+    let moves = [];
+    function note(id, from, to, event) {
+      moves.push({ node: id, from: String(from || ""), to: String(to || ""), event: String(event || "") });
+    }
     const scope = {
       get(symbol) {
         const parts = String(symbol).split(".");
         const head = parts[0];
         if (!Object.prototype.hasOwnProperty.call(nodes, head)) return void 0;
         if (parts.length === 1) return outputs.get(head);
-        const extra = fields.get(head);
+        const extra = fields2.get(head);
         if (extra && Object.prototype.hasOwnProperty.call(extra, parts.slice(1).join("."))) {
           return extra[parts.slice(1).join(".")];
         }
@@ -2469,7 +2656,7 @@
       } catch (e) {
         out = { error: 'Node "' + id + '" could not be worked out: ' + (e && e.message || String(e)) };
       }
-      if (type.fields) fields.set(id, type.fields(node2, ctx));
+      if (type.fields) fields2.set(id, type.fields(node2, ctx));
       const before = outputs.get(id);
       if (outputs.has(id) && same(before, out)) return false;
       outputs.set(id, out);
@@ -2521,6 +2708,7 @@
             const out = m.send(event, scope, Date.now());
             if (!out.changed) continue;
             moved = true;
+            note(id, out.from, out.path, event);
             for (const a of out.assigns) {
               const v = a.tree ? evaluateAssign(a.tree) : void 0;
               if (put(a.id, v) && seed.indexOf(a.id) < 0) seed.push(a.id);
@@ -2551,7 +2739,7 @@
       },
       /** A node's extra outputs — a formula's TeX, for instance. */
       fieldsOf(id) {
-        return fields.get(id) || {};
+        return fields2.get(id) || {};
       },
       /** Who stands on this node. */
       dependents(id) {
@@ -2567,12 +2755,31 @@
         for (const id of ids) for (const on of deps.get(id) || []) out.push({ from: on, to: id });
         return out;
       },
-      /** Work the whole document out from the top. @returns {{ changed: string[] }} */
+      /** Work the whole document out from the top. @returns {{ changed: string[], transitions: any[] }} */
       refresh() {
         const changed = [];
+        moves = [];
         pass(ids, changed);
         startMachines(changed);
         settleMachines(changed);
+        return { changed, transitions: moves.slice() };
+      },
+      /**
+       * A NODE'S EXTRA OUTPUT, WRITTEN FROM OUTSIDE. A URL source that failed to refresh is still the
+       * number it last had, and what changed is the WORDS beside it — so the words are an extra
+       * output rather than a value, and everything that stands on the node is worked out again in
+       * case it reads them. Nothing else in this library writes here.
+       * @param {string} id @param {string} name @param {string} text
+       * @returns {{ changed: string[] }}
+       */
+      setField(id, name, text) {
+        const store = state.extra.get(id) || {};
+        const next = String(text == null ? "" : text);
+        if (String(store[name] == null ? "" : store[name]) === next) return { changed: [] };
+        store[name] = next;
+        state.extra.set(id, store);
+        const changed = [id];
+        pass([id], changed);
         return { changed };
       },
       /**
@@ -2607,23 +2814,25 @@
       /**
        * Move one writable node and recompute what stood on it.
        * @param {string} id @param {any} raw
-       * @returns {{ changed: string[] }}
+       * @returns {{ changed: string[], transitions: any[] }}
        */
       set(id, raw) {
         const changed = [];
-        if (!put(id, raw)) return { changed };
+        moves = [];
+        if (!put(id, raw)) return { changed, transitions: [] };
         pass([id], changed);
         settleMachines(changed);
-        return { changed };
+        return { changed, transitions: moves.slice() };
       },
       /**
        * Send an event to every machine that has a handler for it.
        * @param {string} event
-       * @returns {{ changed: string[] }}
+       * @returns {{ changed: string[], transitions: any[] }}
        */
       send(event) {
         const changed = [];
         const seed = [];
+        moves = [];
         for (const id of order) {
           if ((nodes[id] || {}).type !== "machine") continue;
           const m = state.machines.get(id);
@@ -2631,48 +2840,51 @@
           const out = m.send(event, scope, Date.now());
           if (!out.changed) continue;
           seed.push(id);
+          note(id, out.from, out.path, event);
           for (const a of out.assigns) {
             const v = evaluateAssign(a.tree);
             if (put(a.id, v)) seed.push(a.id);
           }
         }
-        if (!seed.length) return { changed };
+        if (!seed.length) return { changed, transitions: [] };
         pass(seed, changed);
         settleMachines(changed);
-        return { changed };
+        return { changed, transitions: moves.slice() };
       },
       /**
        * Fire whichever `after` timers are due.
        * @param {number} now
-       * @returns {{ changed: string[] }}
+       * @returns {{ changed: string[], transitions: any[] }}
        */
-      tick(now) {
+      tick(now2) {
         const changed = [];
         const seed = [];
+        moves = [];
         for (const id of order) {
           if ((nodes[id] || {}).type !== "machine") continue;
           const m = state.machines.get(id);
           if (!m) continue;
           for (let i = 0; i < MAX_ROUNDS; i++) {
-            const out = m.tick(now);
+            const out = m.tick(now2);
             if (!out.changed) break;
             seed.push(id);
+            note(id, out.from, out.path, "after");
             for (const a of out.assigns) {
               const v = evaluateAssign(a.tree);
               if (put(a.id, v)) seed.push(a.id);
             }
           }
         }
-        if (!seed.length) return { changed };
+        if (!seed.length) return { changed, transitions: [] };
         pass(seed, changed);
         settleMachines(changed);
-        return { changed };
+        return { changed, transitions: moves.slice() };
       },
       /** How long until the earliest pending timer in any machine, or null. */
-      nextDue(now) {
+      nextDue(now2) {
         let best = null;
         for (const [, m] of state.machines) {
-          const left2 = m.nextDue(now);
+          const left2 = m.nextDue(now2);
           if (left2 != null && (best == null || left2 < best)) best = left2;
         }
         return best;
@@ -2802,24 +3014,6 @@
     node2.textContent = format(to);
   }
 
-  // src/static/sdk-libs/_core/config.js
-  function cfg() {
-    return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
-  }
-  function resolveNodeUrl() {
-    const meta = document.querySelector('meta[name="aimeat-node"]');
-    if (meta) return (meta.getAttribute("content") || "").replace(/\/$/, "");
-    if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
-    if (typeof self !== "undefined" && typeof self.origin === "string" && self.origin.indexOf("http") === 0) {
-      return self.origin;
-    }
-    return cfg().baseUrl;
-  }
-  var NODE_URL = resolveNodeUrl();
-  var APEX_URL = cfg().baseUrl;
-  var NODE_ID = cfg().nodeId;
-  var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
-
   // src/static/sdk-libs/living/formula-view.js
   var katexPromise = null;
   function loadKatex() {
@@ -2933,6 +3127,160 @@
       answerUnit.textContent = parts.place === "none" ? parts.unit : "";
     }
     return { el: root, update, relabel };
+  }
+
+  // src/static/sdk-libs/living/hooks-words.js
+  var WORDS = {
+    fi: {
+      "gear.in": "Tämä arvo voi tulla ulkoa",
+      "gear.out": "Kun tämä muuttuu, kerro jollekin",
+      "inward.title": "Tämä arvo voi tulla ulkoa",
+      "inward.lead": "Arvon voi asettaa käsin, lukea osoitteesta tai kirjoittaa muistiin. Sinä valitset kumpaa tietä.",
+      "inward.road": "Mistä arvo tulee",
+      "inward.road.hand": "Käsin, tältä sivulta",
+      "inward.road.url": "Osoitteesta",
+      "inward.road.key": "Muistiavaimesta",
+      "inward.url": "Osoite",
+      "inward.path": "Polku vastauksen sisällä",
+      "inward.every": "Kuinka usein, sekuntia",
+      "inward.key": "Muistiavain",
+      "inward.expected": "Näin vastauksen pitää näyttää",
+      "inward.testRead": "Kokeile lukemista",
+      "inward.write": "Kirjoita arvo muistiin",
+      "inward.agent": "Sano tämä omalle tekoälyllesi",
+      "inward.range": "Sallittu väli",
+      "outward.title": "Kun tämä muuttuu, kerro jollekin",
+      "outward.lead": "Jokaisesta siirtymästä lähtee yksi viesti, joka kantaa koko asiakirjan tilan.",
+      "outward.kind": "Kenelle kerrotaan",
+      "outward.kind.url": "Osoitteeseen",
+      "outward.kind.agent": "Omalle agentille",
+      "outward.url": "Osoite",
+      "outward.method": "Menetelmä",
+      "outward.agent": "Agentin nimi",
+      "outward.enabled": "Päällä",
+      "outward.states": "Tilat",
+      "outward.watching": "Seurattava kone",
+      "outward.payload": "Näin viesti lähtee",
+      "outward.testSend": "Kokeile lähetystä",
+      "save": "Tallenna",
+      "close": "Sulje",
+      "copy": "Kopioi",
+      "copied": "Kopioitu",
+      "guest.read": "Kirjaudu sisään, niin arvo luetaan ulkoa. Näytössä on viimeisin lukema.",
+      "guest.send": "Kirjaudu sisään, niin tämä voi kertoa ulospäin.",
+      "stale.lead": "Lukema ei päivittynyt: ",
+      "stale.tail": " Näytössä on viimeisin, joka saatiin.",
+      "refusal.ALLOWLIST_REFUSED": "Tätä osoitetta ei ole sallittu tällä solmulla.",
+      "refusal.RATE_LIMITED": "Kutsuja on tehty liikaa tämän minuutin aikana.",
+      "refusal.PAYLOAD_TOO_LARGE": "Viesti on liian iso lähetettäväksi.",
+      "refusal.UPSTREAM_FAILED": "Vastaanottaja ei vastannut.",
+      "refusal.NO_EXTENSION": "Tämän solmun living-hooks-laajennus ei vastannut.",
+      "refusal.UNKNOWN": "Kutsu ei mennyt läpi.",
+      "sentence.write": 'Kirjoita AIMEAT-muistiin avaimelle {key} arvo {sample}. Asiakirja "{title}" lukee sen sieltä.',
+      "sentence.task": 'Asiakirja "{title}" siirtyi tilasta {from} tilaan {to}. Koko tila on tämän viestin mukana.'
+    },
+    en: {
+      "gear.in": "This value can come from outside",
+      "gear.out": "When this changes, tell someone",
+      "inward.title": "This value can come from outside",
+      "inward.lead": "The value can be set by hand, read from an address, or written into memory. You choose which road.",
+      "inward.road": "Where the value comes from",
+      "inward.road.hand": "By hand, on this page",
+      "inward.road.url": "From an address",
+      "inward.road.key": "From a memory key",
+      "inward.url": "Address",
+      "inward.path": "Path inside the answer",
+      "inward.every": "How often, in seconds",
+      "inward.key": "Memory key",
+      "inward.expected": "This is the shape the answer must have",
+      "inward.testRead": "Test read",
+      "inward.write": "Write the value into memory",
+      "inward.agent": "Say this to your own AI",
+      "inward.range": "The range it accepts",
+      "outward.title": "When this changes, tell someone",
+      "outward.lead": "Every transition sends one message, and it carries the whole document's state.",
+      "outward.kind": "Who to tell",
+      "outward.kind.url": "An address",
+      "outward.kind.agent": "One of your agents",
+      "outward.url": "Address",
+      "outward.method": "Method",
+      "outward.agent": "The agent's name",
+      "outward.enabled": "On",
+      "outward.states": "The states",
+      "outward.watching": "The machine it watches",
+      "outward.payload": "This is the message as it goes",
+      "outward.testSend": "Test send",
+      "save": "Save",
+      "close": "Close",
+      "copy": "Copy",
+      "copied": "Copied",
+      "guest.read": "Sign in and the value is read from outside. What you see is the last reading.",
+      "guest.send": "Sign in and this can tell the outside.",
+      "stale.lead": "The reading did not refresh: ",
+      "stale.tail": " What you see is the last one that arrived.",
+      "refusal.ALLOWLIST_REFUSED": "This address is not one this node is allowed to call.",
+      "refusal.RATE_LIMITED": "Too many calls have been made this minute.",
+      "refusal.PAYLOAD_TOO_LARGE": "The message is too big to send.",
+      "refusal.UPSTREAM_FAILED": "The receiver did not answer.",
+      "refusal.NO_EXTENSION": "This node's living-hooks extension did not answer.",
+      "refusal.UNKNOWN": "The call did not go through.",
+      "sentence.write": 'Write into AIMEAT memory, under the key {key}, the value {sample}. The document "{title}" reads it from there.',
+      "sentence.task": 'The document "{title}" went from {from} to {to}. Its whole state is with this message.'
+    }
+  };
+  function say(key, langs) {
+    const map = {};
+    for (const lang of Object.keys(WORDS)) {
+      if (WORDS[lang][key] != null) map[lang] = WORDS[lang][key];
+    }
+    const got = pickLang(map, langs || []);
+    return got ? String(got.text) : String(key);
+  }
+  function fill(text, values) {
+    return String(text).replace(/\{([A-Za-z0-9_]+)\}/g, function(whole, name) {
+      const v = values ? values[name] : void 0;
+      return v == null ? whole : String(v);
+    });
+  }
+  function refusalWords(refusal, langs) {
+    if (!refusal) return "";
+    if (refusal.message) return String(refusal.message);
+    const code = String(refusal.code || "UNKNOWN");
+    const known = WORDS.en["refusal." + code] ? code : "UNKNOWN";
+    return say("refusal." + known, langs);
+  }
+
+  // src/static/sdk-libs/living/gear.js
+  var GEAR = '<path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Z"/><path d="M19.3 13.6a7.6 7.6 0 0 0 0-3.2l1.7-1.2-1.7-3-2 .8a7.6 7.6 0 0 0-2.8-1.6L14.2 3h-3.4l-.3 2.4a7.6 7.6 0 0 0-2.8 1.6l-2-.8-1.7 3 1.7 1.2a7.6 7.6 0 0 0 0 3.2L3.7 15l1.7 3 2-.8a7.6 7.6 0 0 0 2.8 1.6l.3 2.2h3.4l.3-2.2a7.6 7.6 0 0 0 2.8-1.6l2 .8 1.7-3-1.4-1.4Z"/>';
+  var GEAR_IN = '<g class="ak-living__gear-arrow"><path d="M1 12h6"/><path d="M4.6 9.2 7.4 12l-2.8 2.8"/></g>';
+  var GEAR_OUT = '<g class="ak-living__gear-arrow"><path d="M17 12h6"/><path d="M20.4 9.2 23.2 12l-2.8 2.8"/></g>';
+  function gearButton(spec) {
+    const langs = typeof spec.langs === "function" ? spec.langs : function() {
+      return [];
+    };
+    const title = say(spec.way === "out" ? "gear.out" : "gear.in", langs());
+    const button = el("button", {
+      type: "button",
+      class: "ak-btn ak-btn--ghost ak-living__gear ak-living__gear--" + (spec.way === "out" ? "out" : "in"),
+      "data-living-gear": spec.way === "out" ? "out" : "in",
+      "data-living-for": String(spec.node || ""),
+      title,
+      "aria-label": title,
+      on: { click: function() {
+        if (spec.onOpen) spec.onOpen();
+      } }
+    });
+    button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (spec.way === "out" ? GEAR_OUT : GEAR_IN) + GEAR + "</svg>";
+    return button;
+  }
+  function relabelGears(root, langs) {
+    if (!root || !root.querySelectorAll) return;
+    for (const button of root.querySelectorAll("[data-living-gear]")) {
+      const way = button.getAttribute("data-living-gear") === "out" ? "gear.out" : "gear.in";
+      const title = say(way, langs ? langs() : []);
+      if (button.getAttribute("title") !== title) button.setAttribute("title", title);
+      if (button.getAttribute("aria-label") !== title) button.setAttribute("aria-label", title);
+    }
   }
 
   // src/static/sdk-libs/living/render.js
@@ -3090,9 +3438,11 @@
     const figure = el("span", { class: "ak-living__figure" });
     const unit = el("span", { class: "ak-living__figure-unit" });
     const labelEl = el("span", { class: "ak-living__note-label", text: spec.label || spec.id });
+    const staleEl = el("p", { class: "ak-living__stale", hidden: true });
     const root = el("div", { class: "ak-living__value", "data-living-node": spec.id }, [
       labelEl,
-      el("span", { class: "ak-living__figure-row" }, [figure, unit])
+      el("span", { class: "ak-living__figure-row" }, [figure, unit]),
+      staleEl
     ]);
     host.appendChild(root);
     let last = NaN;
@@ -3103,7 +3453,13 @@
       if (!unitNow || placeNow === "none") return body;
       return placeNow === "before" ? unitNow + " " + body : body + " " + unitNow;
     };
-    function update(v) {
+    function update(v, stale) {
+      if (stale !== void 0) {
+        const words2 = String(stale || "");
+        if (staleEl.textContent !== words2) staleEl.textContent = words2;
+        staleEl.hidden = !words2;
+        root.setAttribute("data-living-stale", words2 ? "yes" : "no");
+      }
       const parts = formatParts(v, spec.format, void 0, langsOf(spec)[0]);
       if (isQuantity(v) || typeof v === "number") {
         const n = isQuantity(v) ? v.n : v;
@@ -3140,6 +3496,40 @@
       }
     };
   }
+  function triggerRow(host, spec) {
+    const labelEl = el("span", { class: "ak-living__note-label", text: spec.label || spec.id });
+    const whereEl = el("code", { class: "ak-living__trigger-target" });
+    const whenEl = el("span", { class: "ak-living__trigger-at" });
+    const reasonEl = el("p", { class: "ak-living__trigger-reason", hidden: true });
+    const root = el("div", { class: "ak-living__trigger", "data-living-node": spec.id }, [
+      labelEl,
+      el("span", { class: "ak-living__trigger-row" }, [whereEl, whenEl]),
+      reasonEl
+    ]);
+    host.appendChild(root);
+    function where(node2) {
+      const target = node2 && node2.target || {};
+      return String(target.kind) === "agent" ? "@" + String(target.agent || "") : String(target.url || "");
+    }
+    function update(at, reason, node2) {
+      const def = node2 || spec.node || {};
+      whereEl.textContent = where(def);
+      whenEl.textContent = String(at || "");
+      const words2 = String(reason || "");
+      reasonEl.textContent = words2;
+      reasonEl.hidden = !words2;
+      root.setAttribute("data-living-on", def.enabled !== false && !words2 ? "yes" : "no");
+    }
+    update(spec.at, spec.reason, spec.node);
+    return {
+      el: root,
+      update,
+      relabel(label, reason) {
+        if (label != null && labelEl.textContent !== label) labelEl.textContent = String(label);
+        if (reason !== void 0) update(whenEl.textContent, reason, null);
+      }
+    };
+  }
   function statesOf(def) {
     const out = [];
     const walk = (states) => {
@@ -3161,6 +3551,19 @@
     const label = function() {
       return textOf(node2.label, langs());
     };
+    function geared(view, way) {
+      if (!spec.gear || !view || !view.el) return view;
+      view.el.classList.add("ak-living--geared");
+      view.el.appendChild(gearButton({
+        way,
+        node: spec.id,
+        langs,
+        onOpen: function() {
+          spec.gear(spec.id, way);
+        }
+      }));
+      return view;
+    }
     if (node2.type === "control") {
       const target = graph.nodeOf(String(node2.target)) || {};
       const view = controlRow(host, {
@@ -3173,6 +3576,7 @@
           spec.set(String(node2.target), v);
         }
       });
+      geared(view, "in");
       return {
         el: view.el,
         update: () => view.update(graph.valueOf(spec.id)),
@@ -3208,6 +3612,7 @@
     }
     if (node2.type === "machine") {
       const view = machineView(host, { id: spec.id, label: label(), states: statesOf(node2), path: String(value2 || "") });
+      geared(view, "out");
       return {
         el: view.el,
         update: () => view.update(String(graph.valueOf(spec.id) || "")),
@@ -3215,11 +3620,35 @@
         kind: "machine"
       };
     }
-    if (node2.type === "value" || node2.type === "source") {
-      const view = valueRow(host, { id: spec.id, label: label(), value: value2, format: node2.format, langs });
+    if (node2.type === "trigger") {
+      const reason = function() {
+        return spec.reason ? spec.reason() : "";
+      };
+      const view = triggerRow(host, {
+        id: spec.id,
+        label: label(),
+        node: node2,
+        at: String(value2 || ""),
+        reason: reason()
+      });
+      geared(view, "out");
       return {
         el: view.el,
-        update: () => view.update(graph.valueOf(spec.id)),
+        update: () => view.update(String(graph.valueOf(spec.id) || ""), reason(), node2),
+        relabel: () => view.relabel(label(), reason()),
+        kind: "trigger"
+      };
+    }
+    if (node2.type === "value" || node2.type === "source") {
+      const stale = function() {
+        return String((graph.fieldsOf(spec.id) || {}).stale || "");
+      };
+      const view = valueRow(host, { id: spec.id, label: label(), value: value2, format: node2.format, langs });
+      view.update(value2, stale());
+      geared(view, "in");
+      return {
+        el: view.el,
+        update: () => view.update(graph.valueOf(spec.id), stale()),
         relabel: () => view.relabel(label() || spec.id, graph.valueOf(spec.id)),
         kind: node2.type
       };
@@ -3526,13 +3955,13 @@
       file: "nodes/machine-node.js"
     },
     "source": {
-      summary: "A live value from a memory key, or a constant when the page cannot read one.",
-      inputs: ["key (a memory key)", "path (a dotted path inside the record)", "value (the fallback)"],
-      outputs: ["value — what the key holds now, with the node's unit on it"],
-      options: ["unit", "format (how it is printed: 1", '"int"', '"unit"', 'an object; `locale: "auto"` writes the number in the page\'s language)', "scope=own|public", "owner (for a public read)", "label"],
+      summary: "A live value from a memory key or a URL, or a constant when the page cannot read one.",
+      inputs: ["key (a memory key)", "url (an address, read through the node's living-hooks extension)", "path (a path inside the answer, dots and brackets)", "raw (take the body itself as the value)", "value (the fallback)"],
+      outputs: ["value — what the key or the address holds now, with the node's unit on it", "stale — the words a failed read left, empty while it is fresh"],
+      options: ["unit", "every (seconds between reads of a url; the floor is 10)", "format (how it is printed: 1", '"int"', '"unit"', 'an object; `locale: "auto"` writes the number in the page\'s language)', "scope=own|public", "owner (for a public read)", "label"],
       languages: ["label"],
       functions: [],
-      example: { "type": "source", "key": "sensors.livingroom", "path": "celsius", "unit": "°C", "format": 1, "value": 21, "label": { "fi": "Olohuone", "en": "Living room" } },
+      example: { "type": "source", "url": "https://api.porssisahko.net/v1/latest-prices.json", "path": "prices[0].price", "every": 900, "unit": "EUR/kWh", "value": 0.042, "label": { "fi": "Pörssihinta", "en": "Spot price" } },
       file: "nodes/source.js"
     },
     "text": {
@@ -3544,6 +3973,16 @@
       functions: [],
       example: { "type": "text", "template": { "fi": "Lämpötila on {{ t | 1 }} °C, {{ if t > 30 }}liian kuuma{{ else }}hyvä{{ end }}.", "en": "It is {{ t | 1 }} °C, {{ if t > 30 }}too hot{{ else }}fine{{ end }}." }, "block": "note" },
       file: "nodes/text-node.js"
+    },
+    "trigger": {
+      summary: "When a machine moves, the document tells somebody: a URL, or one of your own agents.",
+      inputs: ["on (the machine id it watches, or { node, when } for a crossing that turns true)"],
+      outputs: ["value — the time of the last delivery, empty before the first"],
+      options: ['target { kind: "url", url, method } or { kind: "agent", agent }', "enabled", 'include ("all", or a list of node ids whose rows then go whole)', "label"],
+      languages: ["label"],
+      functions: [],
+      example: { "type": "trigger", "on": "phase", "enabled": true, "target": { "kind": "url", "url": "https://example.org/hook", "method": "POST" }, "include": "all", "label": { "fi": "Kerro invertterille", "en": "Tell the inverter" } },
+      file: "nodes/trigger.js"
     },
     "value": {
       summary: "A named quantity: the writable ground the rest of the document stands on.",
@@ -3557,9 +3996,1074 @@
     }
   };
 
-  // src/static/sdk-libs/living/index.js
-  var VERSION = "0.5.0";
-  var DRAWN = ["control", "formula", "text", "machine", "value", "source"];
+  // src/static/sdk-libs/living/hooks.js
+  var EXTENSION = "living-hooks";
+  function now() {
+    try {
+      if (typeof performance !== "undefined" && performance && typeof performance.now === "function") {
+        return performance.now();
+      }
+    } catch {
+    }
+    return Date.now();
+  }
+  function currentSession() {
+    try {
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      if (!ns || !ns.auth || typeof ns.auth.getSession !== "function") return null;
+      return ns.auth.getSession() || null;
+    } catch {
+      return null;
+    }
+  }
+  function createHooks(opts) {
+    const options = opts || {};
+    const transport = typeof options.transport === "function" ? options.transport : null;
+    const langs = typeof options.langs === "function" ? options.langs : function() {
+      return [];
+    };
+    const ext = String(options.extension || EXTENSION);
+    function signedIn() {
+      if (typeof options.signedIn === "boolean") return options.signedIn;
+      return !!currentSession();
+    }
+    async function overTheWire(req) {
+      const session = currentSession();
+      if (!session || typeof session.fetch !== "function") {
+        return { error: { code: "NO_EXTENSION", message: say("refusal.NO_EXTENSION", langs()) } };
+      }
+      const head = { "Content-Type": "application/json" };
+      if (req.kind === "task") {
+        const made = await session.fetch("/v1/agents/" + encodeURIComponent(String(req.agent)) + "/tasks", {
+          method: "POST",
+          headers: head,
+          body: JSON.stringify({ title: req.title, description: req.description })
+        });
+        if (!made || !made.ok) return { error: made && made.error || { code: "UPSTREAM_FAILED" } };
+        return { ok: true, status: 201 };
+      }
+      const body = req.kind === "read" ? { url: req.url, path: req.path, raw: req.raw, headers: req.headers } : { url: req.url, method: req.method, headers: req.headers, body: req.body };
+      const answer = await session.fetch("/v1/ext/" + encodeURIComponent(ext) + "/" + (req.kind === "read" ? "read" : "send"), {
+        method: "POST",
+        headers: head,
+        body: JSON.stringify(body)
+      });
+      if (!answer || !answer.ok) return { error: answer && answer.error || { code: "UPSTREAM_FAILED" } };
+      return answer.data || {};
+    }
+    async function call(req) {
+      if (!signedIn()) {
+        return {
+          refusal: {
+            code: "SIGNED_OUT",
+            message: say(req.kind === "read" ? "guest.read" : "guest.send", langs())
+          },
+          ms: 0
+        };
+      }
+      const started = now();
+      try {
+        const answer = transport ? await transport(req) : await overTheWire(req);
+        const ms = Math.round(now() - started);
+        if (answer && answer.error) return { refusal: answer.error, ms };
+        return Object.assign({ ms }, answer || {});
+      } catch (e) {
+        return {
+          refusal: { code: "UPSTREAM_FAILED", message: e && e.message || String(e) },
+          ms: Math.round(now() - started)
+        };
+      }
+    }
+    return {
+      /** Whether this page can make the call at all, and the words to say when it cannot. */
+      status() {
+        const ok = signedIn();
+        return { signedIn: ok, reason: ok ? "" : say("guest.send", langs()) };
+      },
+      signedIn,
+      /** The refusal a read earns for a guest, in words — the source runtime shows this on the node. */
+      guestRead() {
+        return say("guest.read", langs());
+      },
+      /** A refusal as a person reads it: the node's own sentence first, the code's fallback second. */
+      words(refusal) {
+        return refusalWords(refusal, langs());
+      },
+      /** @param {{ url: string, method?: string, headers?: object, body: any }} req */
+      send(req) {
+        return call({
+          kind: "send",
+          url: String(req.url),
+          method: String(req.method || "POST"),
+          headers: req.headers,
+          body: req.body
+        });
+      },
+      /** @param {{ url: string, path?: string, raw?: boolean, headers?: object }} req */
+      read(req) {
+        return call({
+          kind: "read",
+          url: String(req.url),
+          path: req.path,
+          raw: req.raw,
+          headers: req.headers
+        });
+      },
+      /** @param {{ agent: string, title: string, description: string, body: any }} req */
+      task(req) {
+        return call({
+          kind: "task",
+          agent: String(req.agent),
+          title: String(req.title),
+          description: String(req.description),
+          body: req.body
+        });
+      }
+    };
+  }
+
+  // src/static/sdk-libs/living/payload.js
+  var ROW_HEAD = 24;
+  var CARRIES_A_VALUE = ["value", "formula", "source", "text"];
+  function readValue(v) {
+    if (isQuantity(v)) return v.n;
+    if (Array.isArray(v)) return v.map(readValue);
+    if (isError(v)) return null;
+    if (v === void 0) return null;
+    return v;
+  }
+  function unitOf(v) {
+    if (isQuantity(v)) return unitLabel(v.u);
+    if (Array.isArray(v) && v.length && isQuantity(v[0])) return unitLabel(v[0].u);
+    return "";
+  }
+  function buildPayload(spec) {
+    const doc = spec.doc || {};
+    const graph = spec.graph;
+    const langs = typeof spec.langs === "function" ? spec.langs : function() {
+      return [];
+    };
+    const wanted = langs();
+    const nodes = (doc.model || {}).nodes || {};
+    const trigger2 = spec.trigger || {};
+    const named = Array.isArray(trigger2.include) ? trigger2.include.map(String) : null;
+    const values = {};
+    const machines = {};
+    for (const id of graph.ids) {
+      const node2 = nodes[id] || {};
+      const type = String(node2.type);
+      if (type === "machine") {
+        machines[id] = String(graph.valueOf(id) || "");
+        continue;
+      }
+      if (CARRIES_A_VALUE.indexOf(type) < 0) continue;
+      if (named && named.indexOf(id) < 0) continue;
+      const raw = graph.valueOf(id);
+      let value2 = readValue(raw);
+      if (Array.isArray(value2) && !named) {
+        value2 = { length: value2.length, head: value2.slice(0, ROW_HEAD) };
+      }
+      const entry = {
+        value: value2,
+        unit: unitOf(raw),
+        label: String(textOf(node2.label, wanted) || id)
+      };
+      if (isError(raw)) entry.error = String(raw.error);
+      const stale = String((graph.fieldsOf(id) || {}).stale || "");
+      if (stale) entry.stale = stale;
+      values[id] = entry;
+    }
+    const body = {
+      document: {
+        key: String(doc.key || ""),
+        title: String(textOf(doc.title, wanted) || ""),
+        register: String(doc.register || "")
+      },
+      at: String(spec.at || (/* @__PURE__ */ new Date()).toISOString()),
+      transition: {
+        node: String((spec.transition || {}).node || ""),
+        from: String((spec.transition || {}).from || ""),
+        to: String((spec.transition || {}).to || ""),
+        event: String((spec.transition || {}).event || "")
+      },
+      values,
+      machines,
+      trigger: {
+        id: String(spec.triggerId || ""),
+        label: String(textOf(trigger2.label, wanted) || spec.triggerId || "")
+      }
+    };
+    if (spec.test) body.test = true;
+    return body;
+  }
+
+  // src/static/sdk-libs/living/deliver.js
+  var KEPT = 50;
+  function asLine(v) {
+    if (v == null) return "";
+    if (typeof v === "object" && typeof v.n === "number") return String(v.n);
+    if (Array.isArray(v)) return "[" + v.length + "]";
+    if (typeof v === "object") return "";
+    return String(v);
+  }
+  function truthy2(v) {
+    if (typeof v === "boolean") return v;
+    if (typeof v === "number") return v !== 0;
+    if (v && typeof v === "object" && typeof v.n === "number") return v.n !== 0;
+    if (typeof v === "string") return v !== "";
+    return !!v;
+  }
+  function createDeliveries(spec) {
+    const doc = spec.doc || {};
+    const graph = spec.graph;
+    const hooks = spec.hooks;
+    const langs = typeof spec.langs === "function" ? spec.langs : function() {
+      return [];
+    };
+    const log = [];
+    const crossings = /* @__PURE__ */ new Map();
+    const trees = /* @__PURE__ */ new Map();
+    let destroyed = false;
+    function triggers() {
+      const nodes = (doc.model || {}).nodes || {};
+      const out = [];
+      for (const id of Object.keys(nodes)) {
+        const node2 = nodes[id] || {};
+        if (String(node2.type) === "trigger") out.push({ id, node: node2 });
+      }
+      return out;
+    }
+    function masterOn() {
+      return !(doc.hooks && doc.hooks.enabled === false);
+    }
+    function treeFor(when) {
+      if (!trees.has(when)) {
+        const tree = parse(String(when));
+        trees.set(when, isError(tree) ? null : tree);
+      }
+      return trees.get(when);
+    }
+    function transitionFor(entry, transitions) {
+      const watch = watchOf(entry.node);
+      if (!watch.node) return null;
+      if (!watch.when) {
+        let found = null;
+        for (const move of transitions) if (move.node === watch.node) found = move;
+        return found;
+      }
+      const tree = treeFor(watch.when);
+      if (!tree) return null;
+      const before = crossings.get(entry.id);
+      const value2 = graph.valueOf(watch.node);
+      const now2 = truthy2(evaluate(tree, graph.scope));
+      crossings.set(entry.id, { on: now2, reading: asLine(value2) });
+      if (!now2 || before && before.on) return null;
+      return {
+        node: watch.node,
+        from: before ? before.reading : "",
+        to: asLine(value2),
+        event: watch.when
+      };
+    }
+    function taskTitle(transition) {
+      const title = String(textOf(doc.title, langs()) || doc.key || "");
+      return "Living document: " + title + ", " + transition.from + " → " + transition.to;
+    }
+    async function deliver(id, node2, transition, isTest) {
+      const at = (/* @__PURE__ */ new Date()).toISOString();
+      const body = buildPayload({
+        doc,
+        graph,
+        langs,
+        triggerId: id,
+        trigger: node2,
+        transition,
+        at,
+        test: !!isTest
+      });
+      const target = node2.target || {};
+      const answer = String(target.kind) === "agent" ? await hooks.task({
+        agent: String(target.agent || ""),
+        title: taskTitle(transition),
+        description: fill(say("sentence.task", langs()), {
+          title: String(textOf(doc.title, langs()) || doc.key || ""),
+          from: transition.from,
+          to: transition.to
+        }) + "\n\n" + JSON.stringify(body, null, 2),
+        body
+      }) : await hooks.send({
+        url: String(target.url || ""),
+        method: String(target.method || "POST"),
+        body
+      });
+      const event = {
+        trigger: id,
+        at,
+        test: !!isTest,
+        ok: !answer.refusal,
+        status: Number(answer.status || 0),
+        ms: Number(answer.ms || 0),
+        refusal: answer.refusal ? hooks.words(answer.refusal) : "",
+        transition
+      };
+      log.push(event);
+      while (log.length > KEPT) log.shift();
+      if (spec.onDelivery) spec.onDelivery(event);
+      if (!isTest && event.ok) {
+        const out = graph.set(id, at);
+        if (spec.onChanged && out.changed.length) spec.onChanged(out.changed);
+      }
+      return event;
+    }
+    return {
+      /**
+       * Everything one graph operation set off. Handed the operation's own result, so the
+       * transitions are the ones it actually made rather than a guess from the changed list.
+       * @param {{ changed?: string[], transitions?: any[] }} result
+       * @returns {Promise<any[]>}
+       */
+      async after(result) {
+        if (destroyed) return [];
+        const transitions = result && result.transitions || [];
+        const out = [];
+        for (const entry of triggers()) {
+          if (entry.node.enabled === false || !masterOn()) {
+            continue;
+          }
+          const transition = transitionFor(entry, transitions);
+          if (!transition) continue;
+          out.push(await deliver(entry.id, entry.node, transition, false));
+        }
+        return out;
+      },
+      /**
+       * A sample message, marked as one. It goes even when the switches are off, because that is
+       * what a person pressing "test send" is asking for; the node's allowlist still decides.
+       * @param {string} triggerId
+       */
+      async test(triggerId) {
+        const nodes = (doc.model || {}).nodes || {};
+        const node2 = nodes[String(triggerId)];
+        if (!node2 || String(node2.type) !== "trigger") {
+          return { trigger: String(triggerId), ok: false, status: 0, ms: 0, refusal: "No trigger by that name." };
+        }
+        const watch = watchOf(node2);
+        const state = String(graph.valueOf(watch.node) || "");
+        return deliver(String(triggerId), node2, {
+          node: watch.node,
+          from: state,
+          to: state,
+          event: watch.when || "TEST"
+        }, true);
+      },
+      /**
+       * REMEMBER WHERE THE CROSSINGS STAND, WITHOUT TELLING ANYBODY. Mounting is not a change: a
+       * page opened twice must not send two messages saying nothing happened. So the crossing
+       * expressions are evaluated once on the state as found, and the first rising edge that counts
+       * is the first one a person or a reading actually causes.
+       */
+      prime() {
+        for (const entry of triggers()) {
+          const watch = watchOf(entry.node);
+          if (!watch.when) continue;
+          const tree = treeFor(watch.when);
+          if (!tree) continue;
+          crossings.set(entry.id, {
+            on: truthy2(evaluate(tree, graph.scope)),
+            reading: asLine(graph.valueOf(watch.node))
+          });
+        }
+      },
+      /** The deliveries this mount has made, oldest first. */
+      list() {
+        return log.slice();
+      },
+      /** Whether this page can tell anybody anything, and why not when it cannot. */
+      status() {
+        const from = hooks.status();
+        return {
+          signedIn: from.signedIn,
+          enabled: masterOn(),
+          reason: from.signedIn ? "" : from.reason,
+          triggers: triggers().map(function(e) {
+            return e.id;
+          })
+        };
+      },
+      destroy() {
+        destroyed = true;
+      }
+    };
+  }
+
+  // src/static/sdk-libs/living/sources-url.js
+  function asRaw(v) {
+    if (typeof v === "number") return v;
+    if (typeof v === "string") {
+      const text = v.trim();
+      if (text !== "" && Number.isFinite(Number(text))) return Number(text);
+    }
+    return v;
+  }
+  function createUrlSources(spec) {
+    const doc = spec.doc || {};
+    const graph = spec.graph;
+    const hooks = spec.hooks;
+    const langs = typeof spec.langs === "function" ? spec.langs : function() {
+      return [];
+    };
+    const timers = /* @__PURE__ */ new Map();
+    let destroyed = false;
+    let running = false;
+    let watching = null;
+    function sources() {
+      const nodes = (doc.model || {}).nodes || {};
+      const out = [];
+      for (const id of Object.keys(nodes)) {
+        const node2 = nodes[id] || {};
+        if (String(node2.type) === "source" && node2.url) out.push({ id, node: node2 });
+      }
+      return out;
+    }
+    function everyOf(node2) {
+      const n = Number(node2.every);
+      if (!Number.isFinite(n) || n <= 0) return 0;
+      return Math.max(EVERY_FLOOR, n);
+    }
+    function report(out) {
+      if (spec.onResult && out && out.changed && out.changed.length) spec.onResult(out);
+    }
+    async function readOnce(id) {
+      if (destroyed) return;
+      const node2 = ((doc.model || {}).nodes || {})[String(id)];
+      if (!node2 || !node2.url) return;
+      const answer = await hooks.read({
+        url: String(node2.url),
+        path: node2.path,
+        raw: node2.raw ? true : void 0
+      });
+      if (destroyed) return;
+      if (answer.refusal) {
+        const words2 = String(answer.refusal.code) === "SIGNED_OUT" ? hooks.words(answer.refusal) : say("stale.lead", langs()) + hooks.words(answer.refusal) + say("stale.tail", langs());
+        report(graph.setField(String(id), "stale", words2));
+        return;
+      }
+      const value2 = node2.raw ? asRaw(answer.value) : answer.value;
+      report(graph.set(String(id), value2));
+      report(graph.setField(String(id), "stale", ""));
+    }
+    function visible() {
+      try {
+        if (typeof document === "undefined" || !document) return true;
+        return document.visibilityState !== "hidden";
+      } catch {
+        return true;
+      }
+    }
+    function clearTimers() {
+      for (const [, handle] of timers) clearInterval(handle);
+      timers.clear();
+    }
+    function arm() {
+      clearTimers();
+      if (destroyed || !running || !visible()) return;
+      for (const entry of sources()) {
+        const every = everyOf(entry.node);
+        if (!every) continue;
+        timers.set(entry.id, setInterval(function() {
+          readOnce(entry.id);
+        }, every * 1e3));
+      }
+    }
+    return {
+      /** Read every address once, then keep the ones with an `every` up to date. */
+      start() {
+        if (destroyed) return Promise.resolve();
+        running = true;
+        if (!watching) {
+          watching = function() {
+            arm();
+          };
+          try {
+            document.addEventListener("visibilitychange", watching);
+          } catch {
+            watching = null;
+          }
+        }
+        const first = sources().map(function(entry) {
+          return readOnce(entry.id);
+        });
+        arm();
+        return Promise.all(first);
+      },
+      /** Stop asking, without forgetting anything. */
+      stop() {
+        running = false;
+        clearTimers();
+      },
+      readOnce,
+      /** Which nodes are on a clock, and how often — after the floor has been applied. */
+      polled() {
+        const out = [];
+        for (const entry of sources()) {
+          const every = everyOf(entry.node);
+          if (every) out.push({ id: entry.id, every });
+        }
+        return out;
+      },
+      destroy() {
+        destroyed = true;
+        running = false;
+        clearTimers();
+        if (watching) {
+          try {
+            document.removeEventListener("visibilitychange", watching);
+          } catch {
+          }
+          watching = null;
+        }
+      }
+    };
+  }
+
+  // src/static/sdk-libs/living/hooks-shapes.js
+  function vocabularyOf(type) {
+    const found = NODES[String(type)];
+    return found ? Object.assign({ id: String(type) }, found) : { id: String(type) };
+  }
+  function memoryKeyFor(doc, id) {
+    return String(doc && doc.key || "living") + ".in." + String(id);
+  }
+  function inwardShape(ctx) {
+    const doc = ctx.doc || {};
+    const nodes = (doc.model || {}).nodes || {};
+    const langs = typeof ctx.langs === "function" ? ctx.langs : function() {
+      return [];
+    };
+    const wanted = langs();
+    const subjectId = String(ctx.node && ctx.node.type === "control" && ctx.node.target ? ctx.node.target : ctx.id);
+    const subject = nodes[subjectId] || ctx.node || {};
+    const sample = readValue(ctx.graph ? ctx.graph.valueOf(subjectId) : subject.value);
+    const road = subject.url ? "url" : subject.key ? "key" : "hand";
+    const path = String(subject.path || "");
+    const expected = subject.raw ? sample : shapeFor(path || "value", sample);
+    const base = String(ctx.base || "");
+    const key = memoryKeyFor(doc, subjectId);
+    const body = { key, value: { value: sample } };
+    const hasRange = typeof subject.min === "number" || typeof subject.max === "number" || typeof subject.step === "number";
+    return {
+      subject: subjectId,
+      target: subjectId,
+      label: String(textOf(subject.label, wanted) || subjectId),
+      road,
+      url: String(subject.url || ""),
+      path,
+      raw: !!subject.raw,
+      every: subject.every == null ? "" : String(subject.every),
+      key: String(subject.key || ""),
+      sample,
+      /** The answer a URL has to give for THIS node to find its number in it. */
+      expected,
+      range: hasRange ? { min: subject.min, max: subject.max, step: subject.step, unit: String(subject.unit || "") } : null,
+      /** The memory road: the key, the request, and a line somebody can paste into a terminal. */
+      write: {
+        key,
+        request: {
+          method: "POST",
+          url: base + "/v1/memory",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer <your token>" },
+          body
+        },
+        curl: "curl -X POST " + base + `/v1/memory -H "Content-Type: application/json" -H "Authorization: Bearer <your token>" -d '` + JSON.stringify(body) + "'"
+      },
+      /** The agent road: the same thing said out loud, in the language the page is reading. */
+      sentence: fill(say("sentence.write", wanted), {
+        key,
+        sample: JSON.stringify(sample),
+        title: String(textOf(doc.title, wanted) || doc.key || "")
+      }),
+      vocabulary: vocabularyOf(subject.type || "value")
+    };
+  }
+  function outwardShape(ctx) {
+    const doc = ctx.doc || {};
+    const nodes = (doc.model || {}).nodes || {};
+    const langs = typeof ctx.langs === "function" ? ctx.langs : function() {
+      return [];
+    };
+    const wanted = langs();
+    const isTrigger = String((ctx.node || {}).type) === "trigger";
+    let triggerId = isTrigger ? String(ctx.id) : null;
+    if (!triggerId) {
+      for (const id of Object.keys(nodes)) {
+        const node2 = nodes[id] || {};
+        if (String(node2.type) === "trigger" && watchOf(node2).node === String(ctx.id)) {
+          triggerId = id;
+          break;
+        }
+      }
+    }
+    const written = triggerId ? nodes[triggerId] : null;
+    const watching = written ? watchOf(written).node : String(ctx.id);
+    const machine = nodes[watching] || {};
+    const target = written && written.target || {};
+    const kind = String(target.kind || "url") === "agent" ? "agent" : "url";
+    const shaped = kind === "agent" ? { kind: "agent", agent: String(target.agent || "") } : { kind: "url", url: String(target.url || ""), method: String(target.method || "POST") };
+    const draft = written || {
+      type: "trigger",
+      on: watching,
+      enabled: true,
+      target: shaped,
+      include: "all"
+    };
+    const state = String(ctx.graph ? ctx.graph.valueOf(watching) || "" : "");
+    return {
+      /** The trigger's id when the record already carries one, null when this would write the first. */
+      trigger: triggerId,
+      /** The id a new trigger would be written under, so the dialog can say it before saving. */
+      newId: String(watching) + "Tells",
+      watching,
+      label: String(textOf(draft.label, wanted) || textOf(machine.label, wanted) || watching),
+      states: statesOf(machine),
+      enabled: draft.enabled !== false,
+      include: Array.isArray(draft.include) ? draft.include.slice() : "all",
+      target: shaped,
+      methods: TRIGGER_METHODS.slice(),
+      /** The message as it would go, for the state the document is in right now. */
+      payload: buildPayload({
+        doc,
+        graph: ctx.graph,
+        langs,
+        triggerId: triggerId || String(watching) + "Tells",
+        trigger: draft,
+        transition: { node: watching, from: state, to: state, event: "" },
+        at: (/* @__PURE__ */ new Date()).toISOString()
+      }),
+      vocabulary: vocabularyOf("trigger")
+    };
+  }
+
+  // src/static/sdk-libs/living/dialog-parts.js
+  function group(host, title) {
+    const body = el("div", { class: "ak-living__dialog-body" });
+    const root = el("section", { class: "ak-living__dialog-group" }, [
+      el("h3", { class: "ak-living__dialog-heading", text: String(title) }),
+      body
+    ]);
+    host.appendChild(root);
+    return {
+      el: root,
+      body,
+      show(on) {
+        root.hidden = !on;
+      }
+    };
+  }
+  function fields(host, list, draft) {
+    const k = kit();
+    const handle = k.form({
+      target: host,
+      submit: false,
+      fields: list.map(function(field) {
+        return Object.assign({}, field, {
+          onInput(value2) {
+            draft[field.name] = value2;
+            if (field.after) field.after(value2);
+          }
+        });
+      })
+    });
+    handle.el.classList.add("ak-living__dialog-fields");
+    return handle;
+  }
+  function copyBlock(host, spec) {
+    const langs = typeof spec.langs === "function" ? spec.langs : function() {
+      return [];
+    };
+    const pre = el("pre", { class: "ak-living__copy-text", tabindex: "0", text: String(spec.text) });
+    const button = el("button", {
+      type: "button",
+      class: "ak-btn ak-btn--outline ak-living__copy-btn",
+      text: say("copy", langs()),
+      on: {
+        click() {
+          const text = pre.textContent || "";
+          const done = function() {
+            button.textContent = say("copied", langs());
+            setTimeout(function() {
+              button.textContent = say("copy", langs());
+            }, 1600);
+          };
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(done, function() {
+                select();
+              });
+              return;
+            }
+          } catch {
+          }
+          select();
+        }
+      }
+    });
+    function select() {
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(pre);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        pre.focus();
+      } catch {
+      }
+    }
+    const root = el("div", { class: "ak-living__copy" }, [
+      el("div", { class: "ak-living__copy-head" }, [
+        el("span", { class: "ak-living__copy-label", text: String(spec.label) }),
+        button
+      ]),
+      pre
+    ]);
+    host.appendChild(root);
+    return {
+      el: root,
+      set(text) {
+        pre.textContent = String(text);
+      }
+    };
+  }
+  function statusLine(host) {
+    const line = el("p", { class: "ak-living__dialog-status", role: "status" });
+    host.appendChild(line);
+    return {
+      el: line,
+      say(text, ok) {
+        line.textContent = String(text || "");
+        line.setAttribute("data-ok", ok ? "yes" : "no");
+      }
+    };
+  }
+  function vocabularyNote(host, vocabulary) {
+    const root = el("div", { class: "ak-living__vocabulary" }, [
+      el("p", { class: "ak-living__vocabulary-summary", text: String(vocabulary.summary || "") }),
+      el("p", {
+        class: "ak-living__vocabulary-options",
+        text: (vocabulary.options || []).join(" · ")
+      })
+    ]);
+    host.appendChild(root);
+    return root;
+  }
+
+  // src/static/sdk-libs/living/dialog-inward.js
+  function reading(value2) {
+    if (value2 == null) return "";
+    if (typeof value2 === "object") return JSON.stringify(value2);
+    return String(value2);
+  }
+  function openInward(spec) {
+    const langs = typeof spec.langs === "function" ? spec.langs : function() {
+      return [];
+    };
+    const shape = inwardShape(spec);
+    const words2 = function(key) {
+      return say(key, langs());
+    };
+    const draft = {
+      road: shape.road,
+      url: shape.url,
+      path: shape.path,
+      every: shape.every,
+      key: shape.key
+    };
+    const k = kit();
+    const handle = k.dialog({
+      title: words2("inward.title"),
+      text: words2("inward.lead"),
+      size: "wide",
+      body(host) {
+        host.classList.add("ak-living__dialog");
+        const roads = group(host, words2("inward.road"));
+        const urlRoad = group(host, words2("inward.url"));
+        const keyRoad = group(host, words2("inward.write"));
+        function showRoad() {
+          urlRoad.show(draft.road === "url");
+          keyRoad.show(draft.road === "key");
+        }
+        fields(roads.body, [{
+          name: "road",
+          id: "ak-living-road",
+          type: "select",
+          label: words2("inward.road"),
+          value: draft.road,
+          options: [
+            { value: "hand", label: words2("inward.road.hand") },
+            { value: "url", label: words2("inward.road.url") },
+            { value: "key", label: words2("inward.road.key") }
+          ],
+          after: showRoad
+        }], draft);
+        const expected = { block: null };
+        fields(urlRoad.body, [
+          { name: "url", id: "ak-living-url", type: "text", label: words2("inward.url"), value: draft.url },
+          {
+            name: "path",
+            id: "ak-living-path",
+            type: "text",
+            label: words2("inward.path"),
+            value: draft.path,
+            after() {
+              if (expected.block) expected.block.set(JSON.stringify(shapeNow(), null, 2));
+            }
+          },
+          { name: "every", id: "ak-living-every", type: "number", label: words2("inward.every"), value: draft.every, min: 10 }
+        ], draft);
+        function shapeNow() {
+          return inwardShape(Object.assign({}, spec, {
+            node: Object.assign({}, spec.node, { path: draft.path, raw: shape.raw, url: draft.url || "x" })
+          })).expected;
+        }
+        expected.block = copyBlock(urlRoad.body, {
+          label: words2("inward.expected"),
+          text: JSON.stringify(shape.expected, null, 2),
+          langs
+        });
+        const urlStatus = statusLine(urlRoad.body);
+        const testRead = document.createElement("button");
+        testRead.type = "button";
+        testRead.className = "ak-btn ak-btn--outline ak-living__dialog-test";
+        testRead.textContent = words2("inward.testRead");
+        testRead.addEventListener("click", function() {
+          urlStatus.say("…", true);
+          spec.hooks.read({ url: draft.url, path: draft.path, raw: shape.raw ? true : void 0 }).then(function(answer) {
+            if (answer.refusal) {
+              urlStatus.say(spec.hooks.words(answer.refusal), false);
+              return;
+            }
+            const got = shape.raw ? asRaw(answer.value) : answer.value;
+            urlStatus.say(reading(got), true);
+          });
+        });
+        urlRoad.body.appendChild(testRead);
+        fields(keyRoad.body, [{
+          name: "key",
+          id: "ak-living-key",
+          type: "text",
+          label: words2("inward.key"),
+          value: draft.key || shape.write.key
+        }], draft);
+        copyBlock(keyRoad.body, {
+          label: words2("inward.write"),
+          text: shape.write.curl,
+          langs
+        });
+        copyBlock(host, { label: words2("inward.agent"), text: shape.sentence, langs });
+        if (shape.range) {
+          const line = document.createElement("p");
+          line.className = "ak-living__dialog-range";
+          line.textContent = words2("inward.range") + ": " + [
+            shape.range.min,
+            shape.range.max
+          ].filter(function(n) {
+            return n != null;
+          }).join(" … ") + (shape.range.unit ? " " + shape.range.unit : "") + (shape.range.step != null ? " (" + shape.range.step + ")" : "");
+          host.appendChild(line);
+        }
+        vocabularyNote(host, shape.vocabulary);
+        showRoad();
+      },
+      actions: [
+        { id: "close", label: words2("close"), tone: "ghost", run: function() {
+          handle.close("close");
+        } },
+        { id: "save", label: words2("save"), tone: "primary", run: function() {
+          save();
+          handle.close("save");
+        } }
+      ]
+    });
+    function save() {
+      const nodes = ((spec.doc || {}).model || {}).nodes || {};
+      const node2 = nodes[shape.subject];
+      if (!node2) return;
+      delete node2.url;
+      delete node2.key;
+      delete node2.every;
+      if (draft.road === "url") {
+        node2.type = "source";
+        node2.url = String(draft.url || "");
+        if (draft.path) node2.path = String(draft.path);
+        else delete node2.path;
+        const every = Number(draft.every);
+        if (Number.isFinite(every) && every > 0) node2.every = every;
+      } else if (draft.road === "key") {
+        node2.type = "source";
+        node2.key = String(draft.key || shape.write.key);
+        if (draft.path) node2.path = String(draft.path);
+        else delete node2.path;
+      } else {
+        node2.type = "value";
+        delete node2.path;
+        delete node2.raw;
+      }
+      if (spec.onSave) spec.onSave(shape.subject);
+    }
+    return handle;
+  }
+
+  // src/static/sdk-libs/living/dialog-outward.js
+  function openOutward(spec) {
+    const langs = typeof spec.langs === "function" ? spec.langs : function() {
+      return [];
+    };
+    const shape = outwardShape(spec);
+    const words2 = function(key) {
+      return say(key, langs());
+    };
+    const draft = {
+      kind: shape.target.kind,
+      url: String(shape.target.url || ""),
+      method: String(shape.target.method || "POST"),
+      agent: String(shape.target.agent || ""),
+      enabled: shape.enabled
+    };
+    const k = kit();
+    const handle = k.dialog({
+      title: words2("outward.title"),
+      text: words2("outward.lead"),
+      size: "wide",
+      body(host) {
+        host.classList.add("ak-living__dialog");
+        const watching = el("p", { class: "ak-living__dialog-watch" }, [
+          el("span", { class: "ak-living__dialog-watch-label", text: words2("outward.watching") + ": " }),
+          el("code", { text: shape.watching })
+        ]);
+        host.appendChild(watching);
+        if (shape.states.length) {
+          const strip = el("div", { class: "ak-living__states ak-living__dialog-states", role: "group" });
+          for (const name of shape.states) {
+            strip.appendChild(el("span", {
+              class: "ak-living__state",
+              "data-state": name,
+              text: name,
+              "data-on": String(shape.payload.machines[shape.watching] || "").split(".").indexOf(name) >= 0 ? "yes" : "no"
+            }));
+          }
+          host.appendChild(el("div", { class: "ak-living__dialog-group" }, [
+            el("h3", { class: "ak-living__dialog-heading", text: words2("outward.states") }),
+            strip
+          ]));
+        }
+        const who = group(host, words2("outward.kind"));
+        const urlRoad = group(host, words2("outward.url"));
+        const agentRoad = group(host, words2("outward.agent"));
+        function showKind() {
+          urlRoad.show(draft.kind === "url");
+          agentRoad.show(draft.kind === "agent");
+        }
+        fields(who.body, [
+          {
+            name: "kind",
+            id: "ak-living-kind",
+            type: "select",
+            label: words2("outward.kind"),
+            value: draft.kind,
+            options: [
+              { value: "url", label: words2("outward.kind.url") },
+              { value: "agent", label: words2("outward.kind.agent") }
+            ],
+            after: showKind
+          },
+          {
+            name: "enabled",
+            id: "ak-living-enabled",
+            type: "toggle",
+            label: words2("outward.enabled"),
+            value: draft.enabled
+          }
+        ], draft);
+        fields(urlRoad.body, [
+          { name: "url", id: "ak-living-hook-url", type: "text", label: words2("outward.url"), value: draft.url },
+          {
+            name: "method",
+            id: "ak-living-hook-method",
+            type: "select",
+            label: words2("outward.method"),
+            value: draft.method,
+            options: shape.methods.map(function(m) {
+              return { value: m, label: m };
+            })
+          }
+        ], draft);
+        fields(agentRoad.body, [
+          { name: "agent", id: "ak-living-hook-agent", type: "text", label: words2("outward.agent"), value: draft.agent }
+        ], draft);
+        copyBlock(host, {
+          label: words2("outward.payload"),
+          text: JSON.stringify(shape.payload, null, 2),
+          langs
+        });
+        const status = statusLine(host);
+        const testSend = el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--outline ak-living__dialog-test",
+          text: words2("outward.testSend"),
+          on: {
+            click() {
+              status.say("…", true);
+              const body = Object.assign({}, shape.payload, { test: true });
+              const call = draft.kind === "agent" ? spec.hooks.task({
+                agent: draft.agent,
+                title: "Living document: " + shape.label + " (test)",
+                description: JSON.stringify(body, null, 2),
+                body
+              }) : spec.hooks.send({ url: draft.url, method: draft.method, body });
+              call.then(function(answer) {
+                if (answer.refusal) {
+                  status.say(spec.hooks.words(answer.refusal), false);
+                  return;
+                }
+                status.say(String(answer.status || 200) + " · " + String(answer.ms || 0) + " ms", true);
+              });
+            }
+          }
+        });
+        host.appendChild(testSend);
+        vocabularyNote(host, shape.vocabulary);
+        showKind();
+      },
+      actions: [
+        { id: "close", label: words2("close"), tone: "ghost", run: function() {
+          handle.close("close");
+        } },
+        { id: "save", label: words2("save"), tone: "primary", run: function() {
+          save();
+          handle.close("save");
+        } }
+      ]
+    });
+    function save() {
+      const model = (spec.doc || {}).model || {};
+      if (!model.nodes) model.nodes = {};
+      const id = shape.trigger || shape.newId;
+      const before = model.nodes[id] || {};
+      model.nodes[id] = Object.assign({}, before, {
+        type: "trigger",
+        on: shape.watching,
+        enabled: !!draft.enabled,
+        include: shape.include,
+        target: draft.kind === "agent" ? { kind: "agent", agent: String(draft.agent || "") } : { kind: "url", url: String(draft.url || ""), method: String(draft.method || "POST") }
+      });
+      if (spec.onSave) spec.onSave(id);
+    }
+    return handle;
+  }
+
+  // src/static/sdk-libs/living/validate-lang.js
   function nodeLanguageRefusals(id, node2, out) {
     for (const field of (NODES[String(node2.type)] || {}).languages || []) {
       if (/[^A-Za-z0-9_[\].]/.test(field)) continue;
@@ -3639,6 +5143,10 @@
       if (isPlainObject(at) || Array.isArray(at)) propLanguageRefusals(blockId, at, out, where);
     }
   }
+
+  // src/static/sdk-libs/living/index.js
+  var VERSION = "0.6.0";
+  var DRAWN = ["control", "formula", "text", "machine", "value", "source", "trigger"];
   function validate(doc) {
     const refusals = [];
     if (!doc || typeof doc !== "object") return { ok: false, refusals: ["This is not a document record."] };
@@ -3771,6 +5279,36 @@
     let chainHandle = null;
     let timer = null;
     let destroyed = false;
+    const hookOpts = options.hooks || {};
+    const hooks = createHooks({
+      transport: hookOpts.transport,
+      signedIn: hookOpts.signedIn,
+      extension: hookOpts.extension,
+      langs
+    });
+    const deliveries = createDeliveries({
+      doc,
+      graph,
+      hooks,
+      langs,
+      onDelivery(event) {
+        tellDelivery(event);
+      },
+      onChanged(ids) {
+        announce(ids);
+      }
+    });
+    const live = createUrlSources({
+      doc,
+      graph,
+      hooks,
+      langs,
+      onResult(out) {
+        announceResult(out);
+      }
+    });
+    const deliveryWatchers = [];
+    const recordWatchers = [];
     const sources = {};
     for (const [blockId, entries] of plan) {
       sources[sourceNameFor(blockId)] = /* @__PURE__ */ (function(id, list) {
@@ -3783,9 +5321,9 @@
         };
       })(blockId, entries);
     }
-    const fill = {};
+    const fill2 = {};
     for (const [blockId, ids] of drawnByBlock) {
-      fill[blockId] = /* @__PURE__ */ (function(list) {
+      fill2[blockId] = /* @__PURE__ */ (function(list) {
         return function(body) {
           for (const id of list) {
             const view = renderNodeInto(body, {
@@ -3793,7 +5331,9 @@
               node: nodes[id],
               graph,
               langs,
-              set: apply
+              set: apply,
+              gear: options.gears === false ? null : openGear,
+              reason: guestReason
             });
             if (view) views.set(id, view);
           }
@@ -3801,7 +5341,7 @@
       })(ids);
     }
     if (options.chainBlock) {
-      fill[options.chainBlock] = function(body) {
+      fill2[options.chainBlock] = function(body) {
         chainHandle = chain(body, { graph, title: "The chain", langs });
       };
     }
@@ -3839,7 +5379,7 @@
       layout,
       fallback: layout,
       sources,
-      fill
+      fill: fill2
     });
     const lateRefusals = unboundBlocks(surface, plan.keys()).map(function(b) {
       return 'A binding writes to block "' + b.id + '", which is a ' + b.component + " — that component does not read a bound record.";
@@ -3867,11 +5407,56 @@
         options.onChange({ changed: changed.slice(), values: valuesNow(), state: statesNow() });
       }
     }
+    function announceResult(out) {
+      announce(out.changed);
+      deliveries.after(out);
+      return out;
+    }
     function apply(id, raw) {
       if (destroyed) return { changed: [] };
-      const out = graph.set(id, raw);
-      announce(out.changed);
-      return out;
+      return announceResult(graph.set(id, raw));
+    }
+    function tellDelivery(event) {
+      if (options.onDelivery) options.onDelivery(event);
+      for (const cb of deliveryWatchers.slice()) {
+        try {
+          cb(event);
+        } catch {
+        }
+      }
+      try {
+        host.dispatchEvent(new CustomEvent("aimeat-living-delivery", { detail: event, bubbles: true }));
+      } catch {
+      }
+    }
+    function guestReason() {
+      const state = deliveries.status();
+      return state.signedIn ? "" : String(state.reason || "");
+    }
+    function openGear(id, way) {
+      const spec = {
+        id: String(id),
+        node: nodes[String(id)] || {},
+        doc,
+        graph,
+        hooks,
+        langs,
+        base: NODE_URL,
+        onSave: recordChanged
+      };
+      if (way === "out") openOutward(spec);
+      else openInward(spec);
+    }
+    function recordChanged(nodeId) {
+      live.stop();
+      live.start();
+      announceResult(graph.refresh());
+      for (const cb of recordWatchers.slice()) {
+        try {
+          cb({ node: String(nodeId), doc });
+        } catch {
+        }
+      }
     }
     function elementOf(block, mounted) {
       const entry = mounted.get(String(block.id));
@@ -3914,6 +5499,7 @@
         if (view) view.update();
       }
       relabelBlocks();
+      relabelGears(host, langs);
       for (const [blockId, entries] of plan) {
         const moved = entries.some(function(e) {
           return out.changed.indexOf(e.from) >= 0;
@@ -3944,7 +5530,7 @@
       timer = setTimeout(function() {
         timer = null;
         if (destroyed) return;
-        announce(graph.tick(Date.now()).changed);
+        announceResult(graph.tick(Date.now()));
       }, Math.max(16, due));
     }
     function valuesNow() {
@@ -3984,7 +5570,10 @@
       readSources();
     };
     if (options.live !== false && sourceIds.length) window.addEventListener("aimeat-live-update", onLive);
+    deliveries.prime();
     const ready = Promise.resolve().then(readSources).then(function() {
+      return options.live === false ? null : live.start();
+    }).then(function() {
       schedule();
     });
     return {
@@ -4011,15 +5600,55 @@
       state: statesNow,
       /** Send an event to the machines. */
       send(event) {
-        const out = graph.send(String(event));
-        announce(out.changed);
-        return out;
+        return announceResult(graph.send(String(event)));
       },
       /** Work the whole document out again. */
       refresh() {
-        const out = graph.refresh();
-        announce(out.changed);
-        return out;
+        return announceResult(graph.refresh());
+      },
+      /** Whether this document can tell anybody anything, and the words to say when it cannot. */
+      hooks() {
+        return deliveries.status();
+      },
+      /** The last fifty deliveries this mount made, oldest first. */
+      deliveries() {
+        return deliveries.list();
+      },
+      /** Send one trigger's message as a sample, marked `test: true`. */
+      test(triggerId) {
+        return deliveries.test(String(triggerId));
+      },
+      /** Ask one URL source for its reading now, rather than waiting for its next turn. */
+      read(id) {
+        return live.readOnce(String(id));
+      },
+      /** Which sources are on a clock, and how often — after the ten-second floor. */
+      polled() {
+        return live.polled();
+      },
+      /**
+       * Hear every delivery: { trigger, at, ok, status, ms, refusal, transition, test }. The same
+       * event is dispatched on the host element as `aimeat-living-delivery`.
+       * @param {(e: any) => void} cb @returns {() => void} stop listening
+       */
+      onDelivery(cb) {
+        deliveryWatchers.push(cb);
+        return function() {
+          const at = deliveryWatchers.indexOf(cb);
+          if (at >= 0) deliveryWatchers.splice(at, 1);
+        };
+      },
+      /**
+       * Hear the record being edited through a gear, so the app can save it. This library persists
+       * nothing: the memory key a document lives under is the app's, and always was.
+       * @param {(e: { node: string, doc: any }) => void} cb @returns {() => void} stop listening
+       */
+      onRecordChange(cb) {
+        recordWatchers.push(cb);
+        return function() {
+          const at = recordWatchers.indexOf(cb);
+          if (at >= 0) recordWatchers.splice(at, 1);
+        };
       },
       /** Draw the chain somewhere of the host's choosing, following this same document. */
       chain(where) {
@@ -4047,6 +5676,8 @@
         destroyed = true;
         if (timer) clearTimeout(timer);
         stopLang();
+        deliveries.destroy();
+        live.destroy();
         window.removeEventListener("aimeat-live-update", onLive);
         if (chainHandle) chainHandle.destroy();
         for (const [, view] of views) if (view.el && view.el.parentNode) view.el.parentNode.removeChild(view.el);

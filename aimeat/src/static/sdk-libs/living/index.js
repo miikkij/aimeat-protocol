@@ -35,6 +35,13 @@
  *   the state it reached, and nothing is remounted, so the kit's entrance does not run again for
  *   a change of wording. `langs` is the optional list of what the record carries, `lang` its
  *   default. describe(type).languages says which of that type's fields take a map.
+ *   IT ALSO REACHES OUT, AND ONLY THROUGH ONE DOOR. A `trigger` node tells a URL or one of the
+ *   owner's own agents when a machine transitions, and a `source` node can take its reading off an
+ *   address. Both go through the node's `living-hooks` extension as the signed-in caller, so the
+ *   owner's allowlist, the rate limits and the size caps decide — never the record, and never the
+ *   browser calling a third party directly. A guest sees both roads disabled with words rather than
+ *   a page that quietly does nothing. The gear on each field is where a person is told which of
+ *   those a node can do, and what the shape would have to be.
  * @structure mount(el, doc, opts) · describe(type?) · validate(doc) · chain(el, doc) · version
  * @usage
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
@@ -45,6 +52,22 @@
  *   doc.set('t', 31);
  *   doc.setLanguage('en');   // …or just let the login pill do it
  * @version-history
+ *   v0.6.0 — 2026-09-06 — THE DOCUMENT REACHES OUT, AND LISTENS. A `trigger` node fires on a
+ *     machine's TRANSITION — not on a recompute — and sends one message carrying the whole state:
+ *     the document, the time, which machine moved from where to where on which event, every value
+ *     with its unit and its label in the page's language, and every machine's state. Its target is
+ *     a URL or one of the owner's own agents, and an agent target becomes a task titled with the
+ *     crossing. A `source` node gained the other road in: a URL, a path with brackets, a raw body
+ *     and an `every` with a ten-second floor, where a failed read KEEPS the last value and writes
+ *     the refusal into the node's new `stale` output. Both roads go through the node's
+ *     `living-hooks` extension as the signed-in caller; a guest is told in words rather than
+ *     watching a page do nothing. Every value, control and source now carries an inward gear and
+ *     every machine and trigger an outward one, and the dialogs behind them are generated from
+ *     describe() and from the node itself — the answer a URL must give for THIS path, the POST that
+ *     writes the value into a memory key of this document's own, the sentence to say to your own
+ *     AI, and the payload exactly as it would leave. Two switches, both the owner's:
+ *     `hooks: { enabled }` on the document and `enabled` on each trigger. The language refusals
+ *     moved to validate-lang.js as a pure extraction on the way (the 800-line ceiling).
  *   v0.5.0 — 2026-09-06 — A ROW IS A VALUE, which is the half of a spreadsheet this language did
  *     not have. Arithmetic and comparison broadcast over a list, min and max go element-wise on
  *     two or more arguments, and range · map · fold · scan · cumsum · index · at · where build a
@@ -92,6 +115,7 @@
  *     chain view and describe().
  */
 import { attach } from '../_core/namespace.js';
+import { NODE_URL } from '../_core/config.js';
 import { createGraph } from './graph.js';
 import { NODE_TYPES, typeOf } from './nodes/index.js';
 import { unboundBlocks } from './nodes/binding.js';
@@ -102,117 +126,23 @@ import { NODES } from './describe-data.js';
 import { resolve, kit } from './dom.js';
 import { isError, isQuantity, asText } from './formula-eval.js';
 import { unitLabel } from './units.js';
-import { parseTemplate, symbolsOfTemplate } from './text.js';
+import { createHooks } from './hooks.js';
+import { createDeliveries } from './deliver.js';
+import { createUrlSources } from './sources-url.js';
+import { openInward } from './dialog-inward.js';
+import { openOutward } from './dialog-outward.js';
+import { relabelGears } from './gear.js';
 import {
-  TEXT_KEYS, hasLangMap, isPlainObject, langKeysOf, langMapError, localizeLayout, localizeProps,
-  onLanguageChange, preference,
+  nodeLanguageRefusals, machineLanguageRefusals, templateLanguageRefusals, propLanguageRefusals,
+} from './validate-lang.js';
+import {
+  TEXT_KEYS, hasLangMap, localizeLayout, localizeProps, onLanguageChange, preference,
 } from './i18n.js';
 
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 
 /** The node types whose rendering this library does itself, when the node names a block. */
-const DRAWN = ['control', 'formula', 'text', 'machine', 'value', 'source'];
-
-/**
- * Every language map in one node, refused by name where it is not one. The FIELDS TO LOOK AT ARE
- * describe()'s own — `NODES[type].languages`, generated from each node module's `@languages`
- * line — so a node type that later gains a translatable field is checked here without anybody
- * remembering to come back and add it.
- * @param {string} id @param {any} node @param {string[]} out
- */
-function nodeLanguageRefusals(id, node, out) {
-  for (const field of ((NODES[String(node.type)] || {}).languages || [])) {
-    // The machine's line names its assignments in words rather than as a field path; those are
-    // walked below, where the states are.
-    if (/[^A-Za-z0-9_[\].]/.test(field)) continue;
-    const perItem = /^([A-Za-z0-9_]+)\[\]\.([A-Za-z0-9_]+)$/.exec(field);
-    if (perItem) {
-      const items = node[perItem[1]];
-      if (!Array.isArray(items)) continue;
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (!item || typeof item !== 'object') continue;
-        const bad = langMapError(item[perItem[2]]);
-        if (bad) out.push('Option ' + (i + 1) + ' of "' + id + '" has a ' + perItem[2] + ' that ' + bad + '.');
-      }
-      continue;
-    }
-    const bad = langMapError(node[field]);
-    if (bad) out.push('Node "' + id + '" has a ' + field + ' that ' + bad + '.');
-  }
-}
-
-/** The words a machine's entry and exit actions write, refused where a map has no language in it. */
-function machineLanguageRefusals(id, node, out) {
-  const walk = (states, prefix) => {
-    for (const name of Object.keys(states || {})) {
-      const state = states[name] || {};
-      const path = prefix ? prefix + '.' + name : name;
-      for (const kind of ['entry', 'exit']) {
-        for (const target of Object.keys(state[kind] || {})) {
-          const bad = langMapError(state[kind][target]);
-          if (bad) {
-            out.push('The ' + kind + ' of "' + id + '" at ' + path + ' writes a ' + target
-              + ' that ' + bad + '.');
-          }
-        }
-      }
-      if (state.states) walk(state.states, path);
-    }
-  };
-  walk(node.states, '');
-}
-
-/**
- * A SENTENCE CARRIES THE SAME HOLES IN EVERY LANGUAGE IT IS WRITTEN IN. The Finnish and the
- * English are composed separately — that is the point — but if one of them reads `dew` and the
- * other does not, the document says two different things depending on who opens it, and the
- * missing half is exactly what nobody notices. So the symbols are compared by name and the
- * refusal says WHICH node and WHICH language.
- * @param {string} id @param {any} node @param {string[]} out
- */
-function templateLanguageRefusals(id, node, out) {
-  const bad = langMapError(node.template);
-  if (bad) { out.push('The sentence "' + id + '" has a template that ' + bad + '.'); return; }
-  if (!isPlainObject(node.template)) return;
-  const perLang = new Map();
-  for (const lang of langKeysOf(node.template)) {
-    const parts = parseTemplate(node.template[lang]);
-    if (!Array.isArray(parts)) {
-      out.push('The sentence "' + id + '" cannot be read in ' + lang + ': ' + parts.error);
-      continue;
-    }
-    perLang.set(lang, symbolsOfTemplate(parts).map((s) => s.split('.')[0]));
-  }
-  const every = [];
-  for (const [, list] of perLang) for (const s of list) if (every.indexOf(s) < 0) every.push(s);
-  for (const [lang, list] of perLang) {
-    for (const s of every) {
-      if (list.indexOf(s) >= 0) continue;
-      out.push('The sentence "' + id + '" reads "' + s + '" in one language and not in ' + lang
-        + '. A sentence carries the same holes in every language it is written in.');
-    }
-  }
-}
-
-/** Every language map in a block's props, however deep, refused where it has no language in it. */
-function propLanguageRefusals(blockId, props, out, path) {
-  if (Array.isArray(props)) {
-    props.forEach((p, i) => propLanguageRefusals(blockId, p, out, path + '[' + i + ']'));
-    return;
-  }
-  if (!isPlainObject(props)) return;
-  for (const key of Object.keys(props)) {
-    const at = props[key];
-    const where = (path ? path + '.' : '') + key;
-    if (TEXT_KEYS.indexOf(key) >= 0 && isPlainObject(at)) {
-      const bad = langMapError(at);
-      if (bad) out.push('Block "' + blockId + '" has a ' + where + ' that ' + bad + '.');
-      continue;
-    }
-    if (isPlainObject(at) || Array.isArray(at)) propLanguageRefusals(blockId, at, out, where);
-  }
-}
+const DRAWN = ['control', 'formula', 'text', 'machine', 'value', 'source', 'trigger'];
 
 /**
  * Read a document without running it: every refusal it would hit, in words, before anything is
@@ -293,8 +223,9 @@ function refusalPanel(host, refusals) {
  * Mount one document.
  * @param {string|Element} target
  * @param {any} doc
- * @param {{ onChange?: (e: any) => void, chainBlock?: string, live?: boolean,
- *   language?: string }} [opts]
+ * @param {{ onChange?: (e: any) => void, onDelivery?: (e: any) => void, chainBlock?: string,
+ *   live?: boolean, language?: string, gears?: boolean,
+ *   hooks?: { transport?: (req: any) => Promise<any>, signedIn?: boolean, extension?: string } }} [opts]
  * @returns {any}
  */
 export function mount(target, doc, opts) {
@@ -359,6 +290,28 @@ export function mount(target, doc, opts) {
   let timer = null;
   let destroyed = false;
 
+  // ── THE ROADS OUT AND IN ──────────────────────────────────────────────────────────────────────
+  // Both go through the node's living-hooks extension as the signed-in caller, and both are one
+  // seam wide: `opts.hooks.transport` receives the same requests the node would have received, so
+  // a test or a proof page exercises the real code without a node, an extension or a network.
+  const hookOpts = options.hooks || {};
+  const hooks = createHooks({
+    transport: hookOpts.transport, signedIn: hookOpts.signedIn,
+    extension: hookOpts.extension, langs: langs,
+  });
+  const deliveries = createDeliveries({
+    doc: doc, graph: graph, hooks: hooks, langs: langs,
+    onDelivery(event) { tellDelivery(event); },
+    onChanged(ids) { announce(ids); },
+  });
+  const live = createUrlSources({
+    doc: doc, graph: graph, hooks: hooks, langs: langs,
+    onResult(out) { announceResult(out); },
+  });
+  /** Whoever is listening for a delivery, and for the record being edited through a gear. */
+  const deliveryWatchers = [];
+  const recordWatchers = [];
+
   const sources = {};
   for (const [blockId, entries] of plan) {
     sources[sourceNameFor(blockId)] = (function (id, list) {
@@ -377,6 +330,8 @@ export function mount(target, doc, opts) {
         for (const id of list) {
           const view = renderNodeInto(body, {
             id: id, node: nodes[id], graph: graph, langs: langs, set: apply,
+            gear: options.gears === false ? null : openGear,
+            reason: guestReason,
           });
           if (view) views.set(id, view);
         }
@@ -437,12 +392,65 @@ export function mount(target, doc, opts) {
     }
   }
 
+  /**
+   * A graph operation, all the way through: the screen catches up, and then whatever the operation
+   * SET OFF goes out. The two are separate because the delivery is a network call and the screen
+   * must never wait on one — a slider that stalls while a webhook answers is a dead slider.
+   * @param {{ changed: string[], transitions?: any[] }} out
+   */
+  function announceResult(out) {
+    announce(out.changed);
+    deliveries.after(out);
+    return out;
+  }
+
   /** Move one node and let the change travel. */
   function apply(id, raw) {
     if (destroyed) return { changed: [] };
-    const out = graph.set(id, raw);
-    announce(out.changed);
-    return out;
+    return announceResult(graph.set(id, raw));
+  }
+
+  /** One delivery, to the host that asked and to anything listening on the element. */
+  function tellDelivery(event) {
+    if (options.onDelivery) options.onDelivery(event);
+    for (const cb of deliveryWatchers.slice()) { try { cb(event); } catch { /* a listener's own fault */ } }
+    try {
+      host.dispatchEvent(new CustomEvent('aimeat-living-delivery', { detail: event, bubbles: true }));
+    } catch { /* no CustomEvent on this page */ }
+  }
+
+  /** The words a guest sees where a trigger would otherwise be waiting to fire. */
+  function guestReason() {
+    const state = deliveries.status();
+    return state.signedIn ? '' : String(state.reason || '');
+  }
+
+  /**
+   * A GEAR WAS PRESSED. Which dialog opens is the direction the gear pointed, and both of them
+   * edit the RECORD — there is no second store of hook settings anywhere in this library.
+   * @param {string} id @param {'in'|'out'} way
+   */
+  function openGear(id, way) {
+    const spec = {
+      id: String(id), node: nodes[String(id)] || {}, doc: doc, graph: graph, hooks: hooks,
+      langs: langs, base: NODE_URL, onSave: recordChanged,
+    };
+    if (way === 'out') openOutward(spec); else openInward(spec);
+  }
+
+  /**
+   * The record was edited through a gear. The url polling is re-armed because a road may have been
+   * added or taken away, and whoever holds the record is told so they can save it — this library
+   * persists nothing, and the memory key the record lives under is the app's to write.
+   * @param {string} nodeId
+   */
+  function recordChanged(nodeId) {
+    live.stop();
+    live.start();
+    announceResult(graph.refresh());
+    for (const cb of recordWatchers.slice()) {
+      try { cb({ node: String(nodeId), doc: doc }); } catch { /* a listener's own fault */ }
+    }
   }
 
   /**
@@ -515,6 +523,7 @@ export function mount(target, doc, opts) {
       if (view) view.update();
     }
     relabelBlocks();
+    relabelGears(host, langs);
     for (const [blockId, entries] of plan) {
       const moved = entries.some(function (e) { return out.changed.indexOf(e.from) >= 0; });
       if (moved || wordyBlocks.has(String(blockId))) surface.refresh(sourceNameFor(blockId));
@@ -539,7 +548,7 @@ export function mount(target, doc, opts) {
     timer = setTimeout(function () {
       timer = null;
       if (destroyed) return;
-      announce(graph.tick(Date.now()).changed);
+      announceResult(graph.tick(Date.now()));
     }, Math.max(16, due));
   }
 
@@ -578,7 +587,14 @@ export function mount(target, doc, opts) {
   const onLive = function () { readSources(); };
   if (options.live !== false && sourceIds.length) window.addEventListener('aimeat-live-update', onLive);
 
-  const ready = Promise.resolve().then(readSources).then(function () { schedule(); });
+  // MOUNTING IS NOT A CHANGE, so nothing is delivered for it: the crossings are merely remembered
+  // as they stand, and the first message goes out when the document actually moves. A page opened
+  // twice must not tell an inverter twice that nothing happened.
+  deliveries.prime();
+  const ready = Promise.resolve()
+    .then(readSources)
+    .then(function () { return options.live === false ? null : live.start(); })
+    .then(function () { schedule(); });
 
   return {
     el: host,
@@ -600,9 +616,44 @@ export function mount(target, doc, opts) {
     /** Every machine's current state. */
     state: statesNow,
     /** Send an event to the machines. */
-    send(event) { const out = graph.send(String(event)); announce(out.changed); return out; },
+    send(event) { return announceResult(graph.send(String(event))); },
     /** Work the whole document out again. */
-    refresh() { const out = graph.refresh(); announce(out.changed); return out; },
+    refresh() { return announceResult(graph.refresh()); },
+
+    /** Whether this document can tell anybody anything, and the words to say when it cannot. */
+    hooks() { return deliveries.status(); },
+    /** The last fifty deliveries this mount made, oldest first. */
+    deliveries() { return deliveries.list(); },
+    /** Send one trigger's message as a sample, marked `test: true`. */
+    test(triggerId) { return deliveries.test(String(triggerId)); },
+    /** Ask one URL source for its reading now, rather than waiting for its next turn. */
+    read(id) { return live.readOnce(String(id)); },
+    /** Which sources are on a clock, and how often — after the ten-second floor. */
+    polled() { return live.polled(); },
+    /**
+     * Hear every delivery: { trigger, at, ok, status, ms, refusal, transition, test }. The same
+     * event is dispatched on the host element as `aimeat-living-delivery`.
+     * @param {(e: any) => void} cb @returns {() => void} stop listening
+     */
+    onDelivery(cb) {
+      deliveryWatchers.push(cb);
+      return function () {
+        const at = deliveryWatchers.indexOf(cb);
+        if (at >= 0) deliveryWatchers.splice(at, 1);
+      };
+    },
+    /**
+     * Hear the record being edited through a gear, so the app can save it. This library persists
+     * nothing: the memory key a document lives under is the app's, and always was.
+     * @param {(e: { node: string, doc: any }) => void} cb @returns {() => void} stop listening
+     */
+    onRecordChange(cb) {
+      recordWatchers.push(cb);
+      return function () {
+        const at = recordWatchers.indexOf(cb);
+        if (at >= 0) recordWatchers.splice(at, 1);
+      };
+    },
     /** Draw the chain somewhere of the host's choosing, following this same document. */
     chain(where) {
       const view = chainView(where, { graph: graph, title: 'The chain', langs: langs });
@@ -630,6 +681,8 @@ export function mount(target, doc, opts) {
       destroyed = true;
       if (timer) clearTimeout(timer);
       stopLang();
+      deliveries.destroy();
+      live.destroy();
       window.removeEventListener('aimeat-live-update', onLive);
       if (chainHandle) chainHandle.destroy();
       for (const [, view] of views) if (view.el && view.el.parentNode) view.el.parentNode.removeChild(view.el);
