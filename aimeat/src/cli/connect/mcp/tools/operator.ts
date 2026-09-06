@@ -17,7 +17,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
-import { agentNameSchema, pickAgent } from './_registry.js';
+import { agentNameSchema, pickAgent, payloadResult } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
@@ -36,20 +36,25 @@ export function registerOperatorTools(mcp: McpServer, registry: AgentRegistry): 
     const target = target_agent_name ?? agent;
     const applied: Record<string, unknown> = {};
     const unsupported: string[] = [];
-    if (mode !== undefined) applied.mode = (await client.patch(`/v1/agents/${encodeURIComponent(target)}/mode`, { mode })).data ?? 'ok';
-    if (tags !== undefined) applied.tags = (await client.patch(`/v1/agents/${encodeURIComponent(target)}/tags`, { tags })).data ?? 'ok';
-    if (scopes !== undefined) applied.scopes = (await client.patch(`/v1/agents/${encodeURIComponent(target)}/scopes`, { scopes })).data ?? 'ok';
+    // THE SAME `.data ?? 'ok'` AS BELOW, three times. A refused PATCH left the literal word "ok"
+    // beside the field it had not changed, under a successful tool call — so an owner narrowing an
+    // agent's scopes was told it had worked when the node had refused every one of them.
+    let refused = false;
+    const patch = async (field: string, path: string, body: Record<string, unknown>) => {
+      const resp = await client.patch(path, body);
+      if (resp.ok === false) { refused = true; applied[field] = resp.error ?? resp; return; }
+      applied[field] = resp.data ?? 'ok';
+    };
+    const enc = encodeURIComponent(target);
+    if (mode !== undefined) await patch('mode', `/v1/agents/${enc}/mode`, { mode });
+    if (tags !== undefined) await patch('tags', `/v1/agents/${enc}/tags`, { tags });
+    if (scopes !== undefined) await patch('scopes', `/v1/agents/${enc}/scopes`, { scopes });
     if (display_name !== undefined) unsupported.push('display_name');
     if (description !== undefined) unsupported.push('description');
-    return {
-      content: [{
-        type: 'text' as const,
-        text: JSON.stringify({
-          agent: target, applied,
-          ...(unsupported.length ? { unsupported, note: 'These fields have no REST route — set them via the server MCP tool or the profile UI.' } : {}),
-        }, null, 2),
-      }],
-    };
+    return payloadResult({
+      agent: target, applied,
+      ...(unsupported.length ? { unsupported, note: 'These fields have no REST route — set them via the server MCP tool or the profile UI.' } : {}),
+    }, { ok: !refused });
   });
 
   mcp.tool('aimeat_operator_ai_config', descriptionFor('aimeat_operator_ai_config'), {
@@ -62,16 +67,18 @@ export function registerOperatorTools(mcp: McpServer, registry: AgentRegistry): 
     const { client } = pickAgent(registry, agent_name);
     const applied: Record<string, unknown> = {};
     const unsupported: string[] = [];
-    if (daily_budget_usd !== undefined) applied.ai_settings = (await client.post('/v1/ai/settings', { daily_budget_usd })).data ?? 'ok';
+    // `.data ?? 'ok'` was the whole record of what the node said, so a refusal became the literal
+    // word "ok" under a successful tool call — the budget unchanged, and nothing anywhere saying so.
+    let refused = false;
+    if (daily_budget_usd !== undefined) {
+      const resp = await client.post('/v1/ai/settings', { daily_budget_usd });
+      refused = resp.ok === false;
+      applied.ai_settings = refused ? (resp.error ?? resp) : (resp.data ?? 'ok');
+    }
     for (const [k, v] of Object.entries({ model, reasoning_model, execution_model })) if (v !== undefined) unsupported.push(k);
-    return {
-      content: [{
-        type: 'text' as const,
-        text: JSON.stringify({
-          applied,
-          ...(unsupported.length ? { unsupported, note: 'Model routing has no REST route — set it via the profile UI or the server MCP tool.' } : {}),
-        }, null, 2),
-      }],
-    };
+    return payloadResult({
+      applied,
+      ...(unsupported.length ? { unsupported, note: 'Model routing has no REST route — set it via the profile UI or the server MCP tool.' } : {}),
+    }, { ok: !refused });
   });
 }

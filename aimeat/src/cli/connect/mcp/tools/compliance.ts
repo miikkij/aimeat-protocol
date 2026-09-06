@@ -21,11 +21,14 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
-import { agentNameSchema, pickAgent } from './_registry.js';
+import { agentNameSchema, payloadResult, pickAgent } from './_registry.js';
+import type { ApiResponse } from '../../api-client.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+// The WHOLE envelope is what these tools print, deliberately -- a compliance answer is read with
+// its protocol and timestamp -- so the payload is the response itself and the flag comes off `ok`.
+const text = (resp: ApiResponse) => payloadResult(resp, resp);
 
 export function registerComplianceTools(mcp: McpServer, registry: AgentRegistry): void {
 

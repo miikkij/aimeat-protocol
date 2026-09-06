@@ -434,12 +434,17 @@ export async function provenanceEchoedResult(
     attach?: { memoryKey: string; content: string };
   },
   resp: ApiResponse,
-): Promise<{ content: { type: 'text'; text: string }[] }> {
+): Promise<{ [x: string]: unknown; content: { type: 'text'; text: string }[]; isError?: true }> {
   const echo = await carryDeclaration(client, opts);
   return {
     content: [{
       type: 'text' as const,
       text: JSON.stringify(withProvenanceEcho(resp.data ?? resp, echo), null, 2),
     }],
+    // The same flag `envelopeResult` sets, for the same reason: this is the return path of 23 tools
+    // -- `aimeat_dm_send` and `aimeat_memory_write` among them -- and without it every one of them
+    // answered a node refusal as a SUCCESSFUL tool call whose text happened to say no. A model
+    // reading a successful write that wrote nothing has no way to find that out afterwards.
+    ...(resp.ok === false ? { isError: true as const } : {}),
   };
 }

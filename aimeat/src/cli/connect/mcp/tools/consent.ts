@@ -17,6 +17,7 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { envelopeResult } from './_registry.js';
 
 export function registerConsentTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -31,18 +32,18 @@ export function registerConsentTools(mcp: McpServer, registry: AgentRegistry): v
     const body: Record<string, unknown> = { data_pattern, recipient: target_gaii, purpose, scope };
     if (ttl_hours != null) body.expires = new Date(Date.now() + ttl_hours * 3_600_000).toISOString();
     const resp = await client.post('/v1/consent', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_consent_list', descriptionFor('aimeat_consent_list'), {}, annotationsFor('aimeat_consent_list'), async () => {
     const resp = await client.get('/v1/consent');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_consent_revoke', descriptionFor('aimeat_consent_revoke'), {
     consent_id: z.string().describe('ID of the consent to revoke'),
   }, annotationsFor('aimeat_consent_revoke'), async ({ consent_id }) => {
     const resp = await client.delete(`/v1/consent/${encodeURIComponent(consent_id)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 }

@@ -17,20 +17,21 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { envelopeResult } from './_registry.js';
 
 export function registerGroupsTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
 
   mcp.tool('aimeat_group_list', descriptionFor('aimeat_group_list'), {}, annotationsFor('aimeat_group_list'), async () => {
     const resp = await client.get('/v1/groups');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_group_get', descriptionFor('aimeat_group_get'), {
     group_id: z.string().describe('Group identifier'),
   }, annotationsFor('aimeat_group_get'), async ({ group_id }) => {
     const resp = await client.get(`/v1/groups/${encodeURIComponent(group_id)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   const memberSchema = z.object({
@@ -48,7 +49,7 @@ export function registerGroupsTools(mcp: McpServer, registry: AgentRegistry): vo
     if (description) body.description = description;
     if (members) body.members = members;
     const resp = await client.post('/v1/groups', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_group_add_member', descriptionFor('aimeat_group_add_member'), {
@@ -60,7 +61,7 @@ export function registerGroupsTools(mcp: McpServer, registry: AgentRegistry): vo
     const body: Record<string, unknown> = { identifier, identifier_type };
     if (permissions) body.permissions = permissions;
     const resp = await client.post(`/v1/groups/${encodeURIComponent(group_id)}/members`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_group_remove_member', descriptionFor('aimeat_group_remove_member'), {
@@ -70,7 +71,7 @@ export function registerGroupsTools(mcp: McpServer, registry: AgentRegistry): vo
     const resp = await client.delete(
       `/v1/groups/${encodeURIComponent(group_id)}/members/${encodeURIComponent(identifier)}`,
     );
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   // ── Key-space shares: the group says WHO, these say WHAT it reaches ──
@@ -85,20 +86,20 @@ export function registerGroupsTools(mcp: McpServer, registry: AgentRegistry): vo
     if (note) body.note = note;
     if (expires_at) body.expires_at = expires_at;
     const resp = await client.post(`/v1/groups/${encodeURIComponent(group_id)}/shares`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_share_list', descriptionFor('aimeat_share_list'), {
     direction: z.enum(['outgoing', 'incoming']).optional().describe('outgoing = what you share; incoming = what was shared with you'),
   }, annotationsFor('aimeat_share_list'), async ({ direction }) => {
     const resp = await client.get(direction === 'incoming' ? '/v1/shares/incoming' : '/v1/shares');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_share_revoke', descriptionFor('aimeat_share_revoke'), {
     share_id: z.string().describe('The share to withdraw'),
   }, annotationsFor('aimeat_share_revoke'), async ({ share_id }) => {
     const resp = await client.delete(`/v1/shares/${encodeURIComponent(share_id)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 }

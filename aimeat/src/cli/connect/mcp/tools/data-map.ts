@@ -13,11 +13,14 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
-import { agentNameSchema, pickAgent } from './_registry.js';
+import { agentNameSchema, payloadResult, pickAgent } from './_registry.js';
+import type { ApiResponse } from '../../api-client.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+const text = (resp: ApiResponse) => payloadResult(resp, resp);
+/** A refusal this tool makes itself, before any call. It did not happen either. */
+const refuse = (message: string) => payloadResult({ error: message }, { ok: false });
 
 export function registerDataMapTools(mcp: McpServer, registry: AgentRegistry): void {
 
@@ -27,7 +30,7 @@ export function registerDataMapTools(mcp: McpServer, registry: AgentRegistry): v
   }, annotationsFor('aimeat_datamap_get'), async ({ agent_name, app }) => {
     const { client } = pickAgent(registry, agent_name);
     const slash = app.indexOf('/');
-    if (slash <= 0) return text({ error: 'Name the app as "owner/filename.html".' });
+    if (slash <= 0) return refuse('Name the app as "owner/filename.html".');
     const owner = encodeURIComponent(app.slice(0, slash));
     const filename = encodeURIComponent(app.slice(slash + 1));
     return text(await client.get(`/v1/datamap/apps/${owner}/${filename}`));
@@ -41,7 +44,7 @@ export function registerDataMapTools(mcp: McpServer, registry: AgentRegistry): v
   }, annotationsFor('aimeat_datamap_set'), async ({ agent_name, app, data_map }) => {
     const { client } = pickAgent(registry, agent_name);
     const slash = app.indexOf('/');
-    if (slash <= 0) return text({ error: 'Name the app as "owner/filename.html".' });
+    if (slash <= 0) return refuse('Name the app as "owner/filename.html".');
     const owner = encodeURIComponent(app.slice(0, slash));
     const filename = encodeURIComponent(app.slice(slash + 1));
     return text(await client.put(`/v1/datamap/apps/${owner}/${filename}`, data_map));

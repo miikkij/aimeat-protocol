@@ -46,7 +46,8 @@ import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema } from '../../../../mcp/catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { carrierAttach, provenanceEchoedResult, readPayloadWithProvenance } from '../../ai-provenance-carry.js';
-import { agentNameSchema, pickAgent } from './_registry.js';
+import { agentNameSchema, pickAgent, envelopeResult, payloadResult, flagged } from './_registry.js';
+import type { ApiResponse } from '../../api-client.js';
 
 export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void {
   // ── Memory ──────────────────────────────────────────────────────────
@@ -67,7 +68,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     // readPayloadWithProvenance, not `resp.data ?? resp`: this route serves the record on the
     // ENVELOPE carrier (meta.provenance), and the plain unwrap threw the envelope away — so a crew
     // reading its own content back got the id and no statement. TARGET-058 Phase 11b.
-    return jsonContent(shapeResponse('aimeat_memory_read', response_format, readPayloadWithProvenance(resp)));
+    return flagged(jsonContent(shapeResponse('aimeat_memory_read', response_format, readPayloadWithProvenance(resp))), resp);
   });
 
   // The bin, on the connector's door. Both are thin proxies onto the same route the CLI dispatch
@@ -80,7 +81,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     const { client } = pickAgent(registry, agent_name);
     const q = owner_scope ? '?owner_scope=true' : '';
     const resp = await client.delete(`/v1/memory/${encodeURIComponent(key)}${q}`);
-    return jsonContent(resp);
+    return flagged(jsonContent(resp), resp);
   });
 
   mcp.tool('aimeat_memory_restore', descriptionFor('aimeat_memory_restore'), {
@@ -90,7 +91,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_memory_restore'), async ({ agent_name, key }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.post(`/v1/memory/${encodeURIComponent(key)}/restore`, {});
-    return jsonContent(resp);
+    return flagged(jsonContent(resp), resp);
   });
 
   mcp.tool('aimeat_memory_write', descriptionFor('aimeat_memory_write'), {
@@ -121,7 +122,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     // carryDeclaration(). See ai-provenance-carry.ts for why that order and not the other one.
     if (ai_provenance_id) body.ai_provenance_id = ai_provenance_id;
     const resp = await client.post('/v1/memory', body);
-    if (!resp.ok) return { content: [{ type: 'text' as const, text: JSON.stringify(resp, null, 2) }] };
+    if (!resp.ok) return envelopeResult(resp);
     return provenanceEchoedResult(client, {
       tool: 'aimeat_memory_write',
       declared: ai_provenance,
@@ -151,7 +152,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     params.set('include', 'meta');
     const qs = params.toString();
     const resp = await client.get(`/v1/memory${qs ? `?${qs}` : ''}`);
-    return jsonContent(shapeResponse('aimeat_memory_list', response_format, resp.data ?? resp));
+    return flagged(jsonContent(shapeResponse('aimeat_memory_list', response_format, resp.data ?? resp)), resp);
   });
 
   mcp.tool('aimeat_memory_search', descriptionFor('aimeat_memory_search'), {
@@ -169,7 +170,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     if (visibility) params.set('visibility', visibility);
     if (limit !== undefined) params.set('limit', String(limit));
     const resp = await client.get(`/v1/memory/search?${params.toString()}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   // ── Catalogue ───────────────────────────────────────────────────────
@@ -186,7 +187,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     if (category) params.set('category', category);
     const qs = params.toString() ? `?${params.toString()}` : '';
     const resp = await client.get(`/v1/catalogue${qs}`);
-    return jsonContent(shapeResponse('aimeat_catalogue_search', response_format, resp.data ?? resp));
+    return flagged(jsonContent(shapeResponse('aimeat_catalogue_search', response_format, resp.data ?? resp)), resp);
   });
 
   // ── Master directory (cross-domain discovery) ───────────────────────
@@ -213,10 +214,10 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     const qs2 = params.toString() ? `?${params.toString()}` : '';
     if (mode === 'map') {
       const resp = await client.get(`/v1/discover/facets${qs2}`);
-      return jsonContent(resp.data ?? resp);
+      return flagged(jsonContent(resp.data ?? resp), resp);
     }
     const resp = await client.get(`/v1/discover${qs2}`);
-    return jsonContent(shapeResponse('aimeat_discover', response_format, resp.data ?? resp));
+    return flagged(jsonContent(shapeResponse('aimeat_discover', response_format, resp.data ?? resp)), resp);
   });
 
   // ── Invoke: the other half of discover ───────────────────────
@@ -243,7 +244,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     async ({ agent_name }) => {
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.get('/v1/agents');
-      return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+      return envelopeResult(resp);
     },
   );
 
@@ -253,7 +254,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_agent_profile'), async ({ agent_name, gaii }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get(`/v1/agents/${encodeURIComponent(gaii)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   // ── Work ────────────────────────────────────────────────────────────
@@ -269,7 +270,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     const body: Record<string, unknown> = { action_id, provider_gaii, input: input ?? {} };
     if (ttl_hours !== undefined) body.ttl_hours = ttl_hours;
     const resp = await client.post('/v1/work/request', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_work_inbox', descriptionFor('aimeat_work_inbox'), {
@@ -278,7 +279,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_work_inbox'), async ({ agent_name, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get('/v1/work/inbox');
-    return jsonContent(shapeResponse('aimeat_work_inbox', response_format, resp.data ?? resp));
+    return flagged(jsonContent(shapeResponse('aimeat_work_inbox', response_format, resp.data ?? resp)), resp);
   });
 
   mcp.tool('aimeat_work_accept', descriptionFor('aimeat_work_accept'), {
@@ -287,7 +288,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_work_accept'), async ({ agent_name, tracking_code }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.post(`/v1/work/${encodeURIComponent(tracking_code)}/accept`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_work_deliver', descriptionFor('aimeat_work_deliver'), {
@@ -300,7 +301,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     const body: Record<string, unknown> = { output };
     if (metadata !== undefined) body.metadata = metadata;
     const resp = await client.post(`/v1/work/${encodeURIComponent(tracking_code)}/deliver`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   // ── Wallet ──────────────────────────────────────────────────────────
@@ -310,7 +311,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_wallet_balance'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get('/v1/wallet');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   // ── Boards (basic read/post) ────────────────────────────────────────
@@ -328,7 +329,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     if (limit !== undefined) params.set('limit', String(limit));
     const qs = params.toString() ? `?${params.toString()}` : '';
     const resp = await client.get(`/v1/boards/${encodeURIComponent(board_id)}/posts${qs}`);
-    return jsonContent(shapeResponse('aimeat_board_read', response_format, resp.data ?? resp));
+    return flagged(jsonContent(shapeResponse('aimeat_board_read', response_format, resp.data ?? resp)), resp);
   });
 
   mcp.tool('aimeat_board_post', descriptionFor('aimeat_board_post'), {
@@ -364,7 +365,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     if (visibility) body.visibility = visibility;
     if (group_id) body.group_id = group_id;
     const resp = await client.post('/v1/storage', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_storage_download', descriptionFor('aimeat_storage_download'), {
@@ -388,7 +389,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
       ? `/v1/pub/${encodeURIComponent(refOwner)}/${refKey.split('/').map(encodeURIComponent).join('/')}?mode=handle`
       : `/v1/storage/${encodeURIComponent(refKey)}?mode=${mode}`;
     const resp = await client.get(path);
-    return jsonContent(resp.data ?? resp);
+    return flagged(jsonContent(resp.data ?? resp), resp);
   });
 
   mcp.tool('aimeat_datapackage_publish', descriptionFor('aimeat_datapackage_publish'), {
@@ -409,7 +410,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     // Straight through: the quality gate, the content hash and the address all live on the node, and
     // a refusal comes back with the row and the column rather than a verdict.
     const resp = await client.post('/v1/datapackages', body as Record<string, unknown>);
-    return jsonContent(resp.data ?? resp);
+    return flagged(jsonContent(resp.data ?? resp), resp);
   });
 
   mcp.tool('aimeat_datapackage_export', descriptionFor('aimeat_datapackage_export'), {
@@ -423,7 +424,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_datapackage_export'), async ({ agent_name, ref, resource, format, limit, offset, select }) => {
     const { client } = pickAgent(registry, agent_name);
     const m = /^pkg:([^/@]+)\/([^@]+)(?:@(sha256:[a-f0-9]{64}))?$/.exec(ref);
-    if (!m) return jsonContent({ error: 'ref must look like "pkg:owner/name" or "pkg:owner/name@sha256:..."' });
+    if (!m) return flagged(jsonContent({ error: 'ref must look like "pkg:owner/name" or "pkg:owner/name@sha256:..."' }), { ok: false });
     const [, owner, name, version] = m;
     const base = `/v1/datapackages/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
     const qs: string[] = [];
@@ -432,13 +433,13 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     // while pulling the table through the model context is slow, billed and usually unnecessary.
     if ((format ?? 'url') === 'url') {
       const resp = await client.get(base + (qs.length ? `?${qs.join('&')}` : ''));
-      return jsonContent(resp.data ?? resp);
+      return flagged(jsonContent(resp.data ?? resp), resp);
     }
     if (limit !== undefined) qs.push(`limit=${encodeURIComponent(limit)}`);
     if (offset !== undefined) qs.push(`offset=${encodeURIComponent(offset)}`);
     if (select?.length) qs.push(`select=${encodeURIComponent(select.join(','))}`);
     const resp = await client.get(`${base}/rows/${encodeURIComponent(resource)}${qs.length ? `?${qs.join('&')}` : ''}`);
-    return jsonContent(resp.data ?? resp);
+    return flagged(jsonContent(resp.data ?? resp), resp);
   });
 
   mcp.tool('aimeat_storage_delete', descriptionFor('aimeat_storage_delete'), {
@@ -449,7 +450,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     // One door, unlike the download above: /v1/storage is namespaced to the caller, and there is no
     // /v1/pub form for a delete because reading someone else's file is allowed and removing it is not.
     const resp = await client.delete(`/v1/storage/${key.split('/').map(encodeURIComponent).join('/')}`);
-    return jsonContent(resp.data ?? resp);
+    return flagged(jsonContent(resp.data ?? resp), resp);
   });
 
   // ── Admin ───────────────────────────────────────────────────────────
@@ -463,7 +464,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_admin_stats'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get('/v1/admin/stats');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_admin_agents', descriptionFor('aimeat_admin_agents'), {
@@ -477,7 +478,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     if (limit !== undefined && Array.isArray(data.agents)) {
       data.agents = data.agents.slice(0, limit);
     }
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return payloadResult(data, resp);
   });
 
   mcp.tool('aimeat_admin_config', descriptionFor('aimeat_admin_config'), {
@@ -485,11 +486,11 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_admin_config'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get('/v1/admin/config');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   // ── BR-04: SSO administration + manual account lifecycle (operator's agent) ──
-  const asText = (resp: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify((resp as { data?: unknown }).data ?? resp, null, 2) }] });
+  const asText = (resp: ApiResponse) => envelopeResult(resp);
 
   mcp.tool('aimeat_admin_sso_list', descriptionFor('aimeat_admin_sso_list'), {
     agent_name: agentNameSchema,

@@ -28,7 +28,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
-import { agentNameSchema, pickAgent } from './_registry.js';
+import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
@@ -50,7 +50,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     if (per_page !== undefined) params.set('per_page', String(per_page));
     const qs = params.toString() ? `?${params.toString()}` : '';
     const resp = await client.get(`/v1/agents/${enc}/tasks${qs}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool(
@@ -85,7 +85,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
       if (scope?.length) body.scope = scope.map(sc => ({ ...sc, type: sc.type ?? 'text' }));
       if (files?.length) body.resources = { files: files.map(ref => ({ ref })) };
       const resp = await client.post(`/v1/agents/${encodeURIComponent(target_agent)}/tasks`, body);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+      return envelopeResult(resp);
     },
   );
 
@@ -96,7 +96,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     const resp = await client.get(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_task_propose_todos', descriptionFor('aimeat_task_propose_todos'), {
@@ -124,7 +124,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
       })),
     };
     const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/propose-todos`, payload);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_task_request_changes', descriptionFor('aimeat_task_request_changes'), {
@@ -135,7 +135,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/request-changes`, { message });
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_task_event', descriptionFor('aimeat_task_event'), {
@@ -150,7 +150,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     const body: Record<string, unknown> = { type, message };
     if (details) body.details = details;
     const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/event`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_task_todo', descriptionFor('aimeat_task_todo'), {
@@ -165,7 +165,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
       `/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/todos/${encodeURIComponent(todo_id)}`,
       { status },
     );
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_task_complete', descriptionFor('aimeat_task_complete'), {
@@ -202,6 +202,6 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     const enc = encodeURIComponent(agent);
     // REST /fail reads `message`; server MCP exposes this as `reason`.
     const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/fail`, { message: reason });
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 }

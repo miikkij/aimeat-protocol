@@ -397,7 +397,10 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
         const r = await client.post(orgPath, { ws: w, grantee, role });
         results.push(r.ok === false ? { ws: w, status: 'forbidden_or_not_found' } : { ws: w, status: 'granted', role });
       }
-      return text({ grantee, role, granted: results.filter(r => r.status === 'granted').length, total: targets.length, results });
+      // Refused on EVERY workspace is a refusal, not a grant of nothing. Without this the answer was
+      // `granted: 0` under a successful call, which reads as "there was nothing to do".
+      const granted = results.filter(r => r.status === 'granted').length;
+      return text({ grantee, role, granted, total: targets.length, results }, granted === 0);
     });
 
   mcp.tool('aimeat_workspace_member_revoke', descriptionFor('aimeat_workspace_member_revoke'),
@@ -419,7 +422,10 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
         const n = Number((r.data as { revoked?: number } | undefined)?.revoked ?? 0);
         results.push({ ws: w, status: n > 0 ? 'revoked' : 'not_a_member', revoked: n });
       }
-      return text({ grantee, revoked: results.filter(r => r.status === 'revoked').length, total: targets.length, results });
+      // Refused everywhere is a refusal. `not_a_member` is NOT one: the node answered, and the
+      // grantee simply had nothing to revoke, which is a true answer to the question asked.
+      const refusedEverywhere = results.every(r => r.status === 'forbidden_or_not_found');
+      return text({ grantee, revoked: results.filter(r => r.status === 'revoked').length, total: targets.length, results }, refusedEverywhere);
     });
 
   mcp.tool('aimeat_workspace_members', descriptionFor('aimeat_workspace_members'),

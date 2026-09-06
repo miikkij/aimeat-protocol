@@ -14,6 +14,7 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { envelopeResult } from './_registry.js';
 
 export function registerMemoryExtTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -25,6 +26,6 @@ export function registerMemoryExtTools(mcp: McpServer, registry: AgentRegistry):
     const resp = await client.get(
       `/v1/memory/${encodeURIComponent(gaii)}/${encodeURIComponent(key)}`,
     );
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 }

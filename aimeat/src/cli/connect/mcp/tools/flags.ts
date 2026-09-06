@@ -15,6 +15,7 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { envelopeResult } from './_registry.js';
 
 export function registerFlagsTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -29,6 +30,6 @@ export function registerFlagsTools(mcp: McpServer, registry: AgentRegistry): voi
     const body: Record<string, unknown> = { targetType: target_type, targetId: target_id, reason };
     if (description) body.description = description;
     const resp = await client.post('/v1/flags', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 }

@@ -28,6 +28,7 @@ import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult, readPayloadWithProvenance } from '../../ai-provenance-carry.js';
+import { envelopeResult, payloadResult } from './_registry.js';
 
 export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client, owner } = registry.resolve();
@@ -127,7 +128,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     if (offset !== undefined) params.set('offset', String(offset));
     const qs = params.toString() ? `?${params.toString()}` : '';
     const resp = await client.get(`/v1/apps${qs}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_app_get', descriptionFor('aimeat_app_get'), {
@@ -144,7 +145,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     if (!app) {
       return out({ ok: false, data: { error: { code: 'NOT_FOUND', message: `No app "${filename}" published by "${owner}".` } } });
     }
-    return { content: [{ type: 'text' as const, text: JSON.stringify(readPayloadWithProvenance({ ...resp, data: { app } }), null, 2) }] };
+    return payloadResult(readPayloadWithProvenance({ ...resp, data: { app } }), resp);
   });
 
   mcp.tool('aimeat_app_delete', descriptionFor('aimeat_app_delete'), {
@@ -153,7 +154,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_app_delete'), async ({ filename, version }) => {
     const qs = version !== undefined ? `?version=${encodeURIComponent(String(version))}` : '';
     const resp = await client.delete(`/v1/apps/${encodeURIComponent(filename)}${qs}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_app_versions', descriptionFor('aimeat_app_versions'), {
@@ -161,7 +162,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     filename: z.string().describe('App filename'),
   }, annotationsFor('aimeat_app_versions'), async ({ owner, filename }) => {
     const resp = await client.get(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/versions`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   // ── Component packages: the capability the app_* tools above used to be ──
@@ -179,7 +180,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     if (status) params.set('status', status);
     const qs = params.size > 0 ? `?${params.toString()}` : '';
     const resp = await client.get(`/v1/packages${qs}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   // Making a package out of apps that already exist, instead of pasting every component by hand.
@@ -199,7 +200,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
       if (args[key] !== undefined) body[key] = args[key];
     }
     const resp = await client.post('/v1/packages/compose', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   // Bringing a package in from another node, signature and digests checked before anything lands.
@@ -215,7 +216,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
       if (args[key] !== undefined) body[key] = args[key];
     }
     const resp = await client.post('/v1/federation/packages/pull', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   // One act for a whole installed package. What the owner edited is reported, never overwritten.
@@ -226,7 +227,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     const body: Record<string, unknown> = {};
     if (dry_run !== undefined) body.dry_run = dry_run;
     const resp = await client.post(`/v1/instances/${encodeURIComponent(instance_id)}/update`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   // A package is created private; this is the act that makes it installable. It existed on no MCP
@@ -239,21 +240,21 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     const body: Record<string, unknown> = { status };
     if (version !== undefined) body.version = version;
     const resp = await client.patch(`/v1/packages/${encodeURIComponent(group_id)}/status`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_package_get', descriptionFor('aimeat_package_get'), {
     group_id: z.string().describe('Package group identifier'),
   }, annotationsFor('aimeat_package_get'), async ({ group_id }) => {
     const resp = await client.get(`/v1/packages/${encodeURIComponent(group_id)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(readPayloadWithProvenance(resp), null, 2) }] };
+    return payloadResult(readPayloadWithProvenance(resp), resp);
   });
 
   mcp.tool('aimeat_package_versions', descriptionFor('aimeat_package_versions'), {
     group_id: z.string().describe('Package group identifier'),
   }, annotationsFor('aimeat_package_versions'), async ({ group_id }) => {
     const resp = await client.get(`/v1/packages/${encodeURIComponent(group_id)}/versions`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_package_delete', descriptionFor('aimeat_package_delete'), {
@@ -263,7 +264,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     const resp = await client.delete(
       `/v1/packages/${encodeURIComponent(group_id)}/versions/${encodeURIComponent(version)}`,
     );
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   // → POST /v1/apps/:owner/:filename/fork — sanctioned, provenance-recording fork (behind the forkable/paid gates).
