@@ -28,7 +28,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
-import { agentNameSchema, pickAgent } from './_registry.js';
+import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
+import type { ApiResponse } from '../../api-client.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
@@ -72,7 +73,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
     async ({ agent_name, target_agent_name, tags }) => {
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/tags`, { tags });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+      return envelopeResult(resp);
     },
   );
 
@@ -87,7 +88,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
     async ({ agent_name, target_agent_name, mode }) => {
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/mode`, { mode });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+      return envelopeResult(resp);
     },
   );
 
@@ -102,7 +103,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
     async ({ agent_name, target_agent_name, description }) => {
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/description`, { description });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+      return envelopeResult(resp);
     },
   );
 
@@ -117,7 +118,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
     async ({ agent_name, target_agent_name, run_mode }) => {
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/run-mode`, { run_mode });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+      return envelopeResult(resp);
     },
   );
 
@@ -137,7 +138,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
     async ({ agent_name, target_agent_name, ...src }) => {
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/runtime-source`, { runtime_source: src });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+      return envelopeResult(resp);
     },
   );
 
@@ -152,7 +153,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
     async ({ agent_name, target_agent_name, console_url }) => {
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/console-url`, { console_url });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+      return envelopeResult(resp);
     },
   );
 
@@ -161,7 +162,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   // (the connector convention); the definition's agent is `target_agent_name`.
   const crewAgentSchema = z.string().describe("The agent whose definition this is (bare name of one of the owner's agents, or its full GAII). The calling agent may name itself or a same-owner sibling.");
   const docSchema = z.record(z.string(), z.unknown());
-  const text = (resp: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify((resp as { data?: unknown })?.data ?? resp, null, 2) }] });
+  const text = (resp: ApiResponse) => envelopeResult(resp);
 
   mcp.tool(
     'aimeat_crew_get',

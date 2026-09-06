@@ -29,13 +29,14 @@ import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { readPayloadWithProvenance } from '../../ai-provenance-carry.js';
 import { knowledgeContributeUnreachable, KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE } from '../../tool-call-defs-core.js';
+import { envelopeResult, payloadResult } from './_registry.js';
 
 export function registerKnowledgeTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
 
   mcp.tool('aimeat_knowledge_list', descriptionFor('aimeat_knowledge_list'), {}, annotationsFor('aimeat_knowledge_list'), async () => {
     const resp = await client.get('/v1/catalogue/knowledge');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_knowledge_get', descriptionFor('aimeat_knowledge_get'), {
@@ -43,7 +44,7 @@ export function registerKnowledgeTools(mcp: McpServer, registry: AgentRegistry):
   }, annotationsFor('aimeat_knowledge_get'), async ({ package_id }) => {
     const resp = await client.get(`/v1/knowledge/${encodeURIComponent(package_id)}`);
     // The package manifest read serves its record on meta.provenance — see core.ts memory_read.
-    return { content: [{ type: 'text' as const, text: JSON.stringify(readPayloadWithProvenance(resp), null, 2) }] };
+    return payloadResult(readPayloadWithProvenance(resp), resp);
   });
 
   // The parameters stay as the catalog declares them, so an agent reading the tool list sees the same
@@ -65,6 +66,6 @@ export function registerKnowledgeTools(mcp: McpServer, registry: AgentRegistry):
   }, annotationsFor('aimeat_knowledge_links'), async ({ package_id, direction }) => {
     const query = direction ? `?direction=${encodeURIComponent(direction)}` : '';
     const resp = await client.get(`/v1/knowledge/${encodeURIComponent(package_id)}/links${query}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 }

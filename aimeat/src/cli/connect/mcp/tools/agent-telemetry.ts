@@ -21,7 +21,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
-import { agentNameSchema, pickAgent } from './_registry.js';
+import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
@@ -46,7 +46,7 @@ export function registerAgentTelemetryTools(mcp: McpServer, registry: AgentRegis
         if (task_id) body.task_id = task_id;
 
         const resp = await client.post(`/v1/agents/${enc}/telemetry`, body);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+        return envelopeResult(resp);
     });
 
     mcp.tool('aimeat_usage_report', descriptionFor('aimeat_usage_report'), {
@@ -67,6 +67,6 @@ export function registerAgentTelemetryTools(mcp: McpServer, registry: AgentRegis
         if (grain) q.set('grain', grain);
         if (limit) q.set('limit', String(limit));
         const resp = await client.get(`/v1/usage/summary?${q.toString()}`);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+        return envelopeResult(resp);
     });
 }

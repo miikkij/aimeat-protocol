@@ -17,6 +17,7 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { envelopeResult } from './_registry.js';
 
 export function registerCapabilitiesTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -36,14 +37,14 @@ export function registerCapabilitiesTools(mcp: McpServer, registry: AgentRegistr
     if (source_type) params.set('source_type', source_type);
     const qs = params.toString() ? `?${params.toString()}` : '';
     const resp = await client.get(`/v1/capabilities${qs}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_capabilities_get', descriptionFor('aimeat_capabilities_get'), {
     id: z.string().describe('Capability identifier'),
   }, annotationsFor('aimeat_capabilities_get'), async ({ id }) => {
     const resp = await client.get(`/v1/capabilities/${encodeURIComponent(id)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_capabilities_invoke', descriptionFor('aimeat_capabilities_invoke'), {
@@ -53,7 +54,7 @@ export function registerCapabilitiesTools(mcp: McpServer, registry: AgentRegistr
   }, annotationsFor('aimeat_capabilities_invoke'), async ({ id, input, mode }) => {
     const qs = mode ? `?mode=${encodeURIComponent(mode)}` : '';
     const resp = await client.post(`/v1/capabilities/${encodeURIComponent(id)}/invoke${qs}`, { input: input ?? {} });
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_capabilities_create', descriptionFor('aimeat_capabilities_create'), {
@@ -78,7 +79,7 @@ export function registerCapabilitiesTools(mcp: McpServer, registry: AgentRegistr
     if (args.usage) body.usage = args.usage;
     if (args.whenToUse) body.whenToUse = args.whenToUse;
     const resp = await client.post('/v1/capabilities', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_capabilities_update', descriptionFor('aimeat_capabilities_update'), {
@@ -100,14 +101,14 @@ export function registerCapabilitiesTools(mcp: McpServer, registry: AgentRegistr
     if (args.whenToUse !== undefined) body.whenToUse = args.whenToUse;
     if (args.whenNotToUse !== undefined) body.whenNotToUse = args.whenNotToUse;
     const resp = await client.put(`/v1/capabilities/${encodeURIComponent(args.id)}`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_capabilities_delete', descriptionFor('aimeat_capabilities_delete'), {
     id: z.string().describe('Capability identifier'),
   }, annotationsFor('aimeat_capabilities_delete'), async ({ id }) => {
     const resp = await client.delete(`/v1/capabilities/${encodeURIComponent(id)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_capabilities_vouch', descriptionFor('aimeat_capabilities_vouch'), {
@@ -117,6 +118,6 @@ export function registerCapabilitiesTools(mcp: McpServer, registry: AgentRegistr
     const body: Record<string, unknown> = {};
     if (comment) body.comment = comment;
     const resp = await client.post(`/v1/capabilities/${encodeURIComponent(id)}/vouch`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 }

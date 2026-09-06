@@ -32,6 +32,7 @@ import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
+import { envelopeResult, payloadResult } from './_registry.js';
 
 export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client, owner } = registry.resolve();
@@ -53,21 +54,26 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     const organisms = [...mineList, ...pubList]
       .filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true; })
       .map(o => ({ ...o, is_member: memberIds.has(o.id) }));
-    return { content: [{ type: 'text' as const, text: JSON.stringify({ organisms, total: organisms.length }, null, 2) }] };
+    // Two reads merged into one list, so the flag asks whether ANY of it could be read. A single
+    // refusal leaves a SHORTER list rather than no list -- the caller sees public organisms and not
+    // its own, or the other way round -- and calling that an error would be as wrong as calling it
+    // a success. What must not happen is both reads being refused and the answer coming back as an
+    // empty list that reads like "you belong to nothing".
+    return payloadResult({ organisms, total: organisms.length }, { ok: mine.ok !== false || pub.ok !== false });
   });
 
   mcp.tool('aimeat_organism_get', descriptionFor('aimeat_organism_get'), {
     organism_id: z.string().describe('ID of the organism to retrieve'),
   }, annotationsFor('aimeat_organism_get'), async ({ organism_id }) => {
     const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_organism_overview', descriptionFor('aimeat_organism_overview'), {
     organism_id: z.string().describe('Organism identifier.'),
   }, annotationsFor('aimeat_organism_overview'), async ({ organism_id }) => {
     const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/overview`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_organism_update', descriptionFor('aimeat_organism_update'), {
@@ -87,7 +93,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     if (join_policy !== undefined) body.join_policy = join_policy;
     if (visibility !== undefined) body.visibility = visibility;
     const resp = await client.put(`/v1/organisms/${encodeURIComponent(organism_id)}`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_organism_join', descriptionFor('aimeat_organism_join'), {
@@ -97,14 +103,14 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     const body: Record<string, unknown> = {};
     if (message != null) body.message = message;
     const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/join`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_organism_leave', descriptionFor('aimeat_organism_leave'), {
     organism_id: z.string().describe('ID of the organism to leave'),
   }, annotationsFor('aimeat_organism_leave'), async ({ organism_id }) => {
     const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/leave`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_organism_members', descriptionFor('aimeat_organism_members'), {
@@ -117,7 +123,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     if (status) params.set('status', status);
     const qs = params.toString();
     const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/members${qs ? `?${qs}` : ''}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_organism_create', descriptionFor('aimeat_organism_create'), {
@@ -133,7 +139,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     if (join_policy != null) body.join_policy = join_policy;
     if (visibility != null) body.visibility = visibility;
     const resp = await client.post('/v1/organisms', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_organism_export', descriptionFor('aimeat_organism_export'), {
@@ -232,7 +238,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
 
   mcp.tool('aimeat_organism_invitations', descriptionFor('aimeat_organism_invitations'), {}, annotationsFor('aimeat_organism_invitations'), async () => {
     const resp = await client.get('/v1/organisms/invitations/mine');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_organism_invitation_respond', descriptionFor('aimeat_organism_invitation_respond'), {
@@ -288,7 +294,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
   }, annotationsFor('aimeat_workspace_comments'), async ({ organism_id, ws, space, instance_id }) => {
     const params = new URLSearchParams({ ws, space, instance_id });
     const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/comments?${params.toString()}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   const out = (resp: { data?: unknown; ok?: boolean }) =>

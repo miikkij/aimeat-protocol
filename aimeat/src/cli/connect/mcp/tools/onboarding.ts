@@ -18,13 +18,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
-import { agentNameSchema, pickAgent } from './_registry.js';
+import { agentNameSchema, envelopeResult, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
-
-function asText(value: unknown): { content: Array<{ type: 'text'; text: string }> } {
-    return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };
-}
 
 export function registerOnboardingTools(mcp: McpServer, registry: AgentRegistry): void {
 
@@ -34,7 +30,7 @@ export function registerOnboardingTools(mcp: McpServer, registry: AgentRegistry)
         const { client, agent } = pickAgent(registry, agent_name);
         const enc = encodeURIComponent(agent);
         const resp = await client.get(`/v1/agents/${enc}/onboarding`);
-        return asText(resp.data ?? resp);
+        return envelopeResult(resp);
     });
 
     mcp.tool('aimeat_onboarding_identify_platform', descriptionFor('aimeat_onboarding_identify_platform'), {
@@ -49,7 +45,7 @@ export function registerOnboardingTools(mcp: McpServer, registry: AgentRegistry)
         if (platform_version) body.platform_version = platform_version;
         if (model) body.model = model;
         const resp = await client.post(`/v1/agents/${enc}/onboarding/step/identify_platform`, body);
-        return asText(resp.data ?? resp);
+        return envelopeResult(resp);
     });
 
     mcp.tool('aimeat_onboarding_confirm_skill_installed', descriptionFor('aimeat_onboarding_confirm_skill_installed'), {
@@ -60,7 +56,7 @@ export function registerOnboardingTools(mcp: McpServer, registry: AgentRegistry)
         const { client, agent } = pickAgent(registry, agent_name);
         const enc = encodeURIComponent(agent);
         const resp = await client.post(`/v1/agents/${enc}/onboarding/step/install_skill`, { platform, version });
-        return asText(resp.data ?? resp);
+        return envelopeResult(resp);
     });
 
     mcp.tool('aimeat_onboarding_confirm_directives_read', descriptionFor('aimeat_onboarding_confirm_directives_read'), {
@@ -70,7 +66,7 @@ export function registerOnboardingTools(mcp: McpServer, registry: AgentRegistry)
         const { client, agent } = pickAgent(registry, agent_name);
         const enc = encodeURIComponent(agent);
         const resp = await client.post(`/v1/agents/${enc}/onboarding/step/read_directives`, { confirmed: confirmed ?? true });
-        return asText(resp.data ?? resp);
+        return envelopeResult(resp);
     });
 
     mcp.tool('aimeat_onboarding_declare_services', descriptionFor('aimeat_onboarding_declare_services'), {
@@ -83,6 +79,6 @@ export function registerOnboardingTools(mcp: McpServer, registry: AgentRegistry)
         const { client, agent } = pickAgent(registry, agent_name);
         const enc = encodeURIComponent(agent);
         const resp = await client.post(`/v1/agents/${enc}/onboarding/step/declare_services`, { services: services ?? [] });
-        return asText(resp.data ?? resp);
+        return envelopeResult(resp);
     });
 }

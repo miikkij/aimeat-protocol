@@ -15,7 +15,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
-import { agentNameSchema, pickAgent } from './_registry.js';
+import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
@@ -37,7 +37,7 @@ export function registerAgentCapsTools(mcp: McpServer, registry: AgentRegistry):
     if (domain) body.domain = domain;
     if (languages) body.languages = languages;
     const resp = await client.put(`/v1/agents/${enc}/capabilities`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_agent_activity', descriptionFor('aimeat_agent_activity'), {
@@ -52,6 +52,6 @@ export function registerAgentCapsTools(mcp: McpServer, registry: AgentRegistry):
     if (granularity) params.set('granularity', granularity);
     const qs = params.toString() ? `?${params.toString()}` : '';
     const resp = await client.get(`/v1/agents/${enc}/activity${qs}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 }

@@ -21,13 +21,14 @@ import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
+import { envelopeResult } from './_registry.js';
 
 export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
 
   mcp.tool('aimeat_board_list', descriptionFor('aimeat_board_list'), {}, annotationsFor('aimeat_board_list'), async () => {
     const resp = await client.get('/v1/boards');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_board_create', descriptionFor('aimeat_board_create'), {
@@ -41,7 +42,7 @@ export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): vo
     if (visibility) body.visibility = visibility;
     if (allowed_gaiis) body.allowed_gaiis = allowed_gaiis;
     const resp = await client.post('/v1/boards', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_board_subscribe', descriptionFor('aimeat_board_subscribe'), {
@@ -56,7 +57,7 @@ export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): vo
     if (callback_url) body.callback_url = callback_url;
     if (filters) body.filters = filters;
     const resp = await client.post(`/v1/boards/${encodeURIComponent(board_id)}/subscribe`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_board_react', descriptionFor('aimeat_board_react'), {
@@ -72,7 +73,7 @@ export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): vo
     const resp = remove
       ? await client.delete(`${path}?reaction=${encodeURIComponent(emoji)}`)
       : await client.post(path, { reaction: emoji });
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_board_reply', descriptionFor('aimeat_board_reply'), {
@@ -101,13 +102,13 @@ export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): vo
       `/v1/boards/${encodeURIComponent(board_id)}/members`,
       body,
     );
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_board_delete', descriptionFor('aimeat_board_delete'), {
     board_id: z.string().describe('Board identifier'),
   }, annotationsFor('aimeat_board_delete'), async ({ board_id }) => {
     const resp = await client.delete(`/v1/boards/${encodeURIComponent(board_id)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 }

@@ -19,7 +19,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
-import { agentNameSchema, pickAgent } from './_registry.js';
+import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
@@ -33,7 +33,7 @@ export function registerAgentMessagesTools(mcp: McpServer, registry: AgentRegist
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     const resp = await client.get(`/v1/agents/${enc}/messages/inbox`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_message_send', descriptionFor('aimeat_message_send'), {
@@ -47,7 +47,9 @@ export function registerAgentMessagesTools(mcp: McpServer, registry: AgentRegist
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     if (!content) {
-      return { content: [{ type: 'text' as const, text: 'Message content is required.' }] };
+      // A refusal of the input, and it counts as one: the message was not sent, so a result that
+      // does not say so is a tool answering ok having done nothing.
+      return { content: [{ type: 'text' as const, text: 'Message content is required.' }], isError: true as const };
     }
     const payload: Record<string, unknown> = { content, direction: 'outbound' };
     if (thread_id) payload.thread_id = thread_id;
@@ -72,6 +74,6 @@ export function registerAgentMessagesTools(mcp: McpServer, registry: AgentRegist
     if (per_page) params.set('per_page', String(per_page));
     const qs = params.toString();
     const resp = await client.get(`/v1/agents/${enc}/messages${qs ? '?' + qs : ''}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 }

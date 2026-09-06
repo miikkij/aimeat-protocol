@@ -19,7 +19,7 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
-import { agentNameSchema, pickAgent } from './_registry.js';
+import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
 
 export function registerHandbookTools(mcp: McpServer, registry: AgentRegistry): void {
   mcp.tool('aimeat_handbook_get', descriptionFor('aimeat_handbook_get'), {
@@ -34,6 +34,6 @@ export function registerHandbookTools(mcp: McpServer, registry: AgentRegistry): 
         ? `/v1/agents/me/handbook/${encodeURIComponent(module)}`
         : '/v1/agents/me/handbook';
     const resp = await client.get(path);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 }

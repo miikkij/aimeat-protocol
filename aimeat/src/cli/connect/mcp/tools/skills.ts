@@ -18,11 +18,9 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
-import { agentNameSchema, pickAgent } from './_registry.js';
+import { agentNameSchema, envelopeResult, pickAgent } from './_registry.js';
 
 export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): void {
-  const json = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
-
   mcp.tool('aimeat_skill_publish', descriptionFor('aimeat_skill_publish'), {
     skill_md: z.string().optional().describe('The SKILL.md content (frontmatter + body). Required on this surface (no presigned upload mode here).'),
     files: z.record(z.string(), z.string()).optional().describe('Additional files as relative-path -> content (scripts/, references/, assets/).'),
@@ -37,7 +35,7 @@ export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): vo
     }
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.post('/v1/skills', { skill_md, files, scope, visibility, organism: organism_id, ws: workspace_id });
-    return json(resp.data ?? resp);
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_skill_list', descriptionFor('aimeat_skill_list'), {
@@ -47,11 +45,11 @@ export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): vo
     const { client, agent } = pickAgent(registry, agent_name);
     if (view === 'linked') {
       const resp = await client.get(`/v1/agents/${encodeURIComponent(agent)}/skills/links`);
-      return json(resp.data ?? resp);
+      return envelopeResult(resp);
     }
     const scope = view === 'mine' ? 'user' : 'library';
     const resp = await client.get(`/v1/skills?scope=${scope}`);
-    return json(resp.data ?? resp);
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_skill_get', descriptionFor('aimeat_skill_get'), {
@@ -80,7 +78,7 @@ export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): vo
     }
     if (manifest_only) path += `${path.includes('?') ? '&' : '?'}manifest_only=true`;
     const resp = await client.get(path);
-    return json(resp.data ?? resp);
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_skill_link', descriptionFor('aimeat_skill_link'), {
@@ -89,7 +87,7 @@ export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): vo
   }, annotationsFor('aimeat_skill_link'), async ({ ref, agent_name }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const resp = await client.post(`/v1/agents/${encodeURIComponent(agent)}/skills`, { ref });
-    return json(resp.data ?? resp);
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_skill_unlink', descriptionFor('aimeat_skill_unlink'), {
@@ -98,7 +96,7 @@ export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): vo
   }, annotationsFor('aimeat_skill_unlink'), async ({ ref, agent_name }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const resp = await client.delete(`/v1/agents/${encodeURIComponent(agent)}/skills?ref=${encodeURIComponent(ref)}`);
-    return json(resp.data ?? resp);
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_skill_update', descriptionFor('aimeat_skill_update'), {
@@ -109,6 +107,6 @@ export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): vo
   }, annotationsFor('aimeat_skill_update'), async ({ name, visibility, scope, agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.patch(`/v1/skills/${encodeURIComponent(name)}?scope=${scope ?? 'user'}`, { visibility });
-    return json(resp.data ?? resp);
+    return envelopeResult(resp);
   });
 }

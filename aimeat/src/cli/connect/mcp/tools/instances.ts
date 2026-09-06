@@ -22,13 +22,14 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { envelopeResult } from './_registry.js';
 
 export function registerInstancesTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
 
   mcp.tool('aimeat_instance_list', descriptionFor('aimeat_instance_list'), {}, annotationsFor('aimeat_instance_list'), async () => {
     const resp = await client.get('/v1/chat-instances');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_instance_create', descriptionFor('aimeat_instance_create'), {
@@ -39,13 +40,13 @@ export function registerInstancesTools(mcp: McpServer, registry: AgentRegistry):
     // its vendor segment.
     const platform = model ? model.split('-')[0] ?? 'unknown' : 'unknown';
     const resp = await client.post('/v1/chat-instances', { platform, app_name: name });
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 
   mcp.tool('aimeat_instance_status', descriptionFor('aimeat_instance_status'), {
     instance_id: z.string().describe('Chat instance ID'),
   }, annotationsFor('aimeat_instance_status'), async ({ instance_id }) => {
     const resp = await client.get(`/v1/chat-instances/${encodeURIComponent(instance_id)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return envelopeResult(resp);
   });
 }
