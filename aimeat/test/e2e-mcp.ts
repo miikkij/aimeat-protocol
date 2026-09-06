@@ -1038,6 +1038,43 @@ await test('35. initialize is still refused, and still points at the OAuth flow'
         `and the challenge still names where to authenticate, got ${challenge}`);
 });
 
+// ─── The consent door: who may approve, and with what ───
+console.log('\nPhase 9 — POST /v1/mcp/authorize-consent: the principal, not the name');
+// This door hands out an authorization code that mints a token carrying the TARGET AGENT's full
+// scope list. It had no test at all, and a code review on 2026-09-06 found its entire authorization
+// was `agent.owner !== ownerPayload.owner` — a comparison of the owner NAME, which reads the same on
+// an owner session, an agent JWT, an ecosystem token, a PAT and an app grant. Invariant 11.
+
+async function registerConsentClient(name: string): Promise<string> {
+    const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: name }) });
+    const id = reg.body.client_id ?? reg.body.data?.client_id;
+    assert(typeof id === 'string', `register ${name}: ${reg.status} ${JSON.stringify(reg.body).slice(0, 200)}`);
+    return id as string;
+}
+
+await test('An AGENT token cannot approve a consent, even for its own owner', async () => {
+    // THE ESCALATION THIS CLOSES: a scope-limited principal registers a client at the open
+    // registration door, posts its OWN bearer here as owner_token, and is handed a credential with
+    // the target agent's whole scope list. The owner name matched, so the old check admitted it.
+    const clientId = await registerConsentClient('consent-probe');
+    const r = await json('/v1/mcp/authorize-consent', {
+        method: 'POST',
+        body: JSON.stringify({ client_id: clientId, gaii: agentGaii, owner_token: agentToken }),
+    });
+    assert(r.status === 403, `an agent token must not approve a consent, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    assert(!('code' in (r.body ?? {})), `no authorization code may be issued: ${JSON.stringify(r.body).slice(0, 200)}`);
+});
+
+await test('The OWNER session still approves — the fix costs the real path nothing', async () => {
+    const clientId = await registerConsentClient('consent-owner');
+    const r = await json('/v1/mcp/authorize-consent', {
+        method: 'POST',
+        body: JSON.stringify({ client_id: clientId, gaii: agentGaii, owner_token: ownerToken }),
+    });
+    assert(r.status === 200, `the owner must still be able to approve, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+});
+
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

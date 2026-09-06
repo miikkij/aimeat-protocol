@@ -66,7 +66,11 @@ const key = (r: OwnerDecision): string => `${r.file}:${r.unit}`;
 export function main(): boolean {
     const seed = process.argv.includes('--seed');
 
-    const { program, files } = srcProgram(/[/\\]src[/\\](routes|services)[/\\]/);
+    // src/mcp JOINED THE SCAN on 2026-09-06, for the reason written out in
+    // check-identity-resolution.ts: the worst owner-as-principal defect in the tree
+    // (mcp/oauth.ts, a credential-granting door gated on `agent.owner !== payload.owner`) sat on a
+    // surface this gate had never read, while the gate reported green.
+    const { program, files } = srcProgram(/[/\\]src[/\\](routes|services|mcp)[/\\]/);
     const all = ownerDecisions(program, files, AIMEAT);
     // A door that names the principal is asking the right question already; the name comparison beside
     // it is a second, narrower one. Those are not the gate's business.
@@ -102,7 +106,7 @@ export function main(): boolean {
     console.log('');
     console.log('  Invariant 11: is the refusal a principal, or a name?');
     console.log('  ' + '─'.repeat(62));
-    console.log(`  refusals on \`owner\`  ${String(all.length).padStart(3)}   in src/routes and src/services`);
+    console.log(`  refusals on \`owner\`  ${String(all.length).padStart(3)}   in src/routes, src/services and src/mcp`);
     console.log(`  doors, name only     ${String(units.length).padStart(3)}   nothing on the door names the principal`);
     console.log(`  doors that name it   ${String(all.filter(r => r.namesPrincipal).length).padStart(3)}   not reported (${PRINCIPAL_GUARDS.join(', ')})`);
     console.log(`  listed               ${String(listed.length).padStart(3)}   of which triaged: ${triaged.length}`);

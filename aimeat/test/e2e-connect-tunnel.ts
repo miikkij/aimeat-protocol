@@ -60,6 +60,7 @@ const ownerName = `tunowner${Date.now()}`;
 let ownerToken = '';      // first owner → operator role (used for the stats route)
 let fullAgentToken = '';  // scopes: '*'
 let liteAgentToken = '';  // scopes: ['memory:read'] — for the scope-enforcement invariant
+let litePrivKey = '';     // kept so a test can mint a FRESH token after the owner changes its scopes
 
 console.log('\n=== AIMEAT Connector Forward Tunnel E2E (Phase 1) ===\n');
 
@@ -86,7 +87,8 @@ await test('Register read-only agent', async () => {
     body: JSON.stringify({ name: 'litebot', owner: ownerName, capabilities: ['memory'], scopes: ['memory:read'] }),
   });
   assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  liteAgentToken = await getToken(body.data.agent.gaii, body.data.private_key, true);
+  litePrivKey = body.data.private_key;
+  liteAgentToken = await getToken(body.data.agent.gaii, litePrivKey, true);
 });
 
 // ─── Phase 1: Connect & handshake ───
@@ -342,9 +344,19 @@ console.log('\nPhase 8 — a scope change reaches a live socket');
 // it for up to an hour, so GET /v1/agents said the agent held the word while every call it made was
 // refused for lacking it. The remedy found in the field was restarting the serve daemon.
 
-await test('19. Granting a scope pushes scopes_changed to that identity, and NOT auth_revoked', async () => {
-    const t = await TunnelClient.connect(BASE, liteAgentToken);
+await test('19. A granted scope does NOT take effect on the pinned credential, and the frame says so', async () => {
+    // The shape production has: one socket opened by one identity, with the agent whose permissions
+    // change riding it as a passenger. That is the branch the connector's scopes_changed handler
+    // takes (identities.get(agent) -> sendAttach), so it is the branch the test has to exercise.
+    const gaii = `litebot#${ownerName}@${NODE_ID}`;
+    const t = await TunnelClient.connect(BASE, fullAgentToken);
+    assert((t.welcome!.payload as any)?.multiplex === true, 'the node must advertise multiplex');
+    const joined = await t.attach(gaii, liteAgentToken);
+    assert(joined.type === 'attached', `attach: ${joined.type} ${joined.message ?? ''}`);
     const before = t.authRevokeds.length;
+
+    const refusedFirst = await t.request('GET', '/v1/messages/agent-inbox', { agent: gaii });
+    assert(refusedFirst.status === 403, `expected 403 before the grant, got ${refusedFirst.status}`);
 
     const patch = await json('/v1/agents/litebot/scopes', {
         method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` },
@@ -354,18 +366,41 @@ await test('19. Granting a scope pushes scopes_changed to that identity, and NOT
 
     const frame = await t.waitForScopesChanged(2000);
     assert(frame !== null, 'the live socket must be told its permissions changed');
-    assert(frame!.agent === `litebot#${ownerName}@${NODE_ID}`, `the frame names the identity, got ${frame!.agent}`);
+    assert(frame!.agent === gaii, `the frame names the identity, got ${frame!.agent}`);
+    // A GRANT must never travel on the revocation channel: auth_revoked stops an identity, so
+    // gaining a permission would kill the agent that gained it.
+    assert(t.authRevokeds.length === before, `a grant must not arrive as auth_revoked (${before} -> ${t.authRevokeds.length})`);
 
-    // THE HALF THAT MATTERS MOST. auth_revoked stops an identity, and this is a GRANT: carrying it
-    // on the revocation channel would kill the agent for gaining a permission.
-    assert(t.authRevokeds.length === before, `a grant must not arrive as auth_revoked (${before} → ${t.authRevokeds.length})`);
+    // THIS IS THE ASSERTION THAT WOULD HAVE CAUGHT THE FIRST ATTEMPT AT THIS FIX. The node
+    // authorizes a forwarded call against the token pinned when this identity attached, so the
+    // record and the tool list being right changes nothing here: the same call is still refused.
+    // Clearing the connector's own mint cache - which is all the first version did - could not have
+    // helped, and the test that shipped with it asserted only that a frame had arrived.
+    const stillRefused = await t.request('GET', '/v1/messages/agent-inbox', { agent: gaii });
+    assert(stillRefused.status === 403, `the pinned credential must still refuse, got ${stillRefused.status}`);
+
+    // And this is what the connector does now: mint a fresh token and RE-ATTACH, which is what
+    // replaces the node's pinned copy (handleAttach overwrites conn.rawToken).
+    const fresh = await getToken(gaii, litePrivKey, true);
+    const reattached = await t.attach(gaii, fresh);
+    assert(reattached.type === 'attached', `re-attach refused: ${JSON.stringify(reattached)}`);
+
+    const allowed = await t.request('GET', '/v1/messages/agent-inbox', { agent: gaii });
+    assert(allowed.status === 200, `after the re-attach the permission must apply, got ${allowed.status}: ${JSON.stringify(allowed.body).slice(0, 160)}`);
     await t.close();
 });
 
-await test('20. REMOVING a scope pushes it too — the direction nobody reported', async () => {
-    // The gap is two-way and this is the serious half: without the push, a permission taken away
-    // went on being honoured for the rest of the token's life.
-    const t = await TunnelClient.connect(BASE, liteAgentToken);
+await test('20. A REMOVED scope is told the same way, and stops applying once re-attached', async () => {
+    // The gap is two-way and this is the serious half: a permission taken away went on being
+    // honoured for the rest of the pinned token's life, and nobody reported it.
+    const gaii = `litebot#${ownerName}@${NODE_ID}`;
+    const granted = await getToken(gaii, litePrivKey, true);   // minted while it still holds messages:read
+    const t = await TunnelClient.connect(BASE, fullAgentToken);
+    const joined = await t.attach(gaii, granted);
+    assert(joined.type === 'attached', `attach: ${joined.type} ${joined.message ?? ''}`);
+    const ok = await t.request('GET', '/v1/messages/agent-inbox', { agent: gaii });
+    assert(ok.status === 200, `the agent holds the word to begin with, got ${ok.status}`);
+
     const patch = await json('/v1/agents/litebot/scopes', {
         method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({ scopes: ['memory:read'] }),
@@ -373,7 +408,15 @@ await test('20. REMOVING a scope pushes it too — the direction nobody reported
     assert(patch.status === 200, `scope patch ${patch.status}`);
     const frame = await t.waitForScopesChanged(2000);
     assert(frame !== null, 'a revocation of one word is told the same way');
-    assert(t.authRevokeds.length === 0, 'still not auth_revoked — the agent keeps running, it re-mints');
+    assert(t.authRevokeds.length === 0, 'still not auth_revoked - the agent keeps running, it re-attaches');
+
+    // The pinned token still carries the removed word until the identity re-attaches. That window is
+    // what this frame exists to close, and the re-attach is what closes it.
+    const fresh = await getToken(gaii, litePrivKey, true);
+    const reattached = await t.attach(gaii, fresh);
+    assert(reattached.type === 'attached', `re-attach refused: ${JSON.stringify(reattached)}`);
+    const refused = await t.request('GET', '/v1/messages/agent-inbox', { agent: gaii });
+    assert(refused.status === 403, `the removed permission must stop applying, got ${refused.status}`);
     await t.close();
 });
 

@@ -10,9 +10,11 @@
  *   MCP tool call flows over the single persistent WS without per-tool changes.
  * @usage Imported by `aimeat connect` subcommands and MCP tools.
  * @version-history
- *   v1.3.0 -- 2026-09-06 -- A SCOPE_DENIED answer drops the credential and retries ONCE. A minted
- *     token carries the scopes of its mint moment and is held for up to an hour, so a permission an
- *     owner granted reached a running agent only when that hour was up. Reported by crewaimeat.
+ *   v1.3.0 -- 2026-09-06 -- A SCOPE_DENIED retry was added here and removed the same day. It sat
+ *     AFTER the transport branch, which returns first, so it could not run on the tunnel -- the path
+ *     the bug was reported on -- and where it did run it re-minted on every refused call, because a
+ *     fresh JWT is never the same string as the one it replaces. A stale pin is replaced by
+ *     re-attaching on the tunnel (tunnel-client.ts), which is where the node's copy actually lives.
  *   v1.10.0 — 2026-09-01 — `lastStatus`: the HTTP status of the most recent call. The loopback
  *     dispatcher behind /v1/invoke needs it to hand back the SAME refusal the target route
  *     gave; without it every refusal came back as 400. Additive — nothing else reads it.
@@ -23,7 +25,6 @@
  */
 import { getToken } from './keychain.js';
 import { loadConfig } from './config.js';
-import { logger } from '../../utils/logger.js';
 
 export interface ApiResponse {
   ok: boolean;
@@ -85,21 +86,6 @@ export class AimeatClient {
   setTransport(t: Transport | null): void { this.transport = t; }
   hasTransport(): boolean { return this.transport !== null; }
 
-  /**
-   * How to obtain a FRESH credential when the node says the current one lacks a scope.
-   *
-   * A minted token carries the scopes the agent had at mint time and is held for up to an hour
-   * (agent-key.ts), so an owner who grants a permission from the dashboard reaches a running agent
-   * only when that hour is up. Reported by crewaimeat on 2026-09-06: the node's own /v1/agents said
-   * the agent held `messages:read` while the same agent got 403 SCOPE_DENIED on every call, and the
-   * remedy was restarting the whole serve daemon — the fleet's single point of failure — to take up
-   * one added permission.
-   *
-   * Set by buildRegistry, which is the layer that knows which agent and owner this client is.
-   */
-  private reauth: (() => Promise<string | null>) | null = null;
-  setReauth(fn: (() => Promise<string | null>) | null): void { this.reauth = fn; }
-
   private headers(): Record<string, string> {
     const h: Record<string, string> = { 'Content-Type': 'application/json', Connection: 'close' };
     if (this.token) h['Authorization'] = `Bearer ${this.token}`;
@@ -111,7 +97,7 @@ export class AimeatClient {
    * transport when one is set; absolute URLs (presigned uploads etc.) and the
    * default case use direct fetch with `Connection: close`.
    */
-  private async send(method: string, path: string, body?: unknown, retried = false): Promise<ApiResponse> {
+  private async send(method: string, path: string, body?: unknown): Promise<ApiResponse> {
     if (this.transport && !path.startsWith('http')) {
       const r = await this.transport.request(method, path, { body });
       this.lastStatus = r.status;
@@ -124,27 +110,7 @@ export class AimeatClient {
       body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
     });
     this.lastStatus = res.status;
-    const parsed = await res.json() as ApiResponse;
-
-    // A SCOPE REFUSAL IS A STATEMENT ABOUT THE TOKEN, so believe it about the token. The node has
-    // just said this credential does not carry a word; a credential minted now would, if the owner
-    // granted it. One retry, and only when the new token is actually different — a genuinely
-    // unpermitted agent gets its 403 on the second call and nothing loops.
-    const code = (parsed as { error?: { code?: string } } | null)?.error?.code;
-    if (res.status === 403 && code === 'SCOPE_DENIED' && !retried && this.reauth) {
-      const fresh = await this.reauth().catch((err: unknown) => {
-        // Said out loud rather than swallowed: a re-mint that failed leaves the caller holding the
-        // node's refusal, which is the right answer, but "the token was stale AND the node would not
-        // mint" and "this agent genuinely lacks the word" look identical in the result.
-        logger.warn('api-client: could not re-mint after a scope refusal', { path, error: String(err) });
-        return null;
-      });
-      if (fresh && fresh !== this.token) {
-        this.token = fresh;
-        return this.send(method, path, body, true);
-      }
-    }
-    return parsed;
+    return res.json() as Promise<ApiResponse>;
   }
 
   async get(path: string): Promise<ApiResponse> { return this.send('GET', path); }

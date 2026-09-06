@@ -34,7 +34,13 @@ import { callsInside, computesPrincipalTest, enclosingUnit } from './entries.js'
 const AUTH_TYPE = 'VerifiedToken';
 
 /** The middleware that asks whether a PERSON is present, rather than what role a token carries. */
-export const PRINCIPAL_GUARDS = ['requireOwnerPrincipal', 'requireOperatorPrincipal', 'requireOwnerSession'];
+// `isOwnerPrincipal` is requireOwnerPrincipal's own test as a value — the middleware calls it rather
+// than restating it (auth/middleware.ts v1.9.0). A handler that verifies a token ITSELF cannot take a
+// door gate, and POST /v1/mcp/authorize-consent is exactly that shape: the owner's session token
+// arrives in the body, not the header. Recognising the test wherever it is made, rather than only as
+// a middleware, is what stops the gate reporting a door that asks the right question as untriaged
+// debt — the same mistake its own comment below records the first version of this gate making.
+export const PRINCIPAL_GUARDS = ['requireOwnerPrincipal', 'requireOperatorPrincipal', 'requireOwnerSession', 'isOwnerPrincipal'];
 
 /**
  * A door can ask the principal question without any middleware, by computing it — and the mark is the

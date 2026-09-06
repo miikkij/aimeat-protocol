@@ -30,9 +30,18 @@
  *   if (outcome === 'online') { const { status, body } = await client.forward('GET', '/v1/memory'); }
  *   await client.close();
  * @version-history
- *   v1.9.0 -- 2026-09-06 -- `scopes_changed`: forget the cached token and nothing else. It sits beside
- *     auth_revoked and must never act like it -- that one stops the identity, and this news is often
- *     a GRANT, so an agent would be killed for gaining a permission.
+ *   v1.9.2 -- 2026-09-06 -- The socket's OWN identity reconnects only when a reconnect would produce a
+ *     DIFFERENT credential. An agent on a stored bearer gets the same string back, so bouncing the
+ *     tunnel bought nothing and cost every call that followed; it now says out loud that an ADDED
+ *     permission needs `aimeat connect` re-run there. A REMOVED one is already in force, because the
+ *     node narrows scopes to the record per request.
+ *   v1.9.1 -- 2026-09-06 -- `scopes_changed` RE-ATTACHES the identity. v1.9.0 only forgot the mint
+ *     cache, which changed nothing: the node authorizes a forwarded call against the token pinned at
+ *     attach, so the stale credential was the node's copy and no local cache clear could reach it.
+ *     Caught by review the same day.
+ *   v1.9.0 -- 2026-09-06 -- `scopes_changed`, beside auth_revoked and never behaving like it -- that one
+ *     stops the identity, and this news is often a GRANT, so an agent would be killed for gaining a
+ *     permission.
  *   2026-09-05 — A frame for an identity this socket no longer holds goes NOWHERE. `handlersFor`
  *     fell back to the opener's handlers for any name not in the map, and the 401 eviction removed a
  *     name from the map without telling the node, which kept pushing — so an evicted agent's next
@@ -76,8 +85,7 @@ import { WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
 import { logger } from '../../utils/logger.js';
 import { getInstallId } from './install-id.js';
-import { gaiiParts } from './agent-gaii.js';
-import { forgetCachedToken } from './agent-key.js';
+import { onScopesChanged } from './tunnel-scopes-changed.js';
 
 import type {
   ConnectTunnelClientOptions, ForwardOptions, ForwardResult, PendingForward,
@@ -120,6 +128,9 @@ export class ConnectTunnelClient {
   /** Does this node speak `attach`? Read from the `welcome` frame; false means one socket per agent,
    *  as before, and the hub falls back to that without anyone asking. */
   private multiplex = false;
+  /** The credential THIS socket is riding on, as handed over at connect. Kept so a permission change
+   *  can ask whether a reconnect would actually produce a different one before paying for it. */
+  private socketToken: string | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private tokenTimer: ReturnType<typeof setTimeout> | null = null;
@@ -223,6 +234,24 @@ export class ConnectTunnelClient {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     try { this.ws.send(JSON.stringify({ type: 'detach', agent: gaii })); }
     catch (err) { console.error(`[${this.label}] detach send failed: ${(err as Error).message}`); }
+  }
+
+  /** What ./tunnel-scopes-changed.ts borrows, built per frame: those arrive rarely. */
+  private scopeCtx() {
+    return {
+      label: this.label,
+      ownGaii: this.opts.gaii,
+      socketToken: this.socketToken,
+      attached: (gaii: string) => this.identities.get(gaii),
+      // sendAttach, NOT attachIdentity: a re-mint that fails must leave this identity on the socket
+      // with its old pin - stale but working - rather than taking it off, which is what
+      // attachIdentity does when an attach is refused.
+      reattach: (identity: TunnelIdentity) => this.sendAttach(identity),
+      ownToken: () => this.opts.getToken(),
+      reconnect: () => {
+        try { this.ws?.terminate(); } catch (err) { logger.warn('scopes_changed: ignore', { error: String(err) }); }
+      },
+    };
   }
 
   /** How many identities ride this socket, the socket's own included. For /local/status. */
@@ -367,6 +396,7 @@ export class ConnectTunnelClient {
       this.setStatus('offline');
       return 'unreachable';
     }
+    this.socketToken = token;
     if (!token) {
       this.authFailure('No stored token');
       return 'auth_failed';
@@ -619,17 +649,9 @@ export class ConnectTunnelClient {
         break;
       }
       case 'scopes_changed': {
-        // ONE THING ONLY: forget the cached credential. The next call mints a fresh one carrying the
-        // permissions the owner just set. This case sits beside auth_revoked and must never behave
-        // like it — auth_revoked detaches the identity and calls onAuthFailure, which is correct for
-        // a dead credential and exactly wrong here, where the owner ADDED a permission. An agent
-        // must not be stopped for gaining one.
-        const who = typeof frame.agent === 'string' ? frame.agent : '';
-        const parts = who ? gaiiParts(who) : null;
-        if (parts) {
-          forgetCachedToken(parts.agent, parts.owner);
-          console.error(`[${this.label}] Permissions changed for ${who} — the next call mints a fresh token`);
-        }
+        // Body in ./tunnel-scopes-changed.ts. It sits beside auth_revoked and must never behave like
+        // it: that one stops the identity, and this news is most often a GRANT.
+        onScopesChanged(this.scopeCtx(), frame);
         break;
       }
       case 'auth_revoked': {

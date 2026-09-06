@@ -33,6 +33,9 @@
  *   const outcome = await setAgentMode({ storage, config }, req.auth!.owner, name, req.body?.mode);
  *   if (!outcome.ok) return renderRefusal(outcome.code, outcome.message);
  * @version-history
+ *   v1.4.0 -- 2026-09-06 -- A scope change here also pushes scopes_changed to a live tunnel. The MCP
+ *     tool list was the only thing being told; a connector holds a token the node pinned at attach
+ *     and went on being authorized by the old permissions.
  *   v1.3.1 -- 2026-09-05 -- Notifies MCP through mcp/resource-events.ts, the leaf, not mcp/index.ts,
  *     which assembles the registry that imports services back (a cycle the dependency cruiser refuses).
  *   v1.3.0 -- 2026-08-13 -- setAgentConsoleUrl(): where the agent's HOST manages it. An agent created
@@ -57,6 +60,7 @@ import type { AimeatConfig } from '../config.js';
 import type { AgentRecord, AgentTechnicalCapability, Storage } from '../storage/interface.js';
 import { buildGAII } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
+import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { emitToolListChanged } from '../mcp/resource-events.js';
 import { deriveStepsForMode } from '../models/agent-onboarding-schemas.js';
 import { AgentCapabilitiesUpdateSchema } from '../models/agent-capabilities-schemas.js';
@@ -363,7 +367,14 @@ export async function setAgentProfile(
     // A scope change makes every open MCP session's tool list wrong, because the scopes decided
     // which tools it registered. Said here rather than at the caller: this is the shared write, and
     // a notification that lives at one of two doors is the half-working kind.
-    if (normalised.updates.defaultScopes) emitToolListChanged(target.gaii);
+    // …and the tool list is only the MCP half. A connector holds a token pinned on the node at
+    // attach, so an open tunnel goes on being authorized by the old permissions until it is told.
+    // The comment above is the reason this pairing exists: a notification at one of two doors is
+    // the half-working kind, and this was at one of THREE.
+    if (normalised.updates.defaultScopes) {
+      emitToolListChanged(target.gaii);
+      getActiveConnectTunnelManager()?.notifyScopesChanged(target.gaii);
+    }
 
     emitChange('agents');
     return { ok: true, agent: updated };

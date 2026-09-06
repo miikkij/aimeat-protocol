@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-09-06 — Re-approval pushes scopes_changed down the live tunnel as well as
+ *     emitting the tool-list change. It was one of three doors that change what an agent may do and
+ *     the only one wired, which is the half-working kind this file's own comment warns about.
  *   v1.9.0 — 2026-09-01 — An agent approver must hold `agent:write`. This route's same-owner branch
  *     is the ONLY way an agent creates an agent, and the permission word for it was read by nobody:
  *     any same-owner agent qualified, so `concierge` and `workflow-manager` made agents as readily
@@ -75,6 +78,7 @@ import { verifyJWT, issueJWT, generateSessionId } from '../../auth/jwt.js';
 import { optionalAuth } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { emitChange } from '../../services/event-bus.js';
+import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import { emitToolListChanged } from '../../mcp/index.js';
 import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
 import { createOnboardingTestTask } from '../../services/onboarding-test-task.js';
@@ -171,8 +175,10 @@ async function approveDeviceAuth(
       lastSeen: now,
     });
     // Re-approval is the other door that changes what an agent may do, and an agent being
-    // re-approved is exactly the one likely to have a session open.
+    // re-approved is exactly the one likely to have a session open — an open MCP session AND an
+    // open tunnel, whose credential the node pinned at attach and will keep honouring until told.
     emitToolListChanged(gaii);
+    getActiveConnectTunnelManager()?.notifyScopesChanged(gaii);
   } else {
     // New agent: create from scratch
     keyPair = await generateKeyPair();

@@ -69,7 +69,12 @@ const key = (r: IdentityRead): string => `${r.file}:${r.unit}`;
 export function main(): boolean {
     const seed = process.argv.includes('--seed');
 
-    const { program, files } = srcProgram(/[/\\]src[/\\](routes|services)[/\\]/);
+    // src/mcp JOINED THE SCAN on 2026-09-06. It had never been in it, and a code review found the
+    // worst identity defects in the tree there — a credential-granting door whose entire
+    // authorization is an owner-NAME comparison, on a surface neither identity ratchet had ever
+    // looked at. A gate that reports green over an unexamined directory is worse than no gate,
+    // because the green is read as a verdict on the whole tree.
+    const { program, files } = srcProgram(/[/\\]src[/\\](routes|services|mcp)[/\\]/);
     const all = identityReads(program, files, AIMEAT);
     const bare = all.filter(r => !r.resolvesToo);
     // The unit is what is decided about, so several reads inside one handler are one entry. The one
@@ -115,7 +120,7 @@ export function main(): boolean {
     console.log('');
     console.log('  Identity: does the unit resolve the caller, or read `sub` raw?');
     console.log('  ' + '─'.repeat(62));
-    console.log(`  reads of \`sub\`      ${String(all.length).padStart(3)}   in src/routes and src/services`);
+    console.log(`  reads of \`sub\`      ${String(all.length).padStart(3)}   in src/routes, src/services and src/mcp`);
     console.log(`  units, sub only     ${String(units.length).padStart(3)}   never call resolveIdentity`);
     console.log(`  of those, hand it on${String(units.filter(u => u.asArgument).length).padStart(3)}   pass \`sub\` to a call — triage these first`);
     console.log(`  units, both         ${String(all.filter(r => r.resolvesToo).length).padStart(3)}   not reported: the unit does resolve`);

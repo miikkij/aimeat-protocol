@@ -13,6 +13,13 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-09-06 — withCurrentScopes() (body in ./effective-scopes.ts): an agent's effective scopes are its token's INTERSECTED with
+ *     its record's, resolved per request beside the revocation check and for the same stated reason.
+ *     A JWT's scope list is a snapshot, a connector holds one for the life of its socket, and an
+ *     owner who removed a permission watched it go on being honoured until that token expired — on
+ *     every door, with nothing saying so. Intersection never union: a token deliberately narrower
+ *     than the record (a scoped PAT, an app grant, a one-job mint) must stay narrow, so a word can
+ *     only be taken away here. Adding one still needs a fresh credential.
  *   v1.9.0 — 2026-09-04 — isOwnerPrincipal(auth) is the requireOwnerPrincipal test as a value, and
  *     the middleware now calls it rather than restating it. For a handler whose other branch is
  *     legitimately open and therefore cannot take a door gate — POST /v1/invitations/:token/accept is
@@ -67,6 +74,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { deny401, deny403, denyScope403, setDenyConfig } from './deny.js';
+import { withCurrentScopes } from './effective-scopes.js';
 
 // P3-7: Reference to storage for session revocation checks
 let _sessionStorage: Storage | null = null;
@@ -283,7 +291,10 @@ export function optionalAuth() {
         // revoking caller writes its own entry; here the revocation happens in storage, and an owner
         // pressing Delete means now. One keyed read per authenticated request that carries a jti.
         if (verified && !(await credentialRevoked(token, verified))) {
-          req.auth = verified;
+          // The scope list on the token is what the agent held when it was minted; the record is
+          // what it holds now. Narrowed here, once, so every door downstream — routes, the MCP
+          // surface, the tunnel's forwarded calls — reads the same answer without asking again.
+          req.auth = await withCurrentScopes(_sessionStorage, verified);
         }
       }
     }
@@ -364,7 +375,10 @@ export function requireAuth() {
       }
     }
 
-    req.auth = verified;
+    // The same narrowing optionalAuth does. This branch is reached only when this middleware runs
+    // WITHOUT the global optionalAuth ahead of it (a unit test, a standalone router) — and a path
+    // that skips it is exactly the kind that goes on honouring a permission an owner removed.
+    req.auth = await withCurrentScopes(_sessionStorage, verified);
     touchAgentLastSeen(verified);
     next();
   };
