@@ -5447,7 +5447,18 @@ paths:
         object), `ack` (C→S: `{id, agent?}`), `backlog` (S→C on-connect snapshot
         of queued tasks + pending messages), `attach`/`attached`/`detach`,
         `subscribe`/`subscribed`, `invoke`/`invoke_result`, `auth_revoked`,
-        `disconnect`, and `error`.
+        `scopes_changed`, `disconnect`, and `error`.
+
+        **`scopes_changed` is not `auth_revoked`, and the distinction is
+        load-bearing.** A minted token carries the permissions its agent held at
+        mint time and a connector holds it for up to an hour, so granting a
+        permission from the dashboard reached a running agent only when that
+        hour was up — and REMOVING one went on being honoured just as long,
+        which is the more serious half. `PATCH /v1/agents/{name}/scopes` now
+        pushes `scopes_changed` (S→C: `{agent, message}`) to that identity's live
+        socket. It asks for a fresh mint and nothing else: the identity keeps
+        running. Sending the same news as `auth_revoked` would detach it, so
+        gaining a permission would stop the agent.
       tags: [Connector Tunnel]
       parameters:
         - name: token

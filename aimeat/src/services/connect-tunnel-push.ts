@@ -40,6 +40,34 @@ export interface PushContext {
 
 
 /**
+ * Tell ONE live identity that its permissions changed, so the credential it holds is stale.
+ *
+ * A push and not a revocation, which is why it lives here rather than beside the three predicates in
+ * ./connect-tunnel-revocation.ts: nothing is detached and nothing is closed. `auth_revoked` STOPS an
+ * identity, and this news is most often a GRANT — carried on that channel, adding a permission would
+ * kill the agent that gained it.
+ *
+ * Why it has to exist at all: a minted token carries the scopes of the moment it was minted and a
+ * connector holds it for up to an hour. Reported by crewaimeat on 2026-09-06, where GET /v1/agents
+ * said the agent held `messages:read` while every call it made was refused for lacking it, and the
+ * remedy found in the field was restarting the whole serve daemon. The reverse direction is the one
+ * nobody reported and the more serious of the two: a REMOVED permission went on being honoured for
+ * the rest of the token's life.
+ */
+export function notifyScopesChanged(ctx: PushContext, gaii: string): void {
+  for (const conn of ctx.connections.values()) {
+    if (conn.principal !== gaii) continue;
+    ctx.sendTo(conn, {
+      type: 'scopes_changed',
+      agent: gaii,
+      message: 'Permissions changed — mint a fresh token',
+      timestamp: new Date().toISOString(),
+    });
+    return;   // one live session per identity
+  }
+}
+
+/**
  * On connect, send a snapshot of everything outstanding for this agent —
  * queued + active tasks and pending messages — straight from storage (the
  * source of truth), so nothing is lost across a disconnect (mirrors

@@ -65,6 +65,9 @@ export class TunnelClient {
   readonly subscribeds: TunnelFrame[] = [];
   /** All inbound `auth_revoked` frames, in arrival order. */
   readonly authRevokeds: TunnelFrame[] = [];
+  /** All inbound `scopes_changed` frames, in arrival order. A permission change, NOT a revocation:
+   *  the identity keeps running and only its cached token is stale. */
+  readonly scopesChangeds: TunnelFrame[] = [];
   /** All inbound error frames, in arrival order. */
   readonly errors: TunnelFrame[] = [];
   /** All inbound `attached` acks, in arrival order — one per identity put on this socket. */
@@ -119,6 +122,7 @@ export class TunnelClient {
             break;
           }
           case 'auth_revoked': this.authRevokeds.push(frame); break;
+          case 'scopes_changed': this.scopesChangeds.push(frame); break;
           case 'error':
             this.errors.push(frame);
             // A refused attach is an `error` carrying its correlation id. Resolving it here is what
@@ -210,6 +214,7 @@ export class TunnelClient {
   private errorCursor = 0;
   private subscribedCursor = 0;
   private authRevokedCursor = 0;
+  private scopesChangedCursor = 0;
 
   /** Return the next unconsumed deliver frame, waiting up to timeoutMs for one. */
   async waitForDeliver(timeoutMs = 1000): Promise<TunnelFrame | null> {
@@ -220,6 +225,9 @@ export class TunnelClient {
   }
   async waitForAuthRevoked(timeoutMs = 1000): Promise<TunnelFrame | null> {
     return this.nextFrame(this.authRevokeds, () => this.authRevokedCursor, (n) => { this.authRevokedCursor = n; }, timeoutMs);
+  }
+  async waitForScopesChanged(timeoutMs = 1000): Promise<TunnelFrame | null> {
+    return this.nextFrame(this.scopesChangeds, () => this.scopesChangedCursor, (n) => { this.scopesChangedCursor = n; }, timeoutMs);
   }
   async waitForError(timeoutMs = 1000): Promise<TunnelFrame | null> {
     return this.nextFrame(this.errors, () => this.errorCursor, (n) => { this.errorCursor = n; }, timeoutMs);

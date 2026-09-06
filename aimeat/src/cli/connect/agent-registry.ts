@@ -24,6 +24,8 @@
  *   - `AgentRegistry` -- holds the entries by GAII, exposes resolve/get/list/size
  *
  * @version-history
+ *   v1.2.0 -- 2026-09-06 -- Each client is wired to re-mint after a scope refusal: forget the cached
+ *     token, resolve a fresh one. This layer is the one that knows the agent and owner.
  *   v1.2.0 -- 2026-09-02 -- remove(gaii). The counterpart to add()'s refusal: an entry may not be
  *     replaced silently, but it may be removed deliberately and added again, which is what a
  *     deleted-and-recreated agent needs -- same identity, a different credential.
@@ -32,6 +34,7 @@
  *   v1.0.0 -- 2026-05-29 -- Initial multi-agent registry
  */
 import { AimeatClient } from './api-client.js';
+import { forgetCachedToken, resolveToken } from './agent-key.js';
 import { isGaii } from './agent-gaii.js';
 import type { AimeatPerAgentConfig, LoadedAgent } from './config.js';
 import { logger } from '../../utils/logger.js';
@@ -180,6 +183,16 @@ export function buildRegistry(loaded: LoadedAgent[]): AgentRegistry {
   const reg = new AgentRegistry();
   for (const a of loaded) {
     const client = new AimeatClient(a.config.node_url, a.token);
+    // The cache is dropped FIRST, or resolveToken hands back the very token the node just refused.
+    // This is the whole remedy for a granted permission not reaching a running agent: one refusal,
+    // one fresh mint, one retry — instead of an hour of silence ended by restarting the daemon.
+    client.setReauth(async () => {
+      forgetCachedToken(a.agent, a.owner);
+      return resolveToken(a.agent, a.owner, a.config.node_url).catch(err => {
+        logger.warn('registry: could not re-mint after a scope refusal', { agent: a.agent, error: String(err) });
+        return null;
+      });
+    });
     try {
       reg.add({ gaii: a.gaii, agent: a.agent, owner: a.owner, client, config: a.config });
     } catch (err) {
