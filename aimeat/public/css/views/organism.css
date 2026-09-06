@@ -11,6 +11,8 @@
  *   views/profile/organisms/home.js and read by home-settings.js. The inner panels (workspace list,
  *   roster, agents, board, map, timeline) keep their own pj- rules; a few are quieted here.
  * @version-history
+ *   v1.2.0 — 2026-09-06 — The visibility chips in a table of spaces go to the far end of the name
+ *     cell (.og-tbl-marks), so they line up against the size column down the whole table.
  *   v1.1.0 — 2026-08-29 — The workspace cover and its pages (design canvas "AIMEAT Työtilan sivu"): the
  *     tables of spaces, the event rows, the tree that replaces the rail on request, and the page
  *     overrides that take the card off the document index, the document and the record rows.
@@ -126,6 +128,9 @@
 .og-tbl--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .og-tbl-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.5rem; line-height: 1; text-align: right; color: var(--text); }
 .og-tbl-nm { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+/* The visibility chips sit at the far end of the name cell, so they stand in one line down the
+   table against the size column instead of trailing each name wherever it happens to end. */
+.og-tbl-marks { margin-left: auto; flex: none; display: flex; align-items: center; gap: .4rem; }
 .og-tbl-name { background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: .97rem; font-weight: 800; color: var(--text); text-align: left; }
 .og-tbl-name:hover { color: var(--accent); }
 .og-tbl-last { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

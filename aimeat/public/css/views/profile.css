@@ -6,6 +6,9 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.8.0 — 2026-09-06 — The organism row's marks get a column of their own (.pj-org-marks, -type,
+ *     -arch): the type badge carries a min-width, so the badge and the lock stand in one line down
+ *     the list instead of trailing each name at a different place.
  *   v3.7.0 — 2026-09-04 — Security tab: the registered-device rows (pf-2fa-devices/-device).
  *   v3.6.0 — 2026-09-04 — Security tab: the two-step sign-in rules (pf-2fa-qr, -codes, -code-input).
  *     The QR keeps a white ground in both themes, because a scanner reads dark on light.
@@ -2742,7 +2745,15 @@
 .pj-org-main { flex: 1; min-width: 220px; cursor: pointer; }
 .pj-org-titlerow { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; min-width: 0; }
 .pj-org-name { font-weight: 600; font-size: 0.95rem; color: var(--text); }
-.pj-org-lock { font-size: 0.75rem; }
+/* The marks (type · lock · archived) hold a column of their own between the name and the counts,
+   so they read as one line down the list instead of trailing each name wherever it happens to end.
+   The type badge carries a min-width, which is what puts every lock at the same x. */
+.pj-org-marks { flex: 0 0 8rem; min-width: 0; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+/* A type is free text up to 40 chars, so the badge is capped and ellipsised: one long name must not
+   push this row's lock out of the line every other row keeps. The full word is on the title. */
+.pj-org-type { min-width: 6rem; max-width: 100%; box-sizing: border-box; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pj-org-lock { flex: none; display: inline-flex; align-items: center; color: var(--text-dim); }
+.pj-org-arch { flex: none; }
 .pj-org-desc { font-size: 0.78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48ch; }
 .pj-org-stats { display: flex; align-items: center; gap: 0.8rem; font-size: 0.78rem; color: var(--muted); flex: none; }
 .pj-org-stat { display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap; }

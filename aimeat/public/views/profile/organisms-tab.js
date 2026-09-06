@@ -19,6 +19,10 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.6.0 — 2026-09-06 — The row's marks (type, lock, archived) leave the title row for a fixed
+ *     column of their own, so they stand in one line down the list instead of trailing each name at
+ *     a different place. The padlock is an outline SVG and the archived pill a plain badge, both
+ *     without the emoji they carried.
  *   v2.5.0 — 2026-08-29 — The organism type is free text (40 chars): the create form gains an "Other"
  *     option with a text field, and the list row shows an unknown type as written instead of the
  *     raw locale key (tOr).
@@ -58,6 +62,11 @@ import { OrganismHome } from '/views/profile/organisms/home.js';
 import { Workspace } from '/views/profile/organisms/workspace.js';
 import { swallowed } from '/js/swallowed.js';
 import { authHeaders } from '/js/services/auth.js';
+
+/** The padlock beside a non-public organism: an outline that takes the row's own colour. */
+const LockMark = html`<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor"
+  stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.2" y="7"
+  width="9.6" height="7" rx="1.4" /><path d="M5.5 7V5.1a2.5 2.5 0 0 1 5 0V7" /></svg>`;
 
 export default function OrganismsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -392,8 +401,9 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       </div>`;
   };
 
-  // Compact one-line row: avatar · name + type + lock · description · members/agents/date ·
-  // primary action · "…" menu. Management (settings, leave, delete) lives in the menu / home page.
+  // Compact one-line row: avatar · name + description · marks (type + lock + archived, their own
+  // fixed column so they line up down the list) · members/agents/date · primary action · "…" menu.
+  // Management (settings, leave, delete) lives in the menu / home page.
   const renderOrgRow = (org, isMine) => {
     const isCreator = org.creatorGhii === ghii;
     const isAdmin = org.admins?.includes(ghii);
@@ -428,11 +438,13 @@ export default function OrganismsTab({ session, showToast, onStats }) {
           onKeyDown=${(e) => { if (e.key === 'Enter') activate(); }}>
           <div class="pj-org-titlerow">
             <span class="pj-org-name">${(org.name)}</span>
-            <span class="badge badge-info">${typeLabel}</span>
-            ${org.visibility !== 'public' ? html`<span class="pj-org-lock" title=${visLabel}>${'🔒'}</span>` : null}
-            ${org.archived ? html`<span class="pj-tab-pill" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${'🗄️ '}${t('organisms.archived') || 'archived'}</span>` : null}
           </div>
           ${org.description ? html`<div class="pj-org-desc">${(org.description)}</div>` : null}
+        </div>
+        <div class="pj-org-marks">
+          <span class="badge badge-info pj-org-type" title=${typeLabel}>${typeLabel}</span>
+          ${org.visibility !== 'public' ? html`<span class="pj-org-lock" title=${visLabel}>${LockMark}</span>` : null}
+          ${org.archived ? html`<span class="badge badge-warn pj-org-arch" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${t('organisms.archived') || 'archived'}</span>` : null}
         </div>
         <div class="pj-org-stats">
           ${isMine && wsCounts[org.id] !== undefined ? html`

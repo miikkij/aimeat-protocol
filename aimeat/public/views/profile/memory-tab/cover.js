@@ -15,6 +15,8 @@
  *   renderRecord · renderPage
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.1.0 — 2026-09-06 — The public/members chips in a table of spaces move into their own mark
+ *     group, pushed to the far end of the name cell so they line up down the table.
  *   v1.0.0 — 2026-08-29 — Initial. Replaces the two tab rows, the tools box, the two search fields
  *     and the 55 000 px flat list as the landing view.
  */
@@ -128,8 +130,10 @@ function spaceTable(ctx, list, { head = true, id = '' } = {}) {
         <div class="og-tbl-n" key=${'n' + s.id}>${s.items.length}</div>
         <div class="og-tbl-nm" key=${'m' + s.id}>
           <button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'space', id: s.id })}>${s.label}</button>
-          ${s.publicN ? html`<span class="og-chip og-chip--sun">${c('publicN', '{n} public').replace('{n}', String(s.publicN))}</span>` : null}
-          ${s.membersN ? html`<span class="og-chip">${c('membersN', '{n} for members').replace('{n}', String(s.membersN))}</span>` : null}
+          ${s.publicN || s.membersN ? html`<span class="og-tbl-marks">
+            ${s.publicN ? html`<span class="og-chip og-chip--sun">${c('publicN', '{n} public').replace('{n}', String(s.publicN))}</span>` : null}
+            ${s.membersN ? html`<span class="og-chip">${c('membersN', '{n} for members').replace('{n}', String(s.membersN))}</span>` : null}
+          </span>` : null}
         </div>
         <div class="og-tbl-last" key=${'s' + s.id}>${formatBytes(s.bytes)}</div>
         <div class="og-tbl-last" key=${'l' + s.id}>${s.latest ? html`<button type="button" class="og-tbl-go" onClick=${() => ctx.pickView({ kind: 'record', key: s.latest.key })}>${displayRemainder(s.latest.key, s.g)} · ${formatRelativeTime(s.latest.updated_at || s.latest.created_at)}</button>` : html`<span class="og-tbl-dot">·</span>`}</div>
