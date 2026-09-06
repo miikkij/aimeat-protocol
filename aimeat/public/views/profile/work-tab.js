@@ -56,6 +56,23 @@ export default function WorkTab({ session, showToast, onStats }) {
     if (session) loadData();
   }, [session, loadData]);
 
+  // A TAB SHOWING SERVER DATA RE-FETCHES ON THE LIVE STREAM. Every sibling here subscribes; these
+  // three did not, so a work item accepted or delivered anywhere else -- another tab, an agent, the
+  // MCP surface -- left this list showing yesterday until the person reloaded. Review item 7.6.
+  useEffect(() => {
+    // The DOMAINS this tab actually depends on. A listener that re-fetches on every event of any
+    // kind is the fan-out services/surface/shared-read.js exists to remove; the sibling tabs filter,
+    // and so does this. `detail.domains` absent means "everything changed", which is the legacy
+    // announce and must still be honoured.
+    const handler = (e) => {
+      const d = e.detail?.domains;
+      if (d && !['work', 'disputes'].some(x => d.has(x))) return;
+      if (session) loadData();
+    };
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [session, loadData]);
+
   async function handleRate(workId, rating, comment) {
     if (!rating) { showToast(t('profile.work.selectRating'), true); return; }
     const resp = await submitRating(workId, rating, comment);

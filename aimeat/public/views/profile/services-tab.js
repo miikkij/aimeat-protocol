@@ -164,6 +164,19 @@ export default function ServicesTab({ session, showToast, onStats }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Load my services once the session is available; loadMyData closes over session/onStats and is intentionally keyed to session.
   }, [session]);
 
+  // Re-fetch on the live stream, like every sibling tab. A service published or withdrawn anywhere
+  // else left this list showing the old one until a reload. Review item 7.6.
+  useEffect(() => {
+    const handler = (e) => {
+      const d = e.detail?.domains;
+      if (d && !['actions', 'catalogue'].some(x => d.has(x))) return;
+      if (session) loadMyData();
+    };
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
   async function loadMyData() {
     try {
       const list = await listMyServices(session.owner);

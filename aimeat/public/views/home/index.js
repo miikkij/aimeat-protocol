@@ -49,11 +49,13 @@
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 3).
  */
 import { h } from 'preact';
-import { useState, useCallback } from 'preact/hooks';
+import { useState, useCallback, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { useSession } from '/js/use-session.js';
+import { getSession } from '/js/services/auth.js';
+import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import { Spinner } from '/components/Spinner.js';
 import { StepMat, StepMatDone } from '/views/home/step-mat.js';
 import { StepAgent } from '/views/home/step-agent.js';
@@ -163,6 +165,25 @@ export default function HomeView({ navigate }) {
   }, []);
 
   const openSettings = useCallback(() => setSettingsOpen(true), []);
+
+  // THE LIVE STREAM, WHICH THIS SURFACE NEVER OPENED. Three blocks under this page register an
+  // `aimeat-live-update` listener -- the history feed, the agent step and the welcome mat -- and
+  // nothing here ever called connect(), so not one of them had ever fired. Worse, arriving here
+  // from the profile ran ITS cleanup, so the stream that WAS open closed on the way in: the home
+  // was the one surface where a change made elsewhere never showed up until a reload. The wiring is
+  // the profile's, verbatim, because it is the same subscription. Review item 7.1, 2026-09-06.
+  useEffect(() => {
+    if (!session) return;
+    const notifyBlocks = (domains) => {
+      window.dispatchEvent(new CustomEvent('aimeat-live-update', { detail: { domains } }));
+    };
+    connect(() => getSession()?.jwt);
+    onUpdate(notifyBlocks);
+    return () => {
+      offUpdate(notifyBlocks);
+      disconnect();
+    };
+  }, [session]);
 
   if (!session) {
     return html`
