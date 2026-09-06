@@ -3164,6 +3164,21 @@
       "outward.watching": "Seurattava kone",
       "outward.payload": "Näin viesti lähtee",
       "outward.testSend": "Kokeile lähetystä",
+      "headers": "Otsakkeet",
+      "headers.lead": "Otsakkeet lähtevät kutsun mukana. Avainta ei kirjoiteta tähän: nimeä salaisuus arvossa, niin palvelin panee arvon paikalleen kutsun lähtiessä.",
+      "headers.add": "Lisää otsake",
+      "headers.name": "Otsakkeen nimi",
+      "headers.value": "Arvo",
+      "headers.remove": "Poista",
+      "headers.none": "Ei yhtään otsaketta.",
+      "secret.pick": "Lisää salaisuus",
+      "secret.none": "Yhtään salaisuutta ei ole vielä tallessa.",
+      "secret.add": "Lisää sellainen Pääsy-sivulla",
+      "agent.pick": "Valitse agentti",
+      "agent.none": "Yksikään agenteistasi ei voi vielä toimia.",
+      "agent.connect": "Yhdistä agentti Agenttisi-sivulla",
+      "agent.seen": "nähty {date}",
+      "agent.unseen": "ei vielä nähty",
       "save": "Tallenna",
       "close": "Sulje",
       "copy": "Kopioi",
@@ -3212,6 +3227,21 @@
       "outward.watching": "The machine it watches",
       "outward.payload": "This is the message as it goes",
       "outward.testSend": "Test send",
+      "headers": "Headers",
+      "headers.lead": "The headers go with the call. A key is not typed here: name a secret in the value, and the server puts the value in as the call leaves.",
+      "headers.add": "Add a header",
+      "headers.name": "Header name",
+      "headers.value": "Value",
+      "headers.remove": "Remove",
+      "headers.none": "No headers.",
+      "secret.pick": "Insert a secret",
+      "secret.none": "No secrets are kept yet.",
+      "secret.add": "Add one on the Access page",
+      "agent.pick": "Pick an agent",
+      "agent.none": "None of your agents can act yet.",
+      "agent.connect": "Connect one on the Your agents page",
+      "agent.seen": "seen {date}",
+      "agent.unseen": "not seen yet",
       "save": "Save",
       "close": "Close",
       "copy": "Copy",
@@ -3960,7 +3990,7 @@
       summary: "A live value from a memory key or a URL, or a constant when the page cannot read one.",
       inputs: ["key (a memory key)", "url (an address, read through the node's living-hooks extension)", "path (a path inside the answer, dots and brackets)", "raw (take the body itself as the value)", "value (the fallback)"],
       outputs: ["value — what the key or the address holds now, with the node's unit on it", "stale — the words a failed read left, empty while it is fresh"],
-      options: ["unit", "every (seconds between reads of a url; the floor is 10)", "format (how it is printed: 1", '"int"', '"unit"', 'an object; `locale: "auto"` writes the number in the page\'s language)', "scope=own|public", "owner (for a public read)", "label"],
+      options: ["unit", "headers (sent with a url read; a value may name a secret of the owner's as {{secret:NAME}}, which the node puts in as the call leaves, so no key is written into the document)", "every (seconds between reads of a url; the floor is 10)", "format (how it is printed: 1", '"int"', '"unit"', 'an object; `locale: "auto"` writes the number in the page\'s language)', "scope=own|public", "owner (for a public read)", "label"],
       languages: ["label"],
       functions: [],
       example: { "type": "source", "url": "https://api.porssisahko.net/v1/latest-prices.json", "path": "prices[0].price", "every": 900, "unit": "EUR/kWh", "value": 0.042, "label": { "fi": "Pörssihinta", "en": "Spot price" } },
@@ -3980,7 +4010,7 @@
       summary: "When a machine moves, the document tells somebody: a URL, or one of your own agents.",
       inputs: ["on (the machine id it watches, or { node, when } for a crossing that turns true)"],
       outputs: ["value — the time of the last delivery, empty before the first"],
-      options: ['target { kind: "url", url, method } or { kind: "agent", agent }', "enabled", 'include ("all", or a list of node ids whose rows then go whole)', "label"],
+      options: ['target { kind: "url", url, method, headers } or { kind: "agent", agent }', "headers (sent with a url delivery; a value may name a secret of the owner's as {{secret:NAME}}, which the node puts in as the call leaves, so no key is written into the document)", "enabled", 'include ("all", or a list of node ids whose rows then go whole)', "label"],
       languages: ["label"],
       functions: [],
       example: { "type": "trigger", "on": "phase", "enabled": true, "target": { "kind": "url", "url": "https://example.org/hook", "method": "POST" }, "include": "all", "label": { "fi": "Kerro invertterille", "en": "Tell the inverter" } },
@@ -4299,6 +4329,9 @@
       }) : await hooks.send({
         url: String(target.url || ""),
         method: String(target.method || "POST"),
+        // The headers the trigger carries, secret names and all. What a `{{secret:NAME}}` stands
+        // for is resolved on the node as the call leaves it; this browser never holds the value.
+        headers: target.headers,
         body
       });
       const event = {
@@ -4445,7 +4478,10 @@
       const answer = await hooks.read({
         url: String(node2.url),
         path: node2.path,
-        raw: node2.raw ? true : void 0
+        raw: node2.raw ? true : void 0,
+        // The headers the record carries, secret names and all. What a `{{secret:NAME}}` stands for
+        // is resolved on the node as the call leaves it; this browser never holds the value.
+        headers: node2.headers
       });
       if (destroyed) return;
       if (answer.refusal) {
@@ -4649,6 +4685,9 @@
   }
 
   // src/static/sdk-libs/living/dialog-parts.js
+  function apexPage(path) {
+    return String(APEX_URL || NODE_URL || "") + String(path);
+  }
   function group(host, title) {
     const body = el("div", { class: "ak-living__dialog-body" });
     const root = el("section", { class: "ak-living__dialog-group" }, [
@@ -4749,6 +4788,174 @@
       }
     };
   }
+  async function ownerRead(path) {
+    try {
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      const session = ns && ns.auth && typeof ns.auth.getSession === "function" ? ns.auth.getSession() : null;
+      if (!session || typeof session.fetch !== "function") return null;
+      const answer = await session.fetch(String(path));
+      if (!answer || !answer.ok) return null;
+      return answer.data || null;
+    } catch {
+      return null;
+    }
+  }
+  function pickOrWords(spec) {
+    return el("p", { class: "ak-living__dialog-none" }, [
+      el("span", { text: String(spec.words) + " " }),
+      el("a", {
+        class: "ak-living__dialog-door",
+        href: String(spec.href),
+        target: "_blank",
+        rel: "noopener",
+        text: String(spec.doorWords)
+      })
+    ]);
+  }
+  function secretPicker(spec) {
+    const langs = typeof spec.langs === "function" ? spec.langs : function() {
+      return [];
+    };
+    const names = Array.isArray(spec.names) ? spec.names : [];
+    if (!names.length) {
+      return pickOrWords({
+        words: say("secret.none", langs()),
+        doorWords: say("secret.add", langs()),
+        href: apexPage("/v1/profile?tab=access")
+      });
+    }
+    const select = el("select", {
+      class: "ak-input ak-living__secret-pick",
+      "aria-label": say("secret.pick", langs())
+    }, [el("option", { value: "" }, say("secret.pick", langs()))].concat(names.map(function(name) {
+      return el("option", { value: name }, name);
+    })));
+    select.addEventListener("change", function() {
+      const name = String(
+        /** @type {HTMLSelectElement} */
+        select.value || ""
+      );
+      select.value = "";
+      if (!name) return;
+      insertAtCaret(spec.input, "{{secret:" + name + "}}");
+    });
+    return select;
+  }
+  function insertAtCaret(input, text) {
+    const value2 = String(input.value || "");
+    let at = value2.length;
+    try {
+      if (typeof input.selectionStart === "number") at = input.selectionStart;
+    } catch {
+    }
+    const end = (function() {
+      try {
+        return typeof input.selectionEnd === "number" ? input.selectionEnd : at;
+      } catch {
+        return at;
+      }
+    })();
+    input.value = value2.slice(0, at) + text + value2.slice(end);
+    try {
+      input.selectionStart = input.selectionEnd = at + text.length;
+    } catch {
+    }
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.focus();
+  }
+  function headerEditor(host, spec) {
+    const langs = typeof spec.langs === "function" ? spec.langs : function() {
+      return [];
+    };
+    const words2 = function(key) {
+      return say(key, langs());
+    };
+    const rows = [];
+    for (const name of Object.keys(spec.headers || {})) {
+      rows.push({ name, value: String((spec.headers || {})[name]) });
+    }
+    const list = el("div", { class: "ak-living__headers" });
+    const add = el("button", {
+      type: "button",
+      class: "ak-btn ak-btn--outline ak-living__headers-add",
+      text: words2("headers.add"),
+      on: { click() {
+        rows.push({ name: "", value: "" });
+        draw();
+        report();
+      } }
+    });
+    const root = el("div", { class: "ak-living__dialog-headers" }, [
+      el("p", { class: "ak-living__dialog-hint", text: words2("headers.lead") }),
+      list,
+      add
+    ]);
+    host.appendChild(root);
+    function report() {
+      const out = {};
+      for (const row of rows) {
+        const name = String(row.name || "").trim();
+        if (name) out[name] = String(row.value || "");
+      }
+      if (spec.onChange) spec.onChange(out);
+    }
+    function draw() {
+      while (list.firstChild) list.removeChild(list.firstChild);
+      const names = spec.secrets() || [];
+      rows.forEach(function(row, i) {
+        const name = (
+          /** @type {HTMLInputElement} */
+          el("input", {
+            type: "text",
+            class: "ak-input ak-living__header-name",
+            value: row.name,
+            placeholder: words2("headers.name"),
+            "aria-label": words2("headers.name")
+          })
+        );
+        const value2 = (
+          /** @type {HTMLInputElement} */
+          el("input", {
+            type: "text",
+            class: "ak-input ak-living__header-value",
+            value: row.value,
+            placeholder: words2("headers.value"),
+            "aria-label": words2("headers.value")
+          })
+        );
+        name.addEventListener("input", function() {
+          row.name = name.value;
+          report();
+        });
+        value2.addEventListener("input", function() {
+          row.value = value2.value;
+          report();
+        });
+        const drop = el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--ghost ak-living__header-drop",
+          text: words2("headers.remove"),
+          on: { click() {
+            rows.splice(i, 1);
+            draw();
+            report();
+          } }
+        });
+        list.appendChild(el("div", { class: "ak-living__header" }, [
+          name,
+          value2,
+          secretPicker({ names, input: value2, langs, base: spec.base }),
+          drop
+        ]));
+      });
+      if (!rows.length) list.appendChild(el("p", { class: "ak-living__dialog-hint", text: words2("headers.none") }));
+    }
+    draw();
+    return { el: root, refresh: draw };
+  }
   function vocabularyNote(host, vocabulary) {
     const root = el("div", { class: "ak-living__vocabulary" }, [
       el("p", { class: "ak-living__vocabulary-summary", text: String(vocabulary.summary || "") }),
@@ -4775,13 +4982,16 @@
     const words2 = function(key) {
       return say(key, langs());
     };
+    const subjectNode = (((spec.doc || {}).model || {}).nodes || {})[shape.subject] || {};
     const draft = {
       road: shape.road,
       url: shape.url,
       path: shape.path,
       every: shape.every,
-      key: shape.key
+      key: shape.key,
+      headers: Object.assign({}, subjectNode.headers || {})
     };
+    let vault = [];
     const k = kit();
     const handle = k.dialog({
       title: words2("inward.title"),
@@ -4829,6 +5039,24 @@
             node: Object.assign({}, spec.node, { path: draft.path, raw: shape.raw, url: draft.url || "x" })
           })).expected;
         }
+        const headers = headerEditor(urlRoad.body, {
+          headers: draft.headers,
+          langs,
+          base: String(spec.base || ""),
+          secrets: function() {
+            return vault;
+          },
+          onChange: function(map) {
+            draft.headers = map;
+          }
+        });
+        ownerRead("/v1/secrets").then(function(data) {
+          const list = data && Array.isArray(data.secrets) ? data.secrets : [];
+          vault = list.map(function(s) {
+            return String(s && s.name ? s.name : s);
+          }).filter(Boolean);
+          headers.refresh();
+        });
         expected.block = copyBlock(urlRoad.body, {
           label: words2("inward.expected"),
           text: JSON.stringify(shape.expected, null, 2),
@@ -4841,7 +5069,7 @@
         testRead.textContent = words2("inward.testRead");
         testRead.addEventListener("click", function() {
           urlStatus.say("…", true);
-          spec.hooks.read({ url: draft.url, path: draft.path, raw: shape.raw ? true : void 0 }).then(function(answer) {
+          spec.hooks.read({ url: draft.url, path: draft.path, raw: shape.raw ? true : void 0, headers: draft.headers }).then(function(answer) {
             if (answer.refusal) {
               urlStatus.say(spec.hooks.words(answer.refusal), false);
               return;
@@ -4895,6 +5123,7 @@
       delete node2.url;
       delete node2.key;
       delete node2.every;
+      delete node2.headers;
       if (draft.road === "url") {
         node2.type = "source";
         node2.url = String(draft.url || "");
@@ -4902,6 +5131,7 @@
         else delete node2.path;
         const every = Number(draft.every);
         if (Number.isFinite(every) && every > 0) node2.every = every;
+        if (Object.keys(draft.headers || {}).length) node2.headers = draft.headers;
       } else if (draft.road === "key") {
         node2.type = "source";
         node2.key = String(draft.key || shape.write.key);
@@ -4918,6 +5148,12 @@
   }
 
   // src/static/sdk-libs/living/dialog-outward.js
+  function seenWord(iso, langs) {
+    if (!iso) return say("agent.unseen", langs);
+    const when = new Date(iso);
+    if (Number.isNaN(when.getTime())) return say("agent.unseen", langs);
+    return fill(say("agent.seen", langs), { date: when.toLocaleDateString() });
+  }
   function openOutward(spec) {
     const langs = typeof spec.langs === "function" ? spec.langs : function() {
       return [];
@@ -4926,13 +5162,17 @@
     const words2 = function(key) {
       return say(key, langs());
     };
+    const written = shape.trigger ? (((spec.doc || {}).model || {}).nodes || {})[shape.trigger] : null;
+    const writtenHeaders = written && written.target && written.target.headers || {};
     const draft = {
       kind: shape.target.kind,
       url: String(shape.target.url || ""),
       method: String(shape.target.method || "POST"),
       agent: String(shape.target.agent || ""),
-      enabled: shape.enabled
+      enabled: shape.enabled,
+      headers: Object.assign({}, writtenHeaders)
     };
+    let vault = [];
     const k = kit();
     const handle = k.dialog({
       title: words2("outward.title"),
@@ -5001,9 +5241,60 @@
             })
           }
         ], draft);
-        fields(agentRoad.body, [
+        const headers = headerEditor(urlRoad.body, {
+          headers: draft.headers,
+          langs,
+          base: String(spec.base || ""),
+          secrets: function() {
+            return vault;
+          },
+          onChange: function(map) {
+            draft.headers = map;
+          }
+        });
+        ownerRead("/v1/secrets").then(function(data) {
+          const list = data && Array.isArray(data.secrets) ? data.secrets : [];
+          vault = list.map(function(s) {
+            return String(s && s.name ? s.name : s);
+          }).filter(Boolean);
+          headers.refresh();
+        });
+        const agentBox = el("div", { class: "ak-living__dialog-fields" });
+        agentRoad.body.appendChild(agentBox);
+        fields(agentBox, [
           { name: "agent", id: "ak-living-hook-agent", type: "text", label: words2("outward.agent"), value: draft.agent }
         ], draft);
+        ownerRead("/v1/agents").then(function(data) {
+          const list = data && Array.isArray(data.agents) ? data.agents : [];
+          while (agentBox.firstChild) agentBox.removeChild(agentBox.firstChild);
+          if (!list.length) {
+            agentBox.appendChild(pickOrWords({
+              words: words2("agent.none"),
+              doorWords: words2("agent.connect"),
+              href: apexPage("/v1/profile?tab=agents")
+            }));
+            return;
+          }
+          const options = list.map(function(a) {
+            const name = String(a.name || "");
+            const said = String(a.display_name || name);
+            return { value: name, label: said + " · " + seenWord(a.last_seen, langs()) };
+          });
+          if (draft.agent && !options.some(function(o) {
+            return o.value === draft.agent;
+          })) {
+            options.unshift({ value: draft.agent, label: draft.agent });
+          }
+          if (!draft.agent) options.unshift({ value: "", label: words2("agent.pick") });
+          fields(agentBox, [{
+            name: "agent",
+            id: "ak-living-hook-agent",
+            type: "select",
+            label: words2("outward.agent"),
+            value: draft.agent,
+            options
+          }], draft);
+        });
         copyBlock(host, {
           label: words2("outward.payload"),
           text: JSON.stringify(shape.payload, null, 2),
@@ -5023,7 +5314,7 @@
                 title: "Living document: " + shape.label + " (test)",
                 description: JSON.stringify(body, null, 2),
                 body
-              }) : spec.hooks.send({ url: draft.url, method: draft.method, body });
+              }) : spec.hooks.send({ url: draft.url, method: draft.method, headers: draft.headers, body });
               call.then(function(answer) {
                 if (answer.refusal) {
                   status.say(spec.hooks.words(answer.refusal), false);
@@ -5058,7 +5349,12 @@
         on: shape.watching,
         enabled: !!draft.enabled,
         include: shape.include,
-        target: draft.kind === "agent" ? { kind: "agent", agent: String(draft.agent || "") } : { kind: "url", url: String(draft.url || ""), method: String(draft.method || "POST") }
+        target: draft.kind === "agent" ? { kind: "agent", agent: String(draft.agent || "") } : Object.assign(
+          { kind: "url", url: String(draft.url || ""), method: String(draft.method || "POST") },
+          // An empty map is left OFF the record rather than written as {}: a trigger that sends no
+          // headers of its own should read as one, in the record as much as on the screen.
+          Object.keys(draft.headers || {}).length ? { headers: draft.headers } : null
+        )
       });
       if (spec.onSave) spec.onSave(id);
     }
@@ -5147,7 +5443,7 @@
   }
 
   // src/static/sdk-libs/living/index.js
-  var VERSION = "0.6.1";
+  var VERSION = "0.7.0";
   var DRAWN = ["control", "formula", "text", "machine", "value", "source", "trigger"];
   function validate(doc) {
     const refusals = [];

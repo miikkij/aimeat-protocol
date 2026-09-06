@@ -14,13 +14,38 @@
  *   origin a document can be opened from, so the fallback selects the text instead of failing
  *   silently — a person who cannot press Copy can still press Ctrl+C, and the button says which of
  *   the two just happened.
- * @structure group · fields · copyBlock · statusLine · vocabularyNote
- * @usage  import { group, fields, copyBlock } from './dialog-parts.js';
+ *
+ *   A HEADER IS WHERE A KEY GOES, AND A KEY IS NOT TYPED HERE. An address that wants an API key
+ *   wants it in a header, and a header typed into a record is a record carrying somebody's key —
+ *   readable by every reader of the document and every copy of it. So the value box takes
+ *   `{{secret:NAME}}` instead, picked from the owner's own vault: the name travels in the record,
+ *   the value stays on the server, and it is put in as the call leaves. The picker is a list of
+ *   NAMES, never of values, because the vault does not hand a value back to anybody.
+ *
+ *   A PICK OVER A LIST NOBODY HAS FILLED SAYS SO. An empty vault and an owner with no agents are
+ *   both ordinary states on a new account, and a select with no options in it reads as a broken
+ *   control. Both answer with one sentence and a door to where the thing is made.
+ * @structure group · fields · copyBlock · statusLine · vocabularyNote · apexPage · ownerRead ·
+ *   pickOrWords · secretPicker · headerEditor
+ * @usage  import { group, fields, copyBlock, headerEditor } from './dialog-parts.js';
  * @version-history
+ *   v0.7.0 — 2026-09-06 — The header editor, the secret picker over the owner's vault, and
+ *     ownerRead/pickOrWords, which the agent pick in the outward dialog stands on too.
  *   v0.6.0 — 2026-09-06 — Initial (the living document, stage 5: hooks).
  */
 import { el, kit } from './dom.js';
 import { say } from './hooks-words.js';
+import { APEX_URL, NODE_URL } from '../_core/config.js';
+
+/**
+ * A page a PERSON opens, addressed at the apex rather than at wherever this document is being
+ * read. An app is served from its own subdomain, so a relative link to the profile would send
+ * somebody to a host that has no profile on it.
+ * @param {string} path @returns {string}
+ */
+export function apexPage(path) {
+  return String(APEX_URL || NODE_URL || '') + String(path);
+}
 
 /** One titled group inside a dialog's body. Hidden and shown by the road a person picks. */
 export function group(host, title) {
@@ -121,6 +146,164 @@ export function statusLine(host) {
       line.setAttribute('data-ok', ok ? 'yes' : 'no');
     },
   };
+}
+
+/* ── What the owner's own lists are read with ───────────────────────────────────────────────── */
+
+/**
+ * One read of this node as the signed-in owner, for a list this library offers a pick over: the
+ * vault's names, the owner's agents. It is the session's own fetch, so no principal travels from
+ * the record and a guest simply gets null.
+ * @param {string} path
+ * @returns {Promise<any|null>}
+ */
+export async function ownerRead(path) {
+  try {
+    const ns = /** @type {any} */ (window).AIMEAT;
+    const session = ns && ns.auth && typeof ns.auth.getSession === 'function' ? ns.auth.getSession() : null;
+    if (!session || typeof session.fetch !== 'function') return null;
+    const answer = await session.fetch(String(path));
+    if (!answer || !answer.ok) return null;
+    return answer.data || null;
+  } catch { return null; }
+}
+
+/**
+ * A sentence and a door, for a pick whose list is empty or could not be read. The door is a real
+ * link to the page where the thing is made, on the node rather than on this document's origin.
+ * @param {{ words: string, doorWords: string, href: string }} spec
+ * @returns {HTMLElement}
+ */
+export function pickOrWords(spec) {
+  return el('p', { class: 'ak-living__dialog-none' }, [
+    el('span', { text: String(spec.words) + ' ' }),
+    el('a', {
+      class: 'ak-living__dialog-door', href: String(spec.href), target: '_blank', rel: 'noopener',
+      text: String(spec.doorWords),
+    }),
+  ]);
+}
+
+/**
+ * The picker that puts a secret's NAME into a value box. It writes `{{secret:NAME}}` where the
+ * caret is, so a header value can carry a word around it ("Bearer {{secret:X}}"), and it resets
+ * itself after each pick so the same secret can be put in twice.
+ * @param {{ names: string[], input: HTMLInputElement|HTMLTextAreaElement, langs?: () => string[],
+ *   base?: string }} spec
+ * @returns {HTMLElement}
+ */
+export function secretPicker(spec) {
+  const langs = typeof spec.langs === 'function' ? spec.langs : function () { return []; };
+  const names = Array.isArray(spec.names) ? spec.names : [];
+  if (!names.length) {
+    return pickOrWords({
+      words: say('secret.none', langs()),
+      doorWords: say('secret.add', langs()),
+      href: apexPage('/v1/profile?tab=access'),
+    });
+  }
+  const select = el('select', {
+    class: 'ak-input ak-living__secret-pick',
+    'aria-label': say('secret.pick', langs()),
+  }, [el('option', { value: '' }, say('secret.pick', langs()))].concat(names.map(function (name) {
+    return el('option', { value: name }, name);
+  })));
+  select.addEventListener('change', function () {
+    const name = String(/** @type {HTMLSelectElement} */ (select).value || '');
+    /** @type {HTMLSelectElement} */ (select).value = '';
+    if (!name) return;
+    insertAtCaret(spec.input, '{{secret:' + name + '}}');
+  });
+  return select;
+}
+
+/**
+ * Put text where the caret is, and leave the caret after it. A box that always appended would be
+ * wrong for the header this exists for: "Bearer " is typed first and the secret goes after it,
+ * but a scheme written after the fact belongs in front.
+ * @param {any} input @param {string} text
+ */
+function insertAtCaret(input, text) {
+  const value = String(input.value || '');
+  let at = value.length;
+  try { if (typeof input.selectionStart === 'number') at = input.selectionStart; } catch { /* no caret here */ }
+  const end = (function () {
+    try { return typeof input.selectionEnd === 'number' ? input.selectionEnd : at; } catch { return at; }
+  }());
+  input.value = value.slice(0, at) + text + value.slice(end);
+  try { input.selectionStart = input.selectionEnd = at + text.length; } catch { /* no caret here */ }
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.focus();
+}
+
+/**
+ * The headers a call carries, as rows a person can add to and take away from. The map is rebuilt
+ * from the rows on every keystroke and handed back, so the caller keeps one shape and never has to
+ * read the DOM.
+ * @param {HTMLElement} host
+ * @param {{ headers?: Record<string, string>, langs?: () => string[], base?: string,
+ *   secrets: () => string[], onChange: (headers: Record<string, string>) => void }} spec
+ * @returns {{ el: HTMLElement, refresh: () => void }}
+ */
+export function headerEditor(host, spec) {
+  const langs = typeof spec.langs === 'function' ? spec.langs : function () { return []; };
+  const words = function (key) { return say(key, langs()); };
+  /** @type {Array<{ name: string, value: string }>} */
+  const rows = [];
+  for (const name of Object.keys(spec.headers || {})) {
+    rows.push({ name: name, value: String((spec.headers || {})[name]) });
+  }
+
+  const list = el('div', { class: 'ak-living__headers' });
+  const add = el('button', {
+    type: 'button', class: 'ak-btn ak-btn--outline ak-living__headers-add', text: words('headers.add'),
+    on: { click() { rows.push({ name: '', value: '' }); draw(); report(); } },
+  });
+  const root = el('div', { class: 'ak-living__dialog-headers' }, [
+    el('p', { class: 'ak-living__dialog-hint', text: words('headers.lead') }),
+    list,
+    add,
+  ]);
+  host.appendChild(root);
+
+  /** The map as the record carries it: a row with no name is a row still being typed. */
+  function report() {
+    /** @type {Record<string, string>} */
+    const out = {};
+    for (const row of rows) {
+      const name = String(row.name || '').trim();
+      if (name) out[name] = String(row.value || '');
+    }
+    if (spec.onChange) spec.onChange(out);
+  }
+
+  function draw() {
+    while (list.firstChild) list.removeChild(list.firstChild);
+    const names = spec.secrets() || [];
+    rows.forEach(function (row, i) {
+      const name = /** @type {HTMLInputElement} */ (el('input', {
+        type: 'text', class: 'ak-input ak-living__header-name', value: row.name,
+        placeholder: words('headers.name'), 'aria-label': words('headers.name'),
+      }));
+      const value = /** @type {HTMLInputElement} */ (el('input', {
+        type: 'text', class: 'ak-input ak-living__header-value', value: row.value,
+        placeholder: words('headers.value'), 'aria-label': words('headers.value'),
+      }));
+      name.addEventListener('input', function () { row.name = name.value; report(); });
+      value.addEventListener('input', function () { row.value = value.value; report(); });
+      const drop = el('button', {
+        type: 'button', class: 'ak-btn ak-btn--ghost ak-living__header-drop', text: words('headers.remove'),
+        on: { click() { rows.splice(i, 1); draw(); report(); } },
+      });
+      list.appendChild(el('div', { class: 'ak-living__header' }, [
+        name, value, secretPicker({ names: names, input: value, langs: langs, base: spec.base }), drop,
+      ]));
+    });
+    if (!rows.length) list.appendChild(el('p', { class: 'ak-living__dialog-hint', text: words('headers.none') }));
+  }
+
+  draw();
+  return { el: root, refresh: draw };
 }
 
 /**

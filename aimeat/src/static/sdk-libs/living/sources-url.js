@@ -88,6 +88,9 @@ export function createUrlSources(spec) {
     if (!node || !node.url) return;
     const answer = await hooks.read({
       url: String(node.url), path: node.path, raw: node.raw ? true : undefined,
+      // The headers the record carries, secret names and all. What a `{{secret:NAME}}` stands for
+      // is resolved on the node as the call leaves it; this browser never holds the value.
+      headers: node.headers,
     });
     if (destroyed) return;
     if (answer.refusal) {

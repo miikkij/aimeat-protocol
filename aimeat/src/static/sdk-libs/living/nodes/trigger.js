@@ -28,7 +28,7 @@
  * @node       trigger   When a machine moves, the document tells somebody: a URL, or one of your own agents.
  * @inputs     trigger   on (the machine id it watches, or { node, when } for a crossing that turns true)
  * @outputs    trigger   value — the time of the last delivery, empty before the first
- * @options    trigger   target { kind: "url", url, method } or { kind: "agent", agent } · enabled · include ("all", or a list of node ids whose rows then go whole) · label
+ * @options    trigger   target { kind: "url", url, method, headers } or { kind: "agent", agent } · headers (sent with a url delivery; a value may name a secret of the owner's as {{secret:NAME}}, which the node puts in as the call leaves, so no key is written into the document) · enabled · include ("all", or a list of node ids whose rows then go whole) · label
  * @languages  trigger   label
  * @example    trigger   { "type": "trigger", "on": "phase", "enabled": true, "target": { "kind": "url", "url": "https://example.org/hook", "method": "POST" }, "include": "all", "label": { "fi": "Kerro invertterille", "en": "Tell the inverter" } }
  * @structure trigger: the node-type module (dependsOn · prepare · evaluate · coerce) · watchOf(node)

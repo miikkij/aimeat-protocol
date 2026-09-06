@@ -8,12 +8,20 @@
  *   open; 01 how you sign in (password, passkeys, two-step, the open sessions grouped, the servers
  *   allowed to verify you, the recovery key); 02 who acts in your name (the apps' keys and the
  *   tokens in one list, in words, with the base package said once, and the token form as a fold);
- *   03 your accounts at other services; 04 sharing groups; 05 your addresses for an AI; 06 how your
- *   AI reads this page. Pure render over the ctx bag; the rows are rows.js.
- * @structure renderPage · mast · strip · secSignIn · secKeys · tokenFold · secAccounts · secGroups ·
- *   secAddresses · secRoads
+ *   03 your accounts at other services; 04 the secrets an extension may use without seeing them;
+ *   05 sharing groups; 06 your addresses for an AI; 07 how your AI reads this page. Pure render
+ *   over the ctx bag; the rows are rows.js.
+ *
+ *   SECRETS SIT WITH THE ACCOUNTS, not with the keys. Both sections answer the same question — a
+ *   credential of the person's that something else uses without ever holding it — while section 02
+ *   answers the opposite one, which is what a key of THIS account may do.
+ * @structure renderPage · mast · strip · secSignIn · secKeys · tokenFold · secAccounts · secSecrets ·
+ *   secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.1.0 — 2026-09-06 — Section 04, the secrets: the list with what names each one, the add form
+ *     as a fold with a write-only value field, a replace on the row and a delete behind the
+ *     confirm. The strip counts them, the rail carries them, and 05 to 07 moved down by one.
  *   v1.0.0 — 2026-09-05 — Initial (design canvas "AIMEAT Pääsy-sivu", direction A).
  */
 import { h } from 'preact';
@@ -28,7 +36,7 @@ import { ConnectionsSection } from '../access-tab/connections.js';
 import { SharingGroupsSection } from '../access-tab/sharing-groups.js';
 import { SharesIncomingSection } from '../access-tab/shares-incoming.js';
 import { x, n, dateWord, crumb, pageLinks, FILTERS, filterRows, scopeSentence } from './frame.js';
-import { keyRow, sessionsBlock, federationBlock } from './rows.js';
+import { keyRow, secretRow, sessionsBlock, federationBlock } from './rows.js';
 
 const chip = (text, cls = '') => html`<span class=${`og-chip ${cls}`}>${text}</span>`;
 const msg = (m) => (m ? html`<small class=${`ac-msg ${m.error ? 'is-err' : ''}`}>${m.text}</small>` : null);
@@ -39,9 +47,10 @@ export function renderPage(ctx) {
     ['01', 'ac-signin', x('rail.signIn'), ov ? (ov.sign_in.two_factor.enabled ? x('twoStep.onShort') : x('twoStep.offShort')) : ''],
     ['02', 'ac-keys', x('rail.keys'), ov ? String(ctx.rows.length) : ''],
     ['03', 'ac-accounts', x('rail.elsewhere'), ov ? String(ov.connections?.connections?.length || 0) : ''],
-    ['04', 'ac-groups', x('rail.groups'), ov ? String(ov.groups?.groups?.length || 0) : ''],
-    ['05', 'ac-addresses', x('rail.addresses'), ''],
-    ['06', 'ac-roads', x('rail.ai'), ''],
+    ['04', 'ac-secrets', x('rail.secrets'), ctx.secrets ? String(ctx.secrets.length) : ''],
+    ['05', 'ac-groups', x('rail.groups'), ov ? String(ov.groups?.groups?.length || 0) : ''],
+    ['06', 'ac-addresses', x('rail.addresses'), ''],
+    ['07', 'ac-roads', x('rail.ai'), ''],
   ];
   return html`
     <div class="og og-ac">
@@ -54,6 +63,7 @@ export function renderPage(ctx) {
             ${secSignIn(ctx)}
             ${secKeys(ctx)}
             ${secAccounts(ctx)}
+            ${secSecrets(ctx)}
             ${secGroups(ctx)}
             ${secAddresses(ctx)}
             ${secRoads()}`}
@@ -101,7 +111,7 @@ function mast(ctx) {
 
 function strip(ctx) {
   const ov = ctx.ov;
-  if (!ov) return html`<div class="og-strip"><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div></div>`;
+  if (!ov) return html`<div class="og-strip"><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div><div><b>…</b></div></div>`;
   const s = ov.sign_in;
   const apps = ctx.rows.filter((r) => r.kind === 'app');
   const tokens = ctx.rows.filter((r) => r.kind === 'token');
@@ -114,9 +124,18 @@ function strip(ctx) {
     <div class="og-strip">
       <div><b>${n(ov.appGrants.total)}</b><span>${x('stripApps')}</span><small>${ov.appGrants.total ? x('stripAppsSub', { day, unused: x('unusedN', { n: unused, days: 30 }), base: ctx.baseHolders }) : x('stripAppsNone')}</small></div>
       <div><b>${n(ov.accessTokens.total)}</b><span>${x('stripTokens')}</span><small>${tokenSub}</small></div>
+      ${secretTile(ctx)}
       <div>${s.two_factor.enabled ? html`<b class="is-good">${x('twoStep.onWord')}</b>` : html`<b class="is-low">${x('twoStep.offWord')}</b>`}<span>${x('stripTwoStep')}</span><small>${x('stripTwoStepSub', { passkeys: s.passkeys.count, password: s.has_password ? x('passwordSet') : x('passwordNone') })}</small></div>
       <div><b>${n(s.sessions.mine.total)}</b><span>${x('stripSessions')}</span><small>${x('stripSessionsSub', { devices: s.sessions.mine.by_device.length, agents: s.sessions.agents.total })}</small></div>
     </div>`;
+}
+
+/** The strip's third tile: how many secrets are kept, and how many of them anything names. */
+function secretTile(ctx) {
+  const list = ctx.secrets || [];
+  const used = list.filter((s) => (s.usedBy || []).length).length;
+  return html`
+    <div><b>${n(list.length)}</b><span>${x('stripSecrets')}</span><small>${list.length ? x('stripSecretsSub', { used, spare: list.length - used }) : x('stripSecretsNone')}</small></div>`;
 }
 
 /* ── 01 ───────────────────────────────────────────────────────────────────────────────────────── */
@@ -227,7 +246,7 @@ function tokenFold(ctx) {
     </div>`;
 }
 
-/* ── 03 and 04: the sections that keep their components ─────────────────────────────────────── */
+/* ── 03 and 05: the sections that keep their components ─────────────────────────────────────── */
 
 function secAccounts(ctx) {
   const c = ctx.ov.connections;
@@ -239,10 +258,59 @@ function secAccounts(ctx) {
     <//>`;
 }
 
+/* ── 04: the vault ────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * The secrets, and the one thing this section can never do: show a value. The list carries the
+ * name, when it was set, when it was last replaced and what names it; the value goes in once and
+ * is not read back by this page, by an app or by an agent.
+ */
+function secSecrets(ctx) {
+  const list = ctx.secrets || [];
+  return html`
+    <${Section} id="ac-secrets" num="04" title=${x('secSecrets')} count=${x('secSecretsSub', { n: list.length })}>
+      <p class="ac-para">${x('secretsIntro')}</p>
+      ${ctx.secretsFailed ? html`<p class="ac-empty">${x('secrets.loadFailed')}</p>` : null}
+      ${list.length ? html`
+        <div class="ac-secrets">
+          <div class="ac-secret ac-secret--head"><div>${x('secrets.colName')}</div><div>${x('secrets.colUsedBy')}</div><div>${x('secrets.colSet')}</div><div></div></div>
+          ${list.map((s) => secretRow(ctx, s))}
+        </div>`
+      : (!ctx.secretsFailed ? html`<p class="ac-empty"><b>${x('secrets.emptyTitle')}</b> ${x('secrets.emptyBody')}</p>` : null)}
+      <div class="ac-why"><b>${x('secrets.whoTitle')}</b> ${x('secretsWho')}</div>
+      ${secretFold(ctx)}
+    <//>`;
+}
+
+/** The add form: a name and a write-only value, and nothing that reads one back. */
+function secretFold(ctx) {
+  const f = ctx.secretForm;
+  const ready = !!f.name.trim() && !!f.value;
+  return html`
+    <div style="margin-top: 1.2rem;">
+    <${Fold} id="ac-secret-add" num="" title=${x('secrets.addTitle')} open=${f.open} onToggle=${() => ctx.toggleSecretForm()}>
+      <div class="ac-form">
+        <span class="og-label">${x('secrets.name')}</span>
+        <div><input class="og-input" type="text" maxlength="64" autocomplete="off" spellcheck="false" value=${f.name} placeholder=${x('secrets.namePlaceholder')} onInput=${(e) => ctx.setSecretForm({ name: e.target.value })} /><p class="ac-hint">${x('secrets.nameHint')}</p></div>
+        <span class="og-label">${x('secrets.value')}</span>
+        <div><input class="og-input" type="password" autocomplete="new-password" spellcheck="false" value=${f.value} placeholder=${x('secrets.valuePlaceholder')} onInput=${(e) => ctx.setSecretForm({ value: e.target.value })} /><p class="ac-hint">${x('secrets.valueHint')}</p></div>
+        <span></span>
+        <div class="ac-submit">
+          <button type="button" class="og-slab" disabled=${!ready || ctx.busy === 'secret:' + f.name.trim()} onClick=${() => ctx.writeSecret(f.name.trim(), f.value, false)}>${ctx.busy === 'secret:' + f.name.trim() ? x('secrets.saving') : x('secrets.save')}</button>
+          <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.toggleSecretForm(false)}>${x('cancel')}</button>
+          ${msg(ctx.secretMsg)}
+        </div>
+      </div>
+    <//>
+    </div>`;
+}
+
+/* ── 05 ───────────────────────────────────────────────────────────────────────────────────────── */
+
 function secGroups(ctx) {
   const groups = ctx.ov.groups?.groups || [];
   return html`
-    <${Section} id="ac-groups" num="04" title=${x('secGroups')} count=${x('secGroupsSub', { n: groups.length })}>
+    <${Section} id="ac-groups" num="05" title=${x('secGroups')} count=${x('secGroupsSub', { n: groups.length })}>
       <p class="ac-para">${x('groupsIntro')}</p>
       <div class="ac-kept">
         <${SharingGroupsSection} showToast=${ctx.showToast} initial=${ctx.ov.groups} />
@@ -251,7 +319,7 @@ function secGroups(ctx) {
     <//>`;
 }
 
-/* ── 05 ───────────────────────────────────────────────────────────────────────────────────────── */
+/* ── 06 ───────────────────────────────────────────────────────────────────────────────────────── */
 
 function secAddresses(ctx) {
   const ov = ctx.ov;
@@ -264,7 +332,7 @@ function secAddresses(ctx) {
     ['key', ov.publicKey || '', ov.publicKey ? x('addr.keySub', { n: ov.publicKey.length }) : x('addr.keyNone')],
   ];
   return html`
-    <${Section} id="ac-addresses" num="05" title=${x('secAddresses')} count=${x('secAddressesSub')}>
+    <${Section} id="ac-addresses" num="06" title=${x('secAddresses')} count=${x('secAddressesSub')}>
       <p class="ac-para">${x('addressesIntro')}</p>
       <div class="ac-kv">
         ${rows.map(([k, v, sub]) => html`
@@ -278,12 +346,12 @@ function secAddresses(ctx) {
     <//>`;
 }
 
-/* ── 06 ───────────────────────────────────────────────────────────────────────────────────────── */
+/* ── 07 ───────────────────────────────────────────────────────────────────────────────────────── */
 
 function secRoads() {
   const ask = x('roadAskPrompt');
   return html`
-    <${Section} id="ac-roads" num="06" title=${x('secRoads')}>
+    <${Section} id="ac-roads" num="07" title=${x('secRoads')}>
       <div class="ac-roads">
         <div class="ac-road is-lead">
           <span class="og-box-label">${x('roadAskTitle')}</span>

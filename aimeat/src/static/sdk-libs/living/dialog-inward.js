@@ -21,18 +21,25 @@
  *   SAVE WRITES INTO THE RECORD, and the record is the truth. There is no second store of hook
  *   settings anywhere: what this dialog does is edit a node, and the document's own persistence —
  *   whatever the app does with `onRecordChange` — carries it.
+ *   AN ADDRESS THAT ASKS WHO IS CALLING IS THE ORDINARY CASE, not the exotic one. A spot price is
+ *   open; a plant's own API, a metering service and every paid feed want a key, and until this
+ *   dialog could send a header the URL road reached only the open half of the world. The key is
+ *   not typed into the record: the value box takes `{{secret:NAME}}` from the owner's vault, the
+ *   name is what the document carries, and the server puts the value in as the read leaves.
  * @structure openInward(spec) → { close }
  * @usage
  *   import { openInward } from './dialog-inward.js';
  *   openInward({ id, node, doc, graph, hooks, langs, base, onSave });
  * @version-history
+ *   v0.7.0 — 2026-09-06 — The URL road sends headers, and a header's value takes a secret's NAME
+ *     from the owner's vault rather than a key typed into the document.
  *   v0.6.0 — 2026-09-06 — Initial (the living document, stage 5: hooks).
  */
 import { kit } from './dom.js';
 import { say } from './hooks-words.js';
 import { inwardShape } from './hooks-shapes.js';
 import { asRaw } from './sources-url.js';
-import { group, fields, copyBlock, statusLine, vocabularyNote } from './dialog-parts.js';
+import { group, fields, copyBlock, statusLine, vocabularyNote, ownerRead, headerEditor } from './dialog-parts.js';
 
 /** The value a reading came back as, in one line a status can show. */
 function reading(value) {
@@ -51,9 +58,15 @@ export function openInward(spec) {
   const langs = typeof spec.langs === 'function' ? spec.langs : function () { return []; };
   const shape = inwardShape(spec);
   const words = function (key) { return say(key, langs()); };
+  // The headers come off the node itself: the shape says what the ANSWER must look like, and a
+  // header is part of the asking.
+  const subjectNode = (((spec.doc || {}).model || {}).nodes || {})[shape.subject] || {};
   const draft = {
     road: shape.road, url: shape.url, path: shape.path, every: shape.every, key: shape.key,
+    headers: Object.assign({}, subjectNode.headers || {}),
   };
+  /** The vault's names, once they arrive. Never a value: the route does not carry one. */
+  let vault = [];
 
   const k = kit();
   const handle = k.dialog({
@@ -103,6 +116,21 @@ export function openInward(spec) {
         })).expected;
       }
 
+      // What the asking carries. An open address needs none of this; an address that wants a key
+      // gets it by name, and the value never reaches this browser.
+      const headers = headerEditor(urlRoad.body, {
+        headers: draft.headers,
+        langs: langs,
+        base: String(spec.base || ''),
+        secrets: function () { return vault; },
+        onChange: function (map) { draft.headers = map; },
+      });
+      ownerRead('/v1/secrets').then(function (data) {
+        const list = data && Array.isArray(data.secrets) ? data.secrets : [];
+        vault = list.map(function (s) { return String(s && s.name ? s.name : s); }).filter(Boolean);
+        headers.refresh();
+      });
+
       expected.block = copyBlock(urlRoad.body, {
         label: words('inward.expected'), text: JSON.stringify(shape.expected, null, 2), langs: langs,
       });
@@ -113,7 +141,7 @@ export function openInward(spec) {
       testRead.textContent = words('inward.testRead');
       testRead.addEventListener('click', function () {
         urlStatus.say('…', true);
-        spec.hooks.read({ url: draft.url, path: draft.path, raw: shape.raw ? true : undefined })
+        spec.hooks.read({ url: draft.url, path: draft.path, raw: shape.raw ? true : undefined, headers: draft.headers })
           .then(function (answer) {
             if (answer.refusal) { urlStatus.say(spec.hooks.words(answer.refusal), false); return; }
             const got = shape.raw ? asRaw(answer.value) : answer.value;
@@ -161,12 +189,15 @@ export function openInward(spec) {
     delete node.url;
     delete node.key;
     delete node.every;
+    delete node.headers;
     if (draft.road === 'url') {
       node.type = 'source';
       node.url = String(draft.url || '');
       if (draft.path) node.path = String(draft.path); else delete node.path;
       const every = Number(draft.every);
       if (Number.isFinite(every) && every > 0) node.every = every;
+      // Written only when there is one: a source that asks plainly reads as one in the record.
+      if (Object.keys(draft.headers || {}).length) node.headers = draft.headers;
     } else if (draft.road === 'key') {
       node.type = 'source';
       node.key = String(draft.key || shape.write.key);

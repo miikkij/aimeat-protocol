@@ -14,9 +14,19 @@
  *   TWO-STEP AND PASSKEYS ARE THE SECURITY TAB'S PANELS, mounted here. The Security tab sits in the
  *   operator-only group, so until 2026-09-05 a member could not reach either; the panels moved with
  *   the person, and the ceremony stayed in one place.
+ *
+ *   THE SECRETS SECTION READS ITS OWN ROUTE, not the composite. A secret's list is a different
+ *   store with a different refusal — a server that does not keep secrets answers 404 — and folding
+ *   it into GET /v1/access/overview would have made the whole page fail on a capability the page
+ *   can live without. So it is a second read, with its own "could not be read" line, and the rest
+ *   of the page never notices.
  * @structure AccessTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'access'
  * @version-history
+ *   v2.1.0 — 2026-09-06 — SECRETS, section 04. The owner's vault said in the page's own register:
+ *     the list with what each secret is used by, one write-only field to add a secret and the same
+ *     field on a row to replace it, and a delete behind the confirm. A value is written once and
+ *     never read back — this page cannot show one, because nothing outside the server can.
  *   v2.0.0 — 2026-09-05 — The poster face (design canvas "AIMEAT Pääsy-sivu", direction A): the
  *     sign-in state and sessions on this page, keys in one list said in words with the base package
  *     said once, a right taken away without revoking the key, the token form as a fold with a 30-day
@@ -29,12 +39,18 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'preact/hooks'
 import { t } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
-import { apiGet, apiPost, apiDelete, apiPatch } from '/js/api.js';
+import { apiGet, apiPost, apiPut, apiDelete, apiPatch } from '/js/api.js';
 import { getNodeUrl, passkeySupported, addPasskey } from '/js/services/auth.js';
 import { renderPage } from './access/page.js';
 import { x, keyRows, filterRows } from './access/frame.js';
 
 const FIRST_KEYS = 12;
+/** What the vault accepts as a name, and how much value it carries. Both are the route's own. */
+const SECRET_NAME = /^[A-Za-z0-9_-]{1,64}$/;
+const SECRET_MAX_BYTES = 4096;
+const EMPTY_SECRET = { open: false, name: '', value: '' };
+/** The value's size as the server counts it: bytes, not characters. */
+const byteLength = (s) => (typeof TextEncoder === 'function' ? new TextEncoder().encode(s).length : String(s).length);
 /** The rights a scoped token may be given, in the order the form lists them. */
 const TOKEN_SCOPES = ['memory:read', 'memory:write', 'memory:delete', 'work:request', 'work:read', 'work:accept', 'work:publish', 'social:read', 'social:write', 'wallet:read', 'consent:manage', 'catalogue:read', 'task:read', 'task:write', 'task:manage', 'cortex:write', 'ext:write'];
 const EMPTY_FORM = { open: false, label: '', level: 'scoped', scopes: {}, expiry: '2592000' };
@@ -74,6 +90,12 @@ export default function AccessTab({ session, showToast }) {
   const [fedInput, setFedInput] = useState('');
   const [keyShown, setKeyShown] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [secrets, setSecrets] = useState(null);
+  const [secretsFailed, setSecretsFailed] = useState(false);
+  const [secretForm, setSecretFormState] = useState(EMPTY_SECRET);
+  const [secretMsg, setSecretMsg] = useState(null);
+  const [replaceName, setReplaceName] = useState(null);
+  const [replaceValue, setReplaceValue] = useState('');
 
   const toast = (m, isErr) => showToast?.(m, !!isErr);
   const isOperator = (session?.roles || []).includes('operator');
@@ -94,9 +116,25 @@ export default function AccessTab({ session, showToast }) {
       setFailed(false);
     } catch (e) { swallowed('access-tab: overview', e); setFailed(true); }
   }, []);
-  useEffect(() => { load(); }, [load]);
-  const loadRef = useRef(load);
-  loadRef.current = load;
+  /**
+   * The vault's names — never a value; the route does not carry one and this page could not show
+   * it if it did. A server without the route answers 404, which is a page with no secrets on it
+   * rather than a page that failed.
+   */
+  const loadSecrets = useCallback(async () => {
+    try {
+      const r = await apiGet('/v1/secrets');
+      const list = r?.data?.secrets;
+      if (!Array.isArray(list)) throw new Error('no secrets');
+      setSecrets(list);
+      setSecretsFailed(false);
+    } catch (e) { swallowed('access-tab: secrets', e); setSecrets([]); setSecretsFailed(true); }
+  }, []);
+
+  const loadAll = useCallback(async () => { await Promise.all([load(), loadSecrets()]); }, [load, loadSecrets]);
+  useEffect(() => { loadAll(); }, [loadAll]);
+  const loadRef = useRef(loadAll);
+  loadRef.current = loadAll;
   useEffect(() => {
     const handler = () => loadRef.current();
     window.addEventListener('aimeat-live-update', handler);
@@ -284,8 +322,66 @@ export default function AccessTab({ session, showToast }) {
     setBusy(false);
   };
 
+  /* ── The vault ─────────────────────────────────────────────────────────────────────────────── */
+
+  const setSecretForm = (patch) => setSecretFormState((f) => ({ ...f, ...patch }));
+  const toggleSecretForm = (open) => {
+    const next = typeof open === 'boolean' ? open : !secretForm.open;
+    // A half-typed value is not carried anywhere: closing the form forgets it.
+    setSecretFormState(next ? { ...EMPTY_SECRET, open: true } : EMPTY_SECRET);
+    setSecretMsg(null);
+    if (next) setReplaceName(null);
+  };
+  const openReplace = (name) => {
+    setReplaceName((cur) => (cur === name ? null : name));
+    setReplaceValue('');
+    setSecretMsg(null);
+  };
+
+  /** The name and the value as the route reads them, or the words saying which one is wrong. */
+  const secretRefusal = (name, value, checkName) => {
+    if (checkName && !name) return x('secrets.needName');
+    if (checkName && !SECRET_NAME.test(name)) return x('secrets.badName');
+    if (!value) return x('secrets.needValue');
+    if (byteLength(value) > SECRET_MAX_BYTES) return x('secrets.tooLong');
+    return null;
+  };
+
+  /** Add or replace: one call either way, because replacing a secret is writing it again. */
+  const writeSecret = async (name, value, replacing) => {
+    const flash = flashFor(setSecretMsg);
+    const bad = secretRefusal(name, value, !replacing);
+    if (bad) { flash(bad, true); return; }
+    setBusy('secret:' + name);
+    try {
+      const r = await apiPut('/v1/secrets/' + encodeURIComponent(name), { value });
+      if (r?.ok === false) throw r;
+      // The value leaves this browser and is forgotten here as well: nothing holds it after this.
+      if (replacing) { setReplaceName(null); setReplaceValue(''); } else setSecretFormState(EMPTY_SECRET);
+      toast(x(replacing ? 'secrets.replaced' : 'secrets.added', { name }));
+      await loadSecrets();
+    } catch (e) { flash(errText(e, x('secrets.failed')), true); }
+    setBusy(false);
+  };
+
+  const deleteSecret = (row) => {
+    confirm(x('secrets.confirmDelete', { name: row.name }), async () => {
+      setBusy('secret:' + row.name);
+      try {
+        const r = await apiDelete('/v1/secrets/' + encodeURIComponent(row.name));
+        if (r?.ok === false) throw r;
+        if (replaceName === row.name) setReplaceName(null);
+        toast(x('secrets.deleted', { name: row.name }));
+        await loadSecrets();
+      } catch (e) { toast(errText(e, x('secrets.deleteFailed')), true); }
+      setBusy(false);
+    }, { danger: true });
+  };
+
   const ctx = {
     session, ov, failed, rows, basePackage, baseHolders, fed, filter, openKey, shownKeys, form, created, formMsg, spendDraft, fedInput, keyShown, busy,
+    secrets, secretsFailed, secretForm, secretMsg, replaceName, replaceValue,
+    setSecretForm, toggleSecretForm, openReplace, setReplaceValue, writeSecret, deleteSecret,
     isOperator, nodeUrl, nodeId, ghii, ownerKey, tokenScopes: TOKEN_SCOPES, passkeysSupported: passkeySupported(), showToast: toast, ConfirmUI,
     load, setFilter, toggleKey, showMoreKeys, setSpendDraft, revokeKey, takeAway, setSpendCap, revokeUnused, signOutOthers, addPasskeyNow,
     toggleFedAll, addFedNode, removeFedNode, setFedInput, setKeyShown, setForm, toggleForm, toggleScope, clearCreated, createToken,

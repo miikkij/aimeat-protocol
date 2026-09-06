@@ -52,6 +52,16 @@
  *   doc.set('t', 31);
  *   doc.setLanguage('en');   // …or just let the login pill do it
  * @version-history
+ *   v0.7.0 — 2026-09-06 — A CALL MAY CARRY A KEY WITHOUT THE DOCUMENT HOLDING ONE. A `source` that
+ *     reads a URL and a `trigger` that tells one both take `headers`, and a header's value may
+ *     name a secret of the owner's as `{{secret:NAME}}`: the name is what the record carries, and
+ *     the node puts the value in as the call leaves, so a document that reads a paid feed can be
+ *     copied, shared and read by anyone without the key going with it. Both gear dialogs got the
+ *     editor, with a pick over the owner's own vault beside every value; the outward dialog's
+ *     agent target became a pick over the owner's own agents, each with when it was last seen,
+ *     because a typed name is a name that fails at delivery time where nobody is watching. An
+ *     empty vault and an account with no agents say so in one sentence and a door, rather than
+ *     offering a select with nothing in it.
  *   v0.6.1 — 2026-09-06 — THE CENT IS A UNIT. `c` and `snt` are EUR/100 in the currency family, so
  *     a tariff written the way a bill writes it — c/kWh — parses, adds to the other cents on the
  *     line, and crosses into EUR/kWh through convert() rather than through a bare division by a
@@ -144,7 +154,7 @@ import {
   TEXT_KEYS, hasLangMap, localizeLayout, localizeProps, onLanguageChange, preference,
 } from './i18n.js';
 
-const VERSION = '0.6.1';
+const VERSION = '0.7.0';
 
 /** The node types whose rendering this library does itself, when the node names a block. */
 const DRAWN = ['control', 'formula', 'text', 'machine', 'value', 'source', 'trigger'];

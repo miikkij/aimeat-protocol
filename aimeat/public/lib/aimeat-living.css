@@ -23,6 +23,11 @@
  * @structure tokens · control row · formula · sentence · machine state · chain · gear · stale ·
  *   trigger · dialogs · refusals · still
  * @version-history
+ *   v0.7.0 — 2026-09-06 — THE HEADERS A CALL CARRIES. One header is one line — name, value, the
+ *     pick that writes a secret's name into the value, and a remove — and under 34rem each part
+ *     takes the whole width, because four controls sharing a phone-wide dialog is four controls
+ *     nobody can hit. The empty-list sentence and its door are the same size as a hint, since that
+ *     is what they are: what to do when the list you were about to pick from has nothing in it.
  *   v0.6.1 — 2026-09-06 — The stale reading and the trigger's reason wear the kit's warn TEXT
  *     colour (--ak-warn-text), not the warn fill: the fill measured 2.15 on a light ground, and
  *     these are the two sentences a guest reads on any document with a URL source or a trigger.
@@ -457,6 +462,65 @@
 
 .ak-living__dialog-test {
   align-self: flex-start;
+}
+
+/* ── The headers a call carries, and the pick that puts a secret's NAME in one ─────────── */
+
+.ak-living__dialog-headers,
+.ak-living__headers {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ak-gap, 0.75rem) * 0.4);
+}
+
+.ak-living__dialog-hint,
+.ak-living__dialog-none {
+  margin: 0;
+  font-size: var(--ak-living-label-size);
+  color: var(--ak-living-ink-dim);
+}
+
+.ak-living__dialog-door {
+  color: inherit;
+}
+
+/* ONE HEADER IS ONE LINE UNTIL IT CANNOT BE. The name is narrow, the value takes what is left, and
+ * the pick and the remove sit at the end; under 34rem — a phone with a dialog on it — each part
+ * takes the whole width rather than four controls sharing 20rem between them. */
+.ak-living__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--ak-gap, 0.75rem) * 0.4);
+}
+
+.ak-living__header-name {
+  flex: 1 1 9rem;
+  min-inline-size: 0;
+  font-family: var(--ak-living-mono);
+}
+
+.ak-living__header-value {
+  flex: 2 1 12rem;
+  min-inline-size: 0;
+  font-family: var(--ak-living-mono);
+}
+
+.ak-living__secret-pick {
+  flex: 0 1 11rem;
+  min-inline-size: 0;
+}
+
+.ak-living__headers-add,
+.ak-living__header-drop {
+  flex: none;
+  align-self: flex-start;
+}
+
+@media (max-width: 34rem) {
+  .ak-living__header > * {
+    flex-basis: 100%;
+  }
 }
 
 .ak-living__vocabulary {

@@ -6,10 +6,14 @@
  *   what it may do in words, when it was last used and a door; what opens under an app's key (each
  *   right on its own line behind a "take away" door, the base package said once, the spending
  *   ceiling where the app may buy, the doors to open the app and to revoke the key); the open
- *   sessions by device and by agent; the servers allowed to verify the person's identity.
- * @structure keyRow · keyOpen · sessionsBlock · federationBlock
- * @usage import { keyRow, sessionsBlock, federationBlock } from './rows.js';
+ *   sessions by device and by agent; the servers allowed to verify the person's identity; and one
+ *   secret from the vault — its name, the spelling an extension writes into a header, what names it
+ *   today, and the write-only field that replaces its value.
+ * @structure keyRow · keyOpen · secretRow · sessionsBlock · federationBlock
+ * @usage import { keyRow, secretRow, sessionsBlock, federationBlock } from './rows.js';
  * @version-history
+ *   v1.1.0 — 2026-09-06 — secretRow: the vault's rows for section 04. It shows the name and never
+ *     the value, because the value cannot be read back from the server either.
  *   v1.0.0 — 2026-09-05 — Initial.
  */
 import { h } from 'preact';
@@ -69,6 +73,48 @@ function keyOpen(ctx, row) {
         ${row.grant?.app_origin ? html`<a class="og-door og-door--quiet" href=${row.grant.app_origin} target="_blank" rel="noopener">${x('open.openApp')}</a>` : null}
         <span class="ac-hint">${x('open.revokeHint')}</span>
       </div>
+    </div>`;
+}
+
+/* ── 04: one secret ─────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * One row of the vault. The sub-line is the spelling an extension writes into a header, because
+ * that is the only thing a person needs to carry away from here; the value is not on this row, in
+ * this file or in the answer the page read.
+ * @param {any} ctx @param {{ name: string, setAt?: string, updatedAt?: string, usedBy?: string[] }} row
+ */
+export function secretRow(ctx, row) {
+  const open = ctx.replaceName === row.name;
+  const busy = ctx.busy === 'secret:' + row.name;
+  const used = Array.isArray(row.usedBy) ? row.usedBy : [];
+  const replaced = row.updatedAt && row.updatedAt !== row.setAt ? row.updatedAt : null;
+  return html`
+    <div class=${`ac-secret ${open ? 'is-open' : ''}`} key=${row.name}>
+      <div class="ac-snm"><b>${row.name}</b><small>${'{{secret:' + row.name + '}}'}</small></div>
+      <div class="ac-sw">${used.length ? used.join(', ') : html`<span class="is-dim">${x('secrets.usedByNone')}</span>`}</div>
+      <div class="ac-swhen">${dateWord(row.setAt)}<br /><span>${replaced ? x('secrets.colReplaced') + ' ' + dateWord(replaced) : x('secrets.neverReplaced')}</span></div>
+      <div class="ac-sgo">
+        <button type="button" class="og-door" onClick=${() => ctx.openReplace(row.name)}>${open ? x('close') : x('secrets.replace')}</button>
+        <button type="button" class="og-door og-door--danger" disabled=${busy} onClick=${() => ctx.deleteSecret(row)}>${x('secrets.delete')}</button>
+      </div>
+      ${open ? secretReplace(ctx, row, busy) : null}
+    </div>`;
+}
+
+/** The one field that writes a value, on the row it belongs to. It is never filled from the server. */
+function secretReplace(ctx, row, busy) {
+  return html`
+    <div class="ac-open">
+      <span class="og-box-label">${x('secrets.replaceTitle', { name: row.name })}</span>
+      <p class="ac-lead">${x('secrets.replaceHint')}</p>
+      <div class="ac-swrite">
+        <input class="og-input" type="password" autocomplete="new-password" spellcheck="false" placeholder=${x('secrets.valuePlaceholder')} value=${ctx.replaceValue} onInput=${(e) => ctx.setReplaceValue(e.target.value)} />
+        <button type="button" class="og-door" disabled=${busy || !ctx.replaceValue} onClick=${() => ctx.writeSecret(row.name, ctx.replaceValue, true)}>${busy ? x('secrets.saving') : x('secrets.replaceSave')}</button>
+        <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.openReplace(row.name)}>${x('cancel')}</button>
+      </div>
+      ${ctx.secretMsg ? html`<small class=${`ac-msg ${ctx.secretMsg.error ? 'is-err' : ''}`}>${ctx.secretMsg.text}</small>` : null}
+      <p class="ac-hint">${x('secrets.valueHint')}</p>
     </div>`;
 }
 
