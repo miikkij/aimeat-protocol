@@ -131,6 +131,20 @@ string, cached bundle needs a restart). → skill `aimeat-library-authoring`.
 The rule that matters from this side: when an app needs behaviour the platform should own, **fix the
 lib, not the app**; the fix then reaches every app instead of one.
 
+## A key for an outside service is named, never held
+
+An app never asks for, stores or sends an API key: the browser cannot keep a secret. The call that
+needs one lives in an extension, and the extension writes the key into an outbound header by name,
+`{{secret:NAME}}`. The node fills it from the **signed-in person's own vault** on the way out (then
+from the extension's operator-level `type: secret` config, then fails as `SECRET_UNKNOWN` naming
+the header and the secret, with nothing sent). No script, record, log or tool ever reads a stored
+value back. What the app owes the person is the NAME and where it goes: their Access page, section
+04 Secrets, or their own AI (`aimeat_secret_set { name, value }`, behind `secrets:manage`, which no
+wildcard scope carries; `aimeat_secret_list` shows names and which extensions used them). A living
+document names a key the same way in a trigger's or a source's `headers`, and its gear dialogs pick
+from the stored names. Show a missing key by its name in the UI; never draw a text field for the key.
+→ `docs/coding-guidelines/extension-memory-architecture.md` (Secrets: the fourth namespace), `docs/pitfalls.md` §52.
+
 ## Removed, do not revive
 
 The SPA service generator (`public/js/services/generator-prompts-*.js`) and the Foundry were removed in July 2026. Do not reference `generator-*` files.

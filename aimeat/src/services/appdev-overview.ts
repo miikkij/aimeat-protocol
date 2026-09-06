@@ -14,6 +14,9 @@
  *   import { buildAppdevOverview } from '../services/appdev-overview.js';
  *   const overview = await buildAppdevOverview(storage, config, identity, { model, sections });
  * @version-history
+ *   2026-09-06 — `secrets_note` beside `scope_note`: a key for an outside service is named as
+ *     `{{secret:NAME}}` in an extension's header and filled from the person's vault, never held
+ *     by the app; the note says where the person stores it and which tools an agent uses.
  *   v1.2.0 — 2026-09-03 — App items carry `requires` (the dependency map), so an agent sees what exists before rebuilding it.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 5: each app carries its `ai_posture`, and the section
  *     states the disclosure contract. Research-first is the moment to learn this — an agent that
@@ -95,6 +98,7 @@ export async function buildAppdevOverview(
     const { owner, ownerGhii } = ownerOf(callerGaii, config);
     const out: Record<string, unknown> = {
         scope_note: 'App development ON AIMEAT only. Flow: research (this) → frame (tier, packs, iam?) → propose to the user → build → publish + report learnings.',
+        secrets_note: 'A key for an outside service is never held by an app or typed into one. The call lives in an extension whose header names it as {{secret:NAME}}; the node fills it from the signed-in person\'s vault on the way out, and a missing name fails as SECRET_UNKNOWN naming it. The person stores it on their Access page (section 04 Secrets) or via an agent holding secrets:manage (aimeat_secret_set); aimeat_secret_list shows names and who used them, never a value.',
         ...(model ? { model } : {}),
     };
 
