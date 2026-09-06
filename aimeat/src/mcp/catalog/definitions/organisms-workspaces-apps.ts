@@ -5,6 +5,10 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.7.0 — 2026-09-06 — workspace_access.action/decision/role, workspace_member_grant.role and
+ *     workspace_transfer.direction declare their enums. Every one of them names its allowed values
+ *     in prose and published `type: string`, so a caller reading the schema had to guess and the
+ *     handler threw.
  *   v1.6.0 — 2026-09-03 — aimeat_workspace_read's index carries the locked `schemas`, and
  *     aimeat_workspace_update's `schemas` now points at that read instead of at
  *     GET /v1/memory/{key}/schema — a REST call an MCP-only agent cannot make, which left the tool
@@ -419,11 +423,11 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             ws: { type: 'string', required: true, description: 'Workspace id.' },
-            action: { type: 'string', required: true, description: "'request' | 'list' | 'decide'." },
+            action: { type: 'string', required: true, enum: ['request', 'list', 'decide'], description: "'request' | 'list' | 'decide'." },
             message: { type: 'string', description: "action='request': optional note to the creator." },
             requester: { type: 'string', description: "action='decide': the requester's owner name (from action='list')." },
-            decision: { type: 'string', description: "action='decide': 'approve' (default) or 'deny'." },
-            role: { type: 'string', description: "action='decide' approve: 'viewer' (read) or 'contributor' (read+write). Omit for the default (contributor, unless decision='viewer')." },
+            decision: { type: 'string', enum: ['approve', 'deny'], description: "action='decide': 'approve' (default) or 'deny'." },
+            role: { type: 'string', enum: ['viewer', 'contributor'], description: "action='decide' approve: 'viewer' (read) or 'contributor' (read+write). Omit for the default (contributor)." },
         },
     },
     {
@@ -436,7 +440,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             ws: { type: 'string', description: 'A single workspace id (use this and/or `workspaces`).' },
             workspaces: { type: 'array', description: 'Many workspace ids to grant in one call.' },
             grantee: { type: 'string', required: true, description: 'Owner name, GHII, or GAII to grant. Applies to the owner (agents inherit).' },
-            role: { type: 'string', required: true, description: "'viewer' (read) or 'contributor' (read+write)." },
+            role: { type: 'string', required: true, enum: ['viewer', 'contributor'], description: "'viewer' (read) or 'contributor' (read+write)." },
         },
     },
     {
@@ -468,7 +472,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier (source for export, target for import).' },
-            direction: { type: 'string', required: true, description: "'export' or 'import'." },
+            direction: { type: 'string', required: true, enum: ['export', 'import'], description: "'export' or 'import'." },
             ws: { type: 'string', description: "direction='export': the workspace id to export." },
             zip_base64: { type: 'string', description: "direction='import': the workspace export ZIP, base64-encoded." },
         },

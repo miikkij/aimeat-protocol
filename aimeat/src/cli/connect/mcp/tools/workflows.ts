@@ -6,6 +6,9 @@
  *   MCP (src/mcp/workflows.ts) so `aimeat connect serve --surface agent` exposes the same
  *   save/get/run tools locally. Thin REST wrappers over /v1/workflows.
  * @version-history
+ *   v1.3.0 -- 2026-09-06 -- workflow_answer takes workflow_id + picks/other. It sent { answer } at a
+ *     route reading { picks, other }, so every human-input answer given through this door left the
+ *     run parked -- the same broken shape the CLI dispatch carried.
  *   v1.2.0 -- 2026-08-30 -- workflow_run forwards `vars` and `target`, which the route has always
  *     read and none of the three tool surfaces sent. Without vars a workflow that takes input runs
  *     at its defaults, which makes it a constant.
@@ -63,12 +66,19 @@ export function registerWorkflowTools(mcp: McpServer, registry: AgentRegistry): 
     });
 
   // → POST /v1/workflows/:id/runs/:runId/steps/:stepId/answer — answer a paused human-input step.
+  // THE SAME BROKEN TOOL THE CLI DISPATCH HAD. The route reads { picks, other } against the question
+  // pinned at ask time, and this door sent { answer: {...} }, so WorkflowHumanAnswerSchema saw an
+  // empty body: every human-input answer given through the connector left the run parked. `answer`
+  // is gone rather than aliased — it never worked, so there is no caller to keep working.
   mcp.tool('aimeat_workflow_answer', descriptionFor('aimeat_workflow_answer'), {
-    id: z.string().describe('The workflow id.'),
+    workflow_id: z.string().describe('The workflow id.'),
     run_id: z.string().describe('The run id (from aimeat_workflow_pending_inputs).'),
     step_id: z.string().describe('The paused step id awaiting input.'),
-    answer: z.record(z.string(), z.unknown()).optional().describe('The answer payload for the step.'),
-  }, annotationsFor('aimeat_workflow_answer'), async ({ id, run_id, step_id, answer }) => {
-    return out(await client.post(`/v1/workflows/${encodeURIComponent(id)}/runs/${encodeURIComponent(run_id)}/steps/${encodeURIComponent(step_id)}/answer`, { answer: answer ?? {} }));
+    picks: z.array(z.string()).optional().describe('Option ids from the pinned question (may be empty when answering with `other` alone).'),
+    other: z.string().optional().describe('Free-text answer; only when the question allows it.'),
+  }, annotationsFor('aimeat_workflow_answer'), async ({ workflow_id, run_id, step_id, picks, other }) => {
+    const body: Record<string, unknown> = { picks: picks ?? [] };
+    if (other !== undefined) body.other = other;
+    return out(await client.post(`/v1/workflows/${encodeURIComponent(workflow_id)}/runs/${encodeURIComponent(run_id)}/steps/${encodeURIComponent(step_id)}/answer`, body));
   });
 }

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 -- 2026-09-06 -- aimeat_agent_mode_set declares its two parameters required, which is
+ *     what it always enforced by throwing. The schema said they could be omitted.
  *   v1.6.0 -- 2026-09-06 -- aimeat_dm_broadcast on the CLI dispatch, the third surface.
  *   v1.5.0 -- 2026-08-28 -- The five aimeat_crew_* tools as thin proxies onto /v1/agents/:name/crew*;
  *     try waits locally by polling, so wait_seconds is consumed here rather than forwarded.
@@ -195,17 +197,17 @@ export const agentTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_agent_mode_set',
         description: "Owner-only. Set an agent's operational mode. Modes: 'autonomous', 'interactive', 'task-runner' (reduced 7-step Hello Integration), 'coordinator', 'workstation' (node-visiting MCP agent, narrowest 4-step Hello Integration).",
+        // Both were declared optional and then thrown on when absent, so the published schema said a
+        // caller could omit what the handler demands. `required: true` says the same thing the throw
+        // did, before the call is made rather than after.
         input: {
-            target_agent_name: { type: 'string', description: 'Agent whose mode to update.' },
-            mode: { type: 'string', enum: ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'], description: 'New mode.' },
+            target_agent_name: { type: 'string', required: true, description: 'Agent whose mode to update.' },
+            mode: { type: 'string', required: true, enum: ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'], description: 'New mode.' },
         },
-        handler: ({ client }, input) => {
-            const target = optionalString(input, 'target_agent_name');
-            const mode = optionalString(input, 'mode');
-            if (!target) throw new Error('target_agent_name is required');
-            if (!mode) throw new Error('mode is required');
-            return client.patch(`/v1/agents/${encodeURIComponent(target)}/mode`, { mode });
-        },
+        handler: ({ client }, input) => client.patch(
+            `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/mode`,
+            { mode: requiredString(input, 'mode') },
+        ),
     },
     {
         name: 'aimeat_agent_basics_get',

@@ -8,6 +8,9 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.6.0 -- 2026-09-06 -- aimeat_app_list stops reading a `query` alias nothing declares:
+ *     withDeclaredInputOnly refuses the name before the handler runs, so it was dead code posing
+ *     as compatibility.
  *   v1.4.0 -- 2026-08-29 -- aimeat_app_marks_set: the badge and install-chip switches over PATCH.
  *   v1.5.0 -- 2026-08-29 -- aimeat_app_legal_set and aimeat_app_audit; the settings group moves to
  *     tool-call-defs-apps-settings.ts (pure extraction at the line ceiling).
@@ -255,7 +258,9 @@ export const appTools: ConnectCliToolDefinition[] = [
             ...PAGING_INPUT, own: { type: 'boolean', description: 'List only your own owner\'s apps.' },
         },
         handler: ({ client }, input) => client.get(`/v1/apps${query({
-            search: optionalString(input, 'search') ?? optionalString(input, 'query'),
+            // `query` used to be read as an alias for `search`; nothing declares it, so
+            // withDeclaredInputOnly refuses it before the handler runs and the alias was dead.
+            search: optionalString(input, 'search'),
             category: optionalString(input, 'category'),
             tag: optionalString(input, 'tag'),
             own: optionalBoolean(input, 'own') ? 'true' : undefined, ...paging(input),
