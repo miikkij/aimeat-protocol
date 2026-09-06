@@ -256,13 +256,18 @@ export const federationOauthMethods = {
   async createExtensionInstance(this: SqliteStorage, record: ExtensionInstanceRecord): Promise<ExtensionInstanceRecord> {
     try {
       this.db.prepare(
-        `INSERT INTO extension_instances (id, extensionName, config, status, createdBy, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO extension_instances (id, extensionName, config, status, createdBy, createdByAgent, translations, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.id, record.extensionName, JSON.stringify(record.config),
-        record.status, record.createdBy, record.createdAt, record.updatedAt,
+        record.status, record.createdBy,
+        record.createdByAgent ?? null,
+        record.translations ? JSON.stringify(record.translations) : null,
+        record.createdAt, record.updatedAt,
       );
-      return record;
+      // Read back, for the reason notification preferences now do: returning the caller's own object
+      // is what let two fields go unwritten for as long as they did.
+      return (await this.getExtensionInstance(record.extensionName, record.id))!;
     } catch (err: unknown) {
       if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) {
         throw new Error(`Extension instance "${record.id}" already exists for "${record.extensionName}"`, { cause: err });
@@ -279,8 +284,10 @@ export const federationOauthMethods = {
   },
 
   async listExtensionInstances(this: SqliteStorage, extensionName: string): Promise<ExtensionInstanceRecord[]> {
+    // Newest first, which is the order the Postgres twin has always returned. An unordered listing
+    // on one backend and a sorted one on the other is a page that looks shuffled to whoever moves.
     const rows = this.db.prepare(
-      'SELECT * FROM extension_instances WHERE extensionName = ?'
+      'SELECT * FROM extension_instances WHERE extensionName = ? ORDER BY createdAt DESC'
     ).all(extensionName) as Record<string, unknown>[];
     return rows.map(r => this.deserializeExtensionInstance(r));
   },
@@ -289,15 +296,21 @@ export const federationOauthMethods = {
     const existing = await this.getExtensionInstance(extensionName, instanceId);
     if (!existing) return null;
     const updated = { ...existing, ...updates };
+    // `translations` and `createdByAgent` were in the record and in neither the SET nor the columns,
+    // so this answered 200 with the caller's own translations echoed back and the next read served
+    // none. Review item 5.4, 2026-09-06.
     this.db.prepare(
-      `UPDATE extension_instances SET config = ?, status = ?, createdBy = ?, createdAt = ?, updatedAt = ?
+      `UPDATE extension_instances SET config = ?, status = ?, createdBy = ?, createdByAgent = ?, translations = ?, createdAt = ?, updatedAt = ?
        WHERE extensionName = ? AND id = ?`
     ).run(
       JSON.stringify(updated.config), updated.status,
-      updated.createdBy, updated.createdAt, updated.updatedAt,
+      updated.createdBy,
+      updated.createdByAgent ?? null,
+      updated.translations ? JSON.stringify(updated.translations) : null,
+      updated.createdAt, updated.updatedAt,
       extensionName, instanceId,
     );
-    return updated;
+    return await this.getExtensionInstance(extensionName, instanceId);
   },
 
   async deleteExtensionInstance(this: SqliteStorage, extensionName: string, instanceId: string): Promise<boolean> {

@@ -48,6 +48,9 @@ export const consentMethods = {
     const params: unknown[] = [ownerGaii];
     if (opts?.status) { sql += ' AND status = ?'; params.push(opts.status); }
     if (opts?.recipient) { sql += ' AND recipient = ?'; params.push(opts.recipient); }
+    // A listing with no ORDER BY is not stable even within one backend. Newest grant first, the same
+    // on both.
+    sql += ' ORDER BY grantedAt DESC';
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
     return rows.map(r => this.deserializeConsent(r));
   },
@@ -64,6 +67,7 @@ export const consentMethods = {
     const params: unknown[] = [...ownerGaiis];
     if (opts?.status) { sql += ' AND status = ?'; params.push(opts.status); }
     if (opts?.recipient) { sql += ' AND recipient = ?'; params.push(opts.recipient); }
+    sql += ' ORDER BY grantedAt DESC';
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
     for (const r of rows) {
       const c = this.deserializeConsent(r);
@@ -177,6 +181,9 @@ export const consentMethods = {
     }
     if (opts?.consentId) { sql += ' AND consentId = ?'; params.push(opts.consentId); }
     if (opts?.accessorGaii) { sql += ' AND accessorGaii = ?'; params.push(opts.accessorGaii); }
+    // Newest first, which is what the Postgres twin has always returned. An audit trail whose order
+    // depends on which backend answered is one nobody can read twice and compare. Review item 5.6.
+    sql += ' ORDER BY timestamp DESC';
 
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
     return rows.map(r => ({

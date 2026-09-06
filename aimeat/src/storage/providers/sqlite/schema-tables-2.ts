@@ -495,6 +495,8 @@ export function applySchemaTables2(db: Database.Database): void {
       config          TEXT NOT NULL DEFAULT '{}',
       status          TEXT NOT NULL DEFAULT 'active',
       createdBy       TEXT NOT NULL,
+      createdByAgent  TEXT,
+      translations    TEXT,
       createdAt       TEXT NOT NULL,
       updatedAt       TEXT NOT NULL,
       PRIMARY KEY (extensionName, id)

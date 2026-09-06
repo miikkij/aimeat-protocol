@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.6.0 -- 2026-09-06 -- Review item 5.5: listAllMemory takes the Postgres order and default --
+ *     key unless newestFirst, and no implicit limit -- so the same call answers the same on both.
  *   v1.8.0 — 2026-09-04 — deleteOwner clears eco_auth, the ecosystem-app device handshakes keyed on
  *     the owner name. It had sat in security/storage-parity-exemptions.json since 2026-08-10.
  *   v1.7.0 — 2026-09-03 — createMemoryIfAbsent treats a row in the bin as absent and takes it over
@@ -427,11 +429,19 @@ export const ownerMethods = {
     const countRow = this.db.prepare('SELECT COUNT(*) as cnt FROM memory' + whereStr).get(...params) as { cnt: number };
     const total = countRow.cnt;
 
-    const limit = opts?.limit ?? 50;
+    // ONE ORDER AND ONE DEFAULT, ON BOTH BACKENDS. This used to sort by updatedAt whatever the
+    // caller asked, and default `limit` to 50, while Postgres sorted by key and returned everything
+    // — so the same call gave a different page depending on which backend answered it, and the
+    // contract's own comment told callers to work around that rather than defining it. Review item
+    // 5.5, 2026-09-06. Postgres's semantics are the definition because they are what production
+    // already does: this moves the LOCAL backend onto production's behaviour and leaves production's
+    // untouched, which is the only direction that cannot break a live node.
     const offset = opts?.offset ?? 0;
-    // Always newest-first here; `newestFirst` is accepted for parity with the Postgres backend,
-    // which defaults to key order and needs the flag to page by recency (see memory.repository.ts).
-    const rows = this.db.prepare('SELECT * FROM memory' + whereStr + ' ORDER BY updatedAt DESC LIMIT ? OFFSET ?').all(...params, limit, offset) as Record<string, unknown>[];
+    const orderSql = opts?.newestFirst ? ' ORDER BY updatedAt DESC' : ' ORDER BY key';
+    const rows = (opts?.limit
+      ? this.db.prepare('SELECT * FROM memory' + whereStr + orderSql + ' LIMIT ? OFFSET ?').all(...params, opts.limit, offset)
+      : this.db.prepare('SELECT * FROM memory' + whereStr + orderSql).all(...params)
+    ) as Record<string, unknown>[];
 
     const items: MemoryRecord[] = [];
     for (const row of rows) {

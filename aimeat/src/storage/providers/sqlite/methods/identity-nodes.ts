@@ -437,7 +437,7 @@ export const identityNodesMethods = {
   },
 
   async getEmailVerificationsByOwner(this: SqliteStorage, ownerName: string): Promise<EmailVerificationRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM email_verifications WHERE ownerName = ?').all(ownerName) as Record<string, unknown>[];
+    const rows = this.db.prepare('SELECT * FROM email_verifications WHERE ownerName = ? ORDER BY createdAt DESC').all(ownerName) as Record<string, unknown>[];
     return rows.map(r => this.deserializeEmailVerification(r));
   },
 

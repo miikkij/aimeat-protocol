@@ -48,5 +48,6 @@ export interface IdentityRepository {
   getActiveEmailVerification(ownerName: string, purpose: string): Promise<EmailVerificationRecord | null>;
   updateEmailVerification(id: string, updates: Partial<EmailVerificationRecord>): Promise<EmailVerificationRecord | null>;
   deleteExpiredEmailVerifications(): Promise<number>;
-  getEmailVerificationsByOwner?(ownerName: string): Promise<EmailVerificationRecord[]>;
+  /** Every verification record for one owner, newest first. Implemented on both backends. */
+  getEmailVerificationsByOwner(ownerName: string): Promise<EmailVerificationRecord[]>;
 }

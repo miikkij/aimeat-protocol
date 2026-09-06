@@ -236,7 +236,9 @@ export const nodeExtEscrowMethods = {
       createdByAgent: record.createdByAgent ?? null, createdAt: new Date(record.createdAt), updatedAt: new Date(),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();
-    return record;
+    // Read back rather than echoing the input, the rule the SQLite twin now follows for the same
+    // reason: an echoed record cannot tell a caller that a field never reached a column.
+    return (await this.getExtensionInstance(record.extensionName, record.id)) ?? record;
   },
   async getExtensionInstance(this: PostgresKyselyStorage, extensionName: string, instanceId: string): Promise<ExtensionInstanceRecord | null> {
     const r = await this.db.selectFrom('ExtensionInstance').selectAll().where('extensionName', '=', extensionName).where('instanceId', '=', instanceId).executeTakeFirst();

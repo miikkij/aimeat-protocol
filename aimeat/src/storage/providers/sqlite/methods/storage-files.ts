@@ -39,7 +39,6 @@ function fileRowToRecord(r: Record<string, unknown>, data: Buffer): StorageFileR
     tags: r.tags ? JSON.parse(r.tags as string) : [],
     createdAt: r.createdAt as string,
   };
-  if (r.accessCode) record.accessCode = r.accessCode as string;
   if (r.groupId) record.groupId = r.groupId as string;
   if (r.workspaceRef) record.workspaceRef = r.workspaceRef as string;
   record.federate = r.federate === 1;
@@ -51,7 +50,7 @@ function fileRowToRecord(r: Record<string, unknown>, data: Buffer): StorageFileR
 
 /** Everything except the bytes — the columns a metadata read, a listing and a range reply all need. */
 const META_COLUMNS =
-  'key, ownerGaii, visibility, mimeType, size, tags, accessCode, groupId, workspaceRef, federate, utf8Verified, createdAt';
+  'key, ownerGaii, visibility, mimeType, size, tags, groupId, workspaceRef, federate, utf8Verified, createdAt';
 
 export const storageFileMethods = {
   async createStorageFile(this: SqliteStorage, file: StorageFileRecord): Promise<StorageFileRecord> {
@@ -59,12 +58,18 @@ export const storageFileMethods = {
     // call sites create files and not one of them should have to know this rule exists.
     const utf8Verified = utf8VerdictFor(file);
     this.db.prepare(
-      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, groupId, workspaceRef, mimeType, size, data, accessCode, tags, createdAt, federate, utf8Verified)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      // The `accessCode` column stays in the table and is written by nobody. It was on
+      // StorageFileRecord, stored here and absent from Postgres entirely, and no route on either
+      // backend ever set it — an access code on a stored file is a concept that exists for APPS,
+      // which have their own field and their own doors. Removed from the record on 2026-09-06
+      // (review item 5.7) rather than mirrored into Postgres: a field nothing keeps is the same
+      // false promise that hid the two real ones beside it, and the column is always NULL.
+      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, groupId, workspaceRef, mimeType, size, data, tags, createdAt, federate, utf8Verified)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       file.ownerGaii, file.key, file.visibility, file.groupId ?? null, file.workspaceRef ?? null,
       file.mimeType, file.size, file.data,
-      file.accessCode ?? null, JSON.stringify(file.tags || []), file.createdAt,
+      JSON.stringify(file.tags || []), file.createdAt,
       file.federate ? 1 : 0,
       utf8Verified === null ? null : (utf8Verified ? 1 : 0),
     );

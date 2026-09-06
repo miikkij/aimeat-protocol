@@ -53,6 +53,7 @@ function toAgentRecord(r: Selectable<Agent>): AgentRecord {
     activityStats: (r.activityStats ?? undefined) as AgentRecord['activityStats'],
     modulesLoaded: (r.modulesLoaded ?? undefined) as AgentRecord['modulesLoaded'],
     agentLimitations: (r.agentLimitations ?? undefined) as AgentRecord['agentLimitations'],
+    ...(r.semantic ? { semantic: r.semantic as AgentRecord['semantic'] } : {}),
     webhookUrl: r.webhookUrl ?? undefined, webhookSecret: r.webhookSecret ?? undefined, webhookEnabled: r.webhookEnabled ?? false,
     webhookLastSuccess: isoOpt(r.webhookLastSuccess), webhookLastFailure: isoOpt(r.webhookLastFailure), webhookFailCount: r.webhookFailCount ?? 0,
     platform: r.platform ?? undefined, platformVersion: r.platformVersion ?? undefined, platformDetectedBy: (r.platformDetectedBy ?? undefined) as AgentRecord['platformDetectedBy'],
@@ -91,6 +92,9 @@ function toGHIIRecord(r: Selectable<Ghii>): GHIIRecord {
     ftnVerified: r.ftnVerified ?? undefined, googleSub: r.googleSub ?? undefined,
     externalIdentities: (r.externalIdentities ?? undefined) as GHIIRecord['externalIdentities'],
     trustScore: r.trustScore ?? undefined, morselBalance: r.morselBalance ?? undefined, allowedOrigins: arr(r.allowedOrigins),
+    // `semantic` existed on SQLite and not here until migration 0072: optional, so it was
+    // dropped on write and undefined on read, on the production backend only. Item 5.8.
+    ...(r.semantic ? { semantic: r.semantic as GHIIRecord['semantic'] } : {}),
   };
 }
 
@@ -146,6 +150,7 @@ export const identityMethods = {
       technicalCapabilities: jsonb(a.technicalCapabilities ?? null), domainCapabilities: jsonb(a.domainCapabilities ?? null),
       activityStats: jsonb(a.activityStats ?? null), modulesLoaded: jsonb(a.modulesLoaded ?? null),
       agentLimitations: jsonb(a.agentLimitations ?? null), languages: jsonb(a.languages ?? null),
+      semantic: jsonb(a.semantic ?? null),
       mode: a.mode ?? 'interactive', maxConcurrentTasks: a.maxConcurrentTasks ?? 1, dailySpendLimit: a.dailySpendLimit ?? null,
       scheduleConstraintDefaults: jsonb(a.scheduleConstraintDefaults ?? null), webhookUrl: a.webhookUrl ?? null,
       webhookSecret: a.webhookSecret ?? null, webhookEnabled: a.webhookEnabled ?? false,
@@ -235,6 +240,7 @@ export const identityMethods = {
         verificationIssuer: r.verificationIssuer ?? null, verificationCredentialHash: r.verificationCredentialHash ?? null,
         ftnVerified: r.ftnVerified ?? false, googleSub: r.googleSub ?? null, externalIdentities: jsonb(r.externalIdentities ?? null),
         trustScore: r.trustScore ?? null, morselBalance: r.morselBalance ?? null, allowedOrigins: r.allowedOrigins ?? [],
+        semantic: jsonb(r.semantic ?? null),
         createdAt: new Date(r.createdAt), updatedAt: new Date(r.updatedAt),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any).returningAll().execute();
