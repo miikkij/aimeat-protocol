@@ -1,0 +1,109 @@
+/*
+ * @file profile-door.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The signed-out door of /v1/profile (views/profile/door.js). Showroom face, because
+ *   the visitor is outside: the headline with the sun's offset shadow, the mono address chip, one
+ *   hot slab with the ink shadow, underlined words for the other doors, the dashed coral aside.
+ *   Every value is a theme.css token, and the faces are read through --font-showroom and
+ *   --font-showroom-body, never as a family name.
+ * @version-history
+ *   v1.0.0 — 2026-09-06 — Initial. The wall it replaces (.login-prompt) lived in profile.css.
+ */
+.pf-door {
+  width: 100%; max-width: 1100px; box-sizing: border-box; margin: 0 auto;
+  padding: 2.75rem 2rem 3.5rem;
+  display: flex; flex-direction: column; gap: 1.5rem;
+  color: var(--text); font-family: var(--font-showroom-body);
+}
+
+/* The address the visitor arrived at, as a machine thing, and the small coral line beside it. */
+.pf-door-kicker { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
+.pf-door-address {
+  display: inline-flex; align-items: center; padding: 6px 10px; border: 2px solid var(--text);
+  font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500; color: var(--text);
+  word-break: break-all;
+}
+.pf-door-label {
+  font-family: var(--font-showroom); text-transform: uppercase; font-size: 0.8rem;
+  letter-spacing: 0.04em; color: var(--accent);
+}
+
+.pf-door-title {
+  margin: 0; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase;
+  font-size: clamp(2.4rem, 5.2vw, 4.75rem); line-height: 0.96; letter-spacing: var(--font-poster-tracking);
+  color: var(--text); text-shadow: 0.075em 0.075em 0 var(--sun);
+  display: flex; flex-direction: column;
+}
+.pf-door-title-accent { color: var(--accent); }
+
+/* Where the address leads: one row under a rule, the path on the left and the chip on the right. */
+.pf-door-target {
+  display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;
+  margin-top: 0.5rem; padding: 0.875rem 0;
+  border-top: 3px solid var(--text); border-bottom: 1px solid var(--border);
+}
+.pf-door-target-path { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.pf-door-crumb { display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 1.06rem; font-weight: 800; color: var(--text); }
+.pf-door-crumb-root { color: var(--text-dim); font-weight: 700; }
+.pf-door-crumb-arrow { color: var(--accent); }
+.pf-door-chip {
+  display: inline-flex; align-items: center; padding: 3px 8px; border: 2px solid var(--text);
+  font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500; color: var(--text);
+}
+
+.pf-door-cols {
+  display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 3.5rem;
+  align-items: start; margin-top: 0.5rem;
+}
+.pf-door-say { display: flex; flex-direction: column; gap: 1.4rem; }
+.pf-door-lead { margin: 0; font-size: 1.25rem; line-height: 1.5; font-weight: 600; color: var(--text); }
+.pf-door-actions { display: flex; align-items: center; gap: 1.75rem; flex-wrap: wrap; }
+
+/* The one loud action on the page, and the underlined words for every other way on. */
+.pf-door-slab {
+  appearance: none; display: inline-block; cursor: pointer;
+  font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: 1rem; line-height: normal;
+  padding: 1rem 1.75rem; border: 3px solid var(--text); border-radius: 0; box-shadow: 6px 6px 0 var(--text);
+  background: var(--accent); color: #FFFFFF; text-decoration: none; text-align: center;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.pf-door-slab:hover { transform: translate(2px, 2px); box-shadow: 3px 3px 0 var(--text); color: #FFFFFF; }
+/* An underlined word, with room above and below so a thumb finds it (41px tall at 0.95rem): the
+   coral rule is drawn under the letters by a pseudo-element, and the padding is the hit area. */
+.pf-door-door {
+  appearance: none; position: relative; display: inline-block; background: none; border: 0; border-radius: 0;
+  padding: 10px 0; margin: 0; cursor: pointer;
+  font-family: var(--font-showroom-body); font-size: 0.95rem; font-weight: 800; line-height: 1.4;
+  color: var(--text); text-decoration: none;
+}
+.pf-door-door::after { content: ''; position: absolute; left: 0; right: 0; bottom: 6px; height: 3px; background: var(--accent); }
+.pf-door-door:hover { color: var(--accent); text-decoration: none; }
+.pf-door-after { margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--text-dim); }
+
+/* The aside that says what this is, for the visitor who came with a link and no account. */
+.pf-door-what {
+  display: flex; flex-direction: column; gap: 0.75rem; padding: 1.5rem 1.6rem;
+  border: 3px dashed var(--accent); background: var(--card-bg);
+}
+.pf-door-what-head { display: flex; flex-direction: column; gap: 0.35rem; }
+.pf-door-what-title { font-family: var(--font-showroom); text-transform: uppercase; font-size: 1.6rem; line-height: 1.05; color: var(--text); }
+.pf-door-what-text { margin: 0; font-size: 0.95rem; line-height: 1.6; color: var(--text); }
+.pf-door-what .pf-door-door { align-self: flex-start; }
+
+/* One reveal, top to bottom, and none for a person who asked for none. */
+@keyframes pfDoorRise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.pf-door > * { animation: pfDoorRise 460ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.pf-door > :nth-child(2) { animation-delay: 90ms; }
+.pf-door > :nth-child(3) { animation-delay: 180ms; }
+.pf-door > :nth-child(4) { animation-delay: 270ms; }
+@media (prefers-reduced-motion: reduce) { .pf-door > * { animation: none; } }
+
+@media (max-width: 900px) {
+  .pf-door-cols { grid-template-columns: 1fr; gap: 1.5rem; }
+}
+@media (max-width: 600px) {
+  .pf-door { padding: 1.75rem 1.25rem 3rem; gap: 1.25rem; }
+  .pf-door-slab { display: block; width: 100%; box-sizing: border-box; }
+  .pf-door-actions { gap: 1.25rem; }
+}
