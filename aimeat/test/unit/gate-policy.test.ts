@@ -13,6 +13,21 @@ describe('gate-policy.shouldGate', () => {
     expect(shouldGate({ action: 'flow:advance', risk: 'high', rule: 'auto' }).gate).toBe(false);
   });
 
+  it('rule:approve gates, even where autonomy would have auto-run', () => {
+    // It was in the declared union and honoured nowhere, so a caller asking to be reviewed was
+    // auto-run instead. L5 auto-runs every non-floor action, which is what makes this the case
+    // worth pinning: asking for review has to outrank the level.
+    expect(shouldGate({ action: 'flow:advance', risk: 'low', rule: 'approve', policy: { autonomy: 'L5' } }))
+      .toEqual({ gate: true, reason: 'rule_approve' });
+  });
+
+  it('…and the floor still outranks it in the other direction', () => {
+    // Order matters both ways: a floor action reports always_gate, not rule_approve, so the reason
+    // a caller reads names the rule that actually decided.
+    expect(shouldGate({ action: DEFAULT_ALWAYS_GATE[0], rule: 'approve' }))
+      .toEqual({ gate: true, reason: 'always_gate' });
+  });
+
   it('autonomy L1 gates everything', () => {
     expect(shouldGate({ action: 'flow:advance', risk: 'low', policy: { autonomy: 'L1' } }).gate).toBe(true);
   });

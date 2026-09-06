@@ -13,6 +13,9 @@
  *   - GET /v1/setup/wizard + POST /v1/setup/init: serve the wizard and provision the first owner
  *
  * @version-history
+ *   v1.3.0 -- 2026-09-06 -- Review item 2.8: /v1/setup/init mints an OWNER session, which is what
+ *     the wizard does with it. It used to put roles ['agent','owner','operator'] on a token whose
+ *     `sub` was an agent GAII, with scopes omitted (so ['*']) -- the last invariant-12 mint.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -240,13 +243,23 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
                 logger.warn('Setup wizard could not write .env file', { error: envErr });
             }
 
-            // 6. Generate JWT for auto-login
-            const roles = ['agent', 'owner', 'operator'];
+            // 6. An OWNER session for auto-login, which is what the wizard does with it: it stores the
+            //    token and sends the browser to the portal.
+            //
+            //    INVARIANT 12, and this was the last mint in the repo still breaking it. The token's
+            //    `sub` was the AGENT's GAII while its roles were ['agent','owner','operator'], so the
+            //    agent this wizard had just created carried the node's operator role — and `scopes`
+            //    was omitted, which makes issueJWT default it to ['*'], the H-1 defect the other
+            //    mints were corrected for in August. A role is granted, never inherited at mint time.
+            //
+            //    The roles are the OWNER RECORD's own, read rather than assembled: the first owner of
+            //    a node really is its operator, and saying so from the record means this line cannot
+            //    drift from what the account is.
             const token = await issueJWT({
-                sub: agentRecord.gaii,
+                sub: username,
                 owner: username,
                 node: config.nodeId,
-                roles,
+                roles: ownerRecord.roles,
             }, config.jwtTtlSeconds);
 
             // 7. Invalidate first-run cache

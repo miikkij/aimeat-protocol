@@ -7,6 +7,9 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 -- 2026-09-06 -- Review item 2.7: workspace update/delete, organism import and
+ *     archive/unarchive carry organism:write, the word their MCP twins publish and their sibling
+ *     doors in this same file already had.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  *   v1.1.0 — 2026-07-15 — Org managers (creator/admin) see every workspace in the agents/activity feed
  *     (isOrgManager), matching their automatic workspace read access.
@@ -17,7 +20,7 @@
  *   v1.4.0 — 2026-08-14 — SECURITY: POST /v1/organisms/:id/workspaces is gated by
  *     requireScope('organism:write'); requireRoleOrScope('agent', …) let every agent through on role.
  */
-import { raw, type Router } from 'express';
+import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
@@ -29,12 +32,6 @@ import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
 import { hashPassword, verifyPassword } from '../../services/password.js';
 import { generateShareToken, SHARE_TOKEN_TTL_SECONDS } from '../../services/share-token.js';
-import { exportWorkspace } from '../../services/workspace-export.js';
-import { importWorkspace } from '../../services/workspace-import.js';
-import { exportOrganism } from '../../services/organism-export.js';
-import { importOrganism } from '../../services/organism-import.js';
-import { ZipSecurityError } from '../../services/safe-zip.js';
-import { recordSecurityIncident } from '../../services/security-incident.js';
 import { updateWorkspaceMeta, WorkspaceMetaError } from '../../services/workspace-meta.js';
 import { provisionWorkspace, WorkspaceProvisionError } from '../../services/workspace-provision.js';
 import { deriveWorkspaceEvents } from '../../services/workspace-enrichment.js';
@@ -293,7 +290,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
   /* ── PUT /v1/organisms/:id/workspace?ws= — update a workspace's name and/or readme IN PLACE (no new
    * id, no touch to objectTypes/schemas/content), keeping the name synced across manifest + registry.
    * Creator-only (or an org admin). ── */
-  router.put('/v1/organisms/:id/workspace', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.put('/v1/organisms/:id/workspace', requireAuth(), requireRole('agent'), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
     const ws = typeof req.query.ws === 'string' ? req.query.ws : (req.body?.ws as string | undefined);
     const organism = await storage.getOrganism(id);
@@ -559,121 +556,11 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       }, [{ description: 'Read the shared documents (send the token as X-Share-Token)', method: 'GET', url: `/v1/organisms/${id}/workspace/public/documents?ws=${ws}` }]));
     });
 
-  /* ── GET /v1/organisms/:id/workspace/export?ws= — download a full-fidelity ZIP backup of a
-   * workspace (workspace.json + images/). The workspace creator (or an org admin) only. ── */
-  router.get('/v1/organisms/:id/workspace/export', requireAuth(), requireScope('organism:read'), async (req, res) => {
-    const id = req.params.id as string;
-    const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
-    const role = await memberRole(req, organism, id);
-    if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
-    const entry = await findWsEntry(id, ws);
-    if (!entry) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Workspace not found')); return; }
-    const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
-    if (createdBy !== (req.auth!.owner as string) && role !== 'creator' && role !== 'admin') {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can export')); return;
-    }
-    const { buffer, filename } = await exportWorkspace(storage, config, {
-      orgId: id, ws, exporterGaii: resolveIdentity(req.auth!, config.nodeId), exportedAt: new Date().toISOString(),
-      isOrgManager: role === 'creator' || role === 'admin',
-    });
-    // Programmatic/MCP callers can request the ZIP as base64 JSON (size-capped to keep it out of an
-    // agent's context); the UI downloads the binary directly.
-    if (req.query.format === 'base64') {
-      if (buffer.length > 1_500_000) {
-        res.status(413).json(error(config.nodeId, 'TOO_LARGE', 'This workspace is too big to send in one piece. Download it from the page instead.'));
-        return;
-      }
-      res.json(success(config.nodeId, { filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') }));
-      return;
-    }
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(buffer);
-  });
-
-  /* ── POST /v1/organisms/:id/workspace/import — restore a workspace ZIP as a NEW workspace in this
-   * organism. Body is the raw ZIP (Content-Type application/zip). Member of the target org only;
-   * the importer becomes the new workspace's creator. ── */
-  router.post('/v1/organisms/:id/workspace/import', requireAuth(), requireScope('organism:write'),
-    // Raw-parse the body EXCEPT application/json (which the global json parser handles → { zip_base64 }).
-    raw({ type: (r) => !/application\/json/i.test(r.headers['content-type'] || ''), limit: '64mb' }),
-    async (req, res) => {
-    const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
-    const b64 = (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) ? (req.body as { zip_base64?: string }).zip_base64 : undefined;
-    const buf = Buffer.isBuffer(req.body) ? req.body : (typeof b64 === 'string' ? Buffer.from(b64, 'base64') : null);
-    if (!buf || buf.length === 0) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Send the workspace ZIP as the raw body (Content-Type: application/zip) or JSON { zip_base64 }')); return; }
-    try {
-      const result = await importWorkspace(storage, config, { orgId: id, importerGaii: resolveIdentity(req.auth!, config.nodeId), importerOwner: req.auth!.owner as string, zip: buf });
-      emitChange('organisms');
-      res.status(201).json(success(config.nodeId, result));
-    } catch (e) {
-      if (e instanceof ZipSecurityError) {
-        const inc = await recordSecurityIncident(storage, config, { type: 'zip_import', code: e.code, actorGhii: resolveIdentity(req.auth!, config.nodeId), actorName: req.auth!.owner as string, detail: e.message, source: 'workspace_import', blob: buf });
-        res.status(422).json(error(config.nodeId, 'ZIP_REJECTED', `Upload rejected by safety checks (${e.code}) and quarantined for review (incident ${inc.id}).`));
-        return;
-      }
-      res.status(400).json(error(config.nodeId, 'IMPORT_FAILED', (e as Error).message || 'Could not import the workspace'));
-    }
-  });
-
-  /* ── GET /v1/organisms/:id/export — download a ZIP backup of the WHOLE organism (settings + all
-   * its workspaces). Any ACTIVE MEMBER (membership keyed by the bare owner name — org agents in
-   * agentGaiis don't qualify): the bundle contains only what the member can already read live, so
-   * the gate matches the read model instead of silently 403ing members the UI shows the button to.
-   * ?format=base64 for a size-capped JSON payload. ── */
-  router.get('/v1/organisms/:id/export', requireAuth(), requireScope('organism:read'), async (req, res) => {
-    const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    const ownerName = req.auth!.owner as string | undefined;
-    const m = ownerName ? await storage.getMembership(id, ownerName) : null;
-    if (!m || m.status !== 'active') { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an active member of the organism can export it')); return; }
-    // Export as the member's owner GHII — a member reads the whole organism live, and the per-creator
-    // registry + records are GHII-owned (an agent-session GAII used to yield a near-empty bundle).
-    const { buffer, filename } = await exportOrganism(storage, config, { orgId: id, exporterGaii: `${ownerName}@${config.nodeId}`, exportedAt: new Date().toISOString() });
-    if (req.query.format === 'base64') {
-      if (buffer.length > 1_500_000) { res.status(413).json(error(config.nodeId, 'TOO_LARGE', 'This organism is too big to send in one piece. Download it from the page instead.')); return; }
-      res.json(success(config.nodeId, { filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') }));
-      return;
-    }
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(buffer);
-  });
-
-  /* ── POST /v1/organisms/import — restore an organism bundle ZIP as a NEW organism (the importer
-   * becomes its creator). Body is the raw ZIP (application/zip) or JSON { zip_base64 }. ── */
-  router.post('/v1/organisms/import', requireAuth(), requireRole('agent'),
-    raw({ type: (r) => !/application\/json/i.test(r.headers['content-type'] || ''), limit: '128mb' }),
-    async (req, res) => {
-    const b64 = (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) ? (req.body as { zip_base64?: string }).zip_base64 : undefined;
-    const buf = Buffer.isBuffer(req.body) ? req.body : (typeof b64 === 'string' ? Buffer.from(b64, 'base64') : null);
-    if (!buf || buf.length === 0) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Send the organism ZIP as the raw body (Content-Type: application/zip) or JSON { zip_base64 }')); return; }
-    try {
-      const result = await importOrganism(storage, config, { importerGaii: resolveIdentity(req.auth!, config.nodeId), importerOwner: req.auth!.owner as string, zip: buf });
-      emitChange('organisms');
-      res.status(201).json(success(config.nodeId, result));
-    } catch (e) {
-      if (e instanceof ZipSecurityError) {
-        const inc = await recordSecurityIncident(storage, config, { type: 'zip_import', code: e.code, actorGhii: resolveIdentity(req.auth!, config.nodeId), actorName: req.auth!.owner as string, detail: e.message, source: 'organism_import', blob: buf });
-        res.status(422).json(error(config.nodeId, 'ZIP_REJECTED', `Upload rejected by safety checks (${e.code}) and quarantined for review (incident ${inc.id}).`));
-        return;
-      }
-      res.status(400).json(error(config.nodeId, 'IMPORT_FAILED', (e as Error).message || 'Could not import the organism'));
-    }
-  });
-
   /* ── DELETE /v1/organisms/:id/workspace — wipe the workspace (manifest + readme + config + ALL
    * object data: drafts, latest, version history) and unregister its schema locks. The organism
    * itself (membership, etc.) stays — it returns to "no workspace yet". Creator/admin only; the
    * deliberate typed-confirmation lives in the UI. Memory under organism.{id}.* is removed entirely. */
-  router.delete('/v1/organisms/:id/workspace', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.delete('/v1/organisms/:id/workspace', requireAuth(), requireRole('agent'), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
@@ -791,6 +678,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
    * (see services/archive.ts). Creator/admin only — archiving is a structural, destructive-adjacent op.
    * Body: { level: 'organism'|'workspace'|'space'|'record', ws?, namespace?, key? }. */
 
-  router.post('/v1/organisms/:id/archive', requireAuth(), requireRole('agent'), archiveHandler('archive'));
-  router.post('/v1/organisms/:id/unarchive', requireAuth(), requireRole('agent'), archiveHandler('unarchive'));
+  // aimeat_organism_archive publishes organism:write; these are the routes behind it.
+  router.post('/v1/organisms/:id/archive', requireAuth(), requireRole('agent'), requireScope('organism:write'), archiveHandler('archive'));
+  router.post('/v1/organisms/:id/unarchive', requireAuth(), requireRole('agent'), requireScope('organism:write'), archiveHandler('unarchive'));
 }

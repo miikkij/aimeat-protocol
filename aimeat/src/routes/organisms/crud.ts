@@ -6,6 +6,10 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   v1.9.0 -- 2026-09-06 -- Review item 2.7: the four doors that change or destroy an organism
+ *     carry the permission word the door that CREATES one has always carried. PUT, DELETE and
+ *     leave take organism:write; join takes social:write, which is what aimeat_organism_join
+ *     publishes. They were requireRole('agent') alone, which every agent satisfies.
  *   v1.7.0 — 2026-08-14 — SECURITY: POST /v1/organisms is gated by requireScope('organism:write').
  *     requireRoleOrScope('agent', …) admitted every agent by role before it read a scope, so the word
  *     removed aimeat_organism_create from the agent's MCP surface and let the same agent create
@@ -255,7 +259,11 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
   });
 
   /* ── PUT /v1/organisms/:id — Update organism ── */
-  router.put('/v1/organisms/:id', requireAuth(), requireRole('agent'), async (req, res) => {
+  // INVARIANT 15: the word is enforced on every door or it does not exist. `organism:write` was on
+  // the create door and on aimeat_organism_update, and absent here, so an agent granted only
+  // memory:read could rename its owner's organism, rewrite the README and flip visibility to
+  // public. Same word as the MCP tool that calls the same service.
+  router.put('/v1/organisms/:id', requireAuth(), requireRole('agent'), requireScope('organism:write'), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const id = req.params.id as string;
 
@@ -287,7 +295,8 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
   });
 
   /* ── DELETE /v1/organisms/:id — Delete organism ── */
-  router.delete('/v1/organisms/:id', requireAuth(), requireRole('agent'), async (req, res) => {
+  // Deleting is strictly more than updating, and it carried strictly less.
+  router.delete('/v1/organisms/:id', requireAuth(), requireRole('agent'), requireScope('organism:write'), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const id = req.params.id as string;
 
@@ -308,7 +317,9 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
   });
 
   /* ── POST /v1/organisms/:id/join — Join an organism ── */
-  router.post('/v1/organisms/:id/join', requireAuth(), requireRole('agent'), async (req, res) => {
+  // `social:write` rather than organism:write, because that is the word aimeat_organism_join
+  // publishes; the two doors reach the same service and must ask the same question.
+  router.post('/v1/organisms/:id/join', requireAuth(), requireRole('agent'), requireScope('social:write'), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const id = req.params.id as string;
     const { message } = req.body ?? {};
@@ -334,7 +345,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
   });
 
   /* ── POST /v1/organisms/:id/leave — Leave an organism ── */
-  router.post('/v1/organisms/:id/leave', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/leave', requireAuth(), requireRole('agent'), requireScope('organism:write'), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const id = req.params.id as string;
 
