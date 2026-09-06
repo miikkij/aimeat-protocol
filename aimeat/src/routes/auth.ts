@@ -61,6 +61,7 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
+import { signatureTimestampFresh } from '../auth/signed-request.js';
 import { issueJWT, revokeToken, generateSessionId } from '../auth/jwt.js';
 import { requireAuth, requireRole, requireOwnerPrincipal, optionalAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
 import { registerOtkRoutes } from './auth-otk.js';
@@ -178,9 +179,8 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
 
-      // Check timestamp freshness (within 5 minutes)
-      const ts = new Date(timestamp).getTime();
-      if (Math.abs(Date.now() - ts) > 5 * 60 * 1000) {
+      // Freshness, from auth/signed-request.ts, which is where the window's one number lives.
+      if (!signatureTimestampFresh(timestamp)) {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Timestamp too old or too far in the future'));
         return;
       }
@@ -274,8 +274,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
 
-      const ts = new Date(timestamp).getTime();
-      if (Math.abs(Date.now() - ts) > 5 * 60 * 1000) {
+      if (!signatureTimestampFresh(timestamp)) {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Timestamp too old or too far in the future'));
         return;
       }
