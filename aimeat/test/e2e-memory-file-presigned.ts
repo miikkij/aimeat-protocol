@@ -58,6 +58,24 @@ async function getOwnerToken(name: string, priv: string): Promise<string> {
     return body.data.token;
 }
 
+/** An agent of `ownerName` holding exactly these scopes, and a token for it. */
+async function agentToken(name: string, scopes: string[]): Promise<string> {
+    const created = await json('/v1/agents', {
+        method: 'POST', headers: authHeaders,
+        body: JSON.stringify({ name, owner: ownerName, display_name: name, capabilities: [], scopes }),
+    });
+    assert(created.status === 201, `agent ${name}: ${created.status} ${JSON.stringify(created.body?.error)}`);
+    const gaii = created.body.data.agent.gaii as string;
+    const timestamp = new Date().toISOString();
+    const sig = await ed.signAsync(new TextEncoder().encode(gaii + timestamp), Buffer.from(created.body.data.private_key as string, 'base64'));
+    const { body } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii, timestamp, signature: Buffer.from(sig).toString('base64') }),
+    });
+    assert(body.ok === true, `agent token ${name}: ${JSON.stringify(body.error)}`);
+    return body.data.token as string;
+}
+
 const ownerName = `mfpowner${Date.now() % 1000000}`;
 let ownerToken = '';
 let authHeaders: Record<string, string> = {};
@@ -225,6 +243,65 @@ await test('Inline base64 upload still works', async () => {
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data?.size === 17, `size ${body.data?.size}`);
+});
+
+// ── 6. The three doors that were asking only "are you an agent" ──
+//
+// /v1/memory/files and /v1/storage are two doors onto ONE store, and the /v1/storage side has taken
+// storage:read / storage:write throughout. On this side the upload, the visibility PATCH and the
+// download had been gated in August; the tag PATCH, the listing and the DELETE were still
+// requireRole('agent') alone — which every agent satisfies by being an agent. The delete also
+// reimplemented the removal inline, so it skipped the key fence the shared service applies. Review
+// item 3.2, 2026-09-06.
+
+await test('An agent with storage:read alone is refused the write doors, and told the word', async () => {
+    const readOnly = await agentToken('readerbot', ['storage:read']);
+    const doors: Array<{ what: string; word: string; call: () => Promise<{ status: number; body: any }> }> = [
+        {
+            what: 'write tags on a file', word: 'storage:write',
+            call: () => json(`/v1/memory/files/${encodeURIComponent('e2e/inline-small.txt')}`, {
+                method: 'PATCH', headers: { Authorization: `Bearer ${readOnly}` }, body: JSON.stringify({ tags: ['nope'] }),
+            }),
+        },
+        {
+            what: 'delete a file', word: 'storage:write',
+            call: () => json(`/v1/memory/files/${encodeURIComponent('e2e/inline-small.txt')}`, {
+                method: 'DELETE', headers: { Authorization: `Bearer ${readOnly}` },
+            }),
+        },
+    ];
+    for (const door of doors) {
+        const r = await door.call();
+        assert(r.status === 403, `${door.what}: expected 403, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.error?.code === 'SCOPE_DENIED', `${door.what}: expected SCOPE_DENIED, got ${r.body.error?.code}`);
+        assert((r.body.error?.message ?? '').includes(door.word), `${door.what}: the refusal must name ${door.word}: ${r.body.error?.message}`);
+    }
+    // …and the listing is a READ, which this agent may do.
+    const list = await json('/v1/memory/files', { headers: { Authorization: `Bearer ${readOnly}` } });
+    assert(list.status === 200, `listing with storage:read must work: ${list.status} ${JSON.stringify(list.body?.error)}`);
+});
+
+await test('An agent without storage:read cannot list them either', async () => {
+    const noStorage = await agentToken('nostoragebot', ['memory:read']);
+    const r = await json('/v1/memory/files', { headers: { Authorization: `Bearer ${noStorage}` } });
+    assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED',
+        `expected 403 SCOPE_DENIED, got ${r.status} ${r.body.error?.code}`);
+    assert((r.body.error?.message ?? '').includes('storage:read'), `must name storage:read: ${r.body.error?.message}`);
+});
+
+await test('An agent holding storage:write deletes its OWN file, through the shared removal', async () => {
+    const writer = await agentToken('writerbot', ['storage:read', 'storage:write']);
+    const put = await json('/v1/memory/files', {
+        method: 'POST', headers: { Authorization: `Bearer ${writer}` },
+        body: JSON.stringify({ key: 'e2e/writerbot.txt', content: Buffer.from('mine').toString('base64'), mime_type: 'text/plain' }),
+    });
+    assert(put.status === 201, `upload: ${put.status} ${JSON.stringify(put.body?.error)}`);
+    const del = await json(`/v1/memory/files/${encodeURIComponent('e2e/writerbot.txt')}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${writer}` },
+    });
+    assert(del.status === 200, `delete: ${del.status} ${JSON.stringify(del.body?.error)}`);
+    const gone = await json(`/v1/memory/files/${encodeURIComponent('e2e/writerbot.txt')}`, { headers: { Authorization: `Bearer ${writer}` } });
+    assert(gone.status === 404, `the file must be gone: ${gone.status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

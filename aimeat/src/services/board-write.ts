@@ -45,6 +45,9 @@
  *   const out = await createBoard({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.2.0 -- 2026-09-06 -- Review item 3.3: the public-board ceiling is publicBoardCeiling(),
+ *     exported, because a limit enforced only where a board is BORN is not a limit -- the
+ *     visibility flip and cortex activation both got past it.
  *   v1.1.0 — 2026-08-30 — Boards are Core again (RFC §27). A board carries its own rules (who
  *     posts, categories, default lifetime, price), checked here for both doors. Any account may open
  *     a public board, up to config.boardPublicPerOwnerMax; a system board stays the operator's.
@@ -167,6 +170,35 @@ export function boardVisibleTo(
     return board.allowedGaiis.includes(gaii);
 }
 
+/**
+ * How many public boards this account may keep, asked wherever a board BECOMES public.
+ *
+ * IT LIVED INSIDE createBoard() AND NOWHERE ELSE, which made it a ceiling on one door rather than on
+ * the catalogue. PATCH /v1/boards/:id/visibility wrote straight to storage, so ten private boards
+ * flipped to public got past a limit of ten; and cortex activation created its board-template boards
+ * with `storage.createBoard` directly, defaulting to public, so activating cortexes was an unbounded
+ * way to fill the same list. Found by the 2026-09-06 review as item 3.3.
+ *
+ * `null` when the move is allowed — including every move that is not INTO public, and every move by
+ * an operator, for whom the count has never applied.
+ */
+export async function publicBoardCeiling(
+    deps: BoardWriteDeps,
+    caller: BoardWriteCaller,
+    visibility: string | undefined,
+): Promise<BoardWriteRefusal | null> {
+    if (visibility !== 'public') return null;
+    if (caller.roles.includes('operator')) return null;
+    const { storage, config } = deps;
+    const mine = (await storage.listBoards({ visibility: 'public' }))
+        .filter(b => b.ownerGaii === caller.gaii || isSameOwner(b.ownerGaii, caller.gaii)).length;
+    if (mine < config.boardPublicPerOwnerMax) return null;
+    return {
+        ok: false, status: 403, code: 'BOARD_QUOTA',
+        message: `You already keep ${mine} public boards, the most one account may here. Delete one to open another.`,
+    };
+}
+
 export type BoardCreateResult = { ok: true; board: BoardRecord } | BoardWriteRefusal;
 
 export interface BoardCreateInput {
@@ -185,7 +217,7 @@ export async function createBoard(
     caller: BoardWriteCaller,
     input: BoardCreateInput,
 ): Promise<BoardCreateResult> {
-    const { storage, config } = deps;
+    const { storage } = deps;
 
     const name = String(input.name ?? '').trim();
     if (!name || name.length > BOARD_LIMITS.nameMax) {
@@ -208,16 +240,8 @@ export async function createBoard(
     if (input.visibility === 'system' && !operator) {
         return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only operators can create system boards' };
     }
-    if (input.visibility === 'public' && !operator) {
-        const mine = (await storage.listBoards({ visibility: 'public' }))
-            .filter(b => b.ownerGaii === caller.gaii || isSameOwner(b.ownerGaii, caller.gaii)).length;
-        if (mine >= config.boardPublicPerOwnerMax) {
-            return {
-                ok: false, status: 403, code: 'BOARD_QUOTA',
-                message: `You already keep ${mine} public boards, the most one account may here. Delete one to open another.`,
-            };
-        }
-    }
+    const ceiling = await publicBoardCeiling(deps, caller, input.visibility);
+    if (ceiling) return ceiling;
 
     const board = await storage.createBoard({
         id: `board-${randomBytes(8).toString('hex')}`,
