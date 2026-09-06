@@ -10,6 +10,8 @@
  *   visible from the file doing it.
  * @usage pnpm test -- agent-health
  * @version-history
+ *   v1.1.0 — 2026-09-06 — The held-connection cases: a spawn agent parked between jobs is available,
+ *     and the same agent with nothing holding it open is still the problem it was.
  *   v1.0.0 — 2026-08-09 — Initial, with V1.
  */
 import { describe, it, expect } from 'vitest';
@@ -201,6 +203,63 @@ describe('the boundaries are exact', () => {
     it('exactly at 24 h is still idle; one ms past is a problem', () => {
         expect(computeAgentHealth(agent({ lastSeen: ago(AGENT_STALE_MS) }), done, NOW).state).toBe('idle');
         expect(computeAgentHealth(agent({ lastSeen: ago(AGENT_STALE_MS + 1) }), done, NOW).state).toBe('problem');
+    });
+});
+
+/**
+ * A spawn agent has no runtime between jobs, so `lastSeen` dates its last WORK and goes stale while
+ * it sits parked and wakeable. On aimeat.io 2026-09-06, 23 spawn agents each held a live socket and
+ * 9 of them were stale at that moment, so nine working agents read as problems on three surfaces.
+ */
+describe('a held connection is liveness (the spawn agent between jobs)', () => {
+    it('days stale with a socket is production, with nothing to fix', () => {
+        const h = computeAgentHealth(agent({ lastSeen: ago(3 * 24 * HOUR) }), done, NOW, true);
+        expect(h.state).toBe('production');
+        expect(h.reasons).toEqual([]);
+    });
+
+    it('the same agent without the socket is the problem it has always been', () => {
+        const h = computeAgentHealth(agent({ lastSeen: ago(3 * 24 * HOUR) }), done, NOW, false);
+        expect(h.state).toBe('problem');
+        expect(h.reasons).toContain('stale-24h');
+    });
+
+    it('never seen at all, but connected, is not never-seen', () => {
+        const h = computeAgentHealth(agent({ lastSeen: undefined }), done, NOW, true);
+        expect(h.state).toBe('production');
+        expect(h.reasons).toEqual([]);
+    });
+
+    it('the delivery channel names the socket rather than a poll that never happens', () => {
+        expect(computeAgentHealth(agent({ lastSeen: ago(3 * 24 * HOUR) }), done, NOW, true).delivery.channel).toBe('socket');
+        expect(computeAgentHealth(agent({ lastSeen: ago(3 * 24 * HOUR) }), done, NOW, false).delivery.channel).toBe('polling');
+    });
+
+    it('a healthy webhook still wins the channel — it is the door the node actually pushes to', () => {
+        const wh = agent({ webhookUrl: 'https://x', webhookEnabled: true, webhookFailCount: 0 });
+        expect(computeAgentHealth(wh, done, NOW, true).delivery.channel).toBe('webhook');
+    });
+
+    it('a broken webhook is still a problem, socket or not — the owner is the only one who can fix it', () => {
+        const wh = agent({ webhookUrl: 'https://x', webhookEnabled: true, webhookFailCount: AGENT_WEBHOOK_DOWN_THRESHOLD });
+        const h = computeAgentHealth(wh, done, NOW, true);
+        expect(h.state).toBe('problem');
+        expect(h.reasons).toEqual(['webhook-down']);
+    });
+
+    it('the fleet reads the connected set per agent, not per fleet', () => {
+        const stale = ago(3 * 24 * HOUR);
+        const many = computeAgentHealthMany(
+            [{ gaii: 'parked#o@n', lastSeen: stale, tags: [] }, { gaii: 'gone#o@n', lastSeen: stale, tags: [] }] as never,
+            { 'parked#o@n': done, 'gone#o@n': done }, NOW, new Set(['parked#o@n']));
+        expect(many['parked#o@n'].state).toBe('production');
+        expect(many['gone#o@n'].state).toBe('problem');
+    });
+
+    it('no connected set at all leaves every verdict where it was', () => {
+        const many = computeAgentHealthMany(
+            [{ gaii: 'a#o@n', lastSeen: ago(3 * 24 * HOUR), tags: [] }] as never, { 'a#o@n': done }, NOW);
+        expect(many['a#o@n'].state).toBe('problem');
     });
 });
 

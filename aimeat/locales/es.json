@@ -10957,6 +10957,7 @@
         "deliveryMcp": "Avisos por MCP",
         "deliveryWebhook": "Webhook",
         "deliveryPolling": "Consultas periódicas",
+        "deliverySocket": "Enlace abierto",
         "deliveryMcpWh": "MCP+WH",
         "deliveryWh": "WH",
         "tokensToday": "Tokens",
@@ -11167,7 +11168,8 @@
             "mcpLabel": "MCP"
           },
           "notReported": "sin declarar",
-          "deliveryPollingLine": "Entrega: consultas periódicas"
+          "deliveryPollingLine": "Entrega: consultas periódicas",
+          "deliverySocketLine": "Entrega: enlace abierto"
         },
         "directives": {
           "footer": "Las directrices van en cada actualización del paquete de habilidades. El agente las recibe como límites de comportamiento.",

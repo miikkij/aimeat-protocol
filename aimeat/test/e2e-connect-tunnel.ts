@@ -296,6 +296,45 @@ await test('14. The dedup set is released when the socket closes', async () => {
   assert(s.ackDedupEntries === 0, `no entries remain once every socket is closed, got ${s.ackDedupEntries}`);
 });
 
+// ─── Phase 6: the socket is liveness on the owner's own list ───
+console.log('\nPhase 6 — The fleet list reads the socket');
+
+/** The health verdict this owner's agent list gives for one agent. */
+async function healthOf(agentName: string): Promise<any> {
+  const { status, body } = await json('/v1/agents', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(status === 200, `agents status ${status}: ${JSON.stringify(body)}`);
+  const row = (body.data.agents as any[]).find(a => a.name === agentName);
+  assert(!!row, `${agentName} is in the list`);
+  return row.health;
+}
+
+await test('15. An agent holding a socket is delivered to down it, not by polling', async () => {
+  // The one the workflow fix (3613167ea) also turned on: an agent whose runtime exists only while
+  // a worker runs has an old lastSeen and is a second away from working. Nothing else in this
+  // response can say so, so the route has to ask the tunnel.
+  const before = await healthOf('fullbot');
+  assert(before.delivery.channel === 'polling', `unconnected reads as polling, got ${before.delivery.channel}`);
+
+  const t = await TunnelClient.connect(BASE, fullAgentToken);
+  await sleep(300);
+  const during = await healthOf('fullbot');
+  assert(during.delivery.channel === 'socket', `connected reads as socket, got ${during.delivery.channel}`);
+
+  await t.close();
+  await sleep(500);
+  const after = await healthOf('fullbot');
+  assert(after.delivery.channel === 'polling', `the socket is gone, so the claim goes with it, got ${after.delivery.channel}`);
+});
+
+await test('16. The socket is read per agent, so a sibling\'s connection says nothing about this one', async () => {
+  const t = await TunnelClient.connect(BASE, fullAgentToken);
+  await sleep(300);
+  const lite = await healthOf('litebot');
+  assert(lite.delivery.channel !== 'socket', `litebot holds no socket of its own, got ${lite.delivery.channel}`);
+  await t.close();
+  await sleep(300);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('Cascade-delete owner', async () => {

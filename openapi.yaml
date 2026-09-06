@@ -1277,7 +1277,11 @@ components:
           properties:
             channel:
               type: string
-              enum: [webhook, webhook-failing, polling, none]
+              description: >-
+                How work reaches this agent. `socket` is a connector holding this agent's own
+                credential on a live forward tunnel, which is how an agent whose runtime starts per
+                job is reached while its last_seen ages.
+              enum: [webhook, webhook-failing, socket, polling, none]
             webhook_configured: { type: boolean }
             webhook_enabled: { type: boolean }
             fail_count: { type: integer }

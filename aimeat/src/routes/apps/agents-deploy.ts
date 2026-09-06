@@ -14,6 +14,8 @@
  *     GET .../instances (hosted instances of the agent + their PUBLIC offers/prices)
  * @usage registered from appsRouter() in src/routes/apps.ts
  * @version-history
+ *   v1.2.0 — 2026-09-06 — The shelf's `online` counts a live connector socket, so a hosted agent
+ *     that starts a runtime per job is offered rather than sorted to the bottom as offline.
  *   v1.1.0 — 2026-07-16 — Slice 2: GET .../instances — discover already-hosted instances of an
  *     app's bundled agent (deployed-name convention + the author's original) with their public
  *     offers + prices, so the catalog can show "use a hosted one" vs "deploy your own".
@@ -28,6 +30,7 @@ import { buildGAII, validateAgentName } from '../../utils/gaii.js';
 import { deployedAgentName } from '../../models/crew-def-schemas.js';
 import type { Offer } from '../../models/offer-schemas.js';
 import { createAppAgentTask } from '../../services/app-agent-deploy.js';
+import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 
 /** Default runner-agent name: crewaimeat's crew-forge daemon registers under this name. */
 const DEFAULT_RUNNER = 'crew-forge';
@@ -188,6 +191,7 @@ export function registerAppAgentRoutes(router: Router, config: AimeatConfig, sto
         const deployedName = deployedAgentName(agentName, appId);
         const all = await storage.listAgents();
         const now = Date.now();
+        const tunnels = getActiveConnectTunnelManager();
         const candidates = all.filter(a =>
             (a.name === deployedName || (a.name === agentName && a.owner === app.ownerName))
             && !(a.tags ?? []).includes('unlisted'));
@@ -213,7 +217,12 @@ export function registerAppAgentRoutes(router: Router, config: AimeatConfig, sto
                 display_name: a.displayName ?? a.name,
                 trust_score: a.trustScore,
                 last_seen: a.lastSeen ?? null,
-                online: !!(a.lastSeen && (now - new Date(a.lastSeen).getTime()) < 10 * 60 * 1000),
+                // Online means "work sent here arrives", so a daemon holding this agent's socket
+                // counts even when lastSeen is old: an agent whose runtime starts per job has no
+                // reason to have touched the node since its last one. Read per agent rather than
+                // per owner, because a shelf lists agents of more than one owner.
+                online: tunnels?.isConnected(a.gaii)
+                    || !!(a.lastSeen && (now - new Date(a.lastSeen).getTime()) < 10 * 60 * 1000),
                 source: a.name === deployedName ? 'deployed' as const : 'author' as const,
                 is_yours: viewer !== null && a.owner === viewer,
                 offers,

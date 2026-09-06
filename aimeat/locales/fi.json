@@ -11351,6 +11351,7 @@
         "deliveryMcp": "MCP-ilmoitukset",
         "deliveryWebhook": "Webhook",
         "deliveryPolling": "Pollaus",
+        "deliverySocket": "Suora yhteys",
         "deliveryMcpWh": "MCP+WH",
         "deliveryWh": "WH",
         "tokensToday": "Tokenit",
@@ -11561,7 +11562,8 @@
             "mcpLabel": "MCP"
           },
           "notReported": "ei raportoitu",
-          "deliveryPollingLine": "Toimitus: polling"
+          "deliveryPollingLine": "Toimitus: polling",
+          "deliverySocketLine": "Toimitus: suora yhteys"
         },
         "directives": {
           "footer": "Direktiivit sisältyvät jokaiseen taitopaketin päivitykseen. Agentti vastaanottaa nämä käyttäytymisrajoituksina.",

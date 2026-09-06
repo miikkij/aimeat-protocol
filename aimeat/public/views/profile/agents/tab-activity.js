@@ -5,6 +5,8 @@
  * @description Enhanced Activity tab with governance filter and category badges.
  *   Wraps the existing activity subtab with additional filter pills.
  * @version-history
+ *   v1.8.0 -- 2026-09-06 -- The delivery line's dot counts a held connection, not just a sighting in
+ *     the last 24 h, so an agent whose runtime starts per job stops reading as inactive between jobs.
  *   v1.7.0 -- 2026-07-16 -- Mount folds 5 agent-domain reads into GET /v1/agents/:name/activity/overview
  *     (getActivityOverview); ledger stays separate. Individual six-request fan-out kept as fallback.
  *   v1.6.0 -- 2026-06-10 -- Event log strictly newest-first (pages interleaved lifecycle events);
@@ -39,6 +41,16 @@ const FILTERS = [
   { id: 'governance', key: 'profile.agents.detail.activity.filterGovernance' },
   { id: 'system', key: 'profile.agents.detail.activity.filterSystem' },
 ];
+
+/**
+ * Is a daemon holding this agent's connection open right now? The server says so in the health
+ * verdict's delivery channel. The dot beside this line used to be drawn from `last_seen` alone,
+ * which for an agent that starts a runtime per job goes grey between jobs while the agent is a
+ * second away from working.
+ */
+function socketHeld(agent) {
+  return agent?.health?.delivery?.channel === 'socket';
+}
 
 function eventCategory(event) {
   // Task-lifecycle events come back from /activity/log with a non-empty
@@ -224,7 +236,7 @@ export default function TabActivity({ agent, agentName }) {
             <span class="pf-agd-governance-label">${t('profile.agents.detail.activity.governance.deliveryHealth')}</span>
             <span class="pf-agd-governance-value">
               ${(!governance.mcpActive && !governance.webhookEnabled)
-                ? html`<span class="pf-agd-status-dot ${agent?.last_seen && (Date.now() - new Date(agent.last_seen).getTime() < 24 * 3600 * 1000) ? 'pf-agd-status-dot--active' : 'pf-agd-status-dot--inactive'}"></span> ${t('profile.agents.detail.activity.deliveryPollingLine') || 'Delivery: polling'}`
+                ? html`<span class="pf-agd-status-dot ${socketHeld(agent) || (agent?.last_seen && (Date.now() - new Date(agent.last_seen).getTime() < 24 * 3600 * 1000)) ? 'pf-agd-status-dot--active' : 'pf-agd-status-dot--inactive'}"></span> ${socketHeld(agent) ? (t('profile.agents.detail.activity.deliverySocketLine') || 'Delivery: live link') : (t('profile.agents.detail.activity.deliveryPollingLine') || 'Delivery: polling')}`
                 : html`
                   ${governance.mcpActive
                     ? html`<span class="pf-agd-status-dot pf-agd-status-dot--active"></span> ${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.connected')}`

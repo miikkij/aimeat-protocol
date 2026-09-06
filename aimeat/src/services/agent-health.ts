@@ -27,6 +27,14 @@
  *   import { computeAgentHealthMany } from '../services/agent-health.js';
  *   const health = computeAgentHealthMany(agents, onboardingByGaii);
  * @version-history
+ *   v1.2.0 — 2026-09-06 — A LIVE CONNECTOR SOCKET IS LIVENESS, and it is how a spawn agent proves
+ *     it. `lastSeen` is written when the agent's own credential touches the node, so an agent whose
+ *     runtime exists only while a worker runs ages out of every window between jobs while being
+ *     perfectly wakeable. Measured on aimeat.io the same day: 23 spawn agents, every one holding a
+ *     socket, 9 of them stale by hours or days at that moment, so nine working agents read as
+ *     problems on the Agents tab, the fleet board and the home. `connected` now blocks the
+ *     never-seen and stale-24h verdicts and carries its own delivery channel, so the page says how
+ *     work reaches the agent instead of claiming a poll that never happens.
  *   v1.1.0 — 2026-08-31 — A `workstation` agent gets its own state and its own bucket
  *     (`connection`), decided before staleness or onboarding are read. It is the MCP connection a
  *     tool uses rather than something that acts on its own, so the working/broken axis said things
@@ -64,7 +72,12 @@ export const AGENT_WEBHOOK_DOWN_THRESHOLD = 10;
 export type AgentHealthState = 'system' | 'workstation' | 'new' | 'onboarding' | 'problem' | 'idle' | 'production';
 export type AgentHealthBucket = 'issue' | 'onboarding' | 'online' | 'quiet' | 'internal' | 'connection';
 export type AgentHealthReason = 'onboarding-failed' | 'never-seen' | 'stale-24h' | 'webhook-down';
-export type AgentDeliveryChannel = 'webhook' | 'webhook-failing' | 'polling' | 'none';
+/**
+ * How work reaches this agent. `socket` is a connector holding this agent's own credential on a
+ * live forward tunnel: the node pushes down it, so an agent parked there is reachable in the second
+ * it is needed, whatever `lastSeen` says.
+ */
+export type AgentDeliveryChannel = 'webhook' | 'webhook-failing' | 'socket' | 'polling' | 'none';
 
 /** Sort order for a fleet view: an issue must never drown in a long list. */
 export const BUCKET_RANK: Record<AgentHealthBucket, number> =
@@ -132,6 +145,7 @@ export function computeAgentHealth(
     agent: HealthAgent,
     onboarding: AgentOnboardingRecord | null,
     nowMs: number = Date.now(),
+    connected = false,
 ): AgentHealth {
     const failCount = agent.webhookFailCount ?? 0;
     const webhookConfigured = !!agent.webhookUrl;
@@ -139,13 +153,18 @@ export function computeAgentHealth(
     const webhookHealthy = webhookEnabled && failCount < AGENT_WEBHOOK_DOWN_THRESHOLD;
 
     const sinceMs = msSince(agent.lastSeen, nowMs);
-    const neverSeen = sinceMs === null;
-    const stale = neverSeen || sinceMs > AGENT_STALE_MS;
-    const seenRecently = sinceMs !== null && sinceMs <= AGENT_ONLINE_WINDOW_MS;
+    // A live socket answers both questions `lastSeen` was being asked to answer. It is the daemon
+    // holding this agent's credential right now, so the agent has been seen this second and work
+    // pushed at it arrives; an agent that only WORKS occasionally is a different thing from one
+    // nobody can reach, and the field cannot tell them apart on its own.
+    const neverSeen = !connected && sinceMs === null;
+    const stale = !connected && (sinceMs === null || sinceMs > AGENT_STALE_MS);
+    const seenRecently = connected || (sinceMs !== null && sinceMs <= AGENT_ONLINE_WINDOW_MS);
 
     const channel: AgentDeliveryChannel = webhookEnabled
         ? (webhookHealthy ? 'webhook' : 'webhook-failing')
-        : (agent.lastSeen ? 'polling' : 'none');
+        : connected ? 'socket'
+            : (agent.lastSeen ? 'polling' : 'none');
 
     const delivery = {
         channel,
@@ -203,8 +222,9 @@ export function computeAgentHealth(
     if (reasons.length > 0) return verdict('problem', reasons);
 
     // A push agent that never polls is still working. The frontend never knew this, so an agent
-    // delivered to by webhook read as idle forever. Staleness above is unconditional, though: a
-    // configured webhook with no traffic keeps failCount at 0, so it cannot prove liveness.
+    // delivered to by webhook read as idle forever. A configured webhook does not clear the
+    // staleness above, though: with no traffic its failCount stays 0, so it proves nothing about
+    // whether anything is listening. A socket does prove it, which is why `connected` clears it.
     if (seenRecently || webhookHealthy) return verdict('production');
     return verdict('idle');
 }
@@ -232,8 +252,16 @@ export function computeAgentHealthMany(
     agents: Array<HealthAgent & { gaii: string }>,
     onboardingByGaii: Record<string, AgentOnboardingRecord | null>,
     nowMs: number = Date.now(),
+    /**
+     * Which of these agents hold a live connector socket right now, from
+     * `ConnectTunnelManager.isConnected(gaii)`. Omitted means "nobody asked the tunnel", and every
+     * verdict then rests on lastSeen and the webhook exactly as it did before.
+     */
+    connectedGaiis?: ReadonlySet<string>,
 ): Record<string, AgentHealth> {
     const out: Record<string, AgentHealth> = {};
-    for (const a of agents) out[a.gaii] = computeAgentHealth(a, onboardingByGaii[a.gaii] ?? null, nowMs);
+    for (const a of agents) {
+        out[a.gaii] = computeAgentHealth(a, onboardingByGaii[a.gaii] ?? null, nowMs, !!connectedGaiis?.has(a.gaii));
+    }
     return out;
 }
