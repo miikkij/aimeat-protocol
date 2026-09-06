@@ -232,8 +232,8 @@ export function listConversations(
 
   return rows.map(row => {
     const last = db.prepare(
-      'SELECT body, direction, senderGhii, recipientGhii FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? ORDER BY createdAt DESC LIMIT 1',
-    ).get(ownerGhii, row.conversationId) as { body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string } | undefined;
+      'SELECT body, direction, senderGhii, recipientGhii, broadcastId FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? ORDER BY createdAt DESC LIMIT 1',
+    ).get(ownerGhii, row.conversationId) as { body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string; broadcastId: string | null } | undefined;
     const unread = (db.prepare(
       'SELECT COUNT(*) as cnt FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? AND senderGhii <> ownerGhii AND ownerReadAt IS NULL',
     ).get(ownerGhii, row.conversationId) as { cnt: number }).cnt;
@@ -257,6 +257,7 @@ export function listConversations(
       messageCount: row.messageCount,
       unread,
       updatedAt: row.updatedAt,
+      broadcastId: last?.broadcastId ?? undefined,
     };
   });
 }
@@ -281,12 +282,12 @@ export function listConversationsForOwners(
 
   // Last message per (owner, conversation): newest row — the row that fixes peer + lastMessage + direction.
   const lasts = db.prepare(
-    `SELECT ownerGhii, conversationId, body, direction, senderGhii, recipientGhii FROM (
-        SELECT ownerGhii, conversationId, body, direction, senderGhii, recipientGhii,
+    `SELECT ownerGhii, conversationId, body, direction, senderGhii, recipientGhii, broadcastId FROM (
+        SELECT ownerGhii, conversationId, body, direction, senderGhii, recipientGhii, broadcastId,
                ROW_NUMBER() OVER (PARTITION BY ownerGhii, conversationId ORDER BY createdAt DESC, id DESC) rn
         FROM direct_messages WHERE ownerGhii IN (${ph})
      ) WHERE rn = 1`,
-  ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string }>;
+  ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string; broadcastId: string | null }>;
   // Thread subject: the earliest non-null subject (the message that opened it).
   const subjects = db.prepare(
     `SELECT ownerGhii, conversationId, subject FROM (
@@ -314,6 +315,7 @@ export function listConversationsForOwners(
       messageCount: g.messageCount,
       unread: g.unread,
       updatedAt: g.updatedAt,
+      broadcastId: last?.broadcastId ?? undefined,
     });
   }
   for (const arr of Object.values(out)) arr.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));

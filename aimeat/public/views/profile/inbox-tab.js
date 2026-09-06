@@ -14,6 +14,9 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.1.0 -- 2026-09-06 -- The copies of one broadcast are ONE row with the rest behind a disclosure
+ *     (openFolds/toggleFold, collapsed by default). The conversations figure still counts THREADS,
+ *     not rows: folding shortens the list, it does not give a person fewer conversations.
  *   v2.0.0 -- 2026-08-29 -- The poster face (design canvas "AIMEAT Viestien sivu", direction A). One title
  *     row (the crumb, Messages with its figures, the New-message slab, Broadcast and Tracked responses
  *     as doors) and the two panes under an ink rule. Broadcast, tracked responses and results are
@@ -164,6 +167,11 @@ import { swallowed } from '/js/swallowed.js';
 export default function InboxTab({ showToast }) {
   const [requests, setRequests] = useState([]);
   const [conversations, setConversations] = useState([]);
+  // Which broadcast rows the person has opened up. Collapsed is the default and the point: the server
+  // hands twenty copies of one announcement down as one row, and this is per-viewer, per-visit state
+  // about what they wanted to look inside — nothing worth persisting.
+  const [openFolds, setOpenFolds] = useState({});
+  const toggleFold = useCallback((id) => setOpenFolds(s => ({ ...s, [id]: !s[id] })), []);
   const [activeConv, setActiveConv] = useState(null);     // { conversationId, peerGhii }
   // Mirrored into a ref so []-memoized callbacks (transcribeVoice) can reload the OPEN thread
   // without taking activeConv as a dependency and being rebuilt on every thread switch.
@@ -683,6 +691,10 @@ export default function InboxTab({ showToast }) {
   // are PAGES under the same crumb rather than contents swapped into the right pane, so the left
   // list never lies about what the right side shows.
   const unreadTotal = conversations.reduce((n, c) => n + (c.unread || 0), 0);
+  // Threads, not rows. Folding twenty copies of one announcement into a single row makes the LIST
+  // shorter; it does not make the person have fewer conversations, and a figure that fell by nineteen
+  // because the display improved would be answering a question nobody asked.
+  const convTotal = conversations.reduce((n, c) => n + 1 + (c.folded?.length || 0), 0);
   const isPage = mode === 'tracked' || mode === 'results' || mode === 'broadcast';
   const pageTitle = mode === 'broadcast' ? t('inbox.broadcastTitle') : mode === 'results' ? t('inbox.resultsTitle') : t('inbox.trackedTitle');
   const goIdle = () => { setMode('idle'); setActiveConv(null); setReplyQuote(null); };
@@ -701,7 +713,7 @@ export default function InboxTab({ showToast }) {
       <div class="og-mast og-mast--page">
         <div class="og-mast-words">
           <h1 class="og-title">${isPage ? pageTitle : t('inbox.title')}${!isPage ? html`<small>
-            <span>${(t('inbox.cover.figConvs') || '{n} conversations').replace('{n}', String(conversations.length))}</span>
+            <span>${(t('inbox.cover.figConvs') || '{n} conversations').replace('{n}', String(convTotal))}</span>
             ${unreadTotal ? html`<span class="og-chip og-chip--sun">${(t('inbox.cover.figUnread') || '{n} unread').replace('{n}', String(unreadTotal))}</span>` : null}
             ${requests.length ? html`<span class="og-chip">${(t('inbox.cover.figRequests') || '{n} requests').replace('{n}', String(requests.length))}</span>` : null}
           </small>` : null}</h1>
@@ -738,7 +750,8 @@ export default function InboxTab({ showToast }) {
       <div class=${`inbox-body${mode !== 'idle' ? ' inbox-body--panel' : ''}`}>
         <button class="inbox-back" onClick=${goIdle}>← ${t('inbox.back')}</button>
         <${ListPanel} requests=${requests} conversations=${conversations} activeConv=${activeConv}
-          peerDisplay=${peerDisplay} accept=${accept} block=${block} openConversation=${openConversation} />
+          peerDisplay=${peerDisplay} accept=${accept} block=${block} openConversation=${openConversation}
+          openFolds=${openFolds} toggleFold=${toggleFold} />
 
         ${mode === 'compose' ? html`
           <div class="inbox-panel">

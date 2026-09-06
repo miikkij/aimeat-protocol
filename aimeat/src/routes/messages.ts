@@ -62,8 +62,8 @@ import type { Storage, DirectMessageRecord } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity, parseGaiiLoose } from '../utils/gaii.js';
-import { conversationIdFor, messagePreview, deliveryTargetFor } from '../utils/messaging.js';
+import { resolveIdentity } from '../utils/gaii.js';
+import { conversationIdFor, messagePreview, deliveryTargetFor, isAddressableRecipient } from '../utils/messaging.js';
 import { emitChange } from '../services/event-bus.js';
 import { dismissConversationNotifications } from '../services/notify.js';
 import { MessageSendSchema, BroadcastSendSchema } from '../models/message-schemas.js';
@@ -74,7 +74,7 @@ import { sendGroupMessage, isParticipant } from '../services/conversation-group.
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
 import { withMessageProvenance } from '../services/message-provenance.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
-import { resolveAudience, sendBroadcast, broadcastToFederation } from '../services/message-broadcast.js';
+import { broadcastFromPrincipal } from '../services/message-broadcast.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 import { createMessagingDbService } from '../services/db/messaging-db-service.js';
 import { createMessagesInboxService } from '../services/db/messages-inbox-db-service.js';
@@ -90,16 +90,6 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
 
   /** Resolve the caller's effective identity (owner→GHII, agent/eco→sub). */
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
-
-  /** A recipient must resolve to an owner@node — a human GHII, an agent GAII (agent#owner@node) or an
-   *  ecosystem app (eco:app#owner@node). Agents/eco have no inbox of their own, so a reply addressed to
-   *  one is delivered to the owner's human inbox (deliveryTargetFor); the thread keeps the agent/eco
-   *  identity. This is what lets you reply to an agent that messaged you. */
-  function isAddressableRecipient(id: string): boolean {
-    const p = parseGaiiLoose(id);
-    return !!p.owner && !!p.node;
-  }
-
 
   /* ── POST /v1/messages — send ── */
   router.post('/v1/messages', requireAuth(), requireExternalPrincipal(), requireScope('messages:send'), async (req, res) => {
@@ -274,41 +264,40 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     }
     const input = parsed.data;
     const senderGhii = resolve(req);
-
-    // "all node users" and "all federation users" are operator-only (a node/federation-wide announcement
-    // is a privileged action). An operator broadcast also bypasses the first-contact gate (lands in inbox).
-    const isOperatorAudience = input.audience === 'node-users' || input.audience === 'federation-users';
-    if (isOperatorAudience && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'A node/federation-wide audience is operator-only'));
-      return;
-    }
-
-    const recipients = (await resolveAudience(deliveryCtx, senderGhii, { to: input.to, groupId: input.group_id, audience: input.audience }))
-      .filter(isAddressableRecipient);
-    // federation-users still proceeds with no LOCAL recipients — peers deliver to their own owners.
-    if (recipients.length === 0 && input.audience !== 'federation-users') {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No valid recipients in the audience'));
-      return;
-    }
-
     const attachments = input.attachments ? mapMessageAttachments(input.attachments, senderGhii, config.nodeId) : undefined;
-    const result = await sendBroadcast(deliveryCtx, {
-      senderGhii, recipients, mode: input.mode, body: input.body, attachments, interactive: input.interactive,
-      skipContactGate: isOperatorAudience,
+
+    // TARGET-058, same rule as the 1:1 door above: an agent broadcasting through REST is writing
+    // AI-authored text delivered to named people, and one set of bytes goes to all of them, so every
+    // copy carries the SAME record. Stamped from the principal here; the MCP tool stamps the agent's
+    // own declaration instead and hands the id to the same service. A human sender is a no-op.
+    const aiProvenanceId = await provenanceForWrite(storage, {
+      principal: senderGhii,
+      content: [input.body ?? '', ...(input.interactive?.role === 'questions'
+        ? input.interactive.questions.map(q => `${q.header ?? ''} ${q.prompt ?? ''}`) : [])].join('\n'),
+      pipeline: 'rest.messages_broadcast',
+      surface: { visibility: 'private', humanAudience: true },
+      labelPolicy: config.aiLabelPublic,
+      nodeId: config.nodeId,
+      baseUrl: config.baseUrl,
+      enabled: config.aiProvenance,
     });
 
-    // federation-users: fan the announcement out to each active peer (each delivers to its own owners).
-    let federationPeers = 0;
-    if (input.audience === 'federation-users') {
-      const fed = await broadcastToFederation(deliveryCtx, {
-        senderGhii, mode: input.mode, body: input.body, interactive: input.interactive, broadcastId: result.broadcastId,
-      });
-      federationPeers = fed.peers;
+    // The whole send-to-many lives in the service, because aimeat_dm_broadcast calls the same five
+    // decisions and a copy of them here is how one door ends up gating what the other does not.
+    const result = await broadcastFromPrincipal(deliveryCtx, {
+      senderGhii, isOperator: req.auth!.roles.includes('operator'),
+      to: input.to, groupId: input.group_id, audience: input.audience,
+      mode: input.mode, body: input.body, subject: input.subject, attachments, interactive: input.interactive,
+      aiProvenanceId,
+    });
+    if (!result.ok) {
+      res.status(result.status).json(error(config.nodeId, result.code, result.message));
+      return;
     }
 
     res.status(201).json(success(config.nodeId, {
-      broadcast_id: result.broadcastId, recipients: recipients.length, sent: result.sent, failed: result.failed,
-      federation_peers: federationPeers,
+      broadcast_id: result.broadcastId, recipients: result.recipients, sent: result.sent, failed: result.failed,
+      federation_peers: result.federationPeers,
     }, [
       { description: 'View results', method: 'GET', url: `/v1/messages/broadcast/${result.broadcastId}` },
     ]));

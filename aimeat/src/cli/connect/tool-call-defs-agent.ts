@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 -- 2026-09-06 -- aimeat_dm_broadcast on the CLI dispatch, the third surface.
  *   v1.5.0 -- 2026-08-28 -- The five aimeat_crew_* tools as thin proxies onto /v1/agents/:name/crew*;
  *     try waits locally by polling, so wait_seconds is consumed here rather than forwarded.
  *   v1.4.0 -- 2026-08-14 -- aimeat_task_create takes `scope` here too.
@@ -485,6 +486,32 @@ export const agentTools: ConnectCliToolDefinition[] = [
             const conversationId = optionalString(input, 'conversation_id'); if (conversationId) body.conversation_id = conversationId;
             const attachments = optionalArray(input, 'attachments'); if (attachments) body.attachments = attachments;
             return client.post('/v1/messages', body);
+        },
+    },
+    {
+        name: 'aimeat_dm_broadcast',
+        description: 'Tell MANY people or agents the same thing in ONE call instead of looping aimeat_dm_send. Every copy is an ordinary 1:1 thread the recipient can answer, and every copy shares one broadcast id, which is what folds them into a single row in the recipient list.',
+        input: {
+            to: { type: 'array', description: 'Recipient identities (owner@node, agent#owner@node, eco:app#owner@node), up to 500.' },
+            group_id: { type: 'string', description: 'A Share Group whose members are the audience.' },
+            audience: { type: 'string', description: '"node-users" or "federation-users". OPERATOR-ONLY.' },
+            mode: { type: 'string', description: '"broadcast" (default, repliable) or "announcement" (read-only).' },
+            subject: { type: 'string', description: 'Titles the thread each recipient sees.' },
+            body: { type: 'string', description: 'Message body (markdown). Optional with attachments or questions.' },
+            attachments: { type: 'array', description: 'Up to 20 { storage_key, mime, kind, size, name } descriptors.' },
+            interactive: { type: 'object', description: 'A question set { role:"questions", v:1, questions:[…] } — makes it a poll.' },
+        },
+        handler: ({ client }, input) => {
+            const body: JsonObject = {};
+            const to = optionalArray(input, 'to'); if (to) body.to = to;
+            const groupId = optionalString(input, 'group_id'); if (groupId) body.group_id = groupId;
+            const audience = optionalString(input, 'audience'); if (audience) body.audience = audience;
+            const mode = optionalString(input, 'mode'); if (mode) body.mode = mode;
+            const subject = optionalString(input, 'subject'); if (subject) body.subject = subject;
+            const text = optionalString(input, 'body'); if (text) body.body = text;
+            const attachments = optionalArray(input, 'attachments'); if (attachments) body.attachments = attachments;
+            const interactive = optionalRecord(input, 'interactive'); if (interactive) body.interactive = interactive;
+            return client.post('/v1/messages/broadcast', body);
         },
     },
     {

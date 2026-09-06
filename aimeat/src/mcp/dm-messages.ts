@@ -52,6 +52,7 @@ import { sendDirectMessage, mapMessageAttachments } from '../services/message-se
 import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
 import { sendGroupMessage } from '../services/conversation-group.js';
+import { broadcastFromPrincipal } from '../services/message-broadcast.js';
 import type { DeliveryCtx } from '../services/message-delivery.js';
 import { MessageAttachmentInputSchema, InteractiveQuestionSchema } from '../models/message-schemas.js';
 import { annotationsFor } from './annotations.js';
@@ -233,6 +234,93 @@ export function registerDmMessageTools(
                             note: 'Support on this node is answered by the people who run it, on another node. Pass conversation_id back to continue the same thread.',
                             reply_with: 'aimeat_dm_send with conversation_id set to the value above',
                         } : {}),
+                        ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
+                    }, null, 2),
+                }],
+            };
+        },
+    );
+
+    // ── aimeat_dm_broadcast — tell MANY the same thing in ONE call ──
+    // The reason this exists: without it the only send-to-many an agent had was a LOOP over
+    // aimeat_dm_send, which produces one untagged thread per recipient and fills a person's list with
+    // twenty identical rows in one minute. A broadcast tags every copy with one shared id, and that id
+    // is what the recipient's conversations list folds on.
+    mcp.tool(
+        'aimeat_dm_broadcast',
+        descriptionFor('aimeat_dm_broadcast'),
+        {
+            to: z.array(z.string().min(3).max(256)).max(500).optional()
+                .describe('Recipient identities: owner@node, agent#owner@node, eco:app#owner@node. Up to 500.'),
+            group_id: z.string().min(1).max(64).optional().describe('A Share Group whose members are the audience.'),
+            audience: z.enum(['node-users', 'federation-users']).optional()
+                .describe('Every human on this node, or across the federation. OPERATOR-ONLY, and an agent is not an operator — use `to` or `group_id`.'),
+            mode: z.enum(['broadcast', 'announcement']).optional()
+                .describe('"broadcast" (default) lets each recipient reply in their own thread; "announcement" disables replies.'),
+            subject: z.string().min(1).max(200).optional()
+                .describe('Titles the thread each recipient sees. Without it the copies land in the nameless per-pair thread.'),
+            body: z.string().max(200_000).optional().describe('Message body (GFM markdown). Optional only with attachments or questions.'),
+            attachments: z.array(MessageAttachmentInputSchema).max(20).optional()
+                .describe('Up to 20 files, each pre-uploaded via aimeat_storage_upload (presigned).'),
+            interactive: z.object({
+                role: z.literal('questions'), v: z.literal(1),
+                questions: z.array(InteractiveQuestionSchema).min(1).max(20),
+                submitLabel: z.string().max(60).optional(),
+            }).optional().describe('A question set — makes it a poll fanned out to everyone.'),
+            ...aiProvenanceInputs,
+        },
+        annotationsFor('aimeat_dm_broadcast'),
+        async ({ to, group_id, audience, mode, subject, body, attachments, interactive, ai_provenance, ai_provenance_id }) => {
+            const senderGhii = getAgentGaii();
+            if (!body?.trim() && !attachments?.length && !interactive) {
+                return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'A broadcast must have a body, an attachment, or questions.' }) }] };
+            }
+            const mapped = attachments?.length ? mapMessageAttachments(attachments, senderGhii, config.nodeId) : undefined;
+            const aiProvenanceId = await provenanceForWrite(storage, {
+                principal: senderGhii,
+                // The questions are content a person reads, exactly as in aimeat_dm_ask, so they are
+                // hashed with the body rather than left out of the record.
+                content: [body ?? '', ...(interactive?.questions ?? []).map(q => `${q.header ?? ''} ${q.prompt ?? ''}`)].join('\n'),
+                declaredId: ai_provenance_id,
+                declared: toDeclaredProvenance(ai_provenance),
+                pipeline: 'mcp.dm_broadcast',
+                surface: { visibility: 'private', humanAudience: true },
+                labelPolicy: config.aiLabelPublic,
+                nodeId: config.nodeId,
+                baseUrl: config.baseUrl,
+                enabled: config.aiProvenance,
+            });
+            // isOperator: false, deliberately. Other tools on this surface read the OWNER's record and
+            // treat the agent as an operator when the human is one. A node-wide announcement is not the
+            // place for that: it reaches every human here and auto-accepts the contact for each of them,
+            // and the REST door refuses the very same agent token, which carries no operator role. A
+            // tool that grants more than the route for one principal is the drift check:mcp-tools exists
+            // to catch, and it would be granting it in the dangerous direction.
+            const result = await broadcastFromPrincipal(ctx, {
+                senderGhii, isOperator: false,
+                to, groupId: group_id, audience,
+                mode: mode ?? 'broadcast', body: body ?? '', subject, attachments: mapped, interactive,
+                aiProvenanceId,
+            });
+            if (!result.ok) {
+                return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: result.message, code: result.code }) }] };
+            }
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        broadcast_id: result.broadcastId,
+                        recipients: result.recipients,
+                        sent: result.sent,
+                        failed: result.failed,
+                        federation_peers: result.federationPeers,
+                        // A refused recipient is named rather than counted away: this is the surface
+                        // where a mistyped agent name now comes back as RECIPIENT_NOT_FOUND per copy,
+                        // and a caller that only saw `sent` would read a partial send as a whole one.
+                        note: result.failed.length
+                            ? `${result.sent} delivered, ${result.failed.length} refused — see failed[] for which and why.`
+                            : `Delivered to ${result.sent}. Each recipient has their own thread and can reply to you in it.`,
+                        read_results_with: `GET /v1/messages/broadcast/${result.broadcastId}`,
                         ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
                     }, null, 2),
                 }],

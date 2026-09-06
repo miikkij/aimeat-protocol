@@ -7,6 +7,8 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.16.0 -- 2026-09-06 -- .inbox-conv-fold / .inbox-fold-toggle: the disclosure under a folded
+ *     broadcast row, on the nesting rail, with a 40 px target on a phone.
  *   v1.15.2 -- 2026-08-29 -- The phone's list view takes the measured --inbox-desk-avail too (use-thread-ux
  *     v1.7.0) instead of "100dvh - 168px", a header height the poster mast no longer matches.
  *   v1.15.1 -- 2026-08-29 -- The -58px margin that lifted the actions onto the old shell's breadcrumb line is
@@ -283,6 +285,21 @@
 .inbox-conv--nested .inbox-name { font-weight: 400; }
 .inbox-conv-subico {
   width: 28px; flex: none; text-align: center; font-size: 15px; opacity: 0.8;
+}
+/* A folded broadcast: one row standing for many copies, with the rest behind a disclosure. The
+   toggle is indented to the nesting rail so it reads as belonging to the row above it. */
+.inbox-conv-fold { display: contents; }
+.inbox-fold-toggle {
+  display: block; width: 100%; text-align: left;
+  padding: 3px 8px 5px 18px; margin: 0;
+  background: none; border: none; cursor: pointer;
+  font-size: 11.5px; color: var(--text-dim); font-family: inherit;
+}
+.inbox-fold-toggle:hover { color: var(--accent); }
+/* A finger presses this one, so it gets a finger's target on a phone. The desktop row keeps its
+   density: the list is read with a pointer there and 24 px is already generous for one. */
+@media (max-width: 760px) {
+  .inbox-fold-toggle { min-height: 40px; padding-top: 8px; padding-bottom: 8px; }
 }
 /* Subject thread chips (conversation list + thread header). */
 .inbox-conv-subject {

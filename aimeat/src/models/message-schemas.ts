@@ -9,6 +9,9 @@
  * @structure MessageAttachmentInputSchema, InteractivePayloadSchema, MessageSendSchema
  * @usage import { MessageSendSchema } from '../models/message-schemas.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-06 -- BroadcastSendSchema takes `subject`. Without it a broadcast could only
+ *     open the nameless per-pair thread, so anyone who wanted a titled announcement looped the 1:1
+ *     send instead and produced N threads with no shared id for a list to fold.
  *   v1.3.0 -- 2026-08-11 -- `to` accepts a named group address (support@operators) and is optional
  *     when conversation_id names a group thread: a reply into a group is addressed to the thread.
  *   Text limits raised — 2026-07-30 — prompts/labels to 10 000 and bodies to 200 000.
@@ -135,6 +138,10 @@ export const BroadcastSendSchema = z.object({
   group_id: z.string().min(1).max(64).optional(),
   audience: z.enum(['node-users', 'federation-users']).optional(),  // OPERATOR-only (gated at the route)
   mode: z.enum(['broadcast', 'announcement']).optional().default('broadcast'),
+  // A titled announcement opens a NAMED thread per recipient instead of dropping into the nameless
+  // per-pair thread. Its absence is why a sender who wanted a title had to loop the 1:1 send instead,
+  // and twenty untitled-but-separate threads is exactly what a broadcast exists to avoid.
+  subject: z.string().min(1).max(200).optional(),
   body: z.string().max(200_000).optional().default(''),
   attachments: z.array(MessageAttachmentInputSchema).max(20).optional(),
   interactive: InteractivePayloadSchema.optional(),

@@ -268,6 +268,23 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_dm_broadcast',
+        description: 'Tell MANY people or agents the same thing in ONE call, instead of looping aimeat_dm_send. Every copy is an ordinary 1:1 thread the recipient can answer privately, and every copy carries one shared broadcast id — which is what lets their inbox fold the copies into a single row instead of one row per recipient. Use this for an announcement, a status notice, or a question put to a whole fleet; use aimeat_dm_send when you are writing to one person. `subject` titles the thread each recipient sees, so name the actual thing. `mode` "announcement" makes the copies read-only (nobody can reply); "broadcast" (the default) lets each recipient answer you in their own thread. Recipients come from `to` (a list), `group_id` (a Share Group as a distribution list), or `audience` (every human on this node, or across the federation — operator only). The reply is a broadcast_id you read results with. Requires the messages:send scope.' + AI_PROVENANCE_TOOL_NOTE,
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            ...aiProvenanceCatalogInput,
+            to: { type: 'array', description: 'Recipient identities (owner@node, agent#owner@node, eco:app#owner@node), up to 500.' },
+            group_id: { type: 'string', description: 'A Share Group whose members are the audience — a reusable distribution list.' },
+            audience: { type: 'string', description: '"node-users" (every human on this node) or "federation-users" (that plus every owner on each active peer). OPERATOR ONLY.' },
+            mode: { type: 'string', description: '"broadcast" (default, each recipient can reply) or "announcement" (read-only, replies disabled).' },
+            subject: { type: 'string', description: 'Titles the thread each recipient sees. Without it the copies land in the nameless per-pair thread.' },
+            body: { type: 'string', description: 'Message body (GFM markdown). Optional only if you attach a file or send questions.' },
+            attachments: { type: 'array', description: 'Up to 20 attachment descriptors { storage_key, mime, kind, size, name }, each pre-uploaded via aimeat_storage_upload.' },
+            interactive: { type: 'object', description: 'A question set { role:"questions", v:1, questions:[…] } — makes it a poll fanned out to everyone.' },
+        },
+    },
+    {
         name: 'aimeat_dm_send_as_owner',
         description: 'Send a federated direct message AS THE OWNER (a consented delegation), not as your own agent identity — this is how you reply to the owner\'s "Postilaatikko" conversations on their behalf so the reply comes FROM the owner, in the owner\'s existing thread. The recipient sees it as from the owner (the human), exactly as if they had sent it from the AIMEAT UI. Requires the messages:send-as-owner scope, which the owner grants explicitly; without it this tool is not available and you should hand the drafted reply back for the owner to send themselves. The sender is always your OWN owner (derived server-side) — you can never send as anyone else. Pass the owner\'s conversation_id (from the reply context) so it lands in the right thread. Attach files via aimeat_storage_upload first. Prefer this over aimeat_dm_send when the human asked you to reply for them.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',

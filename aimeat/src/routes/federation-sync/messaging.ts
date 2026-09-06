@@ -5,6 +5,9 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-09-06 — A federated announcement carries its title: the peer's `subject` is bounded
+ *     and stored, and a titled one opens a thread of its own rather than being buried in the pair
+ *     thread under whatever that was already called.
  *   v1.2.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 13): the first-contact auto-accept no
  *     longer trusts a bare conversation-id match. The id is derived deterministically from two public
  *     identities, so a stranger on any node could compute an existing thread's id and paste it in to
@@ -403,6 +406,11 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         }
 
         const senderGhii: string = broadcast.senderGhii;
+        // The title a peer sent, bounded here rather than trusted. Everything else on this frame is
+        // already shaped by the fields we read; a subject is new, it is a principal-supplied string on
+        // the other side of a trust boundary, and it lands in a row every human on this node sees.
+        const rawSubject = typeof broadcast.subject === 'string' ? broadcast.subject.trim() : '';
+        const peerSubject = rawSubject ? rawSubject.slice(0, 200) : undefined;
         const now = new Date().toISOString();
         const ghiis = await storage.listGHIIs();
         let delivered = 0;
@@ -412,12 +420,19 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 // Respect a block: a recipient who blocked the sender does NOT get the announcement.
                 const existing = await storage.getContact(g.ghii, senderGhii).catch(err => { logger.warn('POST /v1/federation/broadcast: continuing after a suppressed failure', { error: String(err) }); return null; });
                 if (existing?.state === 'blocked') continue;
-                const conversationId = conversationIdFor(senderGhii, g.ghii);
+                // A TITLED announcement opens a thread of its own, the same rule sendDirectMessage
+                // applies locally. Dropping it into the deterministic pair thread instead would bury
+                // it under whatever that thread was already called: the list takes the EARLIEST
+                // non-null subject, so the announcement's own title would never be the one shown.
+                // A reply travels back by conversationId, which the DM payload carries, so the fresh
+                // thread survives the crossing.
+                const conversationId = peerSubject ? randomUUID() : conversationIdFor(senderGhii, g.ghii);
                 const id = randomUUID();
                 // Operator announcement: auto-accept a NEW contact so it lands in the inbox, not requests.
                 if (!existing) await storage.setContactState(g.ghii, senderGhii, 'accepted', id).catch(err => { logger.warn('POST /v1/federation/broadcast: best-effort', { error: String(err) }); });
                 await storage.createDirectMessage({
                     id, ownerGhii: g.ghii, conversationId, senderGhii, recipientGhii: g.ghii,
+                    subject: peerSubject,
                     body: broadcast.body ?? '', interactive: broadcast.interactive ?? undefined,
                     broadcastId: broadcast.broadcastId, respondable: broadcast.respondable,
                     status: 'delivered', direction: 'inbound', origin: 'federation', originNodeId: source_node,

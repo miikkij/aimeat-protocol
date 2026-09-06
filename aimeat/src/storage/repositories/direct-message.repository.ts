@@ -7,6 +7,9 @@
  * @structure DirectMessageRepository — message + contact-consent methods, mirrored across SQLite + Mongo.
  * @usage import type { DirectMessageRepository } from '../interface.js'; (composed into Storage)
  * @version-history
+ *   v1.4.0 -- 2026-09-06 -- ConversationSummary carries broadcastId, read off the thread's NEWEST
+ *     message. That one choice is the whole fold rule: copies of one announcement collapse into a
+ *     single row, and a thread somebody answered lifts back out because a reply carries no id.
  *   v1.3.0 -- 2026-08-22 -- ConversationSummary carries lastSenderGhii (a copy in a mailbox is not
  *     proof the owner wrote it), and listDmsAddressedTo takes an optional groupScope so an identity
  *     can read the group threads it is a named participant of. A group thread's copies are written to the mailbox each participant resolves to, which for an agent is its OWNER's, and the message is addressed to the thread rather than to a person. So the agent was on none of its own rows: it read 0 messages in a thread it had just opened, and the answer would never have reached it either.
@@ -33,6 +36,17 @@ export type ConversationSummary = {
   messageCount: number;
   unread: number;
   updatedAt: string;
+  /**
+   * The broadcast this thread's NEWEST message belongs to, when it belongs to one.
+   *
+   * It is read off the last message rather than the thread, and that is the whole fold rule. One
+   * announcement to twenty agents is twenty separate 1:1 threads by design — each recipient can
+   * answer privately — so twenty rows appeared in one list within the same minute. Rows sharing this
+   * id collapse into one. The moment somebody REPLIES, the newest message in their thread is the
+   * reply, which carries no broadcastId, and their row lifts back out on its own: an answer can never
+   * be folded away, and nothing had to detect one.
+   */
+  broadcastId?: string;
 };
 
 export interface DirectMessageRepository {
