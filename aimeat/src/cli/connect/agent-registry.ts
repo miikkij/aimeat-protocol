@@ -179,7 +179,10 @@ export class AgentRegistry {
 export function buildRegistry(loaded: LoadedAgent[]): AgentRegistry {
   const reg = new AgentRegistry();
   for (const a of loaded) {
-    const client = new AimeatClient(a.config.node_url, a.token);
+    // The identity is named so the client can re-mint after a SCOPE_DENIED. This is the fleet's
+    // client — the one behind /local/call and the tunnel — so a client here that does not know
+    // whose token it holds is exactly the case where the stale-credential retry cannot run.
+    const client = new AimeatClient(a.config.node_url, a.token, { agent: a.agent, owner: a.owner });
     try {
       reg.add({ gaii: a.gaii, agent: a.agent, owner: a.owner, client, config: a.config });
     } catch (err) {

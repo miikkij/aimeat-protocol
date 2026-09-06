@@ -10,6 +10,14 @@
  *   MCP tool call flows over the single persistent WS without per-tool changes.
  * @usage Imported by `aimeat connect` subcommands and MCP tools.
  * @version-history
+ *   v1.4.0 -- 2026-09-07 -- The SCOPE_DENIED retry, done the way v1.3.0 could not. `send()` is now
+ *     a guard around `dispatch()`, so the ONE retry sits in front of both the tunnel and the direct
+ *     fetch rather than after the transport's early return. The anti-amplification guard is a single
+ *     attempt per call, never a token-string comparison: a fresh JWT differs in `iat` and `jti`
+ *     every time, so that comparison could not fire. A client that does not know whose credential
+ *     it holds skips the retry and returns the refusal unchanged. Asked for by crewaimeat on
+ *     2026-09-06, after an owner granted a scope three times in one evening and the only thing that
+ *     made it take effect was killing the shared serve daemon.
  *   v1.3.0 -- 2026-09-06 -- A SCOPE_DENIED retry was added here and removed the same day. It sat
  *     AFTER the transport branch, which returns first, so it could not run on the tunnel -- the path
  *     the bug was reported on -- and where it did run it re-minted on every refused call, because a
@@ -25,6 +33,7 @@
  */
 import { getToken } from './keychain.js';
 import { loadConfig } from './config.js';
+import { forgetCachedToken } from './agent-key.js';
 
 export interface ApiResponse {
   ok: boolean;
@@ -57,9 +66,11 @@ export class AimeatClient {
   private token: string | null = null;
   private transport: Transport | null = null;
 
-  constructor(baseUrl: string, token?: string) {
+  constructor(baseUrl: string, token?: string, identity?: { agent: string; owner: string }) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.token = token ?? null;
+    this.agent = identity?.agent ?? null;
+    this.owner = identity?.owner ?? null;
   }
 
   static async fromConfig(): Promise<AimeatClient> {
@@ -67,8 +78,18 @@ export class AimeatClient {
     if (!config) throw new Error('Not configured. Run: npx aimeat connect');
     const token = await getToken(config.agent, config.owner);
     if (!token) throw new Error('No stored token. Run: npx aimeat connect');
-    return new AimeatClient(config.node_url, token);
+    return new AimeatClient(config.node_url, token, { agent: config.agent, owner: config.owner });
   }
+
+  /**
+   * Whose credential this client carries. Needed to re-mint after a SCOPE_DENIED; a client that
+   * does not know it simply skips the retry and returns the refusal, which is the old behaviour.
+   */
+  private agent: string | null;
+  private owner: string | null;
+
+  /** Name the identity on a client built by hand (the serve daemon builds one per registered agent). */
+  setIdentity(agent: string, owner: string): void { this.agent = agent; this.owner = owner; }
 
   /**
    * The HTTP status of the most recent call, or 0 before the first one.
@@ -98,6 +119,35 @@ export class AimeatClient {
    * default case use direct fetch with `Connection: close`.
    */
   private async send(method: string, path: string, body?: unknown): Promise<ApiResponse> {
+    const first = await this.dispatch(method, path, body);
+    if (!this.isScopeDenied(first)) return first;
+
+    // SCOPE_DENIED means the node compared our token's scopes against the agent's record and
+    // refused. The record is the truth and the token is a snapshot, so a refusal on THIS code is
+    // by definition a stale credential — the only remedy is a fresh one. Reported 2026-09-06:
+    // an owner granted a scope three times in one evening and the only thing that made it take
+    // effect was killing the shared serve daemon, because the mint is cached for `expires_in`.
+    //
+    // ONE retry, gated by a flag and never by comparing the two token strings. The version that
+    // shipped and was removed on 2026-09-06 used that comparison as its anti-amplification guard,
+    // and it can never fire: a freshly minted JWT differs from its predecessor in `iat` and `jti`
+    // every single time. It also sat AFTER the transport branch below, so on the tunnel — the path
+    // the bug was reported on — it never ran at all. This sits in front of BOTH paths.
+    if (!this.agent || !this.owner) return first;
+    forgetCachedToken(this.agent, this.owner);
+    const fresh = await getToken(this.agent, this.owner);
+    if (!fresh || fresh === this.token) return first;
+    this.token = fresh;
+    return this.dispatch(method, path, body);
+  }
+
+  /** True when the node refused this call for a scope the token does not carry. */
+  private isScopeDenied(r: ApiResponse): boolean {
+    return this.lastStatus === 403 && r?.ok === false && r?.error?.code === 'SCOPE_DENIED';
+  }
+
+  /** One attempt. Node-relative paths go through the transport when one is set. */
+  private async dispatch(method: string, path: string, body?: unknown): Promise<ApiResponse> {
     if (this.transport && !path.startsWith('http')) {
       const r = await this.transport.request(method, path, { body });
       this.lastStatus = r.status;
