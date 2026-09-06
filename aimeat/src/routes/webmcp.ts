@@ -43,6 +43,7 @@ import { authoriseMeteredCall } from '../services/metered-access.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { respondMeteredRefusal } from './extensions/metered-response.js';
 import { mintInternalPass } from './extensions/internal-pass.js';
+import { logger } from '../utils/logger.js';
 import { recordCallDuration } from '../services/call-timing.js';
 import { recordAccountEvent, recordFirstUse } from '../services/account-events.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
@@ -277,7 +278,14 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     // Unpriced: a direct invoke of the backing capability — authenticated principals only.
-    requireAuth()(req, res, async () => {
+    //
+    // EXPRESS NEVER SEES THIS PROMISE. `next` is called synchronously and its return value is
+    // discarded, so an async callback here is a floating promise: a throw ABOVE the inner try — the
+    // capability read is a database call — was an unhandled rejection, and the request hung until
+    // the client's own timeout with nothing in any log to say why. The wrapper below is what turns
+    // that into an answer.
+    requireAuth()(req, res, () => {
+      void (async () => {
       if (!tool.action_id) {
         res.status(422).json(error(config.nodeId, 'TOOL_NOT_INVOKABLE', 'This tool declares no price and no capability binding; nothing to invoke'));
         return;
@@ -303,6 +311,14 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
         const e = err as { statusCode?: number; code?: string; message?: string };
         res.status(e.statusCode || 502).json(error(config.nodeId, e.code || 'TOOL_INVOKE_FAILED', e.message || 'Tool invocation failed'));
       }
+      })().catch((err: unknown) => {
+        logger.error('webmcp: the unpriced invoke threw outside its own handler', {
+          app: appRef, tool: toolName, error: err instanceof Error ? err.message : String(err),
+        });
+        if (!res.headersSent) {
+          res.status(500).json(error(config.nodeId, 'TOOL_INVOKE_FAILED', 'The tool could not be invoked. This node has logged why.'));
+        }
+      });
     });
   });
 

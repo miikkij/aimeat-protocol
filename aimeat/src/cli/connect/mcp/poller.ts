@@ -21,6 +21,8 @@
  *   (CI/serverless) still polls unconditionally.
  *
  * @version-history
+ *   v1.1.0 -- 2026-09-06 -- Review item 4.7: a throw inside the loop is logged and the next turn
+ *     is still scheduled. It used to end the poller for good while the daemon reported online.
  *   v1.9.4 -- 2026-05-28 -- Name-based message inbox endpoint
  *   v1.9.5 -- 2026-05-28 -- Track IDs (not counts), recursive setTimeout, surface auth failures
  *   v2.0.0 -- 2026-05-29 -- Per-agent poll loop + task-runner hook for subprocess agents
@@ -145,12 +147,23 @@ export function startPollerForAgent(agent: RegisteredAgent): void {
 
   async function loop(): Promise<void> {
     if (stopped) return;
-    await pollOnce();
+    try {
+      await pollOnce();
+    } catch (err) {
+      // A THROW HERE USED TO END THE POLLER FOR GOOD. loop() was called unawaited with no catch, so
+      // anything raised outside pollOnce's own two inner try blocks became an unhandled rejection
+      // and the chain simply stopped — while the daemon carried on reporting itself online and
+      // nothing was ever polled again. Logging it and scheduling the next turn is the whole fix.
+      //
+      // stderr rather than the logger, deliberately: this runs on the stdio MCP path, where a write
+      // to stdout corrupts the JSON-RPC stream.
+      console.error(`[${tag}] poll threw: ${err instanceof Error ? err.message : String(err)}`);
+    }
     if (stopped) return;
     setTimeout(loop, interval).unref();
   }
 
-  loop();
+  void loop();
   const runnerNote = runnerEnabled ? ` (task-runner: ${agent.config.runner!.command})` : '';
   console.error(`[${tag}] polling every ${agent.config.poll_interval ?? 30}s${runnerNote}`);
 }

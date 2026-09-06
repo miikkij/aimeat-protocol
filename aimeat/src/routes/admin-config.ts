@@ -18,6 +18,9 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   v1.2.0 -- 2026-09-06 -- Review item 4.1: the DURABLE write goes first and the live one only if
+ *     it took. A failed persist went to console.warn -- not the logger -- while the loop carried
+ *     on, the path went into `applied`, and the answer said "Changes survive restart".
  *   (2026-08-28) Reads and writes a row's value through readConfigField / writeConfigField, so the
  *     site-link rows (siteLinks.<name>) resolve one level down like every other row.
  *   v1.1.0 — 2026-08-18 — Sealed configuration on all four doors: GET reports `sealed`, PUT and
@@ -181,16 +184,27 @@ export function adminConfigRouter(
                 continue;
             }
             const oldValue = readConfigField(config, mapping);
-            writeConfigField(config, mapping, value);
-            applied.push({ path, old_value: oldValue, new_value: value });
 
-            // Persist to database as raw string
+            // THE DURABLE WRITE FIRST, and the live one only if it took. This ran the other way
+            // round: the running node was changed, the persist was attempted, and a failure went to
+            // console.warn — not to the logger, so it reached no log this node keeps — while the
+            // loop carried on, the path went into `applied`, and the answer said "Changes survive
+            // restart". The operator was told a setting was saved when it was live-only and would
+            // vanish on the next boot, which is the worst of the three possible outcomes because
+            // nobody investigates a success.
             try {
                 await storage.setConfigValue(path, serializeConfigValue(value));
-                if (provenance) provenance.markDatabase([path]);
             } catch (e) {
-                console.warn(`[config] Failed to persist ${path} to DB:`, e);
+                logger.error('admin-config: a change could not be persisted, so it was not applied', { path, error: String(e) });
+                errors.push({
+                    path,
+                    reason: 'Could not be saved to this node\'s database. Nothing changed for this setting: it still has the value it had.',
+                });
+                continue;
             }
+            writeConfigField(config, mapping, value);
+            if (provenance) provenance.markDatabase([path]);
+            applied.push({ path, old_value: oldValue, new_value: value });
         }
 
         if (applied.length === 0 && errors.length > 0) {

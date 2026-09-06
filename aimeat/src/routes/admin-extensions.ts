@@ -13,6 +13,8 @@
  *   - /scaffold, /:name/actions, GET|PUT /:name/scripts/:actionId: authoring endpoints
  *
  * @version-history
+ *   v1.2.0 -- 2026-09-06 -- Review item 4.6: a schedule that fails to register reaches the answer.
+ *     The route used to warn and report status: active with no jobs registered.
  *   v1.1.0 — 2026-08-16 — Bundled install registers its schedules through
  *     services/extension-schedules.ts. Its own copy produced a second id shape (`ext.name.id`) for
  *     the same schedule, left out the `ownerScope` the executor needs, and picked the jobs up by
@@ -293,6 +295,11 @@ export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, sc
       // the same schedule and left out the owner scope the executor needs at run time. It also
       // restarted the whole scheduler to pick the jobs up, which re-ran every @activate job on the
       // node; addJob inside the builder does it for these jobs alone.
+      // A FAILURE HERE REACHES THE ANSWER. It used to be a `logger.warn` and nothing else, while the
+      // 201 below reported `status: active` — so the operator was told a bundled extension was
+      // installed and running when it had no schedules and no @activate jobs, and would sit there
+      // doing nothing until somebody noticed the absence of output.
+      let schedulesNotRegistered: string | undefined;
       if (manifestSchedules && scheduler) {
         try {
           await registerExtensionSchedules({ storage, config, scheduler }, created, req.auth!.sub);
@@ -301,7 +308,10 @@ export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, sc
           scheduler.runActivateJobs(name).catch(err =>
             logger.error(`Failed to run @activate jobs for ${name}`, { error: String(err) }));
         } catch (schedErr) {
-          logger.warn(`Failed to register schedules for ${name}`, { error: (schedErr as Error).message });
+          const reason = (schedErr as Error).message;
+          logger.error(`Failed to register schedules for ${name}`, { error: reason });
+          schedulesNotRegistered = `The extension is installed, but its scheduled jobs could not be registered: ${reason}. `
+            + 'Nothing it declares on a schedule will run until that is fixed.';
         }
       }
 
@@ -315,6 +325,7 @@ export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, sc
           status: created.status,
           actionsCount: created.actions.length,
         },
+        ...(schedulesNotRegistered ? { schedules_not_registered: schedulesNotRegistered } : {}),
       }));
       emitChange('admin-extensions');
     } catch (err) {
