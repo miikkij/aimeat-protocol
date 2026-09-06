@@ -346,6 +346,9 @@ const ALL_SUITES = [
     'test/e2e-owner-home.ts',
     // BR-04: deactivation ends every credential family, now; each assertion is a refusal.
     'test/e2e-owner-deactivation.ts',
+    // BR-04 again, on the two email doors: they used to re-key the owner and THEN refuse. Runs its
+    // own node with a real SMTP sink, because the secret these paths turn on arrives only by mail.
+    'test/e2e-magic-link-refusal.ts',
     // BR-04: SAML organisation sign-in over live HTTP — doors, discovery, invite/disable refusals.
     'test/e2e-saml-login.ts',
     // BR-04: SCIM provisioning — the directory's lifecycle, and every isolation boundary as a refusal.
