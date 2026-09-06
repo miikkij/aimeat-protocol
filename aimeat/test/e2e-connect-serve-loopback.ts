@@ -558,6 +558,54 @@ await test('POST /local/call/:tool — a data package export carries limit, offs
   assert(!('extra' in rows![0]), `select was dropped: the projection should have removed "extra" — ${JSON.stringify(rows![0])}`);
 });
 
+await test('POST /local/call/:tool — a memory search answers with snippets, not whole records', async () => {
+  // ONE TOOL NAME, TWO SEARCHES. The node MCP has always returned a window around the match plus the
+  // byte size; this door passed the query to the plain REST search, which answers with the FULL
+  // value of every hit. So a fleet agent asking "which keys mention this" pulled whole records
+  // across the tunnel and through its own context — pitfalls §44 again, the shape aimeat_memory_list
+  // was fixed for on 2026-09-04 with the search twin left behind. Review item 6.4.
+  const marker = `snippetprobe${Date.now().toString(36)}`;
+  const big = `${'x'.repeat(4000)} ${marker} ${'y'.repeat(4000)}`;
+  const w = await json(loopbackBase, '/local/call/aimeat_memory_write', {
+    method: 'POST', body: JSON.stringify({ key: `loopback.search.${marker}`, value: big, visibility: 'private' }),
+  });
+  assert(w.status === 200 && w.body.ok === true, `write: ${w.status} ${JSON.stringify(w.body).slice(0, 200)}`);
+
+  const found = await json(loopbackBase, '/local/call/aimeat_memory_search', {
+    method: 'POST', body: JSON.stringify({ query: marker }),
+  });
+  assert(found.status === 200 && found.body.ok !== false, `search: ${found.status} ${JSON.stringify(found.body).slice(0, 200)}`);
+  const hit = (found.body.data?.results ?? []).find((r: { key?: string }) => String(r.key ?? '').includes(marker));
+  assert(hit, `the written key must be found: ${JSON.stringify(found.body.data).slice(0, 300)}`);
+  assert(typeof hit.snippet === 'string' && hit.snippet.includes(marker),
+    `the hit must carry a snippet around the match: ${JSON.stringify(hit).slice(0, 200)}`);
+  assert(hit.value === undefined, 'the hit must NOT carry the whole value');
+  assert(hit.bytes >= big.length, `the hit must say how big the record is: ${hit.bytes}`);
+  assert(JSON.stringify(found.body).length < big.length,
+    `the whole answer must be smaller than the one record it found (${JSON.stringify(found.body).length} vs ${big.length})`);
+});
+
+await test('POST /local/call/:tool — the surface layout says where the vocabulary to change it is', async () => {
+  // The layout alone is a list of block ids with no way to learn what a block is or what it takes,
+  // so the first write an AI attempts against it is always a refusal. Both MCP doors answer with
+  // `available_blocks`; this one was the bare GET. Review item 6.6.
+  //
+  // The catalogue itself is operator-only, and this daemon's agent is not an operator — so what is
+  // asserted here is the honest half: the second read HAPPENS and its refusal is reported. An empty
+  // `available_blocks` would have told the agent this node serves no blocks, which is false.
+  const r = await json(loopbackBase, '/local/call/aimeat_surface_layout_get', {
+    method: 'POST', body: JSON.stringify({ surface: 'portal' }),
+  });
+  assert(r.status === 200 && r.body.ok !== false, `layout_get: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+  assert(r.body.data?.layout !== undefined, `the layout itself must still be there: ${Object.keys(r.body.data ?? {}).join(', ')}`);
+  const blocks = r.body.data?.available_blocks;
+  const refused = r.body.data?.available_blocks_unavailable;
+  assert((Array.isArray(blocks) && blocks.length > 0) || typeof refused === 'string',
+    `the answer must carry the catalogue or say why not: ${Object.keys(r.body.data ?? {}).join(', ')}`);
+  assert(!Array.isArray(blocks) || blocks.length > 0,
+    'an empty available_blocks would claim this node serves no blocks, which is a different and false answer');
+});
+
 await test('POST /local/call/:tool — unknown tool returns 404 UNKNOWN_TOOL', async () => {
   const r = await json(loopbackBase, '/local/call/not_a_real_tool', { method: 'POST', body: '{}' });
   assert(r.status === 404, `status ${r.status}`);

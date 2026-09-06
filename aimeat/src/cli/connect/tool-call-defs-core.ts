@@ -171,10 +171,18 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_memory_search',
+        // A SEARCH IS A SEARCH, on every door. This returned the FULL value of every hit while the
+        // node MCP tool of the same name returned snippets, so "which keys mention this" pulled whole
+        // records across the wire and through a model's context -- pitfalls #44 again, the shape
+        // aimeat_memory_list was fixed for on 2026-09-04 with the search twin left behind. The route
+        // takes `include=meta` and `include_versions` now, so both doors can ask for one answer.
+        // Review item 6.4.
         handler: ({ client }, input) => client.get(`/v1/memory/search${query({
             q: requiredString(input, 'query'),
             visibility: optionalString(input, 'visibility'),
             limit: optionalNumber(input, 'limit'),
+            include: 'meta',
+            include_versions: optionalBoolean(input, 'include_versions') ? 'true' : 'false',
         })}`),
     },
     {
@@ -338,7 +346,37 @@ export const coreTools: ConnectCliToolDefinition[] = [
     // silence — the same defect this repo paid for three times in one week.
     {
         name: 'aimeat_surface_layout_get',
-        handler: ({ client }, input) => client.get(`/v1/site/layout/${encodeURIComponent(requiredString(input, 'surface'))}`),
+        // TWO READS, LIKE BOTH MCP DOORS. The layout on its own is a list of block ids with no way
+        // to learn what a block is or what it takes, so the first write an AI attempts against it is
+        // always a refusal. This door was the bare GET; the vocabulary is the other half of the
+        // answer, and it is what the node MCP inlines and the connector fetches beside it. Item 6.6.
+        handler: async ({ client }, input) => {
+            const surface = encodeURIComponent(requiredString(input, 'surface'));
+            const layout = await client.get(`/v1/site/layout/${surface}`);
+            if (layout.ok === false) return layout;
+            const blocks = await client.get(`/v1/site/blocks?surface=${surface}`);
+            // A REFUSED CATALOGUE IS NOT AN EMPTY ONE. GET /v1/site/blocks is operator-only, so an
+            // ordinary agent cannot read it — and answering `available_blocks: []` would tell that
+            // agent this node serves no blocks, which is a different and false thing. Say which it
+            // is; a layout write it cannot make is better refused with a reason.
+            if (blocks.ok === false) {
+                return {
+                    ...layout,
+                    data: {
+                        ...(layout.data as object),
+                        available_blocks_unavailable: blocks.error?.message
+                            ?? 'The block catalogue is operator-only on this node, so this answer carries the layout without the vocabulary to change it.',
+                    },
+                };
+            }
+            return {
+                ...layout,
+                data: {
+                    ...(layout.data as object),
+                    available_blocks: (blocks.data as { blocks?: unknown } | undefined)?.blocks ?? [],
+                },
+            };
+        },
     },
     {
         name: 'aimeat_surface_layout_set',

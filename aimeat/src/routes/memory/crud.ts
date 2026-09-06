@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 -- 2026-09-06 -- Review item 6.4: GET /v1/memory/search takes `include=meta` (snippet +
+ *     bytes instead of the whole value) and `include_versions`, which is what the node MCP tool had
+ *     been doing in-tool. Both opt-in, so every REST caller keeps the answer it had.
  *   v1.2.0 — 2026-09-04 — GET /v1/memory honours `?limit`. It was published on the connector MCP
  *     tool, forwarded by the CLI dispatch, and read by nobody here, so `limit=1` and no limit at
  *     all returned identical payloads. An agent whose archive outgrew the tunnel's 25 MB response
@@ -32,6 +35,7 @@ import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from './owner-target.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, MEMORY_LIST_MAX_LIMIT } from './shared.js';
+import { isVersionKey, searchHitShape } from '../../services/memory-search-shape.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   //  is no longer destructured here: identity for a write now comes from
@@ -437,7 +441,27 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const hits = (isOwnerSession && !agentParam)
       ? await memoryDb.searchOwnerScope(req.auth!.owner as string, q, { keyPrefix: prefix, visibility, maxFlags, limit })
       : await storage.searchText(q, { ownerGaiis: [gaii], keyPrefix: prefix, visibility, maxFlags, limit });
-    const results: MemoryRecord[] = hits.map(h => h.record);
+    // `.version.N` history rows are immutable snapshots and never what a search is looking for. The
+    // node MCP tool has dropped them since it was written and this door had no way to ask, which is
+    // half of why the same tool name meant two different searches (review item 6.4). Opt-IN, so
+    // every REST caller that exists keeps the answer it has always had.
+    const includeVersions = req.query.include_versions !== 'false';
+    const all: MemoryRecord[] = hits.map(h => h.record);
+    const results = includeVersions ? all : all.filter(r => !isVersionKey(r.key));
+
+    // `include=meta` answers with a SNIPPET and the byte size instead of the whole value, which is
+    // the shape the node MCP tool has always returned. Without it, "which keys mention this" pulled
+    // every matching record across the wire and through a model's context. Same word and same
+    // meaning as the listing door beside it, fixed for the same reason on 2026-09-04 (pitfalls §44).
+    if (req.query.include === 'meta') {
+      res.json(success(config.nodeId, {
+        results: results.map(r => searchHitShape(r, q)),
+        total: results.length,
+        query: q,
+        hint: 'Snippets only. Read a full value with GET /v1/memory/{key}.',
+      }));
+      return;
+    }
 
     res.json(success(config.nodeId, {
       results: results.map(r => ({
