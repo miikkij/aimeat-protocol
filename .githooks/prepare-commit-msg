@@ -16,6 +16,12 @@
 # hook refused the developer's own commit for lacking a name that only a session has. So: a
 # session without AIMEAT_SESSION is refused; a person is never asked. A message that already
 # carries a Session: trailer (an amend, a rebase) is left alone.
+#
+# Since 2026-09-06 the floor holds more than one repository, so a second trailer names the
+# PROJECT the session works in: `Project:` from AIMEAT_PROJECT, the id the project's own
+# CLAUDE.md paragraph gives (this repository: aimeat-protocol). It is stamped when set and never
+# refused when absent, because the claim on the node already carries the project and refuses to
+# exist without one; the trailer is for reading history, not for gating it.
 
 MSG="$1"
 SOURCE="$2"
@@ -41,3 +47,6 @@ if [ -z "$AIMEAT_SESSION" ]; then
 fi
 
 git interpret-trailers --in-place --if-exists addIfDifferent --trailer "Session: $AIMEAT_SESSION" "$MSG"
+if [ -n "$AIMEAT_PROJECT" ] && ! grep -qi '^Project:' "$MSG" 2>/dev/null; then
+  git interpret-trailers --in-place --if-exists addIfDifferent --trailer "Project: $AIMEAT_PROJECT" "$MSG"
+fi
