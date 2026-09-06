@@ -13,6 +13,11 @@
  *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
  *
  * @version-history
+ *   Join completion — 2026-09-06 — Review items 4.4 and 4.5. The approved-join completion is awaited
+ *     inside its own try: the poller is cleared before it, so a failure there used to fall into a
+ *     catch that logs "continuing after a suppressed failure" — a sentence about a poll that would
+ *     try again, printed for a join that never would. The auto-approved path catches instead of
+ *     floating, because the 200 has already gone out and the only thing left is to say so.
  *   Funnel — 2026-08-27 — The `switched` column left the onboarding funnel with the home-or-profile
  *     switch it counted.
  *   Operator revoke — 2026-08-14 — POST /v1/admin/roles/revoke takes the operator role back, refusing
@@ -181,7 +186,15 @@ export function adminMonitoringRouter(
             const targetNodeId = targetInfo.node_id ?? targetUrl;
 
             if (remoteStatus === 'auto_approved') {
-                completeJoin(targetUrl, targetNodeId, config, storage, peers);
+                // The answer above already said `auto_approved`, so this cannot be reported to the
+                // caller — but it can be reported. Unawaited and uncaught, a failure here was an
+                // unhandled rejection: the operator was told the join went through and this node
+                // held no peer record, with nothing in any log between the two.
+                void completeJoin(targetUrl, targetNodeId, config, storage, peers).catch((err: unknown) => {
+                    logger.error('admin-monitoring: the join was auto-approved but completing it failed', {
+                        targetUrl, targetNodeId, error: err instanceof Error ? err.message : String(err),
+                    });
+                });
             } else {
                 pollForApprovalAndComplete(targetUrl, targetNodeId, requestId, config, storage, peers);
             }
@@ -642,7 +655,19 @@ function pollForApprovalAndComplete(
             if (status === 'approved' || status === 'auto_approved') {
                 clearInterval(timer);
                 logger.info(`Join request ${requestId} approved by ${targetNodeId}`);
-                await completeJoin(targetUrl, targetNodeId, config, storage, peers);
+                // THE POLLER IS ALREADY GONE BY HERE, so this failure is terminal and has to say so.
+                // It used to fall through to the catch below, which logs "continuing after a
+                // suppressed failure" — a sentence about a poll that would try again, printed for a
+                // join that never would. Clearing the timer before the await it protects is what
+                // made the two indistinguishable.
+                try {
+                    await completeJoin(targetUrl, targetNodeId, config, storage, peers);
+                } catch (err) {
+                    logger.error('The join was approved but completing it failed. It will NOT be retried: the poll has stopped.', {
+                        requestId, targetUrl, targetNodeId, error: err instanceof Error ? err.message : String(err),
+                    });
+                }
+                return;
             } else if (status === 'rejected') {
                 clearInterval(timer);
                 logger.info(`Join request ${requestId} rejected by ${targetNodeId}`);

@@ -58,6 +58,8 @@
  *   See: docs/superpowers/specs/2026-05-23-agent-integration-architecture-design.md, Appendix A
  *
  * @version-history
+ *   v1.2.0 -- 2026-09-06 -- Review item 4.2: dispatchWebhookEvent never rejects, and the delivery
+ *     chain's own bookkeeping has a terminal catch. Fifteen call sites, one of which awaits.
  *   v1.0.0 -- 2026-05-23 -- Initial creation with retry, HMAC signing, auto-disable
  */
 
@@ -104,8 +106,34 @@ export function createWebhookDispatcher({ config, storage }: DispatchOptions) {
   /**
    * Main entry point: dispatch a webhook event to an agent's configured URL.
    * Returns silently if the agent has no webhook configured or it is disabled.
+   *
+   * IT NEVER REJECTS, AND THAT IS THE POINT. Fifteen call sites invoke this and exactly one of them
+   * awaits or catches — every other one is `webhookDispatcher.dispatchWebhookEvent(...)` on its own
+   * line, after the route has already answered 200. So a throw ABOVE the inner try blocks (the agent
+   * lookup is a database read) was an unhandled rejection: the webhook was never sent, onFailure
+   * never ran, webhookFailCount stayed clean, and nothing anywhere said so. Wrapping it here rather
+   * than at fifteen call sites is the same argument as withDeclaredInputOnly on the CLI dispatch —
+   * a per-caller version leaves whichever one somebody forgets still swallowing it, which is the bug.
+   *
+   * THE FAILURE COUNTER IS NOT TOUCHED HERE. It counts what the AGENT's endpoint did; an exception
+   * before we reach that endpoint is this node's fault, and marking the agent's webhook unhealthy
+   * for our own storage hiccup would eventually disable a perfectly good one.
    */
   async function dispatchWebhookEvent(
+    agentGaii: string,
+    event: WebhookEventType,
+    data: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await dispatch(agentGaii, event, data);
+    } catch (err) {
+      logger.error('Webhook dispatch threw before delivery was attempted', {
+        agentGaii, event, error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  async function dispatch(
     agentGaii: string,
     event: WebhookEventType,
     data: Record<string, unknown>,
@@ -211,6 +239,15 @@ export function createWebhookDispatcher({ config, storage }: DispatchOptions) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         logger.warn('Webhook delivery failed (network)', { agentGaii, event, attempt: attempt + 1, error: errorMessage });
         await handleRetryOrFail(agentGaii, url, body, secret, event, data, attempt, errorMessage, undefined, latencyMs);
+      })
+      // THE BOOKKEEPING CAN FAIL TOO. Both handlers above are async and nothing awaited the promise
+      // they return, so a throw inside onSuccess, logDelivery or handleRetryOrFail — every one of
+      // them a database write — was an unhandled rejection with no line anywhere about a delivery
+      // whose outcome was never recorded.
+      .catch((err: unknown) => {
+        logger.error('Webhook delivery bookkeeping failed after the request finished', {
+          agentGaii, event, attempt: attempt + 1, error: err instanceof Error ? err.message : String(err),
+        });
       });
   }
 

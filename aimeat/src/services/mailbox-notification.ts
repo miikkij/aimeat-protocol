@@ -173,6 +173,13 @@ export class MailboxNotificationService {
         timestamp: new Date().toISOString(),
       };
 
+      // A DEFAULT NOW, WHERE IT USED TO BE A FALLBACK OVER A HOLE. `locale` is optional on the
+      // record and absent means "this person expressed no preference", so English is the node's
+      // answer. It was hiding something else until 2026-09-06: SQLite had no `locale` column, did
+      // not write the field and did not read it back, so `?? 'en'` fired for EVERY owner on a
+      // SQLite node however carefully they had chosen — and the upsert returned the caller's own
+      // object, so the write looked like it took. That is fixed in the provider; this line now
+      // means what it says.
       const locale = prefs.locale ?? 'en';
       let sentAny = false;
       const sentChannels: string[] = [];

@@ -412,15 +412,16 @@ export const extensionsNotifyMethods = {
 
   async upsertNotificationPreferences(this: SqliteStorage, prefs: NotificationPreferences): Promise<NotificationPreferences> {
     this.db.prepare(
-      `INSERT INTO notification_preferences (personalNodeId, enabled, channels, notifyTypes, cooldownMinutes, quietHoursUtc, email)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO notification_preferences (personalNodeId, enabled, channels, notifyTypes, cooldownMinutes, quietHoursUtc, email, locale)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(personalNodeId) DO UPDATE SET
          enabled = excluded.enabled,
          channels = excluded.channels,
          notifyTypes = excluded.notifyTypes,
          cooldownMinutes = excluded.cooldownMinutes,
          quietHoursUtc = excluded.quietHoursUtc,
-         email = excluded.email`
+         email = excluded.email,
+         locale = excluded.locale`
     ).run(
       prefs.personalNodeId,
       prefs.enabled ? 1 : 0,
@@ -429,8 +430,15 @@ export const extensionsNotifyMethods = {
       prefs.cooldownMinutes,
       prefs.quietHoursUtc ? JSON.stringify(prefs.quietHoursUtc) : null,
       prefs.email,
+      prefs.locale ?? null,
     );
-    return prefs;
+    // READ IT BACK, rather than handing the caller their own object again. Returning the input is
+    // what made `locale` look saved for as long as it was: the column did not exist, the field was
+    // not in the INSERT, and every caller was told the write took. What comes back now is what the
+    // database holds, so the NEXT field somebody forgets to store shows up on the first read.
+    return this.deserializeNotificationPreferences(
+      this.db.prepare('SELECT * FROM notification_preferences WHERE personalNodeId = ?').get(prefs.personalNodeId) as Record<string, unknown>,
+    );
   },
 
   async deleteNotificationPreferences(this: SqliteStorage, personalNodeId: string): Promise<boolean> {
@@ -447,6 +455,7 @@ export const extensionsNotifyMethods = {
       cooldownMinutes: row.cooldownMinutes as number,
       quietHoursUtc: row.quietHoursUtc ? JSON.parse(row.quietHoursUtc as string) : null,
       email: (row.email as string) ?? null,
+      ...(row.locale ? { locale: row.locale as string } : {}),
     };
   },
 

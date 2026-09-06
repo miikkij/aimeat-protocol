@@ -192,7 +192,8 @@ export function applySchemaTables2(db: Database.Database): void {
       notifyTypes     TEXT NOT NULL DEFAULT '["work_assignment","action_request"]',
       cooldownMinutes INTEGER NOT NULL DEFAULT 5,
       quietHoursUtc   TEXT,
-      email           TEXT
+      email           TEXT,
+      locale          TEXT
     );
 
     -- ── Notification Templates (Phase 3.2) ──

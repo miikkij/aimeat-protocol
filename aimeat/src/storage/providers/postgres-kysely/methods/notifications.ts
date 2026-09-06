@@ -91,7 +91,10 @@ export const notificationMethods = {
     await this.db.insertInto('NotificationPreference').values({ personalNodeId: p.personalNodeId, ...shared } as any)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .onConflict(oc => oc.column('personalNodeId').doUpdateSet(shared as any)).execute();
-    return p;
+    // Read it back rather than echoing the input, for the reason the SQLite twin now does: returning
+    // the caller's own object is how a field that never reached a column looked saved for months.
+    const stored = await this.db.selectFrom('NotificationPreference').selectAll().where('personalNodeId', '=', p.personalNodeId).executeTakeFirst();
+    return stored ? toPrefs(stored) : p;
   },
   async deleteNotificationPreferences(this: PostgresKyselyStorage, personalNodeId: string): Promise<boolean> {
     const r = await this.db.deleteFrom('NotificationPreference').where('personalNodeId', '=', personalNodeId).executeTakeFirst();
