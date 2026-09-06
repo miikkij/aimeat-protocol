@@ -17,6 +17,17 @@
  *   titled with the crossing, so a document that notices something can hand it to something that
  *   can act on it — without anybody writing a service in between.
  *
+ *   THE AGENT IS PICKED, NOT SPELLED. A typed name is a name that can be typed wrong, and the
+ *   refusal for a wrong one arrives at delivery time, on the far side of a crossing nobody is
+ *   watching. So the list is the owner's own agents, read as the signed-in owner, with when each
+ *   was last seen beside it; an owner with none is told so and given the door to where an agent is
+ *   connected, rather than a select with nothing in it.
+ *
+ *   A HEADER CARRIES THE KEY, AND THE KEY IS NOT IN THE RECORD. Most addresses worth telling want
+ *   an API key, and a key typed into a header here would be a key in a document anybody holding a
+ *   copy can read. The value box takes `{{secret:NAME}}` from the owner's vault instead: the name
+ *   is what travels, and the server puts the value in as the call leaves.
+ *
  *   A TEST SEND GOES THROUGH THE SAME DOOR AS A REAL ONE and is marked `test: true` in the body, so
  *   a receiver can tell them apart and the allowlist, the rate limit and the refusal words are
  *   exactly the ones a real delivery would meet.
@@ -25,12 +36,22 @@
  *   import { openOutward } from './dialog-outward.js';
  *   openOutward({ id, node, doc, graph, hooks, langs, onSave });
  * @version-history
+ *   v0.7.0 — 2026-09-06 — The agent target is a pick over the owner's own agents, and the URL
+ *     target gained the headers it sends, with a picker that writes a secret's NAME into a value.
  *   v0.6.0 — 2026-09-06 — Initial (the living document, stage 5: hooks).
  */
 import { el, kit } from './dom.js';
-import { say } from './hooks-words.js';
+import { say, fill } from './hooks-words.js';
 import { outwardShape } from './hooks-shapes.js';
-import { group, fields, copyBlock, statusLine, vocabularyNote } from './dialog-parts.js';
+import { group, fields, copyBlock, statusLine, vocabularyNote, ownerRead, pickOrWords, headerEditor, apexPage } from './dialog-parts.js';
+
+/** A date as short as a pick's second line needs it. */
+function seenWord(iso, langs) {
+  if (!iso) return say('agent.unseen', langs);
+  const when = new Date(iso);
+  if (Number.isNaN(when.getTime())) return say('agent.unseen', langs);
+  return fill(say('agent.seen', langs), { date: when.toLocaleDateString() });
+}
 
 /**
  * Open the outward dialog for a machine or a trigger.
@@ -42,13 +63,20 @@ export function openOutward(spec) {
   const langs = typeof spec.langs === 'function' ? spec.langs : function () { return []; };
   const shape = outwardShape(spec);
   const words = function (key) { return say(key, langs()); };
+  // The headers come off the record itself rather than off the shape: the shape says what the
+  // message looks like, and a header is part of the road, not part of the message.
+  const written = shape.trigger ? (((spec.doc || {}).model || {}).nodes || {})[shape.trigger] : null;
+  const writtenHeaders = (written && written.target && written.target.headers) || {};
   const draft = {
     kind: shape.target.kind,
     url: String(shape.target.url || ''),
     method: String(shape.target.method || 'POST'),
     agent: String(shape.target.agent || ''),
     enabled: shape.enabled,
+    headers: Object.assign({}, writtenHeaders),
   };
+  /** The vault's names, once they arrive. Never a value: the route does not carry one. */
+  let vault = [];
 
   const k = kit();
   const handle = k.dialog({
@@ -111,9 +139,55 @@ export function openOutward(spec) {
         },
       ], draft);
 
-      fields(agentRoad.body, [
+      // The headers of the URL road, with the secret picker on every value. An agent target is a
+      // task on this node and carries none, which is why this sits inside the URL group.
+      const headers = headerEditor(urlRoad.body, {
+        headers: draft.headers,
+        langs: langs,
+        base: String(spec.base || ''),
+        secrets: function () { return vault; },
+        onChange: function (map) { draft.headers = map; },
+      });
+      ownerRead('/v1/secrets').then(function (data) {
+        const list = data && Array.isArray(data.secrets) ? data.secrets : [];
+        vault = list.map(function (s) { return String(s && s.name ? s.name : s); }).filter(Boolean);
+        headers.refresh();
+      });
+
+      // The agent road: the owner's own agents, read as the owner. Until the list arrives the box
+      // is the name the record already carries, so a dialog opened and closed changes nothing.
+      const agentBox = el('div', { class: 'ak-living__dialog-fields' });
+      agentRoad.body.appendChild(agentBox);
+      fields(agentBox, [
         { name: 'agent', id: 'ak-living-hook-agent', type: 'text', label: words('outward.agent'), value: draft.agent },
       ], draft);
+      ownerRead('/v1/agents').then(function (data) {
+        const list = data && Array.isArray(data.agents) ? data.agents : [];
+        while (agentBox.firstChild) agentBox.removeChild(agentBox.firstChild);
+        if (!list.length) {
+          agentBox.appendChild(pickOrWords({
+            words: words('agent.none'),
+            doorWords: words('agent.connect'),
+            href: apexPage('/v1/profile?tab=agents'),
+          }));
+          return;
+        }
+        // A name the record carries that the account no longer has stays on the list, so saving
+        // the dialog cannot silently retarget a trigger at somebody else's agent.
+        const options = list.map(function (a) {
+          const name = String(a.name || '');
+          const said = String(a.display_name || name);
+          return { value: name, label: said + ' · ' + seenWord(a.last_seen, langs()) };
+        });
+        if (draft.agent && !options.some(function (o) { return o.value === draft.agent; })) {
+          options.unshift({ value: draft.agent, label: draft.agent });
+        }
+        if (!draft.agent) options.unshift({ value: '', label: words('agent.pick') });
+        fields(agentBox, [{
+          name: 'agent', id: 'ak-living-hook-agent', type: 'select', label: words('outward.agent'),
+          value: draft.agent, options: options,
+        }], draft);
+      });
 
       copyBlock(host, {
         label: words('outward.payload'),
@@ -136,7 +210,7 @@ export function openOutward(spec) {
                 description: JSON.stringify(body, null, 2),
                 body: body,
               })
-              : spec.hooks.send({ url: draft.url, method: draft.method, body: body });
+              : spec.hooks.send({ url: draft.url, method: draft.method, headers: draft.headers, body: body });
             call.then(function (answer) {
               if (answer.refusal) { status.say(spec.hooks.words(answer.refusal), false); return; }
               status.say(String(answer.status || 200) + ' · ' + String(answer.ms || 0) + ' ms', true);
@@ -171,7 +245,12 @@ export function openOutward(spec) {
       include: shape.include,
       target: draft.kind === 'agent'
         ? { kind: 'agent', agent: String(draft.agent || '') }
-        : { kind: 'url', url: String(draft.url || ''), method: String(draft.method || 'POST') },
+        : Object.assign(
+          { kind: 'url', url: String(draft.url || ''), method: String(draft.method || 'POST') },
+          // An empty map is left OFF the record rather than written as {}: a trigger that sends no
+          // headers of its own should read as one, in the record as much as on the screen.
+          Object.keys(draft.headers || {}).length ? { headers: draft.headers } : null,
+        ),
     });
     if (spec.onSave) spec.onSave(id);
   }

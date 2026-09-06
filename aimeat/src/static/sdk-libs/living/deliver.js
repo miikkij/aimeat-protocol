@@ -148,7 +148,10 @@ export function createDeliveries(spec) {
         body: body,
       })
       : await hooks.send({
-        url: String(target.url || ''), method: String(target.method || 'POST'), body: body,
+        url: String(target.url || ''), method: String(target.method || 'POST'),
+        // The headers the trigger carries, secret names and all. What a `{{secret:NAME}}` stands
+        // for is resolved on the node as the call leaves it; this browser never holds the value.
+        headers: target.headers, body: body,
       });
 
     const event = {

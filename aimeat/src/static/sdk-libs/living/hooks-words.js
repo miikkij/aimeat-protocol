@@ -19,6 +19,10 @@
  *   import { say, fill } from './hooks-words.js';
  *   say('inward.title', ['fi']);   // 'Tämä arvo voi tulla ulkoa'
  * @version-history
+ *   v0.7.0 — 2026-09-06 — The words the header editor, the secret picker and the agent pick say,
+ *     including the two sentences a person reads when the list they are picking from is empty:
+ *     an account with no secrets and an account with no agents are ordinary, and a pick with
+ *     nothing in it reads as a broken control.
  *   v0.6.0 — 2026-09-06 — Initial (the living document, stage 5: hooks).
  */
 import { pickLang } from './i18n.js';
@@ -56,6 +60,21 @@ export const WORDS = {
     'outward.watching': 'Seurattava kone',
     'outward.payload': 'Näin viesti lähtee',
     'outward.testSend': 'Kokeile lähetystä',
+    'headers': 'Otsakkeet',
+    'headers.lead': 'Otsakkeet lähtevät kutsun mukana. Avainta ei kirjoiteta tähän: nimeä salaisuus arvossa, niin palvelin panee arvon paikalleen kutsun lähtiessä.',
+    'headers.add': 'Lisää otsake',
+    'headers.name': 'Otsakkeen nimi',
+    'headers.value': 'Arvo',
+    'headers.remove': 'Poista',
+    'headers.none': 'Ei yhtään otsaketta.',
+    'secret.pick': 'Lisää salaisuus',
+    'secret.none': 'Yhtään salaisuutta ei ole vielä tallessa.',
+    'secret.add': 'Lisää sellainen Pääsy-sivulla',
+    'agent.pick': 'Valitse agentti',
+    'agent.none': 'Yksikään agenteistasi ei voi vielä toimia.',
+    'agent.connect': 'Yhdistä agentti Agenttisi-sivulla',
+    'agent.seen': 'nähty {date}',
+    'agent.unseen': 'ei vielä nähty',
     'save': 'Tallenna',
     'close': 'Sulje',
     'copy': 'Kopioi',
@@ -104,6 +123,21 @@ export const WORDS = {
     'outward.watching': 'The machine it watches',
     'outward.payload': 'This is the message as it goes',
     'outward.testSend': 'Test send',
+    'headers': 'Headers',
+    'headers.lead': 'The headers go with the call. A key is not typed here: name a secret in the value, and the server puts the value in as the call leaves.',
+    'headers.add': 'Add a header',
+    'headers.name': 'Header name',
+    'headers.value': 'Value',
+    'headers.remove': 'Remove',
+    'headers.none': 'No headers.',
+    'secret.pick': 'Insert a secret',
+    'secret.none': 'No secrets are kept yet.',
+    'secret.add': 'Add one on the Access page',
+    'agent.pick': 'Pick an agent',
+    'agent.none': 'None of your agents can act yet.',
+    'agent.connect': 'Connect one on the Your agents page',
+    'agent.seen': 'seen {date}',
+    'agent.unseen': 'not seen yet',
     'save': 'Save',
     'close': 'Close',
     'copy': 'Copy',

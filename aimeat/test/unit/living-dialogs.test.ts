@@ -207,4 +207,21 @@ describe('describe() answers for the two new types', () => {
   it('lists the trigger among the types', () => {
     expect(describeType()).toContain('trigger');
   });
+
+  // A FIELD THE RUNTIME SENDS AND NO VOCABULARY DECLARES CANNOT BE WRITTEN BY AN AI (pitfalls §48
+  // read from the other end). Both roads out now carry headers, and both say so where an agent
+  // asks — including that a key is NAMED rather than typed into a document anyone may copy.
+  it('the source says a url read may carry headers, and that a secret is named rather than typed', () => {
+    const d = describeType('source') as { options: string[] };
+    const said = d.options.join(' · ');
+    expect(said).toContain('headers');
+    expect(said).toContain('{{secret:NAME}}');
+  });
+
+  it('the trigger says the same about a url delivery', () => {
+    const d = describeType('trigger') as { options: string[] };
+    const said = d.options.join(' · ');
+    expect(said).toContain('headers');
+    expect(said).toContain('{{secret:NAME}}');
+  });
 });

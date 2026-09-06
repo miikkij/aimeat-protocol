@@ -12,6 +12,10 @@
  *   quieted here. Every column is bounded so a long origin or label wraps inside its cell.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-09-06 — Section 04, the secrets: a four-column list whose name column carries the
+ *     {{secret:NAME}} spelling under the name, and the write-only field that replaces a value. It
+ *     is the key list's grid with the middle column narrower, because "used by" is a short list of
+ *     extension names rather than a sentence.
  *   v1.0.0 — 2026-09-05 — Initial.
  */
 
@@ -118,7 +122,27 @@
 .ac-token code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .ac-token .og-door { flex: none; font-size: .7rem; }
 
-/* ── 03 and 04: the sections that keep their components ───────────────────────────────────── */
+/* ── 04: the secrets ──────────────────────────────────────────────────────────────────────── */
+.ac-secrets { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 9rem auto; gap: 0 1rem; align-items: stretch; margin-top: .2rem; }
+.ac-secret { display: contents; }
+.ac-secret > div { padding: .65rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
+.ac-secret--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.ac-secret.is-open > div { border-bottom: 0; }
+.ac-secret > .ac-snm { min-width: 0; }
+.ac-snm b { display: block; font-family: var(--font-mono); font-size: .85rem; font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
+/* .7rem, not the .68rem the key rows' sub-line wears: this line is the spelling a person copies
+   into a header, and 10.88 px is under the 11 px floor a finished surface is measured against. */
+.ac-snm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); overflow-wrap: anywhere; }
+.ac-secret > .ac-sw { font-size: .85rem; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.ac-secret > .ac-swhen { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
+.ac-secret > .ac-sgo { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
+.ac-sgo .og-door { font-size: .72rem; }
+.ac-secret > .ac-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.ac-swrite { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: .6rem; }
+.ac-swrite .og-input { flex: 1 1 16rem; min-width: 10rem; }
+.ac-swrite .og-door { font-size: .72rem; }
+
+/* ── 03 and 05: the sections that keep their components ───────────────────────────────────── */
 .ac-kept .access-section > .access-h3, .ac-kept > .card-h3, .ac-kept .card-h3.access-h3 { display: none; }
 .ac-kept .section-desc { display: none; }
 .ac-kept .access-section > .text-meta-sm:first-of-type { display: none; }
@@ -155,6 +179,12 @@
   .ac-key > .ac-knm { border-bottom: 0; padding-bottom: .1rem; }
   .ac-key > .ac-kgo { grid-column: 1 / -1; justify-content: flex-start; padding-top: .1rem; }
   .ac-key > .ac-open { padding: .8rem .8rem .9rem; }
+  .ac-secrets { grid-template-columns: minmax(0, 1fr) 6.5rem; }
+  .ac-secret--head { display: none; }
+  .ac-secret > .ac-sw, .ac-secret > .ac-swhen { grid-column: 1 / -1; padding-top: 0; border-bottom: 0; }
+  .ac-secret > .ac-snm { border-bottom: 0; padding-bottom: .1rem; }
+  .ac-secret > .ac-sgo { grid-column: 1 / -1; justify-content: flex-start; padding-top: .1rem; }
+  .ac-secret > .ac-open { padding: .8rem .8rem .9rem; }
   .ac-rights { grid-template-columns: minmax(0, 1fr); }
   .ac-rights > .ac-rgo { text-align: left; }
   .ac-form { grid-template-columns: minmax(0, 1fr); gap: .3rem 0; }

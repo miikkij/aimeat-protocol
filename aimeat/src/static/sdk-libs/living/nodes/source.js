@@ -26,7 +26,7 @@
  * @node       source    A live value from a memory key or a URL, or a constant when the page cannot read one.
  * @inputs     source    key (a memory key) · url (an address, read through the node's living-hooks extension) · path (a path inside the answer, dots and brackets) · raw (take the body itself as the value) · value (the fallback)
  * @outputs    source    value — what the key or the address holds now, with the node's unit on it · stale — the words a failed read left, empty while it is fresh
- * @options    source    unit · every (seconds between reads of a url; the floor is 10) · format (how it is printed: 1 · "int" · "unit" · an object; `locale: "auto"` writes the number in the page's language) · scope=own|public · owner (for a public read) · label
+ * @options    source    unit · headers (sent with a url read; a value may name a secret of the owner's as {{secret:NAME}}, which the node puts in as the call leaves, so no key is written into the document) · every (seconds between reads of a url; the floor is 10) · format (how it is printed: 1 · "int" · "unit" · an object; `locale: "auto"` writes the number in the page's language) · scope=own|public · owner (for a public read) · label
  * @languages  source    label
  * @example    source    { "type": "source", "url": "https://api.porssisahko.net/v1/latest-prices.json", "path": "prices[0].price", "every": 900, "unit": "EUR/kWh", "value": 0.042, "label": { "fi": "Pörssihinta", "en": "Spot price" } }
  * @structure sourceNode: the node-type module (dependsOn · prepare · evaluate · coerce · fields · read)
