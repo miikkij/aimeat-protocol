@@ -121,11 +121,14 @@ export function packagesRouter(
   });
 
   // POST /v1/packages/import — import from ZIP bundle
-  router.post('/v1/packages/import', requireAuth(), async (req, res) => {
+  // Cleared by the same false precondition as POST /v1/packages above, and it takes a ZIP full of
+  // app, extension and cortex sources, so it is the more valuable of the two to an unpermitted
+  // caller. Same word as its siblings.
+  router.post('/v1/packages/import', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const owner = req.auth!.owner;
     const roles = req.auth!.roles;
 
-    // Role check: operator always allowed, owner only if configured
+    // The second, narrower question: an operator-only node restricts import further.
     const createRole = config.packageCreateRole ?? 'owner';
     if (!roles.includes('operator') && createRole === 'operator') {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can import packages'));
@@ -245,11 +248,20 @@ export function packagesRouter(
   });
 
   // POST /v1/packages — create package (first version)
-  router.post('/v1/packages', requireAuth(), async (req, res) => {
+  // `packages:write`, and it took a code review to notice it was missing. This door was cleared in
+  // security/route-scope-exemptions.json on the grounds that the role check below made it
+  // operator-only — a clearance whose own sentence stated the precondition it depended on ("if the
+  // node is ever set to 'owner' this branch becomes a no-op"), and config.ts later defaulted
+  // packageCreateRole to 'owner', which made it exactly that. The gate went on reporting green over
+  // a door that had become open to any authenticated principal, while its siblings /v1/packages/
+  // compose and /v1/packages/:groupId/versions carried the scope all along. That is what the triage
+  // clock in scripts/inventory/triage-clock.ts now exists to catch.
+  router.post('/v1/packages', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const owner = req.auth!.owner;
     const roles = req.auth!.roles;
 
-    // Role check: operator always allowed, owner only if configured
+    // The second, narrower question: an operator-only node restricts creation further. Left as
+    // written — it is a deployment choice, and it is no longer the only thing on this door.
     const createRole = config.packageCreateRole ?? 'owner';
     if (!roles.includes('operator') && createRole === 'operator') {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can create packages'));

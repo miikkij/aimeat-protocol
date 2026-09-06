@@ -43,6 +43,7 @@
  *   v1.0.0 — 2026-09-04 — Initial. Measured before it existed: the identity rule was one of four
  *     written rules with no gate at all, and the only one whose failure hides itself from agent tests.
  */
+import { staleTriage, reportTriageClock } from './inventory/triage-clock.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -55,6 +56,8 @@ const EXEMPTIONS = join(AIMEAT, 'security', 'identity-resolution-exemptions.json
 
 interface ExemptionFile {
     note: string;
+    /** How long a triaged clearance may go without being re-read. */
+    maxAgeDays?: number;
     /** `file:unit` → one line. No line number: an entry keyed by line stops covering the code it was
      *  written for as soon as anything above it moves. */
     exempt: Record<string, string>;
@@ -142,6 +145,12 @@ export function main(): boolean {
         console.error('  security/identity-resolution-exemptions.json with the sentence that makes it right.');
         return false;
     }
+
+    // THE CLOCK ON THE CLEARANCES. A triaged entry is a claim about code, and code moves; nothing
+    // re-read the reasoning written into these files until 2026-09-06, when a clearance in a sibling
+    // ratchet was found to have gone false three weeks earlier with the gate still green.
+    const clock = staleTriage(exempt.exempt, exempt.maxAgeDays ?? 90);
+    if (reportTriageClock('identity-resolution', clock, exempt.maxAgeDays ?? 90)) return false;
 
     if (stale.length > 0) {
         console.log(`  ✓ ${stale.length} listed unit${stale.length === 1 ? '' : 's'} gone. Remove to lock the gain in:`);

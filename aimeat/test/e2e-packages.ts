@@ -1695,6 +1695,38 @@ await test('An app declaring a malformed crew-def is refused, not installed empt
   );
 });
 
+// ─── The two doors a false clearance left open ───
+// Found by a code review on 2026-09-06. security/route-scope-exemptions.json cleared POST
+// /v1/packages and POST /v1/packages/import on the grounds that a role check inside the handler made
+// them operator-only — a clearance whose own sentence named the precondition it rested on ("if the
+// node is ever set to 'owner' this branch becomes a no-op"), and config.ts later defaulted
+// packageCreateRole to 'owner', which made it exactly that. The guard stopped firing, the gate stayed
+// green, and any authenticated principal could create a package group with arbitrary app, extension
+// and cortex component sources. Their siblings /compose and /:groupId/versions carried
+// `packages:write` throughout.
+await test('An agent without packages:write cannot create a package group, or import one', async () => {
+  const made = await json('/v1/agents', {
+    method: 'POST', headers: authed(ownerToken),
+    body: JSON.stringify({ name: 'nopkgbot', owner: ownerName, capabilities: ['memory'], scopes: ['memory:read'] }),
+  });
+  assert(made.status === 201, `create agent: ${made.status} ${JSON.stringify(made.body)}`);
+  const gaii = made.body.data.agent.gaii;
+  const ts = new Date().toISOString();
+  const sig = await signMsg(made.body.data.private_key, gaii + ts);
+  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: sig }) });
+  assert(tok.body.ok === true, `agent token: ${JSON.stringify(tok.body.error)}`);
+  const agentToken = tok.body.data.token as string;
+  const create = await json('/v1/packages', {
+    method: 'POST', headers: authed(agentToken),
+    body: JSON.stringify({ name: 'sneaky', description: 'should never exist', category: 'tools', components: [] }),
+  });
+  assert(create.status === 403, `package create must require packages:write, got ${create.status}: ${JSON.stringify(create.body).slice(0, 200)}`);
+  assert(create.body.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${create.body.error?.code}`);
+  const imported = await json('/v1/packages/import', { method: 'POST', headers: authed(agentToken) });
+  assert(imported.status === 403, `package import must require packages:write, got ${imported.status}: ${JSON.stringify(imported.body).slice(0, 200)}`);
+});
+
+
 // ─── Cleanup ────────────────────────────────────────────────────────
 
 console.log('\nCleanup');
@@ -1711,6 +1743,7 @@ await json(`/v1/owners/${ownerName}?cascade=true`, {
 
 
 // (Owner-only requireRole('owner') gating is proven in the access-tokens suite — same middleware.)
+
 
 console.log(`\n📊 Results: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

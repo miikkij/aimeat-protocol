@@ -36,6 +36,7 @@
  *     the fourteen account-security routes it now carries could leave the exemption file.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit, systemic pattern 1).
  */
+import { staleTriage, reportTriageClock } from './inventory/triage-clock.js';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { AUTHORIZATION_GATES } from './inventory/principals.js';
@@ -60,6 +61,8 @@ export interface Finding {
 interface ExemptionFile {
     /** Why this file exists, for whoever opens it in six months. */
     note: string;
+    /** How long a triaged clearance may go without being re-read. */
+    maxAgeDays?: number;
     /** "file:METHOD:path" → one-line reason, the softKey below. No line number: an entry keyed by
      *  line would go stale the moment anything above the route was edited, and a stale entry stops
      *  covering the route it was written for without anyone touching that route. Seeded entries
@@ -183,7 +186,8 @@ function main(): void {
         return;
     }
 
-    const { exempt } = loadExemptions();
+    const exemptions = loadExemptions();
+    const { exempt } = exemptions;
     const known = new Set(Object.keys(exempt));
     const fresh = findings.filter(f => !known.has(softKey(f)));
     const stale = [...known].filter(k => !findings.some(f => softKey(f) === k));
@@ -227,8 +231,16 @@ function main(): void {
         console.log('');
     }
 
-    if (strict && fresh.length) {
-        console.error(`✖ ${fresh.length} new ungated route handler(s).`);
+    // THE CLOCK ON THE CLEARANCES. A triaged entry is a claim about code, and code moves: the entry
+    // for POST /v1/packages cleared it on a precondition its own sentence states conditionally, and
+    // config.ts later falsified it while this gate reported green. Gated even though the stale-entry
+    // report above deliberately is not — that one is the record of a FIX, this one is a clearance
+    // nobody has re-read.
+    const clock = staleTriage(exempt, exemptions.maxAgeDays ?? 90);
+    const clockBad = reportTriageClock('route-scope', clock, exemptions.maxAgeDays ?? 90);
+
+    if (strict && (fresh.length || clockBad)) {
+        if (fresh.length) console.error(`✖ ${fresh.length} new ungated route handler(s).`);
         process.exit(1);
     }
     console.log(fresh.length ? '  (report only — pass --strict to gate)' : '  ✓ no new ungated handlers');
