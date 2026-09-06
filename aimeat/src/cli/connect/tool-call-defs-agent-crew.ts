@@ -13,6 +13,9 @@
  * @structure agentCrewCliTools[] — the handler table, spread by tool-call-defs-agent.ts
  * @usage import { agentCrewCliTools } from './tool-call-defs-agent-crew.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-06 -- target_agent_name (and crew_validate/crew_seed's doc) are marked
+ *     required, which is what the handlers already demanded. Declaring them optional and then
+ *     throwing meant every one of these tools refused every call the published schema permitted.
  *   v1.0.0 — 2026-09-03 — Extracted from tool-call-defs-agent.ts (max-file-lines).
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -32,8 +35,8 @@ export const agentCrewCliTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_crew_validate',
         description: "Ask the agent's own runtime to validate a crew definition; the messages come back verbatim.",
         input: {
-            target_agent_name: { type: 'string', description: "The definition's agent." },
-            doc: { type: 'object', description: 'The whole crew definition to check.' },
+            target_agent_name: { type: 'string', required: true, description: "The definition's agent." },
+            doc: { type: 'object', required: true, description: 'The whole crew definition to check.' },
         },
         handler: ({ client }, input) => client.post(`/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew/validate`, { doc: requiredRecord(input, 'doc') }),
     },
@@ -41,7 +44,7 @@ export const agentCrewCliTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_crew_try',
         description: "Run a crew definition once on the agent's runtime and wait for the output (doc + prompt to start, try_id to keep waiting).",
         input: {
-            target_agent_name: { type: 'string', description: "The definition's agent." },
+            target_agent_name: { type: 'string', required: true, description: "The definition's agent." },
             doc: { type: 'object', description: 'Start a trial: the definition to run once.' },
             prompt: { type: 'string', description: 'Start a trial: what the crew should do. Required with doc.' },
             try_id: { type: 'string', description: 'Continue waiting on a trial already started.' },
@@ -83,7 +86,7 @@ export const agentCrewCliTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_crew_publish',
         description: "Make a crew definition live after the agent's runtime validates it, or restore a kept revision with `revision`.",
         input: {
-            target_agent_name: { type: 'string', description: "The definition's agent." },
+            target_agent_name: { type: 'string', required: true, description: "The definition's agent." },
             doc: { type: 'object', description: 'The definition to make live.' },
             revision: { type: 'number', description: 'Instead of doc: the kept revision to republish.' },
         },
@@ -100,8 +103,8 @@ export const agentCrewCliTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_crew_seed',
         description: "Give an agent its FIRST crew definition when it has no runtime yet to check one. Refused if it already has a definition.",
         input: {
-            target_agent_name: { type: 'string', description: "The agent to give a first definition to." },
-            doc: { type: 'object', description: 'The definition.' },
+            target_agent_name: { type: 'string', required: true, description: "The agent to give a first definition to." },
+            doc: { type: 'object', required: true, description: 'The definition.' },
             validate_with: { type: 'string', description: 'Which connected same-owner agent should check it. Omit and any connected one is used.' },
         },
         handler: ({ client }, input) => client.post(

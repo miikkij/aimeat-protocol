@@ -11,6 +11,11 @@
  *   v1.2.0 -- 2026-05-30 -- F10 drift reconciliation: instance_status id->instance_id. instance_create
  *     left as-is (model vs template) -- server MCP targets chat-instances, connector targets package
  *     instances; the model/template divergence reflects two different instance concepts (baselined).
+ *   v1.3.0 -- 2026-09-06 -- All three point at /v1/chat-instances, the resource their own published
+ *     description names. The baseline above called the split intentional; it was the aimeat_app_*
+ *     failure again -- one tool NAME, two backends. `POST /v1/instances` does not exist on any node,
+ *     so instance_create had been a 404 since it was written, and instance_list/instance_status read
+ *     package instances under a description promising chat sessions.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -22,24 +27,25 @@ export function registerInstancesTools(mcp: McpServer, registry: AgentRegistry):
   const { client } = registry.resolve();
 
   mcp.tool('aimeat_instance_list', descriptionFor('aimeat_instance_list'), {}, annotationsFor('aimeat_instance_list'), async () => {
-    const resp = await client.get('/v1/instances');
+    const resp = await client.get('/v1/chat-instances');
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
   mcp.tool('aimeat_instance_create', descriptionFor('aimeat_instance_create'), {
-    name: z.string().describe('Instance name'),
-    template: z.string().optional().describe('Template to use'),
-  }, annotationsFor('aimeat_instance_create'), async ({ name, template }) => {
-    const body: Record<string, unknown> = { name };
-    if (template) body.template = template;
-    const resp = await client.post('/v1/instances', body);
+    name: z.string().describe('Application name for this instance'),
+    model: z.string().optional().describe('AI model identifier (e.g. gpt-4o, claude-3-5-sonnet)'),
+  }, annotationsFor('aimeat_instance_create'), async ({ name, model }) => {
+    // Same derivation as the node MCP tool: the parameter is a model id, the record's platform is
+    // its vendor segment.
+    const platform = model ? model.split('-')[0] ?? 'unknown' : 'unknown';
+    const resp = await client.post('/v1/chat-instances', { platform, app_name: name });
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
   mcp.tool('aimeat_instance_status', descriptionFor('aimeat_instance_status'), {
-    instance_id: z.string().describe('Instance identifier'),
+    instance_id: z.string().describe('Chat instance ID'),
   }, annotationsFor('aimeat_instance_status'), async ({ instance_id }) => {
-    const resp = await client.get(`/v1/instances/${encodeURIComponent(instance_id)}/status`);
+    const resp = await client.get(`/v1/chat-instances/${encodeURIComponent(instance_id)}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 }

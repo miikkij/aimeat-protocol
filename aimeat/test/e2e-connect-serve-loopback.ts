@@ -340,6 +340,224 @@ await test('POST /local/call/:tool — the app tools reach APPS, not the package
   assert(!JSON.stringify(packages.body).includes(filename), 'the app must NOT appear among packages');
 });
 
+await test('POST /local/call/:tool — the doors the catalog and the handler spelled differently now open', async () => {
+  // TWENTY-ONE TOOLS ON THIS DOOR WERE DEAD, and every one of them failed the same way: the catalog
+  // published `organism_id` / `group_id` / `consent_id` / `package_id` / `instance_id` /
+  // `data_base64` / `summary` / `output` / `add`+`remove`, the handler read `id` / `keys` /
+  // `content` / `description` / `result` / `members`, and withDeclaredInputOnly refused the
+  // published name before the handler ran. Nothing a caller could send would ever get through.
+  //
+  // The unit probe measures whether a value leaves the process. This asserts the round trip against
+  // a real daemon holding a real tunnel to a real node, because a probe with a recording client
+  // cannot tell a repaired door from one repaired to the wrong name.
+  const stamp = Date.now().toString(36);
+
+  // ── Organisms: get / members / leave took `id`, while create and the rest took `organism_id`.
+  const org = await json(loopbackBase, '/local/call/aimeat_organism_create', {
+    method: 'POST', body: JSON.stringify({ name: `Loopback org ${stamp}`, description: 'dead-door probe', join_policy: 'open' }),
+  });
+  assert(org.status === 200 && org.body.ok !== false, `organism_create: ${org.status} ${JSON.stringify(org.body).slice(0, 300)}`);
+  const orgId = (org.body.data?.organism?.id ?? org.body.data?.id) as string;
+  assert(typeof orgId === 'string' && orgId.length > 0, `no organism id in ${JSON.stringify(org.body.data).slice(0, 300)}`);
+
+  const orgGot = await json(loopbackBase, '/local/call/aimeat_organism_get', {
+    method: 'POST', body: JSON.stringify({ organism_id: orgId }),
+  });
+  assert(orgGot.status === 200 && orgGot.body.ok !== false, `organism_get: ${orgGot.status} ${JSON.stringify(orgGot.body).slice(0, 300)}`);
+  assert(JSON.stringify(orgGot.body.data).includes(orgId), `organism_get answered about a different organism: ${JSON.stringify(orgGot.body.data).slice(0, 300)}`);
+
+  const orgMembers = await json(loopbackBase, '/local/call/aimeat_organism_members', {
+    method: 'POST', body: JSON.stringify({ organism_id: orgId, status: 'active' }),
+  });
+  assert(orgMembers.status === 200 && orgMembers.body.ok !== false, `organism_members: ${orgMembers.status} ${JSON.stringify(orgMembers.body).slice(0, 300)}`);
+  assert(Array.isArray(orgMembers.body.data?.members), `expected a member list, got ${JSON.stringify(orgMembers.body.data).slice(0, 200)}`);
+
+  // ── Groups: get / add_member / remove_member took `id`; add_member never sent identifier_type.
+  //    Only the READ is reachable by an agent — POST /v1/groups and the member doors are owner-only
+  //    — so the group is created with the owner's own token and the agent then reads it. For the two
+  //    writes the node's 403 IS the proof: a dispatch refusal never leaves the process, so an answer
+  //    from the node means the parameter names line up and only the role stands in the way.
+  const grantee = `${account.ownerName}@${NODE_ID}`;
+  const grp = await json(BASE, '/v1/groups', {
+    method: 'POST', headers: { Authorization: `Bearer ${account.ownerToken}` },
+    body: JSON.stringify({
+      name: `Loopback group ${stamp}`,
+      description: 'dead-door probe',
+      members: [{ identifier: `${agentName}#${account.ownerName}@${NODE_ID}`, identifier_type: 'gaii' }],
+    }),
+  });
+  assert(grp.status === 200 || grp.status === 201, `owner group create: ${grp.status} ${JSON.stringify(grp.body).slice(0, 300)}`);
+  const groupId = (grp.body.data?.group?.id ?? grp.body.data?.id) as string;
+  assert(typeof groupId === 'string' && groupId.length > 0, `no group id in ${JSON.stringify(grp.body.data).slice(0, 300)}`);
+
+  const grpGot = await json(loopbackBase, '/local/call/aimeat_group_get', {
+    method: 'POST', body: JSON.stringify({ group_id: groupId }),
+  });
+  assert(grpGot.status === 200 && grpGot.body.ok !== false, `group_get: ${grpGot.status} ${JSON.stringify(grpGot.body).slice(0, 300)}`);
+  assert(JSON.stringify(grpGot.body.data).includes(groupId), `group_get answered about a different group: ${JSON.stringify(grpGot.body.data).slice(0, 300)}`);
+
+  for (const [tool, body] of [
+    ['aimeat_group_add_member', { group_id: groupId, identifier: grantee, identifier_type: 'ghii' }],
+    ['aimeat_group_remove_member', { group_id: groupId, identifier: grantee }],
+  ] as const) {
+    const r = await json(loopbackBase, `/local/call/${tool}`, { method: 'POST', body: JSON.stringify(body) });
+    const code = r.body.error?.code;
+    assert(code !== 'UNKNOWN_PARAMETER' && code !== 'INVALID_INPUT',
+      `${tool} was refused by the DISPATCH, not by the node: ${JSON.stringify(r.body).slice(0, 300)}`);
+    assert(code === 'ACCESS_DENIED' || r.body.ok !== false,
+      `${tool} reached the node but answered something unexpected: ${JSON.stringify(r.body).slice(0, 300)}`);
+  }
+
+  // ── Consent: the door required `recipient` + `keys`, a pair nothing declares. Nothing was ever
+  //    granted through it.
+  const granted = await json(loopbackBase, '/local/call/aimeat_consent_grant', {
+    method: 'POST',
+    body: JSON.stringify({ target_gaii: grantee, scope: 'private', data_pattern: `loopback.${stamp}.*`, purpose: 'dead-door probe' }),
+  });
+  assert(granted.status === 200 && granted.body.ok !== false, `consent_grant: ${granted.status} ${JSON.stringify(granted.body).slice(0, 300)}`);
+  const consentId = (granted.body.data?.consent?.id ?? granted.body.data?.id) as string;
+  assert(typeof consentId === 'string' && consentId.length > 0, `no consent id in ${JSON.stringify(granted.body.data).slice(0, 300)}`);
+  const revoked = await json(loopbackBase, '/local/call/aimeat_consent_revoke', {
+    method: 'POST', body: JSON.stringify({ consent_id: consentId }),
+  });
+  assert(revoked.status === 200 && revoked.body.ok !== false, `consent_revoke: ${revoked.status} ${JSON.stringify(revoked.body).slice(0, 300)}`);
+
+  // ── Storage: the door required `content` where the catalog publishes `data_base64`, and dropped
+  //    visibility and group_id besides.
+  const storageKey = `loopback-dead-door-${stamp}.txt`;
+  const uploaded = await json(loopbackBase, '/local/call/aimeat_storage_upload', {
+    method: 'POST',
+    body: JSON.stringify({
+      key: storageKey,
+      data_base64: Buffer.from(`dead door ${stamp}`).toString('base64'),
+      mime_type: 'text/plain',
+      visibility: 'private',
+    }),
+  });
+  assert(uploaded.status === 200 && uploaded.body.ok !== false, `storage_upload: ${uploaded.status} ${JSON.stringify(uploaded.body).slice(0, 300)}`);
+  const downloaded = await json(loopbackBase, '/local/call/aimeat_storage_download', {
+    method: 'POST', body: JSON.stringify({ key: storageKey, inline: true }),
+  });
+  assert(JSON.stringify(downloaded.body).includes(stamp),
+    `the uploaded bytes did not come back: ${JSON.stringify(downloaded.body).slice(0, 300)}`);
+
+  // ── Capabilities: the door required `description` + `type`; the route takes `summary`. POST
+  //    /v1/capabilities is owner-only, so the reachable half is the read — and for the write, the
+  //    node's own 403 is what separates a repaired door from a dead one.
+  const cap = await json(BASE, '/v1/capabilities', {
+    method: 'POST', headers: { Authorization: `Bearer ${account.ownerToken}` },
+    body: JSON.stringify({ name: `Loopback capability ${stamp}`, summary: 'dead-door probe', visibility: 'public' }),
+  });
+  assert(cap.status === 200 || cap.status === 201, `owner capability create: ${cap.status} ${JSON.stringify(cap.body).slice(0, 300)}`);
+  const capId = (cap.body.data?.capability?.id ?? cap.body.data?.id) as string;
+  assert(typeof capId === 'string' && capId.length > 0, `no capability id in ${JSON.stringify(cap.body.data).slice(0, 300)}`);
+  const capGot = await json(loopbackBase, '/local/call/aimeat_capabilities_get', {
+    method: 'POST', body: JSON.stringify({ id: capId }),
+  });
+  assert(JSON.stringify(capGot.body).includes('dead-door probe'),
+    `capabilities_get: ${JSON.stringify(capGot.body).slice(0, 300)}`);
+
+  const capCreate = await json(loopbackBase, '/local/call/aimeat_capabilities_create', {
+    method: 'POST',
+    body: JSON.stringify({ name: `Loopback capability ${stamp} b`, summary: 'dead-door probe', visibility: 'private', tags: ['loopback'] }),
+  });
+  assert(capCreate.body.error?.code === 'ACCESS_DENIED',
+    `capabilities_create must reach the node and be refused by ROLE, not by the dispatch: ${JSON.stringify(capCreate.body).slice(0, 300)}`);
+
+  // ── Boards: the door required a `members` array; the route takes add/remove lists.
+  const board = await json(loopbackBase, '/local/call/aimeat_board_create', {
+    method: 'POST', body: JSON.stringify({ name: `Loopback board ${stamp}`, visibility: 'shared' }),
+  });
+  assert(board.status === 200 && board.body.ok !== false, `board_create: ${board.status} ${JSON.stringify(board.body).slice(0, 300)}`);
+  const boardId = (board.body.data?.board?.id ?? board.body.data?.id) as string;
+  assert(typeof boardId === 'string' && boardId.length > 0, `no board id in ${JSON.stringify(board.body.data).slice(0, 300)}`);
+  // Managing members is an owner-session act even on a board the agent created, so the node's 403
+  // is the reachable proof: a dispatch refusal would have named the parameter instead.
+  const boardMembers = await json(loopbackBase, '/local/call/aimeat_board_members', {
+    method: 'POST', body: JSON.stringify({ board_id: boardId, add: [grantee] }),
+  });
+  assert(boardMembers.body.error?.code === 'ACCESS_DENIED' || boardMembers.body.ok !== false,
+    `board_members: ${boardMembers.status} ${JSON.stringify(boardMembers.body).slice(0, 300)}`);
+  assert(boardMembers.body.error?.code !== 'UNKNOWN_PARAMETER',
+    `board_members was refused by the DISPATCH: ${JSON.stringify(boardMembers.body).slice(0, 300)}`);
+
+  // ── join and leave are the creator's own organism, so the node answers ALREADY_MEMBER and
+  //    CREATOR_CANNOT_LEAVE. Those are the ROUTE's answers about this organism, which is the proof
+  //    wanted here: the id reached the handler. A dead door never got that far.
+  for (const tool of ['aimeat_organism_join', 'aimeat_organism_leave'] as const) {
+    const r = await json(loopbackBase, `/local/call/${tool}`, {
+      method: 'POST', body: JSON.stringify({ organism_id: orgId }),
+    });
+    const code = r.body.error?.code;
+    assert(code !== 'UNKNOWN_PARAMETER' && code !== 'NOT_FOUND',
+      `${tool} did not reach this organism: ${JSON.stringify(r.body).slice(0, 300)}`);
+  }
+});
+
+await test('POST /local/call/:tool — an instance is a CHAT instance on this door too, not a package one', async () => {
+  // ONE TOOL NAME, TWO BACKENDS — the aimeat_app_* failure again, baselined for months as
+  // "intentional: two different instance concepts". The published description says chat sessions on
+  // every surface; this door and the connector MCP pointed at /v1/instances, which is the package
+  // system and has no POST at all, so instance_create was a 404 from the day it was written.
+  const appName = `loopback-chat-${Date.now().toString(36)}`;
+  const created = await json(loopbackBase, '/local/call/aimeat_instance_create', {
+    method: 'POST', body: JSON.stringify({ name: appName, model: 'claude-3-5-sonnet' }),
+  });
+  assert(created.status === 200 && created.body.ok !== false,
+    `instance_create: ${created.status} ${JSON.stringify(created.body).slice(0, 300)}`);
+  const instanceId = created.body.data?.chat_instance?.id as string;
+  assert(typeof instanceId === 'string' && instanceId.length > 0,
+    `expected a chat_instance, got ${JSON.stringify(created.body.data).slice(0, 300)}`);
+  assert(created.body.data.chat_instance.platform === 'claude',
+    `the platform is derived from the model id: got ${created.body.data.chat_instance.platform}`);
+
+  const listed = await json(loopbackBase, '/local/call/aimeat_instance_list', { method: 'POST', body: '{}' });
+  assert(JSON.stringify(listed.body).includes(appName),
+    `instance_list did not include the instance just created — is it still reading /v1/instances? ${JSON.stringify(listed.body).slice(0, 300)}`);
+
+  const status = await json(loopbackBase, '/local/call/aimeat_instance_status', {
+    method: 'POST', body: JSON.stringify({ instance_id: instanceId }),
+  });
+  assert(JSON.stringify(status.body).includes(appName),
+    `instance_status: ${status.status} ${JSON.stringify(status.body).slice(0, 300)}`);
+});
+
+await test('POST /local/call/:tool — a data package export carries limit, offset and select', async () => {
+  // The route reads all three; this door sent none of them, so a fleet caller asking for a window of
+  // a large table got whatever the default is, and a column projection was ignored while the call
+  // answered ok.
+  const name = `loopback-rows-${Date.now().toString(36)}`;
+  const published = await json(loopbackBase, '/local/call/aimeat_datapackage_publish', {
+    method: 'POST',
+    body: JSON.stringify({
+      name,
+      changes: 'first version, for the export probe',
+      resources: [{
+        name: 'rows',
+        rows: [
+          { id: 'a', label: 'alpha', extra: 1 },
+          { id: 'b', label: 'beta', extra: 2 },
+          { id: 'c', label: 'gamma', extra: 3 },
+        ],
+      }],
+    }),
+  });
+  assert(published.status === 200 && published.body.ok !== false,
+    `datapackage_publish: ${published.status} ${JSON.stringify(published.body).slice(0, 300)}`);
+
+  const ref = `pkg:${account.ownerName}/${name}`;
+  const windowed = await json(loopbackBase, '/local/call/aimeat_datapackage_export', {
+    method: 'POST',
+    body: JSON.stringify({ ref, resource: 'rows', format: 'json', limit: 1, offset: 1, select: ['id', 'label'] }),
+  });
+  assert(windowed.status === 200 && windowed.body.ok !== false,
+    `datapackage_export: ${windowed.status} ${JSON.stringify(windowed.body).slice(0, 300)}`);
+  const rows = windowed.body.data?.rows as Record<string, unknown>[] | undefined;
+  assert(Array.isArray(rows) && rows.length === 1, `limit=1 was dropped: got ${JSON.stringify(rows)}`);
+  assert(rows![0].id === 'b', `offset=1 was dropped: expected row b, got ${JSON.stringify(rows![0])}`);
+  assert(!('extra' in rows![0]), `select was dropped: the projection should have removed "extra" — ${JSON.stringify(rows![0])}`);
+});
+
 await test('POST /local/call/:tool — unknown tool returns 404 UNKNOWN_TOOL', async () => {
   const r = await json(loopbackBase, '/local/call/not_a_real_tool', { method: 'POST', body: '{}' });
   assert(r.status === 404, `status ${r.status}`);

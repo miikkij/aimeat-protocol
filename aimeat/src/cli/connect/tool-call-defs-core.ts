@@ -2,7 +2,7 @@
  * @file cli/connect/tool-call-defs-core.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Memory, discovery, work, wallet, board, storage, admin, capabilities, catalogue, consent, flag, group, instance, knowledge and skill connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
+ * @description Memory, discovery, work, wallet, storage, admin, compliance, capabilities, catalogue, consent, flag, group, share, instance and knowledge connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @structure
  *   - knowledgeContributeUnreachable() -- the one refusal both connector doors serve for the knowledge
  *     entry write, which this node exposes over MCP only
@@ -10,6 +10,9 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   v1.6.0 -- 2026-09-06 -- Nine doors that had been dead repaired (see the commit), and the nine
+ *     board entries extracted unchanged to tool-call-defs-boards.ts, which is what brought this
+ *     file back under the line ceiling.
  *   v1.5.0 -- 2026-09-05 -- aimeat_admin_security_overview (GET /v1/admin/security/overview) and
  *     aimeat_admin_incident_resolve (POST .../incidents/:id/resolve), so the fleet door does not lag
  *     the node's Security page.
@@ -26,7 +29,7 @@
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, requiredValue, optionalNumber, optionalBoolean, optionalArray, optionalRecord, requiredRecord, requiredArray } from './tool-call-helpers.js';
+import { query, requiredString, optionalString, requiredValue, optionalNumber, optionalBoolean, optionalArray, optionalRecord, requiredRecord } from './tool-call-helpers.js';
 import type { ApiResponse } from './api-client.js';
 
 /**
@@ -176,10 +179,11 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_catalogue_search',
+        // `query` was this door's historical spelling and used to be read as an alias for `search`.
+        // It cannot arrive any more: withDeclaredInputOnly refuses a parameter nothing declares, and
+        // the refusal names `search`, so the alias was dead code pretending to be compatibility.
         handler: ({ client }, input) => client.get(`/v1/catalogue${query({
-            // `query` is this door's own historical spelling; `search` is what the catalog publishes
-            // and what every other surface takes. Both are accepted so neither caller is broken.
-            search: optionalString(input, 'search') ?? optionalString(input, 'query'),
+            search: optionalString(input, 'search'),
             category: optionalString(input, 'category'),
         })}`),
     },
@@ -235,37 +239,29 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_work_deliver',
-        handler: ({ client }, input) => client.post(
-            `/v1/work/${encodeURIComponent(requiredString(input, 'tracking_code'))}/deliver`,
-            { result: requiredValue(input, 'result') },
-        ),
+        // `output`/`metadata` are what WorkDeliverySchema takes and what the catalog publishes. This
+        // door read `result`, a name nothing declares, so every call died in the dispatch before it
+        // reached the node.
+        handler: ({ client }, input) => {
+            const body: JsonObject = { output: requiredValue(input, 'output') };
+            if (input.metadata !== undefined) body.metadata = input.metadata;
+            return client.post(`/v1/work/${encodeURIComponent(requiredString(input, 'tracking_code'))}/deliver`, body);
+        },
     },
     {
         name: 'aimeat_wallet_balance',
         handler: ({ client }) => client.get('/v1/wallet'),
     },
     {
-        name: 'aimeat_board_read',
-        handler: ({ client }, input) => client.get(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts${query({
-            category: optionalString(input, 'category'),
-            limit: optionalNumber(input, 'limit'),
-        })}`),
-    },
-    {
-        name: 'aimeat_board_post',
-        handler: ({ client }, input) => {
-            const body: JsonObject = { title: requiredString(input, 'title'), body: requiredString(input, 'body') };
-            const category = optionalString(input, 'category');
-            if (category) body.category = category;
-            return client.post(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts`, body);
-        },
-    },
-    {
         name: 'aimeat_storage_upload',
+        // The catalog and the connector-MCP door both publish `data_base64`; POST /v1/storage reads
+        // it as `data`. This door read `content`, which nothing declares and nothing sends, so the
+        // whole tool was unreachable — and `visibility`/`group_id` were dropped besides.
         handler: ({ client }, input) => {
-            const body: JsonObject = { key: requiredString(input, 'key'), content: requiredString(input, 'content') };
-            const mimeType = optionalString(input, 'mime_type');
-            if (mimeType) body.mime_type = mimeType;
+            const body: JsonObject = { key: requiredString(input, 'key'), data: requiredString(input, 'data_base64') };
+            const mimeType = optionalString(input, 'mime_type'); if (mimeType) body.mime_type = mimeType;
+            const visibility = optionalString(input, 'visibility'); if (visibility) body.visibility = visibility;
+            const groupId = optionalString(input, 'group_id'); if (groupId) body.group_id = groupId;
             return client.post('/v1/storage', body);
         },
     },
@@ -305,9 +301,17 @@ export const coreTools: ConnectCliToolDefinition[] = [
             const [, owner, name, version] = m;
             const format = optionalString(input, 'format') ?? 'url';
             const base = `/v1/datapackages/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
-            const qs = version ? `?version=${encodeURIComponent(version)}` : '';
-            if (format === 'url') return client.get(base + qs);
-            return client.get(`${base}/rows/${encodeURIComponent(requiredString(input, 'resource'))}${qs}`);
+            if (format === 'url') return client.get(base + (version ? `?version=${encodeURIComponent(version)}` : ''));
+            // limit, offset and select are read by GET .../rows/:resource and were dropped here. A
+            // fleet caller asking for a window of a large table got whatever the default is, and a
+            // column projection was ignored while the call answered ok.
+            const select = optionalArray(input, 'select')?.filter((c): c is string => typeof c === 'string');
+            return client.get(`${base}/rows/${encodeURIComponent(requiredString(input, 'resource'))}${query({
+                version,
+                limit: optionalNumber(input, 'limit'),
+                offset: optionalNumber(input, 'offset'),
+                select: select?.length ? select.join(',') : undefined,
+            })}`);
         },
     },
     {
@@ -510,72 +514,11 @@ export const coreTools: ConnectCliToolDefinition[] = [
         },
     },
     {
-        name: 'aimeat_board_list',
-        handler: ({ client }) => client.get('/v1/boards'),
-    },
-    {
-        name: 'aimeat_board_create',
-        handler: ({ client }, input) => {
-            const body: JsonObject = { name: requiredString(input, 'name') };
-            const description = optionalString(input, 'description');
-            const visibility = optionalString(input, 'visibility');
-            const allowedGaiis = optionalArray(input, 'allowed_gaiis');
-            if (description) body.description = description;
-            if (visibility) body.visibility = visibility;
-            // Without this a shared or private board is created with nobody on it, which reads as
-            // "the board is broken" rather than "the guest list never left your machine".
-            if (allowedGaiis) body.allowed_gaiis = allowedGaiis;
-            return client.post('/v1/boards', body);
-        },
-    },
-    {
-        name: 'aimeat_board_subscribe',
-        handler: ({ client }, input) => {
-            const body: JsonObject = {};
-            const callbackUrl = optionalString(input, 'callback_url');
-            const filters = optionalRecord(input, 'filters');
-            if (callbackUrl) body.callback_url = callbackUrl;
-            if (filters) body.filters = filters;
-            return client.post(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/subscribe`, body);
-        },
-    },
-    {
-        name: 'aimeat_board_react',
-        handler: ({ client }, input) => {
-            // `reaction` is the body key BoardReactionSchema names; this table sent `emoji`, so a
-            // fleet agent's reaction failed validation on the way in. The same key, the same word,
-            // on all three surfaces now — and `remove` withdraws the caller's own mark.
-            const path = `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts/${encodeURIComponent(requiredString(input, 'post_id'))}/react`;
-            const emoji = requiredString(input, 'emoji');
-            return input.remove === true
-                ? client.delete(`${path}?reaction=${encodeURIComponent(emoji)}`)
-                : client.post(path, { reaction: emoji });
-        },
-    },
-    {
-        name: 'aimeat_board_reply',
-        handler: ({ client }, input) => client.post(
-            `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts/${encodeURIComponent(requiredString(input, 'post_id'))}/replies`,
-            { body: requiredString(input, 'body') },
-        ),
-    },
-    {
-        name: 'aimeat_board_members',
-        handler: ({ client }, input) => client.patch(
-            `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/members`,
-            { members: requiredArray(input, 'members') },
-        ),
-    },
-    {
-        name: 'aimeat_board_delete',
-        handler: ({ client }, input) => client.delete(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}`),
-    },
-    {
         name: 'aimeat_capabilities_list',
         handler: ({ client }, input) => {
             const tags = optionalArray(input, 'tags')?.filter((t): t is string => typeof t === 'string');
             return client.get(`/v1/capabilities${query({
-                search: optionalString(input, 'search') ?? optionalString(input, 'query'),
+                search: optionalString(input, 'search'),
                 tags: tags?.length ? tags.join(',') : undefined,
                 // `callable` is a flag and arrives either as a boolean (JSON caller) or as the
                 // string "true" (shell caller); `authRequired` is NOT a flag at all — the catalog
@@ -600,11 +543,21 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_capabilities_create',
-        handler: ({ client }, input) => client.post('/v1/capabilities', {
-            name: requiredString(input, 'name'),
-            description: requiredString(input, 'description'),
-            type: requiredString(input, 'type'),
-        }),
+        // `summary` is the field POST /v1/capabilities takes and the one both MCP doors publish.
+        // This door required `description` and `type`, neither of them declared anywhere, so the
+        // dispatch refused every call before it could be made.
+        handler: ({ client }, input) => {
+            const body: JsonObject = { name: requiredString(input, 'name'), summary: requiredString(input, 'summary') };
+            const id = optionalString(input, 'id'); if (id) body.id = id;
+            const callable = optionalBoolean(input, 'callable'); if (callable !== undefined) body.callable = callable;
+            const visibility = optionalString(input, 'visibility'); if (visibility) body.visibility = visibility;
+            const tags = optionalArray(input, 'tags'); if (tags) body.tags = tags;
+            const inputSchema = optionalRecord(input, 'inputSchema'); if (inputSchema) body.inputSchema = inputSchema;
+            const outputSchema = optionalRecord(input, 'outputSchema'); if (outputSchema) body.outputSchema = outputSchema;
+            const usage = optionalString(input, 'usage'); if (usage) body.usage = usage;
+            const whenToUse = optionalString(input, 'whenToUse'); if (whenToUse) body.whenToUse = whenToUse;
+            return client.post('/v1/capabilities', body);
+        },
     },
     {
         name: 'aimeat_capabilities_update',
@@ -637,7 +590,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_catalogue_agents',
         handler: ({ client }, input) => client.get(`/v1/catalogue/agents${query({
-            search: optionalString(input, 'search') ?? optionalString(input, 'query'),
+            search: optionalString(input, 'search'),
             category: optionalString(input, 'category'),
         })}`),
     },
@@ -648,17 +601,24 @@ export const coreTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_catalogue_directory',
         handler: ({ client }, input) => client.get(`/v1/catalogue/directory${query({
-            q: optionalString(input, 'query'),
             city: optionalString(input, 'city'),
             interest: optionalString(input, 'interest'),
         })}`),
     },
     {
         name: 'aimeat_consent_grant',
+        // Same shape as the connector-MCP door: the catalog publishes target_gaii/scope/data_pattern
+        // and POST /v1/consent takes `recipient` + `data_pattern`. This door required `recipient`
+        // and `keys` — a pair nothing declares — so no consent was ever granted through it.
         handler: ({ client }, input) => {
-            const body: JsonObject = { recipient: requiredString(input, 'recipient'), keys: requiredArray(input, 'keys') };
-            const purpose = optionalString(input, 'purpose');
-            if (purpose) body.purpose = purpose;
+            const body: JsonObject = {
+                recipient: requiredString(input, 'target_gaii'),
+                scope: requiredString(input, 'scope'),
+                data_pattern: requiredString(input, 'data_pattern'),
+                purpose: requiredString(input, 'purpose'),
+            };
+            const ttlHours = optionalNumber(input, 'ttl_hours');
+            if (ttlHours != null) body.expires = new Date(Date.now() + ttlHours * 3_600_000).toISOString();
             return client.post('/v1/consent', body);
         },
     },
@@ -672,7 +632,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_consent_revoke',
-        handler: ({ client }, input) => client.delete(`/v1/consent/${encodeURIComponent(requiredString(input, 'id'))}`),
+        handler: ({ client }, input) => client.delete(`/v1/consent/${encodeURIComponent(requiredString(input, 'consent_id'))}`),
     },
     {
         name: 'aimeat_flag_report',
@@ -695,7 +655,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_group_get',
-        handler: ({ client }, input) => client.get(`/v1/groups/${encodeURIComponent(requiredString(input, 'id'))}`),
+        handler: ({ client }, input) => client.get(`/v1/groups/${encodeURIComponent(requiredString(input, 'group_id'))}`),
     },
     {
         name: 'aimeat_group_create',
@@ -712,16 +672,20 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_group_add_member',
+        // `identifier_type` and `permissions` are what the route reads and what both MCP doors send;
+        // `role` was a name nothing declared, and the group id was spelled `id` here alone.
         handler: ({ client }, input) => {
-            const body: JsonObject = { identifier: requiredString(input, 'identifier') };
-            const role = optionalString(input, 'role');
-            if (role) body.role = role;
-            return client.post(`/v1/groups/${encodeURIComponent(requiredString(input, 'id'))}/members`, body);
+            const body: JsonObject = {
+                identifier: requiredString(input, 'identifier'),
+                identifier_type: requiredString(input, 'identifier_type'),
+            };
+            const permissions = optionalRecord(input, 'permissions'); if (permissions) body.permissions = permissions;
+            return client.post(`/v1/groups/${encodeURIComponent(requiredString(input, 'group_id'))}/members`, body);
         },
     },
     {
         name: 'aimeat_group_remove_member',
-        handler: ({ client }, input) => client.delete(`/v1/groups/${encodeURIComponent(requiredString(input, 'id'))}/members/${encodeURIComponent(requiredString(input, 'identifier'))}`),
+        handler: ({ client }, input) => client.delete(`/v1/groups/${encodeURIComponent(requiredString(input, 'group_id'))}/members/${encodeURIComponent(requiredString(input, 'identifier'))}`),
     },
     {
         name: 'aimeat_share_create',
@@ -745,22 +709,22 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_instance_list',
-        handler: ({ client }) => client.get('/v1/instances'),
+        handler: ({ client }) => client.get('/v1/chat-instances'),
     },
     {
+        // An "instance" here is a chat session, which is what all three tool descriptions say and
+        // what the node MCP writes. `/v1/instances` is package instances and has no POST at all, so
+        // this door had been calling a route that does not exist.
         name: 'aimeat_instance_create',
         handler: ({ client }, input) => {
-            const body: JsonObject = { name: requiredString(input, 'name') };
-            const template = optionalString(input, 'template');
             const model = optionalString(input, 'model');
-            if (template) body.template = template;
-            if (model) body.model = model;
-            return client.post('/v1/instances', body);
+            const platform = model ? model.split('-')[0] ?? 'unknown' : 'unknown';
+            return client.post('/v1/chat-instances', { platform, app_name: requiredString(input, 'name') });
         },
     },
     {
         name: 'aimeat_instance_status',
-        handler: ({ client }, input) => client.get(`/v1/instances/${encodeURIComponent(requiredString(input, 'id'))}/status`),
+        handler: ({ client }, input) => client.get(`/v1/chat-instances/${encodeURIComponent(requiredString(input, 'instance_id'))}`),
     },
     {
         name: 'aimeat_knowledge_list',
@@ -768,7 +732,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_knowledge_get',
-        handler: ({ client }, input) => client.get(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'id'))}`),
+        handler: ({ client }, input) => client.get(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'package_id'))}`),
     },
     {
         // No HTTP door for the entry write on this node. See knowledgeContributeUnreachable() above:
@@ -781,6 +745,6 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_knowledge_links',
-        handler: ({ client }, input) => client.get(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'id'))}/links`),
+        handler: ({ client }, input) => client.get(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'package_id'))}/links${query({ direction: optionalString(input, 'direction') })}`),
     },
 ];

@@ -168,9 +168,12 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     // connector handbook_get returns the agent operating handbook by `module` (/v1/agents/me/handbook/:module).
     // Two different resources sharing the tool name; unifying them is a semantic decision for consolidation.
     'aimeat_handbook_get',
-    // intentional: server MCP instance_create targets chat-instances (model -> derived platform),
-    // connector instance_create targets package instances (template); two different concepts.
-    'aimeat_instance_create',
+    // RESOLVED 2026-09-06, and the note this replaces was wrong the way the app_* one above was
+    // wrong. It called the split intentional -- "two different instance concepts" -- when the
+    // published description says CHAT instances on every surface, `POST /v1/instances` has never
+    // existed on any node (so connector instance_create was a 404 from the day it was written), and
+    // connector instance_list / instance_status were reading PACKAGE instances under that
+    // description. All three doors speak /v1/chat-instances now, and the connector takes `model`.
 
     // ── NOT intentional. Recorded 2026-08-16, when this audit was wired into the pre-commit gate. ──
     //
@@ -211,7 +214,10 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     'aimeat_skill_list',               // binding, organism_id, workspace_id — a connector caller cannot filter the registry, only list it
     'aimeat_skill_link',               // (agent_name only: the connector routes by agent, so this one is probably intentional and needs confirming, not fixing)
     'aimeat_skill_unlink',             // as skill_link
-    'aimeat_workflow_answer',          // picks, other, workflow_id vs the connector's answer, id — the two doors name the same call differently
+    // RESOLVED 2026-09-06: not a naming difference, a broken door. The connector sent
+    // { answer: {...} } at a route reading { picks, other } against the question pinned at ask time,
+    // so WorkflowHumanAnswerSchema saw an empty body and every answer given there left the run
+    // parked. Both doors take picks/other now; `answer` is deleted, not aliased.
     'aimeat_workflow_save',            // confirm_token, propose — the propose-then-confirm handshake is unreachable from the connector
     'aimeat_operator_agent_configure', // confirm_token, and agent_name vs target_agent_name
     'aimeat_operator_ai_config',       // confirm_token

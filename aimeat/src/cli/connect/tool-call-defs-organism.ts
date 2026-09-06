@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 -- 2026-09-06 -- organism get/join/leave/members read `organism_id`, the name the catalog
+ *     publishes and the rest of this file already used. They read `id`, so the dispatch refused the
+ *     published name and all four were unreachable. join carries `message`, members carries
+ *     role/status -- both read by their routes and dropped here.
  *   v1.4.0 -- 2026-08-25 -- aimeat_organism_member_remove handler, so a fleet agent's call reaches the
  *     same route the two MCP doors use, `ban` included.
  *   v1.3.0 -- 2026-08-13 -- Add the aimeat_schedule_trigger connect-call handler (POST
@@ -47,7 +51,7 @@ export const organismTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_organism_get',
-        handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'id'))}`),
+        handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}`),
     },
     {
         name: 'aimeat_organism_overview',
@@ -68,15 +72,19 @@ export const organismTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_organism_join',
-        handler: ({ client }, input) => client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'id'))}/join`),
+        handler: ({ client }, input) => {
+            const body: JsonObject = {};
+            const message = optionalString(input, 'message'); if (message !== undefined) body.message = message;
+            return client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/join`, body);
+        },
     },
     {
         name: 'aimeat_organism_leave',
-        handler: ({ client }, input) => client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'id'))}/leave`),
+        handler: ({ client }, input) => client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/leave`),
     },
     {
         name: 'aimeat_organism_members',
-        handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'id'))}/members`),
+        handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/members${query({ role: optionalString(input, 'role'), status: optionalString(input, 'status') })}`),
     },
     // ── Organism create / backup (parity with the appdev MCP surface; thin REST wrappers, authz server-side) ──
     {

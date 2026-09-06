@@ -7,6 +7,9 @@
  * @structure workflowTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { workflowTools } from './tool-call-defs-workflows.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-06 -- aimeat_workflow_answer stops reading the legacy `answer` object. It
+ *     never worked (the route reads picks/other) and the dispatch refuses an undeclared name now,
+ *     so the compatibility the comment promised could not happen.
  *   v1.1.0 -- 2026-08-30 -- aimeat_workflow_run forwards `vars` and `target`. This is the door a
  *     fleet daemon calls, and it sent only { mode }: a workflow that declares input ran at its
  *     defaults, every time, with nothing to say so.
@@ -79,13 +82,16 @@ export const workflowTools: ConnectCliToolDefinition[] = [
         },
         // NOT A DROPPED PARAMETER — A BROKEN TOOL. The route reads { picks, other } and this door
         // sent { answer: {...} }, so every human-input answer from /local/call was accepted as an
-        // empty body and the run stayed parked. `answer` is still read, as an object carrying picks
-        // and other, so a caller written against the old shape keeps working.
+        // empty body and the run stayed parked.
+        //
+        // The `answer` object is no longer read. It never worked, so there is no caller to keep
+        // working, and withDeclaredInputOnly refuses an undeclared parameter now — a handler still
+        // reaching for `answer` could only ever have been reading a field the dispatch had already
+        // refused. A caller sending it gets a refusal naming `picks` and `other`.
         handler: ({ client }, input) => {
             const workflowId = optionalString(input, 'workflow_id') ?? requiredString(input, 'id');
-            const legacy = optionalRecord(input, 'answer') ?? {};
-            const picks = optionalArray(input, 'picks') ?? (Array.isArray(legacy.picks) ? legacy.picks : []);
-            const other = optionalString(input, 'other') ?? (typeof legacy.other === 'string' ? legacy.other : undefined);
+            const picks = optionalArray(input, 'picks') ?? [];
+            const other = optionalString(input, 'other');
             const body: JsonObject = { picks };
             if (other !== undefined) body.other = other;
             return client.post(
