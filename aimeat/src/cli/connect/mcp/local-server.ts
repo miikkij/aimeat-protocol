@@ -376,7 +376,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       console.error(`[serve] ${a.agent}@${a.owner}: replacing a credential the node has refused`);
       detachAgent(a.gaii);
     }
-    const client = new AimeatClient(a.config.node_url);
+    const client = new AimeatClient(a.config.node_url, undefined, { agent: a.agent, owner: a.owner });
     const entry: RegisteredAgent = { gaii: a.gaii, agent: a.agent, owner: a.owner, client, config: a.config };
     registry.add(entry);
     await attachRegistered(entry);
