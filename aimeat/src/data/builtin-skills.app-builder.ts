@@ -24,6 +24,8 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   v1.1.0 — 2026-09-06 — The extension section says a key is named as `{{secret:NAME}}` and
+ *     filled from the person's vault, and what the app tells the person instead of drawing a field.
  *   v1.0.0 — 2026-08-25 — Extracted from builtin-skills.ts (max-file-lines) and merged with the
  *     node's diverged copy.
  */
@@ -212,6 +214,14 @@ not in the browser: it owns its \`ext:<name>\` memory namespace, makes outbound 
 \`ctx.fetch()\`, and exports actions as \`export default async function (ctx, input) {...}\`.
 The app reads it **through** the node's cortex libs, never directly. Most apps need NO
 extension — just auth + data + UI libs.
+
+**A key for that API is named, never held.** The app never asks for, stores or sends one; the
+extension writes it into the outbound header as \`{{secret:NAME}}\`, and the node fills it from
+the signed-in person's own vault on the way out (a missing name fails as \`SECRET_UNKNOWN\`,
+naming it, with nothing sent). What the app owes the person is the NAME and where it goes: their
+Access page, section 04 Secrets, or their own AI (\`aimeat_secret_set { name, value }\`, behind
+the \`secrets:manage\` scope the owner ticks per agent; \`aimeat_secret_list\` shows names and
+who used them, never a value). Show a missing key by its name in the UI; never draw a field for it.
 
 ## Do / Don't
 

@@ -18,6 +18,9 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.4.0 — 2026-09-06 — The secrets section teaches `{{secret:NAME}}` beside the operator's
+ *     `type: secret` config: the caller's vault fills the header on the way out, and the script
+ *     never holds the value. Additive; the operator path reads as before.
  *   v1.3.0 — 2026-09-05 — ctx.workspace in the ctx table, with the manifest declaration that
  *     makes it exist and the scopes the caller must hold.
  *   v1.2.0 — 2026-09-03 — versionsSection: kept versions, pinned addresses and the dependency map.
@@ -181,6 +184,24 @@ function secretsSection(): string {
     '',
     'Never put a key in the script, in a memory value, or in a returned object. A consumer buying',
     'your action gets its RESULT and never your credential: that asymmetry is what you are selling.',
+    '',
+    '**When the key belongs to the PERSON calling, not to the operator, name it instead of reading it.**',
+    'Every owner has a vault of named secrets, and a header value written as `{{secret:NAME}}` is',
+    'filled in by the node on the way out: the caller\'s vault first, then a `type: secret` config of',
+    'your own by that name, and if neither holds it the call fails before anything is sent, with',
+    '`SECRET_UNKNOWN` naming the header and the secret. Your script never sees the value, so it cannot',
+    'log it, return it or write it anywhere; a redirect away from the origin you aimed at drops it.',
+    '',
+    '```js',
+    'await ctx.fetch(url, { headers: { Authorization: "Bearer {{secret:OPENWEATHER_KEY}}" } });',
+    '```',
+    '',
+    'So a `config:` secret is for one credential the operator holds for everyone, and `{{secret:NAME}}`',
+    'is for each person\'s own. Write the name in your manifest description and in every error you',
+    'return, exactly as it must be stored: a person fills it in on their Access page (section 04,',
+    'Secrets) or asks their own AI, which stores it with `aimeat_secret_set { name, value }` when the',
+    'owner has ticked `secrets:manage` for that agent. Nothing on the node reads a stored value back,',
+    'so an app or a document can only carry the placeholder, never the key.',
     '',
   ].join('\n');
 }

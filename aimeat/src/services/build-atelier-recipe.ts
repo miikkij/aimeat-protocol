@@ -24,6 +24,8 @@
  *   import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
  *   body += renderCustomisation() + renderLiving(base) + renderPatterns();
  * @version-history
+ *   v1.4.0 — 2026-09-06 — The reach-out paragraph names `{{secret:NAME}}` in a trigger's or a
+ *     source's headers, the vault it is filled from, and the words to give the person.
  *   v1.3.0 — 2026-09-06 — The living section says what `aimeat-light` is for: a genre that
  *     hardcodes its palette declares `fixed`, a fork inherits it, and the fork deletes it when
  *     its colours become tokens. genre-living is the one that says `follows`, and every app
@@ -133,7 +135,12 @@ export function renderLiving(base: string): string {
     + 'the owner\'s allowlist decides which hosts may be reached — never the record, and never the '
     + 'browser calling a third party directly. A guest sees both roads disabled with words. Two '
     + 'switches are the owner\'s: `hooks: { enabled: false }` on the document stops every trigger, '
-    + 'and `enabled` on a trigger stops that one.\n\n'
+    + 'and `enabled` on a trigger stops that one. An address that wants a key gets it by NAME: a '
+    + 'trigger\'s or a source\'s `headers` may carry `{{secret:NAME}}`, which the node fills from '
+    + 'the signed-in owner\'s vault on the way out, so the record holds the placeholder and never '
+    + 'the key. The gear dialogs offer the owner\'s stored names to pick from; a name the owner has '
+    + 'not stored fails by name, and the words to give the person are "store it as NAME on your '
+    + 'Access page, section 04 Secrets, or ask your AI".\n\n'
     + 'THREE THINGS THAT KEEP IT A DOCUMENT. The arithmetic lives in a formula node, so the person '
     + 'changes what the sheet works out by asking their own AI to edit the record. It computes in '
     + 'the browser and persists as the record, which is a memory key — a slider moves faster than '

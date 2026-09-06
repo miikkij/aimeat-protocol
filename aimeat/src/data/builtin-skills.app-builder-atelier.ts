@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.9.0 — 2026-09-06 — "Never" gains a field for an API key: a key is named as `{{secret:NAME}}`
+ *     in an extension's or a living document's headers and filled from the person's vault.
  *   v1.8.0 — 2026-09-06 — A page says whether it keeps its own light: `aimeat-light` beside the
  *     register line, `fixed` on a genre that hardcodes its palette, inherited by a fork and
  *     deleted when the fork's colours become tokens. Written because the pill's control read the
@@ -166,6 +168,12 @@ moved under you says so.
 ## Never, on this track
 
 - daisyUI/Tailwind classes outside a \`section\` body.
+- A field for an API key. A key for an outside service is NAMED, in an extension's header or in
+  a living document's trigger or source \`headers\`, as \`{{secret:NAME}}\`; the node fills it
+  from the signed-in person's vault on the way out and a missing name fails by name. The page
+  tells the person the name and where it goes (their Access page, section 04 Secrets, or their
+  own AI with \`aimeat_secret_set\`), and the living document's gear dialogs pick from the
+  stored names.
 - Hand-written ARIA, focus management or animation code — the components carry them, and a
   hand-rolled control is an accessibility regression, not a shortcut.
 - A copied component. When one is nearly what you need, customise it through the four doors above

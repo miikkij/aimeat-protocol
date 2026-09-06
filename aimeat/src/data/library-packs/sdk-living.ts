@@ -13,6 +13,8 @@
  * @structure LIVING_PACKS: LibraryPack[]
  * @usage Imported by ./sdk.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.4.0 — 2026-09-06 — The aiDoc names `{{secret:NAME}}` in a trigger's or a source's headers
+ *     and the vault behind it, so a builder tells the person the name instead of drawing a field.
  *   v1.3.0 — 2026-09-06 — aimeat-living 0.5.0: the aiDoc gains "rows are arrays", because a
  *     document that can hold a list is a different thing to write than one that cannot, and a
  *     model that does not know range() and scan() exist will write twenty-four nodes for a day.
@@ -180,6 +182,13 @@ export const LIVING_PACKS: LibraryPack[] = [
       'guest sees both roads disabled with words rather than a page that quietly does nothing. Two switches',
       'are the owner\'s and both live in the record: `hooks: { enabled: false }` on the document stops every',
       'trigger at once, and `enabled` on a trigger stops that one.',
+      'A KEY IS NAMED, NEVER WRITTEN. Both a trigger and a source take `headers: { "X-Api-Key": "{{secret:NAME}}" }`,',
+      'and the node fills the placeholder from the signed-in owner\'s vault on the way out: the record',
+      'holds the name, the browser never sees the value, and a name the owner has not stored fails as',
+      'SECRET_UNKNOWN naming it. The gear dialogs list the owner\'s stored names to pick from. Tell the',
+      'person the NAME and where it goes — "store it as NAME on your Access page, section 04 Secrets, or',
+      'ask your AI" (an agent with secrets:manage stores it with aimeat_secret_set) — and never put a',
+      'field for the key itself in the document.',
       'ON THE SCREEN, each value, control and source carries a small gear with an arrow going IN, and each',
       'machine and trigger a gear with the arrow going OUT. The dialogs behind them are generated from the',
       'record: the exact answer a URL must give for THIS node\'s path, the POST that writes the value into a',

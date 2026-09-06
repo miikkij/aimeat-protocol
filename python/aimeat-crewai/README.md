@@ -142,6 +142,18 @@ with create_liaison_agent(
     ...
 ```
 
+## Keys for outside services: the owner's vault
+
+A crew that builds or operates an extension calling a third-party API never receives the key. The
+extension names it in an outbound header as `{{secret:NAME}}`, and the node fills it from the
+owner's vault on the way out; a name the owner has not stored fails as `SECRET_UNKNOWN` before
+anything is sent. Three tools manage the vault, all behind the `secrets:manage` scope, which no
+wildcard carries, so the owner ticks it per agent: `aimeat_secret_list` (names, dates and which
+extensions used each one in the last 30 days, never a value), `aimeat_secret_set { name, value }`
+(store or replace) and `aimeat_secret_delete { name }`. When a task needs a key the owner has not
+stored, tell the owner the exact name and that it goes on their Access page, section 04 Secrets,
+or ask for it once and store it with `aimeat_secret_set`; never write it into memory or a document.
+
 ## Restricting the toolset
 
 By default the liaison sees every `aimeat_*` tool the node exposes (currently ~90+). If you want a narrower surface -- e.g. only memory + knowledge, no wallet, no admin -- pass `tool_filter`:
