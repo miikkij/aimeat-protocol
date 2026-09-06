@@ -62,6 +62,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
 import { signatureTimestampFresh } from '../auth/signed-request.js';
+import { ANONYMOUS_SCOPES } from '../auth/anonymous-scopes.js';
 import { issueJWT, revokeToken, generateSessionId } from '../auth/jwt.js';
 import { requireAuth, requireRole, requireOwnerPrincipal, optionalAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
 import { registerOtkRoutes } from './auth-otk.js';
@@ -102,7 +103,14 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       owner,
       node: config.nodeId,
       roles: ['agent'],
-      scopes: ['memory:read', 'memory:write', 'memory:delete', 'storage:read', 'storage:write', 'catalogue:read', 'social:read'],
+      scopes: [...ANONYMOUS_SCOPES],
+      // IT SAYS WHAT IT IS. This token was minted with no `anonymous` claim, so every guard that
+      // reads `req.auth.anonymous` -- the board roster, the agent card, the app legal pages, the
+      // device-auth viewer -- treated the shared anonymous principal as an ordinary agent and told
+      // it things it should not be told. The middleware's INJECTED identity has carried the flag
+      // throughout; the minted twin did not. Review item 2.9, which this session first read as
+      // harmless on the ground that no anonymous JWT existed. One does: this is it.
+      anonymous: true,
     }, 86400); // 24 hours
 
     res.json(success(config.nodeId, {

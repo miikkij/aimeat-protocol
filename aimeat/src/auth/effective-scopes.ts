@@ -8,12 +8,51 @@
  * @structure withCurrentScopes(storage, verified) → VerifiedToken
  * @usage req.auth = await withCurrentScopes(storage, verified);
  * @version-history
+ *   v1.1.0 -- 2026-09-07 -- The intersection was wrong in one direction, and e2e-profile-tabs
+ *     found it rather than the guard tier (that suite is not in the tier). A token carrying `*`
+ *     is covered by no concrete list, so `token.filter(covered by record)` emptied it: an agent
+ *     whose owner had granted eight named words was refused all eight. intersectScopes() states
+ *     the rule from the token's side and collapses a too-broad token scope to the record's
+ *     entries under it, so both directions of wildcard work and it still can only remove.
  *   v1.0.0 — 2026-09-06 — Extracted from auth/middleware.ts (max-file-lines).
  */
 import type { Storage } from '../storage/interface.js';
 import type { VerifiedToken } from './jwt.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
+
+/**
+ * The permissions a principal holding `token` has, given that its record currently allows `record`.
+ *
+ * A PLAIN `token.filter(covered by record)` IS WRONG, and it shipped that way on 2026-09-06 before
+ * e2e-profile-tabs found it. A token carrying the wildcard `*` is not covered by any concrete list,
+ * so intersecting it against a record holding named scopes produced the EMPTY set: an agent whose
+ * owner had granted it eight specific words was refused all eight. `*` means "everything the record
+ * allows", and the intersection of everything with a list is the list.
+ *
+ * So the rule is stated from the token's side, one scope at a time, and it can only ever remove:
+ *   - the record covers this token scope → keep it as it is;
+ *   - it does not → the token scope is BROADER than the record permits, so it collapses to whichever
+ *     of the record's own entries fall under it (none, if the record allows nothing there).
+ *
+ * Both directions of wildcard therefore work: `*` against `[a, b]` gives `[a, b]`, and `[a, b]`
+ * against `*` gives `[a, b]`. The scopes that only an exact grant can confer (SCOPES_OUTSIDE_WILDCARD)
+ * are unreachable through a token's `*` here exactly as they are at requireScope, because
+ * scopeIsCovered says so in one place for every door.
+ */
+export function intersectScopes(token: readonly string[], record: readonly string[]): string[] {
+  const effective: string[] = [];
+  for (const s of token) {
+    if (scopeIsCovered(record, s)) {
+      if (!effective.includes(s)) effective.push(s);
+      continue;
+    }
+    for (const r of record) {
+      if (scopeIsCovered([s], r) && !effective.includes(r)) effective.push(r);
+    }
+  }
+  return effective;
+}
 
 /**
  * A JWT's scope list is a snapshot of the moment it was minted. Agent tokens here run long, and a
@@ -50,8 +89,8 @@ export async function withCurrentScopes(storage: Storage | null, v: VerifiedToke
   if (!agent) return v;
 
   const current = agent.defaultScopes ?? [];
-  const effective = v.scopes.filter(s => scopeIsCovered(current, s));
-  if (effective.length === v.scopes.length) return v;
+  const effective = intersectScopes(v.scopes, current);
+  if (effective.length === v.scopes.length && effective.every((s, i) => s === v.scopes[i])) return v;
   logger.info('effective-scopes: narrowed to the agent record', {
     sub: v.sub, token: v.scopes.join(','), record: current.join(','), effective: effective.join(','),
   });
