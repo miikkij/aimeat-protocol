@@ -6,8 +6,31 @@
  *   custom-group collapse state, per-tab "last seen" change tracking, effective ordering,
  *   and pop-out. Extracted from ../agents-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-09-06 — agentGaii() and matchesAgentQuery(): the one reading of an agent's
+ *     identifier, and the needle test the fleet search runs over the board and the list together.
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/agents-tab.js (max-file-lines)
  */
+
+// ── Finding one agent among many ──
+
+// The GAII as the fleet response carries it, with the shape it would have if the projection ever
+// stopped carrying it. Every surface that shows or searches an identifier reads it through here,
+// so the board's ID card and a list row can never disagree about what this agent is called.
+export function agentGaii(agent) {
+  return agent?.gaii || `${agent?.name ?? ''}@${agent?.owner ?? ''}`;
+}
+
+// Does this agent answer to what was typed? Name, display name and GAII, because those are the
+// three strings a person has in hand when they are after one agent out of seventy: what the list
+// calls it, what a URL or a command calls it, and what they pasted into somebody else's config.
+// Substring and case-insensitive, so a fragment of a node id finds it too.
+export function matchesAgentQuery(agent, query) {
+  const needle = String(query ?? '').trim().toLowerCase();
+  if (!needle) return true;
+  return String(agent?.display_name ?? '').toLowerCase().includes(needle)
+    || String(agent?.name ?? '').toLowerCase().includes(needle)
+    || agentGaii(agent).toLowerCase().includes(needle);
+}
 
 // ── Per-browser agent ordering (localStorage) ──
 // The agent bar order is not stored server-side; it is a per-browser

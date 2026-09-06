@@ -6,6 +6,9 @@
  *   expandable agent cards with Two-Zone Header + 8-tab interface,
  *   device auth flow, scope management modal.
  * @version-history
+ *   v3.11.0 -- 2026-09-06 -- A search field above the board, matching an agent's name, display
+ *     name or GAII, narrowing the board and the list together. Seventy-one agents on one account
+ *     and the only way to reach one was to scroll past the other seventy.
  *   v3.4.0 -- 2026-08-17 -- The connect panel leads with the connector guide (McpSetupGuide, the
  *     same component the MCP tab renders), open and first, and the npx CLI road folds into a
  *     "For developers" expander. ai-tool-setup.ts has ranked claude.ai first on purpose since it
@@ -88,8 +91,8 @@ import SharedBoard from './agents/shared-board.js';
 import { AgentConsent } from '/components/AgentConsent.js';
 import { McpSetupGuide } from './ai-setup-guide.js';
 import { buildAgentPrompt, buildTaskRunnerPrompt, buildMcpOnboardingPrompt, PLATFORMS, PLATFORM_KEYS, PLATFORM_LABELS } from './agents/connect-prompts.js';
-import { loadAgentOrder, saveAgentOrder, UNGROUPED_ID, loadCollapsedGroups, saveCollapsedGroups, loadSeen, saveSeen, markTabSeen, effectiveOrderedNames, popOutAgent } from './agents/tab-helpers.js';
-import { renderFilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
+import { loadAgentOrder, saveAgentOrder, UNGROUPED_ID, loadCollapsedGroups, saveCollapsedGroups, loadSeen, saveSeen, markTabSeen, effectiveOrderedNames, matchesAgentQuery, popOutAgent } from './agents/tab-helpers.js';
+import { AgentSearch, renderFilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
 import ScopesModal from './agents/scopes-modal.js';
 import BasicAgentsPanel from './agents/basic-agents-panel.js';
 import { swallowed } from '/js/swallowed.js';
@@ -132,6 +135,10 @@ export default function AgentsTab({ session, showToast, onStats }) {
   // from the localStorage "last seen per tab" baseline (see loadSeen + loadData badge logic).
   const [changesMap, setChangesMap] = useState({});
   const [tagFilter, setTagFilter] = useState(new Set());
+  // The fleet search. One string, matched against name, display name and GAII, narrowing the board
+  // and the list together (see matchesAgentQuery). Deliberately not persisted: a filter that is
+  // still on when you come back tomorrow is a fleet that looks like it lost agents.
+  const [query, setQuery] = useState('');
   const [groupBy, setGroupBy] = useState('none'); // 'none' | 'tag' | 'mode' | 'custom'
   // "Group by: Tag" becomes the default once the user actually uses tags — but never
   // override a grouping the user picked themselves (or re-apply after they change it).
@@ -224,9 +231,10 @@ export default function AgentsTab({ session, showToast, onStats }) {
     setAgentOrder(arr);
   }
 
-  // Reordering only makes sense in the flat, unfiltered list.
+  // Reordering only makes sense in the flat, unfiltered list — a drop between two rows that a
+  // search happens to have put next to each other would save an order nobody meant.
   const dnd = {
-    reorderable: groupBy === 'none' && tagFilter.size === 0,
+    reorderable: groupBy === 'none' && tagFilter.size === 0 && query.trim() === '',
     draggingName,
     onDragStart: (name, e) => {
       draggedName.current = name;
@@ -616,8 +624,15 @@ export default function AgentsTab({ session, showToast, onStats }) {
     ${agents.length === 0
       ? html`<div class="empty">${t('profile.agents.empty')}</div>`
       : html`
+        <${AgentSearch}
+          query=${query}
+          setQuery=${setQuery}
+          shown=${agents.filter(a => matchesAgentQuery(a, query)).length}
+          total=${agents.length}
+        />
         <${SharedBoard}
           agents=${agents}
+          query=${query}
           onboardings=${onboardings}
           onAgentClick=${(name) => {
             setExpandedAgent(name);
@@ -636,6 +651,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
         ${renderAgentGroups({
           agents,
           tagFilter,
+          query,
           groupBy,
           onboardings,
           taskStatsMap,

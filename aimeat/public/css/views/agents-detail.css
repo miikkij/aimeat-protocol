@@ -6,6 +6,9 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.25.0 -- 2026-09-06 -- The fleet search field over the board (.pf-agd-fleet-search) and the
+ *     GAII as a press-to-copy control on the agent rows (.pf-agd-gaii). The GAII ellipsizes rather
+ *     than wraps: it is one unbreakable token, and a wrap costs the row a whole second line.
  *   v1.24.0 -- 2026-08-31 -- The run-mode badge (outlined, so it does not compete with the filled
  *     mode badge beside it) and the basic-agents panel.
  *   v1.23.0 -- 2026-08-29 -- Every monospace rule reads var(--font-mono) instead of a hand-typed stack (14 of them),
@@ -1717,6 +1720,78 @@
   background: var(--bg-dim, #F9FAFB);
 }
 
+/* ── The GAII, on the row and copied on press ──
+   Sized to sit inside the collapsed card's meta line without taking a second line: the value is
+   one unbreakable token, so it ellipsizes when the card is narrow and the whole string still goes
+   to the clipboard. The button carries no chrome until it is hovered — it stands in a line of
+   plain meta text, and a framed control there would read as the loudest thing on the row. */
+.pf .pf-agd-gaii {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 100%;
+  vertical-align: bottom;
+  padding: 0 0.25rem;
+  margin-left: -0.25rem;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-dim, #6B7280);
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+}
+.pf .pf-agd-gaii:hover,
+.pf .pf-agd-gaii:focus-visible {
+  color: var(--accent, #E8564A);
+  background: var(--bg-dim, #F9FAFB);
+}
+.pf .pf-agd-gaii--copied,
+.pf .pf-agd-gaii--copied:hover { color: var(--success, #10b981); }
+.pf .pf-agd-gaii-value {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pf .pf-agd-gaii-mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.55;
+}
+.pf .pf-agd-gaii:hover .pf-agd-gaii-mark { opacity: 1; }
+/* Separator between the GAII and the rest of the meta line, matching the middle dots the
+   delivery/status pieces bring with them. */
+.pf .pf-agd-meta-sep {
+  margin: 0 0.4rem 0 0.15rem;
+  color: var(--border, #E5E7EB);
+}
+
+/* ── The fleet search, above the board ──
+   One row: the field takes the width, the count and the clear only appear once something is
+   typed, so an empty search is a field and nothing else. */
+.pf .pf-agd-fleet-search {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+.pf .pf-agd-fleet-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pf .pf-agd-fleet-search-count {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted, #9CA3AF);
+  white-space: nowrap;
+}
+
 /* ── Drag-to-reorder rows (ungrouped, unfiltered agent list) ── */
 /* The row's box (= the drop target) is extended LEFT to cover the grip handle
    via padding-left, while a matching negative margin-left pulls the box back so
@@ -2159,6 +2234,12 @@
 .pf .pf-agd-zone1-name {
   font-weight: 600;
   font-size: 0.95rem;
+}
+/* The GAII line under the header, on the card's own content inset. Its own row because the header
+   is already full: at 390px the badges and the last-seen leave the identity column 41px, which is
+   two characters of an identifier whose point is that it is complete. */
+.pf .pf-agd-gaii-row {
+  padding: 0 1rem 0.25rem;
 }
 .pf .pf-agd-zone1-badges {
   display: flex;

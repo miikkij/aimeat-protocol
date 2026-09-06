@@ -9,6 +9,9 @@
  *   an "ID card" face (renderIdCard): full GAII with its expansion, issued date, last seen,
  *   task/message tallies, trust + morsels — teaching display-name-vs-GAII at a glance.
  * @version-history
+ *   v3.4.0 -- 2026-09-06 -- The board honours the fleet search (`query`). The counts on the status
+ *     pills are computed from the searched set, not the whole fleet: a pill reading 48 above a
+ *     grid of three would be describing a fleet the person cannot see.
  *   v3.3.0 -- 2026-08-31 -- A sixth pill, `connection`, in teal: the MCP connections the owner's own
  *     tools use. They were being counted as issues on the surface written to make an issue
  *     unmissable, purely for not having been opened today.
@@ -37,6 +40,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { agentState, agentBucket, agentRank, getStateColor } from './state-detector.js';
+import { agentGaii, matchesAgentQuery } from './tab-helpers.js';
 
 const html = htm.bind(h);
 
@@ -54,12 +58,14 @@ const BUCKETS = [
   { id: 'internal', color: 'var(--text-muted)', key: 'profile.agents.board.internal' },
 ];
 
-export default function SharedBoard({ agents, onboardings, onAgentClick }) {
+export default function SharedBoard({ agents, onboardings, onAgentClick, query = '' }) {
   const [bucketFilter, setBucketFilter] = useState(null);
 
   // Hooks must run unconditionally before any early return (Rules of Hooks).
+  // The search is applied HERE, before the counts are taken, so the pills describe the grid under
+  // them rather than the fleet the grid is a slice of.
   const agentStates = useMemo(() => {
-    const rows = (agents || []).map(agent => ({
+    const rows = (agents || []).filter(agent => matchesAgentQuery(agent, query)).map(agent => ({
       agent,
       state: agentState(agent),
       bucket: agentBucket(agent),
@@ -68,7 +74,7 @@ export default function SharedBoard({ agents, onboardings, onAgentClick }) {
     // Problems first, onboarding second, then the rest — an issue must not drown.
     rows.sort((a, b) => agentRank(a.agent) - agentRank(b.agent));
     return rows;
-  }, [agents, onboardings]);
+  }, [agents, onboardings, query]);
 
   const counts = useMemo(() => {
     const c = { online: 0, quiet: 0, onboarding: 0, issue: 0, connection: 0, internal: 0 };
@@ -88,7 +94,9 @@ export default function SharedBoard({ agents, onboardings, onAgentClick }) {
     return tagCounts;
   }, [agentStates]);
 
-  if (!agents || agents.length === 0) return null;
+  // Nothing to radiate: no fleet at all, or a search nobody matched — in which case the list below
+  // says so once, and an empty grid under six zeroed pills would only say it a second time.
+  if (!agents || agents.length === 0 || agentStates.length === 0) return null;
 
   return html`
     <div class="pf-agd-board">
@@ -182,7 +190,7 @@ function formatIssued(isoDate) {
 // seen, and its work/trust footprint. All data comes from the fleet payload the
 // board already holds (agent.stats via ?include=stats) — no extra requests.
 function renderIdCard(agent) {
-  const gaii = agent.gaii || `${agent.name}@${agent.owner || ''}`;
+  const gaii = agentGaii(agent);
   const nodeId = gaii.includes('@') ? gaii.split('@').pop() : '';
   const st = agent.stats || {};
   const tasks = st.tasks || {};

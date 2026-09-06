@@ -19,6 +19,9 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.5.0 — 2026-09-06 — The GAII control on an agent row (.pf-agd-gaii) takes the square corner
+ *     and the sun on hover, like the board tiles it came from; the fleet search count reads as a
+ *     quiet mono figure beside the underline field the shared .input-field already gives it.
  *   v1.4.2 — 2026-09-04 — The wallet-card and wallet-request selectors go: the wallet wears its own
  *     poster face (wallet-poster.css) and the classes they styled no longer exist.
  *   v1.4.1 — 2026-09-04 — The fnd-cal- selectors go: the calibrator wears its own poster face
@@ -211,6 +214,9 @@
 }
 .pf .pf-agd-legend-pill--active, .tag-pill--active, .tag-pill.active { background: var(--sun); color: var(--on-sun); }
 .pf .pf-agd-filter-bar, .pf .pf-agd-group-header, .pf .pf-agd-filter-tags { border-bottom: 2px solid var(--text); font-weight: var(--font-poster-strong-weight); }
+/* The GAII on a row: square, and the sun under the pointer, the same answer the board tiles give. */
+.pf .pf-agd-gaii { border-radius: 0; }
+.pf .pf-agd-gaii:hover, .pf .pf-agd-gaii:focus-visible { background: var(--sun); color: var(--on-sun); }
 .pf .pf-agd-active-row { border-radius: 0; border-bottom: 1px solid var(--border); }
 .pf .mem-tools-bar { background: none; border: 0; border-top: 3px solid var(--text); border-bottom: 2px solid var(--text); border-radius: 0; padding: 0.6rem 0; }
 /* The attach-this-agent box (components/McpInstall) inside an agent: an ink frame, a mono command. */

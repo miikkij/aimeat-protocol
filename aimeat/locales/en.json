@@ -10532,6 +10532,11 @@
       "copyCommand": "Copy command",
       "copyAgentInstruction": "Copy agent instruction",
       "copyGaii": "Copy GAII",
+      "gaiiCopied": "GAII copied",
+      "search": {
+        "placeholder": "Find an agent by name or GAII",
+        "count": "{shown} / {total}"
+      },
       "empty": "No agents registered yet.",
       "loadError": "Could not load agents.",
       "trust": "Trust",

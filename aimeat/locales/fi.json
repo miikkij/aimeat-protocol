@@ -10547,6 +10547,11 @@
       "copyCommand": "Kopioi komento",
       "copyAgentInstruction": "Kopioi agentin ohje",
       "copyGaii": "Kopioi GAII",
+      "gaiiCopied": "GAII kopioitu",
+      "search": {
+        "placeholder": "Etsi agenttia nimellä tai GAII:lla",
+        "count": "{shown} / {total}"
+      },
       "empty": "Ei rekisteröityjä agentteja.",
       "loadError": "Agenttien lataus epäonnistui.",
       "trust": "Luottamus",
