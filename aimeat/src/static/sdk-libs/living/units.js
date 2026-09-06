@@ -34,6 +34,10 @@
  *   const c = parseUnit('°C');            // { dim: { K: 1 }, scale: 1, offset: 273.15 }
  *   convert({ n: 22, u: c }, parseUnit('K'));   // { n: 295.15, u: K }
  * @version-history
+ *   v0.5.0 — 2026-09-06 — m² and m³ are units by those names as well as by m^2 and m^3, because a
+ *     unit's LABEL is the text the record declared and a designed sheet then prints the caret. The
+ *     superscript names are deliberately NOT prefixable: km² is a million square metres, not a
+ *     thousand, and a prefix table that squared nothing would have said the second.
  *   v0.3.0 — 2026-09-05 — A percentage is a label on a face number: `%` and `ppm` carry a scale
  *     of 1, so arithmetic is on the number the author typed, and convert() refuses between two
  *     dimensionless labels rather than answering with a rescaled one.
@@ -52,6 +56,9 @@ const PREFIXES = {
 };
 
 /** The names a prefix may sit in front of. Anything else must be written out in full. */
+// NOT m² or m³: a prefix on an area is applied to the LENGTH and then squared, so km² is a
+// million square metres and not a thousand. cm^2 is written with the power syntax, where the
+// prefix lands on cm before the square and comes out right.
 const PREFIXABLE = ['m', 'g', 's', 'A', 'K', 'mol', 'cd', 'N', 'Pa', 'J', 'W', 'V', 'L', 'Hz', 'Ω', 'ohm', 'F', 'C', 'B', 'Wh', 'bar'];
 
 /** dim(base) → exponent. The seven SI bases plus one pseudo-base per currency code. */
@@ -77,6 +84,11 @@ const UNITS = {
   // length
   m: u({ m: 1 }), km: u({ m: 1 }, 1e3), cm: u({ m: 1 }, 1e-2), mm: u({ m: 1 }, 1e-3),
   mi: u({ m: 1 }, 1609.344), ft: u({ m: 1 }, 0.3048), in: u({ m: 1 }, 0.0254),
+  // area and volume, WRITTEN THE WAY A PERSON WRITES THEM. "m^2" parses because the power syntax
+  // is general, and it is then what a sheet PRINTS, since a unit's label is the text it was
+  // declared with — a caret in the middle of a designed page. The superscript spellings are the
+  // same units under another name, so a record may say either.
+  'm²': u({ m: 2 }), 'm³': u({ m: 3 }),
   // mass
   kg: u({ kg: 1 }), g: u({ kg: 1 }, 1e-3), mg: u({ kg: 1 }, 1e-6), t: u({ kg: 1 }, 1e3),
   lb: u({ kg: 1 }, 0.45359237),

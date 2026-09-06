@@ -22,6 +22,9 @@
  *   does nothing (docs/pitfalls.md §47).
  * @structure tokens · control row · formula · sentence · machine state · chain · refusals · still
  * @version-history
+ *   v0.5.0 — 2026-09-06 — A chain drawn in a frame of its own keeps that frame's size, because a
+ *     wiring diagram squeezed into a column is a wiring diagram nobody can read. Everything else
+ *     about it — the pills, the tones and the flash — is still the kit's own stylesheet.
  *   v0.2.0 — 2026-09-05 — The control row is now the kit's own form field (atelier 0.53.0), so
  *     the rules that drew a row here only DRESS one: the marker classes keep their meaning on
  *     the kit's elements, and the kinds the kit draws no reading for get the row shape from a
@@ -236,6 +239,17 @@
   border-radius: var(--ak-living-radius);
   padding: calc(var(--ak-living-pad) * 0.5);
   overflow-x: auto;
+}
+
+/* A CHAIN TOO BIG FOR THE KIT'S FRAME KEEPS THE ONE IT MEASURED FOR ITSELF. The kit's graph fills
+   its container, which is right for a drawing sized to fit one; a wiring diagram of a hundred and
+   fifty nodes is two thousand units wide, and filling a six-hundred-pixel column with it means a
+   reduction of three and a half and lettering nobody can read. So it keeps its size and the frame
+   above scrolls it — the way a folded drawing is pulled open. */
+.ak-living__chain-draw .ak-graph__svg {
+  width: auto;
+  max-width: none;
+  height: auto;
 }
 
 .ak-living__chain-list {

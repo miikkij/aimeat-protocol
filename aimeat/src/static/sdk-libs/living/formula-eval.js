@@ -20,16 +20,35 @@
  *   AND THE THIRD, ALSO FROM units.js: a percentage is a label on a face number, so ln(rh) is the
  *   logarithm of 72 and rh / 100 is 0.72. fraction(x) and percent(x) are the only two things that
  *   move a number between those two readings, and they are written in the formula.
- * @structure evaluate(tree, scope) · isError · asText · asNumber · OPS
+ *
+ *   A ROW IS A VALUE, AND EVERY SCALAR OPERATION GOES DOWN IT. The switch below is written once,
+ *   for one element, in applyScalar(); evaluate() puts it down a list when any argument is one.
+ *   That is the whole of broadcasting, and it is why `prices * load` and `max(0, pv - load)` mean
+ *   what a person reading them expects without a second implementation of the arithmetic. The
+ *   shapes — range, index, at, cumsum, the child scope of a map body — are formula-arrays.js's;
+ *   the arithmetic and the units stay here, and neither file knows the other's half.
+ *
+ *   min AND max ARE TWO FUNCTIONS WEARING ONE NAME, and the argument count decides which. One
+ *   argument reduces a row to its largest, the way avg() and sum() do and the way every document
+ *   already written expects. Two or more go element by element, which is how a surplus is written:
+ *   max(0, pv - load). A spreadsheet reduces in both cases; it also has no rows of its own to
+ *   broadcast over, so it never had to choose.
+ * @structure evaluate(tree, scope) · applyScalar · isError · asText · asNumber
  * @usage
  *   import { evaluate } from './formula-eval.js';
  *   evaluate(parse('t * 9/5 + 32'), { get: (id) => ({ n: 22, u: celsius }) });   // 71.6
  * @version-history
+ *   v0.5.0 — 2026-09-06 — ROWS. Every arithmetic, comparison and one-argument function broadcasts
+ *     over a list; range · map · fold · scan · cumsum · index · at · where build one and read it
+ *     back; the trigonometry and log10 join; `pi` is a head so the printer can set it as π. min
+ *     and max reduce on one argument and go element-wise on more.
  *   v0.3.0 — 2026-09-05 — fraction() and percent(), the two explicit doors the percentage rule
  *     leaves open now that `%` is a label on a face number rather than a scale of 0.01.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 import { parseUnit, unitLabel, sameDim, convert, mulUnits, divUnits, powUnit, isAffine, isPlain, toBase } from './units.js';
+import { BOUND } from './formula-parse.js';
+import { isList, broadcast, rangeOf, indexAt, readAt, cumsumOf, childScope } from './formula-arrays.js';
 
 /** The unit percent() puts on its answer. Read once: the table never changes at run time. */
 const PERCENT = /** @type {any} */ (parseUnit('%'));
@@ -213,6 +232,61 @@ function aggregate(args, fold, name) {
 }
 
 /**
+ * The larger (or smaller) of two values, with the units checked. This is the ELEMENT-WISE min and
+ * max — the two-or-more-argument reading — and it keeps whichever side carries a unit, so
+ * max(0, pv - load) comes back in kWh rather than as a bare number the moment the surplus is nil.
+ */
+function pairPick(a, b, wantMax) {
+  const name = wantMax ? 'max' : 'min';
+  const qa = num(a, name);
+  if (isError(qa)) return qa;
+  const qb = num(b, name);
+  if (isError(qb)) return qb;
+  if (qa.u && qb.u && !sameDim(qa.u, qb.u)) {
+    return { error: 'I cannot take the ' + name + ' of ' + unitLabel(qa.u) + ' and ' + unitLabel(qb.u) + ': those measure different things.' };
+  }
+  const moved = qa.u && qb.u && unitLabel(qb.u) !== unitLabel(qa.u) ? convert(qb, qa.u) : qb;
+  if (isError(moved)) return moved;
+  const takeB = wantMax ? moved.n > qa.n : moved.n < qa.n;
+  const unit = qa.u || moved.u;
+  return tidy({ n: takeB ? moved.n : qa.n, u: unit });
+}
+
+/**
+ * The one-argument maths, each of which takes a plain number and answers with one. An angle is in
+ * RADIANS throughout: deg() and rad() are the two doors, and they are written in the formula for
+ * the same reason fraction() and percent() are — a conversion nobody can see is a conversion
+ * nobody can check.
+ */
+const MATH1 = {
+  Sin: Math.sin, Cos: Math.cos, Tan: Math.tan,
+  Atan: Math.atan,
+  Deg: (x) => (x * 180) / Math.PI, Rad: (x) => (x * Math.PI) / 180,
+  Log10: null, Asin: null, Acos: null,
+};
+
+/** The heads whose meaning is per element, so a list argument puts them down the row. */
+const ELEMENTWISE = {
+  Add: 1, Subtract: 1, Negate: 1, Multiply: 1, Divide: 1, Power: 1,
+  Equal: 1, NotEqual: 1, Less: 1, LessEqual: 1, Greater: 1, GreaterEqual: 1,
+  Not: 1, Concat: 1, Text: 1, Number: 1, Where: 1,
+  Abs: 1, Sqrt: 1, Exp: 1, Ln: 1, Log: 1, Log10: 1,
+  Round: 1, Floor: 1, Ceiling: 1, Clamp: 1, Convert: 1, Fraction: 1, Percent: 1,
+  Min: 1, Max: 1,
+  Sin: 1, Cos: 1, Tan: 1, Asin: 1, Acos: 1, Atan: 1, Atan2: 1, Deg: 1, Rad: 1,
+};
+
+/** Adding two values, and reading a point between them — what a row's own helpers are handed. */
+function addValues(a, b) { return addLike(a, b, 1, 'Add'); }
+function blendValues(a, b, f) {
+  const gap = addLike(b, a, -1, 'Subtract');
+  if (isError(gap)) return gap;
+  const part = mulLike(gap, f, false);
+  if (isError(part)) return part;
+  return addLike(a, part, 1, 'Add');
+}
+
+/**
  * Work a tree out. The scope answers for a symbol: get(id) returns a value, or undefined when
  * this document has no node by that name.
  * @param {any} tree
@@ -234,6 +308,40 @@ export function evaluate(tree, scope) {
   }
   const head = tree[0];
   const arg = (i) => evaluate(tree[i], scope);
+
+  // THE BODY OF A MAP, FOLD OR SCAN IS NOT AN ARGUMENT, it is an expression run once per element,
+  // so it must not be worked out before the element exists. The bound names are formula-parse's
+  // own list, which is the same list symbolsOf() takes out of the dependency edges — one place,
+  // so the engine and the graph can never disagree about what `x` means.
+  if (head === 'Map' || head === 'Fold' || head === 'Scan') {
+    const row = evaluate(tree[1], scope);
+    if (isError(row)) return row;
+    if (!isList(row)) {
+      return { error: head.toLowerCase() + '() walks a list, and was given ' + describeValue(row) + '.' };
+    }
+    const body = tree[head === 'Map' ? 2 : 3];
+    const names = BOUND[head];
+    if (head === 'Map') {
+      const out = [];
+      for (let k = 0; k < row.length; k++) {
+        const got = evaluate(body, childScope(scope, names, [row[k], k]));
+        if (isError(got)) return { error: got.error + ' That is at position ' + k + ' of the list.' };
+        out.push(got);
+      }
+      return out;
+    }
+    let acc = evaluate(tree[2], scope);
+    if (isError(acc)) return acc;
+    const trail = [acc];
+    for (let k = 0; k < row.length; k++) {
+      acc = evaluate(body, childScope(scope, names, [acc, row[k], k]));
+      if (isError(acc)) return { error: acc.error + ' That is at position ' + k + ' of the list.' };
+      trail.push(acc);
+    }
+    // scan answers with EVERY accumulator, the one it started from first: 24 hours in, 25
+    // readings out, which are the state at each hour boundary. fold answers with the last.
+    return head === 'Scan' ? trail : acc;
+  }
 
   // The three that must not evaluate everything first.
   if (head === 'If') {
@@ -258,10 +366,107 @@ export function evaluate(tree, scope) {
     if (isError(v)) return v;
     args.push(v);
   }
+
+  // ── THE SHAPES: heads that TAKE a row rather than going down one. They are answered before
+  // broadcasting is even asked about, because a list is what they are for. ──
+  switch (head) {
+    case 'Range': {
+      const plain = [];
+      for (const one of args) {
+        const q = num(one, 'range');
+        if (isError(q)) return q;
+        plain.push(q.n);
+      }
+      return rangeOf(plain);
+    }
+    case 'Index': {
+      if (!isList(args[0])) return { error: 'index() reads a list, and was given ' + describeValue(args[0]) + '.' };
+      const at = num(args[1], 'index');
+      if (isError(at)) return at;
+      return indexAt(args[0], at.n);
+    }
+    case 'At': {
+      if (!isList(args[0])) return { error: 'at() reads a list, and was given ' + describeValue(args[0]) + '.' };
+      const at = num(args[1], 'at');
+      if (isError(at)) return at;
+      return readAt(args[0], at.n, blendValues);
+    }
+    case 'CumSum': {
+      if (!isList(args[0])) return { error: 'cumsum() adds along a list, and was given ' + describeValue(args[0]) + '.' };
+      return cumsumOf(args[0], addValues);
+    }
+    // One argument is the aggregate min and max this language has always had; two or more is the
+    // element-wise pair, which falls through to the scalar table below.
+    case 'Min': if (args.length === 1) return aggregate(args, (v) => Math.min.apply(null, v), 'min'); break;
+    case 'Max': if (args.length === 1) return aggregate(args, (v) => Math.max.apply(null, v), 'max'); break;
+    case 'Sum': return aggregate(args, (v) => v.reduce((x, y) => x + y, 0), 'sum');
+    case 'Mean': return aggregate(args, (v) => v.reduce((x, y) => x + y, 0) / v.length, 'avg');
+    case 'Count': { const items = spread(args); return isError(items) ? items : items.length; }
+    case 'First': { const items = spread(args); return isError(items) ? items : (items.length ? items[0] : { error: 'first() was given an empty list.' }); }
+    case 'Last': { const items = spread(args); return isError(items) ? items : (items.length ? items[items.length - 1] : { error: 'last() was given an empty list.' }); }
+    default: break;
+  }
+
+  // ── AND EVERYTHING ELSE GOES DOWN THE ROW. One scalar implementation, put down the list by
+  // formula-arrays; with no list among the arguments this is the same single call it always was.
+  if (ELEMENTWISE[head] && args.some(isList)) {
+    return broadcast(args, function (one) { return applyScalar(head, one); });
+  }
+  return applyScalar(head, args);
+}
+
+/**
+ * ONE OPERATION, ON ONE ELEMENT. Everything above either hands this the whole argument list or
+ * hands it one element from each; nothing in here knows which, which is what keeps broadcasting
+ * from being a second copy of the arithmetic.
+ * @param {string} head @param {any[]} args
+ * @returns {any}
+ */
+function applyScalar(head, args) {
   const a = args[0];
   const b = args[1];
 
+  if (MATH1[head] || head === 'Asin' || head === 'Acos' || head === 'Log10') {
+    const q = num(a, head.toLowerCase());
+    if (isError(q)) return q;
+    if (head === 'Asin' || head === 'Acos') {
+      if (q.n < -1 || q.n > 1) {
+        return { error: 'There is no ' + head.toLowerCase() + ' of ' + trimNumber(q.n) + ': it takes a number between -1 and 1.' };
+      }
+      return head === 'Asin' ? Math.asin(q.n) : Math.acos(q.n);
+    }
+    if (head === 'Log10') {
+      if (q.n <= 0) return { error: 'There is no logarithm of ' + trimNumber(q.n) + '.' };
+      return Math.log10(q.n);
+    }
+    return MATH1[head](q.n);
+  }
+
   switch (head) {
+    case 'Pi': return Math.PI;
+    case 'Atan2': {
+      const qy = num(a, 'atan2');
+      if (isError(qy)) return qy;
+      const qx = num(b, 'atan2');
+      if (isError(qx)) return qx;
+      return Math.atan2(qy.n, qx.n);
+    }
+    // where() is the element-wise door if(): it takes all three sides as values, so a row of
+    // conditions picks from a row of answers. if() cannot do that — it works one side out and
+    // leaves the other alone, which is what a lazy branch is for.
+    case 'Where': {
+      const cond = truth(a);
+      if (isError(cond)) return cond;
+      return cond ? b : args[2];
+    }
+    case 'Min': case 'Max': {
+      let best = args[0];
+      for (let i = 1; i < args.length; i++) {
+        best = pairPick(best, args[i], head === 'Max');
+        if (isError(best)) return best;
+      }
+      return best;
+    }
     case 'Add': return addLike(a, b, 1, 'Add');
     case 'Subtract': return addLike(a, b, -1, 'Subtract');
     case 'Negate': { const q = num(a, 'a minus sign'); return isError(q) ? q : tidy({ n: -q.n, u: q.u }); }
@@ -350,13 +555,6 @@ export function evaluate(tree, scope) {
       }
       return { n: q.n * 100, u: PERCENT };
     }
-    case 'Min': return aggregate(args, (v) => Math.min.apply(null, v), 'min');
-    case 'Max': return aggregate(args, (v) => Math.max.apply(null, v), 'max');
-    case 'Sum': return aggregate(args, (v) => v.reduce((x, y) => x + y, 0), 'sum');
-    case 'Mean': return aggregate(args, (v) => v.reduce((x, y) => x + y, 0) / v.length, 'avg');
-    case 'Count': { const items = spread(args); return isError(items) ? items : items.length; }
-    case 'First': { const items = spread(args); return isError(items) ? items : (items.length ? items[0] : { error: 'first() was given an empty list.' }); }
-    case 'Last': { const items = spread(args); return isError(items) ? items : (items.length ? items[items.length - 1] : { error: 'last() was given an empty list.' }); }
     default: return { error: 'a function this document does not have: ' + head };
   }
 }
