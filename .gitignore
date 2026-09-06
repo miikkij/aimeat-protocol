@@ -13,6 +13,7 @@ package-lock.json
 yarn.lock
 .DS_Store
 coverage/
+coverage-e2e/
 .tmp/
 tmp/
 .env.production
