@@ -52,6 +52,18 @@ export default function LivingTab({ session, showToast }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (session) loadAll(); }, [session]);
 
+  // Re-fetch on the live stream, like every sibling tab. Review item 7.6.
+  useEffect(() => {
+    // NO FILTER HERE, and that is the measured answer rather than laziness: routes/living.ts emits
+    // no change domain at all, so there is no name to listen for. A filter would be a guess that
+    // makes this tab MISS updates, which is worse than fetching once too often. The day living docs
+    // announce themselves, this gains the domain they announce.
+    const handler = () => { if (session) loadAll(); };
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
   async function loadAll() {
     try {
       // Mount fold: ONE composite (templates + instances partitioned server-side from a single owner-memory

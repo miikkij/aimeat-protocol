@@ -97,6 +97,23 @@ const mcpPlatformNames = (d) => [...new Set((d?.chat_instances ?? [])
   .map((i) => String(i.platform || '').replace(/^mcp-/, '')).filter(Boolean)
   .map((p) => p.charAt(0).toUpperCase() + p.slice(1)))];
 
+/**
+ * The two endpoints TWO blocks each read, with one path and one pick apiece.
+ *
+ * They were written out at both call sites, one pair with a pick and one without, and the shared
+ * cache stored whichever shape the block that mounted FIRST produced. Naming them is what makes two
+ * readers of one endpoint unable to disagree; see shared-read.js for why the cache holds the raw
+ * envelope now. Review item 7.3.
+ */
+const ORGANISMS_PATH = (owner) => (owner ? `/v1/organisms?member=${encodeURIComponent(owner)}&include=counts` : '');
+const KNOWLEDGE_PATH = '/v1/knowledge/tab';
+const pickOrganisms = (d) => (d?.organisms ?? d?.items ?? []).map((o) => ({
+  id: o.id, name: o.name || o.id, workspace_count: o.workspace_count,
+  updatedAt: o.updated_at || o.updatedAt,
+}));
+const pickPackages = (d) => (d?.packages ?? []).filter((p) => String(p.key || '').endsWith('/manifest'))
+  .map((p) => ({ key: p.key, name: p.value?.name || p.value?.title || p.key.split('/')[1], updatedAt: p.updated_at }));
+
 export function ChatDoorBlock() {
   const { data: chatStatus } = useShared('chat-status', '/v1/chat/status', ['chat']);
   const { data: instances } = useShared('chat-instances', '/v1/chat-instances', ['instances'], mcpPlatformNames);
@@ -133,14 +150,8 @@ export function ThingsBlock(/** @type {{ ctx?: any, props?: Record<string, any>,
   const owner = state?.owner ?? '';
 
   const { data: usage } = useShared('usage', '/v1/owner/usage', ['memory', 'files', 'apps']);
-  const { data: orgs } = useShared('organisms', owner ? `/v1/organisms?member=${encodeURIComponent(owner)}&include=counts` : '',
-    ['organisms'], (d) => (d?.organisms ?? d?.items ?? []).map((o) => ({
-      id: o.id, name: o.name || o.id, workspace_count: o.workspace_count,
-      updatedAt: o.updated_at || o.updatedAt,
-    })));
-  const { data: packages } = useShared('knowledge', '/v1/knowledge/tab', ['knowledge', 'memory'],
-    (d) => (d?.packages ?? []).filter((p) => String(p.key || '').endsWith('/manifest'))
-      .map((p) => ({ key: p.key, name: p.value?.name || p.value?.title || p.key.split('/')[1], updatedAt: p.updated_at })));
+  const { data: orgs } = useShared('organisms', ORGANISMS_PATH(owner), ['organisms'], pickOrganisms);
+  const { data: packages } = useShared('knowledge', KNOWLEDGE_PATH, ['knowledge', 'memory'], pickPackages);
   const { prefs, toggleStar, setAppsMode } = useHomePrefs();
   const { data: favorites } = useShared('app-favorites', '/v1/memory/app-catalog.favorites?soft=1', ['memory'],
     (d) => (d?.exists === false ? { refs: [] } : (d?.value ?? { refs: [] })));
@@ -189,8 +200,14 @@ export function AchievementsBlock() {
     (d) => new Set((d?.items ?? d?.entries ?? []).map((m) => m.key)));
   const { data: chatStatus } = useShared('chat-status', '/v1/chat/status', ['chat']);
   const owner = state?.owner ?? '';
-  const { data: orgs } = useShared('organisms', owner ? `/v1/organisms?member=${encodeURIComponent(owner)}&include=counts` : '', ['organisms']);
-  const { data: packages } = useShared('knowledge', '/v1/knowledge/tab', ['knowledge', 'memory']);
+  // THE SAME PICK AS THE BLOCK ABOVE, named rather than repeated. These two reads had none, and
+  // read `.length` off what came back: it worked only because `home.things` sits earlier in the
+  // layout the node serves, mounts first, and its pick shaped the shared cache into the arrays this
+  // block wanted. Operator-editable ordering decided that, and the raw cache (2026-09-06, review
+  // item 7.3) removed the luck -- so this block received the envelope and both achievements could
+  // never come up done. Found in a browser, not by a test.
+  const { data: orgs } = useShared('organisms', ORGANISMS_PATH(owner), ['organisms'], pickOrganisms);
+  const { data: packages } = useShared('knowledge', KNOWLEDGE_PATH, ['knowledge', 'memory'], pickPackages);
   const { prefs, markTried } = useHomePrefs();
 
   if (!state || prefs?.hideAchievements) return null;

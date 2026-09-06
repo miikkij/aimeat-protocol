@@ -33,7 +33,13 @@ import { takesTasks } from '/js/services/offers.js';
  * follow the same action; SSE still covers the changes somebody else made, which is what it is for.
  */
 function announce() {
-  window.dispatchEvent(new CustomEvent('aimeat-live-update', { detail: { domain: 'open-items' } }));
+  // `domains`, A SET, PLURAL -- which is the contract every other dispatcher and every listener
+  // uses. This said `domain` with one string, and onLiveUpdate reads `e.detail?.domains`: an
+  // undefined `d` falls through the filter to the legacy "everything changed" path, so switching one
+  // open item off re-read the WHOLE home. Measured in a browser on 2026-09-07: 16 requests from one
+  // toggle, including both surface layouts. That fan-out is the thing services/surface/shared-read.js
+  // exists to remove, reachable from a local click.
+  window.dispatchEvent(new CustomEvent('aimeat-live-update', { detail: { domains: new Set(['open-items']) } }));
 }
 
 /** What is switched on. Satisfied suggestions are already dropped by the server. */

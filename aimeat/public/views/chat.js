@@ -166,6 +166,17 @@ export default function ChatView() {
     const abortRef = useRef(null);
     const bottomRef = useRef(null);
     const lastAskRef = useRef('');
+    /**
+     * WHICH CONVERSATION THE SCREEN IS SHOWING, as a number that only goes up.
+     *
+     * Two races shared one cause: nothing recorded that the answer coming back belonged to the
+     * conversation still open. Click A then B before A's fetch returns and A's turns landed on top
+     * of B (review item 7.4); send a message and switch conversation while it streams, and the
+     * finished turn was written into whichever one was open (7.2). Both are now the same check:
+     * the token is bumped on every open, captured where the work starts, and compared before any
+     * state is written. A late answer is dropped rather than displayed under the wrong name.
+     */
+    const openSeqRef = useRef(0);
 
     const loadThreads = useCallback(async () => {
         const res = await chat.listThreads();
@@ -173,11 +184,15 @@ export default function ChatView() {
     }, []);
 
     const openThread = useCallback(async (id) => {
+        const seq = ++openSeqRef.current;
+        // Closed straight away: the list is the person's answer to "which one", and leaving it open
+        // while the fetch runs invites the second click this guard exists for.
+        setListOpen(false);
         const res = await chat.getThread(id);
+        if (seq !== openSeqRef.current) return;   // a later open won; this answer is stale
         setThread(res?.data?.thread ?? null);
         setFailure('');
         setLive({ text: '', thought: '', tools: [], cards: [] });
-        setListOpen(false);
     }, []);
 
     // First load: what this node offers, and where the person left off.
@@ -314,6 +329,10 @@ export default function ChatView() {
             target = await startThread();
             if (!target) return;
         }
+        // The conversation this turn belongs to. Every write below is gated on it still being the
+        // one on screen, so switching conversation mid-stream leaves the answer where it was asked.
+        const turnSeq = openSeqRef.current;
+        const stillOpen = () => openSeqRef.current === turnSeq;
 
         lastAskRef.current = text;
         setDraft('');
@@ -339,6 +358,7 @@ export default function ChatView() {
         const cards = new Map();
         try {
             for await (const update of chat.streamTurn(target.id, text, controller.signal, attachmentKeys, starterId)) {
+                if (!stillOpen()) continue;   // the person moved on; keep reading so the turn finishes
                 if (update.kind === 'text') {
                     answer += update.text;
                     setLive((l) => ({ ...l, text: answer }));
@@ -373,18 +393,19 @@ export default function ChatView() {
         } finally {
             abortRef.current = null;
             setBusy(false);
-            setLive({ text: '', thought: '', tools: [], cards: [] });
+            if (stillOpen()) setLive({ text: '', thought: '', tools: [], cards: [] });
             // Read the conversation back from the node: it is the record, and what it holds is what
             // was actually saved rather than what this page happened to see.
             try {
                 const fresh = await chat.getThread(target.id);
-                if (fresh?.data?.thread) setThread(fresh.data.thread);
+                // Only onto the conversation it belongs to. This used to replace whatever was open.
+                if (fresh?.data?.thread && stillOpen()) setThread(fresh.data.thread);
                 await loadThreads();
             } catch (err) {
                 // The turn ran; a failed re-read leaves the optimistic copy on screen, which is the
                 // same text, and the next open corrects it.
                 console.warn('[chat] the conversation could not be re-read:', err.message);
-                if (answer) {
+                if (answer && stillOpen()) {
                     setThread((prev) => (prev ? {
                         ...prev,
                         turns: [...(prev.turns ?? []), { role: 'agent', text: answer, at: new Date().toISOString(), tools: [...tools.values()], cards: [...cards.values()] }],

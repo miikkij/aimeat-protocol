@@ -48,7 +48,9 @@ export function useHomePrefs() {
     }).catch((e) => swallowed('surface: prefs write', e));
     // Re-read rather than assume: the write may have been refused, and a page showing a star that
     // did not stick is worse than one that shows the truth a moment later.
-    await invalidateShared(KEY, PATH, pick);
+    // The cache holds the raw envelope now and each reader picks its own shape, so the third
+    // argument is gone: passing one could only have meant this write decided everybody's shape.
+    await invalidateShared(KEY, PATH);
   }, [prefs]);
 
   const markTried = useCallback((what) =>
