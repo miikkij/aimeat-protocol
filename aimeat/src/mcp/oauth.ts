@@ -32,6 +32,7 @@ import { randomBytes, createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { issueJWT } from '../auth/jwt.js';
+import { credentialRevoked, isOwnerPrincipal } from '../auth/middleware.js';
 import { verify } from '../auth/keypair.js';
 import { parseGAII } from '../utils/gaii.js';
 import { buildAgentAuthMetadata } from '../services/auth-md.js';
@@ -269,12 +270,36 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             return;
         }
 
+        // FOUR QUESTIONS, NOT ONE. `verifyJWT` asks about the signature and the expiry and nothing
+        // else, so a signed-out session, a deleted agent's unexpired JWT and an owner deactivated
+        // through SCIM all still minted here. This door hands out a credential; it takes the same
+        // revocation test every authenticated route takes.
+        if (await credentialRevoked(owner_token, ownerPayload)) {
+            res.status(401).json({ error: 'access_denied', error_description: 'That session is no longer valid' });
+            return;
+        }
+
+        // INVARIANT 11, AND THIS IS THE DOOR THAT MADE THE RULE WORTH WRITING. `owner` reads the same
+        // on an owner session, an agent JWT, an ecosystem token, a PAT and an app grant, so the name
+        // comparison below refuses a different PERSON and admits everything acting in this person's
+        // name. Approving an OAuth consent is an account action: it mints a credential carrying the
+        // target agent's full scope list, so a `memory:read` principal that registered a client at the
+        // open registration door could post its own bearer here as `owner_token` and be handed one.
+        // isOwnerPrincipal is requireOwnerPrincipal's own test as a value — the middleware cannot be
+        // used because this token arrives in the body rather than the header, and a near-copy of the
+        // test is exactly how three of them came to disagree in auth/middleware.ts.
+        if (!isOwnerPrincipal({ ...ownerPayload, scopes: ownerPayload.scopes ?? [] } as unknown as Request['auth'])) {
+            res.status(403).json({ error: 'access_denied', error_description: 'Only the account holder can approve this. Sign in as the owner and try again.' });
+            return;
+        }
+
         // Verify the agent belongs to this owner
         const agent = await storage.getAgent(gaii);
         if (!agent) {
             res.status(400).json({ error: 'invalid_request', error_description: 'Agent not found' });
             return;
         }
+        // The second and narrower question, once the principal is settled: WHICH owner.
         if (agent.owner !== ownerPayload.owner) {
             res.status(403).json({ error: 'access_denied', error_description: 'Agent does not belong to you' });
             return;

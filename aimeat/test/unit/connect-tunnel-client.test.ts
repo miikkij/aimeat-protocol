@@ -618,11 +618,20 @@ describe('scopes_changed is not auth_revoked', () => {
     return { server, client, failures };
   }
 
-  it('leaves the identity attached and running', async () => {
+  it('RE-ATTACHES the identity, because the node authorizes against the token it pinned', async () => {
+    // THE WHOLE FIX, and the thing the first version of this got wrong. Forgetting the connector's
+    // own mint cache changes nothing: a forwarded call is authorized on the node against the token
+    // pinned when this identity attached (connect-tunnel-forward.ts), and only a fresh attach
+    // replaces that pin. Without this assertion the handler could be a no-op and every other test
+    // here would still pass — which is exactly what happened.
     const { server, client, failures } = await attachedFixture();
+    const attachesBefore = server.framesOfType('attach').length;
     const ws = server.sockets[server.sockets.length - 1];
     ws.send(JSON.stringify({ type: 'scopes_changed', agent: SUBJECT, message: 'Permissions changed' }));
-    await new Promise(r => setTimeout(r, 150));
+
+    await waitFor(() => server.framesOfType('attach').length === attachesBefore + 1);
+    const sent = server.framesOfType('attach');
+    expect(sent[sent.length - 1].agent).toBe(SUBJECT);
 
     // The three things auth_revoked would have done, and none of them may happen here.
     expect(failures).toEqual([]);

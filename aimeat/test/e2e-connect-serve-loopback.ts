@@ -229,6 +229,47 @@ await test('POST /local/call/:tool — owner_scope reaches the node from the CLI
     `owner_scope did not survive the CLI dispatch: ${JSON.stringify(scoped.body).slice(0, 300)}`);
 });
 
+await test('A scope change reaches the RUNNING daemon, in both directions, with nothing restarted', async () => {
+  // THE REPORTED BUG, against the real thing: a real `aimeat connect serve` daemon holding a real
+  // tunnel to a real node, with the owner changing permissions from outside. No mock server and no
+  // hand-made re-attach — the connector's own scopes_changed handler has to do the work, or this
+  // fails. The first attempt at this fix passed a unit test against a stub and did nothing here.
+  const inbox = '/v1/messages/agent-inbox';
+  const patchScopes = async (scopes: string[]) => {
+    const r = await json(BASE, `/v1/agents/${agentName}/scopes`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${account.ownerToken}` },
+      body: JSON.stringify({ scopes }),
+    });
+    assert(r.status === 200, `scope patch ${JSON.stringify(scopes)}: ${r.status} ${JSON.stringify(r.body)}`);
+  };
+  /** Poll the loopback until the proxied call reaches `want`, or give up loudly. */
+  const settlesAt = async (want: number, whatFor: string): Promise<void> => {
+    const deadline = Date.now() + 8000;
+    let last = 0;
+    while (Date.now() < deadline) {
+      const r = await json(loopbackBase, inbox);
+      last = r.status;
+      if (r.status === want) return;
+      await sleep(200);
+    }
+    assert(false, `${whatFor}: the proxied call never reached ${want} (last ${last})`);
+  };
+
+  // The daemon's agent starts with '*', so the call is allowed before anything changes.
+  const before = await json(loopbackBase, inbox);
+  assert(before.status === 200, `a wildcard agent reads its inbox: ${before.status}`);
+
+  // REMOVE the permission. This is the direction nobody reported and the more serious one: the
+  // token the node pinned at connect still carries the word, so without the push it goes on being
+  // honoured for the life of that token.
+  await patchScopes(['memory:read', 'memory:write']);
+  await settlesAt(403, 'a removed permission');
+
+  // GRANT it back. This is the direction crewaimeat reported, and the whole point: no restart.
+  await patchScopes(['*']);
+  await settlesAt(200, 'a granted permission');
+});
+
 await test('POST /local/call/:tool — deliverable_key survives the CLI dispatch onto the task record', async () => {
   const created = await json(BASE, `/v1/agents/${agentName}/tasks`, {
     method: 'POST', headers: { Authorization: `Bearer ${account.ownerToken}` },

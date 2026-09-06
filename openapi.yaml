@@ -5450,15 +5450,23 @@ paths:
         `scopes_changed`, `disconnect`, and `error`.
 
         **`scopes_changed` is not `auth_revoked`, and the distinction is
-        load-bearing.** A minted token carries the permissions its agent held at
-        mint time and a connector holds it for up to an hour, so granting a
-        permission from the dashboard reached a running agent only when that
-        hour was up — and REMOVING one went on being honoured just as long,
-        which is the more serious half. `PATCH /v1/agents/{name}/scopes` now
-        pushes `scopes_changed` (S→C: `{agent, message}`) to that identity's live
-        socket. It asks for a fresh mint and nothing else: the identity keeps
-        running. Sending the same news as `auth_revoked` would detach it, so
-        gaining a permission would stop the agent.
+        load-bearing.** A forwarded call is authorized against the token this
+        identity pinned when it attached (or at upgrade, for the socket's own
+        credential), so a permission change does not reach an open tunnel by
+        itself: granting one from the dashboard was honoured only after the
+        socket happened to reconnect, and REMOVING one went on being honoured
+        just as long, which is the more serious half. Every door that changes an
+        agent's scopes — `PATCH /v1/agents/{name}/scopes`, device-auth
+        re-approval, and the shared profile write — pushes `scopes_changed`
+        (S→C: `{agent, message}`) to that identity's live socket.
+
+        The client answers by RE-ATTACHING that identity with a freshly minted
+        token, which is what replaces the node's pinned copy; for the socket's
+        own credential, which is pinned at upgrade and cannot be replaced by any
+        frame, it reconnects. Clearing a client-side token cache is not enough
+        and is not what this frame asks for. Sending the same news as
+        `auth_revoked` would detach the identity, so gaining a permission would
+        stop the agent.
       tags: [Connector Tunnel]
       parameters:
         - name: token
