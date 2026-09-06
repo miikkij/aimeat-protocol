@@ -72,6 +72,7 @@
     "test:e2e": "cd aimeat && node --import tsx test/run-e2e-ci.ts",
     "test:e2e:postgres-kysely": "cd aimeat && pnpm test:e2e:postgres-kysely",
     "test:e2e:sqlite": "cd aimeat && pnpm test:e2e:sqlite",
+    "test:e2e:coverage": "cd aimeat && pnpm test:e2e:coverage",
     "test:e2e:all": "cd aimeat && node --import tsx test/run-e2e-ci.ts --all",
     "test:e2e:full": "cd aimeat && pnpm test:e2e",
     "test:e2e:federation": "cd aimeat && pnpm test:e2e:federation",
