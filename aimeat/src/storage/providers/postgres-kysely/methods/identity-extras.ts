@@ -85,6 +85,15 @@ export const identityExtraMethods = {
       .where('status', '=', 'pending').where('expiresAt', '>', new Date()).orderBy('createdAt', 'desc').executeTakeFirst();
     return r ? toEmail(r) : null;
   },
+  // Implemented on both backends as of 2026-09-06 (review item 5.9). It was declared optional on the
+  // interface and written for SQLite alone, so a caller that appeared on a Postgres node would have
+  // found nothing there -- an optional method with one implementation is a trap laid for whoever
+  // needs it next. Newest first, like getActiveEmailVerification above.
+  async getEmailVerificationsByOwner(this: PostgresKyselyStorage, ownerName: string): Promise<EmailVerificationRecord[]> {
+    const rows = await this.db.selectFrom('EmailVerification').selectAll()
+      .where('ownerName', '=', ownerName).orderBy('createdAt', 'desc').execute();
+    return rows.map(toEmail);
+  },
   async updateEmailVerification(this: PostgresKyselyStorage, id: string, updates: Partial<EmailVerificationRecord>): Promise<EmailVerificationRecord | null> {
     const data: Record<string, unknown> = {};
     if (updates.status !== undefined) data.status = updates.status;

@@ -5,6 +5,8 @@
  * @description Personal Access Token domain for the Postgres+Kysely backend (PersonalAccessToken table).
  *   The raw token is never stored — only its SHA-256 hash. Translated 1:1 from the Prisma provider.
  * @version-history
+ *   v1.1.0 -- 2026-09-06 -- Review item 5.2: listPats filters revoked tokens and orders newest
+ *     first, as SQLite always has. The Access page listed every token ever revoked.
  *   v1.0.0 — 2026-07-15 — Phase 5: PAT on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -35,8 +37,16 @@ export const patMethods = {
     const p = await this.db.selectFrom('PersonalAccessToken').selectAll().where('tokenHash', '=', tokenHash).where('revoked', '=', false).executeTakeFirst();
     return p ? toPat(p) : null;
   },
+  // REVOKED TOKENS WERE IN THE LIST, on the production backend only. SQLite has filtered them and
+  // ordered newest-first since it was written; this had neither, so the Access page on a Postgres
+  // node showed every token the account had ever revoked, indistinguishable from the live ones —
+  // and a person looking for "what can reach my data right now" was reading a list that answered a
+  // different question. Review item 5.2, 2026-09-06.
   async listPats(this: PostgresKyselyStorage, owner: string): Promise<PatRecord[]> {
-    return (await this.db.selectFrom('PersonalAccessToken').selectAll().where('owner', '=', owner).execute()).map(toPat);
+    return (await this.db.selectFrom('PersonalAccessToken').selectAll()
+      .where('owner', '=', owner).where('revoked', '=', false)
+      .orderBy('createdAt', 'desc')
+      .execute()).map(toPat);
   },
   async revokePat(this: PostgresKyselyStorage, id: string, owner: string): Promise<boolean> {
     const existing = await this.db.selectFrom('PersonalAccessToken').select('id').where('id', '=', id).where('owner', '=', owner).where('revoked', '=', false).executeTakeFirst();

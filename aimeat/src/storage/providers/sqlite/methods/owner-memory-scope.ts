@@ -118,13 +118,15 @@ export const ownerMemoryScopeMethods = {
     const whereStr = whereClauses ? ' WHERE ' + whereClauses.slice(5) : '';
 
     const countRow = this.db.prepare('SELECT COUNT(*) as cnt FROM memory' + whereStr).get(...params) as { cnt: number };
-    const limit = opts?.limit ?? 50;
+    // The same order and the same default as listAllMemory beside it, which is now the same as the
+    // Postgres backend's: key unless the caller asked for recency, and no implicit ceiling.
     const offset = opts?.offset ?? 0;
-    // Always newest-first, matching this backend's listAllMemory (see that method's note).
-    const rows = this.db.prepare(
-      'SELECT key, ownerGaii, visibility, tags, version, flagCount, byteSize, ttlHours, createdAt, updatedAt FROM memory'
-      + whereStr + ' ORDER BY updatedAt DESC LIMIT ? OFFSET ?'
-    ).all(...params, limit, offset) as Record<string, unknown>[];
+    const orderSql = opts?.newestFirst ? ' ORDER BY updatedAt DESC' : ' ORDER BY key';
+    const cols = 'SELECT key, ownerGaii, visibility, tags, version, flagCount, byteSize, ttlHours, createdAt, updatedAt FROM memory';
+    const rows = (opts?.limit
+      ? this.db.prepare(cols + whereStr + orderSql + ' LIMIT ? OFFSET ?').all(...params, opts.limit, offset)
+      : this.db.prepare(cols + whereStr + orderSql).all(...params)
+    ) as Record<string, unknown>[];
 
     const items: MemoryMetaRow[] = [];
     for (const row of rows) {

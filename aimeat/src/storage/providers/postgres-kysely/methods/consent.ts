@@ -51,7 +51,9 @@ export const consentMethods = {
     let q = this.db.selectFrom('Consent').selectAll().where('ownerGaii', '=', ownerGaii);
     if (opts?.status) q = q.where('status', '=', opts.status);
     if (opts?.recipient) q = q.where('recipient', '=', opts.recipient);
-    return (await q.execute()).map(toConsent);
+    // Newest grant first, the same order the SQLite twin now returns. Unordered on both was stable
+    // on neither.
+    return (await q.orderBy('grantedAt', 'desc').execute()).map(toConsent);
   },
   async listConsentsForAgents(this: PostgresKyselyStorage, ownerGaiis: string[], opts?: { status?: 'active' | 'revoked' | 'expired'; recipient?: string }): Promise<Record<string, ConsentRecord[]>> {
     const out: Record<string, ConsentRecord[]> = {};
@@ -60,7 +62,7 @@ export const consentMethods = {
     let q = this.db.selectFrom('Consent').selectAll().where('ownerGaii', 'in', ownerGaiis);
     if (opts?.status) q = q.where('status', '=', opts.status);
     if (opts?.recipient) q = q.where('recipient', '=', opts.recipient);
-    for (const row of await q.execute()) {
+    for (const row of await q.orderBy('grantedAt', 'desc').execute()) {
       const c = toConsent(row);
       (out[c.ownerGaii] ??= []).push(c);
     }

@@ -646,6 +646,14 @@ export function initializeSchema(db: Database.Database): void {
   // whatever the owner had picked. Review item 5.3, 2026-09-06.
   safeAddColumn('notification_preferences', 'locale', 'TEXT');
 
+  // An extension instance's per-locale overrides and the agent that created it. The
+  // deserializer has read both since they were added to the record; the table had neither
+  // column and the INSERT and UPDATE wrote neither, while updateExtensionInstance returned
+  // `{...existing, ...updates}` -- so a PUT answered 200 with the translations echoed back and
+  // the next GET served nothing. Review item 5.4, 2026-09-06.
+  safeAddColumn('extension_instances', 'createdByAgent', 'TEXT');
+  safeAddColumn('extension_instances', 'translations', 'TEXT');
+
   // ── Memory full-text search (Tier-1 librarian retrieval) ──
   // FTS5 is built into better-sqlite3 — no dependency. A standalone virtual table mirrors the
   // searchable text of every memory row (key + JSON value + tags), keyed by memory.rowid. AFTER

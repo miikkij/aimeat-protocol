@@ -256,7 +256,6 @@ export interface StorageFileRecord {
    *  those paths read the bytes as they always did. Only recorded for types where it changes the
    *  served Content-Type; a PNG carries no verdict because a charset on a PNG means nothing. */
   utf8Verified?: boolean;
-  accessCode?: string;
   tags?: string[];
   createdAt: string;
   federate?: boolean;

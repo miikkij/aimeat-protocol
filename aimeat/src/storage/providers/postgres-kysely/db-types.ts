@@ -84,6 +84,7 @@ export interface Agent {
   mcpClient: string | null;
   mcpLastSeen: string | null;
   scheduleConstraintDefaults: Json | null;
+  semantic: Json | null;
   tags: string[] | null;
   technicalCapabilities: Json | null;
   trustScore: Generated<number>;
@@ -885,6 +886,7 @@ export interface Board {
   ownerGaii: string;
   /** The board's own rules (migration 0057): who posts, categories, default lifetime, price. NULL = the node's defaults. */
   rules: Json | null;
+  semantic: Json | null;
   visibility: string;
 }
 
@@ -900,6 +902,7 @@ export interface BoardPost {
   postId: string;
   reactions: Generated<Json>;
   replyTo: string | null;
+  semantic: Json | null;
   tags: string[] | null;
   title: string;
   ttlExpiresAt: Timestamp | null;
@@ -1414,6 +1417,7 @@ export interface Ghii {
   passwordFailedAttempts: Generated<number>;
   passwordHash: string | null;
   passwordLockedUntil: string | null;
+  semantic: Json | null;
   totpBackupCodes: string[] | null;
   totpEnabled: Generated<boolean>;
   totpFailedAttempts: Generated<number>;
@@ -1815,6 +1819,7 @@ export interface PersonalNode {
   mailboxUsedBytes: Generated<number>;
   ownerName: string;
   publicKey: string;
+  semantic: Json | null;
   status: Generated<string>;
   updatedAt: Timestamp;
   visibility: Generated<string>;

@@ -33,10 +33,12 @@ function toBoard(r: Selectable<Board>): BoardRecord {
     id: r.boardId, name: r.name, description: r.description ?? undefined, visibility: r.visibility as BoardRecord['visibility'], ownerGaii: r.ownerGaii,
     allowedGaiis: r.allowedGaiis ?? [], federate: r.federate ?? false, createdAt: iso(r.createdAt),
     ...(r.rules ? { rules: r.rules as BoardRules } : {}),
+    ...(r.semantic ? { semantic: r.semantic as BoardRecord['semantic'] } : {}),
   };
 }
 function toPost(r: Selectable<BoardPost>): BoardPostRecord {
-  return { id: r.postId, boardId: r.boardId, authorGaii: r.authorGaii, title: r.title, body: r.body, category: r.category ?? undefined, tags: r.tags ?? [], ttlExpiresAt: r.ttlExpiresAt ? iso(r.ttlExpiresAt) : undefined, reactions: (r.reactions ?? {}) as BoardPostRecord['reactions'], replyTo: r.replyTo ?? undefined, createdAt: iso(r.createdAt), aiProvenanceId: r.aiProvenanceId ?? undefined };
+  return { id: r.postId, boardId: r.boardId, authorGaii: r.authorGaii, title: r.title, body: r.body, category: r.category ?? undefined, tags: r.tags ?? [], ttlExpiresAt: r.ttlExpiresAt ? iso(r.ttlExpiresAt) : undefined, reactions: (r.reactions ?? {}) as BoardPostRecord['reactions'], replyTo: r.replyTo ?? undefined, createdAt: iso(r.createdAt), aiProvenanceId: r.aiProvenanceId ?? undefined,
+    ...(r.semantic ? { semantic: r.semantic as BoardPostRecord['semantic'] } : {}) };
 }
 function toSub(r: Selectable<BoardSubscription>): BoardSubscriptionRecord {
   return { id: r.id, boardId: r.boardId, gaii: r.gaii, callbackUrl: r.callbackUrl ?? undefined, filters: (r.filters ?? undefined) as BoardSubscriptionRecord['filters'], createdAt: iso(r.createdAt) };
@@ -47,6 +49,7 @@ export const boardMethods = {
     const [row] = await this.db.insertInto('Board').values({
       boardId: b.id, name: b.name, description: b.description ?? null, visibility: b.visibility, ownerGaii: b.ownerGaii, allowedGaiis: b.allowedGaiis ?? null,
       federate: b.federate ?? false, createdAt: new Date(b.createdAt), rules: b.rules ? jsonb(b.rules) : null,
+      semantic: jsonb(b.semantic ?? null),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).returningAll().execute();
     return toBoard(row);
@@ -90,6 +93,7 @@ export const boardMethods = {
       postId: p.id, boardId: p.boardId, authorGaii: p.authorGaii, title: p.title, body: p.body, category: p.category ?? null,
       tags: p.tags ?? null, ttlExpiresAt: p.ttlExpiresAt ? new Date(p.ttlExpiresAt) : null, reactions: jsonb(p.reactions ?? {}),
       replyTo: p.replyTo ?? null, createdAt: new Date(p.createdAt), aiProvenanceId: p.aiProvenanceId ?? null,
+      semantic: jsonb(p.semantic ?? null),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).returningAll().execute();
     return toPost(row);

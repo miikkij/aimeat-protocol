@@ -229,9 +229,14 @@ export interface MemoryRepository {
    * unwanted rows fill the whole window. The public activity feed (`system@…`) does exactly that
    * on a busy node, which is what emptied the landing ticker.
    *
-   * `newestFirst` orders by updatedAt DESC. Postgres otherwise orders by key and SQLite by
-   * updatedAt, so a windowed call without this flag returns DIFFERENT rows per backend; set it
-   * whenever `limit` is used and recency is what you meant.
+   * ORDER AND DEFAULT ARE THE SAME ON EVERY BACKEND, as of 2026-09-06. Key order unless
+   * `newestFirst` is set, which orders by updatedAt DESC; and an omitted `limit` means everything,
+   * with no implicit ceiling. Until then SQLite always sorted by updatedAt and capped at 50 while
+   * Postgres sorted by key and returned all, so the same call answered differently depending on
+   * which backend ran it — and this comment said so instead of the code fixing it. Review item 5.5.
+   *
+   * Set `newestFirst` whenever `limit` is used and recency is what you meant: a window over key
+   * order is an alphabetical slice, which is rarely what a "most recent N" caller wants.
    */
   listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; excludeOwnerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean; newestFirst?: boolean }): Promise<{ items: MemoryRecord[]; total: number }>;
   /**

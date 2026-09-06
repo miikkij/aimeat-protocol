@@ -16,7 +16,7 @@ import type {
   FederationPeerRecord, PeeringRequestRecord, PersonalNodeRecord, MailboxItemRecord, GenesisPeerRecord,
 } from '../../../interface.js';
 import type { FederationPeer, PeeringRequest, PersonalNode, MailboxItem, GenesisPeer } from '../db-types.js';
-import { dbError } from '../helpers.js';
+import { dbError, jsonb } from '../helpers.js';
 import { logger } from '../../../../utils/logger.js';
 import type { PostgresKyselyStorage } from '../index.js';
 
@@ -63,6 +63,7 @@ function toPersonalNode(r: Selectable<PersonalNode>): PersonalNodeRecord {
     status: r.status as PersonalNodeRecord['status'], agentGaiis: r.agentGaiis ?? [], lastSeen: iso(r.lastSeen),
     mailboxQuotaBytes: r.mailboxQuotaBytes, mailboxUsedBytes: r.mailboxUsedBytes,
     visibility: r.visibility as PersonalNodeRecord['visibility'], createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt),
+    ...(r.semantic ? { semantic: r.semantic as PersonalNodeRecord['semantic'] } : {}),
   };
 }
 function toMailboxItem(r: Selectable<MailboxItem>): MailboxItemRecord {
@@ -148,6 +149,7 @@ export const federationMethods = {
       id: node.nodeId, ownerName: node.ownerName, anchorNodeId: node.anchorNodeId, publicKey: node.publicKey,
       status: node.status, agentGaiis: node.agentGaiis, lastSeen: new Date(node.lastSeen),
       mailboxQuotaBytes: node.mailboxQuotaBytes, mailboxUsedBytes: node.mailboxUsedBytes, visibility: node.visibility,
+      semantic: jsonb(node.semantic ?? null),
       createdAt: new Date(node.createdAt), updatedAt: new Date(node.updatedAt ?? node.createdAt),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();

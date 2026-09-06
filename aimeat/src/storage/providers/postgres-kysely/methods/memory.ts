@@ -9,6 +9,9 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   v1.4.0 -- 2026-09-06 -- Review item 5.1: countArchivedByKeyPrefix returns { active, archived },
+ *     the shape the interface declares. It returned a number, so structure-overview read
+ *     `.archived` off it and got undefined on the production backend, with no throw to notice.
  *   v1.5.0 — 2026-09-03 — createMemoryIfAbsent treats a row in the bin as absent and takes it over
  *     (new value, tombstone cleared), as setMemory already did. A DO NOTHING against a binned row
  *     answered null on every retry, so the workspace append could never seed a draft for a
@@ -477,8 +480,19 @@ export const memoryMethods = {
     return Number(r.numUpdatedRows ?? 0);
   },
 
-  async countArchivedByKeyPrefix(this: PostgresKyselyStorage, keyPrefix: string): Promise<number> {
-    const r = await this.db.selectFrom('Memory').select(sql<number>`count(*)`.as('n')).where('key', 'like', keyPrefix + '%').where('archived', '=', true).executeTakeFirst();
-    return Number(r?.n ?? 0);
+  // THE ONE METHOD WHOSE RETURN TYPE CONTRADICTED THE INTERFACE. memory.repository.ts declares
+  // `Promise<{ active, archived }>` and this returned `Promise<number>`, so on the production
+  // backend services/structure-overview.ts read `.archived` off a number and got `undefined` — no
+  // throw, so its try/catch never fired — and the `active` half did not exist there at all. Review
+  // item 5.1, 2026-09-06. FILTER is the Postgres spelling of the CASE sum the SQLite repo uses.
+  async countArchivedByKeyPrefix(this: PostgresKyselyStorage, keyPrefix: string): Promise<{ active: number; archived: number }> {
+    const r = await this.db.selectFrom('Memory')
+      .select([
+        sql<number>`count(*) FILTER (WHERE archived = false)`.as('active'),
+        sql<number>`count(*) FILTER (WHERE archived = true)`.as('archived'),
+      ])
+      .where('key', 'like', keyPrefix + '%')
+      .executeTakeFirst();
+    return { active: Number(r?.active ?? 0), archived: Number(r?.archived ?? 0) };
   },
 };
