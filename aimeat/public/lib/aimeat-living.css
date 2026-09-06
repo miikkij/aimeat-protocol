@@ -23,6 +23,10 @@
  * @structure tokens · control row · formula · sentence · machine state · chain · gear · stale ·
  *   trigger · dialogs · refusals · still
  * @version-history
+ *   v0.6.1 — 2026-09-06 — The stale reading and the trigger's reason wear the kit's warn TEXT
+ *     colour (--ak-warn-text), not the warn fill: the fill measured 2.15 on a light ground, and
+ *     these are the two sentences a guest reads on any document with a URL source or a trigger.
+ *     The version moves with the lib (units.js: the cent joins the currency family).
  *   v0.6.0 — 2026-09-06 — THE GEAR AND THE TWO DIALOGS BEHIND IT. A geared field reserves the
  *     kit's touch width at its end rather than letting the mark sit on top of a label, so nothing
  *     runs underneath it at any width; the gear itself is 18px of inline SVG in `currentColor`,
@@ -327,7 +331,9 @@
 .ak-living__trigger-reason {
   margin: calc(var(--ak-living-gap) * 0.3) 0 0;
   font-size: var(--ak-living-label-size);
-  color: var(--ak-warn, var(--ak-living-ink-dim));
+  /* The kit's warn TEXT colour, not the warn fill: the fill measures 2.15 on a light ground and
+     these are the two sentences a guest reads on any document with a URL source or a trigger. */
+  color: var(--ak-warn-text, var(--ak-living-ink-dim));
 }
 
 .ak-living__value[data-living-stale='yes'] .ak-living__figure {

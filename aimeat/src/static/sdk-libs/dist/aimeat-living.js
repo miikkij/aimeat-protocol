@@ -119,6 +119,8 @@
   };
   var CURRENCIES = ["EUR", "USD", "GBP", "SEK", "NOK", "DKK", "JPY", "CHF", "PLN"];
   for (const code of CURRENCIES) UNITS[code] = u({ ["cur:" + code]: 1 });
+  UNITS.c = u({ "cur:EUR": 1 }, 0.01);
+  UNITS.snt = u({ "cur:EUR": 1 }, 0.01);
   function lookup(name) {
     if (Object.prototype.hasOwnProperty.call(UNITS, name)) return UNITS[name];
     for (const p of Object.keys(PREFIXES)) {
@@ -5145,7 +5147,7 @@
   }
 
   // src/static/sdk-libs/living/index.js
-  var VERSION = "0.6.0";
+  var VERSION = "0.6.1";
   var DRAWN = ["control", "formula", "text", "machine", "value", "source", "trigger"];
   function validate(doc) {
     const refusals = [];
