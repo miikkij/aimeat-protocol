@@ -10,6 +10,15 @@
  *   MCP tool call flows over the single persistent WS without per-tool changes.
  * @usage Imported by `aimeat connect` subcommands and MCP tools.
  * @version-history
+ *   v1.5.0 -- 2026-09-07 -- The retry asks the right store. v1.4.0 paired `forgetCachedToken`
+ *     (agent-key.ts's mint cache) with `keychain.getToken` (the stored-bearer FILE), which that
+ *     cache has nothing to do with -- so a v2 agent, holding a key and no bearer, got null back and
+ *     skipped the retry, and a v1 agent got the identical string and skipped it too. Third version
+ *     of this retry and the third way of not firing, which is why it now has a test that counts
+ *     dispatches instead of a reading of the source: test/unit/connect-scope-retry.test.ts, seven
+ *     cases, two of which fail on the v1.4.0 pairing. `resolveToken` is the pair `forgetCachedToken`
+ *     exists for, and it is what local-server.ts and acp/index.ts already call. Its MintFailedError
+ *     is caught here: a refusal handed back as an exception is a worse answer than the refusal.
  *   v1.4.0 -- 2026-09-07 -- The SCOPE_DENIED retry, done the way v1.3.0 could not. `send()` is now
  *     a guard around `dispatch()`, so the ONE retry sits in front of both the tunnel and the direct
  *     fetch rather than after the transport's early return. The anti-amplification guard is a single
@@ -33,7 +42,7 @@
  */
 import { getToken } from './keychain.js';
 import { loadConfig } from './config.js';
-import { forgetCachedToken } from './agent-key.js';
+import { forgetCachedToken, resolveToken } from './agent-key.js';
 
 export interface ApiResponse {
   ok: boolean;
@@ -135,7 +144,30 @@ export class AimeatClient {
     // the bug was reported on — it never ran at all. This sits in front of BOTH paths.
     if (!this.agent || !this.owner) return first;
     forgetCachedToken(this.agent, this.owner);
-    const fresh = await getToken(this.agent, this.owner);
+
+    // resolveToken, NOT keychain.getToken. They are different stores, and pairing the wrong one
+    // with `forgetCachedToken` is why this could not fire: the cache that was just dropped belongs
+    // to agent-key.ts, and `keychain.getToken` reads the stored-bearer FILE, which it does not
+    // touch. So a v2 agent -- a key on disk and no bearer at all, which is what a migrated fleet
+    // runs on -- got null back and the retry was skipped, and a v1 agent got the identical string
+    // and it was skipped too. Measured in test/unit/connect-scope-retry.test.ts: one dispatch, both
+    // shapes. `resolveToken` is what every other credential consumer in the daemon already calls
+    // (local-server.ts, acp/index.ts) and what `forgetCachedToken` exists to invalidate: it mints
+    // for a key-holder and reads the file for a bearer, so this line does not have to know which.
+    //
+    // A v1 agent still does not retry, and that is right rather than a leftover -- a stored bearer
+    // cannot be re-minted, so a second attempt would carry the same refused token. The connector
+    // says so on `scopes_changed`: an ADDED permission needs `aimeat connect` re-run.
+    let fresh: string | null;
+    try {
+      fresh = await resolveToken(this.agent, this.owner, this.baseUrl);
+    } catch {
+      // A mint that failed is not a credential that does not exist (MintFailedError). Either way the
+      // answer to THIS call is the refusal the node already gave: the caller asked whether it may do
+      // something and it may not, and handing that back as an exception would be a worse answer than
+      // the refusal itself.
+      return first;
+    }
     if (!fresh || fresh === this.token) return first;
     this.token = fresh;
     return this.dispatch(method, path, body);
