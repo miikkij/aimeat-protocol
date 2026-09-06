@@ -10309,6 +10309,11 @@
       "copyCommand": "Copiar el comando",
       "copyAgentInstruction": "Copiar la instrucción",
       "copyGaii": "Copiar el GAII",
+      "gaiiCopied": "GAII copiado",
+      "search": {
+        "placeholder": "Busca un agente por nombre o por GAII",
+        "count": "{shown} / {total}"
+      },
       "empty": "Todavía no hay agentes registrados.",
       "loadError": "No se pudieron cargar los agentes.",
       "trust": "Confianza",

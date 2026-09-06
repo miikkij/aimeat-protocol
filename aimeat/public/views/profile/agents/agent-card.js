@@ -5,6 +5,11 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.26.0 -- 2026-09-06 -- The GAII stands on the row itself, closed and open, and copies itself
+ *     when pressed (GaiiChip). It was the one thing about an agent that gets typed somewhere else,
+ *     and it was reachable only by hovering a board tile. Split (max-file-lines): the delivery
+ *     indicator and the platform / model / readiness badges moved unchanged to
+ *     ./agent-card-badges.js, which is where their history continues.
  *   v1.25.0 -- 2026-09-06 -- The delivery word reads the server's channel, so an agent reached down
  *     a held connection says so instead of claiming a poll it never makes. One helper now, used by
  *     both the collapsed row and the open card, which had the same two-branch copy each.
@@ -88,6 +93,8 @@ import { t, tOr } from '/js/i18n.js';
 import { apiGet, apiPatch } from '/js/api.js';
 import { timeAgo } from '/js/utils.js';
 import { agentState, getDefaultTab } from './state-detector.js';
+import { GaiiChip } from './gaii-chip.js';
+import { deliveryLabel, renderDeliveryIndicator, renderPlatformBadge, renderModelBadge, renderReadinessBadge } from './agent-card-badges.js';
 import { RunModeSwitch, renderRunModeBadge } from './agent-card-run-mode.js';
 import { testWebhook, updateWebhook } from '/js/services/agent-integration.js';
 import TabReadme from './tab-readme.js';
@@ -255,9 +262,12 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
             </div>
             ${renderPopOut(onPopOut, agent)}
           </div>
-          <!-- Second line: faint-divider-separated meta (delivery + status + last seen)
-               so the long status text gets its own row instead of overflowing. -->
+          <!-- Second line: faint-divider-separated meta (GAII + delivery + status + last seen)
+               so the long status text gets its own row instead of overflowing. The GAII leads it
+               because it is what a person carries away from this row: the name is for the eye,
+               the GAII is what a chat, a config file or another agent is given. -->
           <div class="pf-agd-collapsed-meta">
+            <${GaiiChip} agent=${agent} /><span class="pf-agd-meta-sep">·</span>
             ${renderDeliveryIndicator(agent)}
             ${renderCollapsedStats(state, agent, onboarding)}
           </div>
@@ -287,6 +297,12 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
             ${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''}
           </span>
         </div>
+
+        <!-- The GAII on its own line rather than inside the header: it is far wider than the name,
+             and sharing the header row with the badges would leave it a few characters at a phone
+             width. Directly under the name, because that is the same thing said twice: once for
+             the eye, once for whatever this gets pasted into. -->
+        <div class="pf-agd-gaii-row"><${GaiiChip} agent=${agent} /></div>
 
         <!-- Tags (editable) -->
         <${TagStrip} agent=${agent} showToast=${showToast} />
@@ -436,81 +452,6 @@ function renderChangeBadge(changes) {
   // Has-unseen indicator (a dot, not an exact count). Neutral gray; red ONLY for unseen FAILED tasks.
   const failed = (changes.tasksFailed || 0) > 0;
   return html`<span class="pf-agd-change-badge pf-agd-change-badge--dot ${failed ? 'pf-agd-change-badge--failed' : ''}" title=${title}></span>`;
-}
-
-/**
- * The word for how work reaches this agent, from the server's own channel verdict
- * (services/agent-health.ts). `socket` is a daemon holding this agent's connection open, which is
- * how an agent that starts a runtime per job is reached; saying "polling" about it named something
- * that never happens.
- */
-function deliveryLabel(delivery) {
-  if (delivery.webhook_configured) return t('profile.agents.detail.deliveryWh');
-  if (delivery.channel === 'socket') return t('profile.agents.detail.deliverySocket');
-  return t('profile.agents.detail.deliveryPolling');
-}
-
-/**
- * How this agent is reached, from the server's verdict.
- *
- * Was computed here from `agent.webhookUrl` (not in the response), `agent.mcpEnabled` (not a field
- * on any record) and a fail threshold of 5 that disagreed with the server's 10. So the warning icon
- * could never appear, and the MCP labels could never be chosen. The MCP branch is gone rather than
- * rewired: there is nothing to rewire it to.
- */
-function renderDeliveryIndicator(agent) {
-  const delivery = agent?.health?.delivery;
-  if (!delivery) return null;
-  const label = deliveryLabel(delivery);
-  const icon = delivery.webhook_configured ? (delivery.channel === 'webhook-failing' ? '⚠' : '✓') : '';
-
-  return html`<span class="pf-agd-delivery-indicator">${label}${icon ? ` ${icon}` : ''} · </span>`;
-}
-
-function renderPlatformBadge(onboarding) {
-  const platform = onboarding?.platformName || onboarding?.detectedPlatform;
-  if (!platform) return null;
-  const version = onboarding?.platformVersion;
-  return html`<span class="pf-agd-badge pf-agd-badge--platform">${platform}${version ? ` v${version}` : ''}</span>`;
-}
-
-// Self-reported primary LLM (indicative — coding platforms delegate to subagents on other
-// models mid-session). Comes from the owner agent list projection (agent.model).
-function renderModelBadge(agent) {
-  if (!agent?.model) return null;
-  return html`<span class="pf-agd-badge pf-agd-badge--model" title=${t('profile.agents.modelBadgeTitle')}>${agent.model}</span>`;
-}
-
-function renderReadinessBadge(state, onboarding) {
-  if (state === 'system') {
-    // Internal (auto-provisioned) agent — no device-auth onboarding / readiness.
-    return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">${t('profile.agents.detail.state.internal')}</span>`;
-  }
-  if (state === 'new') {
-    return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
-  }
-  if (state === 'onboarding') {
-    const passed = onboarding?.steps?.filter(s => s.status === 'passed').length ?? 0;
-    const total = onboarding?.steps?.length ?? 11;
-    return html`<span class="pf-agd-badge pf-agd-badge--readiness-onboarding">${t('profile.agents.detail.state.onboarding')}: ${passed}/${total}</span>`;
-  }
-  if (state === 'problem') {
-    const level = onboarding?.readinessLevel || 'none';
-    const score = onboarding?.readinessScore;
-    if (!score && score !== 0) return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
-    const label = t(`agentOnboarding.readiness.${level}`);
-    // No "degraded ↓" marker: it was driven by onboarding.previousReadinessLevel, which is not a
-    // field on the record, has no column in either backend and is written nowhere — so the arrow
-    // could never appear. Reintroducing it needs a stored previous level first, not a rank table.
-    return html`<span class="pf-agd-badge pf-agd-badge--readiness-${level}">${label} (${score})</span>`;
-  }
-  // idle and production both show level + score
-  const level = onboarding?.readinessLevel || 'none';
-  const score = onboarding?.readinessScore;
-  if (!score && score !== 0) return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
-  const label = t(`agentOnboarding.readiness.${level}`);
-  return html`<span class="pf-agd-badge pf-agd-badge--readiness-${level}"
-    title=${t('profile.agents.detail.readinessTooltip') || 'Readiness score 0–100 from onboarding checks. Levels: none → basic → standard → advanced → full.'}>${label} (${score})</span>`;
 }
 
 function renderCollapsedStats(state, agent, onboarding) {

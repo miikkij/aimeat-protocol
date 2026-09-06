@@ -6,6 +6,10 @@
  *   grouped agent-card renderer (none / custom groups / mode / tag). Extracted from
  *   ../agents-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-06 — AgentSearch: one field above the board that narrows the board and the
+ *     list together, on the agent's name or its GAII. Seventy-one agents on one account is past
+ *     the point where scrolling finds anything, and the person looking already knows which one
+ *     they want.
  *   v1.1.0 — 2026-08-31 — In the DEFAULT view the owner's own tool connections (mode `workstation`)
  *     fall under a standing heading at the end instead of being mixed into the list. Grouping by
  *     mode already existed, but behind a dropdown nobody opens, and mixing them is what made an MCP
@@ -18,9 +22,32 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import AgentCard from './agent-card.js';
-import { effectiveOrderedNames, UNGROUPED_ID } from './tab-helpers.js';
+import { effectiveOrderedNames, matchesAgentQuery, UNGROUPED_ID } from './tab-helpers.js';
 
 const AGENT_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'];
+
+/**
+ * The fleet search, above the board rather than above the list: it narrows both, so the status
+ * pills never count agents the list below is not showing. Name or GAII, because those are the two
+ * strings a person arrives with — one from the screen, the other from wherever they pasted it.
+ * @param {{ query: string, setQuery: (v: string) => void, shown: number, total: number }} props
+ */
+export function AgentSearch({ query, setQuery, shown, total }) {
+  const active = query.trim() !== '';
+  return html`
+    <div class="pf-agd-fleet-search">
+      <input class="input-field pf-agd-fleet-search-input" type="search"
+             value=${query}
+             placeholder=${t('profile.agents.search.placeholder')}
+             aria-label=${t('profile.agents.search.placeholder')}
+             onInput=${(e) => setQuery(e.target.value)} />
+      ${active && html`
+        <span class="pf-agd-fleet-search-count">${t('profile.agents.search.count', { shown, total })}</span>
+        <button class="pf-agd-filter-clear" onClick=${() => setQuery('')}>${t('profile.agents.filter.clear')}</button>
+      `}
+    </div>
+  `;
+}
 
 function collectTags(agents) {
   const set = new Set();
@@ -118,15 +145,16 @@ export function ActiveTasksPanel({ activeTasksMap, agents, onOpen }) {
   `;
 }
 
-export function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsMap, changesMap, onTabSeen, expandedAgent, toggleAgent, session, showToast, setScopesModal, handleDeleteAgent, toggleFederate, onPopOut, dnd, agentOrder, deepLink, agentGroups, collapsedGroups, editingGroup, setEditingGroup, addGroup, renameGroup, removeGroup, toggleGroupCollapsed, groupDnd }) {
-  // Tag filter: agent must have ALL selected tags (intersection)
-  const filtered = tagFilter.size === 0
-    ? agents
-    : agents.filter(a => {
-        const at = new Set(a.tags ?? []);
-        for (const want of tagFilter) if (!at.has(want)) return false;
-        return true;
-      });
+export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardings, taskStatsMap, changesMap, onTabSeen, expandedAgent, toggleAgent, session, showToast, setScopesModal, handleDeleteAgent, toggleFederate, onPopOut, dnd, agentOrder, deepLink, agentGroups, collapsedGroups, editingGroup, setEditingGroup, addGroup, renameGroup, removeGroup, toggleGroupCollapsed, groupDnd }) {
+  // Search narrows first, then the tag filter: agent must have ALL selected tags (intersection).
+  // `agents` itself stays whole — it is handed to every open card as `allAgents`, which is what the
+  // schedules picker and the tag-peer list read, and neither of those is about what is on screen.
+  const filtered = agents.filter(a => {
+    if (!matchesAgentQuery(a, query)) return false;
+    const at = new Set(a.tags ?? []);
+    for (const want of tagFilter) if (!at.has(want)) return false;
+    return true;
+  });
 
   if (filtered.length === 0) {
     return html`<div class="empty">${t('profile.agents.filter.noMatches')}</div>`;
