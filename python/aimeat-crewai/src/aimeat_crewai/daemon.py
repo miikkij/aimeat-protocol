@@ -14,6 +14,24 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.26.0 -- A refusal stops being indistinguishable from an empty result. Five node calls read the
+    status, threw it away and returned a neutral value -- `_poll_tasks` [], the message body "",
+    `_poll_messages` [], `_agent_engagements` None, `_space_contract` None -- so an agent whose
+    owner had not granted the scope looked exactly like an agent with nothing to do. 401 and 403
+    are now separated from every other non-200 by `_Api.refused()`, which records the node's own
+    error code and prints it once per (call, code) and again when it changes. Reported by
+    crewaimeat on 2026-09-06, after two hours spent looking for the bug in the wrong place.
+    NO EXCEPTION IS RAISED, and that is the design rather than caution: the poll loop wraps its
+    whole body in one `except Exception`, `_drain_records`/`_drain_dms` have already taken their
+    events off the loopback queue by the time one could be raised, and a 403 does not clear
+    itself -- so raising would drop those events and abandon the rest of the cycle, every cycle,
+    for as long as the scope was missing. The return contracts are unchanged; what changed is
+    that the daemon now says which door was shut and which scope shuts it.
+    The engagement gate keeps its documented fail-OPEN (§7d): failing closed on a refusal would
+    skip every record in every workspace, which stops the agent for a reason it cannot report.
+    The other node calls are left alone on purpose. `_is_cancelled` is a deliberate, documented
+    fail-safe; `_mark_message_delivered` returns a bool the next cycle retries; the remaining
+    status checks are `/local/*` loopback calls, which carry no scopes.
   0.25.1 -- The two call sites that build the liaison's MCP session now pass `identity.gaii`,
     not the bare `agent_name`. 0.25.0 taught the SESSION to carry an identity and this file kept
     handing it the credential's NAME, so a two-owner daemon refused every liaison it opened --
@@ -286,6 +304,24 @@ except ImportError as exc:  # pragma: no cover
     ) from exc
 
 
+def _refusal_detail(r: Any) -> tuple[str, str]:
+    """The node's own `error.code` and `error.message` from a refused response.
+
+    The AIMEAT envelope carries both and the message names the missing scope in words
+    ("Scope \\"messages:read\\" required. Agent scopes: [memory:read, memory:write]"), which is
+    the one line that turns "the agent is quiet" into a thing the owner can act on. A body that
+    is not the envelope (a proxy's HTML, a truncated read) falls back to the status alone rather
+    than raising -- this runs on the reporting path, and a reporter that throws reports nothing.
+    """
+    try:
+        err = (r.json() or {}).get("error") or {}
+        if isinstance(err, dict):
+            return str(err.get("code") or f"HTTP_{r.status_code}"), str(err.get("message") or "")
+    except Exception:  # noqa: BLE001, S110 -- the body was not the envelope; the status alone is still worth printing, and a reporter that raises reports nothing
+        pass
+    return f"HTTP_{r.status_code}", ""
+
+
 class _Api:
     """Shared HTTP context for the daemon's REST helpers (0.4.0+).
 
@@ -314,6 +350,48 @@ class _Api:
         self.base_url = base_url.rstrip("/")
         self.session = session or requests.Session()
         self.session.headers.update({"X-Aimeat-Agent": self.gaii})
+        # Permission refusals this credential has collected, newest wins: {call label: error code}.
+        # Kept rather than counted -- a refusal is a standing fact, not an event rate.
+        self.refusals: dict[str, str] = {}
+
+    def refused(self, r: Any, call: str) -> bool:
+        """True when the node refused `call` because this credential may not make it.
+
+        401 and 403 are separated from every other non-200 ON PURPOSE, and the separation is the
+        whole point of this method. A timeout, a 502 or a dropped socket is a blip: the caller's
+        neutral answer ("no tasks this cycle") is an honest reading of the cycle it just had, and
+        the next cycle fixes it. A refusal is not that. It is a standing fact about this
+        credential -- it does not clear itself, it will still be there in thirty seconds, and the
+        owner has to grant the scope before it changes. Flattened into the same empty list, it
+        reads as "nothing to do", and a fleet built on that conclusion sits idle looking healthy.
+
+        Reported by crewaimeat on 2026-09-06: three calls answered with an empty list at the same
+        moment the same call over REST answered 403 SCOPE_DENIED, and two hours went into looking
+        for the bug in the wrong place.
+
+        The caller keeps its return contract -- this records and reports, it does not raise. That
+        is deliberate: the poll loop wraps its whole body in one `except Exception`, so a raise
+        would abandon the rest of the cycle, and `_drain_records`/`_drain_dms` have already taken
+        their events off the loopback queue by then (queue-only, no re-list, no catch-up), so the
+        events after the raise would be lost. A 403 does not go away, so that would happen on
+        every cycle for as long as the scope is missing: a fleet that never finishes a cycle
+        again, which is the failure this is meant to make visible rather than a new one.
+
+        Printed once per (call, code) and again the moment the code changes -- so the owner's
+        grant shows up in the log, and a 30 s poll loop does not bury it under identical lines.
+        """
+        if r.status_code not in (401, 403):
+            return False
+        code, message = _refusal_detail(r)
+        if self.refusals.get(call) != code:
+            self.refusals[call] = code
+            detail = f": {message}" if message else ""
+            print(
+                f"[daemon:{self.agent_name}] {call}: the node refused this credential -- "
+                f"HTTP {r.status_code} {code}{detail}. This is not a blip and it does not clear "
+                f"itself; the owner grants the scope."
+            )
+        return True
 
     def get(self, path: str, **kwargs: Any) -> Any:
         kwargs.setdefault("timeout", 15)
@@ -526,10 +604,15 @@ def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
 
 
 def _poll_tasks(api: _Api, status: str = "queued") -> list[dict[str, Any]]:
-    """Return list of tasks for the agent in the given status, or [] on error."""
+    """Return list of tasks for the agent in the given status, or [] on error.
+
+    A refusal is reported before the empty list goes back: without it, an agent whose owner has
+    not granted `task:read` is indistinguishable from an agent with nothing queued.
+    """
     try:
         r = api.get(f"/v1/agents/{api.agent_name}/tasks", params={"status": status})
         if r.status_code != 200:
+            api.refused(r, f"tasks (status={status})")
             return []
         body = r.json()
         return body.get("data", {}).get("tasks", []) or []
@@ -659,6 +742,10 @@ def _fetch_message_content(api: _Api, thread_id: str, msg_id: str) -> str:
             params={"thread_id": thread_id, "per_page": 100},
         )
         if r.status_code != 200:
+            # The caller falls back to the ~100-char preview, so a refusal here degrades the crew's
+            # input silently unless it is said out loud: the message arrives truncated for a reason
+            # nobody can see in the message.
+            api.refused(r, "message body")
             return ""
         msgs = r.json().get("data", {}).get("messages", []) or []
         for m in msgs:
@@ -695,6 +782,7 @@ def _poll_messages(api: _Api) -> list[dict[str, Any]]:
     try:
         r = api.get(f"/v1/agents/{api.agent_name}/inbox")
         if r.status_code != 200:
+            api.refused(r, "inbox")
             return []
         data = r.json().get("data", {})
         # The node returns inbox items under `pending_messages` (and a unified
@@ -867,6 +955,11 @@ def _agent_engagements(api: _Api, org: str, ws: str, agent_name: str) -> list[di
     try:
         r = api.get(f"/v1/organisms/{org}/workspace/engagements", params={"ws": ws}, timeout=10)
         if r.status_code != 200:
+            # The gate's fail-open STAYS (§7d): failing closed on a refusal would skip every record
+            # in every workspace, which stops the agent for a reason it cannot report. What changes
+            # is that the refusal is no longer indistinguishable from the node hiccup the fail-open
+            # was written for -- the gate keeps letting work through, and says why it could not check.
+            api.refused(r, f"engagements ({org}/{ws})")
             return None
         engs = (r.json().get("data") or {}).get("engagements") or []
     except Exception:  # noqa: BLE001 -- no engagement list is the same answer as an unreachable node: nothing to do
@@ -883,6 +976,7 @@ def _space_contract(api: _Api, org: str, ws: str, space: str, cache: dict[str, d
         try:
             r = api.get(f"/v1/organisms/{org}/workspace", params={"ws": ws}, timeout=10)
             if r.status_code != 200:
+                api.refused(r, f"workspace manifest ({org}/{ws})")
                 return None
             ots = ((r.json().get("data") or {}).get("manifest") or {}).get("objectTypes") or []
             cache[key] = {
