@@ -9916,6 +9916,15 @@
       "mapTitle": "Mapa de lo que puedes hacer",
       "mapDesc": "Una vista a ojo de pájaro de tus ofertas, agrupadas: orientarte aquí, actuar en la lista.",
       "mapNote": "Haz clic en un nodo para abrir su ficha.",
+      "mapNoteTab": "Una ficha abre la oferta en una pestaña nueva.",
+      "mapSearch": "Acota el mapa: un nombre, un agente o una necesidad…",
+      "mapShown": "{n} a la vista",
+      "mapView": {
+        "tree": "Árbol",
+        "columns": "Columnas",
+        "grid": "Cuadrícula",
+        "tiles": "Mosaico"
+      },
       "groupBy": "Agrupar",
       "sortBy": "Ordenar",
       "clearFilters": "Limpiar",

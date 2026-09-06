@@ -16,8 +16,10 @@
  *   - isAuto(offer) · standingScore(offer) · sortOffers(items, mode)
  *   - groupByAxis(items, axis) -> [{ key, items }]
  *   - buildMermaid(rootLabel, groups) -> mermaid flowchart source (labels pre-resolved by caller)
+ *   - filterOffers(items, q, needLabels) -> the items matching typed text (the map's search)
  * @usage import { classifyNeed, groupByAxis, sortOffers, buildMermaid } from '/js/services/offers-grouping.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-06 -- filterOffers: the map page's search, every typed word found somewhere on the item.
  *   v1.0.0 -- 2026-06-16 -- Initial: need-verb classification, facets, standing sort, axis grouping,
  *     deterministic Mermaid map. Pairs with the AI need-router (offers.js) + the richer Offerings tab.
  */
@@ -203,4 +205,27 @@ export function buildMermaid(rootLabel, groups, { maxPerGroup = 12 } = {}) {
     if (hidden > 0) lines.push(`  ${gid} --> ${gid}more["+${hidden}…"]`);
   });
   return lines.join('\n');
+}
+
+// ── The map's search ─────────────────────────────────────────────────────────
+/**
+ * Keep the items that match what a person typed: the title, the ask, the tags, the agent's name and
+ * the need, on its key and on the label the caller shows for it (so "luo" finds the Create bucket
+ * in Finnish). Every typed word has to be found somewhere on the item; the order is kept and nothing
+ * is ranked, because the map narrows while the person types and the rule has to be one they can
+ * predict. Empty text returns the list as it was.
+ * @param {Array<{ offer: object, agent?: string, need?: string }>} items
+ * @param {string} q
+ * @param {Record<string, string>} [needLabels]  need key → the label on screen
+ */
+export function filterOffers(items, q, needLabels = {}) {
+  const words = String(q || '').toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return items;
+  const str = (v) => (typeof v === 'string' ? v : '');
+  return items.filter((it) => {
+    const o = it.offer || {};
+    const hay = [str(o.title), str(o.ask), ...(Array.isArray(o.tags) ? o.tags.map(str) : []), str(it.agent), str(it.need), it.need ? str(needLabels[it.need]) : '']
+      .join(' ').toLowerCase();
+    return words.every(w => hay.includes(w));
+  });
 }
