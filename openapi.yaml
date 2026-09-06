@@ -60,6 +60,8 @@ tags:
     description: Node peering and cross-node routing
   - name: Presence
     description: Human (GHII) presence/availability — manual/auto status, who-can-see visibility, federated cache
+  - name: Secrets
+    description: The owner's write-only credential vault — named keys the node uses on their behalf and nothing reads back
   - name: Admin
     description: Operator dashboard and configuration
   - name: MCP
@@ -26942,6 +26944,95 @@ paths:
       responses:
         '200': { description: Removed }
         '404': { description: No passkey of yours with that id }
+
+  /v1/secrets:
+    get:
+      operationId: secretList
+      summary: The named keys and passwords in your vault
+      description: |
+        Name, when it was first stored, when the value last changed, and which extensions have used
+        it in the last 30 days. Never a value: nothing on this node reads one back, including this
+        route, including the owner. The `usedBy` line is the only answer there is to "what breaks if
+        I delete this", because a secret can be named inside a document, an extension config or a
+        workflow, none of which the vault can see.
+
+        Needs `secrets:manage`, which no wildcard carries. An owner session bypasses scopes as
+        always; an agent or an app grant must hold the exact word.
+      tags: [Secrets]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: The names and times, never a value }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/secrets/{name}:
+    put:
+      operationId: secretSet
+      summary: Store or replace one secret
+      description: |
+        Replacing is this same call: a vault with a separate rotate door is a vault where somebody
+        eventually uses the wrong one. Replacing keeps `setAt` (since when you have held this name)
+        and moves `updatedAt` (when the value changed).
+
+        The value goes in and comes out of nothing. What it is FOR is being named in an outbound
+        header as `{{secret:NAME}}`: an extension writes the placeholder, the node fills in the
+        value inside `ctx.fetch` after the sandboxed script has handed the request over, and neither
+        the script nor the document that carries the placeholder ever holds the key.
+
+        A node with no encryption key configured answers 503 and stores nothing. It never falls back
+        to storing the value in the clear.
+      tags: [Secrets]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Letters, digits, underscore and hyphen, 1 to 64 characters. Case-exact.
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{1,64}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value:
+                  type: string
+                  maxLength: 4096
+                  description: The key or password itself, up to 4 kB of UTF-8. Encrypted at rest.
+      responses:
+        '200': { description: Stored. Answers the name and the two times, never the value }
+        '400': { description: INVALID_SECRET_NAME, INVALID_SECRET_VALUE or SECRET_TOO_LARGE }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { description: SECRET_STORE_UNAVAILABLE — this node has no encryption key, and nothing was written }
+    delete:
+      operationId: secretDelete
+      summary: Remove one secret
+      description: |
+        Anything that named it in a header stops working immediately and refuses by name, so read
+        the list first to see which extensions have been using it.
+
+        A name this owner does not hold answers 404, and deliberately the same 404 another owner's
+        name would get: a distinct "that exists but is not yours" would turn this route into a way
+        to ask whether a stranger holds a secret called STRIPE_KEY.
+      tags: [Secrets]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{1,64}$' }
+      responses:
+        '200': { description: Removed }
+        '400': { description: INVALID_SECRET_NAME }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: SECRET_NOT_FOUND — you hold no secret of that name }
 
   /v1/ghii/login/passkey/options:
     post:
