@@ -12,6 +12,10 @@ This document defines the memory namespace model, access patterns, and trust bou
 | **Extension namespace** | `ext:{name}` | `ext:prh-yritystietopalvelu/watchlist.items` | Only the extension (via `ctx.memory.set()`) | Anyone (public, unauthenticated) |
 | **Instance namespace** | `ext:{name}.{instanceId}` | `ext:alerts.user123/config` | Only the extension instance | Anyone (public) |
 
+There is a fourth place data can live and it is not memory at all: the owner's **secrets vault**,
+which nothing reads back. See "Secrets: the fourth namespace" below before storing a credential
+anywhere in the table above.
+
 ### Key principle: extensions own their namespace
 
 An extension's `ctx.memory.set(key, value)` writes to `ext:{extensionName}` with `visibility: 'public'`. No one else can write to this namespace — not the cortex, not the app, not even the user directly.
@@ -162,6 +166,52 @@ const tr = await AIMEAT.myLib.getTranslations('fi');
 4. **Public reads are unauthenticated.** `GET /v1/memory/ext%3Aname/key` requires no JWT — anyone can read ext:{name} data. This is by design: extension data is public.
 
 5. **User data requires authentication.** `GET /v1/memory/key` (owner namespace) requires a valid JWT.
+
+6. **A credential is in neither namespace, and the script never holds it.** The owner's secrets
+   vault (`/v1/secrets`, table `Secret`) is the fourth place data can live here, and the only one
+   nothing reads back — not the owner, not an export, not a tool. An extension asks for a secret by
+   writing `{{secret:NAME}}` in an outbound HEADER VALUE, and `ctx.fetch` substitutes it after the
+   script has handed the request over. Which means the script can SEND a credential and cannot LEARN
+   one, which is what makes it safe for an AI to write the script and a stranger to open the page it
+   renders.
+
+---
+
+## Secrets: the fourth namespace
+
+| Where | Who writes | Who reads |
+|-------|-----------|-----------|
+| **The owner's vault** (`/v1/secrets`) | the owner, or an agent or app holding `secrets:manage` | **nobody** — only `ctx.fetch`, into a header, on the way out |
+
+```javascript
+// In an extension action. The value is not here, and cannot be got here.
+const res = await ctx.fetch('https://api.example.com/v1/prices', {
+  headers: { Authorization: 'Bearer {{secret:PRICES_KEY}}' },
+});
+```
+
+Three rules, and each one closes a way the value could leak back:
+
+- **Header values only.** A placeholder in the URL, the body, or a header NAME is left exactly as it
+  arrived. Substituting into any of those would put the value where the script or the far end can
+  read it back as data.
+- **The CALLER's vault, then the extension's own `secrets` config, then a refusal.** The vault is per
+  owner GHII, so the owner at a screen, their agent and their granted app all reach one vault; a
+  `secrets` field in the manifest is the operator's shared fallback for a key everyone on the node
+  should be able to use, and the person's own entry always wins. A name in neither refuses with
+  `SECRET_UNKNOWN`, names the secret and the header, and sends nothing.
+- **Never resolve a secret inside a script.** `living-hooks` did until 2026-09-06 and that is what
+  the platform replaced: a script that resolves its own secret HOLDS it, in a variable, for the
+  length of the call — and every extension wanting the same thing would have written the same code
+  and got it right or not. What a script still decides is which headers may leave at all, which is
+  the extension's own business.
+
+`usedBy` on each secret records which extensions resolved it and when, because a secret is named
+inside a document, a config or a workflow and the vault can see none of those. It is the only answer
+this node has to "what breaks if I delete this".
+
+Full reference: `src/services/owner-secrets.ts` (the one implementation), `src/routes/secrets.ts`
+(the three doors), `src/services/extension-ctx.ts` (the resolution point).
 
 ---
 
