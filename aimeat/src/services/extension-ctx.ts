@@ -27,6 +27,12 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.6.0 — 2026-09-06 — ctx.fetch resolves `{{secret:NAME}}` in header VALUES from the caller's
+ *     owner vault, falling back to the extension's own `secrets` config and refusing by name when
+ *     neither has it. It sits here rather than in a script because a script that resolves its own
+ *     secret HOLDS it: living-hooks did exactly that until today, and every other extension wanting
+ *     the same thing would have had to write the same code and get it right. Here the guest never
+ *     sees the value, and every road into the sandbox inherits it from this one builder.
  *   v1.5.0 — 2026-09-05 — `workspace`, an optional capability like files: a road that has a real
  *     caller and an extension whose manifest declares it passes what
  *     services/extension-workspace.ts built; the scheduler passes nothing. Its guards live in the
@@ -58,7 +64,8 @@ import { enforceExtensionMemoryLimits } from './quota.js';
 import { extensionCrossNotify, safeNotificationLink } from './extension-notify.js';
 import { notify } from './notify.js';
 import { safeFetch } from '../utils/url-validator.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, ownerGhiiOf } from '../utils/gaii.js';
+import { resolveSecretForHeaders, secretPlaceholderNames, secretUnknownMessage } from './owner-secrets.js';
 import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 
@@ -320,6 +327,54 @@ export function sandboxLimits(
 }
 
 /**
+ * Fill every `{{secret:NAME}}` in these header values from the CALLER's owner vault, then from the
+ * extension's own `secrets` config, and refuse by name if neither has it.
+ *
+ * WHY IT IS HERE AND NOT IN THE SANDBOX. living-hooks did this inside its own script until
+ * 2026-09-06, which meant the value was handed INTO the VM: the guest held the credential in a
+ * variable for the length of the call, and every other extension that wanted the same thing had to
+ * write the same code and get it right. Here, the guest never sees it, and every road into the
+ * sandbox inherits the behaviour because they all take their context from this one builder.
+ *
+ * The refusal is a THROW rather than a return, because ctx.fetch's contract is "you get a response
+ * or you get an error", and a script that treats a refusal as a response would send nothing and
+ * report success. The message begins `SECRET_UNKNOWN:` so a script can tell this apart from the far
+ * end being down, and it names the secret and the header without ever naming a value.
+ */
+async function resolveOutboundSecrets(
+    deps: ExtensionCtxDeps,
+    headers: Record<string, string> | undefined,
+): Promise<{ values: Record<string, string> | undefined; sensitive: string[] }> {
+    const named = secretPlaceholderNames(headers);
+    // The common case: no placeholder, no database read, nothing changed.
+    if (!named.length) return { values: headers, sensitive: [] };
+
+    // The extension's name from the record when a road knows it, and otherwise from the namespace,
+    // which is always `ext:{name}` or `ext:{name}.{instanceId}`. Only the usedBy stamp reads it.
+    const extName = deps.extension?.name
+        ?? deps.extMemoryOwner.replace(/^ext:/, '').split('.')[0];
+
+    const resolved = await resolveSecretForHeaders({
+        storage: deps.storage,
+        config: deps.config,
+        // The vault belongs to the HUMAN, whichever of their principals is calling: the owner at a
+        // screen, their agent, their granted app. ownerGhiiOf collapses all three to one coordinate.
+        ownerGhii: ownerGhiiOf(deps.caller.gaii),
+        extConfig: deps.extConfig,
+        extName,
+        headers,
+    });
+    if (!resolved.ok) {
+        throw new Error(`SECRET_UNKNOWN: ${secretUnknownMessage(resolved.headerName, resolved.secretName)}`);
+    }
+    // Which headers actually carried a secret — the ones a cross-origin redirect must not inherit.
+    const sensitive = Object.entries(headers ?? {})
+        .filter(([, v]) => typeof v === 'string' && named.some(n => v.includes(`{{secret:${n}}}`)))
+        .map(([k]) => k);
+    return { values: resolved.headers, sensitive };
+}
+
+/**
  * Build the sandbox context. The three capabilities in the core are the ones that carry a guard, and
  * they are built here precisely so no road can be given a context without them.
  */
@@ -452,12 +507,26 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
         // GUARD (June H-3): safeFetch validates the URL and re-validates every redirect hop. A bare
         // fetch here is an SSRF hole with a script the owner installed on the other end of it, and
         // the scheduler copy had exactly that.
-        fetch: async (url, opts) => {
+        //
+        // GUARD (2026-09-06): the owner's secrets vault. A header value written as
+        // `{{secret:NAME}}` is filled in HERE, after the script has handed the request over — so a
+        // sandboxed script can SEND a credential and cannot LEARN one. That is what lets an AI write
+        // the script and a stranger open the document it renders. Header VALUES only: a placeholder
+        // in a URL, a body or a header NAME is left exactly as it arrived, because substituting into
+        // any of those puts the value somewhere the script or the far end can read it back.
+        fetch: async (url, opts, host) => {
+            const outbound = await resolveOutboundSecrets(deps, opts?.headers);
             const resp = await safeFetch(url, {
                 method: opts?.method || 'GET',
-                headers: opts?.headers,
+                headers: outbound.values,
                 body: opts?.body,
-                signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+                // The headers a secret went into are dropped if a redirect leaves the origin the
+                // script aimed at. The hop is re-validated for SSRF, which says nothing about
+                // whether the new host should be handed somebody's key.
+                sensitiveHeaders: outbound.sensitive,
+                // The caller's deadline when it has one — the sandbox road hands over the run's own
+                // timeout and its teardown signal — and this file's ceiling when it does not.
+                signal: host?.signal ?? AbortSignal.timeout(FETCH_TIMEOUT_MS),
             });
             // Opted in per extension, in its manifest config — so a feed reader keeps the forgiving
             // default and a package producer gets a failed run instead of a mojibake version.

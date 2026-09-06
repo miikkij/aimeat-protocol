@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.4.0 — 2026-09-06 — The owner's secrets vault: aimeat_secret_list / _set / _delete.
  *   v1.3.0 — 2026-09-03 — aimeat_skill_update: visibility without a republish (the PATCH door).
  *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.2.0 — 2026-08-11 — Remove aimeat_feedback_send/inbox. Reaching the operators is now an
@@ -152,6 +153,30 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {},
+    },
+    {
+        name: 'aimeat_secret_list',
+        description: "The named keys and passwords in your owner's vault: for each one its name, when it was first stored, when its value last changed, and which extensions have used it in the last 30 days. NEVER a value — nothing on this node reads one back, including this tool and including the owner. Use it to see what is already stored before asking a person for a key again, and to see what would break before removing one. Needs secrets:manage, which no wildcard carries — the owner ticks it per agent.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {},
+    },
+    {
+        name: 'aimeat_secret_set',
+        description: "Store a key or password in your owner's vault under a name, or replace what is there (same call either way — replacing keeps the date it was first stored). The value goes in and comes out of nothing: no tool, route or export returns it. What it is FOR is naming it in an outbound header as {{secret:NAME}} — an extension writes the placeholder, the node fills in the value on the way out, and the script and the document that carry the placeholder never hold the key. Name: letters, digits, underscore and hyphen, up to 64. Value: up to 4 kB. Needs secrets:manage, which no wildcard carries.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            name: { type: 'string', required: true, description: 'What to call it: letters, digits, underscore and hyphen, 1 to 64 characters. This is the name written into a header as {{secret:NAME}}, so it is case-exact.' },
+            value: { type: 'string', required: true, description: 'The key or password itself, up to 4 kB. It is encrypted at rest and never returned by anything.' },
+        },
+    },
+    {
+        name: 'aimeat_secret_delete',
+        description: "Remove one secret from your owner's vault by name. Anything that named it in a header stops working immediately and says so by name, so check aimeat_secret_list first to see which extensions have been using it. Answers a plain not-found when the owner holds no secret of that name. Needs secrets:manage, which no wildcard carries.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: { name: { type: 'string', required: true, description: 'The secret to remove, exactly as it was stored.' } },
     },
     {
         name: 'aimeat_consent_revoke',

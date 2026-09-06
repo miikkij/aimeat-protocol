@@ -23,6 +23,9 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-06 — The owner's secrets vault: aimeat_secret_list (read-only), _set (idempotent, not
+ *     destructive — what it replaces is a value nobody could read) and _delete (destructive:
+ *     whatever named that secret stops working).
  *   2026-09-05 — aimeat_admin_security_overview (read-only) and aimeat_admin_incident_resolve.
  *   2026-08-29 — aimeat_app_marks_set, aimeat_app_legal_set, aimeat_app_audit.
  *   2026-08-28 — The five crew-definition tools.
@@ -420,6 +423,14 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_consent_grant: { title: 'Grant Consent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_consent_revoke: { title: 'Revoke Consent', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_access_list: { title: 'Access: Who Holds a Key', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+
+    // ── The owner's secrets vault ──
+    // set is idempotent (the same name and value twice leaves the same row) and NOT destructive,
+    // even though it replaces: what it replaces is a value nobody could read, and the caller
+    // supplied the new one. delete IS destructive — whatever named that secret stops working.
+    aimeat_secret_list: { title: 'Secrets: What Is Stored', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_secret_set: { title: 'Store a Secret', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_secret_delete: { title: 'Remove a Secret', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
     // ── Flags / moderation ──
     aimeat_flag_report: { title: 'Report Content for Moderation', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

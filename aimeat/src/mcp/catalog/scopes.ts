@@ -20,6 +20,10 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.19.0 -- 2026-09-06 -- The three secrets-vault tools → secrets:manage, the same word the three
+ *     REST doors use. A new word rather than a memory one: memory:write is already held by live
+ *     agents and grants, and putting a credential store behind it would have handed every one of
+ *     them the power to rotate the owner's keys with nobody ever asked.
  *   v1.18.0 -- 2026-09-05 -- aimeat_admin_security_overview and aimeat_admin_incident_resolve join
  *     the operator-gated list: the handler checks the role, no scope word narrows them.
  *   v1.17.0 -- 2026-08-29 -- aimeat_app_legal_set and aimeat_app_audit → app:write (the one app
@@ -455,6 +459,15 @@ export const TOOL_SCOPES: Record<string, string> = {
     // The Access page's read (GET /v1/access/overview → owner, or account:security). Every key to the
     // account in one answer, so the word that opens it is the one no wildcard carries.
     aimeat_access_list: 'account:security',
+
+    // The owner's secrets vault (GET/PUT/DELETE /v1/secrets* → secrets:manage). The same word as
+    // the routes, because the tools ARE those doors: a permission enforced on one surface and not
+    // the other is a permission the owner was told they had (invariant 15). One word for all three:
+    // the list is names and dates, and an agent that could read a name and not set it has nothing
+    // it can act on. No wildcard carries it (utils/scope-coverage.ts).
+    aimeat_secret_list: 'secrets:manage',
+    aimeat_secret_set: 'secrets:manage',
+    aimeat_secret_delete: 'secrets:manage',
 
     // Cortex management (POST/PUT/DELETE /v1/cortex* → cortex:write; PUT is the idempotent upsert)
     // List/get are NOT gated (mirrors REST: GET /v1/cortex is just requireAuth).

@@ -6,6 +6,7 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.7.0 — 2026-09-06 — secrets table: the owner's write-only credential vault.
  *   v1.6.0 — 2026-09-04 — passkeys table (WebAuthn credentials).
  *   v1.5.0 — 2026-09-03 — dependency_edges and component_versions tables.
  *   v1.4.0 — 2026-08-26 — Workspace row spaces: rows a group accumulates, as a table rather than as
@@ -595,6 +596,25 @@ export function applySchemaTables4(db: Database.Database): void {
       lastUsedAt TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_passkeys_owner ON passkeys(owner);
+
+    -- ── The owner's secrets vault (types/secrets.ts; mirrors Postgres 0071) ──
+    -- Named credentials an account holds so the things acting in its name can USE them without ever
+    -- HOLDING them. Write-only from outside: no API returns ciphertext or plaintext, and the only
+    -- reader is ctx.fetch resolving {{secret:NAME}} in an outbound header. There is no plaintext
+    -- column; ciphertext is iv:authTag:ct under the node key (services/encryption.ts), and a node
+    -- with no key refuses the write rather than storing the value in the clear.
+    -- usedBy is a JSON object { "<extension name>": "<ISO timestamp>" }: the only answer this node
+    -- can give to "what breaks if I delete this".
+    CREATE TABLE IF NOT EXISTS secrets (
+      ownerGaii  TEXT NOT NULL,
+      name       TEXT NOT NULL,
+      ciphertext TEXT NOT NULL,
+      setAt      TEXT NOT NULL,
+      updatedAt  TEXT NOT NULL,
+      usedBy     TEXT NOT NULL DEFAULT '{}',
+      PRIMARY KEY (ownerGaii, name)
+    );
+    CREATE INDEX IF NOT EXISTS idx_secrets_owner ON secrets(ownerGaii);
 
   `);
 }

@@ -24,6 +24,7 @@
  * @version-history
  *   v1.0.0 — 2026-07-25 — Initial: scope-gated SSE domains (an app-grant stream no longer
  *     sees every domain in the owner's keyspace).
+ *   v1.2.0 — 2026-09-06 — `secrets` → secrets:manage: the owner's credential vault.
  *   v1.1.0 — 2026-08-08 — Domain wildcards are honoured, via utils/scope-coverage.ts. The lookup
  *     was exact-set only, so a principal holding `memory:*` passed every requireScope('memory:…')
  *     gate on the node and then heard nothing on the memory stream — the one place that read the
@@ -96,6 +97,12 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   // Nudges
   notifications: 'notifications:send',
   push: 'notifications:send',
+
+  // The owner's secrets vault. The domain name alone says "a credential on this account changed",
+  // which is exactly the kind of timing metadata this map exists to fence: only a principal the
+  // owner ticked for the vault hears it. Deny-by-default would have handled it, but a name in the
+  // map is a decision somebody made and an absence is a question nobody asked.
+  secrets: 'secrets:manage',
 });
 
 /**

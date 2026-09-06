@@ -1299,6 +1299,19 @@ export interface Passkey {
   lastUsedAt: string | null;
 }
 
+/**
+ * The owner's secrets vault (migration 0071). `ciphertext` is iv:authTag:ct under the node key;
+ * there is no plaintext column and no API returns this row's value.
+ */
+export interface Secret {
+  ownerGaii: string;
+  name: string;
+  ciphertext: string;
+  setAt: string;
+  updatedAt: string;
+  usedBy: Generated<string>;
+}
+
 export interface DependencyEdge {
   fromKind: string;
   fromRef: string;
@@ -2272,6 +2285,7 @@ export interface DB {
   Package: Package;
   PackageInstance: PackageInstance;
   Passkey: Passkey;
+  Secret: Secret;
   PeeringRequest: PeeringRequest;
   PendingApproval: PendingApproval;
   PersonalAccessToken: PersonalAccessToken;

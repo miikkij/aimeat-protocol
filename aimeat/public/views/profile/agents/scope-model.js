@@ -18,6 +18,10 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.8.0 — 2026-09-06 — secrets:manage, in its own domain and outside every wildcard: the owner's
+ *     credential vault. The word is new rather than borrowed from memory: reusing memory:write
+ *     would have handed every live agent and app grant the power to rotate the owner's credentials
+ *     with nobody ever asked.
  *   v1.7.0 — 2026-08-29 — organism:rows: the person's half of the two-hand rule that lets an app
  *     keep an append-only trail on a row space the organism opened to it.
  *   v1.6.0 — 2026-08-26 — site:layout-write, in its own domain and outside every wildcard: which
@@ -100,6 +104,13 @@ export const NOT_IN_WILDCARD = [
   // to take the shop off the members' home is the use it exists for, so an agent is not shut out —
   // it just costs its own tick. Only an operator's own agent can be given it at all.
   'site:layout-write',
+  // ── Added 2026-09-06 ─────────────────────────────────────────────────────────────────────────
+  // The owner's secrets vault: the named credentials this account holds so the things acting in its
+  // name can use them without holding them. Nothing reads a value back, so the only power the word
+  // grants is to set and destroy them — and destroying one silently stops whatever was using it.
+  // "Full access" is one click, and nobody clicking it is deciding that an agent may rotate the key
+  // their extensions call the world with.
+  'secrets:manage',
 ];
 
 /**
@@ -186,6 +197,11 @@ export const SCOPE_DOMAINS = [
   // single act in this list and it asked for nothing at all until 2026-08-15. A row here is what
   // lets an owner see it and take it away.
   { key: 'packages', permissions: ['write'] },
+  // secrets:manage — set, replace and delete the named credentials in the owner's vault. One word
+  //   rather than a read and a write: the list is names and dates, and an agent that could see a
+  //   name and not set it has learned nothing it can act on. Without a row here an owner could not
+  //   grant it from this page at all.
+  { key: 'secrets',  permissions: ['manage'] },
 
   // ── Added 2026-08-10 (August 2026 audit, step 3a) ────────────────────────────────────────────
   // These name things an agent could already do with no permission at all, because the MCP surface

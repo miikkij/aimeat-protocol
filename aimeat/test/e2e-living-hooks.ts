@@ -31,6 +31,12 @@
  *   because the runner pins AIMEAT_ALLOW_PRIVATE_EGRESS=true (run-e2e-server.ts) — the same flag
  *   e2e-connections and e2e-ai-jobs use to put a real counterparty on the machine.
  * @version-history
+ *   v1.1.0 — 2026-09-06 — The secret is resolved by the PLATFORM now (ctx.fetch reads the owner's
+ *     vault first and this extension's `secrets` config second), so what this suite proves about
+ *     the secret is unchanged and where the value comes from is not: the operator's shared map is
+ *     the fallback. Also names the one refusal that looks like a code change and is not — a 403 on
+ *     the manifest PUT means this suite's owner is not the operator, which means the database was
+ *     not empty when it started.
  *   v1.0.0 — 2026-09-06 — Initial.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=living-hooks
@@ -391,6 +397,14 @@ await test('the operator stores a secret in the extension settings', async () =>
         method: 'PUT', headers: auth(owner.token),
         body: JSON.stringify({ manifest: withSecret, scripts: LIVING_HOOKS.scripts }),
     });
+    // 403 here is almost never a code change. living-hooks is installed by `system`, and
+    // canManageInstalledExt lets only an OPERATOR manage somebody else's extension; this suite's
+    // owner is the operator solely because it registered first on an empty database. So a 403 says
+    // the database was not empty — usually two runners sharing test/.test-e2e.db in one worktree,
+    // which is the same collision the runner reports as EBUSY when it wins the race instead.
+    // Give the runner a database of its own: AIMEAT_DB_PATH=test/.test-e2e-<session>.db
+    assert(r.status !== 403, `PUT 403 ${JSON.stringify(r.body?.error)} — this owner is not the operator, `
+        + 'so the database this suite ran against was not empty. See the comment above.');
     assert(r.status === 200, `PUT ${r.status}: ${JSON.stringify(r.body?.error)}`);
 });
 

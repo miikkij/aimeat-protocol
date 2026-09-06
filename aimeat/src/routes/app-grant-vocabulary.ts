@@ -9,6 +9,7 @@
  * @structure APP_GRANTABLE_SCOPES — the one list, keyed by scope word.
  * @usage import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-06 -- secrets:manage: the owner's credential vault, askable by an app.
  *   v1.1.0 -- 2026-08-29 -- organism:rows: the person's half of the two-hand rule that lets an app
  *     keep an append-only trail on a row space the organism opened to it.
  *   v1.0.0 -- 2026-08-18 -- Extracted verbatim from routes/app-grants.ts (max-file-lines).
@@ -79,6 +80,11 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // of the owner's own pocket. That is a spending decision even though nobody is being charged for it,
   // so an app that arranges revenue sharing asks for it rather than inheriting it from selling.
   'exchange:beneficiary': 'Share part of what you earn with other accounts, and pay those shares out',
+  // The owner's secrets vault. An app may set and remove the named credentials this account holds,
+  // and can never read one back — no door returns a value. Its own word rather than a memory one:
+  // handing this to memory:write would have given it to every grant already live, and deleting a
+  // secret silently stops whatever was using it, which is a decision the owner makes per app.
+  'secrets:manage': 'Store and remove the named keys and passwords in your vault (it can never read one back)',
   'notifications:send': 'Send you notifications (bell + browser push) that open this app',
   'organism:read': 'Read the published content of workspaces you are a member of (e.g. gated curriculum an app renders for you)',
   'organism:invite': 'Invite people into organisms you belong to (send email invitations / access keys on your behalf)',

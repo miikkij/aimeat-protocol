@@ -13,6 +13,10 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   v1.2.0 — 2026-09-06 — `fetch` takes a third, host-only argument. The VM bridge had written its
+ *     own fetch precisely because it had nowhere to hand the run's deadline and its teardown signal,
+ *     and that copy then drifted from this one; the argument is what lets the bridge call the
+ *     capability instead of reimplementing it. A guest cannot supply it: the bridge crosses JSON.
  *   v1.1.0 — 2026-09-06 — `caller.scopes`: the permission words the calling credential carries. A
  *     script could name its caller and not tell a read-only agent from an unrestricted one, so an
  *     action that writes outward had no way to hold a scope word the way a route does.
@@ -117,7 +121,17 @@ export interface ExtensionCtx {
     trust: {
         getScore?(gaii: string): Promise<number>;
     };
-    fetch(url: string, opts?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; ok: boolean; text: string; headers: Record<string, string> }>;
+    /**
+     * The guest's only way out, and the host's single implementation of it.
+     *
+     * `host` is a THIRD argument the guest cannot supply: the VM bridge crosses JSON, so a script
+     * can pass an object shaped like an AbortSignal and never a real one. The sandbox road uses it
+     * to hand over the per-run deadline (min(timeout_ms, 30s)) and the teardown signal, which is why
+     * this argument exists at all — without it the runtime had to write its own fetch, and did, and
+     * the two drifted: the copy in extension-runtime.ts threw on a charset it could not name where
+     * this one falls back with a warning, and it never honoured `strictCharset`.
+     */
+    fetch(url: string, opts?: { method?: string; headers?: Record<string, string>; body?: string }, host?: { signal?: AbortSignal }): Promise<{ status: number; ok: boolean; text: string; headers: Record<string, string> }>;
     /** Stored FILES, by reference. Optional the way notify/email are: a road that cannot offer it
      *  simply does not, and the guest sees undefined.
      *

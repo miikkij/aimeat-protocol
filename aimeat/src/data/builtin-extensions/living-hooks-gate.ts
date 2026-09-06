@@ -20,6 +20,10 @@
  * @usage
  *   const script = LIVING_HOOKS_LIB_JS + LIVING_HOOKS_GATE_JS + '\n\n' + SEND_ACTION_JS;
  * @version-history
+ *   v1.1.0 — 2026-09-06 — livingHeaders no longer resolves {{secret:NAME}}; it validates which
+ *     headers may be sent and passes the placeholder through for ctx.fetch to fill from the owner's
+ *     vault. Two things follow: the credential never enters this VM, and a person's own vault entry
+ *     now beats the operator's shared map for everyone on the node.
  *   v1.0.0 — 2026-09-06 — Initial (living hooks, the node-side half).
  */
 
@@ -120,16 +124,19 @@ async function livingOpen(ctx, input, needScope) {
     stateKey: stateKey,
     state: state,
     now: Date.parse(ctx.now()),
-    secrets: livingSecrets(ctx.config ? ctx.config.secrets : null),
   };
 }
 
 /**
- * The headers this call may carry, with {{secret:NAME}} resolved out of the owner's secret map.
- * Returns a refusal for a header nobody allowed, or for a placeholder naming a secret that is not
- * set. The resolved values go out and never come back.
+ * The headers this call may carry. Refuses a header name nobody allowed, a value that is not a
+ * string, a value over 4096 bytes, and more than 16 of them.
+ *
+ * A {{secret:NAME}} placeholder is passed through UNTOUCHED and on purpose. ctx.fetch fills it in
+ * from the owner's vault after this script has handed the request over, so the value never enters
+ * this VM and cannot be read back out of it by anything running here. What stays this script's job
+ * is which headers may be sent at all, which is a living-hooks decision and not the platform's.
  */
-function livingHeaders(raw, secrets, defaults) {
+function livingHeaders(raw, defaults) {
   var out = {};
   var k;
   for (k in defaults) if (Object.prototype.hasOwnProperty.call(defaults, k)) out[k] = defaults[k];
@@ -154,13 +161,7 @@ function livingHeaders(raw, secrets, defaults) {
     if (livingBytes(v) > 4096) {
       return { refusal: livingRefuse('INVALID_INPUT', 'The header "' + k + '" is longer than 4096 bytes.') };
     }
-    var resolved = livingResolveSecret(v, secrets);
-    if (!resolved.ok) {
-      return { refusal: livingRefuse('SECRET_UNKNOWN',
-        'The header "' + k + '" asks for the secret ' + resolved.missing + ', which this account has not set. '
-        + 'Put it in the living-hooks extension settings under secrets, as {"' + resolved.missing + '": "…"}.') };
-    }
-    out[k] = resolved.value;
+    out[k] = v;
   }
   return { ok: true, headers: out };
 }

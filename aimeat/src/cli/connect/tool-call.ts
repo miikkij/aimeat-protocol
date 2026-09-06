@@ -32,6 +32,8 @@
  *   v1.7.0 -- 2026-07-13 -- Split tool definitions + shared helpers into sibling modules
  *     (tool-call-helpers.ts, tool-call-defs-{agent,core,organism,apps}.ts) to satisfy max-file-lines;
  *     CONNECT_CLI_TOOLS is now the concatenation of those groups (order preserved).
+ *   v1.9.0 -- 2026-09-06 -- secretTools joins the table: the owner's vault on the THIRD surface,
+ *     which is the one a fleet daemon actually calls and the one a new tool is forgotten on.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -43,6 +45,7 @@ import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.j
 import { agentTools } from './tool-call-defs-agent.js';
 import { coreTools } from './tool-call-defs-core.js';
 import { skillTools } from './tool-call-defs-skills.js';
+import { secretTools } from './tool-call-defs-secrets.js';
 import { organismTools } from './tool-call-defs-organism.js';
 import { appTools } from './tool-call-defs-apps.js';
 import { commerceCliTools } from './tool-call-defs-commerce.js';
@@ -65,6 +68,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...agentTools,
     ...coreTools,
     ...skillTools,
+    ...secretTools,
     ...organismTools,
     ...appTools,
     ...commerceCliTools,

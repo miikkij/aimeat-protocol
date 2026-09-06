@@ -12,6 +12,8 @@
  * @structure cascadeMethods.cascadeDeleteAgentData(gaii) — every owner-scoped table for one identity
  * @usage Object.assign(SqliteStorage.prototype, cascadeMethods) in providers/sqlite/index.ts
  * @version-history
+ *   v1.2.0 — 2026-09-06 — secrets joins the cascade. A row there is a live credential to somebody
+ *     else's service, held under a username that is released for reuse.
  *   v1.1.0 — 2026-09-04 — Six tables join the cascade: memory_history, owner_agent_defaults,
  *     group_shares, agent_usage_event, agent_usage_event_archive and agent_usage_daily. All six had
  *     sat in security/storage-parity-exemptions.json since 2026-08-10 as "decide", and each is now
@@ -123,5 +125,11 @@ export const cascadeMethods = {
       this.db.prepare('DELETE FROM group_shares WHERE groupId = ?').run(g.id);
     }
     this.db.prepare('DELETE FROM sharing_groups WHERE ownerGaii = ?').run(gaii);
+
+    // The secrets vault. A row here is a LIVE credential to somebody else's service, and a deleted
+    // username is released for reuse — so a surviving row would hand the next person to register
+    // that name a working key to the previous person's accounts. The same argument the connections
+    // rows carry, one step sharper: nothing about this row identifies whose key it is.
+    this.db.prepare('DELETE FROM secrets WHERE ownerGaii = ?').run(gaii);
   },
 };

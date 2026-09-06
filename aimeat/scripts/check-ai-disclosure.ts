@@ -28,6 +28,10 @@
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.5.0 — 2026-09-06 — aimeat_secret_set is listed as reviewed WITHOUT a provenance parameter. A
+ *     secret is a credential, not content: nobody wrote it and nobody reads it, so there is nothing
+ *     to disclose and nobody to disclose it to — and a provenance record is a durable readable row
+ *     about a value, which is the one thing the vault promises does not exist.
  *   v1.2.0 — 2026-08-16 — The transport check knows every provider-reaching export, not only
  *     `complete`. src/routes/llm-proxy.ts imports `chatCompletionRaw`, and the check would have
  *     passed it silently — a new provider path admitted because the checker predated it. The proxy
@@ -267,6 +271,13 @@ const AI_PROVENANCE_REQUIRED = [
  * nothing to anyone. `app_draft_save` is the one deliberate content exception; the reason is on it.
  */
 const AI_PROVENANCE_REVIEWED_WITHOUT = [
+  // DECIDED, 2026-09-06. A secret is a CREDENTIAL, not content: it is a key somebody else's service
+  // issued, it is delivered to no reader, and nothing on this node — including the owner — can ever
+  // read it back. There is nobody to disclose to and nothing to disclose about. Worse than useless:
+  // a provenance record is a durable, readable row ABOUT a value, and the one thing this vault
+  // promises is that no such row exists. "Who wrote this" has no answer here, because nobody wrote
+  // it; Stripe did.
+  'aimeat_secret_set',
   // DECIDED, Phase 8b. A draft is inline-only staging that nobody but its author can see, and its
   // content is stamped at PUBLISH by the one publish path. A record minted at save time would
   // describe bytes that were never shown to anyone and that the next save replaces — and it would
