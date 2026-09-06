@@ -9,6 +9,8 @@
  *   telemetry. Translated 1:1 from the Prisma implementation (providers/mongodb/methods/messaging.ts):
  *   `id` is the composite mailbox-copy key `${mid}::${ownerGhii}`, `mid` the message uuid.
  * @version-history
+ *   v1.5.0 — 2026-09-06 — Both conversation-list reads select the last message's broadcastId, so the
+ *     owner's list can fold the copies of one broadcast into one row.
  *   v1.4.0 — 2026-08-22 — Unread is ownerReadAt-based: `senderGhii <> ownerGhii AND ownerReadAt IS
  *     NULL` in all three counts, and markConversationRead stamps it in a SECOND statement so the
  *     read receipt stays inbound-only. `readAt` on that row is the RECIPIENT's read receipt, so the badge was cleared by somebody else's reading and could not be cleared by the owner's without faking one.
@@ -198,7 +200,7 @@ export const directMessageMethods = {
 
     const results: ConversationSummary[] = [];
     for (const g of groups) {
-      const last = await this.db.selectFrom('DirectMessage').select(['body', 'direction', 'senderGhii', 'recipientGhii'])
+      const last = await this.db.selectFrom('DirectMessage').select(['body', 'direction', 'senderGhii', 'recipientGhii', 'broadcastId'])
         .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', g.conversationId).orderBy('createdAt', 'desc').limit(1).executeTakeFirst();
       const unreadRow = await this.db.selectFrom('DirectMessage').select(this.db.fn.countAll<number>().as('n'))
         .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', g.conversationId).whereRef('senderGhii', '<>', 'ownerGhii').where('ownerReadAt', 'is', null).executeTakeFirst();
@@ -216,6 +218,7 @@ export const directMessageMethods = {
         messageCount: Number(g.messageCount ?? 0),
         unread: Number(unreadRow?.n ?? 0),
         updatedAt: g.updatedAt ? iso(g.updatedAt) : '',
+        broadcastId: last?.broadcastId ?? undefined,
       });
     }
     results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -237,9 +240,9 @@ export const directMessageMethods = {
     `.execute(this.db);
     if (groups.rows.length === 0) return {};
 
-    const lasts = await sql<{ ownerGhii: string; conversationId: string; body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string }>`
-      SELECT "ownerGhii", "conversationId", "body", "direction", "senderGhii", "recipientGhii" FROM (
-        SELECT "ownerGhii", "conversationId", "body", "direction", "senderGhii", "recipientGhii",
+    const lasts = await sql<{ ownerGhii: string; conversationId: string; body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string; broadcastId: string | null }>`
+      SELECT "ownerGhii", "conversationId", "body", "direction", "senderGhii", "recipientGhii", "broadcastId" FROM (
+        SELECT "ownerGhii", "conversationId", "body", "direction", "senderGhii", "recipientGhii", "broadcastId",
                ROW_NUMBER() OVER (PARTITION BY "ownerGhii", "conversationId" ORDER BY "createdAt" DESC, "id" DESC) AS rn
         FROM "DirectMessage" WHERE "ownerGhii" IN (${owners})
       ) t WHERE rn = 1
@@ -270,6 +273,7 @@ export const directMessageMethods = {
         messageCount: Number(g.messageCount ?? 0),
         unread: Number(g.unread ?? 0),
         updatedAt: g.updatedAt ? iso(g.updatedAt) : '',
+        broadcastId: last?.broadcastId ?? undefined,
       });
     }
     for (const arr of Object.values(out)) arr.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));

@@ -7,6 +7,8 @@
  *   the node REST API (POST /v1/messages, GET /v1/messages/agent-inbox|agent-thread). Distinct from the
  *   agent↔owner dashboard tools in agent-messages.ts. Mirrors the server MCP surface (src/mcp/dm-messages.ts).
  * @version-history
+ *   v1.4.0 -- 2026-09-06 -- aimeat_dm_broadcast: send-to-many in one call. Without it the only
+ *     fan-out an agent had was a loop over aimeat_dm_send, which tags nothing and fills a list.
  *   v1.3.0 -- 2026-08-01 -- TARGET-058 Phase 11: dm_send / dm_ask / dm_send_as_owner carry
  *     `ai_provenance` / `ai_provenance_id` and echo what was recorded.
  *   v1.0.0 -- 2026-06-22 -- Initial: aimeat_dm_send / aimeat_dm_inbox / aimeat_dm_thread.
@@ -59,6 +61,33 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
     const resp = await client.post('/v1/messages', payload);
     return provenanceEchoedResult(client,
       { tool: 'aimeat_dm_send', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
+  });
+
+  mcp.tool('aimeat_dm_broadcast', descriptionFor('aimeat_dm_broadcast'), {
+    agent_name: agentNameSchema,
+    to: z.array(z.string()).optional().describe('Recipient identities (owner@node, agent#owner@node, eco:app#owner@node), up to 500.'),
+    group_id: z.string().optional().describe('A Share Group whose members are the audience.'),
+    audience: z.string().optional().describe('"node-users" or "federation-users". OPERATOR-ONLY.'),
+    mode: z.string().optional().describe('"broadcast" (default, repliable) or "announcement" (read-only).'),
+    subject: z.string().optional().describe('Titles the thread each recipient sees.'),
+    body: z.string().optional().describe('Message body (GFM markdown). Optional with attachments or questions.'),
+    attachments: z.array(z.record(z.string(), z.unknown())).optional().describe('Up to 20 { storage_key, mime, kind, size, name } descriptors (upload files first).'),
+    interactive: z.record(z.string(), z.unknown()).optional().describe('A question set { role:"questions", v:1, questions:[…] } — makes it a poll.'),
+    ...aiProvenanceInputs,
+  }, annotationsFor('aimeat_dm_broadcast'), async ({ agent_name, to, group_id, audience, mode, subject, body, attachments, interactive, ai_provenance, ai_provenance_id }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const payload: Record<string, unknown> = {};
+    if (to) payload.to = to;
+    if (group_id) payload.group_id = group_id;
+    if (audience) payload.audience = audience;
+    if (mode) payload.mode = mode;
+    if (subject) payload.subject = subject;
+    if (body) payload.body = body;
+    if (attachments) payload.attachments = attachments;
+    if (interactive) payload.interactive = interactive;
+    const resp = await client.post('/v1/messages/broadcast', payload);
+    return provenanceEchoedResult(client,
+      { tool: 'aimeat_dm_broadcast', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
   mcp.tool('aimeat_dm_ask', descriptionFor('aimeat_dm_ask'), {

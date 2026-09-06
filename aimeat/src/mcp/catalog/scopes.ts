@@ -491,6 +491,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     // Federated direct messages / inbox (REST: POST /v1/messages → messages:send). Distinct from the
     // agent-dashboard aimeat_message_* tools, which are not scope-gated (agent↔own-owner only).
     aimeat_dm_send: 'messages:send',
+    aimeat_dm_broadcast: 'messages:send',
     aimeat_dm_ask: 'messages:send',
     // Delegated "reply as me": send a federated DM AS THE OWNER. Its own scope so the owner grants it
     // deliberately (it is part of the full '*' bundle; granular agents opt in separately). The sender is

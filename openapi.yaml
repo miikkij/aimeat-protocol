@@ -4409,6 +4409,26 @@ components:
         messageCount: { type: integer }
         unread: { type: integer }
         updatedAt: { type: string, format: date-time }
+        broadcastId:
+          type: string
+          description: >-
+            The broadcast the thread's NEWEST message belongs to, when it belongs to one. Read off the
+            last message rather than the thread: a copy nobody answered still ends on the announcement
+            and folds with its siblings, and the moment someone replies their newest message carries no
+            broadcastId and their row stands on its own again.
+        broadcastCount:
+          type: integer
+          description: >-
+            How many copies of one broadcast this row stands for. Present only on a FOLDED row; its
+            absence means the row is one thread and nothing else. A group of one is never folded.
+        folded:
+          type: array
+          description: >-
+            The other copies of the same broadcast, newest first, carried with the row rather than
+            behind a second request. They were already in this response before folding, so nesting
+            them cannot make it larger.
+          items:
+            $ref: '#/components/schemas/ConversationSummary'
 
     ContactConsentRecord:
       type: object
@@ -41820,6 +41840,13 @@ paths:
                 group_id: { type: string, description: A Share Group whose members are the audience. }
                 audience: { type: string, enum: [node-users, federation-users], description: 'All node users, or all owners across the federation (OPERATOR-only).' }
                 mode: { type: string, enum: [broadcast, announcement], default: broadcast }
+                subject:
+                  type: string
+                  maxLength: 200
+                  description: >-
+                    Titles the thread each recipient sees, opening a named thread per recipient instead
+                    of dropping into the nameless per-pair one. Its absence is why a sender who wanted a
+                    title had to loop the 1:1 send, which produces untagged threads nothing can fold.
                 body: { type: string }
                 attachments: { type: array, items: { type: object } }
                 interactive: { $ref: '#/components/schemas/InteractivePayload' }

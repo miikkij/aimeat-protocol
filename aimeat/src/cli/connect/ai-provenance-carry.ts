@@ -129,6 +129,7 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   aimeat_board_reply: { kind: 'not-carried', route: 'POST /v1/boards/:id/posts/:postId/replies' },
   aimeat_dm_ask: { kind: 'not-carried', route: 'POST /v1/messages' },
   aimeat_dm_send: { kind: 'not-carried', route: 'POST /v1/messages' },
+  aimeat_dm_broadcast: { kind: 'not-carried', route: 'POST /v1/messages/broadcast' },
   aimeat_dm_send_as_owner: { kind: 'not-carried', route: 'POST /v1/messages' },
   aimeat_exchange_work_deliver: { kind: 'not-carried', route: 'POST /v1/exchange/work/:id/deliver' },
   aimeat_knowledge_contribute: { kind: 'not-carried', route: 'POST /v1/knowledge/:id/contribute' },
