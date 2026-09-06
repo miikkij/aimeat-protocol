@@ -1,6 +1,9 @@
 // E2E Tests for Human↔Human Direct Messages (GHII↔GHII), local (same-node) delivery + first-contact gate.
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-messages
 // v1.0.0 -- 2026-06-16 -- Initial: send/inbox/conversations/read/reply, request gate, accept, block.
+// v1.1.0 -- 2026-09-06 -- Tests 16 and 17 REGISTER the agent they message. They used to invent a GAII
+//   and say "need not exist", which passed only because the send checked the owner and not the agent —
+//   the defect that answered `delivered` for an agent nobody had created. What they assert is unchanged.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -281,7 +284,13 @@ await test('15. Cannot message yourself', async () => {
 
 console.log('\nPhase 7 -- Reply to an agent is delivered to the agent\'s owner inbox');
 await test('16. Replying to an agent GAII delivers to the owner (thread keeps the agent)', async () => {
-    const agentGaii = `someagent#${bobName}@${NODE_ID}`;   // bob's agent (need not exist) — reply lands in bob's inbox
+    // The agent is REGISTERED here. Until 2026-09-06 this line read "need not exist", and it was true:
+    // the send checked whether the owner existed, and an agent's mail is delivered to its owner's
+    // inbox, so any name at all under bob passed. That is the defect this suite was quietly asserting
+    // — a DM to an agent nobody had ever created came back `delivered`. What the test is FOR (the
+    // thread keeps the agent's identity, the owner reads it) is unchanged and is what it still proves.
+    const agent = await createAgent(bobName, bob.token, 'someagent', ['messages:read']);
+    const agentGaii = agent.gaii;
     const send = await json('/v1/messages', {
         method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
         body: JSON.stringify({ to: agentGaii, body: 'Done — homma hoidettu, omnituinen-agent!' }),
@@ -295,12 +304,13 @@ await test('16. Replying to an agent GAII delivers to the owner (thread keeps th
 });
 
 await test('17. Can message your OWN agent via the inbox (allowed; not a self-message)', async () => {
+    const mine = await createAgent(aliceName, alice.token, 'myagent', ['messages:read']);
     const { status, body } = await json('/v1/messages', {
         method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
-        body: JSON.stringify({ to: `myagent#${aliceName}@${NODE_ID}`, body: 'to my own agent' }),
+        body: JSON.stringify({ to: mine.gaii, body: 'to my own agent' }),
     });
     assert(status === 201, `own-agent send should be 201, got ${status}: ${JSON.stringify(body)}`);
-    assert(body.data.message.recipientGhii === `myagent#${aliceName}@${NODE_ID}`, 'thread is with the agent');
+    assert(body.data.message.recipientGhii === mine.gaii, 'thread is with the agent');
 });
 
 await test('17b. A LITERAL self-message (you → you) is still blocked', async () => {

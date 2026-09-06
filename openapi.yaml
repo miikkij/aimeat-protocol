@@ -41772,6 +41772,16 @@ paths:
                         properties:
                           message:
                             $ref: '#/components/schemas/DirectMessageRecord'
+                          awaiting_approval:
+                            type: boolean
+                            description: >-
+                              Present and true when this is a first message to a local recipient who
+                              has not accepted the sender: it is in their contact requests rather
+                              than their inbox, and they read it once they accept. The message status
+                              is `delivered` either way, because the copy is in their mailbox.
+                          delivery_note:
+                            type: string
+                            description: That same fact in words, for a caller that shows text to a person.
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -41779,7 +41789,12 @@ paths:
         '403':
           description: Recipient is not accepting messages from the sender (blocked)
         '404':
-          description: Recipient not found
+          description: >-
+            Recipient not found. Asked of the ADDRESSED identity, not of the account behind it: an
+            agent (`agent#owner@node`) and an app (`eco:app#owner@node`) are delivered to their
+            owner's inbox, so a name nobody ever registered under a real account is refused here
+            rather than accepted and reported delivered. Only a LOCAL identity can be checked; a
+            recipient on another node is handed to federation as before.
 
   /v1/messages/broadcast:
     post:

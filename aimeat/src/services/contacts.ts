@@ -20,11 +20,14 @@
  *   promoteContactsForVerifiedEmail links the two and the projection collapses them into one row.
  *
  *   Email lookup is EXACT-match only via the same privacy-preserving hash the invite flow uses.
- * @structure ContactsError; contactKind/normalizeContactId; resolveDisplayNames;
+ * @structure ContactsError; normalizeContactId; resolveDisplayNames;
  *   listContactsMerged; addContact (identity | person); updatePersonContact; removeContact;
  *   resolveContactEmail; resolveOwnerByVerifiedEmail; promoteContactsForVerifiedEmail.
  * @usage const { contacts } = await listContactsMerged(storage, config, ownerGhii, { q });
  * @version-history
+ *   v2.2.0 — 2026-09-06 — Pure extraction: the identity classification (`contactKind`, now
+ *     `identityKind`) and the local existence check move to services/local-identity.ts, so the DM
+ *     send path can ask the same question instead of checking only the owner. No behaviour here.
  *   v2.1.0 — 2026-08-30 — The Contacts page in the poster face. Every row carries the last message
  *     (when, first line, who wrote it, how many), an agent's or an app's owner, and on request the
  *     organisms shared with the person (include 'together') and the owner's open invitation to a
@@ -47,7 +50,10 @@ import { inviteEmailHash } from './invitations.js';
 import { getActiveEmailService } from './email.js';
 import { ensureContact, updateContactCard, sendOutbound, OutboundError } from './outbound/outbound-service.js';
 import { revokeContactHandles } from './contact-handles.js';
-import { parseGaiiLoose, isValidGAII, isValidGEAI, isValidGHII } from '../utils/gaii.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
+import {
+  MAIL_PREFIX, identityKind, isIdentityShaped, localIdentityExists, type IdentityKind,
+} from './local-identity.js';
 import { logger } from '../utils/logger.js';
 import { isValidEmail } from '../utils/email-validator.js';
 import type { ConversationSummary } from '../storage/repositories/direct-message.repository.js';
@@ -70,30 +76,12 @@ export class ContactsError extends Error {
   }
 }
 
-/** The four things a contact can be. `mail` is a person this node has no identity for. */
-export type ContactKind = 'geai' | 'gaii' | 'ghii' | 'mail';
-
-/**
- * The address-book id of a person with no identity here. The prefix is load-bearing three times
- * over: contactKind classifies anything without '#' or 'eco:' as a GHII, the Postgres consent key
- * is a `::` string join, and every grant surface needs a way to say "you cannot grant to this one".
- */
-export const MAIL_PREFIX = 'mail:';
-
 /** The address-book id for a contact record. */
 export const mailContactId = (recordId: string): string => `${MAIL_PREFIX}${recordId}`;
 
 /** The contact-record id behind a `mail:` address-book id, or null if that is not one. */
 export const mailRecordId = (contactId: string): string | null =>
   contactId.startsWith(MAIL_PREFIX) ? contactId.slice(MAIL_PREFIX.length) : null;
-
-/** The identity class of a contact id: person-without-identity, ecosystem app, agent, or human. */
-export function contactKind(id: string): ContactKind {
-  if (id.startsWith(MAIL_PREFIX)) return 'mail';
-  if (id.startsWith('eco:')) return 'geai';
-  if (id.includes('#')) return 'gaii';
-  return 'ghii';
-}
 
 /** Normalize a save target: a bare local owner name becomes a full GHII; everything else passes
  *  through (GAII/GEAI/full GHII/`mail:`). */
@@ -106,7 +94,7 @@ export function normalizeContactId(raw: string, nodeId: string): string {
 
 export interface ContactRow {
   contact_id: string;
-  kind: ContactKind;
+  kind: IdentityKind;
   /** The name to SHOW. A node identity's own profile name wins; a person's is what the owner wrote. */
   display_name: string | null;
   /** What the owner wrote, kept beside the profile name rather than replaced by it. */
@@ -166,7 +154,7 @@ function messageOf(conv: ConversationSummary | undefined): Pick<ContactRow, 'has
 
 /** The person behind an agent or an app id, as a GHII; null for anything else. */
 function ownerOf(id: string): string | null {
-  const kind = contactKind(id);
+  const kind = identityKind(id);
   if (kind !== 'gaii' && kind !== 'geai') return null;
   const p = parseGaiiLoose(id);
   return p.owner && p.node ? `${p.owner}@${p.node}` : null;
@@ -185,7 +173,7 @@ async function resolveDisplayNames(storage: Storage, ids: string[]): Promise<Map
   const unique = [...new Set(ids)];
   await Promise.all(unique.map(async (id) => {
     try {
-      const kind = contactKind(id);
+      const kind = identityKind(id);
       if (kind === 'ghii') {
         const rec = await storage.getGHII(id);
         if (rec?.displayName) out.set(id, rec.displayName);
@@ -315,7 +303,7 @@ export async function listContactsMerged(
     // is not a contact of their own.
     if (c.contactId === ownerGhii) continue;
     emit(c.contactId, {
-      contact_id: c.contactId, kind: contactKind(c.contactId),
+      contact_id: c.contactId, kind: identityKind(c.contactId),
       state: c.state, origin: c.origin ?? 'message',
       created_at: c.createdAt, updated_at: c.updatedAt,
     });
@@ -325,7 +313,7 @@ export async function listContactsMerged(
     for (const peer of messaged) {
       if (byId.has(peer) || peer === ownerGhii) continue;
       emit(peer, {
-        contact_id: peer, kind: contactKind(peer), state: null, origin: 'message',
+        contact_id: peer, kind: identityKind(peer), state: null, origin: 'message',
         created_at: null, updated_at: null,
       });
     }
@@ -342,7 +330,7 @@ export async function listContactsMerged(
       if (seen.has(id) || byId.has(id)) continue;
       seen.add(id);
       out.push({
-        contact_id: id, kind: contactKind(id), display_name: null,
+        contact_id: id, kind: identityKind(id), display_name: null,
         ...cardOf(p),
         state: null, origin: 'saved', ...messageOf(convByPeer.get(id)), owner: null,
         created_at: p.createdAt, updated_at: p.updatedAt,
@@ -381,42 +369,6 @@ export async function listContactsMerged(
   return { contacts, truncated };
 }
 
-/**
- * Is this even shaped like an identity?
- *
- * Asked of EVERY id, local or federated, and it is the check that was missing. Existence can only
- * be asked of a local id, so without a shape test anything with an `@` in it was admitted as "a
- * GHII on some other node" — an email address landed in the address book as a person on a node
- * called `example.com`, which every consumer then read as a human and failed on. The node part
- * has a grammar (hyphen-separated lowercase segments, two at minimum, no dots); a mail host does
- * not fit it.
- */
-function isIdentityShaped(contactId: string): boolean {
-  const kind = contactKind(contactId);
-  if (kind === 'gaii') return isValidGAII(contactId);
-  if (kind === 'geai') return isValidGEAI(contactId);
-  if (kind === 'ghii') return isValidGHII(contactId);
-  return false;
-}
-
-/**
- * Does this identity exist on this node?
- *
- * Only asked of a LOCAL id: a federated one lives on a node we cannot interrogate, and refusing it
- * would make a remote person unaddressable. The three kinds each have their own record, and until
- * this existed only GHII was checked — so a contact naming an app that had never been onboarded,
- * under an owner who had never registered, was accepted and stored.
- */
-async function localIdentityExists(storage: Storage, config: AimeatConfig, contactId: string): Promise<boolean | null> {
-  const kind = contactKind(contactId);
-  const { owner, node } = parseGaiiLoose(contactId);
-  if (node !== config.nodeId) return null;          // not ours to judge
-  if (kind === 'ghii') return !!(await storage.getOwner(owner));
-  if (kind === 'gaii') return !!(await storage.getAgent(contactId));
-  if (kind === 'geai') return !!(await storage.getEcosystemApp(contactId));
-  return null;
-}
-
 /** What the caller wants saved: an identity on some node, or a person who may have none. */
 export type AddContactInput =
   | { contact_id: string }
@@ -424,7 +376,7 @@ export type AddContactInput =
 
 export interface AddContactResult {
   contact_id: string;
-  kind: ContactKind;
+  kind: IdentityKind;
   /** The consent row, when the contact is an identity. Absent for a person. */
   consent?: ContactConsentRecord;
   /** The saved person, when the contact is one. Absent for a bare identity. */
@@ -447,7 +399,7 @@ async function addIdentityContact(
   storage: Storage, config: AimeatConfig, ownerGhii: string, rawContactId: string,
 ): Promise<AddContactResult> {
   const contactId = normalizeContactId(rawContactId, config.nodeId);
-  if (contactKind(contactId) === 'mail') {
+  if (identityKind(contactId) === 'mail') {
     throw new ContactsError(400, 'INVALID_INPUT', 'A saved person is added with a name and an email, not by id');
   }
   if (contactId === ownerGhii) throw new ContactsError(400, 'INVALID_INPUT', 'You cannot add yourself as a contact');
@@ -465,7 +417,7 @@ async function addIdentityContact(
   if (!existing) {
     const exists = await localIdentityExists(storage, config, contactId);
     if (exists === false) {
-      const kind = contactKind(contactId);
+      const kind = identityKind(contactId);
       const what = kind === 'gaii' ? 'agent' : kind === 'geai' ? 'app' : 'owner';
       throw new ContactsError(404, kind === 'ghii' ? 'OWNER_NOT_FOUND' : 'CONTACT_NOT_FOUND',
         `No ${what} "${contactId}" on this node — check the id, or add them as a person with a name and an email`);
@@ -473,7 +425,7 @@ async function addIdentityContact(
   }
   const contact = await storage.setContactState(ownerGhii, contactId, 'accepted', undefined, 'saved');
   emitChange('messages', ownerGhii);
-  return { contact_id: contactId, kind: contactKind(contactId), consent: contact };
+  return { contact_id: contactId, kind: identityKind(contactId), consent: contact };
 }
 
 /** Save a PERSON: someone the owner knows, who may or may not have an identity on this node. */
@@ -513,7 +465,7 @@ async function addPersonContact(
   emitChange('messages', ownerGhii);
   return {
     contact_id: person.ghii ?? mailContactId(person.id),
-    kind: person.ghii ? contactKind(person.ghii) : 'mail',
+    kind: person.ghii ? identityKind(person.ghii) : 'mail',
     person: personView(person),
   };
 }
