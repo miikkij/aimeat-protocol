@@ -13,6 +13,9 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   v1.1.0 — 2026-09-06 — `caller.scopes`: the permission words the calling credential carries. A
+ *     script could name its caller and not tell a read-only agent from an unrestricted one, so an
+ *     action that writes outward had no way to hold a scope word the way a route does.
  *   v1.0.0 — 2026-08-31 — Extracted from extension-runtime.ts (pure extraction; no behaviour change).
  */
 
@@ -175,6 +178,18 @@ export interface ExtensionCtx {
      */
     caller: {
       gaii: string; owner: string; roles: string[];
+      /**
+       * The permission words this credential actually carries, as the token granted them.
+       *
+       * An extension could see WHO was calling and not WHAT THEY MAY DO, so a script that needed to
+       * refuse a read-only agent had nothing to read: `requireScope` sits on routes, and an
+       * extension action is one route for every action there will ever be. The roads that have a
+       * session pass what that session holds; a road with none passes an empty list, and an
+       * unattended run says so with the `operator` role instead. Empty is not "everything": an
+       * owner signed in at their own screen carries no scopes either, because owner sessions bypass
+       * them, so a script asks about the ROLE first and the word second.
+       */
+      scopes?: string[];
       member?: { role: string; level: number | null; since: string; note: string } | null;
       isAppOwner?: boolean;
     };

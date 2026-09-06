@@ -9,6 +9,10 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.33.0 -- 2026-09-06 -- Add e2e-living-hooks.ts: the two doors a living document uses to talk
+ *            to the world (living-hooks, shipped with the node). It binds 40665 for a real receiver,
+ *            so it is a fixed-port suite and lands in lane 0; the body that arrives there is what
+ *            proves a send, and the call count is what proves the ten-second cache.
  *   v1.32.0 -- 2026-09-06 -- The runner REFUSES to start on a port a suite in this run writes down.
  *            It had computed that answer since fixedPorts() existed and never said it, and the
  *            silence cost two sessions in one day: a throwaway node on 40262 turned e2e-app-origin
@@ -357,6 +361,9 @@ const ALL_SUITES = [
     'test/e2e-knowledge.ts',
     'test/e2e-libs.ts',
     'test/e2e-library-packs.ts',
+    // Starts a real receiver on 127.0.0.1:40665 (E2E_LIVING_HOOKS_PORT), reachable because the
+    // runner pins AIMEAT_ALLOW_PRIVATE_EGRESS, so the body that arrives is the body that was sent.
+    'test/e2e-living-hooks.ts',
     'test/e2e-appdev-pitfalls.ts',
     'test/e2e-appdev-overview.ts',
     'test/e2e-dependency-map.ts',
@@ -679,6 +686,13 @@ const GUARD_SUITES = [
     'test/e2e-ai-provenance-agent-plane.ts',// …as an agent sees it
     'test/e2e-ai-provenance-surfaces.ts',   // one record read four ways, and the identical 404 that hides the rest
     'test/e2e-extension-workspace.ts',      // a sandboxed script reaching a workspace as its caller: membership, scope, schema, version, budget
+    // Earned 2026-09-06 the way the rule says: alone, on a freshly deleted database, three
+    // consecutive 31-of-31 runs on BOTH backends, counts identical. Twenty-one of its assertions
+    // are a refusal or an isolation boundary, and the tier's question is answered yes: this
+    // extension makes the node call an outside address and carry the owner's credential while doing
+    // it, so its allowlist, its scope gate, its per-owner separation and its secret handling are
+    // exactly what must not regress.
+    'test/e2e-living-hooks.ts',             // where the node may call out, on whose word, with whose secret
 ];
 
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone

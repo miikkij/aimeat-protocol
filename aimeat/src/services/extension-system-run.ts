@@ -151,7 +151,10 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
         // when `gaii` names the owner: a workflow step acts in the owner's name, it is not the owner
         // sitting at a screen, and an IAM gate that treats the two the same would let an unattended
         // run pass a door meant for a person.
-        caller: { gaii: callerGaii, owner: ownerName, roles: ['operator'] },
+        // No scopes, and that is the honest answer rather than a forgotten field: there is no
+        // session here, so there is no list of words anybody granted. A script deciding what an
+        // unattended run may do reads the 'operator' role, which says exactly that.
+        caller: { gaii: callerGaii, owner: ownerName, roles: ['operator'], scopes: [] },
         extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), encKey),
         instance: instanceCtx,
         logPrefix: `[ext:${ext.name}:${logLabel}]`,

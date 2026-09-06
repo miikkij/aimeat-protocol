@@ -11,6 +11,8 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v2.3.0 — 2026-09-06 — aimeat_extension_invoke passes the session's scopes into ctx.caller, as
+ *     the HTTP door does, so a script holding a permission word answers the same on both surfaces.
  *   v2.2.0 — 2026-09-05 — aimeat_extension_invoke attaches ctx.workspace when the manifest declares
  *     it, as the session's agent with the session's scopes (services/extension-workspace.ts), so
  *     an action that keeps a shared workspace record works through this door as it does over HTTP.
@@ -293,6 +295,10 @@ export function registerExtensionsTools(
                     gaii: agentGaii,
                     owner: parseGAII(agentGaii)?.owner ?? agentGaii,
                     roles: ['agent'],
+                    // The session's own scopes, the same list the workspace capability above is
+                    // built with. A script that holds a permission word must see the same answer
+                    // through this door as through the HTTP one, or the word means two things.
+                    scopes: sessionScopes,
                 },
                 // Decrypted for the VM as routes/extensions/actions.ts does; the { encrypted } wrapper would silently break the script.
                 extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
