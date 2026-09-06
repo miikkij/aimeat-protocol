@@ -1074,6 +1074,118 @@ await test('The OWNER session still approves — the fix costs the real path not
     assert(r.status === 200, `the owner must still be able to approve, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
 });
 
+// ─── The signature in the query string, and the two allowlists an omission used to switch off ───
+console.log('\nPhase 12 — A signed GET is recent, single-use, and bounded by what was registered');
+
+/** A signed authorize request for this agent, ready to send more than once. */
+async function signedAuthorizeQuery(clientId: string, timestamp = new Date().toISOString()): Promise<string> {
+    const signature = await signMsg(agentPrivKey, agentGaii + NODE_ID + timestamp);
+    return new URLSearchParams({ response_type: 'code', client_id: clientId, gaii: agentGaii, signature, timestamp }).toString();
+}
+
+await test('A signed authorize URL works ONCE — the second send of the same bytes is refused', async () => {
+    // THE DEFECT: this is a GET, so the whole signed request travels in a query string and lands in
+    // the access log, every proxy in front of it, the browser history and the Referer of whatever
+    // the redirect reaches. Nothing spent the signature, so one captured URL minted authorization
+    // codes for that agent forever.
+    const clientId = await registerConsentClient('replay-probe');
+    const qs = await signedAuthorizeQuery(clientId);
+
+    const first = await json(`/v1/mcp/authorize?${qs}`);
+    assert(first.status === 200 && typeof first.body.code === 'string',
+        `the first send must work: ${first.status} ${JSON.stringify(first.body).slice(0, 200)}`);
+
+    const replay = await json(`/v1/mcp/authorize?${qs}`);
+    assert(replay.status === 401, `the replay must be refused, got ${replay.status}: ${JSON.stringify(replay.body).slice(0, 200)}`);
+    assert(String(replay.body.error_description ?? '').includes('already been used'),
+        `and the refusal must say why: ${JSON.stringify(replay.body)}`);
+});
+
+await test('A signature over an old timestamp is refused even though it verifies', async () => {
+    // A valid signature proves who made it, never when. Ten minutes is outside the five-minute
+    // window the twin door in routes/auth.ts has always enforced.
+    const clientId = await registerConsentClient('stale-probe');
+    const old = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const r = await json(`/v1/mcp/authorize?${await signedAuthorizeQuery(clientId, old)}`);
+    assert(r.status === 401, `a ten-minute-old signature must be refused, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    assert(String(r.body.error_description ?? '').toLowerCase().includes('timestamp'),
+        `and name the timestamp: ${JSON.stringify(r.body)}`);
+});
+
+await test('A client that registered no redirect_uris may not use one', async () => {
+    // AN EMPTY ALLOWLIST IS NOT A PERMISSIVE ONE. The check read `length > 0 &&`, so omitting
+    // redirect_uris at registration turned the allowlist off permanently and an authorization code
+    // could be delivered anywhere.
+    const clientId = await registerConsentClient('open-redirect-probe');
+    const qs = await signedAuthorizeQuery(clientId);
+    // Manual redirect handling on purpose: when this door was open the node answered 302 to the
+    // attacker's address with the code in the query, and a following fetch reports that as a DNS
+    // error rather than as what it is.
+    const res = await fetch(`${BASE}/v1/mcp/authorize?${qs}&redirect_uri=${encodeURIComponent('https://attacker.test/collect')}`, { redirect: 'manual' });
+    assert(res.status === 400,
+        `an unregistered redirect must be refused, got ${res.status}${res.status === 302 ? ` -> ${res.headers.get('location')}` : ''}`);
+});
+
+await test('…and a registered one still works, so the fix costs the real path nothing', async () => {
+    const reg = await json('/v1/mcp/register', {
+        method: 'POST',
+        body: JSON.stringify({ client_name: 'registered-redirect', redirect_uris: ['https://client.test/cb'] }),
+    });
+    const clientId = reg.body.client_id as string;
+    const qs = await signedAuthorizeQuery(clientId);
+    const res = await fetch(`${BASE}/v1/mcp/authorize?${qs}&redirect_uri=${encodeURIComponent('https://client.test/cb')}`, { redirect: 'manual' });
+    assert(res.status === 302, `expected a redirect carrying the code, got ${res.status}`);
+    assert((res.headers.get('location') ?? '').startsWith('https://client.test/cb?code='),
+        `and it must go to the registered address: ${res.headers.get('location')}`);
+});
+
+await test('Redeeming an authorization code without the client_secret is refused', async () => {
+    // `client && client_secret && mismatch` meant a caller holding only the code redeemed it by
+    // sending no secret at all. Our registration response and the RFC 8414 metadata both say this
+    // client authenticates with client_secret_post, so it owes one.
+    const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'secretless-probe' }) });
+    const clientId = reg.body.client_id as string;
+    const clientSecret = reg.body.client_secret as string;
+
+    const stolen = await json(`/v1/mcp/authorize?${await signedAuthorizeQuery(clientId)}`);
+    const code = stolen.body.code as string;
+    assert(typeof code === 'string', `authorize: ${JSON.stringify(stolen.body).slice(0, 200)}`);
+
+    const noSecret = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: clientId }),
+    });
+    assert(noSecret.status === 401, `a secretless redemption must be refused, got ${noSecret.status}: ${JSON.stringify(noSecret.body).slice(0, 200)}`);
+
+    // The code survives the refusal only if it was never spent; either way, prove the honest path
+    // still works with a fresh one.
+    const again = await json(`/v1/mcp/authorize?${await signedAuthorizeQuery(clientId)}`);
+    const withSecret = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'authorization_code', code: again.body.code, client_id: clientId, client_secret: clientSecret }),
+    });
+    assert(withSecret.status === 200 && typeof withSecret.body.access_token === 'string',
+        `the honest redemption must still work: ${withSecret.status} ${JSON.stringify(withSecret.body).slice(0, 200)}`);
+});
+
+await test('An unknown client_id cannot reach the consent door either', async () => {
+    // The authorize step has refused an unknown client since it was written; the consent POST let
+    // one through, so an unregistered id carried no redirect allowlist at all — under a client_name
+    // the request itself chose.
+    const r = await json('/v1/mcp/authorize-consent', {
+        method: 'POST',
+        body: JSON.stringify({
+            client_id: 'never-registered-at-all',
+            client_name: 'Something Trustworthy',
+            gaii: agentGaii,
+            owner_token: ownerToken,
+            redirect_uri: 'https://attacker.test/collect',
+        }),
+    });
+    assert(r.status === 400 && r.body.error === 'invalid_client',
+        `expected invalid_client, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+});
+
 
 // ─── Cleanup ───
 console.log('\nCleanup');

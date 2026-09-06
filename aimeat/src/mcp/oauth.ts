@@ -12,6 +12,11 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   v1.6.0 — 2026-09-06 — Review items 2.3 and 2.4. The signed GET is bounded in time and spent on
+ *     first use, and it refuses on a deactivated account. Three omissions stop disabling their own
+ *     checks: no registered redirect_uris means no redirect_uri may be used (it used to mean any
+ *     address at all), a registered client owes its client_secret on both grants, and an unknown
+ *     client_id is refused at the consent door as it already was at authorize.
  *   v1.1.0 — 2026-08-10 — Both mints stamp the agent's own scopes. Omitting them meant a wildcard,
  *     so every MCP OAuth session ignored the per-tool scope filter written for exactly that surface.
  *   v1.4.0 — 2026-07-28 — /.well-known/oauth-protected-resource answers per ORIGIN
@@ -33,6 +38,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { issueJWT } from '../auth/jwt.js';
 import { credentialRevoked, isOwnerPrincipal } from '../auth/middleware.js';
+import { signatureTimestampFresh, spendSignature } from '../auth/signed-request.js';
 import { verify } from '../auth/keypair.js';
 import { parseGAII } from '../utils/gaii.js';
 import { buildAgentAuthMetadata } from '../services/auth-md.js';
@@ -149,9 +155,20 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             return;
         }
 
+        // AN EMPTY ALLOWLIST IS NOT A PERMISSIVE ONE. This read `allowedRedirects.length > 0 &&`,
+        // so a client that registered without `redirect_uris` — which POST /v1/mcp/register accepts,
+        // defaulting to `[]` — had the allowlist switched off permanently and could have an
+        // authorization code delivered to any address at all. Registering none now means none may be
+        // used, which is the same sentence the registration made. A client with no redirect_uri at
+        // all still works: that is the signature path below, which answers with the code as JSON.
         const allowedRedirects = client ? client.redirectUris : viaUrl!.redirectUris;
-        if (redirectUri && allowedRedirects.length > 0 && !allowedRedirects.includes(redirectUri)) {
-            res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri not registered' });
+        if (redirectUri && !allowedRedirects.includes(redirectUri)) {
+            res.status(400).json({
+                error: 'invalid_request',
+                error_description: allowedRedirects.length
+                    ? 'redirect_uri not registered'
+                    : 'This client registered no redirect_uris, so no redirect_uri may be used with it. Register the addresses you will redirect to.',
+            });
             return;
         }
 
@@ -173,6 +190,31 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             const isValid = await verify(agent.publicKey, message, signature);
             if (!isValid) {
                 res.status(401).json({ error: 'access_denied', error_description: 'Invalid signature' });
+                return;
+            }
+
+            // A VALID SIGNATURE IS NOT A RECENT ONE, AND IT IS NOT A FRESH ONE. This is a GET, so the
+            // whole signed request travels in a query string: it lands in this node's access log,
+            // every proxy in front of it, the browser's history and the Referer header of wherever
+            // the redirect below goes. Nothing here compared the timestamp to now and nothing spent
+            // the signature, so a single captured URL minted authorization codes for that agent
+            // forever. The comparable door (routes/auth.ts) has enforced the window since it was
+            // written; the spend is what a query-string credential additionally needs.
+            if (!signatureTimestampFresh(timestamp)) {
+                res.status(401).json({ error: 'access_denied', error_description: 'Timestamp too old or too far in the future' });
+                return;
+            }
+            if (!spendSignature(signature)) {
+                res.status(401).json({ error: 'access_denied', error_description: 'That signature has already been used. Sign a new timestamp.' });
+                return;
+            }
+
+            // BR-04, and for the reason the twin door states: the agent acts in a person's name and
+            // that person is gone from this node's point of view. After the signature check, so a
+            // stranger learns nothing about which accounts exist, and before a credential is minted.
+            const agentOwner = await storage.getOwner(parsed.owner);
+            if (agentOwner?.disabledAt) {
+                res.status(403).json({ error: 'access_denied', error_description: 'The account this agent acts for has been deactivated' });
                 return;
             }
 
@@ -233,16 +275,33 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         // the approval screen would say `https://…/client.json` where the client's own name belongs.
         const viaUrl = client ? null : await resolveClientIdMetadata(client_id);
 
-        // If client not found (e.g. server restarted since registration), allow consent
-        // to proceed — we still verify owner JWT + agent ownership below.
-        // Validate redirect_uri against registered URIs when available.
+        // AN UNKNOWN CLIENT IS REFUSED, as it is at the authorize step. The comment that stood here
+        // said to let consent proceed "e.g. server restarted since registration", which stopped
+        // being a case when clients moved into storage. What it left behind was a door where an
+        // unregistered client_id carried no allowlist at all, so the code went wherever the request
+        // asked — under a client_name the request also chose.
+        if (!client && !viaUrl) {
+            res.status(400).json({
+                error: 'invalid_client',
+                error_description: 'Unknown client_id. Register first, or use a Client ID Metadata Document URL as your client_id.',
+            });
+            return;
+        }
+        // Validate redirect_uri against the registered URIs. Registering none means none may be
+        // used — see the authorize step for why the `length > 0` escape that stood here was the
+        // whole allowlist's off switch.
         const finalRedirect = redirect_uri ?? client?.redirectUris[0] ?? viaUrl?.redirectUris[0];
         if (viaUrl && finalRedirect && !viaUrl.redirectUris.includes(finalRedirect)) {
             res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri is not one this client\'s metadata document lists' });
             return;
         }
-        if (client && finalRedirect && client.redirectUris.length > 0 && !client.redirectUris.includes(finalRedirect)) {
-            res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri not registered' });
+        if (client && finalRedirect && !client.redirectUris.includes(finalRedirect)) {
+            res.status(400).json({
+                error: 'invalid_request',
+                error_description: client.redirectUris.length
+                    ? 'redirect_uri not registered'
+                    : 'This client registered no redirect_uris, so no redirect_uri may be used with it.',
+            });
             return;
         }
         // Fail fast (clear 400, not a 500) if a redirect_uri was supplied but is not a
@@ -374,8 +433,15 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 return;
             }
 
+            // OMITTING THE SECRET SKIPPED THE CHECK. `client && client_secret && mismatch` means a
+            // caller holding only the authorization code redeemed it by sending no secret at all,
+            // which is the whole of client authentication gone. A client that registered here was
+            // issued a secret and TOLD it authenticates with client_secret_post, both in the
+            // registration response and in the RFC 8414 metadata, so it owes one. A Client ID
+            // Metadata Document client has no row and no secret by design; PKCE carries that case,
+            // and `client` is null for it, so it is untouched here.
             const client = await storage.getOAuthClient(client_id);
-            if (client && client_secret && client.clientSecret !== hashToken(client_secret)) {
+            if (client && (!client_secret || client.clientSecret !== hashToken(client_secret))) {
                 res.status(401).json({ error: 'invalid_client', error_description: 'Invalid client credentials' });
                 return;
             }
@@ -459,8 +525,9 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 return;
             }
 
+            // Same rule as the authorization_code grant above: a registered client owes its secret.
             const client = await storage.getOAuthClient(client_id);
-            if (client && client_secret && client.clientSecret !== hashToken(client_secret)) {
+            if (client && (!client_secret || client.clientSecret !== hashToken(client_secret))) {
                 res.status(401).json({ error: 'invalid_client', error_description: 'Invalid client credentials' });
                 return;
             }
