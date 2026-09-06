@@ -6,6 +6,8 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.10.0 — 2026-09-06 — The signed-out wall's rules (.login-prompt, .bg-aurora, .aurora-wave, pfAurora)
+ *     removed: the door that replaced it has its own sheet, profile-door.css.
  *   v3.9.0 — 2026-09-06 — The organism row's counts, date and door get fixed tracks (.pj-org-stats
  *     as a grid, .pj-org-door): 12 workspaces instead of 1, a longer date or a longer word on the
  *     button no longer moves the marks column beside them, and each icon stands under its own.
@@ -224,19 +226,9 @@
 /* Full-bleed dashboard shell (like the admin dashboard): the sidebar+content
    flex fills the viewport instead of being capped to a narrow centered column.
    The old 1000px cap squeezed tab content (organisms, etc.) into ~760px. The
-   not-logged-in login prompt is centered on its own (.login-prompt), and the
-   home dashboard / tab content get breathing room via .pf-content padding. */
+   home dashboard / tab content get breathing room via .pf-content padding. The
+   signed-out door has its own sheet (profile-door.css). */
 .pf{max-width:none;margin:0;padding:0;position:relative;z-index:1}
-.pf .login-prompt{max-width:1000px;margin:0 auto}
-.pf .bg-aurora{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
-.pf .aurora-wave{position:absolute;width:200%;height:60%;left:-50%;border-radius:50%;filter:blur(80px);opacity:.25;animation:pfAurora 8s ease-in-out infinite alternate}
-.pf .aurora-wave:nth-child(1){top:10%;background:linear-gradient(90deg,#ff6b9d,#c44569,#ff8a80,#f48fb1);animation-duration:8s}
-.pf .aurora-wave:nth-child(2){top:35%;background:linear-gradient(90deg,#f48fb1,#880e4f,#ff6b9d,#e91e63);animation-duration:12s;animation-delay:-4s}
-.pf .aurora-wave:nth-child(3){top:60%;background:linear-gradient(90deg,#ad1457,#ff6b9d,#f06292,#880e4f);animation-duration:10s;animation-delay:-2s}
-@keyframes pfAurora{0%{transform:translateX(-20%) scaleY(1)}50%{transform:translateX(10%) scaleY(1.3)}100%{transform:translateX(-10%) scaleY(.8)}}
-.pf .login-prompt{text-align:center;padding:4rem 2rem}
-.pf .login-prompt h1{font-size:2rem;margin-bottom:1rem}
-.pf .login-prompt p{color:var(--text-dim,#6B7280);margin-bottom:2rem;font-size:1.1rem}
 .pf-hero-inner .profile-header,.pf .profile-header{display:flex;align-items:center;gap:1.25rem;margin-bottom:1.5rem;flex-wrap:wrap}
 .pf-hero-inner .avatar,.pf .avatar{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#E8564A,#8B5CF6);display:flex;align-items:center;justify-content:center;font-size:1.75rem;color:#fff;font-weight:700;flex-shrink:0;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.1)}
 .pf-hero-inner .profile-info h1,.pf .profile-info h1{font-size:1.5rem;font-weight:800;margin-bottom:.2rem}

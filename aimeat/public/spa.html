@@ -147,6 +147,7 @@
   <link rel="stylesheet" href="/css/views/start.css">
   <link rel="stylesheet" href="/css/views/transparency.css">
   <link rel="stylesheet" href="/css/views/profile-poster.css">
+  <link rel="stylesheet" href="/css/views/profile-door.css">
   <!-- The organism home and its settings page (og-), after the poster skin so its few overrides win. -->
   <link rel="stylesheet" href="/css/views/organism.css">
   <link rel="stylesheet" href="/css/views/memory.css">
@@ -958,7 +959,15 @@
       const go = (e, path) => { e.preventDefault(); navigate(path); };
       // The dev view is /v1/portal?view=dev and shares its path with the landing; it gets the
       // footer too since 2026-08-29, when it stopped painting its own full-page background.
-      if (!FOOTER_ROUTES.has(location.pathname)) return null;
+      //
+      // /v1/profile is a work surface for its owner and a door for everyone else. A signed-out
+      // visitor who lands there (a shared link, a notification, a bookmark) sees the door
+      // (views/profile/door.js), which is a page they leave from, so it carries the footer until
+      // they sign in. The session comes from the ONE session source, so the footer leaves the
+      // moment the profile itself appears (2026-09-06).
+      const session = useSession();
+      const signedOutDoor = location.pathname === '/v1/profile' && !session;
+      if (!FOOTER_ROUTES.has(location.pathname) && !signedOutDoor) return null;
       return html`
         <footer class="site-footer">
           <div class="site-footer-row">

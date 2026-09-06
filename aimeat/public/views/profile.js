@@ -10,6 +10,10 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-09-06 — The signed-out wall is the door (profile/door.js): it names where the address leads
+ *     (Settings & Controls → the tab the URL asks for), offers sign-in and an account, and the shell
+ *     renders the site footer under it. The old wall ("Your AIMEAT Profile" under an aurora theme.css
+ *     had turned off) was a title on a blank page.
  *   2026-09-03 — The AI tab (id 'ai', alias 'generator') renders the poster-face AI page
  *     (profile/ai-tab.js) instead of the collapsible OpenRouter panel.
  *   2026-09-03 — A `fleet` tab: "Your agents", the Agents v2 section, which was a page reached by a
@@ -45,6 +49,8 @@ import * as nodesService from '/js/services/nodes.js';
 
 // === Landing page (adaptive dashboard) ===
 import LandingPage, { computeTier } from './profile/landing-page.js';
+// === The door a signed-out visitor sees ===
+import SignedOutDoor from './profile/door.js';
 
 // === Tab modules (lazy-loaded on first visit, stay mounted) ===
 import PortfolioTab from './profile/portfolio-tab.js';
@@ -313,18 +319,12 @@ export default function Profile({ navigate, locale }) {
     return tab ? t(tab.key) : tabId;
   }, []);
 
-  // Not logged in — guard placed AFTER the hooks above (Rules of Hooks).
+  // Not logged in — guard placed AFTER the hooks above (Rules of Hooks). The door says where the
+  // address leads: the tab the URL names, when this registry knows it; otherwise the profile alone.
   if (!session) {
-    return html`
-      <div class="bg-aurora" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none">
-        <div class="aurora-wave"></div><div class="aurora-wave"></div><div class="aurora-wave"></div>
-      </div>
-      <div class="pf">
-        <div class="login-prompt">
-          <h1>${t('profile.signInTitle')}</h1>
-          <p>${t('profile.signInDesc')}</p>
-        </div>
-      </div>`;
+    const asked = canonicalTab(new URLSearchParams(window.location.search).get('tab'));
+    const askedTab = TABS.find(x => x.id === asked);
+    return html`<${SignedOutDoor} navigate=${navigate} tabLabel=${askedTab ? t(askedTab.key) : null} />`;
   }
 
   return html`
