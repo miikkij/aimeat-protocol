@@ -6,6 +6,9 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.9.0 — 2026-09-06 — The organism row's counts, date and door get fixed tracks (.pj-org-stats
+ *     as a grid, .pj-org-door): 12 workspaces instead of 1, a longer date or a longer word on the
+ *     button no longer moves the marks column beside them, and each icon stands under its own.
  *   v3.8.0 — 2026-09-06 — The organism row's marks get a column of their own (.pj-org-marks, -type,
  *     -arch): the type badge carries a min-width, so the badge and the lock stand in one line down
  *     the list instead of trailing each name at a different place.
@@ -2755,8 +2758,18 @@
 .pj-org-lock { flex: none; display: inline-flex; align-items: center; color: var(--text-dim); }
 .pj-org-arch { flex: none; }
 .pj-org-desc { font-size: 0.78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48ch; }
-.pj-org-stats { display: flex; align-items: center; gap: 0.8rem; font-size: 0.78rem; color: var(--muted); flex: none; }
-.pj-org-stat { display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap; }
+/* Fixed tracks, not content widths. The counts and the date sit to the RIGHT of the marks, so
+   anything that changes their width moves the marks column with it: 12 workspaces instead of 1 is
+   6.5px, a date of 11.6. instead of 9.6. is another 12, and in a proportional face even 1 against 3
+   is a fraction. Tracks sized from the measured worst case (three digits 41px, a ten-character date
+   64px) plus tabular figures, so every icon stands under its own down the list and nothing the data
+   says can push the badge beside it. A count wider than its track overflows into the gap; a grid
+   track does not grow, which is the whole point. */
+.pj-org-stats { display: grid; grid-template-columns: 2.4rem 2.4rem 2.4rem 4.1rem; align-items: center; gap: 0 0.8rem; font-size: 0.78rem; color: var(--muted); flex: none; font-variant-numeric: tabular-nums; }
+.pj-org-stat { display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap; min-width: 0; }
+.pj-org-date { justify-content: flex-end; }
+/* 3.2rem holds the longest of the four words the door ever says (UNIRSE, measured at 47.8px). */
+.pj-org-door { flex: 0 0 3.2rem; display: flex; justify-content: flex-end; }
 .pj-org-openbtn { flex: none; white-space: nowrap; }
 .pj-org-detail { flex-basis: 100%; border-top: 1px solid var(--border); margin-top: 0.35rem; padding-top: 0.5rem; cursor: default; }
 .pj-org-hint { font-size: 0.74rem; color: var(--muted); margin: -0.35rem 0 0.75rem; }
