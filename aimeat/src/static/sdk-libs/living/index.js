@@ -52,6 +52,11 @@
  *   doc.set('t', 31);
  *   doc.setLanguage('en');   // …or just let the login pill do it
  * @version-history
+ *   v0.6.1 — 2026-09-06 — THE CENT IS A UNIT. `c` and `snt` are EUR/100 in the currency family, so
+ *     a tariff written the way a bill writes it — c/kWh — parses, adds to the other cents on the
+ *     line, and crosses into EUR/kWh through convert() rather than through a bare division by a
+ *     hundred. The first sheet to read a real spot price needed it, and needed it in the unit
+ *     table rather than in its own arithmetic (units.js).
  *   v0.6.0 — 2026-09-06 — THE DOCUMENT REACHES OUT, AND LISTENS. A `trigger` node fires on a
  *     machine's TRANSITION — not on a recompute — and sends one message carrying the whole state:
  *     the document, the time, which machine moved from where to where on which event, every value
@@ -139,7 +144,7 @@ import {
   TEXT_KEYS, hasLangMap, localizeLayout, localizeProps, onLanguageChange, preference,
 } from './i18n.js';
 
-const VERSION = '0.6.0';
+const VERSION = '0.6.1';
 
 /** The node types whose rendering this library does itself, when the node names a block. */
 const DRAWN = ['control', 'formula', 'text', 'machine', 'value', 'source', 'trigger'];

@@ -156,6 +156,32 @@ describe('evaluate: the units are carried and checked', () => {
     expect(unitLabel(parseUnit('EUR') as never)).toBe('EUR');
   });
 
+  it('a cent is a hundredth of a euro, and c/kWh converts to EUR/kWh', () => {
+    // A tariff is written in cents and the money is counted in euros, and the door between the
+    // two is convert() rather than a division by a hundred nobody can see.
+    const cent = parseUnit('c') as { dim: Record<string, number>; scale: number; label: string };
+    expect(cent.dim).toEqual({ 'cur:EUR': 1 });
+    expect(cent.scale).toBe(0.01);
+    const euros = run('convert(p, "EUR/kWh")', { p: q(12.4, 'c/kWh') }) as { n: number; u: { label: string } };
+    expect(euros.n).toBeCloseTo(0.124, 12);
+    expect(euros.u.label).toBe('EUR/kWh');
+  });
+
+  it('snt is the same cent under the Finnish name, and the two add', () => {
+    const out = run('a + b', { a: q(5.5, 'snt/kWh'), b: q(2.8, 'c/kWh') }) as { n: number; u: { label: string } };
+    expect(out.n).toBeCloseTo(8.3, 10);
+    expect(out.u.label).toBe('snt/kWh');
+  });
+
+  it('a cent is money, so it will not add to a plain number or to another currency', () => {
+    const mixed = run('a + b', { a: q(10, 'c'), b: q(1, 'USD') }) as { error: string };
+    expect(isError(mixed)).toBe(true);
+    expect(mixed.error).toMatch(/different things/);
+    const centAndEuro = run('a + b', { a: q(150, 'c'), b: q(1, 'EUR') }) as { n: number; u: { label: string } };
+    expect(centAndEuro.n).toBeCloseTo(250, 10);
+    expect(centAndEuro.u.label).toBe('c');
+  });
+
   it('a compound unit is parsed rather than looked up', () => {
     const speed = parseUnit('km/h') as { dim: Record<string, number>; scale: number };
     expect(speed.dim).toEqual({ m: 1, s: -1 });

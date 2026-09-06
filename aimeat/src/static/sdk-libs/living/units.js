@@ -17,6 +17,12 @@
  *   rate this library does not have and will not invent, so it refuses. That is the honest
  *   answer, and it is the one a document about money needs.
  *
+ *   THE ONE EXCEPTION IS THE CENT, because it is not another currency: `c` and `snt` are the euro
+ *   divided by a hundred, a fixed factor rather than a rate, so c/kWh and EUR/kWh are the same
+ *   kind of thing and convert() crosses between them. That is what lets a tariff be written the
+ *   way a bill writes it and the money be counted in euros without a bare `/ 100` standing in the
+ *   middle of the arithmetic saying nothing about what it converts.
+ *
  *   A PERCENTAGE IS A LABEL ON A FACE NUMBER, NOT A FACTOR — the second rule worth reading
  *   before the rest. `%` and `ppm` measure nothing, so they cannot be checked the way kg and °C
  *   are checked, and a scale hidden inside one is a scale nobody can see: 72 % stored as 0.72
@@ -34,6 +40,12 @@
  *   const c = parseUnit('°C');            // { dim: { K: 1 }, scale: 1, offset: 273.15 }
  *   convert({ n: 22, u: c }, parseUnit('K'));   // { n: 295.15, u: K }
  * @version-history
+ *   v0.6.1 — 2026-09-06 — THE CENT JOINS THE CURRENCY FAMILY: `c` and `snt` are EUR/100, so
+ *     c/kWh parses and convert(x, "EUR/kWh") is the door a tariff crosses to become money. A
+ *     document that wrote the same crossing as `x / 100` was doing dimensional analysis in its
+ *     head and printing the answer in a unit nothing had checked. The cent is the euro's alone
+ *     and is not prefixable; the centi prefix is untouched, because a prefix is only tried when
+ *     the whole name is not in the table.
  *   v0.5.0 — 2026-09-06 — m² and m³ are units by those names as well as by m^2 and m^3, because a
  *     unit's LABEL is the text the record declared and a designed sheet then prints the caret. The
  *     superscript names are deliberately NOT prefixable: km² is a million square metres, not a
@@ -119,6 +131,22 @@ const UNITS = {
 /** Currency codes are their own dimension and never convert into one another. */
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'SEK', 'NOK', 'DKK', 'JPY', 'CHF', 'PLN'];
 for (const code of CURRENCIES) UNITS[code] = u({ ['cur:' + code]: 1 });
+
+// THE CENT IS THE EURO'S HUNDREDTH, AND IT IS THE EURO'S ALONE. A tariff in this part of the
+// world is quoted in cents per kilowatt-hour and the money is counted in euros, so the two are the
+// same dimension with a factor of a hundred between them and convert() is the door: c/kWh into
+// EUR/kWh, out loud, instead of a division by a hundred that says nothing about what it is doing.
+// `snt` is the same unit under the name a Finnish invoice prints.
+//
+// It is EUR/100 by name rather than "a hundredth of whatever currency is nearby", because there is
+// no currency nearby: a unit is parsed on its own, and a `c` that meant a US cent in one document
+// and a euro cent in the next would be the silent wrong answer this whole file exists to refuse.
+// Another currency's hundredth is written out as the currency divided by a hundred.
+//
+// It is also NOT prefixable, and it shadows nothing: the centi prefix is only ever tried when the
+// whole name is not in the table, so cm, cJ and the rest still resolve exactly as they did.
+UNITS.c = u({ 'cur:EUR': 1 }, 0.01);
+UNITS.snt = u({ 'cur:EUR': 1 }, 0.01);
 
 /** A single unit name, with a prefix when the bare name is not in the table. */
 function lookup(name) {
