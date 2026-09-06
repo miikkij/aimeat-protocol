@@ -32,9 +32,16 @@
  *   are written again into the elements that are already on the screen. Rebuilding would be
  *   fewer lines and would take the slider out from under the person's finger, fire the kit's
  *   entrance again, and restart every count-up — for a change that is only words.
- * @structure controlRow · textView · machineView · valueRow · renderNodeInto
+ * @structure controlRow · textView · machineView · valueRow · triggerRow · statesOf · renderNodeInto
  * @usage  import { renderNodeInto } from './render.js';
  * @version-history
+ *   v0.6.0 — 2026-09-06 — THE GEAR, AND THE TWO THINGS IT NEEDED ON THE FIELDS IT SITS ON. Every
+ *     value, control and source carries an inward gear and every machine and trigger an outward
+ *     one, drawn as inline SVG at the kit's touch size. A source's reading gained a line under it
+ *     for the words a failed read left, because the number is still there — that is the point of
+ *     keeping it — and the only place the truth can be told is beside it. And a trigger is drawn
+ *     at all: who it tells, whether it is on, when it last spoke, and for a guest the words that
+ *     say why it will not fire.
  *   v0.4.1 — 2026-09-06 — A CONTROL SAYS ITS ANSWER ONCE. The reading beside a control is drawn
  *     only for the slider and the number field, which cannot show the answer themselves. A pick's
  *     reading printed the stored value while its select showed the option's words, so one row said
@@ -58,6 +65,7 @@ import { formulaView } from './formula-view.js';
 import { isQuantity, asText, asNumber } from './formula-eval.js';
 import { formatNumber, formatParts } from './format.js';
 import { textOf } from './i18n.js';
+import { gearButton } from './gear.js';
 
 let seq = 0;
 function uid() { seq += 1; return 'ak-living-' + seq; }
@@ -273,9 +281,13 @@ export function valueRow(host, spec) {
   const figure = el('span', { class: 'ak-living__figure' });
   const unit = el('span', { class: 'ak-living__figure-unit' });
   const labelEl = el('span', { class: 'ak-living__note-label', text: spec.label || spec.id });
+  // WHERE A READING SAYS IT IS OLD. A source whose last read failed keeps its number, so the only
+  // place the truth can be told is beside it, in words. It is empty and takes no room otherwise.
+  const staleEl = el('p', { class: 'ak-living__stale', hidden: true });
   const root = el('div', { class: 'ak-living__value', 'data-living-node': spec.id }, [
     labelEl,
     el('span', { class: 'ak-living__figure-row' }, [figure, unit]),
+    staleEl,
   ]);
   host.appendChild(root);
   let last = NaN;
@@ -286,7 +298,13 @@ export function valueRow(host, spec) {
     if (!unitNow || placeNow === 'none') return body;
     return placeNow === 'before' ? unitNow + ' ' + body : body + ' ' + unitNow;
   };
-  function update(v) {
+  function update(v, stale) {
+    if (stale !== undefined) {
+      const words = String(stale || '');
+      if (staleEl.textContent !== words) staleEl.textContent = words;
+      staleEl.hidden = !words;
+      root.setAttribute('data-living-stale', words ? 'yes' : 'no');
+    }
     const parts = formatParts(v, spec.format, undefined, langsOf(spec)[0]);
     if (isQuantity(v) || typeof v === 'number') {
       const n = isQuantity(v) ? v.n : v;
@@ -326,6 +344,50 @@ export function valueRow(host, spec) {
   };
 }
 
+/**
+ * A TRIGGER, SEEN. It is the only node whose interesting facts are not a number: who it tells,
+ * whether it is on, and when it last spoke. A guest sees the same row with the words that say why
+ * it will not fire, rather than a control that silently does nothing.
+ * @param {HTMLElement} host
+ * @param {{ id: string, label?: string, node: any, at?: string, reason?: string }} spec
+ */
+export function triggerRow(host, spec) {
+  const labelEl = el('span', { class: 'ak-living__note-label', text: spec.label || spec.id });
+  const whereEl = el('code', { class: 'ak-living__trigger-target' });
+  const whenEl = el('span', { class: 'ak-living__trigger-at' });
+  const reasonEl = el('p', { class: 'ak-living__trigger-reason', hidden: true });
+  const root = el('div', { class: 'ak-living__trigger', 'data-living-node': spec.id }, [
+    labelEl,
+    el('span', { class: 'ak-living__trigger-row' }, [whereEl, whenEl]),
+    reasonEl,
+  ]);
+  host.appendChild(root);
+
+  /** Where this one points, in the record's own words: an address, or an agent's name. */
+  function where(node) {
+    const target = (node && node.target) || {};
+    return String(target.kind) === 'agent' ? '@' + String(target.agent || '') : String(target.url || '');
+  }
+  function update(at, reason, node) {
+    const def = node || spec.node || {};
+    whereEl.textContent = where(def);
+    whenEl.textContent = String(at || '');
+    const words = String(reason || '');
+    reasonEl.textContent = words;
+    reasonEl.hidden = !words;
+    root.setAttribute('data-living-on', (def.enabled !== false && !words) ? 'yes' : 'no');
+  }
+  update(spec.at, spec.reason, spec.node);
+  return {
+    el: root,
+    update: update,
+    relabel(label, reason) {
+      if (label != null && labelEl.textContent !== label) labelEl.textContent = String(label);
+      if (reason !== undefined) update(whenEl.textContent, reason, null);
+    },
+  };
+}
+
 /** Every state name a machine definition declares, outermost first. */
 export function statesOf(def) {
   const out = [];
@@ -345,7 +407,9 @@ export function statesOf(def) {
  * null for a node that has no direct rendering.
  * @param {HTMLElement} host
  * @param {{ id: string, node: any, graph: any, langs?: () => string[],
- *   set: (id: string, v: any) => void }} spec
+ *   set: (id: string, v: any) => void,
+ *   gear?: ((id: string, way: 'in'|'out') => void)|null,
+ *   reason?: () => string }} spec
  * @returns {{ el: HTMLElement, update: (...args: any[]) => void, relabel: () => void, kind: string }|null}
  */
 export function renderNodeInto(host, spec) {
@@ -354,12 +418,30 @@ export function renderNodeInto(host, spec) {
   const langs = spec.langs || function () { return []; };
   const value = graph.valueOf(spec.id);
   const label = function () { return textOf(node.label, langs()); };
+
+  /**
+   * THE ONE MARK THAT SAYS THIS PART CAN BE AUTOMATED. A value, a control and a source can take a
+   * reading from outside; a machine and a trigger can tell somebody. The gear goes on the field
+   * itself so it is beside the thing it is about, and a host that wants none passes no `gear`.
+   * @param {any} view @param {'in'|'out'} way
+   */
+  function geared(view, way) {
+    if (!spec.gear || !view || !view.el) return view;
+    view.el.classList.add('ak-living--geared');
+    view.el.appendChild(gearButton({
+      way: way, node: spec.id, langs: langs,
+      onOpen: function () { spec.gear(spec.id, way); },
+    }));
+    return view;
+  }
+
   if (node.type === 'control') {
     const target = graph.nodeOf(String(node.target)) || {};
     const view = controlRow(host, {
       id: spec.id, node: node, target: target, value: value, langs: langs,
       onSet(v) { spec.set(String(node.target), v); },
     });
+    geared(view, 'in');
     return {
       el: view.el,
       update: () => view.update(graph.valueOf(spec.id)),
@@ -391,6 +473,7 @@ export function renderNodeInto(host, spec) {
   }
   if (node.type === 'machine') {
     const view = machineView(host, { id: spec.id, label: label(), states: statesOf(node), path: String(value || '') });
+    geared(view, 'out');
     return {
       el: view.el,
       update: () => view.update(String(graph.valueOf(spec.id) || '')),
@@ -398,11 +481,27 @@ export function renderNodeInto(host, spec) {
       kind: 'machine',
     };
   }
-  if (node.type === 'value' || node.type === 'source') {
-    const view = valueRow(host, { id: spec.id, label: label(), value: value, format: node.format, langs: langs });
+  if (node.type === 'trigger') {
+    const reason = function () { return spec.reason ? spec.reason() : ''; };
+    const view = triggerRow(host, {
+      id: spec.id, label: label(), node: node, at: String(value || ''), reason: reason(),
+    });
+    geared(view, 'out');
     return {
       el: view.el,
-      update: () => view.update(graph.valueOf(spec.id)),
+      update: () => view.update(String(graph.valueOf(spec.id) || ''), reason(), node),
+      relabel: () => view.relabel(label(), reason()),
+      kind: 'trigger',
+    };
+  }
+  if (node.type === 'value' || node.type === 'source') {
+    const stale = function () { return String((graph.fieldsOf(spec.id) || {}).stale || ''); };
+    const view = valueRow(host, { id: spec.id, label: label(), value: value, format: node.format, langs: langs });
+    view.update(value, stale());
+    geared(view, 'in');
+    return {
+      el: view.el,
+      update: () => view.update(graph.valueOf(spec.id), stale()),
       relabel: () => view.relabel(label() || spec.id, graph.valueOf(spec.id)),
       kind: node.type,
     };

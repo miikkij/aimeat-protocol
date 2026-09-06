@@ -20,8 +20,17 @@
  *   scripts honour — the media query, the kit's own Less-motion switch and the per-surface
  *   opt-out — because a switch that reaches the scripts and not the stylesheet is a switch that
  *   does nothing (docs/pitfalls.md §47).
- * @structure tokens · control row · formula · sentence · machine state · chain · refusals · still
+ * @structure tokens · control row · formula · sentence · machine state · chain · gear · stale ·
+ *   trigger · dialogs · refusals · still
  * @version-history
+ *   v0.6.0 — 2026-09-06 — THE GEAR AND THE TWO DIALOGS BEHIND IT. A geared field reserves the
+ *     kit's touch width at its end rather than letting the mark sit on top of a label, so nothing
+ *     runs underneath it at any width; the gear itself is 18px of inline SVG in `currentColor`,
+ *     and the arrow carries a heavier stroke because direction is the whole message. A reading
+ *     that failed to refresh keeps its number and dims it, with the words under it. A trigger
+ *     gets a row of its own — who it tells, when it last spoke, and for a guest why it will not.
+ *     A block of JSON in a dialog scrolls inside itself, because a payload with a long URL in it
+ *     would otherwise push a modal past the edge of a phone.
  *   v0.5.0 — 2026-09-06 — A chain drawn in a frame of its own keeps that frame's size, because a
  *     wiring diagram squeezed into a column is a wiring diagram nobody can read. Everything else
  *     about it — the pills, the tones and the flash — is still the kit's own stylesheet.
@@ -267,6 +276,197 @@
 @keyframes ak-living-flash {
   0% { fill-opacity: 1; stroke-width: 3; }
   100% { fill-opacity: 1; stroke-width: 1; }
+}
+
+/* ── The gear, and the two dialogs behind it ───────────────────────────────────────────── */
+
+/* A GEARED FIELD MAKES ROOM FOR THE GEAR RATHER THAN SITTING UNDER IT. The mark is placed at the
+ * start of the field's own top line, so a label never runs beneath it at any width, and the hit
+ * area is the kit's touch floor while the drawn gear stays small. */
+.ak-living--geared {
+  position: relative;
+  padding-inline-end: var(--ak-touch, 44px);
+}
+
+.ak-living__gear {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--ak-touch, 44px);
+  block-size: var(--ak-touch, 44px);
+  padding: 0;
+  color: var(--ak-living-ink-dim);
+}
+
+.ak-living__gear:hover,
+.ak-living__gear:focus-visible {
+  color: var(--ak-living-accent);
+}
+
+.ak-living__gear svg {
+  inline-size: 18px;
+  block-size: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The arrow is the whole message: a person reads direction before they read anything else. */
+.ak-living__gear .ak-living__gear-arrow {
+  stroke-width: 1.8;
+}
+
+/* ── A reading that says it is old, and a trigger seen ─────────────────────────────────── */
+
+.ak-living__stale,
+.ak-living__trigger-reason {
+  margin: calc(var(--ak-living-gap) * 0.3) 0 0;
+  font-size: var(--ak-living-label-size);
+  color: var(--ak-warn, var(--ak-living-ink-dim));
+}
+
+.ak-living__value[data-living-stale='yes'] .ak-living__figure {
+  opacity: 0.62;
+}
+
+.ak-living__trigger {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ak-living-gap) * 0.3);
+  margin-block-end: var(--ak-living-gap);
+  --ak-living-gap: var(--ak-gap, 0.75rem);
+  --ak-living-label-size: var(--ak-text-fine, 0.8125rem);
+  --ak-living-ink-dim: var(--ak-ink-dim, currentColor);
+  --ak-living-accent: var(--ak-accent, currentColor);
+  --ak-living-mono: var(--ak-font-mono, ui-monospace, monospace);
+}
+
+.ak-living__trigger-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: calc(var(--ak-living-gap) * 0.6);
+  font-family: var(--ak-living-mono);
+  font-size: var(--ak-living-label-size);
+  min-width: 0;
+}
+
+.ak-living__trigger-target {
+  overflow-wrap: anywhere;
+  color: var(--ak-living-ink-dim);
+}
+
+.ak-living__trigger[data-living-on='yes'] .ak-living__trigger-target {
+  color: var(--ak-living-accent);
+}
+
+.ak-living__trigger-at {
+  color: var(--ak-living-ink-dim);
+}
+
+/* ── The dialogs ───────────────────────────────────────────────────────────────────────── */
+
+.ak-living__dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ak-gap, 0.75rem);
+  --ak-living-label-size: var(--ak-text-fine, 0.8125rem);
+  --ak-living-mono: var(--ak-font-mono, ui-monospace, monospace);
+  --ak-living-ink-dim: var(--ak-ink-dim, currentColor);
+}
+
+.ak-living__dialog-group {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ak-gap, 0.75rem) * 0.5);
+}
+
+.ak-living__dialog-heading {
+  margin: 0;
+  font-size: var(--ak-living-label-size);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ak-living-ink-dim);
+}
+
+.ak-living__dialog-watch,
+.ak-living__dialog-range {
+  margin: 0;
+  font-size: var(--ak-living-label-size);
+  color: var(--ak-living-ink-dim);
+}
+
+.ak-living__dialog-states {
+  flex-wrap: wrap;
+}
+
+.ak-living__copy {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ak-gap, 0.75rem) * 0.35);
+}
+
+.ak-living__copy-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ak-gap, 0.75rem);
+}
+
+.ak-living__copy-label {
+  font-size: var(--ak-living-label-size);
+  color: var(--ak-living-ink-dim);
+}
+
+/* A BLOCK OF JSON SCROLLS INSIDE ITSELF, never widening the dialog: a payload with a long URL in
+ * it would otherwise push a modal past the edge of a phone. */
+.ak-living__copy-text {
+  margin: 0;
+  max-block-size: 16rem;
+  overflow: auto;
+  padding: calc(var(--ak-pad, 1rem) * 0.6);
+  border: var(--ak-line-w, 1px) solid var(--ak-line, currentColor);
+  border-radius: var(--ak-radius-sm, 0.5rem);
+  font-family: var(--ak-living-mono);
+  font-size: var(--ak-living-label-size);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.ak-living__dialog-status {
+  margin: 0;
+  font-family: var(--ak-living-mono);
+  font-size: var(--ak-living-label-size);
+  overflow-wrap: anywhere;
+}
+
+.ak-living__dialog-status[data-ok='no'] {
+  color: var(--ak-err, currentColor);
+}
+
+.ak-living__dialog-test {
+  align-self: flex-start;
+}
+
+.ak-living__vocabulary {
+  margin-block-start: calc(var(--ak-gap, 0.75rem) * 0.5);
+  padding-block-start: calc(var(--ak-gap, 0.75rem) * 0.5);
+  border-block-start: var(--ak-line-w, 1px) solid var(--ak-line, currentColor);
+}
+
+.ak-living__vocabulary p {
+  margin: 0 0 0.25em;
+  font-size: var(--ak-living-label-size);
+  color: var(--ak-living-ink-dim);
+}
+
+.ak-living__vocabulary-options {
+  font-family: var(--ak-living-mono);
 }
 
 /* ── A refusal, when the kit is not on the page to say it properly ─────────────────────── */

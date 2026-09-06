@@ -43,6 +43,10 @@
  *   m.start();              // { changed: false, path: 'fine', assigns: [] }
  *   m.send('HOT', scope);   // { changed: true, path: 'hot', assigns: [] }
  * @version-history
+ *   v0.6.0 — 2026-09-06 — send() and tick() say `from` as well as `path`. A trigger's message is
+ *     "from charging to exporting", and without the departing state on the result the caller had
+ *     to keep its own copy of where the machine had been — a second store of the machine's state,
+ *     which goes wrong the first time two machines move inside one pass.
  *   v0.4.0 — 2026-09-06 — An entry or exit assignment may be a language map; one tree per language
  *     is compiled and the one in force is picked when the assignment is handed to the engine.
  *     words() hands back the active states' word-writing entries so a language change moves the
@@ -245,11 +249,17 @@ export function createMachine(def, opts) {
 
     /**
      * Send an event. Looks for a handler from the deepest active state outward, honouring guards.
+     *
+     * IT SAYS WHERE IT CAME FROM as well as where it is. A trigger's whole reason for existing is
+     * "from charging to exporting", and a result that carried only the destination would leave the
+     * caller to remember the previous state itself — which is a second copy of the machine's state,
+     * kept somewhere else, going wrong the first time two machines move in one pass.
      * @param {string} event @param {{ get: (id: string) => any }} scope @param {number} [now]
-     * @returns {{ changed: boolean, path: string, assigns: Array<{ id: string, tree: any }> }}
+     * @returns {{ changed: boolean, from: string, path: string, assigns: Array<{ id: string, tree: any }> }}
      */
     send(event, scope, now) {
       const clock = now == null ? 0 : now;
+      const from = active.join('.');
       for (let depth = active.length; depth >= 1; depth--) {
         const path = active.slice(0, depth);
         const node = stateAt(model, path);
@@ -263,9 +273,9 @@ export function createMachine(def, opts) {
           if (isError(v) || !truthy(v)) continue;
         }
         const assigns = move(resolveTarget(target, depth), depth - 1, clock);
-        return { changed: true, path: active.join('.'), assigns: assigns };
+        return { changed: true, from: from, path: active.join('.'), assigns: assigns };
       }
-      return { changed: false, path: active.join('.'), assigns: [] };
+      return { changed: false, from: from, path: from, assigns: [] };
     },
 
     /**
@@ -274,6 +284,7 @@ export function createMachine(def, opts) {
      * @param {number} now
      */
     tick(now) {
+      const from = active.join('.');
       for (let depth = active.length; depth >= 1; depth--) {
         const path = active.slice(0, depth);
         const node = stateAt(model, path);
@@ -286,10 +297,10 @@ export function createMachine(def, opts) {
           const target = typeof handler === 'string' ? handler : handler && handler.target;
           if (!target) continue;
           const assigns = move(resolveTarget(target, depth), depth - 1, now);
-          return { changed: true, path: active.join('.'), assigns: assigns };
+          return { changed: true, from: from, path: active.join('.'), assigns: assigns };
         }
       }
-      return { changed: false, path: active.join('.'), assigns: [] };
+      return { changed: false, from: from, path: from, assigns: [] };
     },
 
     /** How long until the earliest pending `after`, or null when nothing is waiting. */
