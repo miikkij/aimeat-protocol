@@ -11,6 +11,14 @@
  * @structure sendDirectMessage(ctx, input) → { ok, message } | { ok:false, code }
  * @usage import { sendDirectMessage } from '../services/message-send.js';
  * @version-history
+ *   v1.5.0 — 2026-09-06 — A local recipient must EXIST, and be the one that was addressed. The check
+ *     asked whether the owner existed; an agent's and an app's mail is delivered to their owner's
+ *     inbox, so every name under a real owner passed. A DM to an agent nobody had ever registered was
+ *     written, answered `delivered` with a timestamp, and read back as a thread — a failure that
+ *     returned success and that the sender had no way to detect. Now services/local-identity.ts (the
+ *     same check the address book has had since August) answers it, and the refusal names the part of
+ *     the address that was wrong. The result also says when a delivered message is still sitting in
+ *     the recipient's first-contact requests bucket.
  *   v1.0.0 — 2026-06-21 — Extracted from routes/messages.ts for reuse by Tracked Response replies.
  *   v1.1.0 — 2026-06-21 — Allow replying to an AGENT/eco identity that messaged you: the stored copy +
  *     conversation keep the agent GAII (so the thread is intact), but delivery is routed to the agent's
@@ -35,6 +43,7 @@ import { notify } from './notify.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { deliverDirectMessage, logDelivery, type DeliveryCtx } from './message-delivery.js';
 import { duplicateMessageAttachments } from './attachment-duplication.js';
+import { localIdentityExists, missingIdentityReason } from './local-identity.js';
 
 export interface SendMessageInput {
   senderGhii: string;
@@ -114,8 +123,20 @@ export function mapMessageAttachments(
 }
 
 export type SendMessageResult =
-  | { ok: true; message: DirectMessageRecord }
-  | { ok: false; code: 'RECIPIENT_NOT_FOUND' | 'BLOCKED' };
+  | {
+    ok: true;
+    message: DirectMessageRecord;
+    /** Local delivery only: the message is sitting in the recipient's first-contact requests bucket
+     *  rather than their inbox, and they have to accept the sender before they read it. */
+    awaitingApproval?: boolean;
+  }
+  | {
+    ok: false;
+    code: 'RECIPIENT_NOT_FOUND' | 'BLOCKED';
+    /** What was wrong with the address, in the words of whoever wrote it. Callers show this instead
+     *  of their own generic line when it is present. */
+    reason?: string;
+  };
 
 /**
  * Create and deliver a direct message from `senderGhii` to `recipientGhii`. Same-node recipients are
@@ -140,11 +161,15 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
   const conversationId = input.conversationId
     || (subject ? randomUUID() : conversationIdFor(senderGhii, recipientGhii));
 
-  // For a local recipient, enforce the first-contact gate (block) BEFORE materialising delivery.
+  // For a local recipient, refuse before writing: the recipient has to exist, and it has to be the
+  // one that was ADDRESSED. This checked the owner only, and an agent's or an app's mail is delivered
+  // to its owner's inbox — so `typo#alice@node` passed, was written, was reported delivered with a
+  // timestamp, and read back as a thread. Nothing downstream disagreed, because the owner was real
+  // and the identity nobody had ever registered was only ever a label on the row.
   if (isLocal) {
-    const recipientOwner = parseGaiiLoose(deliveryGhii).owner;
-    const ownerRec = await storage.getOwner(recipientOwner);
-    if (!ownerRec) return { ok: false, code: 'RECIPIENT_NOT_FOUND' };
+    if (await localIdentityExists(storage, config, recipientGhii) === false) {
+      return { ok: false, code: 'RECIPIENT_NOT_FOUND', reason: missingIdentityReason(recipientGhii) };
+    }
     const contact = await storage.getContact(deliveryGhii, senderGhii);
     if (contact?.state === 'blocked') {
       // Record the sender's own copy as undeliverable; do not deliver to the recipient.
@@ -176,6 +201,12 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     await storage.setContactState(senderGhii, recipientGhii, 'accepted');
   }
 
+  // Local, and the recipient has not accepted this sender yet: the message is in their requests
+  // bucket, not their inbox. `delivered` is still true of the row — it is in their mailbox and they
+  // decide — but a sender told only "delivered" cannot tell the two apart, and that is the same
+  // silence the missing existence check produced. Reported, not hidden.
+  let awaitingApproval = false;
+
   if (isLocal) {
     // Sending to your OWN agent/eco: delivery resolves to you (the owner). The owner's mailbox already
     // holds the sender (outbound) copy, so the inbound copy is owned by the AGENT to avoid a primary-key
@@ -195,6 +226,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
         contact = await storage.setContactState(deliveryGhii, senderGhii, autoAccept ? 'accepted' : 'pending', id);
       }
       isRequest = contact.state === 'pending';
+      awaitingApproval = isRequest;
     }
 
     // Recipient's inbound copy. recipientGhii names the agent/eco the thread is with; ownerGhii is the
@@ -265,5 +297,5 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     emitChange('messages');
   }
 
-  return { ok: true, message: senderCopy };
+  return { ok: true, message: senderCopy, awaitingApproval };
 }

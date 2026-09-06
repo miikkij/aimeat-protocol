@@ -12,6 +12,12 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   v1.7.0 -- 2026-09-06 -- A refusal now says which part of the address was wrong, and a send that
+ *     is waiting behind the recipient's first-contact gate says so instead of reporting `delivered`
+ *     and nothing else. Both come from the service, so the REST door and the connector carry them
+ *     too. Reported from the fleet: two DMs to an agent that did not exist were answered `delivered`,
+ *     with a conversation id that read back a thread, and the only way anyone found out was the
+ *     other party saying a day later that nothing had arrived.
  *   v1.6.0 -- 2026-08-22 -- aimeat_dm_inbox and aimeat_dm_thread read through
  *     services/agent-dm-reads.ts rather than calling storage themselves. Both tools reached past the
  *     route into the storage predicates, so the group-thread fix would have landed on the REST door
@@ -199,9 +205,9 @@ export function registerDmMessageTools(
             });
 
             if (!result.ok) {
-                const msg = result.code === 'RECIPIENT_NOT_FOUND'
+                const msg = result.reason ?? (result.code === 'RECIPIENT_NOT_FOUND'
                     ? `No such recipient: ${recipientGhii}`
-                    : 'The recipient is not accepting messages from you (blocked or pending first-contact approval).';
+                    : 'The recipient is not accepting messages from you (blocked or pending first-contact approval).');
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: msg, code: result.code }) }] };
             }
 
@@ -215,6 +221,13 @@ export function registerDmMessageTools(
                         status: result.message.status,
                         attachments: result.message.attachments?.length ?? 0,
                         created_at: result.message.createdAt,
+                        // `delivered` and "they have read nothing yet" are both true of a first
+                        // message to a stranger. Say which one this is, or the sender waits for an
+                        // answer to something sitting behind a gate.
+                        ...(result.awaitingApproval ? {
+                            awaiting_approval: true,
+                            delivery_note: 'This is your first message to them, so it is in their contact requests rather than their inbox. They accept you once, and this message and everything after it arrive normally.',
+                        } : {}),
                         ...(redirectedTo ? {
                             addressed_to: redirectedTo,
                             note: 'Support on this node is answered by the people who run it, on another node. Pass conversation_id back to continue the same thread.',
@@ -288,9 +301,9 @@ export function registerDmMessageTools(
             });
 
             if (!result.ok) {
-                const msg = result.code === 'RECIPIENT_NOT_FOUND'
+                const msg = result.reason ?? (result.code === 'RECIPIENT_NOT_FOUND'
                     ? `No such recipient: ${recipientGhii}`
-                    : 'The recipient is not accepting messages (blocked or pending first-contact approval).';
+                    : 'The recipient is not accepting messages (blocked or pending first-contact approval).');
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: msg, code: result.code }) }] };
             }
 
@@ -309,6 +322,10 @@ export function registerDmMessageTools(
                         status: result.message.status,
                         attachments: result.message.attachments?.length ?? 0,
                         created_at: result.message.createdAt,
+                        ...(result.awaitingApproval ? {
+                            awaiting_approval: true,
+                            delivery_note: 'This is the owner\'s first message to them, so it is in their contact requests rather than their inbox. They accept once, and this message and everything after it arrive normally.',
+                        } : {}),
                         ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
                     }, null, 2),
                 }],
@@ -359,9 +376,9 @@ export function registerDmMessageTools(
                 aiProvenanceId,
             });
             if (!result.ok) {
-                const msg = result.code === 'RECIPIENT_NOT_FOUND'
+                const msg = result.reason ?? (result.code === 'RECIPIENT_NOT_FOUND'
                     ? `No such recipient: ${recipientGhii}`
-                    : 'The recipient is not accepting messages from you (blocked or pending first-contact approval).';
+                    : 'The recipient is not accepting messages from you (blocked or pending first-contact approval).');
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: msg, code: result.code }) }] };
             }
             return {
@@ -375,6 +392,12 @@ export function registerDmMessageTools(
                         status: result.message.status,
                         note: 'The answer returns as a reply — read interactive.answers via aimeat_dm_thread(conversation_id).',
                         created_at: result.message.createdAt,
+                        // A question nobody can see yet will never be answered, and waiting for the
+                        // answer is the whole point of this tool.
+                        ...(result.awaitingApproval ? {
+                            awaiting_approval: true,
+                            delivery_note: 'This is your first message to them, so the question is in their contact requests rather than their inbox. They accept you once, and it reaches them.',
+                        } : {}),
                         ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
                     }, null, 2),
                 }],

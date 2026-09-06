@@ -427,5 +427,80 @@ await test('25. My own sends still never count against me', async () => {
     assert(unread === 0, `my own words are not unread for me, got ${unread}`);
 });
 
+console.log('\nPhase F — an address nobody answers is refused, not acknowledged');
+// Reported from the fleet on 2026-09-06: an agent sent two DMs to `crewaimeat#owner@node` — the name
+// of a repository and an organism, never of an agent — and both came back `status: delivered` with a
+// deliveredAt and a conversation id that read back a two-message thread. An agent's mail is delivered
+// to its OWNER's inbox, and the existence check stopped at the owner, so every name under a real
+// account passed. Nothing failed, so nothing retried, and it took the other party saying "I got
+// nothing" a day later.
+await test('26. A DM to an agent name that does not exist is 404, and writes nothing', async () => {
+    const ghost = `nosuchagent${stamp}#${aliceName}@${NODE_ID}`;
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: ghost, body: 'Kukaan ei lue tätä.' }),
+    });
+    assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'RECIPIENT_NOT_FOUND', `code: ${body.error?.code}`);
+    // The account is real and the agent is not, and the refusal has to say which — a bare "no such
+    // recipient" reads as "no such account" and sends the caller to fix the wrong half.
+    assert(/nosuchagent/.test(body.error?.message ?? '') && new RegExp(aliceName).test(body.error?.message ?? ''),
+        `the message must name the agent and the account: ${body.error?.message}`);
+
+    // REFUSE BEFORE YOU WRITE: no sender copy, so no thread to read back.
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${alice.token}` } });
+    const leaked = (convs.body.data.conversations ?? []).find((c: any) => c.peerGhii === ghost);
+    assert(leaked === undefined, 'a refused send must leave no conversation behind');
+});
+
+await test('27. Same for an app that was never onboarded', async () => {
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: `eco:nosuchapp${stamp}#${aliceName}@${NODE_ID}`, body: 'Eikä tätä.' }),
+    });
+    assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'RECIPIENT_NOT_FOUND', `code: ${body.error?.code}`);
+});
+
+await test('28. An agent that DOES exist still receives, and the sender is told it is delivered', async () => {
+    // The other half of 26: the check refuses a name nobody registered and nothing else. dmbot is
+    // Alice's own agent, so there is no first-contact gate between them.
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: dmbot.gaii, body: 'Tämä menee perille.' }),
+    });
+    assert(status === 201, `expected 201, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.message.status === 'delivered', `status: ${body.data.message.status}`);
+    assert(body.data.awaiting_approval === undefined, 'my own agent has nothing to approve');
+});
+
+await test('29. A first message to a stranger says it is waiting for their approval', async () => {
+    // `delivered` is true of the row and useless on its own: the message is in Bob's requests bucket
+    // and he has never accepted this sender, so waiting for an answer would be waiting for nothing.
+    const stranger = await registerOwner(`dmstranger${stamp}`);
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${stranger.token}` },
+        body: JSON.stringify({ to: bob.ghii, body: 'Ensimmäinen viesti tuntemattomalle.' }),
+    });
+    assert(status === 201, `expected 201, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.awaiting_approval === true, `expected awaiting_approval, got ${JSON.stringify(body.data.awaiting_approval)}`);
+    assert(typeof body.data.delivery_note === 'string' && body.data.delivery_note.length > 0, 'the note says it in words');
+
+    // And it is genuinely a request, not an inbox row.
+    const reqs = await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(reqs.body.data.requests.some((r: any) => r.contactId === stranger.ghii), 'it is in Bob\'s requests');
+});
+
+await test('30. A recipient on another node is still handed to federation, not refused', async () => {
+    // Existence is only ours to judge locally. Refusing an unknown remote id would make everyone off
+    // this node unaddressable, so this must stay a 201 with a queued copy.
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: `whoever#someone@aimeat-elsewhere-001-test`, body: 'Toisen noden asia.' }),
+    });
+    assert(status === 201, `a federated recipient must not be refused locally, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.message.status !== 'delivered', `a queued send must not claim delivery, got ${body.data.message.status}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);

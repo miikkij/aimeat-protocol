@@ -21,6 +21,9 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   v1.9.0 -- 2026-09-06 -- A 404 here names the part of the address that was wrong (the account is
+ *     real, the agent under it is not), and a 201 says when the message is waiting in the
+ *     recipient's contact requests rather than their inbox. Both come from the service.
  *   v1.8.0 -- 2026-08-22 -- agent-inbox and agent-thread go through services/agent-dm-reads.ts, so a
  *     GROUP thread the agent belongs to is readable by it. A group thread's copies are written to the mailbox each participant resolves to, which for an agent is its OWNER's, and the message is addressed to the thread rather than to a person. So the agent was on none of its own rows: it read 0 messages in a thread it had just opened, and the answer would never have reached it either.
  *     GET /conversations/:id?agent= gets the same resolution: the list had begun advertising rows
@@ -231,7 +234,8 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     });
     if (!result.ok) {
       if (result.code === 'RECIPIENT_NOT_FOUND') {
-        res.status(404).json(error(config.nodeId, 'RECIPIENT_NOT_FOUND', `No such recipient: ${recipientGhii}`));
+        res.status(404).json(error(config.nodeId, 'RECIPIENT_NOT_FOUND',
+          result.reason ?? `No such recipient: ${recipientGhii}`));
         return;
       }
       res.status(403).json(error(config.nodeId, 'BLOCKED', 'This person is not taking messages from you. Ask them to add you as a contact.'));
@@ -240,6 +244,13 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
 
     res.status(201).json(success(config.nodeId, {
       message: result.message,
+      // `delivered` and "they have read nothing yet" are both true of a first message to a stranger,
+      // and a caller that sees only the first cannot tell the difference between a slow answer and a
+      // gate. Additive: the status field is unchanged.
+      ...(result.awaitingApproval ? {
+        awaiting_approval: true,
+        delivery_note: 'This is your first message to them, so it is in their contact requests rather than their inbox. They accept you once, and this message and everything after it arrive normally.',
+      } : {}),
       // Only on the redirect path, and additive: an existing caller reads the same `message` it always
       // did. The sender wrote `support@operators` and is told where that went, once.
       ...(group.kind === 'redirect' ? {

@@ -15,6 +15,8 @@
  *   gate); POST /v1/contacts/resolve (email → GHII exact match, or invite fallback signal).
  * @usage app.use(contactsRouter(config, storage))
  * @version-history
+ *   v1.2.1 — 2026-09-06 — `contactKind` is `identityKind` and comes from services/local-identity.ts,
+ *     which the DM send path now shares. No behaviour.
  *   v1.2.0 — 2026-08-30 — The Contacts page in the poster face: GET takes ?include=together,invites
  *     (shared organisms per person; the owner's open invitation per person without an account);
  *     GET /:contactId/together reads what the owner and one person have in common; POST /invite
@@ -37,8 +39,9 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
   ContactsError, listContactsMerged, addContact, updatePersonContact, removeContact, resolveContactEmail,
-  sendToContact, contactKind, parseContactInclude, type AddContactInput,
+  sendToContact, parseContactInclude, type AddContactInput,
 } from '../services/contacts.js';
+import { identityKind } from '../services/local-identity.js';
 import { contactTogether } from '../services/contacts-together.js';
 import { createContactInvitation, ContactInvitationError } from '../services/contact-invitations.js';
 import { invitePublic } from '../services/invitations.js';
@@ -101,7 +104,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
    * only; an agent's or an app's "together" is its owner's. ── */
   router.get('/v1/contacts/:contactId/together', requireAuth(), requireRole('owner'), async (req, res) => {
     const contactId = decodeURIComponent(req.params.contactId as string);
-    if (contactKind(contactId) !== 'ghii') {
+    if (identityKind(contactId) !== 'ghii') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Together is read for a person with an account here: pass their owner@node id, or the owner of the agent or app'));
       return;
     }
