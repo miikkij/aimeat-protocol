@@ -15,6 +15,9 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   Semantic prefixes — 2026-09-08 — SemanticAnnotationSchema refuses a prefix no @context defines.
+ *     It was `.passthrough()` with nothing checked, so `{"@type": "foo:Bar"}` was stored and served
+ *     as though it meant something; it expands to nothing in any JSON-LD processor.
  *   Board rules — 2026-08-30 — BoardRulesSchema (posting, categories, default_ttl_hours, post_cost)
  *     on BoardCreateSchema, and BoardPostUpdateSchema (ttl_hours or resolved: true), RFC §27.
  *   Password floor unsplit — 2026-08-12 — GhiiRegistrationSchema drops password.min(8). The rule was
@@ -24,13 +27,28 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { z } from 'zod';
+import { annotationErrors } from '../utils/onto-context.js';
 
 // ── Semantic Ontology (Phase 0.7b) ─────────────────────────
 
+/**
+ * A JSON-LD annotation, and the one thing about it this node checks: every prefix it names must
+ * resolve. `.passthrough()` stays — an ontology-specific field is the whole point of the block —
+ * but a prefix nobody declared is not an extra field, it is a claim that expands to nothing.
+ *
+ * A BARE type (`"@type": "LocalBusiness"`) is untouched: that is how schema.org is written, and it
+ * resolves against the document's default vocabulary rather than a prefix. Only `p:X` is checked,
+ * and only for whether `p` was defined — never for whether that vocabulary has such a term, which
+ * this node cannot know. → src/utils/onto-context.ts
+ */
 export const SemanticAnnotationSchema = z.object({
     '@context': z.record(z.string(), z.string()).optional(),
     '@type': z.string().optional(),
-}).passthrough();  // Allow ontology-specific fields (schema:category, qudt:unit, etc.)
+}).passthrough().superRefine((value, ctx) => {
+    for (const message of annotationErrors(value)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+    }
+});
 
 // ── Personal Nodes ──────────────────────────────────────────
 

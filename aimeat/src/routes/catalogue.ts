@@ -15,6 +15,9 @@
  *   v1.3.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 1): publish + delete resolve the
  *     provider identity instead of storing the raw `sub`, so an owner session (admitted through the
  *     agent role) publishes under its GHII rather than a bare name the delete would miss.
+ *   v1.4.0 — 2026-09-08 — The six `@context` blocks read DEFAULT_CONTEXT (utils/onto-context.ts)
+ *     instead of each carrying its own two-prefix copy. The copies were what a consumer resolved
+ *     against, and they had drifted from what the node itself accepts.
  */
 import { Router } from 'express';
 import { createHash, randomUUID } from 'node:crypto';
@@ -24,6 +27,7 @@ import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/mid
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { DEFAULT_CONTEXT } from '../utils/onto-context.js';
 import { cached, TTL } from '../services/cache.js';
 import type { DirectoryService } from '../services/directory.js';
 import type { RealtimeStats } from '../services/realtime-manager.js';
@@ -76,7 +80,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const paged = filteredActions.slice(start, start + perPage);
 
     res.json(success(config.nodeId, {
-      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
+      '@context': DEFAULT_CONTEXT,
       actions: paged.map(a => ({
         id: a.id,
         display_name: a.displayName,
@@ -119,7 +123,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const paged = filteredActions.slice(start, start + perPage);
 
     res.json(success(config.nodeId, {
-      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
+      '@context': DEFAULT_CONTEXT,
       actions: paged.map(a => ({
         id: a.id,
         display_name: a.displayName,
@@ -147,7 +151,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const paged = agents.slice(start, start + perPage);
 
     res.json(success(config.nodeId, {
-      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
+      '@context': DEFAULT_CONTEXT,
       agents: paged.map(a => ({
         gaii: a.gaii,
         display_name: a.displayName,
@@ -167,7 +171,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const publicBoards = boards.filter(b => b.visibility === 'public');
 
     res.json(success(config.nodeId, {
-      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
+      '@context': DEFAULT_CONTEXT,
       boards: publicBoards.map(b => ({
         id: b.id,
         name: b.name,
@@ -278,7 +282,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     });
 
     res.json(success(config.nodeId, {
-      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
+      '@context': DEFAULT_CONTEXT,
       entries: result.entries,
       facets: result.facets,
       total: result.total,
@@ -466,7 +470,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     }
 
     res.json(success(config.nodeId, {
-      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
+      '@context': DEFAULT_CONTEXT,
       id: action.id,
       display_name: action.displayName,
       description: action.description,

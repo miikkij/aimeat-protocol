@@ -69,6 +69,7 @@ import { companiesRouter } from '../routes/companies.js';
 import { bootstrapRouter } from '../routes/bootstrap.js';
 import { agentDocsRouter } from '../routes/agent-docs.js';
 import { glossaryRouter } from '../routes/glossary.js';
+import { nsRouter } from '../routes/ns.js';
 import { markdownMirrorsRouter } from '../routes/markdown-mirrors.js';
 import { agentConventionsRouter } from '../routes/agent-conventions.js';
 import { nodeRobotsTxt } from './static-files.js';
@@ -345,6 +346,7 @@ export async function mountRoutes(
   app.use(bootstrapRouter(config, storage, tunnelManager ?? undefined, siteService));
   app.use(agentDocsRouter(config));  // /sitemap.md + /AGENTS.md (apex only)
   app.use(glossaryRouter(config));   // /v1/glossary.{json,md} + JSON-LD
+  app.use(nsRouter(config));         // /v1/ns{,.md} — the core ontology at the namespace we cite
   app.use(markdownMirrorsRouter(config));  // <page>.md mirrors (apex only)
   app.use(agentConventionsRouter(config));  // /openapi.json, /skill.md, /agents.txt, webmcp + x402 discovery
   app.use(statsRouter(config, storage, stats, metricsRegistry));

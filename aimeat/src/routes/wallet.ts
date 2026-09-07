@@ -23,6 +23,8 @@
  *   v1.3.0 — 2026-09-04 — `lifetime` comes from services/wallet-stats.ts, which reads every row kind
  *     (the route had summed four of eleven and said "earned 0" over +190) and adds in/out, ledger_sum,
  *     unrecorded (balance − rows: what the daily pace credited without a row) and by_type.
+ *   v1.4.0 — 2026-09-08 — The three `@context` blocks read DEFAULT_CONTEXT (utils/onto-context.ts)
+ *     rather than repeating a two-prefix copy of it.
  */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -30,6 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, WalletTransaction } from '../storage/interface.js';
 import { requireAuth, requireScope, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { DEFAULT_CONTEXT } from '../utils/onto-context.js';
 import { calculateEscrow } from '../services/morsel.js';
 import { MorselRequestSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
@@ -85,7 +88,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
 
     const isAgentSession = req.auth!.roles.includes('agent') && !req.auth!.roles.includes('owner');
     res.json(success(config.nodeId, {
-      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
+      '@context': DEFAULT_CONTEXT,
       '@type': 'aimeat:Wallet',
       gaii: identity,
       ...(isAgentSession ? { note: 'This is your owner\'s shared wallet. Agents do not have separate balances -- all spending is deducted from the owner\'s account.', accessed_by: req.auth!.sub } : {}),
@@ -123,7 +126,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     const paged = transactions.slice(start, start + perPage);
 
     res.json(success(config.nodeId, {
-      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
+      '@context': DEFAULT_CONTEXT,
       transactions: paged.map(tx => ({
         '@type': 'schema:TransferAction',
         id: tx.id,
@@ -154,7 +157,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
       : [];
 
     res.json(success(config.nodeId, {
-      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
+      '@context': DEFAULT_CONTEXT,
       transactions: transactions.map(tx => ({
         '@type': 'schema:TransferAction',
         id: tx.id,

@@ -9,6 +9,11 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.36.0 -- 2026-09-08 -- Add e2e-ontology.ts: the core ontology served at the namespace our own
+ *            responses cite, and the two write doors that used to store an annotation naming a
+ *            vocabulary nobody defined. No fixed port, no receiver; 19 assertions, five of them
+ *            refusals. Not in the guard tier yet — it earns that with three identical green runs
+ *            alone on both backends, which it has not had time to accumulate.
  *   v1.35.0 -- 2026-09-07 -- Guard publishing permission across all three HTTP doors.
  *   v1.34.0 -- 2026-09-06 -- Add e2e-secrets.ts: the owner's write-only credential vault, and the
  *            resolution of {{secret:NAME}} inside ctx.fetch. It binds 40672 for a real receiver, so
@@ -504,6 +509,9 @@ const ALL_SUITES = [
     'test/e2e-agent-crew.ts',
     'test/e2e-connect-serve-loopback.ts',
     'test/e2e-phase0.ts',
+    // The semantic layer: the core ontology served at the namespace our own responses cite, and the
+    // two doors that used to store an annotation naming a vocabulary nobody defined.
+    'test/e2e-ontology.ts',
     'test/e2e-projects.ts',
     'test/e2e-portal.ts',
     'test/e2e-header-nav.ts',
