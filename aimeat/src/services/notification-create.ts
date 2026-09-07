@@ -11,6 +11,11 @@
  * @structure NotificationCreateError · createPrincipalNotification
  * @usage const r = await createPrincipalNotification(storage, config, req.auth!, body);
  * @version-history
+ *   v1.1.0 — 2026-09-07 — `created` says whether it was created. It was the literal `true`, and
+ *     notify()'s answer was taken apart for `muted` alone, so the one field carrying a storage
+ *     failure was dropped here: POST /v1/notifications answered 201 and aimeat_notify answered
+ *     `status: notified`, both having stored nothing. notify() swallowing is correct for its four
+ *     side-effect callers; it only holds if the answer says what happened.
  *   v1.0.0 — 2026-08-30 — Extracted from routes/notifications.ts so the MCP tool is the same call.
  */
 import type { AimeatConfig } from '../config.js';
@@ -30,7 +35,7 @@ export interface CreateNotificationInput { title?: unknown; body?: unknown; link
 
 export async function createPrincipalNotification(
   storage: Storage, config: AimeatConfig, auth: CreatorAuth, input: CreateNotificationInput,
-): Promise<{ created: true; link: string | null; muted: boolean }> {
+): Promise<{ created: boolean; link: string | null; muted: boolean }> {
   const { title, body, link, type } = input;
   if (typeof title !== 'string' || !title.trim() || title.length > 200) {
     throw new NotificationCreateError(400, 'VALIDATION_ERROR', 'title is required (string, max 200 chars)');
@@ -78,6 +83,17 @@ export async function createPrincipalNotification(
 
   const ghii = `${auth.owner}@${config.nodeId}`;
   const result = await notify(storage, ghii, { type: finalType, title: finalTitle, body: body as string | undefined, link: finalLink, source });
+  // `created` SAYS WHETHER IT WAS CREATED. It was the literal `true`, and `notify()`'s answer was
+  // taken apart for `muted` alone, so the one field that could have carried the failure was dropped
+  // here and every caller above was told the notification had landed. `notify()` is best-effort BY
+  // DESIGN -- it swallows a storage failure so the action that TRIGGERED a notification still
+  // succeeds, which is right for the four call sites where notifying is a side effect -- and that
+  // design only holds if the answer says what happened. Measured 2026-09-07 against a storage that
+  // refuses every write: `aimeat_notify` was the one tool of 318 on the node's MCP surface that
+  // reached broken storage and answered without an error.
+  //
+  // A MUTED notification keeps `created: false` with `muted: true`, and that is not a failure: the
+  // owner said "nothing from this one", the node honoured it, and the two fields together say so.
   emitChange('notifications', ghii);
-  return { created: true, link: finalLink ?? null, muted: result.muted };
+  return { created: result.stored, link: finalLink ?? null, muted: result.muted };
 }
