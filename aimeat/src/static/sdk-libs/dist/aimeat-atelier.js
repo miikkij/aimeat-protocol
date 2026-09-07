@@ -7062,12 +7062,14 @@
     return {
       rebuild,
       dispose: function() {
+        if (disposed) return;
         disposed = true;
         if (raf) cancelAnimationFrame(raf);
         ro.disconnect();
         controls.dispose();
         disposeGroup();
         renderer.dispose();
+        renderer.forceContextLoss();
         clear(stage);
       }
     };
