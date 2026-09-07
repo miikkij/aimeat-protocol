@@ -44,6 +44,10 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+          # The same missing line as vulnerability-scan.yml had, and the same result: setup-node
+          # looked for the lockfile in the repo root, found the stub, and the job died with
+          # "Dependencies lock file is not found" before it read a single library version.
+          cache-dependency-path: aimeat/pnpm-lock.yaml
 
       # The vendored binaries are identified by the manifest, not by their bytes being present, so
       # the 70 MB of wasm this job never looks at can stay unfetched.
