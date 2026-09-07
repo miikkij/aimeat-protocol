@@ -10,6 +10,11 @@
  *   MCP tool call flows over the single persistent WS without per-tool changes.
  * @usage Imported by `aimeat connect` subcommands and MCP tools.
  * @version-history
+ *   v1.6.0 -- 2026-09-07 -- ONE mint per credential, not one per call. Removing v1.3.0's string
+ *     comparison left nothing in its place: a genuinely unpermitted agent minted on EVERY refusal,
+ *     for ever, against a 60-a-minute IP-keyed door — the budget that took 22 agents down in
+ *     agent-key.ts v1.1.0. A credential refused after its own retry is marked, and the mark is the
+ *     token itself, so any change of credential re-arms it with no timer.
  *   v1.5.0 -- 2026-09-07 -- The retry asks the right store. v1.4.0 paired `forgetCachedToken`
  *     (agent-key.ts's mint cache) with `keychain.getToken` (the stored-bearer FILE), which that
  *     cache has nothing to do with -- so a v2 agent, holding a key and no bearer, got null back and
@@ -131,6 +136,24 @@ export class AimeatClient {
     const first = await this.dispatch(method, path, body);
     if (!this.isScopeDenied(first)) return first;
 
+    // ONE MINT PER CREDENTIAL, NOT ONE PER CALL. Removing the old string-comparison guard left
+    // nothing in its place, and the shape that leaves is worse than the one it replaced: an agent
+    // that genuinely lacks a word is refused for ever, and every refusal dropped the cache and
+    // minted again. `POST /v1/agents/v2/token` is rateLimit({ max: 60, windowMs: 60_000 }) and
+    // takes no credential, so it is keyed by IP — one polling agent missing one scope spends the
+    // whole machine's mint budget and takes every other identity behind that address down with it.
+    // That is not hypothetical: agent-key.ts v1.1.0 records a 62-identity fleet whose budget ran
+    // out during a joining burst, and twenty-two agents holding good keys stopped for good.
+    //
+    // The guard is the token itself, and it is exact. A refusal is worth ONE fresh credential:
+    // the retry exists to pick up a grant made after the token was minted. If the FRESH token is
+    // refused too, the record really does lack the word and no further mint can change that — so
+    // that token is marked, and every later call carrying it returns the refusal without minting.
+    // The mark is a token string, so it stops matching the moment the credential changes for any
+    // reason at all (expiry, a `scopes_changed` push, a re-attach), and the retry re-arms itself
+    // with no timer and nothing to tune.
+    if (this.token && this.token === this.refusedAfterRetry) return first;
+
     // SCOPE_DENIED means the node compared our token's scopes against the agent's record and
     // refused. The record is the truth and the token is a snapshot, so a refusal on THIS code is
     // by definition a stale credential — the only remedy is a fresh one. Reported 2026-09-06:
@@ -170,8 +193,20 @@ export class AimeatClient {
     }
     if (!fresh || fresh === this.token) return first;
     this.token = fresh;
-    return this.dispatch(method, path, body);
+    const second = await this.dispatch(method, path, body);
+    // Marked only when the FRESH credential is refused too. A retry that succeeds leaves nothing
+    // behind, so a later refusal — a permission removed and granted again, say — is retried on its
+    // own merits rather than being suppressed by a mark from an unrelated call.
+    if (this.isScopeDenied(second)) this.refusedAfterRetry = fresh;
+    return second;
   }
+
+  /**
+   * The credential that was minted in answer to a scope refusal and refused again. While the client
+   * still holds exactly this token there is nothing a new mint could add, so the retry above stands
+   * down. Any change of token clears it by ceasing to match.
+   */
+  private refusedAfterRetry: string | null = null;
 
   /** True when the node refused this call for a scope the token does not carry. */
   private isScopeDenied(r: ApiResponse): boolean {

@@ -55,16 +55,19 @@ export interface PushContext {
  * the rest of the token's life.
  */
 export function notifyScopesChanged(ctx: PushContext, gaii: string): void {
-  for (const conn of ctx.connections.values()) {
-    if (conn.principal !== gaii) continue;
-    ctx.sendTo(conn, {
-      type: 'scopes_changed',
-      agent: gaii,
-      message: 'Permissions changed — mint a fresh token',
-      timestamp: new Date().toISOString(),
-    });
-    return;   // one live session per identity
-  }
+  // `connections` IS KEYED BY GAII, so this is a `get`. It used to walk every value comparing
+  // `conn.principal` to the key it was already holding — the same fact read two ways, in a file
+  // that reads it the direct way twice more (the task push and the record push both `get`), and
+  // that revokeByGaii in connect-tunnel-revocation.ts reads with one lookup. Cheap either way at
+  // 62 identities; the reason to change it is that two spellings of one lookup is how they drift.
+  const conn = ctx.connections.get(gaii);
+  if (!conn) return;
+  ctx.sendTo(conn, {
+    type: 'scopes_changed',
+    agent: gaii,
+    message: 'Permissions changed — mint a fresh token',
+    timestamp: new Date().toISOString(),
+  });
 }
 
 /**
