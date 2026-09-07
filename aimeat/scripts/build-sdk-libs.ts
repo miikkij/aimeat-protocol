@@ -15,6 +15,8 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.9.0 — 2026-09-08 — Register aimeat-onto (what a record MEANS: types, and a SKOS vocabulary
+ *     kept in one memory record).
  *   v1.8.0 — 2026-09-05 — Register aimeat-living (the living document: one JSON record, one
  *     dependency graph, formulas with units, a statechart and the chain view).
  *   v1.7.0 — 2026-09-02 — Register aimeat-assets (the asset manager: one manifest per app, files in
@@ -87,6 +89,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'auth', entry: 'auth/index.js' },
   { name: 'atelier', entry: 'atelier/index.js' },
   { name: 'living', entry: 'living/index.js' },
+  { name: 'onto', entry: 'onto/index.js' },
 ];
 
 function banner(name: string): string {
