@@ -47,6 +47,7 @@ import { activateExtension, deactivateExtension } from './cortex/activation.js';
 import { refreshCortexDependencies, dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { snapshotCortexVersion, resolveCortexLib, listVersions } from '../services/component-versions.js';
 import { logger } from '../utils/logger.js';
+import { cortexOntologyToSkos } from '../services/cortex-ontology-skos.js';
 
 // Re-exported so existing consumers (e.g. services/generator-registration.ts) keep importing
 // `activateExtension` from '../routes/cortex.js' unchanged after the activation logic moved out.
@@ -594,6 +595,11 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
         name: o.name,
         description: o.description,
         concepts: o.concepts,
+        // The same content under the names a SKOS reader knows. `concepts` stays exactly as it was,
+        // so nothing that reads this endpoint today has to change; a reader that speaks SKOS now has
+        // something to speak to. Rendered here rather than stored, so it follows the manifest even
+        // for a cortex activated before this existed.
+        skos: cortexOntologyToSkos(o, `${name}/${o.name}`),
       })),
       total: ontologies.length,
     }));

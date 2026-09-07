@@ -6,6 +6,10 @@
  *   schemas, ontologies, prompts, actions, boards, seed-data and lib registrations. Extracted
  *   from src/routes/cortex.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-09-08 — An activated ontology carries a `skos` rendering beside its `concepts`.
+ *     The old shape was a concept scheme under names no SKOS tool recognises, so nothing outside
+ *     this repo could read it and it could not be pointed at an outside vocabulary. `concepts` is
+ *     unchanged, so nothing that reads it notices.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/cortex.ts (max-file-lines)
  */
 import { randomBytes } from 'node:crypto';
@@ -13,6 +17,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import { publicBoardCeiling } from '../../services/board-write.js';
+import { cortexOntologyToSkos } from '../../services/cortex-ontology-skos.js';
 
 // ── Activation Logic ──
 
@@ -62,7 +67,16 @@ export async function activateExtension(
         await storage.setMemory({
           key: ontKey,
           ownerGaii: gaii,
-          value: { name: comp.name, description: comp.description, concepts: comp.concepts },
+          // Both readings, side by side. `concepts` is byte-for-byte what it has always been, so a
+          // cortex published months ago and anything reading that field are untouched; `skos` is
+          // the same content under the names a SKOS reader knows, which is what lets an app point
+          // a cortex's vocabulary at an outside one.
+          value: {
+            name: comp.name,
+            description: comp.description,
+            concepts: comp.concepts,
+            skos: cortexOntologyToSkos(comp, `${ext.name}/${comp.name}`),
+          },
           visibility: 'public',
           tags: ['cortex', 'ontology', ext.name],
           ttlHours: null,

@@ -36003,6 +36003,13 @@ paths:
     get:
       operationId: getCortexModelOntology
       summary: Get cortex model ontology
+      description: >-
+        The ontology components a cortex declares. Each one is returned twice: `concepts` in the
+        shape it has carried since Phase 0.7 (`label`, `broader`, `related_to`, `values`), and
+        `skos` as a `skos:ConceptScheme` under the names a SKOS reader knows. The second is rendered
+        from the manifest rather than stored, so a cortex activated before this existed carries it
+        too. In the SKOS view a concept's `values` become narrower concepts with their own ids, which
+        is what makes them filterable and translatable.
       tags: [Cortex]
       security:
         - BearerAuth: []
