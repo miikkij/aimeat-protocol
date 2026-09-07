@@ -31172,7 +31172,13 @@ paths:
         App-grant sessions (role `app`) need `notifications:send` in their grant; an app
         notification gets the app's name prefixed to the title (provenance) and `link` defaults to
         the app's own open URL (`/v1/apps/{owner}/{file}?mode=inline`) so the click reopens the app.
-        Delivery is best-effort (`created: true` confirms acceptance, not push delivery).
+        `created` says whether the notification was STORED — that it is in the bell and will be
+        there when the owner next looks. It is not a claim about the browser push, which is
+        best-effort on top and can fail without changing `created`. A notification the owner has
+        MUTED comes back 201 with `created: false, muted: true`: nothing failed, the node honoured
+        a decision the owner made, and the caller is told so it can say something else instead. A
+        notification that could not be stored is a 502, because the caller asked for one thing and
+        it did not happen.
 
         A client-supplied `actions` field is rejected with 400: inline `reply`/`api` actions execute
         with the recipient's own authority when clicked, so they may only originate from trusted node
@@ -31192,10 +31198,11 @@ paths:
                 link: { type: string, maxLength: 500, description: "Same-node path the notification deep-links to (must start with '/'), e.g. '/v1/profile?tab=messages'" }
                 type: { type: string, pattern: "^[a-zA-Z0-9_:.-]{1,64}$", description: "Machine type; defaults to 'app' / 'agent' / 'custom' by caller role" }
       responses:
-        '201': { description: "Notification accepted ({ created: true, link })" }
+        '201': { description: "Stored ({ created: true, link }), or honoured as muted ({ created: false, muted: true })" }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Missing notifications:send scope }
+        '502': { description: "NOTIFICATION_NOT_STORED — the notification could not be written, so nobody was told" }
     delete:
       operationId: clearNotifications
       summary: Clear the caller's notifications (the bell's "Clear all")

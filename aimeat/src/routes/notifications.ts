@@ -23,6 +23,9 @@
  *   Notification body limit 1 000 → 10 000 — 2026-07-30 — matched in openapi.yaml.
  *   v1.3.0 -- 2026-07-19 -- DELETE /v1/notifications: "Clear all" from the header bell removes the owner's
  *     notif rows (owner-scoped list → bulkDeleteMemory, per-key fallback); optional { ids } to clear a subset.
+ *   v1.5.0 -- 2026-09-07 -- POST answers 502 NOTIFICATION_NOT_STORED instead of 201 when the
+ *     notification was not written. 201 means created, and this door answered it with
+ *     `created: false` in the body. A MUTED notification keeps its 201: nothing failed.
  *   v1.0.0 -- 2026-06-08 -- Initial: memory-backed notification inbox.
  *   v1.1.0 -- 2026-07-02 -- POST /v1/notifications: apps/agents notify their own owner
  *     (scope notifications:send); app notifications deep-link back to the app by default.
@@ -161,6 +164,21 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
     try {
       const auth = req.auth!;
       const r = await createPrincipalNotification(storage, config, { owner: auth.owner as string, sub: auth.sub, roles: auth.roles, app_grant: auth.app_grant ?? null }, (req.body ?? {}) as Record<string, unknown>);
+      // 201 MEANS IT WAS CREATED. `createPrincipalNotification` is best-effort BY DESIGN — it
+      // swallows a storage failure so that the action which triggered the notification still
+      // succeeds, which is right for its four internal callers, where notifying is a side effect of
+      // work that already happened. It is wrong here: this door exists to send a notification and
+      // nothing else, and it answered 201 with `stored: false` in the body, so the caller was told
+      // the owner had been told. Measured 2026-09-07 against a storage that refuses every write.
+      //
+      // `muted` is NOT this case and keeps its 201: the owner said "nothing from you", the node
+      // honoured it, and the answer carries `muted: true` for the caller to read. Nothing failed.
+      if (!r.created && !r.muted) {
+        res.status(502).json(error(config.nodeId, 'NOTIFICATION_NOT_STORED',
+          'The notification could not be stored, so nobody was told. Nothing about your own work failed — try again, and if it keeps failing, say so in a message instead.',
+          undefined, r));
+        return;
+      }
       res.status(201).json(success(config.nodeId, r, [
         { description: 'List your notifications', method: 'GET', url: '/v1/notifications' },
       ]));
