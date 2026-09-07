@@ -1,0 +1,97 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-vocab
+  namespace: aimeat
+  description: "The app's door to a real vocabulary. Searches Finto (YSO: about 30 000 Finnish, Swedish and English concepts, CC BY 4.0) through the vocab-finto extension, and turns the concepts a person picked into a scheme they save as their own."
+  author: AIMEAT
+  tags: [vocabulary, concepts, taxonomy, skos, yso, finto, tags, ontology]
+  labels:
+    domain: knowledge
+  visibility: public
+
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: prompt
+      name: vocab-assistant
+      content: |
+        You are helping build an app that has the aimeat-vocab cortex installed, beside the
+        aimeat-onto library.
+
+        THE TWO ARE DIFFERENT THINGS AND THE DIFFERENCE MATTERS.
+          AIMEAT.onto  — the vocabulary the OWNER keeps, in their own memory at vocab.<id>.
+                         Read it, search it, save it. No network beyond this node.
+          AIMEAT.vocab — the outside source. Looks a term up in Finto and hands back concepts
+                         nobody here has kept yet.
+
+        The flow that makes an app worth using is: search outside, let the person choose, save
+        inside. After that the app reads the owner's own record and never calls Finto again, so
+        it keeps working when the service is down and the person owns what they picked.
+
+          // 1. find candidates
+          const { results } = await AIMEAT.vocab.search('lintu', { lang: 'fi' });
+          //    → [{ uri, prefLabel, lang, vocab }]
+
+          // 2. the person ticks the ones they want, then:
+          const { scheme } = await AIMEAT.vocab.scheme(chosenUris, {
+            id: 'hobbies', label: { fi: 'Harrastukset', en: 'Hobbies' }, langs: ['fi', 'en'],
+          });
+
+          // 3. it is theirs now
+          await AIMEAT.onto.saveVocab('hobbies', scheme);
+
+          // 4. from here on, no network
+          const v = await AIMEAT.onto.vocab('hobbies');
+          v.search('lintu', 'fi');   v.label(id, 'fi');   v.broader(id);
+
+        One concept in full, when you need its relations before deciding:
+          const { concept } = await AIMEAT.vocab.concept(uri, { langs: ['fi', 'en'] });
+          //    → { uri, prefLabel: {fi,en}, altLabel: {...}, broader: [...], narrower: [...] }
+
+        WHAT EACH SAVED CONCEPT KEEPS. `skos:exactMatch` points back at the concept in YSO. That
+        is the field that lets two systems which never agreed on anything tell they mean the same
+        thing, without either adopting the other's ids. Do not strip it.
+
+        ATTRIBUTION TRAVELS WITH THE DATA. YSO is CC BY 4.0, and the scheme comes back carrying
+        `dcterms:rights` and `dcterms:source`. Leave them in the record, and show the credit
+        wherever a person sees the concepts.
+
+        LANGUAGES. fi, sv and en are what YSO carries; anything else answers empty. Ask for the
+        ones your app renders, not all three by habit — each language is a separate lookup.
+
+        Load via:
+          <script src="{{node_url}}/v1/libs/aimeat-auth.js"></script>
+          <script src="{{node_url}}/v1/libs/aimeat-onto.js"></script>
+          <script src="{{node_url}}/v1/cortex/aimeat-vocab/libs/aimeat-vocab.js"></script>
+      variables:
+        - "{{node_url}}"
+
+    - type: lib
+      name: aimeat-vocab
+      filename: aimeat-vocab.js
+      exports: [search, concept, scheme, available]
+      api_surface: |
+        Every call needs a signed-in session (aimeat-auth.js first). This library reaches the
+        vocab-finto extension; an app never calls /v1/ext/ itself.
+
+        AIMEAT.vocab.search(query, opts?) -> { results: [{ uri, prefLabel, lang, vocab }], cached, stale? }
+          opts: { lang?: 'fi'|'sv'|'en', vocab?: string, limit?: number }
+          A trailing wildcard is added for you, so 'lintu' finds 'lintuharrastus'. `stale: true`
+          means Finto could not be reached and this is the stored copy.
+
+        AIMEAT.vocab.concept(uri, opts?) -> { concept: { uri, prefLabel, altLabel, broader, narrower }, cached }
+          opts: { langs?: string[], vocab?: string }
+
+        AIMEAT.vocab.scheme(uris, opts) -> { scheme, fetched }
+          opts: { id (required), label?: Record<lang,string>, langs?: string[], vocab?: string }
+          Hands back a SKOS concept scheme ready for AIMEAT.onto.saveVocab(id, scheme). A concept
+          whose broader was ALSO picked keeps that hierarchy locally; one whose broader was not is
+          left flat rather than pointing at an id the vocabulary does not contain.
+
+        AIMEAT.vocab.available() -> boolean   (is a session present at all)
+
+        A refusal arrives as a thrown Error carrying the extension's own code and message
+        (QUERY_TOO_SHORT, BAD_URI, BAD_ID, NO_CONCEPTS, TOO_MANY, FINTO_UNREACHABLE, FINTO_ERROR),
+        so show it to the person rather than translating it into "something went wrong".

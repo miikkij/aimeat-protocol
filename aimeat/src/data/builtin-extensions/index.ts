@@ -20,11 +20,15 @@
  * @usage
  *   import { BUILTIN_EXTENSIONS } from '../data/builtin-extensions/index.js';
  * @version-history
+ *   v1.1.0 — 2026-09-08 — vocab-finto: the door to YSO, so a vocabulary can be built from a real
+ *     one rather than typed out. It is an extension and not a core route because YSO is one source
+ *     among many and the core should not take a position on which.
  *   v1.0.0 — 2026-09-06 — Initial, with living-hooks as its first entry.
  */
 import { LIVING_HOOKS, type BuiltinExtension } from './living-hooks.js';
+import { VOCAB_FINTO } from './vocab-finto.js';
 
 export type { BuiltinExtension } from './living-hooks.js';
 
 /** Every extension this build ships. Order is install order; nothing here depends on anything else. */
-export const BUILTIN_EXTENSIONS: BuiltinExtension[] = [LIVING_HOOKS];
+export const BUILTIN_EXTENSIONS: BuiltinExtension[] = [LIVING_HOOKS, VOCAB_FINTO];
