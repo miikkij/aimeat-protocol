@@ -111,6 +111,13 @@ export const NOT_IN_WILDCARD = [
   // "Full access" is one click, and nobody clicking it is deciding that an agent may rotate the key
   // their extensions call the world with.
   'secrets:manage',
+  // ── Added 2026-09-07 ─────────────────────────────────────────────────────────────────────────
+  // Removing a message from the owner's own mailbox, as the owner. A separate word from
+  // send-as-owner and not a widening of it: replying for someone is additive and they can read what
+  // was sent, while deleting destroys a piece of their correspondence and leaves nothing behind to
+  // read. An agent is not shut out — asking your own AI to clear out a thread is the use it exists
+  // for — but it costs its own tick rather than riding along with "Full access".
+  'messages:delete-as-owner',
 ];
 
 /**
@@ -147,7 +154,9 @@ export const SCOPE_DOMAINS = [
   // social:members — add or remove who may read a shared board. A different promise from posting
   //   to one, which is what social:write covers.
   { key: 'social',    permissions: ['read', 'write', 'members'] },
-  { key: 'messages',  permissions: ['send', 'read', 'send-as-owner'] },
+  // delete-as-owner — remove a message from the owner's own mailbox. Its own tick beside
+  //   send-as-owner, because the two are not the same promise: one adds, the other destroys.
+  { key: 'messages',  permissions: ['send', 'read', 'send-as-owner', 'delete-as-owner'] },
   { key: 'wallet',    permissions: ['read'] },
   // consent:groups — create a sharing group and decide who is in it. A sharing group IS the
   //   boundary of who reads the owner's memory, so it is separated from managing consents.

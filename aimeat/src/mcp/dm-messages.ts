@@ -51,6 +51,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
 import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
+import { deleteOwnerMessage } from '../services/direct-message-delete.js';
 import { sendGroupMessage } from '../services/conversation-group.js';
 import { broadcastFromPrincipal } from '../services/message-broadcast.js';
 import type { DeliveryCtx } from '../services/message-delivery.js';
@@ -418,6 +419,36 @@ export function registerDmMessageTools(
                     }, null, 2),
                 }],
             };
+        },
+    );
+
+    // ── aimeat_dm_delete_as_owner — remove one message from the OWNER's mailbox ──
+    // Gated by the explicit `messages:delete-as-owner` scope, which no wildcard carries: the
+    // registration filter only offers this tool to an agent whose owner ticked it by hand. A word of
+    // its own rather than `messages:send-as-owner`, because replying for someone is additive and they
+    // can read what was sent, while this destroys part of their correspondence and leaves nothing to
+    // read. The mailbox is derived server-side from the session GAII, so an agent can only ever reach
+    // its own owner's messages.
+    mcp.tool(
+        'aimeat_dm_delete_as_owner',
+        descriptionFor('aimeat_dm_delete_as_owner'),
+        {
+            message_id: z.string().min(1).max(200).describe('Id of the message to remove, from aimeat_dm_inbox or aimeat_dm_thread.'),
+        },
+        annotationsFor('aimeat_dm_delete_as_owner'),
+        async ({ message_id }) => {
+            const agentGaii = getAgentGaii();
+            const parsed = parseGaiiLoose(agentGaii);
+            // The SAME service the REST door calls, so the two surfaces cannot come to different
+            // answers about whose mailbox this is.
+            const gone = await deleteOwnerMessage(storage, { owner: parsed.owner }, config.nodeId, message_id);
+            if (!gone) {
+                return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: "No such message in your owner's mailbox.", code: 'NOT_FOUND', message_id }) }] };
+            }
+            // Audit: an agent removed something from a person's mailbox, and there is no undo. The log
+            // is the only durable record of which agent did it.
+            logger.info('dm deleted as owner (delegated)', { agent: agentGaii, owner: `${parsed.owner}@${config.nodeId}`, messageId: message_id });
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, message_id }, null, 2) }] };
         },
     );
 

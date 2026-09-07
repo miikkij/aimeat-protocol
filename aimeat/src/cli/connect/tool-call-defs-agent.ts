@@ -542,6 +542,16 @@ export const agentTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.get(`/v1/messages/agent-inbox${query({ page: optionalNumber(input, 'page'), per_page: optionalNumber(input, 'per_page') })}`),
     },
     {
+        // THE THIRD SURFACE, and the one a fleet actually calls. A tool that exists on the two MCP
+        // doors and not here is a tool a fleet daemon cannot reach at all.
+        name: 'aimeat_dm_delete_as_owner',
+        description: "Remove one message from the OWNER's mailbox, as the owner. No undo; the other side keeps their copy. Requires the messages:delete-as-owner scope.",
+        input: {
+            message_id: { type: 'string', required: true, description: 'Id of the message to remove (from aimeat_dm_inbox or aimeat_dm_thread).' },
+        },
+        handler: ({ client }, input) => client.delete(`/v1/messages/${encodeURIComponent(requiredString(input, 'message_id'))}`),
+    },
+    {
         name: 'aimeat_dm_thread',
         description: "Read a full federated DM thread as this agent sees it (your sent + the messages addressed to you), for one conversation_id.",
         input: {

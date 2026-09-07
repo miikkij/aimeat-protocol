@@ -155,13 +155,15 @@ import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
 import { peerLabel } from '/js/services/messages-ai-prompts.js';
-import { ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure, parkMessage, openTrackedRecord, buildContactOptions, normalizePollQuestions, mergeThreadPage } from './inbox-tab/helpers.js';
+import { ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure, openTrackedRecord, buildContactOptions, normalizePollQuestions, mergeThreadPage } from './inbox-tab/helpers.js';
 import { Composer, MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
 import { buildConversationReplyProps, buildMessageReplyProps, buildConversationNotebookProps } from './inbox-tab/ai-actions.js';
 import { ListPanel, ThreadPanel, TrackedPanel, ResultsPanel, renderBroadcastForm } from './inbox-tab/panels.js';
 import { useThreadAutoScroll, useMobileComposerKeyboard, useLinkPreviewToggle, useAttachmentUrlRefresh, useRecentBroadcasts } from './inbox-tab/use-thread-ux.js';
 import { useVoiceMessages } from './inbox-tab/use-voice.js';
 import { ContactPicker } from '/components/ContactPicker.js';
+import { useConfirm } from '/components/Modal.js';
+import { messageActions } from './inbox-tab/message-actions.js';
 import { swallowed } from '/js/swallowed.js';
 
 export default function InboxTab({ showToast }) {
@@ -177,6 +179,9 @@ export default function InboxTab({ showToast }) {
   // without taking activeConv as a dependency and being rebuilt on every thread switch.
   const activeConvRef = useRef(null); activeConvRef.current = activeConv;
   const [thread, setThread] = useState([]);
+  // The delete on a bubble is the one action here with no undo, so it goes through the shared
+  // confirm rather than a window.confirm: same dialog, same danger styling, as every other delete.
+  const { confirm, ConfirmUI } = useConfirm();
   const [urlMap, setUrlMap] = useState({});
   const { showLinkPreviews, toggleLinkPreviews } = useLinkPreviewToggle(); const [mdViewer, setMdViewer] = useState(null); // link-preview toggle (persisted) + markdown viewer state
   const [aiReply, setAiReply] = useState(null);           // { title, build } — Reply with AI popover (TARGET-031)
@@ -291,37 +296,15 @@ export default function InboxTab({ showToast }) {
   const activeTracked = trackedList.filter(tr => tr.state !== 'replied');
   const doneCount = trackedList.length - activeTracked.length;
 
-  // Clicking 🔗: if the message already has an ACTIVE tracked response, surface it (don't make a
-  // duplicate); a finished (replied) one may be tracked again as a fresh task.
-  const onTrackMsg = (msg) => {
-    const existing = trackedByMsg[msg.id];
-    if (existing && existing.state !== 'replied') { showToast?.(t('inbox.trackAlready')); setMode('tracked'); return; }
-    setTrackMsg(msg);
-  };
-
-  // Clicking 📓: copy the message straight into the notebook for later processing (no AI step) — keeps the
-  // source link + reply intent so it can be replied to or enriched/filed from the notebook later.
-  const onParkMsg = (msg) => parkMessage(msg, showToast);
-
-  const cancelTracked = async (tr) => {
-    let resp;
-    try { resp = await tracked.cancelTrackedResponse(tr.id); }
-    catch { showToast?.(t('inbox.trackFailed'), true); return; }
-    if (resp?.ok === false) { showToast?.(resp.error?.message || t('inbox.trackFailed'), true); return; }
-    // Only on confirmed success: dismiss it immediately (so a stale re-fetch can't bring it back) + toast.
-    dismissedRef.current.add(tr.id);
-    setTrackedList(prev => prev.filter(x => x.id !== tr.id));
-    showToast?.(t('inbox.trackCancelled'));
-    loadLists();
-  };
-
-  const toggleImportant = async (msg) => {
-    const next = new Set(important);
-    const on = !next.has(msg.id);
-    if (on) next.add(msg.id); else next.delete(msg.id);
-    setImportant(next);
-    await tracked.setMessageImportant(msg.id, on).catch(err => { swallowed('inbox-tab: toggleImportant', err); });
-  };
+  // The five things a person does TO one message or one tracked response. Extracted to
+  // ./inbox-tab/message-actions.js when this file passed the 800-line ceiling; the bodies are
+  // unchanged and the closure they read became this argument.
+  const { onTrackMsg, onParkMsg, onDeleteMsg, cancelTracked, toggleImportant } = messageActions({
+    trackedByMsg, important, dismissedRef,
+    showToast, confirm,
+    setMode, setTrackMsg, setThread, setTrackedList, setImportant,
+    loadLists,
+  });
 
   const startSuggestedReply = async (tr) => {
     const d = await tracked.getTrackedResponseDraft(tr.id).catch(err => { swallowed('inbox-tab: startSuggestedReply', err); return null; });
@@ -772,7 +755,7 @@ export default function InboxTab({ showToast }) {
           cmdFill=${cmdFill} agentCommands=${agentCommands} sending=${sending} draftPrefill=${draftPrefill} prefillNonce=${prefillNonce}
           msgsRef=${msgsRef} peerDisplay=${peerDisplay} showToast=${showToast} toggleImportant=${toggleImportant}
           replyQuote=${replyQuote} setReplyQuote=${setReplyQuote} onQuoteReply=${startQuoteReply} composerFocus=${composerFocus}
-          onTrackMsg=${onTrackMsg} onParkMsg=${onParkMsg} openMessageAi=${openMessageAi} submitInteractiveAnswers=${submitInteractiveAnswers}
+          onTrackMsg=${onTrackMsg} onParkMsg=${onParkMsg} onDeleteMsg=${onDeleteMsg} openMessageAi=${openMessageAi} submitInteractiveAnswers=${submitInteractiveAnswers}
           setMdViewer=${setMdViewer} openConversationAi=${openConversationAi} openConversationNotebook=${openConversationNotebook} insertCommand=${insertCommand} setCmdFill=${setCmdFill}
           cancelTracked=${cancelTracked} openRecord=${openRecord} startSuggestedReply=${startSuggestedReply} doSend=${doSend} showLinkPreviews=${showLinkPreviews} toggleLinkPreviews=${toggleLinkPreviews}
           threadAll=${threadAll} toggleThreadAll=${toggleThreadAll}
@@ -786,6 +769,7 @@ export default function InboxTab({ showToast }) {
           </div>` : null}
       </div>`}
 
+      <${ConfirmUI} />
       <${TrackResponseModal} open=${!!trackMsg} msg=${trackMsg}
         onClose=${() => setTrackMsg(null)} onDone=${loadLists} showToast=${showToast} />
       ${mdViewer && html`<${MarkdownViewer} url=${mdViewer.url} name=${mdViewer.name} onClose=${() => setMdViewer(null)} />`}

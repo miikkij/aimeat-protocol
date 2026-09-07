@@ -198,6 +198,14 @@ const OWN_TICK_SCOPES = [
     'consent:groups',          // create a sharing group, add or remove who is in it
     'share:manage',            // hand another account a standing right to read part of the owner's memory
     'social:members',          // change who may read a shared board
+    // Remove a message from the OWNER's own mailbox, as the owner. A new word rather than
+    // `messages:send-as-owner`, for the reason SECRETS_MANAGE_SCOPE is a new word: that one is
+    // already granted, it is what "Reply with AI" runs on, and reusing it would hand every agent
+    // holding it the power to destroy the owner's correspondence, retroactively and with nobody
+    // asked. Sending is additive and a person can see what was sent; deleting is neither.
+    // Nobody is grandfathered onto it (scope-vocabulary-migration.ts has no entry) because the
+    // capability did not exist before -- no agent can lose one it had.
+    'messages:delete-as-owner',
 ] as const;
 
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [

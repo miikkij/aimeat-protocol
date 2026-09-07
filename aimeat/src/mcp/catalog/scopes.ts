@@ -497,6 +497,11 @@ export const TOOL_SCOPES: Record<string, string> = {
     // deliberately (it is part of the full '*' bundle; granular agents opt in separately). The sender is
     // still derived server-side from the agent's owner, so the scope never enables cross-owner sends.
     aimeat_dm_send_as_owner: 'messages:send-as-owner',
+    // Removing one message from the owner's mailbox, as the owner. A word of its own rather than
+    // send-as-owner: that one is already granted and is what "Reply with AI" runs on, so reusing it
+    // would hand every agent holding it the power to destroy the owner's correspondence with nobody
+    // asked. NOT part of the '*' bundle either (utils/scope-coverage.ts) -- it costs its own tick.
+    aimeat_dm_delete_as_owner: 'messages:delete-as-owner',
     aimeat_notify: 'notifications:send',
     aimeat_dm_inbox: 'messages:read',
     aimeat_dm_thread: 'messages:read',

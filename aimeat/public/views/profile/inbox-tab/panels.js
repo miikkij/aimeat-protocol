@@ -153,7 +153,7 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
 export function ThreadPanel({
   activeConv, thread, urlMap, important, trackedByMsg, awaitingForConv, awaitingDrafts,
   schedOpen, setSchedOpen, cmdFill, agentCommands, sending, draftPrefill, prefillNonce, msgsRef,
-  peerDisplay, showToast, toggleImportant, onTrackMsg, onParkMsg, openMessageAi, submitInteractiveAnswers,
+  peerDisplay, showToast, toggleImportant, onTrackMsg, onParkMsg, onDeleteMsg, openMessageAi, submitInteractiveAnswers,
   setMdViewer, openConversationAi, openConversationNotebook, insertCommand, setCmdFill, cancelTracked, openRecord, startSuggestedReply, doSend,
   replyQuote, setReplyQuote, onQuoteReply, composerFocus, showLinkPreviews, toggleLinkPreviews,
   threadAll, toggleThreadAll, onTranscribe, canTranscribe, voiceMaxSeconds,
@@ -228,7 +228,7 @@ export function ThreadPanel({
               who=${m.direction === 'outbound' ? t('inbox.quoteYou') : peerDisplay(m.senderGhii || activeConv.peerGhii)}
               domId=${`inbox-msg-${m.id}`} quoted=${quoted} quotedName=${quoted ? quoteSender(quoted) : ''} onJumpTo=${jumpTo}
               onQuote=${(onQuoteReply && !activeConv.viaAgent) ? onQuoteReply : null}
-              starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} onPark=${onParkMsg} onReplyAi=${openMessageAi} tracked=${trackedByMsg[m.id]}
+              starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} onPark=${onParkMsg} onReplyAi=${openMessageAi} onDelete=${onDeleteMsg} tracked=${trackedByMsg[m.id]}
               answeredWith=${m.interactive?.role === 'questions' ? answersByQ[m.id] : null}
               onAnswer=${submitInteractiveAnswers} submitting=${sending} showLinkPreviews=${showLinkPreviews}
               onTranscribe=${activeConv.viaAgent ? null : onTranscribe} canTranscribe=${canTranscribe}

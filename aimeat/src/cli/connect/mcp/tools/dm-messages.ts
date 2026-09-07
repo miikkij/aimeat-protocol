@@ -149,6 +149,16 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
     return envelopeResult(resp);
   });
 
+  // The owner's mailbox, on one explicit word. Thin over DELETE /v1/messages/:id, which is where the
+  // scope is enforced and where the mailbox is resolved — this surface adds no rule of its own.
+  mcp.tool('aimeat_dm_delete_as_owner', descriptionFor('aimeat_dm_delete_as_owner'), {
+    agent_name: agentNameSchema,
+    message_id: z.string().describe('Id of the message to remove, from aimeat_dm_inbox or aimeat_dm_thread.'),
+  }, annotationsFor('aimeat_dm_delete_as_owner'), async ({ agent_name, message_id }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return envelopeResult(await client.delete(`/v1/messages/${encodeURIComponent(message_id)}`));
+  });
+
   mcp.tool('aimeat_dm_thread', descriptionFor('aimeat_dm_thread'), {
     agent_name: agentNameSchema,
     conversation_id: z.string().describe('Conversation id (from aimeat_dm_inbox or aimeat_dm_send).'),

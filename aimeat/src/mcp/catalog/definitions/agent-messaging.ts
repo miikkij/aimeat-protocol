@@ -300,6 +300,15 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_dm_delete_as_owner',
+        description: "Remove one message from the OWNER's mailbox, as the owner \u2014 the same delete a person makes from the Messages page. Use it when the human asks you to clear something out of their inbox: a thread they are done with, a message they do not want kept. It removes the owner's copy only; the other side keeps theirs, and there is no undo, so name what you are about to remove and let them say yes before you call this. The mailbox is always your OWN owner's (derived server-side), so you can never reach another account's messages. Requires the messages:delete-as-owner scope, which the owner grants on its own tick \u2014 \"Full access\" does not carry it, and without it this tool is not available and you should hand back the message id for the owner to remove themselves.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            message_id: { type: 'string', required: true, description: "Id of the message to remove, from aimeat_dm_inbox or aimeat_dm_thread." },
+        },
+    },
+    {
         name: 'aimeat_dm_ask',
         description: 'Ask a person a STRUCTURED question through the federated inbox — a federated AskUserQuestion. Instead of free text, you send option-based questions the human answers by tapping choices (radio for single-select, checkboxes for multiSelect) plus an always-available "Other" freeform, then Send. Use this to map intent / clarify BEFORE acting. Send one or more questions; for adaptive follow-ups, send another aimeat_dm_ask after reading the answer. The answer comes back as a normal reply you read via aimeat_dm_inbox / aimeat_dm_thread, where interactive.answers is the machine-readable result keyed by your question id. Same recipients + threading as aimeat_dm_send. Requires the messages:send scope.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
