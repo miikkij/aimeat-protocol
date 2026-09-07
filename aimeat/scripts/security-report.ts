@@ -25,6 +25,7 @@
  *   pnpm audit:security              # write the three files
  *   pnpm audit:security -- --dev     # include the build toolchain in the scan
  * @version-history
+ *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.0.0 — 2026-08-31 — Initial: both scanners, the licence gate, deprecations and the SBOM.
  */
 import { execSync } from 'node:child_process';
@@ -34,34 +35,25 @@ import { AIMEAT_ROOT, REPO_ROOT, npmComponents, vendoredComponents } from './lib
 import { scanComponents, type Finding } from './lib/osv-scan.js';
 import { libFreshness } from './check-lib-freshness.js';
 import { cell } from './lib/md-table.js';
+import { parsePnpmAudit } from './lib/pnpm-audit.mjs';
 
 const SEVERITY_ORDER = ['CRITICAL', 'HIGH', 'MODERATE', 'MEDIUM', 'LOW'];
 
 /** Run a pnpm script and return its output, treating a non-zero exit as data rather than a crash. */
-function run(command: string): { ok: boolean; out: string } {
+function run(command: string): { ok: boolean; out: string; exitCode: number | null } {
   try {
-    return { ok: true, out: execSync(command, { cwd: AIMEAT_ROOT, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }) };
+    return { ok: true, exitCode: 0, out: execSync(command, { cwd: AIMEAT_ROOT, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }) };
   } catch (err) {
-    const e = err as { stdout?: string; stderr?: string; message: string };
-    return { ok: false, out: `${e.stdout ?? ''}${e.stderr ?? ''}` || e.message };
+    const e = err as { stdout?: string; stderr?: string; message: string; status?: number };
+    return { ok: false, exitCode: e.status ?? null, out: e.stdout || e.stderr || e.message };
   }
 }
 
-interface AuditMeta { vulnerabilities?: Record<string, number>; totalDependencies?: number }
-
 /** `pnpm audit --json`: GitHub's npm advisory database, npm tree only. */
-function pnpmAudit(): { counts: Record<string, number>; total: number; raw: string } {
-  const { out } = run('pnpm audit --json');
-  try {
-    const parsed = JSON.parse(out) as { metadata?: AuditMeta };
-    return {
-      counts: parsed.metadata?.vulnerabilities ?? {},
-      total: parsed.metadata?.totalDependencies ?? 0,
-      raw: out,
-    };
-  } catch {
-    return { counts: {}, total: 0, raw: out.slice(0, 2000) };
-  }
+function pnpmAudit() {
+  const { out, exitCode } = run('pnpm audit --json');
+  const result = parsePnpmAudit(out, exitCode);
+  return { ...result, counts: result.counts ?? {}, raw: out.slice(0, 2000) };
 }
 
 interface OutdatedEntry { current?: string; latest?: string; isDeprecated?: boolean; dependencyType?: string }
@@ -234,7 +226,7 @@ function main(): void {
     const externalFindings = external.filter(s => s.status === 'findings');
     const externalBroken = external.filter(s => s.status === 'error');
     const externalMissing = external.filter(s => s.status === 'not-installed');
-    const needsPerson = scan.findings.length > 0 || auditTotal > 0 || !licences.ok
+    const needsPerson = !audit.ok || scan.findings.length > 0 || auditTotal > 0 || !licences.ok
       || externalFindings.length > 0 || externalBroken.length > 0;
 
     if (needsPerson) {
@@ -253,7 +245,7 @@ function main(): void {
     md.push(`| Check | Ran | Result |`);
     md.push('|---|---|---|');
     md.push(`| OSV.dev API — npm tree **and** browser libraries | yes | ${scan.findings.length === 0 ? `clean, ${scan.scanned} component versions` : `**${scan.findings.length} finding(s)**`} |`);
-    md.push(`| \`pnpm audit\` — npm advisory database | yes | ${auditTotal === 0 ? `clean, ${audit.total} packages` : `**${auditTotal} advisory(ies)**`} |`);
+    md.push(`| \`pnpm audit\` — npm advisory database | ${audit.ok ? 'yes' : '**FAILED**'} | ${!audit.ok ? `**${audit.error}**` : auditTotal === 0 ? `clean, ${audit.total} packages` : `**${auditTotal} advisory(ies)**`} |`);
     for (const s of external) {
       const ran = s.status === 'not-installed' ? '**NO**' : 'yes';
       const result = s.status === 'not-installed'
@@ -276,7 +268,8 @@ function main(): void {
 
     md.push('## Vulnerabilities');
     md.push('');
-    if (scan.findings.length === 0 && auditTotal === 0) {
+    if (!audit.ok) md.push(`npm advisory check failed: ${audit.error}. Its vulnerability count is unknown.`);
+    if (audit.ok && scan.findings.length === 0 && auditTotal === 0) {
       md.push('Neither database knows of anything affecting this tree.');
     } else {
       if (auditTotal > 0) {
@@ -358,7 +351,9 @@ function main(): void {
     writeFileSync(mdFile, md.join('\n') + '\n', 'utf-8');
     writeFileSync(jsonFile, JSON.stringify({
       version, date: stamp, scanned: scan.scanned, osv: scan.findings,
-      pnpmAudit: audit.counts, licencesPass: licences.ok, externalScanners: external,
+      pnpmAudit: audit.ok ? audit.counts : null,
+      pnpmAuditStatus: audit.status, pnpmAuditError: audit.error,
+      licencesPass: licences.ok, externalScanners: external,
       deprecated: deprecated.map(([name, v]) => ({ name, version: v.current })),
       major: majors.map(([name, v]) => ({ name, current: v.current, latest: v.latest })),
       minor: minors.map(([name, v]) => ({ name, current: v.current, latest: v.latest })),

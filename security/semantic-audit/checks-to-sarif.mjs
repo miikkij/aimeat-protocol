@@ -14,22 +14,10 @@
  */
 import { execSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
+import { AUDIT_CHECKS } from '../../aimeat/scripts/lib/check-registry.mjs';
 
 // Each entry: the pnpm script, and the invariant / concern it guards (shown in the alert).
-const CHECKS = [
-  ['check:route-scopes', 'inv 4 — every mutating route has an explicit scope/role gate'],
-  ['check:denial-coverage', 'inv 9 — cross-owner / cross-scope denial tests exist'],
-  ['check:outbound-fetch', 'inv 3 — non-constant outbound HTTP goes through safeFetch'],
-  ['check:trusted-keys', 'inv 2 — server-read keys are unreachable by scoped principals'],
-  ['check:storage-parity', 'new data types/fields exist on both storage backends'],
-  ['check:ext-entrypoints', 'extension entrypoints are declared, not inferred'],
-  ['check:shared-impl', 'one capability, one implementation — no tool writes storage directly'],
-  ['check:sse-parity', 'the SSE surface matches its REST counterpart'],
-  ['check:copied-logic', 'a security decision is not written out twice'],
-  ['check:liaison-surface', 'the pypi liaison package matches the node schema'],
-  ['check:mcp-tools', 'MCP tool NAMES match across node / connector / CLI surfaces'],
-  ['check:mcp-schemas', 'MCP tool PARAMETERS match across the surfaces'],
-];
+const CHECKS = AUDIT_CHECKS.map(({ script, label }) => [script, label]);
 
 const results = [];
 const rules = [];

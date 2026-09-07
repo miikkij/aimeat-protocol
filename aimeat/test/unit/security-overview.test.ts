@@ -5,6 +5,7 @@
  *   of services/security-overview.ts: the 24-hour window, the groupings, the readable span and its
  *   mean, and the zone and status rules.
  * @version-history
+ *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.0.0 — 2026-09-05 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -23,6 +24,17 @@ const line = (over: Partial<AuthFailureLine> = {}): AuthFailureLine => ({
 });
 
 describe('summariseRefusals', () => {
+  it('A6: 1,000 recent lines remain a sample with an unknown daily total', () => {
+    const sample = Array.from({ length: 1000 }, (_, n) => line({ ts: hoursAgo(n * 0.7 / 1000) }));
+    const s = summariseRefusals(sample, NOW);
+    expect(s.count_kind).toBe('sample');
+    expect(s.sample_limit).toBe(1000);
+    expect(s.window_total).toBeNull();
+    expect(s.in_window).toBe(1000);
+    expect(s.mean_per_day).toBeNull();
+    expect(refusalZone(s.in_window, s.mean_per_day)).toBe('unknown');
+    expect(statusOf({ open_incidents: 0, walled: 0, zones: ['unknown', 'healthy'] })).toBe('unknown');
+  });
   it('counts the last 24 hours, groups by door, source and credential, and keeps the tail newest first', () => {
     const lines = [
       line({ ts: hoursAgo(2), path: '/v1/admin/dashboard', ip: '203.0.113.9', credential: 'bearer-jwt', credential_digest: 'aaaaaaaaaaaa', status: 403, code: 'ACCESS_DENIED' }),
@@ -93,7 +105,8 @@ describe('the zones', () => {
     expect(refusalZone(150, 60)).toBe('watch');
     expect(refusalZone(100, 60)).toBe('healthy');
     expect(refusalZone(15, 2)).toBe('healthy');   // under the floor, whatever the mean says
-    expect(refusalZone(500, null)).toBe('healthy'); // no history to compare with
+    // A6: missing history gives no evidence that the refusal rate is normal.
+    expect(refusalZone(500, null)).toBe('unknown');
   });
 
   it('flags one address behind more than half of a busy window', () => {

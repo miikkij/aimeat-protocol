@@ -47690,7 +47690,10 @@ paths:
       tags: [Admin]
       summary: The Security page in one read (operator)
       description: |
-        Operator-only. What is happening at the door in the last 24 hours (refusals, distinct
+        Operator-only. A bounded sample of at most 1000 readable refusal-log lines, filtered to
+        the last 24 hours. Counts are sample observations, not a rolling-day total
+        (count_kind=sample, sample_limit=1000, window_total=null). Missing comparison history
+        produces zone/status unknown. The sample includes refusals, distinct
         sources, walled addresses, each with a zone decided from this instance's own readable
         history), the refusal log grouped by door, source, credential kind and credential
         fingerprint plus its newest 200 lines, the refused-and-kept incidents with the open count,
@@ -47715,10 +47718,17 @@ paths:
                           generated_at: { type: string, format: date-time }
                           now:
                             type: object
-                            description: The headline numbers, each with a zone (healthy, watch, critical), and the status word (quiet, watch, open)
+                            description: Headline observations with zone healthy, watch, critical or unknown; status quiet, watch, open or unknown
                             properties:
-                              status: { type: string, enum: [quiet, watch, open] }
-                              refusals: { type: object }
+                              status: { type: string, enum: [quiet, watch, open, unknown] }
+                              refusals:
+                                type: object
+                                properties:
+                                  value: { type: integer, description: Refusals observed in the bounded sample during the last 24 hours }
+                                  zone: { type: string, enum: [healthy, watch, critical, unknown] }
+                                  count_kind: { type: string, enum: [sample] }
+                                  sample_limit: { type: integer }
+                                  window_total: { nullable: true, description: Always null; the rolling-day total is unavailable }
                               sources: { type: object }
                               rate_limit_hits: { type: object }
                               scope_denials: { type: object }
@@ -47729,7 +47739,7 @@ paths:
                               log: { type: object, description: Whether the refusal log is on, its file, its size and its older generation's }
                           refusals:
                             type: object
-                            description: The last 24 hours grouped by door, source, credential kind and fingerprint; the readable span and its mean per day; the newest 200 lines
+                            description: Bounded sample filtered to the last 24 hours, grouped by door, source, credential kind and fingerprint; count_kind=sample, sample_limit=1000, window_total=null; the readable span and its mean per day; the newest 200 lines
                           incidents:
                             type: object
                             properties:

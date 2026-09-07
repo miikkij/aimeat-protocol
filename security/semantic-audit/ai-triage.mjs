@@ -10,6 +10,7 @@
  *
  * Run from aimeat/:  pnpm audit:triage    (then pnpm audit:report to render)
  * @version-history
+ *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *  - 1.2.0 (2026-08-23): CodeQL alerts join the triage too, via the same code-scanning fetch
  *    (generalized to fetchCodeScanningFindings). CodeQL is the generic JS/TS suite, not the identity
  *    model, so the prompt carries a CodeQL branch and each finding's security-severity; a
@@ -22,12 +23,12 @@
 import { execFileSync, execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { createHash } from 'node:crypto';
+import { reviewInvariantRange } from './invariant-review.mjs';
+import { currentCodeScanningAlerts } from './finding-context.mjs';
 import { GUARDS } from './report-content.mjs';
 import { ROOT, astScan, fingerprintOf, loadStore, saveStore, norm, resolveClaudeBin } from './audit-lib.mjs';
 
 const MODEL = process.env.AIMEAT_TRIAGE_MODEL || 'opus';
-const DIFF_CAP = 60_000;
 const claudeBin = resolveClaudeBin();
 if (!claudeBin) {
   console.error('Ei claude-binääriä: aseta AIMEAT_CLAUDE_BIN tai asenna Claude Code.');
@@ -36,7 +37,8 @@ if (!claudeBin) {
 
 const git = (cmd) => execSync(`git ${cmd}`, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
 const today = new Date().toISOString().slice(0, 10);
-const head = git('rev-parse --short HEAD');
+const head = git('rev-parse HEAD');
+if (git('status --porcelain')) throw new Error('Commit the source changes before reviewing a commit range.');
 
 /** One headless claude call: prompt on stdin, read-only tools, JSON object out. */
 function askClaude(prompt) {
@@ -67,16 +69,15 @@ function fetchCodeScanningFindings(toolName, source) {
     const repo = execSync('gh repo view --json nameWithOwner -q .nameWithOwner',
       { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     const raw = execSync(
-      `gh api "repos/${repo}/code-scanning/alerts?per_page=100&state=open&tool_name=${encodeURIComponent(toolName)}" --paginate`,
+      `gh api "repos/${repo}/code-scanning/alerts?per_page=100&tool_name=${encodeURIComponent(toolName)}" --paginate`,
       { cwd: ROOT, encoding: 'utf8', maxBuffer: 128 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
     const alerts = JSON.parse(raw.replace(/\]\s*\[/g, ','));
-    return alerts.map(a => {
+    // A3: a dismissal belongs to an earlier review, not every future authorization context.
+    // Include still-present dismissed alerts; fixed findings have no current occurrence to review.
+    return currentCodeScanningAlerts(alerts, head).map(a => {
       const file = a.most_recent_instance?.location?.path;
       const line = a.most_recent_instance?.location?.start_line ?? 1;
       if (!file) return null;
-      // Only findings in code we ship; CodeQL default queries reach vendored/test paths the
-      // workflow's paths-ignore already drops, but a belt-and-braces filter here keeps a stray one out.
-      if (/(^|\/)(test|tests)\//.test(file) || /\/dist\//.test(file) || /\.min\.js$/.test(file) || file.startsWith('docs/')) return null;
       let text = '';
       try { text = readFileSync(resolve(ROOT, file), 'utf8').split('\n')[line - 1] ?? ''; } catch { return null; }
       return {
@@ -86,8 +87,8 @@ function fetchCodeScanningFindings(toolName, source) {
         ruleDesc: a.rule?.description ?? '',
       };
     }).filter(Boolean);
-  } catch {
-    process.stderr.write(`   (${toolName}-hälytyksiä ei saatu GitHubista — gh puuttuu tai ei oikeuksia. Jatketaan ilman.)\n`);
+  } catch (error) {
+    process.stderr.write(`   (${toolName}: tarkistus jäi tekemättä: ${String(error.message).slice(0, 300)})\n`);
     return [];
   }
 }
@@ -115,7 +116,7 @@ if (fresh.length === 0) {
     'The tools over-report by design; your job is to decide, per finding, whether the flagged site',
     'is a legitimate, known-safe pattern or something a human must confirm. Findings come from THREE',
     'tools, and each block below is tagged with which:',
-    '  - ast-grep (structural) and Semgrep taint (interprocedural) — the identity invariants. Semgrep',
+    '  - ast-grep (structural) and Semgrep OSS taint (within a function) — the identity invariants. Semgrep',
     '    follows req.auth.sub through variables and calls into a storage argument; its rule file with',
     '    the known sanitizers is security/semantic-audit/semgrep/resolve-identity.yml.',
     '  - CodeQL — the generic JS/TS security suite (injection, path traversal, ReDoS, clear-text',
@@ -174,7 +175,7 @@ if (fresh.length === 0) {
     const out = askClaude(prompt);
     const byFp = new Map((out.verdicts || []).map(v => [v.fingerprint, v]));
     for (const f of batch) {
-      // Identical matched text in the same file shares a fingerprint; one entry covers them all.
+      // Only the same occurrence in the same source/rule snapshot shares an approval.
       if (known.has(f.fingerprint)) continue;
       known.add(f.fingerprint);
       const v = byFp.get(f.fingerprint);
@@ -202,16 +203,7 @@ if (fresh.length === 0) {
 
 // ── 2. Review the non-static invariants against the diff since the last reviewed commit ──
 process.stderr.write('2/2 Katselmoidaan ei-staattiset invariantit (5, 13, 14, 16)…\n');
-const last = store.lastInvariantReviewCommit;
-const range = last ? `${last}..HEAD` : 'HEAD~10..HEAD';
-let diff = '';
-try { diff = git(`diff ${range} -- aimeat/src python/aimeat-crewai`); } catch { diff = ''; }
-if (!diff.trim()) {
-  process.stderr.write('   Ei uusia muutoksia katselmoitavana.\n');
-  store.lastInvariantReviewCommit = head;
-} else {
-  const stat = git(`diff --stat ${range} -- aimeat/src python/aimeat-crewai`).split('\n').slice(-40).join('\n');
-  const capped = diff.length > DIFF_CAP;
+const found = reviewInvariantRange({ git, store, head, date: today, ask: ({ range, stat, text, id, offset, total }) => {
   const prompt = [
     'You are reviewing a diff of the AIMEAT node for the four security invariants that static',
     'analysis cannot check. Read their full definitions first:',
@@ -223,9 +215,9 @@ if (!diff.trim()) {
     '',
     `Commit range: ${range}. File stat:\n${stat}`,
     '',
-    capped
-      ? `The diff is larger than the inline cap. Read the changed files yourself with Read/Grep. Inline head of the diff follows:\n${diff.slice(0, DIFF_CAP)}`
-      : `The diff:\n${diff}`,
+    `Review chunk ${id}, offset ${offset} of ${total} characters. Adjacent chunks overlap for context.`,
+    'Read the surrounding files when a chunk begins or ends inside a function. Every chunk must be reviewed.',
+    `The diff chunk:\n${text}`,
     '',
     'Report ONLY genuine concerns where the diff plausibly violates one of the four invariants —',
     'an ordering problem, a raw value at a gate, a conditional around a signature verify, or a',
@@ -234,28 +226,16 @@ if (!diff.trim()) {
     'for a clean diff.',
     '',
     'Respond with ONLY this JSON object:',
-    '{"findings":[{"invariant":5|13|14|16,"file":"…","note":"…"}]}',
+    '{"reviewedChunk":"the exact chunk id above","findings":[{"invariant":5|13|14|16,"file":"…","note":"…"}]}',
   ].join('\n');
 
-  const out = askClaude(prompt);
-  const found = (out.findings || []).slice(0, 20);
-  for (const f of found) {
-    store.invariantFindings.push({
-      id: createHash('sha256').update(`${f.invariant}|${f.file}|${f.note}`).digest('hex').slice(0, 12),
-      invariant: f.invariant,
-      file: f.file,
-      note: f.note,
-      commitRange: range,
-      date: today,
-      status: 'open',
-    });
-  }
-  store.lastInvariantReviewCommit = head;
-  process.stderr.write(found.length
-    ? `   🟠 ${found.length} havaintoa kirjattu — ne näkyvät raportissa kunnes suljettu.\n`
-    : '   ✓ Ei invarianttihuolia tässä muutosvälissä.\n');
-}
+  return askClaude(prompt);
+} });
+process.stderr.write(`   ${found.length} invarianttihavaintoa; koko muutosväli käsitelty.\n`);
 
+if (git('rev-parse HEAD') !== head || git('status --porcelain')) {
+  throw new Error('Source changed during review; no approvals or checkpoint saved.');
+}
 saveStore(store);
 process.stderr.write(`\n✅ Triage-muisti päivitetty: ${store.entries.length} kuittausta, ${store.invariantFindings.filter(f => f.status === 'open').length} avointa invarianttihavaintoa.\n`);
 process.stderr.write('   Aja seuraavaksi: pnpm audit:report\n');

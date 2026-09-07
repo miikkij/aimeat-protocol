@@ -27,6 +27,7 @@
  * @usage
  *   const overview = await buildSecurityOverview(config, storage);
  * @version-history
+ *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.0.0 -- 2026-09-05 -- Initial: the Security page in the poster face (wish
  *     wish-admin-security-view-direction-a, design canvas "AIMEAT Admin Security").
  */
@@ -48,8 +49,8 @@ const SURGE_FLOOR = 20;
 /** Since-restart counters that are ordinary on a node with agents; past this they earn a look. */
 const COUNTER_WATCH_AT = 100;
 
-export type Zone = 'healthy' | 'watch' | 'critical';
-export type SecurityStatus = 'quiet' | 'watch' | 'open';
+export type Zone = 'healthy' | 'watch' | 'critical' | 'unknown';
+export type SecurityStatus = 'quiet' | 'watch' | 'open' | 'unknown';
 
 export interface CountRow { key: string; count: number }
 /** One credential fingerprint: how often, what kind, and whether it was turned away for being
@@ -58,6 +59,10 @@ export interface CountRow { key: string; count: number }
 export interface DigestRow extends CountRow { kind: string; refused_401: number; refused_403: number }
 
 export interface RefusalSummary {
+  /** Counts describe the bounded log sample; the full rolling-day total is unavailable. */
+  count_kind: 'sample';
+  sample_limit: number;
+  window_total: null;
   window_hours: number;
   in_window: number;
   sources_in_window: number;
@@ -82,7 +87,7 @@ export interface SecurityOverview {
   generated_at: string;
   now: {
     status: SecurityStatus;
-    refusals: HeadlineNumber & { window_hours: number; mean_per_day: number | null; readable_hours: number | null };
+    refusals: HeadlineNumber & { count_kind: 'sample'; sample_limit: number; window_total: null; window_hours: number; mean_per_day: number | null; readable_hours: number | null };
     sources: HeadlineNumber & { top_source: string | null; top_share: number | null };
     rate_limit_hits: HeadlineNumber;
     scope_denials: HeadlineNumber;
@@ -137,7 +142,8 @@ function topOf(lines: AuthFailureLine[], pick: (l: AuthFailureLine) => string | 
  * log can still vouch for. Pure, so the thresholds are testable without a file.
  */
 export function summariseRefusals(lines: AuthFailureLine[], now: Date = new Date()): RefusalSummary {
-  const newestFirst = [...lines].sort((a, b) => b.ts.localeCompare(a.ts));
+  const newestFirst = lines.filter(l => Number.isFinite(Date.parse(l.ts)) && Date.parse(l.ts) <= now.getTime() + 60_000)
+    .sort((a, b) => b.ts.localeCompare(a.ts));
   const since = now.getTime() - REFUSAL_WINDOW_HOURS * 3_600_000;
   const inWindow = newestFirst.filter(l => {
     const t = Date.parse(l.ts);
@@ -166,6 +172,9 @@ export function summariseRefusals(lines: AuthFailureLine[], now: Date = new Date
   }
 
   return {
+    count_kind: 'sample',
+    sample_limit: READ_LINES,
+    window_total: null,
     window_hours: REFUSAL_WINDOW_HOURS,
     in_window: inWindow.length,
     sources_in_window: new Set(inWindow.map(l => l.ip || '?')).size,
@@ -188,7 +197,8 @@ export function summariseRefusals(lines: AuthFailureLine[], now: Date = new Date
 
 /** A window busier than twice its own mean earns a look; under the floor nothing does. */
 export function refusalZone(inWindow: number, meanPerDay: number | null): Zone {
-  if (inWindow < SURGE_FLOOR || meanPerDay == null) return 'healthy';
+  if (meanPerDay == null) return 'unknown';
+  if (inWindow < SURGE_FLOOR) return 'healthy';
   return inWindow > 2 * meanPerDay ? 'watch' : 'healthy';
 }
 
@@ -204,7 +214,8 @@ export function counterZone(value: number): Zone {
 
 export function statusOf(input: { open_incidents: number; walled: number; zones: Zone[] }): SecurityStatus {
   if (input.open_incidents > 0 || input.walled > 0) return 'open';
-  return input.zones.includes('watch') || input.zones.includes('critical') ? 'watch' : 'quiet';
+  if (input.zones.includes('watch') || input.zones.includes('critical')) return 'watch';
+  return input.zones.includes('unknown') ? 'unknown' : 'quiet';
 }
 
 export async function buildSecurityOverview(config: AimeatConfig, storage: Storage): Promise<SecurityOverview> {
@@ -235,7 +246,7 @@ export async function buildSecurityOverview(config: AimeatConfig, storage: Stora
     generated_at: now.toISOString(),
     now: {
       status: statusOf({ open_incidents: incidents.open, walled: refusals.walled_in_window, zones: Object.values(zones) }),
-      refusals: { value: refusals.in_window, zone: zones.refusals, window_hours: refusals.window_hours, mean_per_day: refusals.mean_per_day, readable_hours: refusals.readable_hours },
+      refusals: { value: refusals.in_window, zone: zones.refusals, count_kind: 'sample', sample_limit: READ_LINES, window_total: null, window_hours: refusals.window_hours, mean_per_day: refusals.mean_per_day, readable_hours: refusals.readable_hours },
       sources: { value: refusals.sources_in_window, zone: zones.sources, top_source: topSource?.key ?? null, top_share: topShare },
       rate_limit_hits: { value: rateLimitHits, zone: zones.rateLimit },
       scope_denials: { value: scopeDenials, zone: zones.scope },

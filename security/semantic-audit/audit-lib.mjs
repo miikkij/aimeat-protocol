@@ -1,13 +1,14 @@
 /**
  * @file audit-lib.mjs
  * @description Shared helpers for the semantic security audit: the ast-grep scan invocation, the
- * finding fingerprint (stable across line drift), the triage store (committed acknowledgments), and
+ * finding fingerprint (bound to the reviewed source context), the triage store, and
  * the resolver for a headless `claude` binary. Used by generate-report.mjs and ai-triage.mjs.
  * @version-history
+ *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *  - 1.0.0 (2026-08-23): extracted from generate-report.mjs; fingerprint + store + claude resolver added.
  */
 import { execSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { contextDigest, contextFingerprint } from './finding-context.mjs';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,17 +26,11 @@ export const astScan = (path) => JSON.parse(execSync(
   { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] },
 ) || '[]');
 
-/**
- * A fingerprint that survives line-number drift: rule id + file + the matched text with whitespace
- * collapsed. Editing the matched code itself invalidates the acknowledgment, which is the point —
- * a changed site must be looked at again.
- */
+let scanContext;
+/** A3: approvals apply only to the reviewed source/policy snapshot and the exact occurrence. */
 export function fingerprintOf(finding) {
-  const text = String(finding.text || '').replace(/\s+/g, ' ').trim();
-  return createHash('sha256')
-    .update(`${finding.ruleId}|${norm(finding.file)}|${text}`)
-    .digest('hex')
-    .slice(0, 16);
+  scanContext ??= contextDigest(ROOT);
+  return contextFingerprint(finding, scanContext);
 }
 
 /** The committed triage store: acknowledged findings + open invariant-review findings. */

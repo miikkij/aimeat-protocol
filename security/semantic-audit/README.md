@@ -9,12 +9,11 @@ otherwise.
 
 ## Two engines
 
-- **ast-grep** (`ast-grep/*.yml`) — a native binary that runs on Windows too (Semgrep needs WSL or
-  Docker, which this project does not use), so it is what runs both locally and in CI. Structural and
+- **ast-grep** (`ast-grep/*.yml`) runs locally and in CI, including Windows. Structural and
   intra-procedural: it matches a pattern and its surroundings, but does not follow a value through a
   variable across statements.
-- **Semgrep** (`semgrep/*.yml`) — true interprocedural taint (follows a value through assignments and
-  across functions). Stronger for the resolve-identity check. Runs in CI on a Linux runner
+- **Semgrep OSS** (`semgrep/*.yml`) follows taint through assignments within a function.
+  This workflow does not provide Pro interprocedural or cross-file analysis. Runs in CI on Linux
   (`semgrep-taint` job), SARIF category `semgrep-taint`.
 
 CI runs the ast-grep rules and uploads the SARIF to GitHub code scanning, so every finding is a
@@ -54,7 +53,7 @@ Numbers are the invariants in `docs/coding-guidelines/security-development-dna.m
 | 14 — refuse before you write | NOT static | an ordering property (write-before-check); tests + code review |
 | 16 — deprecated is not removed | NOT static | a policy property (a deprecation must name flag+default+version); review |
 
-### The three rules that exist
+### The four rules that exist
 
 - **resolve-identity** — `req.auth!.sub` reaching a `storage.*` call without being resolved. On an
   owner session `sub` is the bare owner name, so owner data lands under the wrong key. Sanitizers:
@@ -69,7 +68,7 @@ Numbers are the invariants in `docs/coding-guidelines/security-development-dna.m
 
 ## One pane — every audit signal on the Security tab
 
-The audit is not only the three ast-grep rules. Two other families already run, and CI mirrors all of
+The audit includes four ast-grep rules. Two other families already run, and CI mirrors all of
 them onto the same GitHub code-scanning Security tab so "what is checked, and what is currently
 regressed" is one view rather than twelve log tails (`.github/workflows/semantic-audit.yml`):
 
@@ -107,14 +106,40 @@ the newest Claude Code editor extension):
 1. **Finding triage** — each unacknowledged finding is classified with its surrounding code:
    `legit` (a known-safe pattern, with a one-sentence reason) or `confirm` (a human must look).
    Findings come from ast-grep (local scan) AND from the Semgrep taint alerts the CI job uploaded
-   to code scanning (fetched via `gh api`, since Semgrep does not run on Windows; the fingerprint
-   uses the flagged line's current local text). Verdicts land in `triage-store.json` (committed),
-   keyed by a fingerprint of rule + file + matched text — so an acknowledgment survives line drift
-   but dies the moment the matched code itself changes. Claude calls are batched, 15 findings each.
+   to code scanning (fetched via `gh api`). Verdicts land in `triage-store.json` (committed).
+   Version 2 fingerprints bind the exact occurrence and rule to a digest of shipped source,
+   security policy and scanner definitions. This deliberately invalidates approvals on any
+   shipped source change: dynamically assembled middleware and runtime registries cannot be
+   bounded safely by an import walk alone. Legacy approvals remain historical and require
+   fresh review; there is no automatic approval migration. Calls batch 15 findings each.
+   Still-present dismissed GitHub findings are included in re-review; fixed alerts are excluded.
+   CI locations are usable only when their analysis commit matches the local reviewed HEAD.
 2. **Non-static invariant review** — the git diff since `lastInvariantReviewCommit` is reviewed
    against invariants 5, 13, 14 and 16 (the ones the table below marks as not statically
    checkable). Concerns are stored as open `invariantFindings` and stay in the report until a
    human closes them in the store.
+
+   Every diff character is sent in bounded, overlapping chunks. Each response must identify
+   its chunk and provide a valid findings array. All findings are retained. A git error,
+   missing history or malformed/partial answer leaves the checkpoint unchanged. Without a
+   previous checkpoint, the initial review covers the whole scoped tree rather than ten commits.
+   The stored coverage includes the range, paths, diff hash and completed chunk intervals.
+
+## Report coverage and failures
+
+`aimeat/scripts/lib/check-registry.mjs` is the shared registry for `check:fast`, the report and the SARIF
+adapter. The report and SARIF also run `check:invariants`, whose five checks share one compiler
+program. Lint, types, unit tests and E2E remain separate CI jobs; they are not claimed by this list.
+
+`audit:report` is a report generator: exit 0 means the artifacts were written. Read its verdict
+and structured states; it is not a release gate. The report names the scanned commit, dirty-tree
+state, raw/acknowledged/new local findings, scanners not run locally, and commits since the last
+AI review. Zero open findings does not prove that those later commits were reviewed.
+
+Both dependency reports validate npm audit metadata and distinguish clean, findings and error.
+A valid findings response may have exit 1; a network failure, JSON error envelope or missing
+metadata is an error with unknown counts. Run regression checks with
+`node --test security/semantic-audit/reliability.test.mjs` (also covered by the unit suite).
 
 `pnpm audit:report` renders the store: acknowledged findings collapse with their reasons, and only
 unacknowledged or human-pending items count as "katsottavaa". A human resolves a `confirm` entry by
