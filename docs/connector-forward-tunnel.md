@@ -211,6 +211,13 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
   shell-callable tool dispatch over the tunnel — JSON body = tool input, response
   = AIMEAT envelope; same registry as `aimeat connect call`, no subprocess),
   `/local/tasks/next` (long-poll), `/local/status`, `POST /local/shutdown`.
+- **Console:** every line the daemon prints starts with the local date and time
+  (`2026-09-07 18:42:38`), the same format the serve watchdog writes, so the two
+  logs read side by side. It is done at the stream, so the tunnel's reconnect and
+  token-refresh lines carry it too — those are the ones read when something is
+  wrong, and until 2026-09-07 the only clock in that window was the binary's
+  build time. `AIMEAT_LOG_TIMESTAMPS=0` turns it off for a caller that stamps the
+  lines itself.
 
 ## Security model
 
