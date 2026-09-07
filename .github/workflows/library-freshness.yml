@@ -52,6 +52,11 @@ jobs:
       # The vendored binaries are identified by the manifest, not by their bytes being present, so
       # the 70 MB of wasm this job never looks at can stay unfetched.
       - name: Install
+        # `pnpm install` AT THE REPO ROOT INSTALLS NOTHING. The root package.json only proxies;
+        # the workspace with the dependencies is aimeat/, which is where every step below runs.
+        # Without this the install "succeeded" against no projects and the next step that needed
+        # a dev dependency died with `sh: 1: tsx: not found`.
+        working-directory: aimeat
         run: pnpm install --frozen-lockfile
         env:
           AIMEAT_SKIP_VENDOR: '1'
@@ -60,7 +65,14 @@ jobs:
       # anybody still releases the library at all.
       - name: What is new upstream (outdated:libs)
         working-directory: aimeat
-        run: pnpm outdated:libs | tee ../library-freshness.txt
+        # `set -o pipefail`, and it is the whole reason this job could be green while doing
+        # nothing. GitHub runs a `run:` block as `bash -e`, and `-e` does NOT fail a pipeline
+        # whose LAST command succeeded -- so `pnpm outdated:libs | tee` exited 0 on tee's
+        # status while the scan itself had died with `tsx: not found`. Measured 2026-09-07:
+        # the run reported success with both of its real steps failed inside.
+        run: |
+          set -o pipefail
+          pnpm outdated:libs | tee ../library-freshness.txt
 
       # Which apps load which file. This is the number that decides whether a frozen old file can
       # ever be retired: while even one app loads it, the file stays and there is nothing to discuss.
@@ -68,7 +80,9 @@ jobs:
       - name: Who still loads what (libs:usage)
         if: ${{ github.event_name == 'schedule' || inputs.node_url != '' }}
         working-directory: aimeat
-        run: pnpm libs:usage -- --node "${NODE_URL}" | tee -a ../library-freshness.txt
+        run: |
+          set -o pipefail
+          pnpm libs:usage -- --node "${NODE_URL}" | tee -a ../library-freshness.txt
         env:
           NODE_URL: ${{ inputs.node_url || 'https://aimeat.io' }}
 
