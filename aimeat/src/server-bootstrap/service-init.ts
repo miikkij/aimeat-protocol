@@ -178,8 +178,10 @@ export async function initializeServices(
     .then(count => { if (count > 0) logger.info(`Auto-installed ${count} bundled cortex extensions`); })
     .catch(err => logger.error('Failed to seed bundled cortexes', { error: String(err) }));
 
-  // The extensions the node SHIPS (living-hooks). Installed and switched on when missing, updated
-  // in place when this build is newer, and every value an owner set is carried across the update.
+  // The extensions the node SHIPS (living-hooks, vocab-finto). Installed and switched on when
+  // missing, updated in place when this build is newer, and every value an owner set is carried
+  // across the update. NOT awaited, deliberately: boot must not wait on it, and a node whose
+  // shipped extensions have not landed yet still answers every other door.
   seedBuiltinExtensions(storage, config, scheduler)
     .then(r => {
       if (r.installed.length) logger.info(`Built-in extensions installed: ${r.installed.join(', ')}`);
