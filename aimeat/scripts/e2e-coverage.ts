@@ -17,6 +17,7 @@
  * @usage
  *   pnpm test:e2e:coverage --db=sqlite [--port=40271] [--workers=4] [--snapshot-ms=0] [runner args]
  *   pnpm test:e2e:coverage report --db=sqlite        # redo the report from an earlier run's raw files
+ *   pnpm test:e2e:coverage report --db=union         # both backends' raw files as one measure
  *   pnpm test:e2e:coverage compare                    # sqlite versus postgres-kysely, file by file
  *   Output: aimeat/coverage-e2e/<db>/ (index.html, coverage-summary.json, by-directory.md) and
  *   aimeat/coverage-e2e/compare.md. All gitignored.
@@ -33,7 +34,8 @@ const ROOT = process.cwd();
 const OUT_ROOT = resolve(ROOT, 'coverage-e2e');
 const PRELOAD = resolve(ROOT, 'test/coverage-preload.mjs');
 const DBS = ['sqlite', 'postgres-kysely'] as const;
-type Db = typeof DBS[number];
+/** `union` is a report over both backends' raw files at once: what the E2E sweep reaches on either. */
+type Db = typeof DBS[number] | 'union';
 
 interface Args { command: 'run' | 'report' | 'compare'; db: Db; port: string; workers: string; snapshotMs: string; rest: string[] }
 
@@ -47,16 +49,19 @@ function parseArgs(argv: string[]): Args {
         else if (a.startsWith('--snapshot-ms=')) args.snapshotMs = a.slice(14);
         else args.rest.push(a);
     }
-    if (!DBS.includes(args.db)) throw new Error(`--db must be one of ${DBS.join(', ')}, got "${args.db}"`);
+    const known: readonly string[] = args.command === 'report' ? [...DBS, 'union'] : DBS;
+    if (!known.includes(args.db)) throw new Error(`--db must be one of ${known.join(', ')}, got "${args.db}"`);
     return args;
 }
 
 const outDir = (db: Db): string => join(OUT_ROOT, db);
 const rawDir = (db: Db): string => join(outDir(db), 'raw');
+const rawDirs = (db: Db): string[] => (db === 'union' ? DBS.map(rawDir) : [rawDir(db)]).filter(d => existsSync(d));
 
 // ── Run ──
 
 function run(args: Args): number {
+    if (args.db === 'union') throw new Error('union is a report over existing runs; run one backend at a time.');
     const raw = rawDir(args.db);
     rmSync(outDir(args.db), { recursive: true, force: true });
     mkdirSync(raw, { recursive: true });
@@ -82,14 +87,16 @@ function run(args: Args): number {
 
 // ── Report ──
 
-function loadSourceMaps(raw: string): Record<string, unknown> {
-    const smcDir = join(raw, 'smc');
+function loadSourceMaps(raws: string[]): Record<string, unknown> {
     const out: Record<string, unknown> = {};
-    if (!existsSync(smcDir)) return out;
-    for (const f of readdirSync(smcDir)) {
-        if (!f.endsWith('.json')) continue;
-        const { url, entry } = JSON.parse(readFileSync(join(smcDir, f), 'utf8')) as { url: string; entry: unknown };
-        out[url] = entry;
+    for (const raw of raws) {
+        const smcDir = join(raw, 'smc');
+        if (!existsSync(smcDir)) continue;
+        for (const f of readdirSync(smcDir)) {
+            if (!f.endsWith('.json')) continue;
+            const { url, entry } = JSON.parse(readFileSync(join(smcDir, f), 'utf8')) as { url: string; entry: unknown };
+            out[url] ??= entry;
+        }
     }
     return out;
 }
@@ -100,13 +107,17 @@ function loadSourceMaps(raw: string): Record<string, unknown> {
  * same data, unreduced, so it is reduced here, and its source maps fill any the preload did not
  * reach. Measured on a full sweep: 348 of the first kind, 4 of the second.
  */
-function mergeSnapshots(raw: string, sourceMaps: Record<string, unknown>): { merged: ProcessCov; files: number } {
+function mergeSnapshots(raws: string[], sourceMaps: Record<string, unknown>): { merged: ProcessCov; files: number } {
     const srcPrefix = `${pathToFileURL(resolve(ROOT, 'src')).href}/`;
-    const files = readdirSync(raw).filter(f => (f.startsWith('cov-') || f.startsWith('coverage-')) && f.endsWith('.json')).sort();
+    const files = raws.flatMap(raw => readdirSync(raw)
+        .filter(f => (f.startsWith('cov-') || f.startsWith('coverage-')) && f.endsWith('.json'))
+        .sort()
+        .map(f => join(raw, f)));
     let merged: ProcessCov = { result: [] };
-    for (const f of files) {
+    for (const path of files) {
+        const f = path.slice(path.lastIndexOf(sep) + 1);
         let cov: ProcessCov & { 'source-map-cache'?: Record<string, unknown> };
-        try { cov = JSON.parse(readFileSync(join(raw, f), 'utf8')) as typeof cov; } catch { continue; }
+        try { cov = JSON.parse(readFileSync(path, 'utf8')) as typeof cov; } catch { continue; }
         if (f.startsWith('coverage-')) {
             cov.result = cov.result.filter(s => s.url.startsWith(srcPrefix));
             for (const [url, entry] of Object.entries(cov['source-map-cache'] ?? {})) {
@@ -119,11 +130,11 @@ function mergeSnapshots(raw: string, sourceMaps: Record<string, unknown>): { mer
 }
 
 function report(db: Db): void {
-    const raw = rawDir(db);
+    const raws = rawDirs(db);
     const out = outDir(db);
-    if (!existsSync(raw)) throw new Error(`No raw coverage under ${raw}. Run the sweep first.`);
-    const sourceMaps = loadSourceMaps(raw);
-    const { merged, files } = mergeSnapshots(raw, sourceMaps);
+    if (raws.length === 0) throw new Error(`No raw coverage under ${rawDir(db)}. Run the sweep first.`);
+    const sourceMaps = loadSourceMaps(raws);
+    const { merged, files } = mergeSnapshots(raws, sourceMaps);
     const mergedDir = join(out, 'merged');
     rmSync(mergedDir, { recursive: true, force: true });
     mkdirSync(mergedDir, { recursive: true });
