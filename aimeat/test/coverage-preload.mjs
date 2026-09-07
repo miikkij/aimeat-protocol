@@ -33,7 +33,7 @@
 import v8 from 'node:v8';
 import { ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isMainThread } from 'node:worker_threads';
 
@@ -101,9 +101,15 @@ if (dir && !isMainThread) {
     const stopFile = join(dir, `stop-${process.pid}`);
     const snapshotMs = Number(process.env.AIMEAT_COVERAGE_SNAPSHOT_MS ?? '0');
     if (snapshotMs > 0) setInterval(() => flush(() => true), snapshotMs).unref();
+    const startedAt = Date.now();
     setInterval(() => {
       if (!existsSync(stopFile)) return;
+      // The same guard from the other side: a sentinel older than this process was meant for the
+      // previous holder of the pid.
+      let stale;
+      try { stale = statSync(stopFile).mtimeMs < startedAt - 1000; } catch { return; }
       try { unlinkSync(stopFile); } catch { /* ignore */ }
+      if (stale) return;
       flush(() => true);
       try { v8.stopCoverage(); } catch { /* ignore */ }
       process.exit(0);
@@ -123,11 +129,19 @@ if (dir && !isMainThread) {
     const alive = this.exitCode === null && this.signalCode === null;
     if (!alive || signal === 'SIGKILL' || typeof signal === 'number' || !this.pid) return realKill.call(this, signal);
     try { writeFileSync(join(dir, `stop-${this.pid}`), ''); } catch { return realKill.call(this, signal); }
+    const sentinel = join(dir, `stop-${this.pid}`);
     const timer = setTimeout(() => {
-      try { unlinkSync(join(dir, `stop-${this.pid}`)); } catch { /* the child took it */ }
+      try { unlinkSync(sentinel); } catch { /* the child took it */ }
       if (this.exitCode === null && this.signalCode === null) realKill.call(this, signal);
     }, KILL_GRACE_MS);
-    this.once('exit', () => clearTimeout(timer));
+    // A child that exits on its own without having polled (anything that is not a node) leaves the
+    // sentinel behind, and Windows hands its pid to the next process within minutes: a lane server
+    // then read a stale sentinel in its first 200 ms and "exited during startup (code 0)", and the
+    // lane died with 45 suites unrun. Measured on the first postgres sweep. The killer cleans up.
+    this.once('exit', () => {
+      clearTimeout(timer);
+      try { unlinkSync(sentinel); } catch { /* the child took it */ }
+    });
     return true;
   };
 }
