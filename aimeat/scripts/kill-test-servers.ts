@@ -19,8 +19,20 @@ import { existsSync, rmSync } from 'node:fs';
 import { platform } from 'node:os';
 import { resolve } from 'node:path';
 
-// The E2E runner (test/run-e2e-ci.ts) auto-starts its server on this port.
-const port = process.env.AIMEAT_TEST_PORT ?? '40251';
+// THE PORT THIS SESSION'S SERVER ACTUALLY BINDS, not the one the default assumes.
+//
+// This read `AIMEAT_TEST_PORT ?? '40251'` and nothing else, while the server binds `AIMEAT_PORT`.
+// A session that set only AIMEAT_PORT — which is the one the env files ship and the only one most
+// people know — therefore ran its server on its own port and had this script go on killing 40251:
+// somebody else's. It is prepended to every `test:e2e:*` script, so every `pnpm gate` did it.
+// Measured 2026-09-07 by cc-jouni-scope, who killed cc-jouni-dm's server four times in one night
+// before noticing, and by cc-jouni-dm, who spent the same night attributing the wreckage to their
+// own parallel runs. Three worktrees of four still carry the shipped 40251.
+//
+// AIMEAT_TEST_PORT still wins, because it is the documented explicit override and somebody may be
+// pointing this at a port the server is not on. AIMEAT_PORT is what a session that only knows one
+// variable sets, and it is now honoured.
+const port = process.env.AIMEAT_TEST_PORT ?? process.env.AIMEAT_PORT ?? '40251';
 
 function killOnPort(p: string): void {
   if (platform() === 'win32') {

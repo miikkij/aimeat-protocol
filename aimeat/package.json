@@ -101,6 +101,7 @@
     "test:e2e:guards:sqlite": "tsx scripts/kill-test-servers.ts && node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --guards --workers=4",
     "test:e2e:guards:postgres-kysely": "tsx scripts/kill-test-servers.ts && node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --guards --workers=4",
     "test:e2e:guards": "pnpm test:e2e:guards:sqlite && pnpm test:e2e:guards:postgres-kysely",
+    "test:env:init": "tsx scripts/test-env-init.ts",
     "test:e2e:sqlite": "tsx scripts/kill-test-servers.ts && node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --workers=4",
     "test:e2e:postgres-kysely": "tsx scripts/kill-test-servers.ts && node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --workers=4",
     "test:e2e:coverage": "tsx scripts/e2e-coverage.ts",
