@@ -307,11 +307,12 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_memory_search',
-        description: 'Full-text search across this agent\'s own memory entries (optionally filtered by visibility). Returns a SNIPPET per hit (a short window around the match) + key/bytes/tags — NOT the full value, so a broad query stays a sane size. Capped at `limit` hits (default 50) and skips `.version.N` history by default. Read a hit\'s full value with aimeat_memory_read on its exact key. Use when you know roughly what you stored but not the exact key; to browse keys by prefix/tag use aimeat_memory_list.',
+        description: 'Full-text search across this agent\'s own memory entries (optionally filtered by visibility). Returns a SNIPPET per hit (a short window around the match) + key/bytes/tags — NOT the full value, so a broad query stays a sane size. Capped at `limit` hits (default 50) and skips `.version.N` history by default. Read a hit\'s full value with aimeat_memory_read on its exact key. Use when you know roughly what you stored but not the exact key; to browse keys by prefix/tag use aimeat_memory_list. `type` narrows to what a record IS rather than what it says — a semantic type such as schema:Person or aimeat:Task, several separated by commas, or a full IRI; it matches whichever spelling the writer used, so schema:Person finds a record written as https://schema.org/Person. Give a single `type` with no `query` to list records of that type; give both to search within one type. GET /v1/ns lists the types this node names for itself.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            query: { type: 'string', required: true, description: 'Search query.' },
+            query: { type: 'string', description: 'Search query. Optional when `type` names a single type.' },
+            type: { type: 'string', description: 'Semantic type(s) to narrow to, comma-separated: schema:Person, aimeat:Task, or a full IRI.' },
             visibility: { type: 'string', enum: ['private', 'owner', 'group', 'members', 'public'], description: 'Optional visibility filter.' },
             limit: { type: 'number', description: 'Max hits to return (default 50, max 200).' },
             include_versions: { type: 'boolean', description: 'Include `.version.N` history snapshots (skipped by default).' },

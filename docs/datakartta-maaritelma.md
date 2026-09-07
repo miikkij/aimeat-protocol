@@ -29,7 +29,7 @@ Kuusi asiaa koko appista. **Kaksi ensimmäistä ovat ne jotka unohtuvat, ja ne o
 
 ### Rivin taso
 
-Yksi rivi per avainperhe, ei per avain. Rivillä yksitoista asiaa:
+Yksi rivi per avainperhe, ei per avain. Rivillä kaksitoista asiaa:
 
 1. **mitä** — avainperhe tai tietuelaji
 2. **mitä data on** — laji
@@ -42,6 +42,14 @@ Yksi rivi per avainperhe, ei per avain. Rivillä yksitoista asiaa:
 9. **kuinka kauan**
 10. **voiko sen menettää**
 11. **miksi täällä eikä jossain muualla**
+12. **mikä se on** — semanttinen tyyppi, valinnainen
+
+Kahdestoista lisättiin 8.9.2026 ja se on ainoa valinnainen. Kohdat 2 ja 3 sanovat mitä data on
+tämän appin sanoin, ja se on se mitä rakentaja lukee; kohta 12 sanoo saman sanalla jonka muutkin
+järjestelmät jo tuntevat (`schema:Person`, `aimeat:Task`, tai koko URL). Se on se mikä tekee
+avainperheestä löydettävän `?type=`-haulla ja luettavan agentille joka ei ole koskaan avannut tätä
+appia. Perhe joka ei aidosti ole mitään standardia jättää sen tyhjäksi eikä kurota lähimpään
+väärään tyyppiin. Noden omat luokat: `GET /v1/ns`.
 
 ---
 

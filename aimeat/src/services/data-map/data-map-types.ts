@@ -123,6 +123,17 @@ export interface DataMapRow {
   personalData: 'yes' | 'no' | 'unstated';
   /** One sentence: why HERE and not somewhere else. Empty means nobody has said. Never invented. */
   why: string;
+  /**
+   * What the records in this family ARE, as a semantic type: `schema:Person`, `aimeat:Task`, or a
+   * full IRI. `GET /v1/ns` lists the ones this node names for itself.
+   *
+   * OPTIONAL, AND HONESTLY SO. `kind` and `holds` say what the data is in this app's words, which
+   * is what a builder reads; this is the same answer in a word every other system already knows,
+   * which is what makes the family findable with `?type=` and readable by an agent that has never
+   * opened this app. A family that is genuinely nothing standard leaves it out rather than reaching
+   * for the nearest wrong type.
+   */
+  isA?: string;
 }
 
 /** The second table: what is unresolved, or is not ours. */

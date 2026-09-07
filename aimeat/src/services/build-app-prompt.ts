@@ -15,6 +15,11 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-09-08 — ADDITIVE (permission granted 2026-09-08): two paragraphs at the end of the memory
+ *     SHAPE rules in Data Storage — say what a record IS with a standard type when one fits (and
+ *     leave it out when none does, because a wrong type is believed), and keep a user's own tags as
+ *     ONE vocabulary key rather than free strings. Nothing existing changed; the shape rules above
+ *     them are untouched.
  *   2026-09-06 — After the AI-key rule: any other key the app needs is named as `{{secret:NAME}}`
  *     in an extension's header and filled from the signed-in person's vault; the app tells the
  *     person the name and the Access page section, and never offers a field for the key.
@@ -235,6 +240,11 @@ function composeAppPrompt(
   body += '**The two ceilings, as numbers.** A value may be **1024 kB** serialised, so a whole small database fits in one key. A principal may hold **1000 keys** by default (`AIMEAT_MEMORY_MAX_KEYS`; some nodes raise it, do not count on it). Before you ship, count the keys one day of ordinary use writes: **if `keys_per_day × 365` exceeds 1000, the shape is wrong.** Fold the per-item keys into a per-period collection (`myapp.log.2026-08` holding an array) and split only once `JSON.stringify(value).length` passes ~256 kB.\n';
   body += '**Nesting is free for search.** Search indexes the key, its dot-separated segments, the tags AND the scalar values inside the record, so an item inside an array inside one key is as findable as a key of its own. Keep data within 5 levels of the value root: on the production backend, scalars nested deeper than 6 levels fall out of the index.\n';
   body += '**A key name is a stable address, not a sentence.** Lowercase dot-separated segments, each one either a fixed word or an id you can reconstruct from the data. Never a title, a tag label, a write timestamp, or anything a user typed (`myapp.index.by-tag.all conspiracies are real` is a value, not an address).\n';
+  // Typing a record costs one line and is the difference between data only this app understands and
+  // data the owner's own AI can find. Phrased as a default with an out, because a wrong type is
+  // worse than none: it is believed.
+  body += '**Say what a record IS when a standard word exists for it.** One line at write time, and the record stops being legible only to your app: `AIMEAT.data.set(key, AIMEAT.onto.describe(value, "schema:Person"), …)` (load `/v1/libs/aimeat-onto.js`). Then the owner\'s own AI finds it with the type filter on memory search, and an agent that has never opened your app knows what it found. Use a schema.org type where one fits (`Person`, `Event`, `Offer`, `Place`, `CreativeWork`, `Review`) or an `aimeat:` one for this platform\'s own things (`GET /v1/ns` lists all of them with definitions). **Leave it out when nothing fits** rather than reaching for the nearest wrong type: an untyped record is honest, and a wrong type is believed and acted on. Eight prefixes resolve without being declared (`aimeat`, `schema`, `skos`, `dcterms`, `prov`, `rdfs`, `qudt`, `saref`); anything else the node REFUSES unless your record declares it, and `describe()` writes that context for you when you pass one.\n';
+  body += '**Tags a user picks are concepts, not strings, once there are more than a handful.** `AIMEAT.onto` keeps a whole vocabulary in ONE key (`vocab.<id>`) as a SKOS scheme with labels in every language you support, a hierarchy, and a link to the same concept in an outside vocabulary — so "lintuharrastus", "birdwatching" and "ornitologia" are one thing with three names instead of three strings that never match. Add the `aimeat-vocab` cortex and the person can pick from a real 30 000-concept vocabulary instead of typing. Skip all this for a fixed list of five categories; reach for it the moment users type their own.\n';
   body += 'Match the PRIVATE vs SHARED choice from Step 1:\n';
   body += '```javascript\n';
   body += '// PRIVATE — scoped to the logged-in owner, only they can read it:\n';

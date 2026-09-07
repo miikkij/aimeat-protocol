@@ -35,7 +35,7 @@ import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from './owner-target.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, MEMORY_LIST_MAX_LIMIT } from './shared.js';
-import { isVersionKey, searchHitShape } from '../../services/memory-search-shape.js';
+import { isVersionKey, searchHitShape, matchesType } from '../../services/memory-search-shape.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   //  is no longer destructured here: identity for a write now comes from
@@ -419,9 +419,22 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       }
       gaii = agentParam;
     }
-    const q = req.query.q as string;
+    // `type` narrows to what a record IS: a CSV of semantic types (`schema:Person`,
+    // `aimeat:Task`, or a full IRI). Records have carried `@type` since Phase 0.7 and no door could
+    // ask about it, so the annotation was written and never read.
+    const typeParam = req.query.type as string | undefined;
+    const wantedTypes = typeParam ? typeParam.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+    // `q` is required UNLESS a type is given. "Every Person record I have" is a real question and it
+    // has no text in it. The type string is then the query: `@type` is indexed like any other scalar
+    // in the value, so searching for it finds the candidates, and matchesType makes the answer exact
+    // by dropping records that merely mention the string somewhere else.
+    const q = (req.query.q as string | undefined) ?? (wantedTypes.length === 1 ? wantedTypes[0] : '');
     if (!q) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'q query parameter is required'));
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        wantedTypes.length > 1
+          ? 'q is required when more than one type is given: searching several types at once needs something to search for.'
+          : 'q query parameter is required'));
       return;
     }
 
@@ -447,7 +460,8 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // every REST caller that exists keeps the answer it has always had.
     const includeVersions = req.query.include_versions !== 'false';
     const all: MemoryRecord[] = hits.map(h => h.record);
-    const results = includeVersions ? all : all.filter(r => !isVersionKey(r.key));
+    const kept = includeVersions ? all : all.filter(r => !isVersionKey(r.key));
+    const results = wantedTypes.length ? kept.filter(r => matchesType(r.value, wantedTypes)) : kept;
 
     // `include=meta` answers with a SNIPPET and the byte size instead of the whole value, which is
     // the shape the node MCP tool has always returned. Without it, "which keys mention this" pulled

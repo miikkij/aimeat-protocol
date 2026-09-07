@@ -157,16 +157,22 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   mcp.tool('aimeat_memory_search', descriptionFor('aimeat_memory_search'), {
     agent_name: agentNameSchema,
-    query: z.string().describe('Search query'),
+    query: z.string().optional().describe('Search query. Optional when `type` names a single type.'),
+    type: z.string().optional().describe('Narrow to what a record IS: a semantic type, or several separated by commas (schema:Person, aimeat:Task, or a full IRI). Matches whichever spelling the writer used.'),
     visibility: z.string().optional().describe('Optional visibility filter'),
     limit: z.number().optional().describe('Max hits to return (default 50, cap 200).'),
     include_versions: z.boolean().optional().describe('Include `.version.N` history snapshots (skipped by default -- they are immutable history and the main source of bloat).'),
-  }, annotationsFor('aimeat_memory_search'), async ({ agent_name, query, visibility, limit, include_versions }) => {
+  }, annotationsFor('aimeat_memory_search'), async ({ agent_name, query, type, visibility, limit, include_versions }) => {
     const { client } = pickAgent(registry, agent_name);
     // SNIPPETS, like the node MCP tool of the same name. This asked for the plain search, which
     // answers with the FULL value of every hit, so a broad query pulled whole records across the
     // wire and through a model's context to answer "which keys mention this". Review item 6.4.
-    const params = new URLSearchParams({ q: query, include: 'meta', include_versions: include_versions ? 'true' : 'false' });
+    const params = new URLSearchParams({ include: 'meta', include_versions: include_versions ? 'true' : 'false' });
+    // The route makes `q` optional when a single type is given, so pass what the caller sent and let
+    // one implementation decide. Sending an empty `q` instead would be this door answering the
+    // question differently from the other two.
+    if (query) params.set('q', query);
+    if (type) params.set('type', type);
     if (visibility) params.set('visibility', visibility);
     if (limit !== undefined) params.set('limit', String(limit));
     const resp = await client.get(`/v1/memory/search?${params.toString()}`);

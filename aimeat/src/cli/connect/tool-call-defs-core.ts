@@ -177,8 +177,12 @@ export const coreTools: ConnectCliToolDefinition[] = [
         // aimeat_memory_list was fixed for on 2026-09-04 with the search twin left behind. The route
         // takes `include=meta` and `include_versions` now, so both doors can ask for one answer.
         // Review item 6.4.
+        // `query` is optional now, because `type` alone answers "every Person record I have" and
+        // that question has no text in it. The route decides; this door only forwards, so all three
+        // surfaces refuse the same input for the same reason.
         handler: ({ client }, input) => client.get(`/v1/memory/search${query({
-            q: requiredString(input, 'query'),
+            q: optionalString(input, 'query'),
+            type: optionalString(input, 'type'),
             visibility: optionalString(input, 'visibility'),
             limit: optionalNumber(input, 'limit'),
             include: 'meta',
