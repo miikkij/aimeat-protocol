@@ -154,8 +154,18 @@ async function main(): Promise<void> {
     const why = e.code ? `${e.code}${e.message ? ': ' + e.message : ''}` : String(e.message || err);
     console.error(`  could not create ${database} — ${why}`);
     if (e.code === 'ECONNREFUSED') {
-      console.error('  Postgres is not answering on that address. The env files ARE written and the');
-      console.error('  sqlite side works; start Postgres and run this again, or create it by hand:');
+      // ECONNREFUSED SAYS NOTHING ABOUT WHETHER POSTGRES IS RUNNING, and reading it as "it is down"
+      // cost a wrong report on 2026-09-07. On this setup the server lives inside WSL2 and Windows
+      // reaches it only while WSL's localhost forwarding is up; that forwarding drops on its own,
+      // and then every worktree's DATABASE_URL — all of which say localhost — refuses while
+      // `ss -ltnp` inside WSL shows 0.0.0.0:5432 listening perfectly well. Say what was refused and
+      // how to tell the two apart, rather than guessing which one it is.
+      console.error('  Nothing accepted a connection there. That does NOT mean Postgres is down:');
+      console.error('    · inside WSL:  wsl -e bash -lc "ss -ltnp | grep 5432"');
+      console.error('    · on Windows:  Get-NetTCPConnection -LocalPort 5432');
+      console.error('  Listening in WSL but absent on Windows means the localhost forwarding dropped;');
+      console.error('  `wsl --shutdown` and a restart brings it back. The env files ARE written and');
+      console.error('  the sqlite side works either way. To create the database by hand:');
     } else {
       console.error('  The env files are written. Create the database yourself with:');
     }
