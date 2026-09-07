@@ -11,12 +11,17 @@
  *   Nothing changed in the move; local-server.ts re-exports every name so no importer notices.
  *
  * @structure SERVE_DISCOVERY_SCHEMA_VERSION · ServeDiscoveryAgent · ServeDiscoveryPrincipal ·
- *   ServeDiscovery · serveDiscoveryPath() · pidAlive()
+ *   ServeDiscovery · serveDiscoveryPath() · pidAlive() · exitIfAnotherDaemonOwns() ·
+ *   writeDiscoveryFile()
  * @usage import { serveDiscoveryPath, type ServeDiscovery } from './local-discovery.js';
  * @version-history
+ *   v1.1.0 — 2026-09-07 — The two operations ON the file follow the file's own contract here:
+ *     refusing to start when a live pid still owns it, and the atomic write. Pure extraction from
+ *     local-server.ts, which passed the cap again; nothing changed but where the lines live.
  *   v1.0.0 — 2026-09-03 — Extracted from local-server.ts (max-file-lines).
  */
 import { join } from 'node:path';
+import { writeFileSync, renameSync, existsSync, readFileSync, mkdirSync } from 'node:fs';
 import { getConfigDir } from '../config.js';
 
 /**
@@ -69,4 +74,79 @@ export function serveDiscoveryPath(): string {
 export function pidAlive(pid: number): boolean {
   try { process.kill(pid, 0); return true; }
   catch (err) { return (err as NodeJS.ErrnoException).code === 'EPERM'; }
+}
+
+/**
+ * A live daemon OWNS this file; a dead pid's is overwritten. Exits the process when somebody else
+ * still holds it, because two daemons on one home would race for the same port record and the
+ * second one's clients would be told to talk to a port that is not its own.
+ */
+export function exitIfAnotherDaemonOwns(discoveryFile: string): void {
+  if (!existsSync(discoveryFile)) return;
+  try {
+    const prev = JSON.parse(readFileSync(discoveryFile, 'utf-8')) as ServeDiscovery;
+    if (prev.pid && prev.pid !== process.pid && pidAlive(prev.pid)) {
+      console.error(`Another serve daemon appears to be running (pid ${prev.pid}, port ${prev.port}).`);
+      console.error(`Stop it first, or delete ${discoveryFile} if it is stale.`);
+      process.exit(1);
+    }
+  // eslint-disable-next-line aimeat/no-silent-catch -- unreadable file — treat as stale and overwrite
+  } catch { /* unreadable file — treat as stale and overwrite */ }
+}
+
+/**
+ * What this file needs to know about one served identity. Structural on purpose: `RegisteredAgent`
+ * satisfies it, and stating it this way keeps the contract module free of the daemon's registry.
+ */
+export interface DiscoverySource {
+  agent: string;
+  gaii: string;
+  owner: string;
+  config: { node_url: string };
+}
+
+/**
+ * The document, from the identities a daemon is serving. `transportOf` is asked per identity rather
+ * than read from a map here, because on a shared socket an identity's transport is its own and not
+ * its socket's — the distinction that made a deleted agent read `online` until 2026-09-03.
+ */
+export function buildDiscoveryDoc(
+  port: number,
+  startedAt: string,
+  entries: DiscoverySource[],
+  transportOf: (gaii: string) => ServeDiscoveryAgent['transport'],
+): ServeDiscovery {
+  return {
+    schema_version: SERVE_DISCOVERY_SCHEMA_VERSION,
+    port,
+    pid: process.pid,
+    started_at: startedAt,
+    // Neutral principal list — an `eco:`-prefixed id is type 'ecosystem', else 'agent'.
+    principals: entries.map(e => ({
+      type: e.agent.startsWith('eco:') ? 'ecosystem' as const : 'agent' as const,
+      // The FULL identity, which is what this field has always said it was. It carried the bare
+      // name, so two owners' `concierge` were one row and the file described a daemon that does
+      // not exist.
+      id: e.gaii,
+      owner: e.owner,
+      node_url: e.config.node_url,
+      transport: transportOf(e.gaii),
+    })),
+    // Transitional alias (agent-typed only) for sidecars that still read `agents`.
+    agents: entries.filter(e => !e.agent.startsWith('eco:')).map(e => ({
+      agent: e.agent,
+      gaii: e.gaii,
+      owner: e.owner,
+      node_url: e.config.node_url,
+      transport: transportOf(e.gaii),
+    })),
+  };
+}
+
+/** Write it whole or not at all: a reader must never catch this file half-written. */
+export function writeDiscoveryFile(discoveryFile: string, doc: ServeDiscovery): void {
+  mkdirSync(getConfigDir(), { recursive: true });
+  const tmp = `${discoveryFile}.tmp-${process.pid}`;
+  writeFileSync(tmp, JSON.stringify(doc, null, 2), 'utf-8');
+  renameSync(tmp, discoveryFile); // atomic replace on the same volume
 }

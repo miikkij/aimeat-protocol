@@ -34,6 +34,14 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-09-07 — The serve.json operations moved to ./local-discovery.ts, which already owns that
+ *     file's contract: the refusal when a live pid still holds it, the document builder and the
+ *     atomic write. Pure extraction, forced by the cap; nothing changed but where the lines live.
+ *   2026-09-07 — Every line this daemon prints starts with a local date and time. The window was
+ *     the first place anyone looked and the only clock in it was the binary's BUILD TIME, so the
+ *     tunnel's reconnect lines could not say whether they were five seconds or five hours old.
+ *     Stamped at the stream (../../../utils/log-timestamps.ts), which is the only place that also
+ *     catches what the tunnel client and the dependencies write.
  *   2026-09-05 — The private socket is built with its own `gaii`, like the hub's, so the client can
  *     drop a frame for an identity it does not hold instead of handing it to these handlers.
  *   2026-09-04 — Every call to the node goes through `ch.forward`, which carries the stamp naming
@@ -116,14 +124,14 @@
 import express, { type Request, type Response } from 'express';
 import type { Server } from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { writeFileSync, renameSync, existsSync, readFileSync, unlinkSync, mkdirSync } from 'node:fs';
+import { existsSync, unlinkSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ConnectTunnelClient, type TunnelIdentity } from '../tunnel-client.js';
 import { TunnelHub, statusOfIdentity, principalRow } from './tunnel-hub.js';
 import { resolveToken } from '../agent-key.js';
-import { getConfigDir, type AimeatPerAgentConfig } from '../config.js';
+import { type AimeatPerAgentConfig } from '../config.js';
 import { AimeatClient } from '../api-client.js';
 import { handleEnrolOffer, ENROL_CAPABILITY } from '../enrolment.js';
 import { AgentRegistry, type RegisteredAgent } from '../agent-registry.js';
@@ -139,6 +147,7 @@ import { CONNECT_CLI_TOOLS } from '../tool-call.js';
 export { AgentChannel } from './local-channel.js';
 import { logger } from '../../../utils/logger.js';
 import { checkBuildFreshness, announceBuild, buildIdentity } from '../../../utils/build-stamp.js';
+import { installTimestampedOutput } from '../../../utils/log-timestamps.js';
 
 // The `serve.json` contract -- schema version, its two row shapes, where the file lives and
 // whether the pid in an existing one is still alive -- is its own unit in ./local-discovery.ts:
@@ -147,7 +156,9 @@ export {
   SERVE_DISCOVERY_SCHEMA_VERSION, serveDiscoveryPath,
   type ServeDiscovery, type ServeDiscoveryAgent, type ServeDiscoveryPrincipal,
 } from './local-discovery.js';
-import { SERVE_DISCOVERY_SCHEMA_VERSION, serveDiscoveryPath, pidAlive, type ServeDiscovery } from './local-discovery.js';
+import {
+  serveDiscoveryPath, exitIfAnotherDaemonOwns, buildDiscoveryDoc, writeDiscoveryFile,
+} from './local-discovery.js';
 
 export interface ServeDaemonOptions {
   registry: AgentRegistry;
@@ -170,6 +181,13 @@ export interface ServeDaemonOptions {
 export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   const { registry, buildMcp } = opts;
 
+  // Every line from here on carries a local date and time. It goes in at the STREAM, before the
+  // first line is written, so the tunnel's reconnects and anything a dependency prints are stamped
+  // too — those are the lines somebody reads when the fleet is misbehaving, and a reconnect with no
+  // clock cannot say whether it was five seconds or five hours ago. Stdio serve does not do this:
+  // there stdout is the MCP transport. AIMEAT_LOG_TIMESTAMPS=0 turns it off.
+  installTimestampedOutput();
+
   // Say what artifact this is BEFORE anything else, because clients reach the node only through
   // this daemon: when dist/ is behind the source, nothing errors — a field added in source is
   // simply absent from every write, and the search starts at the node.
@@ -177,19 +195,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   announceBuild(freshness, line => console.error(line));
 
   const discoveryFile = serveDiscoveryPath();
-
-  // Stale-detect: a live daemon owns the discovery file; a dead pid is overwritten.
-  if (existsSync(discoveryFile)) {
-    try {
-      const prev = JSON.parse(readFileSync(discoveryFile, 'utf-8')) as ServeDiscovery;
-      if (prev.pid && prev.pid !== process.pid && pidAlive(prev.pid)) {
-        console.error(`Another serve daemon appears to be running (pid ${prev.pid}, port ${prev.port}).`);
-        console.error(`Stop it first, or delete ${discoveryFile} if it is stale.`);
-        process.exit(1);
-      }
-    // eslint-disable-next-line aimeat/no-silent-catch -- unreadable file — treat as stale and overwrite
-    } catch { /* unreadable file — treat as stale and overwrite */ }
-  }
+  exitIfAnotherDaemonOwns(discoveryFile);
 
   const startedAt = new Date().toISOString();
   // Keyed by GAII, not by name: two owners on one daemon both have `concierge`, and a name-keyed
@@ -737,36 +743,8 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   const port = (server.address() as { port: number }).port;
 
   const writeDiscovery = (): void => {
-    const entries = registry.list();
-    const doc: ServeDiscovery = {
-      schema_version: SERVE_DISCOVERY_SCHEMA_VERSION,
-      port,
-      pid: process.pid,
-      started_at: startedAt,
-      // Neutral principal list — an `eco:`-prefixed id is type 'ecosystem', else 'agent'.
-      principals: entries.map(e => ({
-        type: e.agent.startsWith('eco:') ? 'ecosystem' as const : 'agent' as const,
-        // The FULL identity, which is what this field has always said it was. It carried the bare
-        // name, so two owners' `concierge` were one row and the file described a daemon that does
-        // not exist.
-        id: e.gaii,
-        owner: e.owner,
-        node_url: e.config.node_url,
-        transport: channels.get(e.gaii)!.transportMode,
-      })),
-      // Transitional alias (agent-typed only) for sidecars that still read `agents`.
-      agents: entries.filter(e => !e.agent.startsWith('eco:')).map(e => ({
-        agent: e.agent,
-        gaii: e.gaii,
-        owner: e.owner,
-        node_url: e.config.node_url,
-        transport: channels.get(e.gaii)!.transportMode,
-      })),
-    };
-    mkdirSync(getConfigDir(), { recursive: true });
-    const tmp = `${discoveryFile}.tmp-${process.pid}`;
-    writeFileSync(tmp, JSON.stringify(doc, null, 2), 'utf-8');
-    renameSync(tmp, discoveryFile); // atomic replace on the same volume
+    const doc = buildDiscoveryDoc(port, startedAt, registry.list(), gaii => channels.get(gaii)!.transportMode);
+    writeDiscoveryFile(discoveryFile, doc);
   };
   writeDiscovery();
 

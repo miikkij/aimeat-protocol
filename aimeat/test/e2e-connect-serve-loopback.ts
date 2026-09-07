@@ -14,6 +14,8 @@
 //   - Single-socket: the node reports one active tunnel connection.
 //   - Degraded fallback: against a node with AIMEAT_CONNECT_TUNNEL_ENABLED=false
 //     the daemon still works via direct transport (no crash).
+//   - Console clock: every line the daemon prints — its own, the tunnel's, the
+//     listening line — starts with the local date and time.
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -153,6 +155,19 @@ await test('Daemon starts and writes the discovery file (tunnel transport)', asy
   assert(disc.agents[0].agent === agentName, `agent: ${disc.agents[0].agent}`);
   assert(disc.agents[0].transport === 'tunnel', `transport: ${disc.agents[0].transport} (expected tunnel)\n--- daemon output ---\n${daemon1!.stderr()}`);
   loopbackBase = `http://127.0.0.1:${disc.port}`;
+});
+
+await test('Every line the daemon prints starts with a local date and time', async () => {
+  // The daemon's own window is where somebody looks first, and the only clock in it used to be the
+  // binary's build time. Asserted on the REAL process output, not on the stamper: the lines that
+  // matter come from three places (this file's `[serve]` lines, the tunnel client's, and the
+  // listening line), and only a spawned daemon proves all three go through the patched stream.
+  const stamped = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} /;
+  const lines = daemon1!.stderr().split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim() !== '');
+  const ours = lines.filter(l => /(\[serve\]|\[tunnel|AIMEAT serve daemon)/.test(l));
+  assert(ours.length >= 3, `expected the daemon's own lines, saw:\n${lines.slice(0, 20).join('\n')}`);
+  const bare = ours.filter(l => !stamped.test(l));
+  assert(bare.length === 0, `line(s) with no clock:\n${bare.slice(0, 5).join('\n')}`);
 });
 
 // ─── Forward-proxy parity ───
