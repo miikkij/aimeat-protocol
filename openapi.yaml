@@ -31492,7 +31492,7 @@ paths:
                 action: { type: string, description: "e.g. flow:advance, data-model-change, external-release, publish" }
                 arguments: { type: object, description: The proposed change payload }
                 risk: { type: string, enum: [low, medium, high] }
-                rule: { type: string, enum: [approve, auto] }
+                rule: { type: string, enum: [approve, auto], description: "What the CALLER asks for. `approve` always gates, even where the organism's autonomy level would have auto-run it. `auto` asks to skip review and is honoured only where the organism's own `policy.agentAutonomy` already allows it — an owner's setting the caller could opt out of would not be a setting. It is recorded in the decision's reason either way." }
                 approverRole: { type: string, enum: [owner, admin, member] }
                 stageId: { type: string }
                 flowGateId: { type: string }

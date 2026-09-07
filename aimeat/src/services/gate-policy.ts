@@ -77,15 +77,30 @@ export function gatePolicyFromManifest(manifest: unknown): GatePolicy {
 
 /**
  * Decide whether an action must be gated. Precedence:
- *   1. action ∈ alwaysGate  → gate (the safety floor; wins over rule/autonomy).
+ *   1. action ∈ alwaysGate  → gate (the safety floor; wins over everything).
  *   2. rule === 'approve'   → gate (the caller asking for review; cannot be undone by autonomy).
- *   3. rule === 'auto'      → auto (explicit pass-through, still audited by the caller).
- *   4. autonomy × risk      → gate if risk ≥ the level's threshold; else auto.
+ *   3. autonomy × risk      → gate if risk ≥ the level's threshold. THE OWNER'S SETTING, and it
+ *                             outranks the caller's `rule`.
+ *   4. rule === 'auto'      → auto, where step 3 already allowed it. Recorded in the reason so an
+ *                             audit can see the caller asked; it no longer decides anything.
  *
- * `rule` IS A CALLER-SUPPLIED VALUE, and that is the design rather than an oversight: the module's
- * posture is "gate only consequential actions", and step 3 is the documented way to opt one out.
- * What makes it safe is step 1, which no request can reach past — the 2026-09-06 review read step 3
- * as bypassing the policy and it does not, because step 1 is evaluated first and is a policy value.
+ * WHOSE VALUE IS WHOSE, which is the whole of it. `policy` comes from the organism's manifest and
+ * belongs to the OWNER. `rule` arrives on `req.body` (routes/organisms/gates.ts) and belongs to the
+ * CALLER — the agent. Until 2026-09-07 step 4 was evaluated third, before autonomy was read at all,
+ * so an organism set to L1 — whose own table says `gate ≥ low → everything` — passed any action
+ * outside the eight-name floor the moment a caller sent `rule: 'auto'`, and recorded it as
+ * `decidedBy: 'system'`. A policy the party it constrains can opt out of is not a policy; it is the
+ * shape invariant 15 names, a permission word that is not enforced on every door.
+ *
+ * The previous note here argued that step 1 makes this safe. It is right about the floor and silent
+ * about the case: the floor is eight named actions, and L1 promises all of them and everything else.
+ * Either L1 means what it says or the word is decoration. Ruled 2026-09-07: L1 means it.
+ *
+ * WHAT THIS COSTS. `rule: 'auto'` no longer changes an outcome anywhere — where autonomy gates it
+ * is overruled, and where autonomy does not it was already going to pass. It stays in the union and
+ * in the reason because the caller's intent is worth recording, but it is now a label rather than a
+ * control. `rule: 'approve'` is unaffected and still binds: asking for MORE review than the policy
+ * requires is not a thing an owner's setting needs protecting from.
  */
 export function shouldGate(input: {
   action: string;
@@ -98,14 +113,17 @@ export function shouldGate(input: {
 
   if (alwaysGate.includes(input.action)) return { gate: true, reason: 'always_gate' };
   // `approve` was in the declared union and honoured nowhere, so a caller ASKING to be gated was
-  // auto-run instead — the union's safer half was decorative. It sits below the floor and above the
-  // pass-through, which is the only order that leaves both halves meaning what they say.
+  // auto-run instead — the union's safer half was decorative. It sits below the floor and above
+  // everything else, which is the only order that leaves both halves meaning what they say.
   if (input.rule === 'approve') return { gate: true, reason: 'rule_approve' };
-  if (input.rule === 'auto') return { gate: false, reason: 'rule_auto' };
 
   const autonomy = input.policy?.autonomy ?? 'L3';
   const threshold = GATE_AT_OR_ABOVE[autonomy];
-  if (threshold === null) return { gate: false, reason: `autonomy_${autonomy}` };
-  const gate = riskRank(risk) >= riskRank(threshold);
-  return { gate, reason: `autonomy_${autonomy}_risk_${risk}` };
+  if (threshold !== null && riskRank(risk) >= riskRank(threshold)) {
+    return { gate: true, reason: `autonomy_${autonomy}_risk_${risk}` };
+  }
+  // Past the owner's threshold. The caller's pass-through is honoured here and only here, so the
+  // reason still says which of the two let it through.
+  if (input.rule === 'auto') return { gate: false, reason: 'rule_auto' };
+  return { gate: false, reason: threshold === null ? `autonomy_${autonomy}` : `autonomy_${autonomy}_risk_${risk}` };
 }

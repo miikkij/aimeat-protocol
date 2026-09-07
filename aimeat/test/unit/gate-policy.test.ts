@@ -9,8 +9,33 @@ describe('gate-policy.shouldGate', () => {
     }
   });
 
-  it('rule:auto passes non-floor actions through', () => {
-    expect(shouldGate({ action: 'flow:advance', risk: 'high', rule: 'auto' }).gate).toBe(false);
+  // THIS TEST ASSERTED THE HOLE, and it is the third of the three cases the repo's rule names: not
+  // that the source was broken and not that its setup drifted, but that it pinned the defect as the
+  // behaviour. `flow:advance` at HIGH risk with no policy is default autonomy L3, whose threshold
+  // is exactly 'high' — so the owner's setting says gate, and the assertion was that the caller's
+  // own `rule` overrules it. It does not any more.
+  it('rule:auto does NOT overrule the owner: the autonomy threshold is read first', () => {
+    // L3 is the default and gates at high. The caller asking to skip it changes nothing.
+    expect(shouldGate({ action: 'flow:advance', risk: 'high', rule: 'auto' }))
+      .toEqual({ gate: true, reason: 'autonomy_L3_risk_high' });
+    // L1 says "gate everything", and until 2026-09-07 one caller-supplied word passed any action
+    // outside the eight-name floor and recorded it as decidedBy:'system'.
+    expect(shouldGate({ action: 'flow:advance', risk: 'low', rule: 'auto', policy: { autonomy: 'L1' } }))
+      .toEqual({ gate: true, reason: 'autonomy_L1_risk_low' });
+  });
+
+  it('rule:auto is honoured where the owner already allowed it, and says so in the reason', () => {
+    // Below the threshold the answer is auto either way; the reason names which asked for it, so an
+    // audit can still see the caller's intent rather than only the level's.
+    expect(shouldGate({ action: 'flow:advance', risk: 'low', rule: 'auto', policy: { autonomy: 'L3' } }))
+      .toEqual({ gate: false, reason: 'rule_auto' });
+    expect(shouldGate({ action: 'flow:advance', risk: 'low', policy: { autonomy: 'L3' } }))
+      .toEqual({ gate: false, reason: 'autonomy_L3_risk_low' });
+    // L4 and L5 auto-run every non-floor action; the caller's word is still recorded.
+    expect(shouldGate({ action: 'flow:advance', risk: 'high', rule: 'auto', policy: { autonomy: 'L5' } }))
+      .toEqual({ gate: false, reason: 'rule_auto' });
+    expect(shouldGate({ action: 'flow:advance', risk: 'high', policy: { autonomy: 'L5' } }))
+      .toEqual({ gate: false, reason: 'autonomy_L5' });
   });
 
   it('rule:approve gates, even where autonomy would have auto-run', () => {
