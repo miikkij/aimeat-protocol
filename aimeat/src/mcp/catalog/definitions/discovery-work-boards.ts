@@ -5,6 +5,7 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.3.0 — 2026-09-05 — aimeat_admin_security_overview (the Security page in one read) and
  *     aimeat_admin_incident_resolve, beside the other operator tools.
  *   v1.2.0 — 2026-08-30 — Board tool descriptions say what a board is for (RFC v4.0 §27 reinstated):
@@ -330,7 +331,8 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_admin_security_overview',
-        description: 'Operator-only. The Security page in one read: what is happening at the door in the last 24 hours (refusals, distinct sources, walled addresses, each with a zone decided from this instance\'s own readable history), the refusal log grouped by door, source, credential kind and credential fingerprint plus its newest 200 lines, the refused-and-kept incidents with the open count, who holds the operator role and which accounts are deactivated or use two-step sign-in, and the door settings (rate limits, tarpit, lockout, TOTP, CORS origins, federation sign-in, body limits, the log file). The same data as GET /v1/admin/security/overview. Returns an operator-role error for non-operators.',
+        // A6: the overview reports a bounded sample and an explicit unknown comparison state.
+        description: 'Operator-only. The Security page in one read: a bounded sample of at most 1000 readable log lines filtered to the last 24 hours (count_kind=sample, window_total=null; unknown zone when comparison history is insufficient) (refusals, distinct sources, walled addresses, each with a zone decided from this instance\'s own readable history), the refusal log grouped by door, source, credential kind and credential fingerprint plus its newest 200 lines, the refused-and-kept incidents with the open count, who holds the operator role and which accounts are deactivated or use two-step sign-in, and the door settings (rate limits, tarpit, lockout, TOTP, CORS origins, federation sign-in, body limits, the log file). The same data as GET /v1/admin/security/overview. Returns an operator-role error for non-operators.',
         caller: 'operator',
         visibility: agentEverywhere,
         input: {},

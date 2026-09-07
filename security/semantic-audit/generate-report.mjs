@@ -21,6 +21,7 @@ import { astScan, fingerprintOf, loadStore, norm } from './audit-lib.mjs';
 import { triageSection, depsSection, secretsSection } from './report-sections.mjs';
 import { runDepsAudit } from './deps-audit.mjs';
 import { runSecretsScan } from './secrets-scan.mjs';
+import { reviewCoverage } from './invariant-review.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..', '..');
@@ -32,12 +33,14 @@ const pad = n => String(n).padStart(2, '0');
 const d = new Date();
 const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} klo ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 let commit = 'tuntematon';
-try { commit = execSync('git rev-parse --short HEAD', { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { /* ei repo */ }
+try { commit = execSync('git rev-parse HEAD', { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { /* ei repo */ }
 
 // 1. Aja vahdit oikeaa koodia vasten, ja jaa osumat triage-muistin perusteella:
 //    kuitatut (legit), ihmistä odottavat (confirm) ja kokonaan triagemattomat (fresh).
 process.stderr.write('1/5 Ajetaan vahdit oikeaa koodia vasten…\n');
 const store = loadStore();
+const coverage = reviewCoverage(cmd => execSync(`git ${cmd}`, { cwd: ROOT, encoding: 'utf8' }).trim(), store.lastInvariantReviewCommit, commit);
+const dirty = execSync('git status --porcelain', { cwd: ROOT, encoding: 'utf8' }).trim().length > 0;
 const ackByFp = new Map(store.entries.map(e => [e.fingerprint, e]));
 const findings = astScan('aimeat/src');
 const byGuard = {};
@@ -103,6 +106,7 @@ else if (GUARDS.some(g => !g.selfOk)) { verdict = '🟠 TARKISTA'; verdictWhy = 
 else if (depsWorst) { verdict = '🟠 TARKISTA'; verdictWhy = `${depsWorst} korkean tai kriittisen tason haavoittuvuutta riippuvuuksissa.`; }
 else if (pendingConfirm.length || openInvariants.length) { verdict = '🟠 TARKISTA'; verdictWhy = `${pendingConfirm.length + openInvariants.length} kohtaa odottaa ihmisen vahvistusta (AI-triage tai invarianttikatselmointi).`; }
 else if (!secrets.ok || !deps.ok) { verdict = '🟠 TARKISTA'; verdictWhy = 'Osa tarkistuksista ei valmistunut — katso osiot alta.'; }
+else if (freshFindings.length || coverage.status !== 'current' || dirty) { verdict = '🟠 TARKISTA'; verdictWhy = 'Uusia osumia tai katselmoimattomia muutoksia. Katso kattavuus ja triage alta.'; }
 else { verdict = '🟢 KAIKKI KUNNOSSA'; verdictWhy = freshFindings.length === 0 ? 'Ei ongelmia, ei katsottavaa: jokainen osuma on kuitattu ja kaikki tarkistukset vihreitä.' : `Ei yhtään estävää ongelmaa. ${freshFindings.length} uutta osumaa odottaa triagea (\`pnpm audit:triage\`).`; }
 
 // ── Rakenna markdown ──
@@ -122,11 +126,15 @@ M.push(`### ${verdict}`);
 M.push('');
 M.push(verdictWhy);
 M.push('');
+M.push('Raportin muodostus ei ole julkaisuportti. Exit 0 tarkoittaa, että raportti valmistui; CI:n tarkistukset valvovat muutoksia erikseen.');
+M.push(`AI-katselmointi: **${coverage.status}**, viimeksi \`${coverage.last || 'ei tarkistuspistettä'}\`, tämän jälkeen **${coverage.pendingCommits ?? 'tuntematon määrä'}** committia. Työpuussa tallentamattomia muutoksia: **${dirty ? 'kyllä' : 'ei'}**.`);
+M.push('Paikallinen raakaskannaus: ast-grep. Semgrep ja CodeQL eivät ajaneet tässä raportissa; niiden tulokset luetaan kyseisen CI-commitin raporteista.');
+M.push('');
 M.push('| Mittari | Tulos | Mitä tarkoittaa |');
 M.push('|---|---|---|');
 M.push(`| Estäviä ongelmia | **${errorLevel}** | Ongelmia jotka estävät julkaisun. Nolla = ei estettä. |`);
 M.push(`| Katsottavia kohtia | **${reviewLevel}** | Osumia joita kukaan ei ole vielä kuitannut (${freshFindings.length} triagematonta, ${pendingConfirm.length} ihmisen jonossa). **Ei vikoja.** |`);
-M.push(`| Kuitattuja osumia | **${ackedLegit}** | AI:n tai ihmisen lailliseksi toteamia, perustelu tallessa. Eivät nouse uudelleen. |`);
+M.push(`| Kuitattuja osumia | **${ackedLegit}** | Hyväksyntä vastaa tämän skannauksen lähdekoodi- ja sääntökontekstia. |`);
 M.push(`| Automaattiset tarkistukset | **${gates.length - gatesFailed.length} / ${gates.length}** | Vihreitä = kunnossa. |`);
 M.push(`| Vahtien omavalvonta | **${selfPass} / ${GUARDS.length}** | Todistettu joka ajolla: vahti nappaa tahallaan rikotun koodin. |`);
 M.push(`| Riippuvuushaavoittuvuudet | **${deps.ok ? `${depsWorst} vakavaa / ${Object.values(deps.counts).reduce((a, b) => a + b, 0)} yht.` : 'ei ajettu'}** | Tunnetut CVE:t riippuvuuspuussa (${deps.ok ? deps.totalDeps : '?'} pakettia). |`);
@@ -147,7 +155,7 @@ M.push('');
 // 2. Miten toimii
 M.push('## Miten järjestelmä toimii');
 M.push('');
-M.push('Turva-auditointi on **jatkuva**, ei kertaluontoinen. Joka koodimuutoksella ajetaan neljä asiaa:');
+M.push('CI ajaa staattiset tarkistukset joka pushilla. AI-triage ja paikallinen raportti ovat erikseen käynnistettäviä ajoja:');
 M.push('');
 M.push('1. **Vahdit** — hakevat koodista kuvioita jotka rikkoisivat turvasäännön (esim. datahaku ilman tunnuksen ratkaisua). Ne osuvat tarkoituksella herkästi, jotta mikään oikea ongelma ei jää huomaamatta.');
 M.push('2. **AI-triage** — jokainen vahdin osuma katselmoidaan kerran: AI lukee koodin osuman ympäriltä ja joko kuittaa sen lailliseksi kuvioksi perusteluineen tai nostaa sen ihmiselle. Kuittaus säilyy kunnes se koodikohta muuttuu. Sama ajo katselmoi git-muutokset niitä turvasääntöjä vasten joita konehaku ei tavoita (tarkistusten järjestys, deprekointipolitiikka, otsakkeiden luotettavuus, federaation allekirjoitus).');
@@ -274,6 +282,9 @@ writeFileSync(resolve(OUT, 'gates.json'), JSON.stringify(gates, null, 2));
 writeFileSync(resolve(OUT, 'data.json'), JSON.stringify({
   generatedAt: d.toISOString(),
   commit,
+  dirty,
+  invariantReview: coverage,
+  scans: { astGrep: { status: 'completed', raw: findings.length, acknowledged: ackedLegit, fresh: freshFindings.length }, semgrep: { status: 'not-run' }, codeql: { status: 'not-run' } },
   verdict: verdict.replace(/^\S+\s/, ''),
   summary: {
     blocking: errorLevel, toReview: reviewLevel, acknowledged: ackedLegit,

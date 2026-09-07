@@ -5,6 +5,8 @@
  * report's words live in one readable place. Finnish, because that is who reads it.
  */
 
+import { AUDIT_CHECKS } from '../../aimeat/scripts/lib/check-registry.mjs';
+
 // Each guard: the ast-grep rule id, and everything the report says about it.
 export const GUARDS = [
   {
@@ -93,20 +95,7 @@ export const GUARDS = [
 ];
 
 // The automatic ratchets: plain name + why it matters + tool.
-export const CHECKS = [
-  ['check:route-scopes', 'Jokainen muutos vaatii luvan', 'Muutos-toiminto ilman lupatarkistusta on oikeuksien kiertoreitti. Skripti laskee: jokaisella muuttavalla reitillä on oltava lupavahti.'],
-  ['check:denial-coverage', 'Luvaton pääsy testataan ja estetään', 'Jokaiselle tunnuksia koskevalle ominaisuudelle on testi joka yrittää luvatonta pääsyä ja odottaa 403:a.'],
-  ['check:outbound-fetch', 'Ulkoiset yhteydet tarkistetaan', 'Palvelimen ulos ottamat yhteydet kulkevat tarkistuksen läpi, ettei niitä voi ohjata sisäverkkoon (SSRF).'],
-  ['check:trusted-keys', 'Salaisuuksiin ei pääse käsiksi väärin', 'Avaimet joita palvelin lukee ja joihin se luottaa eivät saa olla sovelluksen kirjoitettavissa.'],
-  ['check:storage-parity', 'Data tallentuu samoin joka tietokannalla', 'Uusi tietotyyppi on toteutettava molemmilla tietokannoilla, ettei toinen taustajärjestelmä käyttäydy eri tavalla.'],
-  ['check:ext-entrypoints', 'Laajennukset eivät saa piiloreittejä', 'Laajennuksen sisäänkäynnit on ilmoitettava, ei pääteltävä — ettei synny vahvistamatonta pintaa.'],
-  ['check:shared-impl', 'Jokainen toiminto tehdään yhdessä paikassa', 'Sama toiminto ei saa olla toteutettu kahdesti (esim. työkalu ohi reitin), jottei toinen kopio jää ilman lupatarkistusta.'],
-  ['check:sse-parity', 'Reaaliaikanäkymä vastaa oikeaa dataa', 'Reaaliaikainen syöte näyttää saman kuin varsinainen rajapinta, ei eri sääntöjä.'],
-  ['check:copied-logic', 'Turvapäätöstä ei kirjoiteta kahdesti', 'Sama turvapäätös kahdessa paikassa ajautuu erilleen; skripti vaatii yhden lähteen.'],
-  ['check:liaison-surface', 'Python-paketti vastaa palvelinta', 'CrewAI-liaison-paketti ei saa tarjota työkalua jota palvelin ei enää tue.'],
-  ['check:mcp-tools', 'AI-työkalut samat joka rajapinnassa', 'AI-työkalujen NIMET täsmäävät node-, connector- ja CLI-pinnalla, ettei jokin ovi tarjoa eri työkaluja.'],
-  ['check:mcp-schemas', 'AI-työkalujen parametrit samat', 'AI-työkalujen PARAMETRIT täsmäävät joka pinnalla, ettei parametri katoa hiljaa yhdellä ovella.'],
-];
+export const CHECKS = AUDIT_CHECKS.map(({ script, label }) => [script, label, `pnpm ${script}`]);
 
 // Invariants that cannot be a clean static rule, and what covers them instead. Since 2026-08-23 the
 // AI diff review (ai-triage.mjs) reads every commit range against these four, so "katselmointi" is a

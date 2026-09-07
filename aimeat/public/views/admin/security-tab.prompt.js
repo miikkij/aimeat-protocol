@@ -9,6 +9,7 @@
  *   read by a model, and the tool names inside it are the node's own.
  * @structure buildSecurityPrompt({ url })
  * @version-history
+ *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.0.0 — 2026-09-05 — Initial (the Security page in the poster face).
  */
 
@@ -21,7 +22,7 @@ export function buildSecurityPrompt({ url = '' } = {}) {
   return `I run an AIMEAT node${where} and I am its operator. Read its security page for me and tell me what needs a decision.
 
 == 1. Read ==
-  aimeat_admin_security_overview {}   the refusals of the last 24 hours grouped by door, source and credential fingerprint, the newest lines, the refused-and-kept incidents, the accounts and roles, and the door settings
+  aimeat_admin_security_overview {}   a sample of up to 1000 log lines filtered to the last 24 hours (daily total unknown), grouped by door, source and credential fingerprint, the newest lines, the refused-and-kept incidents, the accounts and roles, and the door settings
   aimeat_admin_stats {}               the counters since the restart
 
 == 2. Tell them apart ==

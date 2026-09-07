@@ -7,6 +7,7 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.2.0 -- 2026-09-05 -- Two more pins: the login rate limit (e2e-auth-lib tripped it at random
  *            once the tarpit stopped spacing its logins out) and the MCP idle-sweep interval (1 s,
  *            so e2e-mcp-session-expiry proves a 6 s reap in 8 s rather than 18). And lanes:
@@ -31,6 +32,19 @@ import { createServer } from 'node:net';
 import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
+import { tmpdir } from 'node:os';
+
+const authLogs = new WeakMap<RunnerTarget, string>();
+/** A5: a suite owns its log, including when a parent environment names a shared log. */
+export function suiteAuthLog(target: RunnerTarget): string {
+    let path = authLogs.get(target);
+    if (!path) {
+        path = resolve(tmpdir(), `aimeat-e2e-auth-${process.pid}-${randomUUID()}.log`);
+        authLogs.set(target, path);
+    }
+    return path;
+}
 
 /** Everything the runner and the suites have to agree on about the node under test. */
 export interface RunnerTarget {
@@ -328,7 +342,7 @@ export function pinnedEnv(target: RunnerTarget): Record<string, string> {
         // ── Refusal log ──
         // Pinned to a test-local path so e2e-auth-refusals reads a log the suite itself
         // produced, and a developer's aimeat/data/ never collects test refusals.
-        AIMEAT_AUTH_LOG_PATH: process.env.AIMEAT_AUTH_LOG_PATH ?? 'test/.auth-failures.log',
+        AIMEAT_AUTH_LOG_PATH: suiteAuthLog(target),
 
         // ── The money rails ──
         // x402 settlement: pin the rail ON and settle against the OFF-CHAIN double. e2e-x402 needs
@@ -582,6 +596,7 @@ const SERVER_READY_TIMEOUT_MS = 60_000;
 
 export async function startServer(target: RunnerTarget): Promise<ChildProcess> {
     await requirePortFree(Number(target.port), PORT_FREE_TIMEOUT_MS, 'the runner asked to start a server on it');
+    authLogs.delete(target);
 
     const env = { ...process.env, ...pinnedEnv(target) };
     const serverArgs = ['--import', 'tsx', 'src/index.ts', 'start', '--db', target.dbType];
@@ -592,6 +607,11 @@ export async function startServer(target: RunnerTarget): Promise<ChildProcess> {
     }
 
     const child = spawn('node', serverArgs, { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
+    // These two generated files belong only to this server. Keep external/user log files intact.
+    const authLog = env.AIMEAT_AUTH_LOG_PATH;
+    child.once('close', () => {
+        for (const path of [authLog, `${authLog}.1`]) if (existsSync(path)) unlinkSync(path);
+    });
 
     // Keep the tail of stderr. A server that dies on boot (a bad pin, a database it cannot open)
     // used to report only "failed to start within 60000ms", with the reason drained to nothing.

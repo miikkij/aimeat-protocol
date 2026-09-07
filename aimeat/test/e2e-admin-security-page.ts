@@ -7,6 +7,7 @@
  *   and credential kind and listed newest first, the incident open with the status word "open" —
  *   and that resolving and deleting go through the same service the MCP tool calls.
  * @version-history
+ *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.0.0 -- 2026-09-05 -- Initial: the overview's gate and shape, the incident lifecycle.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=admin-security-page
@@ -76,12 +77,15 @@ await test('The overview door refuses a stranger (401) and a non-operator (403)'
 
 await test('The operator reads the page in one call, with every part present', async () => {
     const d = await overview(opToken);
-    assert(['quiet', 'watch', 'open'].includes(d.now.status), `status word ${d.now.status}`);
+    assert(['quiet', 'watch', 'open', 'unknown'].includes(d.now.status), `status word ${d.now.status}`);
     for (const k of ['refusals', 'sources', 'rate_limit_hits', 'scope_denials', 'open_incidents']) {
         assert(typeof d.now[k].value === 'number', `now.${k}.value is a number`);
-        assert(['healthy', 'watch', 'critical'].includes(d.now[k].zone), `now.${k}.zone is a zone, got ${d.now[k].zone}`);
+        assert(['healthy', 'watch', 'critical', 'unknown'].includes(d.now[k].zone), `now.${k}.zone is a zone, got ${d.now[k].zone}`);
     }
     assert(d.now.refusals.window_hours === 24, 'the window is 24 hours');
+    assert(d.now.refusals.count_kind === 'sample' && d.now.refusals.window_total === null, 'A6: sample count is distinct from the unknown daily total');
+    assert(d.refusals.sample_limit === 1000 && d.refusals.count_kind === 'sample', 'A6: the bounded sample is explicit');
+    assert(d.now.refusals.mean_per_day !== null || d.now.refusals.zone === 'unknown', 'A6: no comparison history cannot be healthy');
     assert(d.now.log.enabled === true, 'the refusal log is on under the runner');
     assert(typeof d.now.log.path === 'string' && d.now.log.path.length > 0, 'the log line names the file');
     assert(Array.isArray(d.refusals.tail) && Array.isArray(d.refusals.by_door), 'refusals carry the tail and the groupings');

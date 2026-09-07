@@ -5,6 +5,7 @@
  * vulnerabilities and the secret scan. Each function returns an array of markdown lines; the words
  * are Finnish because that is who reads the report.
  * @version-history
+ *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *  - 1.0.0 (2026-08-23): first version.
  */
 
@@ -23,7 +24,7 @@ export function triageSection(store, pendingConfirm, openInvariants) {
   M.push('Vahdit hälyttävät herkästi tarkoituksella, joten jokainen osuma katselmoidaan kerran: AI lukee');
   M.push('osuman ympäröivine koodeineen ja joko kuittaa sen lailliseksi kuvioksi perusteluineen tai nostaa');
   M.push('sen ihmiselle. Kuittaus tallentuu (`security/semantic-audit/triage-store.json`) ja pysyy voimassa');
-  M.push('kunnes kyseinen koodikohta muuttuu — sama osuma ei nouse katsottavaksi kahdesti. Uudet osumat');
+  M.push('vain tarkistetussa lähdekoodi- ja sääntökontekstissa. Muutos palauttaa osumat katselmointiin. Uudet osumat');
   M.push('katselmoidaan ajamalla `pnpm audit:triage`.');
   M.push('');
   if (store.entries.length === 0) {
@@ -32,7 +33,7 @@ export function triageSection(store, pendingConfirm, openInvariants) {
     return M;
   }
   const legit = store.entries.filter(e => e.verdict === 'legit');
-  M.push(`Kuitattuja lailliseksi: **${legit.length}** · ihmistä odottaa: **${pendingConfirm.length + openInvariants.length}**`);
+  M.push(`Historiallisia hyväksyntöjä: **${legit.length}** · ihmistä odottaa: **${pendingConfirm.length + openInvariants.length}**. Vain tiivistelmän ajantasaiset kuittaukset koskevat tätä skannausta.`);
   M.push('');
   if (pendingConfirm.length) {
     M.push('### 🟠 Ihmisen vahvistusta odottavat osumat');

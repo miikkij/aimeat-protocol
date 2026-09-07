@@ -12,6 +12,7 @@
  * @structure SecurityTab({ switchPage }) — load · alertLine · RightNow · Strip · the sections from
  *   security-tab.refusals.js and security-tab.sections.js · the actions (resolve, delete, payload)
  * @version-history
+ *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v2.0.0 — 2026-09-05 — The poster face and the one read; the Statistics tab's three security
  *     counters become rows here with a sentence each; the emoji heading and the party-popper empty
  *     state go; every admin tab re-reads on a live update, this one included.
@@ -49,6 +50,7 @@ export function alertLine(ov) {
       : S('now.lineWalledMany', { n: num(r.walled_in_window), sources: num(r.walled_sources.length) }));
   }
   if (parts.length) return parts.join(' ');
+  if (ov.now.status === 'unknown') return S('now.lineUnknown');
   return ov.now.status === 'watch' ? S('now.lineWatch') : S('now.lineQuiet');
 }
 
@@ -58,7 +60,7 @@ function RightNow({ ov, switchPage }) {
   const row = (key, zone, value, last) => html`
     <div class="adm-mrow ${last ? 'adm-mrow--last' : ''}">
       <span><b>${S('now.' + key)}</b><span class="adm-why">${S('now.' + key + 'Why')}</span></span>
-      <span><${Badge} type=${zone} /></span>
+      <span><${Badge} type=${zone} label=${zone === 'unknown' ? S('now.word.unknown') : undefined} /></span>
       <span class="adm-mval">${value}</span>
     </div>`;
   const meanText = n.refusals.mean_per_day != null
