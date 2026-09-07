@@ -11,6 +11,12 @@
  *   - setupStaticFiles() -- main entry, applied during server bootstrap
  *   - STATIC_HTML_REDIRECTS -- map of legacy .html paths to canonical /v1/ routes
  * @version-history
+ *   v1.12.0 -- 2026-09-08 -- The three inline path-candidate lists move to asset-dirs.ts, and the
+ *     static/ one gains the location the PACKAGE carries it at. public/ and locales/ keep their
+ *     directory name in the build, so one candidate answered for both the dev tree and the
+ *     package; src/static is copied to dist/static, so the same candidate read dist/src/static
+ *     and no npm-installed node has ever served /app-catalog.html, /manifest.json,
+ *     /app-silent.html or /app-login.js. Measured on aimeat@3.13.1 in production.
  *   v1.7.0 -- 2026-08-29 -- The CSP drops fonts.googleapis.com from style-src and fonts.gstatic.com
  *     from font-src: every face is self-hosted under /lib/fonts now and no page links the CDN.
  *   v1.6.0 -- 2026-08-23 -- The silent SSO bridge is framable from a company address too. The
@@ -63,10 +69,11 @@ import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import { serveSpa } from '../routes/portal.js';
 import { buildAuthMd } from '../services/auth-md.js';
+import { resolveAssetDir } from './asset-dirs.js';
 
 /**
- * Resolve the public directory from multiple candidate paths.
- * Returns the __dirname computed from this module's URL for consistent path resolution.
+ * This module's own directory, which is what asset-dirs.ts measures the asset trees against:
+ * it differs between the dev tree and the compiled one, and that difference is the whole map.
  */
 function resolveServerDir(): string {
   const __filename = fileURLToPath(import.meta.url);
@@ -136,12 +143,8 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     appFrameSrc = ` ${scheme}://${h} ${scheme}://*.${h} ${scheme}://${h}:* ${scheme}://*.${h}:*`;
   }
 
-  // Try multiple paths: relative to src/ (dev via tsx) and relative to dist/ (compiled)
-  const publicCandidates = [
-    join(process.cwd(), 'public'),         // scaffolded: CWD/public
-    join(__dirname, '..', '..', 'public'),       // dev: server-bootstrap/../../public
-    join(__dirname, '..', '..', '..', 'public'), // dist: dist/src/server-bootstrap/../../../public
-  ];
+  // Dev tree, compiled tree, npm install or scaffolded CWD — asset-dirs.ts holds the layouts.
+  const publicDir = resolveAssetDir('public', __dirname, process.cwd());
   // Security headers applied to ALL responses (API and static)
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -193,7 +196,6 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     res.type('text/markdown; charset=utf-8').send(authMd);
   });
 
-  const publicDir = publicCandidates.find(p => existsSync(p));
   if (publicDir) {
     warnAboutMissingVendoredAssets(publicDir);
     // Redirect legacy and template URLs to the canonical route that renders them.
@@ -345,24 +347,15 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
   }
 
   // Serve locale files at /locales/*.json (used by SPA i18n module)
-  const localeCandidates = [
-    join(process.cwd(), 'locales'),        // scaffolded: CWD/locales
-    join(__dirname, '..', '..', 'locales'),      // dev: server-bootstrap/../../locales
-    join(__dirname, '..', '..', '..', 'locales'), // dist
-  ];
-  const localeDir = localeCandidates.find(p => existsSync(p));
+  const localeDir = resolveAssetDir('locales', __dirname, process.cwd());
   if (localeDir) {
     app.use('/locales', express.static(localeDir, { maxAge: '1h', dotfiles: 'deny' }));
   }
 
   // PWA manifest + app-catalog + silent-bridge pages. The service worker is NOT here: /sw.js
-  // resolves to public/sw.js, which the public/ mount above serves first.
-  const pwaCandidates = [
-    join(process.cwd(), 'static'),                       // scaffolded: CWD/static
-    join(__dirname, '..', '..', 'src', 'static'),       // dev
-    join(__dirname, '..', '..', '..', 'src', 'static'), // dist
-  ];
-  const pwaStaticDir = pwaCandidates.find(p => existsSync(p));
+  // resolves to public/sw.js, which the public/ mount above serves first. The list this reads
+  // used to name only src/static, which the package does not carry: see asset-dirs.ts.
+  const pwaStaticDir = resolveAssetDir('static', __dirname, process.cwd());
   if (pwaStaticDir) {
     // Serve app-catalog.html with relaxed CSP — self-contained SPA with many inline event handlers
     const appCatalogPath = join(pwaStaticDir, 'app-catalog.html');
