@@ -36,7 +36,7 @@ export const dataMapTools: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             app: { type: 'string', required: true, description: 'The app, as "owner/filename.html".' },
-            data_map: { type: 'object', required: true, description: 'The whole map, carrying spec "aimeat.datamap/2": what, usedFor, form, arrangement, machinery, leaves, held[], elsewhere[].' },
+            data_map: { type: 'object', required: true, description: 'The whole map, carrying spec "aimeat.datamap/2": what, usedFor, form, arrangement, machinery, leaves, held[], elsewhere[]. A held row may also carry `isA`, the semantic type its records ARE — schema:Person, aimeat:Task, or a full IRI (GET /v1/ns lists the ones this node names). It is the only optional field on a row: `kind` and `holds` say what the data is in the app\'s own words, and `isA` says the same in a word other systems already know, which is what makes the family findable with the type filter on memory search. A family that is genuinely nothing standard leaves it out rather than reaching for the nearest wrong type.' },
         },
     },
     {

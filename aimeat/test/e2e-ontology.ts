@@ -14,6 +14,9 @@
  *   spec itself saying the block was "not currently validated".
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ontology
  * @version-history
+ *   v1.1.0 — 2026-09-08 — Search narrowed by what a record IS (`?type=`). The case that earns its
+ *     keep is two Person records written with different spellings of the same type, found by one
+ *     query: comparing the strings would have answered correctly only when both sides agreed.
  *   v1.0.0 — 2026-09-08 — Initial: /v1/ns and /v1/ns.md, the schema-context refusals and its happy
  *     path, the second owner's 403 and the unauthenticated 401 on both write doors, the CSM
  *     semantic refusal and its happy path.
@@ -183,11 +186,50 @@ await test('9. the same context, spelled right, is accepted and read back', asyn
     assert(ctx?.properties?.temperature?.['qudt:unit'] === 'qudt:DEG_C', 'the per-field mapping survived');
 });
 
+console.log('\nSearch narrowed by what a record IS');
+
+await test('9b. three records, two of them people, one written as a full IRI', async () => {
+    const write = (key: string, value: unknown) => json('/v1/memory', {
+        method: 'POST', headers: auth(token),
+        body: JSON.stringify({ key, value, visibility: 'private' }),
+    });
+    const a = await write(`onto-p1-${stamp}`, { '@type': 'schema:Person', name: 'Anna', city: 'Helsinki' });
+    const b = await write(`onto-p2-${stamp}`, { '@type': 'https://schema.org/Person', name: 'Bertta', city: 'Helsinki' });
+    const c = await write(`onto-e1-${stamp}`, { '@type': 'schema:Event', name: 'Concert', city: 'Helsinki' });
+    for (const r of [a, b, c]) assert(r.status === 200 || r.status === 201, `write ${r.status}`);
+});
+
+await test('10. ?type= narrows a text search, and matches BOTH spellings of the same type', async () => {
+    // The one behaviour that makes this worth having: the caller writes schema:Person and finds the
+    // record written as https://schema.org/Person too. Comparing the strings would answer correctly
+    // only when both sides happened to agree.
+    const r = await json(`/v1/memory/search?q=Helsinki&type=${encodeURIComponent('schema:Person')}&include=meta`, { headers: auth(token) });
+    assert(r.status === 200, `search ${r.status}`);
+    const keys = (r.body.data?.results ?? []).map((x: any) => x.key);
+    assert(keys.includes(`onto-p1-${stamp}`), `the prefixed one is there: ${keys.join(', ')}`);
+    assert(keys.includes(`onto-p2-${stamp}`), `the full-IRI one is there too: ${keys.join(', ')}`);
+    assert(!keys.includes(`onto-e1-${stamp}`), `the Event is not: ${keys.join(', ')}`);
+});
+
+await test('11. a single type with no q lists that type', async () => {
+    const r = await json(`/v1/memory/search?type=${encodeURIComponent('schema:Event')}&include=meta`, { headers: auth(token) });
+    assert(r.status === 200, `search ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const keys = (r.body.data?.results ?? []).map((x: any) => x.key);
+    assert(keys.includes(`onto-e1-${stamp}`), `the Event is listed: ${keys.join(', ')}`);
+    assert(!keys.includes(`onto-p1-${stamp}`), `a Person is not: ${keys.join(', ')}`);
+});
+
+await test('12. neither q nor type is still a refusal, and it says which', async () => {
+    const r = await json('/v1/memory/search?include=meta', { headers: auth(token) });
+    assert(r.status === 400, `expected 400, got ${r.status}`);
+    assert(r.body.error?.code === 'INVALID_INPUT', `got ${r.body.error?.code}`);
+});
+
 console.log('\nThe fence: a second owner cannot rewrite what this one means');
 
 let otherToken = '';
 
-await test('10. Setup a second owner', async () => {
+await test('13. Setup a second owner', async () => {
     const other = `onto2${stamp}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: other, display_name: 'Onto2', password: 'Onto12345' }) });
     assert(reg.status === 200 || reg.status === 201, `register ${reg.status}`);
@@ -197,7 +239,7 @@ await test('10. Setup a second owner', async () => {
     assert(!!otherToken, 'no token for the second owner');
 });
 
-await test('11. a different owner is refused, and the refusal is about the LOCK, not the annotation', async () => {
+await test('14. a different owner is refused, and the refusal is about the LOCK, not the annotation', async () => {
     // A valid semantic context from the wrong principal must still be refused. If this ever came
     // back 400 INVALID_SEMANTIC_CONTEXT instead of 403, the new check would have moved in FRONT of
     // the ownership gate — which is the order this suite is here to pin.
@@ -212,13 +254,13 @@ await test('11. a different owner is refused, and the refusal is about the LOCK,
     assert(r.body.error?.code === 'SCHEMA_LOCKED_BY_OTHER', `expected SCHEMA_LOCKED_BY_OTHER, got ${r.body.error?.code}`);
 });
 
-await test('12. and what the first owner said is still what the key means', async () => {
+await test('15. and what the first owner said is still what the key means', async () => {
     const got = await json(`/v1/memory/${encodeURIComponent(KEY)}/schema`);
     assert(got.body.data?.semantic_context?.['@type'] === 'schema:PropertyValue',
         `unchanged after the refusal: ${JSON.stringify(got.body.data?.semantic_context)}`);
 });
 
-await test('13. with no credential at all, the door does not open', async () => {
+await test('16. with no credential at all, the door does not open', async () => {
     const r = await json(`/v1/memory/${encodeURIComponent(KEY)}/schema`, {
         method: 'PUT',
         body: JSON.stringify({ schema: SCHEMA, apply_to: 'exact', schema_mode: 'open' }),
@@ -226,7 +268,7 @@ await test('13. with no credential at all, the door does not open', async () => 
     assert(r.status === 401, `expected 401, got ${r.status}`);
 });
 
-await test('14. registering a CSM needs a credential too', async () => {
+await test('17. registering a CSM needs a credential too', async () => {
     const res = await fetch(`${BASE}/v1/csm`, {
         method: 'POST', headers: { 'Content-Type': 'text/yaml' },
         body: csmYaml(`onto-anon-${stamp}`, ''),
@@ -272,7 +314,7 @@ const postCsm = (yaml: string) => fetch(`${BASE}/v1/csm`, {
     body: yaml,
 }).then(async (res) => ({ status: res.status, body: await res.json() as any }));
 
-await test('15. a manifest naming a vocabulary nobody defined is refused', async () => {
+await test('18. a manifest naming a vocabulary nobody defined is refused', async () => {
     const r = await postCsm(csmYaml(`onto-bad-${stamp}`, `  semantic:
     "@type": "shop:Directory"`));
     assert(r.status === 400, `expected 400, got ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`);
@@ -280,7 +322,7 @@ await test('15. a manifest naming a vocabulary nobody defined is refused', async
     assert(String(r.body.error?.message).includes('service.semantic'), `the message says where: ${r.body.error?.message}`);
 });
 
-await test('16. the same manifest with the prefix declared registers', async () => {
+await test('19. the same manifest with the prefix declared registers', async () => {
     const r = await postCsm(csmYaml(`onto-ok-${stamp}`, `  semantic:
     "@context":
       shop: "https://example.org/shop#"
@@ -290,13 +332,13 @@ await test('16. the same manifest with the prefix declared registers', async () 
     assert(r.status === 200 || r.status === 201, `expected 200/201, got ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`);
 });
 
-await test('17. a manifest using a default prefix needs no @context of its own', async () => {
+await test('20. a manifest using a default prefix needs no @context of its own', async () => {
     const r = await postCsm(csmYaml(`onto-def-${stamp}`, `  semantic:
     "@type": "schema:DataCatalog"`));
     assert(r.status === 200 || r.status === 201, `expected 200/201, got ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`);
 });
 
-await test('18. a manifest with no semantic block at all is untouched', async () => {
+await test('21. a manifest with no semantic block at all is untouched', async () => {
     const r = await postCsm(csmYaml(`onto-none-${stamp}`, ''));
     assert(r.status === 200 || r.status === 201, `expected 200/201, got ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`);
 });

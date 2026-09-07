@@ -28,7 +28,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { isVersionKey, searchHitShape } from '../services/memory-search-shape.js';
+import { isVersionKey, searchHitShape, matchesType } from '../services/memory-search-shape.js';
 
 export function registerMemoryExtendedTools(
     mcp: McpServer,
@@ -55,26 +55,45 @@ export function registerMemoryExtendedTools(
         'aimeat_memory_search',
         descriptionFor('aimeat_memory_search'),
         {
-            query: z.string(),
+            query: z.string().optional(),
+            type: z.string().optional().describe('Narrow to what a record IS: a semantic type, or several separated by commas (schema:Person, aimeat:Task, or a full IRI). Matches whichever spelling the writer used.'),
             visibility: z.enum(['private', 'owner', 'group', 'members', 'public']).optional(),
             limit: z.number().optional().describe('Max hits to return (default 50).'),
             include_versions: z.boolean().optional().describe('Include `.version.N` history snapshots (skipped by default — they are immutable history and the main source of bloat).'),
         },
         annotationsFor('aimeat_memory_search'),
-        async ({ query, visibility, limit, include_versions }) => {
+        async ({ query, type, visibility, limit, include_versions }) => {
             const cap = Math.max(1, Math.min(limit ?? 50, 200));
+            const wantedTypes = type ? type.split(',').map(t => t.trim()).filter(Boolean) : [];
+            // `query` is optional when a type is given: "every Person record I have" is a real
+            // question with no text in it. The type string becomes the query, because `@type` is
+            // indexed like any other scalar in the value; matchesType then makes the answer exact.
+            const effectiveQuery = (query ?? '').trim() || (wantedTypes.length === 1 ? wantedTypes[0] : '');
+            if (!effectiveQuery) {
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                            error: wantedTypes.length > 1
+                                ? 'Give a query as well: searching several types at once needs something to search for.'
+                                : 'Give a query, or a single type to list.',
+                        }, null, 2),
+                    }],
+                };
+            }
             // Pull a bounded candidate set from storage (safety net over a pathological store), then drop
             // version history in-tool and cap to `cap` non-version hits.
-            const candidates = await storage.searchMemory(agentGaii, query, { visibility, limit: cap * 4 });
-            const hits = (include_versions ? candidates : candidates.filter(r => !isVersionKey(r.key))).slice(0, cap);
-            const q = query.trim();
+            const candidates = await storage.searchMemory(agentGaii, effectiveQuery, { visibility, limit: cap * 4 });
+            const typed = wantedTypes.length ? candidates.filter(r => matchesType(r.value, wantedTypes)) : candidates;
+            const hits = (include_versions ? typed : typed.filter(r => !isVersionKey(r.key))).slice(0, cap);
+            const q = effectiveQuery;
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
                         query: q,
                         total: hits.length,
-                        truncated: (include_versions ? candidates.length : candidates.filter(r => !isVersionKey(r.key)).length) > hits.length,
+                        truncated: (include_versions ? typed.length : typed.filter(r => !isVersionKey(r.key)).length) > hits.length,
                         hits: hits.map(r => searchHitShape(r, q)),
                         hint: 'Snippets only. Read a full value with aimeat_memory_read(key).',
                     }, null, 2),

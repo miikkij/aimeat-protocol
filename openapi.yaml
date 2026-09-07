@@ -13308,10 +13308,23 @@ paths:
       parameters:
         - name: q
           in: query
-          required: true
           schema:
             type: string
-          description: Search query
+          description: >-
+            Search query. Required UNLESS `type` names exactly one type, because "every Person
+            record I have" is a real question with no text in it; the type string is then the query.
+        - name: type
+          in: query
+          schema:
+            type: string
+          description: >-
+            Narrow to what a record IS rather than what it says: a semantic type such as
+            `schema:Person` or `aimeat:Task`, several separated by commas, or a full IRI. Compares
+            EXPANDED forms, so `schema:Person` matches a record written as
+            `https://schema.org/Person`, and a record's own `@context` is honoured. The filter runs
+            over what the text search found, so a record of the right type that `q` did not match is
+            not in the answer; give `type` alone to search on the type itself. `GET /v1/ns` lists
+            the types this node names for itself.
         - name: visibility
           in: query
           schema:

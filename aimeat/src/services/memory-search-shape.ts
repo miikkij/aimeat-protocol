@@ -20,13 +20,18 @@
  *   - isVersionKey(key) — is this a `.version.N` history row
  *   - snippetOf(text, needle) — the window, with ellipses where it was cut
  *   - searchHitShape(record, query) — the meta-only hit: key, snippet, bytes, visibility, tags, updated_at
+ *   - typeOfRecord(value) / matchesType(value, wanted) — the semantic `@type` filter, one place
  * @usage
- *   import { isVersionKey, searchHitShape } from '../services/memory-search-shape.js';
+ *   import { isVersionKey, searchHitShape, matchesType } from '../services/memory-search-shape.js';
  * @version-history
+ *   v1.1.0 — 2026-09-08 — `matchesType`: search narrowed by what a record IS. Records have carried
+ *     `@type` since Phase 0.7 and nothing could filter on it, so the annotation was written and
+ *     never read — which is what made it decorative.
  *   v1.0.0 — 2026-09-06 — Extracted from mcp/memory-extended.ts so the REST door can answer the same
  *     way (review item 6.4).
  */
 import type { MemoryRecord } from '../storage/interface.js';
+import { contextOf, expandTerm } from '../utils/onto-context.js';
 
 /** Characters kept either side of the match. Enough to read the sentence, not the record. */
 export const SNIPPET_RADIUS = 120;
@@ -52,6 +57,44 @@ export interface MemorySearchHit {
     visibility: string;
     tags?: string[];
     updated_at?: string;
+}
+
+/**
+ * The `@type` a stored value declares, or null.
+ *
+ * Reads the value's OWN annotation only. It does not go hunting through nested objects: a record
+ * saying what it is says so at the top, and a type found three levels down belongs to something the
+ * record contains rather than to the record.
+ */
+export function typeOfRecord(value: unknown): string | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const t = (value as Record<string, unknown>)['@type'];
+    if (typeof t === 'string') return t;
+    if (Array.isArray(t) && typeof t[0] === 'string') return t[0];
+    return null;
+}
+
+/**
+ * Is this record one of the types asked for?
+ *
+ * Compares EXPANDED forms, so `schema:Person` matches a record written as
+ * `https://schema.org/Person` and the caller does not have to know which spelling the writer used.
+ * A record's own `@context` is honoured, so a document that remapped a prefix is read the way it
+ * meant itself.
+ *
+ * WHAT THIS CANNOT SEE, and it is written here rather than left to be discovered: the filter runs
+ * over what the text search already found. A record of the right type that the query did not match
+ * is not in the candidate set and cannot be recovered by filtering. The doors handle that by
+ * searching for the type STRING when no query is given, which is what makes "list my Person records"
+ * work at all — the type is indexed like any other scalar in the value.
+ */
+export function matchesType(value: unknown, wanted: string[]): boolean {
+    if (!wanted.length) return true;
+    const t = typeOfRecord(value);
+    if (!t) return false;
+    const ctx = contextOf(value);
+    const have = expandTerm(t, ctx);
+    return wanted.some((w) => expandTerm(w.trim(), ctx) === have);
 }
 
 /** One hit with the value replaced by a window of it and its size. */
