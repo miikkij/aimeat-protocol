@@ -243,6 +243,68 @@ describe('SCOPE_DENIED retry in AimeatClient.send()', () => {
     }
   });
 
+  it('a standing refusal costs ONE mint in total, not one per call', async () => {
+    // THE ONE ABOVE ONLY LOOKS INSIDE A SINGLE CALL. Across calls the client had no memory at all:
+    // every refusal dropped the cache and minted again, so an agent that genuinely lacks a word
+    // paid a mint on every request it ever made. `POST /v1/agents/v2/token` is 60 a minute and
+    // takes no credential, so it is keyed by IP — one polling agent missing one scope spends the
+    // whole machine's budget and takes every other identity behind that address with it. That is
+    // the failure agent-key.ts v1.1.0 records: a 62-identity fleet, the budget gone in a joining
+    // burst, twenty-two agents holding good keys stopped for good.
+    //
+    // FIVE calls, every dispatch refused. Ten dispatches, and exactly one mint: the first refusal
+    // buys one fresh credential, that credential is refused too, and from there the answer is the
+    // node's refusal with no mint behind it.
+    await writeAgentKey();
+    cacheToken(AGENT, OWNER, 'narrow-token', 3600);
+    const mint = await mintServer('fresh-but-still-narrow');
+    try {
+      const transport = new RecordingTransport(
+        Array.from({ length: 10 }, () => ({ status: 403, body: SCOPE_DENIED })),
+      );
+      const client = new AimeatClient(mint.url, 'narrow-token', { agent: AGENT, owner: OWNER });
+      client.setTransport(transport);
+
+      for (let i = 0; i < 5; i++) {
+        const r = await client.get('/v1/messages/agent-inbox');
+        expect(r.ok).toBe(false);
+      }
+      // Call 1 dispatches twice (refusal, then the retry on the fresh token). Calls 2-5 dispatch
+      // once each and never reach the mint door.
+      expect(mint.mints).toBe(1);
+      expect(transport.calls).toHaveLength(6);
+    } finally {
+      await mint.close();
+    }
+  });
+
+  it('and the guard is the token, so a credential that changes re-arms the retry', async () => {
+    // The mark is the token string rather than a flag or a timer, which is what makes it release
+    // itself. A `scopes_changed` push, an expiry or a re-attach all replace the credential, and a
+    // refusal on the NEW one is a new question that deserves its own mint. Driven here by setting
+    // the token the way the daemon's own paths do.
+    await writeAgentKey();
+    cacheToken(AGENT, OWNER, 'narrow-token', 3600);
+    const mint = await mintServer('fresh-but-still-narrow');
+    try {
+      const transport = new RecordingTransport(
+        Array.from({ length: 8 }, () => ({ status: 403, body: SCOPE_DENIED })),
+      );
+      const client = new AimeatClient(mint.url, 'narrow-token', { agent: AGENT, owner: OWNER });
+      client.setTransport(transport);
+
+      await client.get('/v1/messages/agent-inbox');   // mints once, refused again, marks it
+      await client.get('/v1/messages/agent-inbox');   // suppressed
+      expect(mint.mints).toBe(1);
+
+      client.setToken('a-credential-from-somewhere-else');
+      await client.get('/v1/messages/agent-inbox');   // a different token: armed again
+      expect(mint.mints).toBe(2);
+    } finally {
+      await mint.close();
+    }
+  });
+
   it('returns the refusal, and does not throw, when no fresh credential can be obtained', async () => {
     // `resolveToken` THROWS for a key-holder whose mint fails (MintFailedError) rather than
     // returning null -- the distinction that kept 22 agents down on 2026-09-04. Here there is a key,
