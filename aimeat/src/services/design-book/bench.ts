@@ -21,6 +21,8 @@
  * @usage
  *   const result = await runPartBench(storage, config, 'leiska-cover');
  * @version-history
+ *   v1.6.0 — 2026-09-08 — Check 40px phone controls, clipped content and small text in both
+ *     themes. JavaScript errors fail the render; old bench stamps remain historical.
  *   v1.5.0 — 2026-09-05 — Two more counts: fx_applied (elements wearing an effect, with a box)
  *     and fx_running (animations still running on one after the settle, pseudo-element drifts
  *     excluded); an EFFECT part passes when it is worn and at rest, or, as a pass over the
@@ -47,6 +49,7 @@
  *     bench is the field validation at propose time.
  *   v1.0.0 — 2026-08-28 — Initial (TARGET-074, the guarantee bench automated).
  */
+import { DESIGN_BOOK_GEOMETRY_JS } from './measure.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { systemGhiiFor } from '../compliance-register.js';
@@ -66,6 +69,11 @@ const SETTLE_MS = 1_200;
 
 export interface BenchViewportResult {
   viewport: string;
+  theme?: string;
+  clipped_content?: number;
+  text_below_min?: number;
+  console_errors?: number;
+  reduced_motion_animations?: number;
   overflow_px: number;
   units_rendered: number;
   controls_below_touch_min: number;
@@ -94,6 +102,9 @@ interface BenchPage {
   route(m: string, h: (r: { request(): { resourceType(): string }; fulfill(o: unknown): void; continue(): void }) => void): Promise<void>;
   evaluate<T>(fn: string): Promise<T>;
   close(): Promise<void>;
+  on(event: 'pageerror', callback: () => void): void;
+  on(event: 'console', callback: (message: { type(): string }) => void): void;
+  emulateMedia(options: { reducedMotion: 'reduce' }): Promise<void>;
 }
 
 /** The in-page measurements, one string so the lazy page surface needs no function serializer. */
@@ -101,12 +112,7 @@ const MEASURE_JS = `(() => {
   const doc = document.documentElement;
   const overflow = doc.scrollWidth - doc.clientWidth;
   const units = document.querySelectorAll('.ak-mosaic__unit, .ak-mosaic__band > *, main > *').length;
-  let smallControls = 0;
-  for (const el of document.querySelectorAll('button, [role="button"], a, input, select')) {
-    const r = el.getBoundingClientRect();
-    if (r.width === 0 && r.height === 0) continue;    // not rendered (hidden projection state)
-    if (r.height < 24 || r.width < 24) smallControls++;
-  }
+  const { smallControls, clippedContent, smallText } = ${DESIGN_BOOK_GEOMETRY_JS};
   // The ambient layer stamps data-ak-ambient-painted in the tick it first draws; a layer whose
   // preset is none has no box and is not counted.
   let ambientLayers = 0;
@@ -132,13 +138,13 @@ const MEASURE_JS = `(() => {
     if (a.playState !== 'running' || !target || eff.pseudoElement) continue;
     if (target.closest && target.closest('.ak-fx')) fxRunning++;
   }
-  return { overflow, units, smallControls, ambientLayers, ambientPainted, fxApplied, fxRunning };
+  return { overflow, units, smallControls, clippedContent, smallText, ambientLayers, ambientPainted, fxApplied, fxRunning };
 })()`;
 
 /** What MEASURE_JS answers. */
 interface Measured {
   overflow: number; units: number; smallControls: number; ambientLayers: number; ambientPainted: number;
-  fxApplied: number; fxRunning: number;
+  fxApplied: number; fxRunning: number; clippedContent: number; smallText: number;
 }
 
 /**
@@ -167,7 +173,9 @@ export async function runPartBench(
   const at = new Date().toISOString();
 
   const viewports: BenchViewportResult[] = [];
-  for (const vp of BENCH_VIEWPORTS) {
+  for (const theme of ['light', 'dark']) for (const vp of BENCH_VIEWPORTS) {
+    let consoleErrors = 0;
+    let reducedMotionAnimations = 0;
     // A render-time failure (the page never loads, the browser dies mid-run) is part of the
     // CONTRACT, not an exception: the bench answers ran:false WITH THE REAL REASON, because a
     // 500 tells the operator nothing and an unavailable bench is never a passed bench.
@@ -176,6 +184,8 @@ export async function runPartBench(
       measured = await withHeadlessContext({ width: vp.width, height: vp.height }, async (ctx) => {
         const page = await ctx.newPage() as BenchPage;
         try {
+          page.on('pageerror', () => { consoleErrors++; });
+          page.on('console', (message) => { if (message.type() === 'error') consoleErrors++; });
           let fulfilled = false;
           await page.route('**/*', (route) => {
             if (!fulfilled && route.request().resourceType() === 'document') {
@@ -188,8 +198,15 @@ export async function runPartBench(
           // domcontentloaded, not load: a slow or unreachable IMAGE (a hero photo on another
           // host) must never time the whole bench out — layout is measured after the settle.
           await page.goto(url, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
+          await page.evaluate(`document.documentElement.setAttribute("data-theme", "${theme}")`);
           await page.waitForTimeout(SETTLE_MS);
-          return await page.evaluate<Measured>(MEASURE_JS);
+          const measured = await page.evaluate<Measured>(MEASURE_JS);
+          await page.emulateMedia({ reducedMotion: 'reduce' });
+          await page.evaluate('document.documentElement.setAttribute("data-ak-motion", "less")');
+          await page.waitForTimeout(100);
+          reducedMotionAnimations = await page.evaluate<number>(`document.getAnimations().filter(a =>
+            a.playState === 'running' && Number(a.effect?.getTiming().duration) > 1).length`);
+          return measured;
         } finally {
           await page.close();
         }
@@ -207,6 +224,11 @@ export async function runPartBench(
     }
     viewports.push({
       viewport: vp.id,
+      theme,
+      clipped_content: measured.clippedContent,
+      text_below_min: measured.smallText,
+      console_errors: consoleErrors,
+      reduced_motion_animations: reducedMotionAnimations,
       overflow_px: measured.overflow,
       units_rendered: measured.units,
       controls_below_touch_min: measured.smallControls,
@@ -222,7 +244,9 @@ export async function runPartBench(
   // after the settle — or, as a pass over the layer, that the layer painted. Every other kind is
   // measured the same but not held to it — a layout's look may run none.
   const on = part.kind === 'effect' ? (part.body as { on?: string }).on : undefined;
-  const passed = viewports.every((v) => v.overflow_px === 0 && v.units_rendered > 0 && v.controls_below_touch_min === 0
+  const passed = viewports.every((v) => v.overflow_px === 0 && v.units_rendered > 0
+    && v.controls_below_touch_min === 0 && v.clipped_content === 0 && v.text_below_min === 0
+    && v.console_errors === 0 && v.reduced_motion_animations === 0
     && (part.kind !== 'ambient' || (v.ambient_painted ?? 0) > 0)
     && (part.kind !== 'effect' || (on === 'layer'
       ? (v.ambient_painted ?? 0) > 0

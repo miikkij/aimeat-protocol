@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.4.0 — 2026-09-08 — Browser results cover both themes and report clipped content,
+ *     small text and JavaScript errors alongside the existing render checks.
  *   v1.3.0 — 2026-09-05 — The EFFECT kind (wish-atelier-post-process-effects): the worded
  *     refusals (an unknown effect with the nearest named, a target outside the three, a picture
  *     effect on the bare hero band, living motion on a figure, a block effect as a layer pass, a
@@ -306,7 +308,7 @@ const GOOD_BODY = {
     });
 
     await test('the guarantee bench answers its contract: a run with measurements, or the worded unavailable', async () => {
-        // On a machine with a browser the bench renders three viewports and stamps the record; on
+        // With a browser the bench renders three viewports in both themes and stamps the record; on
         // a CI box with none it answers ran:false WITH THE REASON. Both are the contract; a
         // silent 500 or an unstamped "pass" is neither.
         const r = await json('/v1/designbook/leiska-cover/bench', {
@@ -314,8 +316,8 @@ const GOOD_BODY = {
         });
         assert(r.status === 200, `bench ${r.status}: ${JSON.stringify(r.body?.error)}`);
         if (r.body.data.ran === true) {
-            assert(Array.isArray(r.body.data.viewports) && r.body.data.viewports.length === 3,
-                `three viewports measured, got ${JSON.stringify(r.body.data.viewports)}`);
+            assert(Array.isArray(r.body.data.viewports) && r.body.data.viewports.length === 6,
+                `three viewports in both themes measured, got ${JSON.stringify(r.body.data.viewports)}`);
             const g = await json('/v1/designbook/leiska-cover', { headers: auth(op.token) });
             assert(g.body.data.part.bench.browser?.ran === true, 'the result is stamped on the record');
         } else {
@@ -684,7 +686,9 @@ const GOOD_BODY = {
         assert(r.status === 200, `bench ${r.status}: ${JSON.stringify(r.body?.error)}`);
         if (r.body.data.ran === true) {
             const vps = r.body.data.viewports;
-            assert(Array.isArray(vps) && vps.length === 3 && vps.every((v: any) => typeof v.ambient_layers === 'number' && typeof v.ambient_painted === 'number'),
+            assert(Array.isArray(vps) && vps.length === 6 && vps.every((v: any) => typeof v.ambient_layers === 'number' && typeof v.ambient_painted === 'number'
+                && ['light', 'dark'].includes(v.theme) && typeof v.clipped_content === 'number'
+                && typeof v.text_below_min === 'number' && typeof v.console_errors === 'number'),
                 `the counts ride every viewport: ${JSON.stringify(vps)}`);
             // Measured, never asserted in the guard tier (a slow box would flake it): what painted.
             console.log(`     ambient bench: ${vps.map((v: any) => `${v.viewport} layers=${v.ambient_layers} painted=${v.ambient_painted}`).join(' · ')} passed=${r.body.data.passed}`);
