@@ -94,13 +94,26 @@ function loadSourceMaps(raw: string): Record<string, unknown> {
     return out;
 }
 
-function mergeSnapshots(raw: string): { merged: ProcessCov; files: number } {
-    const files = readdirSync(raw).filter(f => f.startsWith('cov-') && f.endsWith('.json')).sort();
+/**
+ * `cov-*.json` is what the preload reduced on the way out. `coverage-*.json` is Node's own write at
+ * exit, from a node that ended without the sentinel (a boot failure, a shutdown of its own): the
+ * same data, unreduced, so it is reduced here, and its source maps fill any the preload did not
+ * reach. Measured on a full sweep: 348 of the first kind, 4 of the second.
+ */
+function mergeSnapshots(raw: string, sourceMaps: Record<string, unknown>): { merged: ProcessCov; files: number } {
+    const srcPrefix = `${pathToFileURL(resolve(ROOT, 'src')).href}/`;
+    const files = readdirSync(raw).filter(f => (f.startsWith('cov-') || f.startsWith('coverage-')) && f.endsWith('.json')).sort();
     let merged: ProcessCov = { result: [] };
     for (const f of files) {
-        let cov: ProcessCov;
-        try { cov = JSON.parse(readFileSync(join(raw, f), 'utf8')) as ProcessCov; } catch { continue; }
-        merged = mergeProcessCovs([merged, cov]);
+        let cov: ProcessCov & { 'source-map-cache'?: Record<string, unknown> };
+        try { cov = JSON.parse(readFileSync(join(raw, f), 'utf8')) as typeof cov; } catch { continue; }
+        if (f.startsWith('coverage-')) {
+            cov.result = cov.result.filter(s => s.url.startsWith(srcPrefix));
+            for (const [url, entry] of Object.entries(cov['source-map-cache'] ?? {})) {
+                if (url.startsWith(srcPrefix) && !(url in sourceMaps)) sourceMaps[url] = entry;
+            }
+        }
+        merged = mergeProcessCovs([merged, { result: cov.result }]);
     }
     return { merged, files: files.length };
 }
@@ -109,8 +122,8 @@ function report(db: Db): void {
     const raw = rawDir(db);
     const out = outDir(db);
     if (!existsSync(raw)) throw new Error(`No raw coverage under ${raw}. Run the sweep first.`);
-    const { merged, files } = mergeSnapshots(raw);
     const sourceMaps = loadSourceMaps(raw);
+    const { merged, files } = mergeSnapshots(raw, sourceMaps);
     const mergedDir = join(out, 'merged');
     rmSync(mergedDir, { recursive: true, force: true });
     mkdirSync(mergedDir, { recursive: true });
@@ -120,7 +133,7 @@ function report(db: Db): void {
     const c8 = spawnSync(process.execPath, [
         resolve(ROOT, 'node_modules/c8/bin/c8.js'), 'report', `--temp-directory=${mergedDir}`, `--reports-dir=${out}`,
         '--reporter=html', '--reporter=json-summary', '--reporter=text-summary',
-        '--src=src', '--include=src/**/*.ts', '--exclude=src/**/*.d.ts', '--exclude=**/dist/**', '--all',
+        '--src=src', '--include=src/**/*.ts', '--exclude=src/**/*.d.ts', '--exclude=**/dist/**', '--exclude=src/**/__tests__/**', '--all',
     ], { stdio: 'inherit', cwd: ROOT });
     if (c8.status !== 0) throw new Error(`c8 report exited with ${c8.status}`);
     byDirectory(db);
