@@ -113,7 +113,7 @@ jobs:
         working-directory: aimeat
         run: pnpm test
 
-  # THE GUARD TIER BLOCKS. 67 suites, chosen on one question: does a failure here mean a
+  # THE GUARD TIER BLOCKS. 68 suites, chosen on one question: does a failure here mean a
   # principal can reach money, an identity, or another account's data that they must not? The
   # list and the reason for each entry are in test/run-e2e-ci.ts (GUARD_SUITES). The runner
   # prints the assertion total and runs the tier over four lanes — four nodes at once, each suite
@@ -196,3 +196,12 @@ jobs:
       - name: E2E guard tier (PostgreSQL + Kysely — primary backend) — blocking
         working-directory: aimeat
         run: pnpm test:e2e:guards:postgres-kysely
+
+      # The unit job has no Postgres service. Run the cross-provider assertions here, and refuse
+      # both a missing URL and a failed connection instead of accepting a SQLite-only result.
+      - name: Storage conformance (SQLite and PostgreSQL) — blocking
+        working-directory: aimeat
+        env:
+          DATABASE_URL: postgresql://appuser:devpassword123@localhost:5432/aimeat_kysely_e2e
+          AIMEAT_CONFORMANCE_REQUIRE_POSTGRES: 'true'
+        run: pnpm exec vitest run test/unit/storage-conformance.test.ts

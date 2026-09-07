@@ -6,6 +6,7 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.6.0 -- 2026-09-07 -- Require app:write before promoting or consuming a saved draft.
  *   v2.5.0 — 2026-08-24 — The draft-publish response carries `data_map` / `data_map_hints` too, so
  *     the third publish door says the same thing as the other two.
  *   v2.4.0 — 2026-08-16 — Four routes for incremental editing: .../draft/write appends a piece,
@@ -390,7 +391,7 @@ export function registerDraftRoutes(
     // forward (exactly like a normal re-publish), then clears the draft slot. THIS is
     // the moment the live app changes + the public feed fires — saving/testing a draft
     // never does.
-    router.post('/v1/apps/:owner/:filename/publish-draft', requireAuth(), async (req, res) => {
+    router.post('/v1/apps/:owner/:filename/publish-draft', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
         const { owner, ownerGhii } = await canonicalOwner(req);

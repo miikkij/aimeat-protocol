@@ -8,6 +8,7 @@
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
+ *   v2.4.0 -- 2026-09-07 -- Require app:write before inline publishing or presigned authorization.
  *   v2.3.0 — 2026-08-24 — The publish response carries `data_map` and `data_map_hints`, on the same
  *     terms as `ai_posture` / `ai_hints`: what the node now believes, and what to fix. Neither has
  *     ever been able to turn a publish into a refusal.
@@ -44,7 +45,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppManifest } from '../../storage/interface.js';
 import { validateCortexAgents } from '../../models/crew-def-schemas.js';
-import { requireAuth } from '../../auth/middleware.js';
+import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
@@ -60,8 +61,8 @@ export function registerPublishRoutes(
     storage: Storage,
     canonicalOwner: CanonicalOwner,
 ): void {
-    // POST /v1/apps — Publish/update an app (requires auth)
-    router.post('/v1/apps', requireAuth(), async (req, res) => {
+    // Permission is checked before either publishing bytes or minting a presigned upload token.
+    router.post('/v1/apps', requireAuth(), requireScope('app:write'), async (req, res) => {
         // Apps are OWNER-scoped resources. Whether the owner or one of their
         // agents publishes, the canonical record lives under the owner's GHII
         // so `/v1/apps/<owner>/<filename>` resolves to a single row and the

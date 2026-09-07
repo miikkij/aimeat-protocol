@@ -9,6 +9,7 @@
  * @structure APP_GRANTABLE_SCOPES — the one list, keyed by scope word.
  * @usage import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-07 -- Document the enforced publishing scope and existing migration.
  *   v1.2.0 -- 2026-09-06 -- secrets:manage: the owner's credential vault, askable by an app.
  *   v1.1.0 -- 2026-08-29 -- organism:rows: the person's half of the two-hand rule that lets an app
  *     keep an append-only trail on a row space the organism opened to it.
@@ -105,28 +106,11 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // somewhere are separate from reading the registry.
   'company:read': 'See the companies you have registered and their addresses',
   'company:write': 'Register companies in your name and set what their address serves',
-  // Publishing under the owner's name. This word is STEP ONE OF THREE and deliberately gates
-  // nothing yet. POST /v1/apps, the draft routes and fork/patch/delete ask for requireAuth() and no
-  // scope, and at least one live app (ORIGAMI, 460 downloads) publishes through an app-grant token
-  // while requesting ten permissions, none of them this one. Refusing role 'app' at those doors
-  // today would take a working app off the air. So step one only makes the favour askable: an app
-  // can request it, and the owner sees it on the consent screen and can uncheck it. Until now
-  // publishing was absent from this vocabulary entirely, which is why no owner has ever been asked.
-  //
-  // STEP TWO belongs to the apps. ORIGAMI, and anything else that publishes on a grant, declares
-  // `app:write` in its <meta name="aimeat-scopes">, and each of its owners passes the consent screen
-  // once more. A live grant carries the scopes that were approved when it was made and gains nothing
-  // from the app being updated. The owner's own app clears this with no prompt through
-  // /v1/auth/app-grant-silent; a stranger's app shows the screen with the new line badged "new".
-  //
-  // STEP THREE is still pending: the publish doors (routes/apps/publish.ts, drafts.ts,
-  // fork-manage.ts) start refusing a scoped principal that does not carry the word. Take it only
-  // once the live grants show that the apps publishing this way already hold it, or the outage
-  // repeats the shape of changelog 1.33.1. When it is taken, two surfaces nobody meant to touch are
-  // already safe: requireScope waves an owner session through (its owner branch is roles includes
-  // owner AND NOT agent AND NOT ecosystem), so publishing from the website is unaffected, and every
-  // agent alive on 2026-08-10 was handed `app:write` at boot by
-  // services/scope-vocabulary-migration.ts, so no agent loses publishing either. The app grant is
-  // the principal the gate is actually for, which is why it has to ask first.
+  // Publishing under the owner's name requires app:write on inline publishing, presigned URL
+  // issuance and draft promotion, as well as fork/patch. Deletion uses app:manage instead.
+  // Owner sessions retain their bypass.
+  // Apps declare this word in aimeat-scopes and obtain the owner's approval; updating HTML alone
+  // does not expand an existing grant. scope-vocabulary-migration.ts handles eligible legacy
+  // credentials and preserves deliberately narrowed grants. A scoped reader cannot publish.
   'app:write': 'Publish and update apps in your name (each one gets a public address anyone with the link can open)',
 };
