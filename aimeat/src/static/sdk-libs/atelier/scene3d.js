@@ -20,6 +20,8 @@
  * @structure scene3d(spec) → { el, set, destroy }
  * @usage  AIMEAT.atelier.scene3d({ target: host, kind: 'bars', data: { items: rows } });
  * @version-history
+ *   v0.36.2 — 2026-09-08 — Release the WebGL context on teardown as well as its resources.
+ *     Repeated lazy gallery visits must not exhaust Chrome's context budget before GC runs.
  *   v0.36.1 — 2026-09-05 — The token-colour probe moved out to token-color.js (a pure extraction):
  *     the ambient layer reads its palette through the same probe, and the copied-logic gate
  *     wants one copy. Nothing here changes but the import.
@@ -461,12 +463,14 @@ function buildWorld(THREE, stage, kind, spec, root) {
   return {
     rebuild: rebuild,
     dispose: function () {
+      if (disposed) return;
       disposed = true;
       if (raf) cancelAnimationFrame(raf);
       ro.disconnect();
       controls.dispose();
       disposeGroup();
       renderer.dispose();
+      renderer.forceContextLoss();
       clear(stage);
     },
   };
