@@ -11,6 +11,10 @@
  *   - PUT /v1/memory/:key/schema: validate the schema, enforce lock ownership, persist + cache-bust
  *
  * @version-history
+ *   v1.1.0 — 2026-09-08 — semantic_context is checked before the write: its prefixes must resolve,
+ *     and every field its `properties` map names must be a field of the schema it describes. Both
+ *     were stored unexamined, so a per-field mapping with a typo in the field name looked complete
+ *     and pointed at nothing.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -20,6 +24,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateSchemaItself, removeFromCache } from '../services/schema-validator.js';
 import { SchemaSetSchema } from '../models/schemas.js';
+import { semanticContextErrors } from '../utils/onto-context.js';
 import { emitChange } from '../services/event-bus.js';
 
 export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
@@ -57,6 +62,17 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
 
     if (existing && existing.lockedBy !== req.auth!.sub && !roles.includes('operator')) {
       res.status(403).json(error(config.nodeId, 'SCHEMA_LOCKED_BY_OTHER', `This structure is locked by ${existing.lockedBy}. Ask them to unlock it, or make your own copy.`));
+      return;
+    }
+
+    // The semantic context is checked BEFORE anything is written or evicted: a prefix nobody
+    // declared, or a per-field mapping naming a field this schema does not have, describes nothing
+    // and must not be stored looking as though it does.
+    const semanticProblems = semanticContextErrors(semantic_context, schema);
+    if (semanticProblems.length > 0) {
+      res.status(400).json(error(config.nodeId, 'INVALID_SEMANTIC_CONTEXT', semanticProblems[0], 400, {
+        violations: semanticProblems.map((message) => ({ path: 'semantic_context', message })),
+      }));
       return;
     }
 

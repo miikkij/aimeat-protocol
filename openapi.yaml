@@ -2149,12 +2149,25 @@ components:
           enum: [open, strict]
           default: open
         semantic_context:
-          $ref: '#/components/schemas/SemanticAnnotation'
+          allOf:
+            - $ref: '#/components/schemas/SemanticAnnotation'
+          description: >-
+            What the data under this key MEANS, beside the schema that says what shape it is. Its
+            optional `properties` map takes a FIELD of the schema to the ontology term for that
+            field. A field name in there that the schema does not have is refused with
+            INVALID_SEMANTIC_CONTEXT, because a mapping pointing at no field reads as complete and
+            describes nothing.
 
     # === Phase 0: Semantic Ontology ===
     SemanticAnnotation:
       type: object
-      description: JSON-LD compatible semantic annotation for ontology support
+      description: >-
+        A JSON-LD annotation. Every prefix it names must resolve: either declared in its own
+        `@context`, or one this node carries by default (aimeat, schema, skos, dcterms, prov, rdfs,
+        qudt, saref — see GET /v1/ns). A prefixed name whose prefix nobody defined is refused, since
+        it expands to nothing in any JSON-LD processor. A BARE type (`"@type": "LocalBusiness"`) is
+        always accepted: it resolves against the document's default vocabulary. Ontology-specific
+        properties pass through untouched, and are checked the same way.
       properties:
         '@context':
           type: object
@@ -19561,6 +19574,42 @@ paths:
           content:
             application/json:
               schema: { type: object }
+
+  /v1/ns:
+    get:
+      operationId: coreOntology
+      summary: The AIMEAT core ontology
+      description: >-
+        The classes and relations `https://aimeat.io/ns/` names, as a JSON-LD document. Served at
+        the namespace the catalogue responses, the directory's semantic block and the interest
+        profile have been citing, so a peer node can find out what our records mean instead of
+        taking the prefix on trust. A hub rather than a catalogue: a class appears only when no
+        standard vocabulary already says it, concepts are SKOS, provenance is PROV, and people,
+        places and offers are schema.org. Each class carries its glossary definition as
+        `rdfs:comment`. Public and unenveloped — this document is itself a graph, so a JSON-LD
+        processor can be handed it directly.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: The core ontology as JSON-LD
+          content:
+            application/ld+json:
+              schema: { type: object }
+
+  /v1/ns.md:
+    get:
+      operationId: coreOntologyMd
+      summary: The AIMEAT core ontology (markdown)
+      description: >-
+        The same classes and relations as prose, plus the table of prefixes an annotation may use
+        without declaring them. This is the form an agent reads before writing a `semantic` block.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: The core ontology
+          content:
+            text/markdown:
+              schema: { type: string }
 
   /.well-known/aimeat:
     get:

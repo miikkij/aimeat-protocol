@@ -216,6 +216,16 @@ service:
 
 Additional keys are permitted and passed through. The parser accepts `semantic` only if it is a non-null object; otherwise it is set to `undefined`.
 
+**Every prefix must resolve.** A prefixed name (`shop:Directory`) is refused unless `shop` is
+declared in this block's own `@context` or is one the node carries by default: `aimeat`, `schema`,
+`skos`, `dcterms`, `prov`, `rdfs`, `qudt`, `saref`. `GET /v1/ns` lists them, along with the classes
+`aimeat:` names. A bare type (`"@type": "LocalBusiness"`, as above) is always accepted: it resolves
+against the document's default vocabulary rather than a prefix.
+
+This is checked because the block does not stay in the manifest. Registration copies it onto the
+memory key's `semanticContext`, where a consumer reads it as the node's own statement about what the
+data means, so a prefix that expands to nothing would be published under this node's name.
+
 ---
 
 ## 12. Validation Rules
@@ -232,8 +242,9 @@ Additional keys are permitted and passed through. The parser accepts `semantic` 
 | At least one required field | `"data_schema.required must have at least one field"` |
 | Every field has a `type` | `"data_schema field \"<name>\" is missing type"` |
 | `visibility_default` is valid | `"consent_requirements.visibility_default must be one of: private, federation, public"` |
+| Every prefix in `service.semantic` resolves | `"service.semantic: \"@type\": \"shop:Directory\" uses the prefix \"shop:\", which no @context defines…"` |
 
-**Not currently validated:** `data_retention` format, `auto_hide_threshold` range, `ui_hints` field names against `data_schema`, `semantic` content correctness.
+**Not currently validated:** `data_retention` format, `auto_hide_threshold` range, `ui_hints` field names against `data_schema`. The semantic block's prefixes are checked (above); whether a vocabulary really has the term named is not, and cannot be — this node does not hold anyone else's vocabulary.
 
 ---
 

@@ -13,9 +13,13 @@
  *   - csmToJsonSchema(def): CSM data schema → JSON Schema
  *
  * @version-history
+ *   v1.1.0 — 2026-09-08 — validateCsm checks service.semantic's prefixes. The spec had listed the
+ *     semantic block under "not currently validated", so a manifest could name a vocabulary nobody
+ *     defined and the node copied it into the memory key's semanticContext unexamined.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { parse as parseYaml } from 'yaml';
+import { annotationErrors } from '../utils/onto-context.js';
 
 // ── CSM Types ──
 
@@ -148,6 +152,13 @@ export function validateCsm(def: CsmDefinition): string[] {
   // Validate consent requirements
   if (!['private', 'dmz', 'local', 'federation', 'public'].includes(def.consentRequirements.visibilityDefault)) {
     errors.push('consent_requirements.visibility_default must be one of: private, dmz, local, federation, public');
+  }
+
+  // The semantic block, if there is one. The CSM spec listed this under "not currently validated",
+  // and a manifest registered with `@type: shop:Directory` was stored, served and copied into the
+  // key's semanticContext with nothing anywhere able to say what `shop:` meant.
+  for (const message of annotationErrors(def.service.semantic)) {
+    errors.push(`service.semantic: ${message}`);
   }
 
   return errors;
