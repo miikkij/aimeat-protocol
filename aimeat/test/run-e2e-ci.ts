@@ -138,8 +138,9 @@
  *            count under the totals.
  */
 
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, execSync, type ChildProcess } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
+import { platform } from 'node:os';
 import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -918,9 +919,42 @@ function fixedPorts(suites: string[]): Map<string, number[]> {
 }
 
 /**
- * A lane's own port, from a range no suite writes down. It also has to avoid the port the RUNNER was
- * given: a caller who says AIMEAT_PORT=40512 to keep out of another session's way would otherwise
- * have a lane bind the same number (`taken` covers it, and this comment is why that matters).
+ * Every port something on THIS MACHINE is listening on. Read once, synchronously, before the lanes
+ * are planned.
+ *
+ * `taken` used to know only this run's own reservations, so two sessions running --workers=4 both
+ * took 40501-40503 and trampled each other. The symptom is the worst kind: the guard tier fails in
+ * nine suites with no common thread, one of them 0/0 DID NOT RUN, and both sessions go looking in
+ * their own diff. Measured 2026-09-07, and the same night one session read 45 failures that were
+ * entirely leftover servers and 2351/0 once the ports were cleared.
+ *
+ * Best-effort by design: if netstat or lsof is not there, this returns nothing and the behaviour is
+ * exactly what it was. A port that is free now and taken a second later is still possible — this
+ * closes the case where it was ALREADY taken when we chose it, which is the one that keeps happening.
+ */
+function listeningPorts(): Set<number> {
+    const found = new Set<number>();
+    try {
+        const cmd = platform() === 'win32'
+            ? 'netstat -ano -p TCP | findstr LISTENING'
+            : 'lsof -nP -iTCP -sTCP:LISTEN';
+        const out = execSync(cmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 10_000 });
+        for (const m of out.matchAll(/[:.](\d{4,5})\b/g)) {
+            const n = Number(m[1]);
+            if (n >= 40000 && n < 41000) found.add(n);
+        }
+    } catch {
+        // No netstat, no lsof, or it answered nothing. Say so rather than pretending to know.
+        console.log('  (could not read the machine\'s listening ports; lane ports are chosen blind)');
+    }
+    return found;
+}
+
+/**
+ * A lane's own port, from a range no suite writes down. It has to avoid three things: the port the
+ * RUNNER was given (a caller who says AIMEAT_PORT=40512 to keep out of another session's way would
+ * otherwise have a lane bind the same number), the ports its own other lanes took, and — since
+ * 2026-09-07 — anything already listening on this machine, which is another session's run.
  */
 function lanePort(lane: number, taken: Set<number>): string {
     for (let p = 40500 + lane; p < 40600; p++) {
@@ -928,7 +962,7 @@ function lanePort(lane: number, taken: Set<number>): string {
         taken.add(p);
         return String(p);
     }
-    throw new Error('No free port for a lane between 40500 and 40599.');
+    throw new Error('No free port for a lane between 40500 and 40599. Another session is probably running the same suites; check with the claims board.');
 }
 
 function planLanes(suites: string[], workers: number, pinned: Map<string, number[]>): string[][] {
@@ -1118,7 +1152,7 @@ async function main() {
 
     // Lane 0 is the base target. Every other lane gets a port no suite has written down and a
     // database of its own, created first for Postgres.
-    const taken = new Set<number>([Number(TARGET.port), ...[...pinned.values()].flat()]);
+    const taken = new Set<number>([Number(TARGET.port), ...[...pinned.values()].flat(), ...listeningPorts()]);
     let targets = lanes.map((_, k) => k === 0 ? TARGET : laneTarget(TARGET, k, lanePort(k, taken)));
     const wall0 = Date.now();
     let results: SuiteResult[] = [];
