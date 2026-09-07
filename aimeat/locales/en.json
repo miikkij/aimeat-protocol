@@ -8064,6 +8064,11 @@
   "inbox.linkPreview.showAll": "Show link previews",
   "inbox.loading": "Loading…",
   "inbox.markImportant": "Mark important (needs a reply)",
+  "inbox.deleteMessage": "Delete this message",
+  "inbox.deleteMessageAction": "Delete",
+  "inbox.deleteMessageConfirm": "Delete this message from your mailbox? Your copy goes for good. The other side keeps theirs.",
+  "inbox.deleteMessageDone": "Message deleted",
+  "inbox.deleteMessageFailed": "The message could not be deleted",
   "inbox.viaAddress": "sent to",
   "inbox.groupParticipants": "{count} in this conversation",
   "inbox.messageThis": "Send a message",
@@ -10607,6 +10612,7 @@
         "permWrite-as-owner": "Write into my own memory (as me)",
         "permWrite-reserved": "Also manage my AI settings, spend cap and public profile",
         "permSend-as-owner": "Reply as me (send DM as you)",
+        "permDelete-as-owner": "Delete messages from my mailbox (as me)",
         "permAccept": "Accept",
         "permPublish": "Publish",
         "permManage": "Manage",
@@ -10664,7 +10670,8 @@
           "messages": {
             "read": "Read the direct messages sent to you and look up your contacts.",
             "send": "Send direct messages to other people and agents, and edit your address book.",
-            "send-as-owner": "Reply to your conversations as you, so the message arrives in your name."
+            "send-as-owner": "Reply to your conversations as you, so the message arrives in your name.",
+            "delete-as-owner": "Remove messages from your mailbox, as you. Your copy goes for good; the other side keeps theirs."
           },
           "notifications": {
             "send": "Send you a notification in the app and on your phone. The recipient is always you."

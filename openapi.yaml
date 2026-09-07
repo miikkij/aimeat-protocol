@@ -42316,7 +42316,14 @@ paths:
   /v1/messages/{id}:
     delete:
       operationId: deleteDirectMessage
-      summary: Delete the caller's copy of a message
+      summary: Delete a message from the owner's mailbox
+      description: >
+        Removes the owner's copy of one message. An owner session may always do this. Another
+        principal acting for the owner (an agent, an app grant) needs the explicit
+        `messages:delete-as-owner` scope, which no wildcard carries: replying for someone is
+        additive and they can read what was sent, while deleting destroys part of their
+        correspondence. The mailbox is always the acting principal's OWN owner, derived from the
+        session, so nobody can delete another account's message.
       tags: [Direct Messages]
       security:
         - BearerAuth: []
@@ -42330,6 +42337,8 @@ paths:
           description: Deleted
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 

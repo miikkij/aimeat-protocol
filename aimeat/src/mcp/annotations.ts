@@ -378,6 +378,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_dm_send: { title: 'Send Federated Direct Message', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_dm_broadcast: { title: 'Send One Message to Many', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_dm_send_as_owner: { title: 'Send Federated Direct Message As Owner', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    aimeat_dm_delete_as_owner: { title: "Delete a Message From the Owner's Mailbox", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_notify: { title: 'Notify Your Owner', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_dm_ask: { title: 'Ask a Structured Question (Federated)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_dm_inbox: { title: 'Read Federated DM Inbox', readOnlyHint: true },

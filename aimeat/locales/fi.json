@@ -8079,6 +8079,11 @@
   "inbox.linkPreview.showAll": "Näytä linkkien esikatselut",
   "inbox.loading": "Ladataan…",
   "inbox.markImportant": "Merkitse tärkeäksi (vaatii vastauksen)",
+  "inbox.deleteMessage": "Poista tämä viesti",
+  "inbox.deleteMessageAction": "Poista",
+  "inbox.deleteMessageConfirm": "Poistetaanko tämä viesti postilaatikostasi? Oma kappaleesi häviää lopullisesti. Vastapuolelle jää omansa.",
+  "inbox.deleteMessageDone": "Viesti poistettu",
+  "inbox.deleteMessageFailed": "Viestiä ei saatu poistettua",
   "inbox.viaAddress": "osoitteeseen",
   "inbox.groupParticipants": "{count} osallistujaa",
   "inbox.messageThis": "Lähetä viesti",
@@ -10622,6 +10627,7 @@
         "permWrite-as-owner": "Kirjoita minun muistiini (minuna)",
         "permWrite-reserved": "Hallitse myös AI-asetuksiani, kulukattoani ja julkista profiiliani",
         "permSend-as-owner": "Vastaa minuna (lähetä viesti nimissäni)",
+        "permDelete-as-owner": "Poistaa viestejä postilaatikostani (minuna)",
         "permAccept": "Hyväksyntä",
         "permPublish": "Julkaisu",
         "permManage": "Hallinta",
@@ -10679,7 +10685,8 @@
           "messages": {
             "read": "Lue sinulle lähetetyt yksityisviestit ja hae yhteystietojasi.",
             "send": "Lähetä yksityisviestejä muille ihmisille ja agenteille sekä muokkaa osoitekirjaasi.",
-            "send-as-owner": "Vastaa keskusteluihisi sinuna, jolloin viesti saapuu sinun nimissäsi."
+            "send-as-owner": "Vastaa keskusteluihisi sinuna, jolloin viesti saapuu sinun nimissäsi.",
+            "delete-as-owner": "Poistaa viestejä postilaatikostasi sinun nimissäsi. Oma kappaleesi häviää lopullisesti; vastapuolelle jää omansa."
           },
           "notifications": {
             "send": "Lähetä sinulle ilmoitus sovellukseen ja puhelimeesi. Vastaanottaja on aina sinä."

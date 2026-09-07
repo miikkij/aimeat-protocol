@@ -65,6 +65,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { conversationIdFor, messagePreview, deliveryTargetFor, isAddressableRecipient } from '../utils/messaging.js';
 import { emitChange } from '../services/event-bus.js';
+import { deleteOwnerMessage } from '../services/direct-message-delete.js';
 import { dismissConversationNotifications } from '../services/notify.js';
 import { MessageSendSchema, BroadcastSendSchema } from '../models/message-schemas.js';
 import { propagateReadReceipt } from '../services/message-delivery.js';
@@ -563,15 +564,25 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   });
 
   /* ── DELETE /v1/messages/:id — delete the caller's copy ── */
-  router.delete('/v1/messages/:id', requireAuth(), requireRole('owner'), async (req, res) => {
-    const ghii = resolve(req);
+  // THE OWNER'S MAILBOX, AND AN AGENT MAY REACH IT ON ONE EXPLICIT WORD. `requireRole('owner')`
+  // shut every agent out, so the only way to remove a message was curl -- the Messages page has no
+  // button either, which made this a capability with no door at all. `messages:delete-as-owner` is
+  // the door: a new word rather than `messages:send-as-owner`, because replying for someone is
+  // additive and they can read what was sent, while deleting destroys part of their correspondence.
+  // It is outside every wildcard (utils/scope-coverage.ts), so "Full access" does not carry it and
+  // no existing agent gained it by this change.
+  //
+  // An owner session still passes untouched: requireScope lets an owner-role principal through
+  // without looking at the word, which is the same admission requireRole('owner') gave it.
+  router.delete('/v1/messages/:id', requireAuth(), requireScope('messages:delete-as-owner'), async (req, res) => {
+    // The mailbox and the emit both live in services/direct-message-delete.ts, so this door and the
+    // MCP tool cannot come to different answers about whose messages are being removed.
     const id = req.params.id as string;
-    const ok = await storage.deleteDirectMessage(id, ghii);
+    const ok = await deleteOwnerMessage(storage, req.auth!, config.nodeId, id);
     if (!ok) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Message not found'));
       return;
     }
-    emitChange('messages');
     res.json(success(config.nodeId, { deleted: true }));
   });
 

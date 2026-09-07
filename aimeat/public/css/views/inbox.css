@@ -711,6 +711,11 @@
   box-shadow: var(--shadow-md);
 }
 .inbox-row:hover .inbox-bubble-actions { opacity: 1; pointer-events: auto; }
+/* Keyboard too, not only the pointer. These buttons are in the tab order whether or not they are
+   visible, so before this a keyboard user could land on one, see nothing, and press Enter. That was
+   survivable while every action here was reversible; the delete is not, so the row now shows itself
+   to whatever is about to press it. Measured in a browser: focus lands with the row at opacity 0. */
+.inbox-bubble-actions:focus-within { opacity: 1; pointer-events: auto; }
 /* Touch devices have no hover — the per-message actions (↩ reply, ⧉ copy, ⭐, 🔗, 📓, ✨) would be unreachable.
    Reveal them permanently there so a phone user can actually reply to / act on a message by tapping. */
 @media (hover: none) {
@@ -726,6 +731,11 @@
    action is a CopyButton, so it lights up the same way --on does for the other toggles. */
 .inbox-bubble-act--on,
 .inbox-bubble-act.copied { color: var(--accent); }
+/* Delete: the one action in this row that cannot be undone, so it does not turn accent on hover
+   like its neighbours. It sits quiet until the pointer is on it and then reads as the danger it is;
+   the SVG inside inherits currentColor, so the whole icon changes with the text. */
+.inbox-bubble-act--danger { display: inline-flex; align-items: center; }
+.inbox-bubble-act--danger:hover { background: var(--danger-bg); color: var(--danger-fg); }
 
 .inbox-track-banner {
   display: flex; align-items: center; gap: 10px;

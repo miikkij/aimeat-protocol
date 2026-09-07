@@ -7919,6 +7919,11 @@
   "inbox.linkPreview.showAll": "Mostrar las vistas previas de enlaces",
   "inbox.loading": "Cargando…",
   "inbox.markImportant": "Marcar como importante (necesita respuesta)",
+  "inbox.deleteMessage": "Borrar este mensaje",
+  "inbox.deleteMessageAction": "Borrar",
+  "inbox.deleteMessageConfirm": "¿Borrar este mensaje de tu buzón? Tu copia se pierde para siempre. La otra persona conserva la suya.",
+  "inbox.deleteMessageDone": "Mensaje borrado",
+  "inbox.deleteMessageFailed": "No se pudo borrar el mensaje",
   "inbox.messageThis": "Enviar un mensaje",
   "inbox.modelClaimed": "El agente dice que esto lo escribió {model}. Lo declara él mismo: no se puede comprobar, y una plataforma puede pasarle el trabajo a otro modelo a mitad de sesión.",
   "inbox.new": "Mensaje nuevo",
@@ -10384,6 +10389,7 @@
         "permWrite-as-owner": "Escribir en mi propia memoria (como yo)",
         "permWrite-reserved": "Llevar además mis ajustes de IA, mi tope de gasto y mi perfil público",
         "permSend-as-owner": "Responder como yo (mandar mensajes en tu nombre)",
+        "permDelete-as-owner": "Borrar mensajes de mi buzón (como yo)",
         "permAccept": "Aceptar",
         "permPublish": "Publicar",
         "permManage": "Gestionar",
@@ -10441,7 +10447,8 @@
           "messages": {
             "read": "Leer los mensajes directos que te llegan y consultar tus contactos.",
             "send": "Mandar mensajes directos a otras personas y agentes, y editar tu agenda.",
-            "send-as-owner": "Responder en tus conversaciones como tú, de modo que el mensaje llegue con tu nombre."
+            "send-as-owner": "Responder en tus conversaciones como tú, de modo que el mensaje llegue con tu nombre.",
+            "delete-as-owner": "Borra mensajes de tu buzón en tu nombre. Tu copia se pierde para siempre; la otra persona conserva la suya."
           },
           "notifications": {
             "send": "Mandarte un aviso en la aplicación y en tu teléfono. Quien lo recibe siempre eres tú."

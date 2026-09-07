@@ -201,7 +201,12 @@ export function PollBuilder({ questions, setQuestions }) {
     </div>`;
 }
 
-export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack, onPark, onReplyAi, onQuote, quoted, quotedName, onJumpTo, domId, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting, showLinkPreviews, onTranscribe, canTranscribe }) {
+/** The bin, as an inline SVG: the interface carries no emoji, and ✗ reads as "cancel", not "remove". */
+const TRASH_SVG = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" '
+  + 'stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M2.5 4h11M6 4V2.6h4V4M4 4l.6 9.4h6.8L12 4M6.6 6.6v4.4M9.4 6.6v4.4"/></svg>';
+
+export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack, onPark, onReplyAi, onQuote, onDelete, quoted, quotedName, onJumpTo, domId, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting, showLinkPreviews, onTranscribe, canTranscribe }) {
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
   const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
   // urlMap is keyed by `${messageId}::${attachmentId}` because per-message attachment ids (at0, at1…)
@@ -236,6 +241,12 @@ export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack
             onClick=${() => onPark?.(msg)}>📓</button>
           <button class="inbox-bubble-act" title=${t('inbox.ai.replyToMessage')}
             onClick=${() => onReplyAi?.(msg)}>✨</button>
+          <!-- LAST in the row on purpose: it is the only action here that cannot be undone, and it
+               asks before it acts. Until now the only way to remove a message was curl. -->
+          ${onDelete ? html`<button class="inbox-bubble-act inbox-bubble-act--danger"
+            title=${t('inbox.deleteMessage')} aria-label=${t('inbox.deleteMessage')}
+            onClick=${() => onDelete(msg)}
+            dangerouslySetInnerHTML=${{ __html: TRASH_SVG }}></button>` : null}
         </div>
         ${quoted ? html`<button class="inbox-bubble-quote" onClick=${() => onJumpTo?.(quoted.id)} title=${t('inbox.quoteJump')}>
           <span class="inbox-quote-name">${escHtml(quotedName || '')}</span>
