@@ -24,19 +24,14 @@ When a feature, bugfix, or structural change is completed:
    ```
    For changes scoped to one layer (CLI-only, single route, single view), state explicitly which suites you ran and why others were not needed.
 
-2. **End of a multi-step plan — full sweep on both PRIMARY backends (both must be green):**
-   ```bash
-   pnpm test:e2e:postgres-kysely   # PRIMARY / prod backend
-   pnpm test:e2e:sqlite
-   # or both in one go: pnpm test:e2e:all-backends
-   ```
+2. **Finish with the affected suites on both supported backends and run `pnpm gate --postgres` once.** A full E2E sweep requires Jouni's explicit request or approval, as specified in `CLAUDE.md`; completing a multi-step plan does not authorize it.
 
 3. **Target: 0 failures in the suites you ran.**
    - Failures in an area your change touches → change is NOT complete; fix it.
-   - Failures in an unrelated suite → verify they pre-exist on `main` (e.g. `git stash && pnpm test:e2e:sqlite -- --test=<suite>` then `git stash pop`). Report as pre-existing; do not fix them as part of the current work.
+   - Failures in an unrelated suite → verify they pre-exist on `main` in a separate clean worktree with its own test port and database. Report as pre-existing; do not change another agent's working tree or fix unrelated failures in the current work.
    - Complicated or ambiguous → ask the user before continuing.
 
-4. **Full test runs are required at the end of any multi-step plan execution.**
+4. **Create test environments per worktree.** Claim a free port in Lifecycle Central, then run `AIMEAT_E2E_PORT=<claimed-port> pnpm test:env:init` from `aimeat/`. Never copy `.env.test.*` from another checkout. The initializer currently honors explicit ports only from 40251 through 40499. For a higher claimed port, set both `AIMEAT_PORT` and `AIMEAT_TEST_PORT` in the test process. The runner refuses ports hard-coded by a selected suite; use another free claimed port when that happens.
 
 ### Rule 1b: The guard tier is the part CI refuses to merge without
 
@@ -49,10 +44,10 @@ pnpm test:e2e:guards:sqlite
 pnpm test:e2e:guards:postgres-kysely
 ```
 
-Sixty-four suites as of 2026-09-04 (the runner prints the assertion total; `check:doc-counts` holds the suite count), about two minutes per backend since the runner runs four lanes at once (`--workers=4`: four nodes, four ports, four databases, every suite still alone on an empty node). Membership is one question: **does a failure here mean a principal can reach money, an identity, or another account's data that they must not?** Everything in it asserts a refusal or an isolation boundary.
+The current suite list is `GUARD_SUITES` in the runner. It prints both suite and assertion totals; `check:doc-counts` holds the counts stated in CLAUDE.md and CI. The runner uses four lanes (`--workers=4`: four nodes, four ports, four databases, every suite alone on an empty node). Membership is one question: **does a failure here mean a principal can reach money, an identity, or another account's data that they must not?** Everything in it asserts a refusal or an isolation boundary.
 
-- **Run it once, when the work is finished**, through `pnpm gate`, which runs the tier only when the change touched `src/routes/`, `src/auth/`, `src/services/`, `src/storage/`, `src/mcp/` or `src/middleware/` (`--postgres` adds the production backend; `pnpm gate:full` is everything on both backends, for a release or a storage change). A change elsewhere gets the static gates and the unit tests it reaches, and the tier is skipped for cause, which the plan says out loud. Not on every commit and not on every push: a day of iterative work is twenty commits, and a tier on each of them is a day lost. The pre-push hook does not run it; CI runs it on every push and blocks a merge on it, so a push that skipped the gate is caught there, after the fact, without holding anyone up.
-- **A suite you fixed can be promoted into the tier.** That is the intended direction of travel, and it is how the advisory sweep shrinks.
+- **Run it once, when the work is finished**, through `pnpm gate`, which runs the tier only when the change touched `src/routes/`, `src/auth/`, `src/services/`, `src/storage/`, `src/mcp/`, `src/middleware/`, `src/utils/`, `src/commerce/`, `src/server-bootstrap/`, `src/config.ts` or `src/config-types.ts` (`--postgres` adds the production backend; `pnpm gate:full` runs static checks, all unit tests, changed E2E suites and the guard tier on both backends; it does not run the full E2E sweep). A change elsewhere gets the static gates and the unit tests it reaches, and the tier is skipped for cause, which the plan says out loud. Not on every commit and not on every push: a day of iterative work is twenty commits, and a tier on each of them is a day lost. The pre-push hook does not run it; CI runs it on every push and blocks a merge on it, so a push that skipped the gate is caught there, after the fact, without holding anyone up.
+- **A suite you fixed can be promoted into the tier after three consecutive identical green runs on each backend**, alone on a freshly cleaned test database. That is how the advisory sweep shrinks.
 - **A suite cannot be in the tier if its result depends on what ran before it.** `e2e-money-audit` and `e2e-zip-security` were held out for a day on that basis and are in now: the dependency turned out to be a defect, not a property. See the rule below.
 - **A suite that boots its own node must say where that node's data goes.** Thirteen suites call `createServer()` themselves, and `config.ts` defaults `sqlitePath` to `./data/aimeat.db` — the developer's working node. `e2e-money-audit` had been registering its accounts there for months (242 owners measured on 2026-08-15, 241 of them its own), and because the first owner on a node is promoted to operator and nobody else ever is, its first run took that role permanently and every run after it failed the same 18 assertions. The runner pins `AIMEAT_SQLITE_PATH` now, so a suite has to opt OUT of the test database rather than opt in; a suite running a SECOND node beside the runner's should still name a file of its own, because two nodes must not share one SQLite file.
 - Removing an entry is a decision to stop guarding something. Say why in the commit.
@@ -109,29 +104,13 @@ pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --tes
 pnpm test:e2e:ci:filter -- --test=security
 ```
 
-### E2E Test Suites (19 suites)
+### E2E Test Suites
 
-| Suite | File | Tests |
-|-------|------|-------|
-| Full API | `test/api-full.ts` | 35 tests across 6 phases + GDPR |
-| Admin Features | `test/e2e-admin-features.ts` | Admin dashboard API endpoints |
-| Anonymous | `test/e2e-anonymous.ts` | Anonymous access mode |
-| Auth & Libraries | `test/e2e-auth-lib.ts` | Authentication flows |
-| Board TTL | `test/e2e-board-ttl.ts` | Board post time-to-live |
-| Concurrency | `test/e2e-concurrency.ts` | Concurrent access patterns |
-| Disputes | `test/e2e-disputes.ts` | Dispute escalation flow |
-| Extensions | `test/e2e-extensions.ts` | V8 isolate extensions |
-| Federation | `test/e2e-federation.ts` | Node federation |
-| Hooks | `test/e2e-hooks.ts` | Extension hooks |
-| Knowledge | `test/e2e-knowledge.ts` | Knowledge base API |
-| Libraries | `test/e2e-libs.ts` | Client SDK libraries |
-| MCP | `test/e2e-mcp.ts` | Model Context Protocol |
-| Micro-Memory | `test/e2e-micro-memory.ts` | Micro-memory operations |
-| Personal Node | `test/e2e-personal-node.ts` | Personal node features |
-| Phase 0 | `test/e2e-phase0.ts` | Core phase 0 operations |
-| Portal | `test/e2e-portal.ts` | Portal rendering |
-| Security | `test/e2e-security.ts` | Security hardening |
-| Storage Visibility | `test/e2e-storage-visibility.ts` | Storage access control |
+`ALL_SUITES` in `aimeat/test/run-e2e-ci.ts` is the current runnable inventory; `GUARD_SUITES` is its blocking subset. Register new standalone suites in the runner. Use `--test=<name>` for targeted verification.
+
+### Storage conformance
+
+`pnpm exec vitest run test/unit/storage-conformance.test.ts` tests SQLite locally and PostgreSQL when `DATABASE_URL` is set. A configured but unavailable PostgreSQL database fails the suite. Set `AIMEAT_CONFORMANCE_REQUIRE_POSTGRES=true` to require a URL as well; CI does this in its PostgreSQL service job. A local SQLite-only pass is not PostgreSQL evidence.
 
 ---
 
@@ -276,10 +255,10 @@ Default is **scoped, not exhaustive** — run the minimum that gives confidence 
 | After any code change | `npx tsc --noEmit` + `pnpm lint` |
 | After changing a single route/service | `--test=<suite>` for the affected suite(s) on SQLite |
 | After changing a CLI subcommand | The CLI's own integration test, if any. Server suites do not exercise CLI code. |
-| After changing storage layer | `pnpm test:e2e:postgres-kysely` + `pnpm test:e2e:sqlite` (both must pass) |
+| After changing storage layer | Affected suites and storage conformance on both backends; finish with `pnpm gate --postgres` |
 | Before claiming a feature is done | The affected suites on PostgreSQL+Kysely **and** SQLite |
-| End of a multi-step plan | `pnpm test:e2e:postgres-kysely` + `pnpm test:e2e:sqlite` (both, full sweep) |
-| Before creating a PR | Both primary backends (PostgreSQL+Kysely + SQLite), full sweep |
+| End of a multi-step plan | Affected suites on both backends and the final gate; full sweep only with Jouni's authorization |
+| Before claiming completion | Relevant checks on both backends, final gate, and green CI for the pushed commit |
 
 ---
 

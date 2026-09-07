@@ -11,15 +11,16 @@
  *   the same observable result. It is also the safety net the step 3 refactor needs, since that work
  *   moves code across this layer and a divergence introduced there would otherwise look green.
  *
- *   Postgres is optional here: when DATABASE_URL is absent (a plain `pnpm test` on a laptop) the
- *   cross-provider cases skip with a printed reason rather than failing, and the SQLite-only
- *   invariants still run. CI sets DATABASE_URL, so the pair is compared where it matters.
+ *   A plain local run without DATABASE_URL checks SQLite only. Supplying DATABASE_URL requires
+ *   Postgres to initialize; connection errors fail the suite. CI runs this suite in the Postgres
+ *   guard job with AIMEAT_CONFORMANCE_REQUIRE_POSTGRES=true, which also refuses a missing URL.
  * @structure
- *   - providers(): the provider list for this run (sqlite always; postgres when reachable)
+ *   - provs: SQLite, plus mandatory Postgres when configured or explicitly required
  *   - seedOwner(): one owner with data in several owner-scoped tables
  *   - the cases: delete cascade, transaction lookup, memory listing order, push subscriptions
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.4.0 -- 2026-09-07 -- Fail on a configured Postgres connection error; CI requires both providers.
  *   v1.3.0 — 2026-09-04 — Six tables join the seed and the cascade check: memory version history,
  *     the owner's agent defaults, the two usage tables, group shares and the ecosystem-app handshake.
  *     Each had been listed in security/storage-parity-exemptions.json as "decide" since 2026-08-10,
@@ -40,24 +41,22 @@ import type { Storage } from '../../src/storage/interface.js';
 
 const SQLITE_PATH = `./test/.conformance-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';
+const REQUIRE_POSTGRES = process.env.AIMEAT_CONFORMANCE_REQUIRE_POSTGRES === 'true';
 
 interface Provider { name: string; storage: Storage }
 const provs: Provider[] = [];
 
 beforeAll(async () => {
+    if (REQUIRE_POSTGRES && !PG_URL) {
+        throw new Error('Postgres conformance requires DATABASE_URL; a SQLite-only run cannot satisfy this check.');
+    }
     provs.push({ name: 'sqlite', storage: await createStorage({ provider: 'sqlite', sqlitePath: SQLITE_PATH }) });
     if (PG_URL) {
-        try {
-            // `dbUrl`, not `databaseUrl` — StorageOptions names it dbUrl, and test/ is outside tsconfig's
-            // include, so the wrong key type-checked fine and pg fell back to env vars with no password.
-            // The postgres arm of this suite had therefore never run once. Fixed 2026-08-11.
-            provs.push({ name: 'postgres-kysely', storage: await createStorage({ provider: 'postgres-kysely', dbUrl: PG_URL }) });
-        } catch (err) {
-            console.warn(`[conformance] postgres unavailable, comparing sqlite only: ${String(err)}`);
-        }
+        provs.push({ name: 'postgres-kysely', storage: await createStorage({ provider: 'postgres-kysely', dbUrl: PG_URL }) });
     } else {
         console.warn('[conformance] DATABASE_URL not set — cross-provider comparison skipped, sqlite invariants still run');
     }
+    console.info(`[conformance] providers checked: ${provs.map(p => p.name).join(', ')}`);
 }, 60_000);
 
 afterAll(async () => {
@@ -178,7 +177,7 @@ async function seedOwner(s: Storage, name: string): Promise<{ ghii: string; gaii
 }
 
 /** Everything the cascade must leave empty, read back through the Storage interface. */
-async function leftovers(s: Storage, owner: string, ghii: string, gaii: string) {
+async function leftovers(s: Storage, owner: string, ghii: string, _gaii: string) {
     return {
         memory: (await s.listMemory(ghii, {})).length,
         transactions: (await s.getTransactions(ghii)).length,

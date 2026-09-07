@@ -14,9 +14,11 @@
  *     unit          vitest --changed <base>: the test files whose import graph reaches a changed
  *                   file; the whole suite only with --full
  *     guard tier    only when a change touches the code the tier guards — src/routes, src/auth,
- *                   src/services, src/storage, src/mcp, src/middleware — on SQLite; --postgres adds
+ *                   src/services, src/storage, src/mcp, src/middleware, src/utils, src/commerce,
+ *                   src/server-bootstrap and config — on SQLite; --postgres adds
  *                   the production backend; --full forces the tier
- *     own suites    an E2E suite file that itself changed is run, on SQLite
+ *     own suites    an E2E suite file that itself changed is run, including under --full;
+ *                   SQLite always, Postgres with --postgres or --full
  *
  *   It prints the plan and the reason for each line before running anything, so a "why did this
  *   take four minutes" has its answer at the top of the log. CI still runs everything on every
@@ -24,10 +26,12 @@
  * @usage
  *   cd aimeat && pnpm gate                 # what the change reaches
  *   cd aimeat && pnpm gate --postgres      # …plus the Postgres tier when the tier runs
- *   cd aimeat && pnpm gate --full          # everything, both backends
+ *   cd aimeat && pnpm gate --full          # all units, changed suites and guards on both backends
  *   cd aimeat && pnpm gate --base=HEAD~3   # measure against another base
  *   cd aimeat && pnpm gate --plan          # print the plan and run nothing
  * @version-history
+ *   v1.1.0 -- 2026-09-07 -- Preserve changed suites under --full, honor --postgres for them,
+ *     and select guards when shared identity, commerce, configuration or bootstrap code changes.
  *   v1.0.0 — 2026-09-05 — Initial. "Full tests rarely; only what changed, and the security tier
  *     only when platform code that concerns it changed, not for every little thing."
  */
@@ -44,7 +48,7 @@ const AIMEAT = process.cwd();
 const ROOT = resolve(AIMEAT, '..');
 
 /** Paths that can move a guard suite: the doors, the identity layer, the services behind them. */
-const GUARDED = /^aimeat\/src\/(routes|auth|services|storage|mcp|middleware)\//;
+const GUARDED = /^aimeat\/src\/(?:(routes|auth|services|storage|mcp|middleware|utils|commerce|server-bootstrap)\/|config(?:-types)?\.ts$)/;
 /** Paths a unit test can reach at all. */
 const UNIT_REACH = /^aimeat\/(src\/|test\/(unit|integration)\/|public\/|scripts\/|package\.json|vitest\.config|tsconfig|eslint\.config|locales\/)/;
 
@@ -103,8 +107,11 @@ function plan(files: string[], mergeBase: string): Step[] {
         steps.push({ name: `unit tests reaching ${unitReach.length} changed file(s)`, cmd: ['pnpm', '-s', 'exec', 'vitest', 'run', '--changed', mergeBase, '--passWithNoTests'], why: unitReach.slice(0, 4).join(', ') + (unitReach.length > 4 ? ', …' : '') });
     }
 
-    if (ownSuites.length > 0 && !FULL) {
-        steps.push({ name: `own E2E suite(s): ${ownSuites.join(', ')}`, cmd: ['node', '--env-file=.env.test.sqlite', '--import', 'tsx', 'test/run-e2e-ci.ts', ...ownSuites.map(s => `--test=${s}`)], why: 'a suite that changed is run' });
+    if (ownSuites.length > 0) {
+        for (const backend of POSTGRES ? ['sqlite', 'postgres-kysely'] : ['sqlite']) {
+            const label = backend === 'sqlite' ? 'SQLite' : 'Postgres';
+            steps.push({ name: `own E2E suite(s), ${label}: ${ownSuites.join(', ')}`, cmd: ['node', `--env-file=.env.test.${backend}`, '--import', 'tsx', 'test/run-e2e-ci.ts', ...ownSuites.map(s => `--test=${s}`)], why: 'a suite that changed is run' });
+        }
     }
 
     if (FULL || guarded.length > 0) {
@@ -123,7 +130,7 @@ function main(): void {
     for (const s of steps) console.log(`  • ${s.name.padEnd(44)} ${s.why}`);
     const skipped: string[] = [];
     if (!FULL && !files.some(f => UNIT_REACH.test(f))) skipped.push('unit tests (nothing a test can reach changed)');
-    if (!FULL && !files.some(f => GUARDED.test(f))) skipped.push('guard tier (no change under src/routes, auth, services, storage, mcp, middleware)');
+    if (!FULL && !files.some(f => GUARDED.test(f))) skipped.push('guard tier (no guarded backend, shared utility, commerce, configuration or bootstrap changes)');
     for (const s of skipped) console.log(`  · skipped: ${s}`);
     console.log('');
     if (PLAN_ONLY) return;

@@ -22885,6 +22885,9 @@ paths:
         Supply `content` (base64) inline, or set `mode: presigned` to receive an upload URL for larger
         files. Re-publishing an app inherits its current `parked` state, so an update never silently
         re-exposes a parked app.
+        Scoped principals require `app:write` for both inline publishing and presigned upload
+        authorization. Owner sessions retain access. Missing permission returns `403` before
+        changing any app or issuing an upload token.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -23023,6 +23026,8 @@ paths:
                                   absent.
         '200':
           description: Presigned upload URL (when mode=presigned)
+        '403':
+          description: Scoped principal lacks app:write; no upload token is issued and no app is changed.
         '400':
           $ref: '#/components/responses/BadRequest'
         '422':
@@ -24982,6 +24987,8 @@ paths:
 
         The promoted bytes are stamped with a provenance record and run the same non-blocking AI
         transparency check as `POST /v1/apps` — two doors to the same act give the same answer.
+        Scoped principals require `app:write`; owner sessions retain access. A missing permission
+        returns `403` before reading or consuming the draft.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -25041,6 +25048,7 @@ paths:
                             items: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { description: No draft to publish }
+        '403': { description: The scoped principal lacks app:write; the draft and live app are unchanged }
         '429': { description: Publishing a first-version draft would exceed the published-app quota }
 
   /v1/apps/{owner}/{filename}/fork:

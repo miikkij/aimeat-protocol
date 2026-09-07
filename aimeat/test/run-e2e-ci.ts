@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.35.0 -- 2026-09-07 -- Guard publishing permission across all three HTTP doors.
  *   v1.34.0 -- 2026-09-06 -- Add e2e-secrets.ts: the owner's write-only credential vault, and the
  *            resolution of {{secret:NAME}} inside ctx.fetch. It binds 40672 for a real receiver, so
  *            it is a fixed-port suite and lands in lane 0 beside e2e-living-hooks; what arrives at
@@ -179,6 +180,7 @@ const ALL_SUITES = [
     'test/e2e-app-draft-edit.ts',
     'test/e2e-app-screenshot-capture.ts',
     'test/e2e-app-publish-gate.ts',
+    'test/e2e-app-publish-scopes.ts',
     'test/e2e-app-playtest.ts',
     'test/e2e-app-ui.ts',
     'test/e2e-designbook.ts',
@@ -631,6 +633,7 @@ const ALL_SUITES = [
  * private file of its own; both suites are green repeatedly on both backends.
  */
 const GUARD_SUITES = [
+    'test/e2e-app-publish-scopes.ts',       // app:write on all three publish doors; 3 isolated green runs per backend
     'test/e2e-account-security-gate.ts',    // the doors back INTO the account: password, recovery, 2FA, deletion
     'test/e2e-organism-scope-gate.ts',      // organism:write means the same thing on the HTTP door and the tool surface
     'test/e2e-write-guards.ts',             // which principal may write into which namespace
