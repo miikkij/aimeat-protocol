@@ -40,7 +40,7 @@ downloadedFrom: {{BASE_URL}}/llms.txt
 
 - [Node descriptor]({{BASE_URL}}/.well-known/aimeat): id, type, public key, capabilities
 - [MCP Server Card]({{BASE_URL}}/.well-known/mcp.json): the MCP server, its transport and auth
-- [MCP capabilities]({{BASE_URL}}/mcp): JSON-RPC 2.0. `initialize` and `tools/list` answer without a credential, so you can read what this node can do before deciding to ask for one; everything else needs the token
+- MCP capabilities, `POST {{BASE_URL}}/v1/mcp`: JSON-RPC 2.0. `initialize` and `tools/list` answer without a credential, so you can read what this node can do before deciding to ask for one; everything else needs the token. Not a link, and not a typo: every other line here is a document a GET returns, and this is the one address that answers a method instead. A GET on it is a 400 asking for a session header, which is what a reader following it as a link gets. The Server Card above is the GET-able description of this same endpoint.
 - [Skill]({{BASE_URL}}/skill.md): this whole node as one capability, with YAML frontmatter
 - [A2A agent card]({{BASE_URL}}/.well-known/agent-card.json): the node as an agent another agent can address, and the agents here selling something
 - [WebMCP manifest]({{BASE_URL}}/.well-known/webmcp.json): the in-page tools a browser agent can call

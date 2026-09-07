@@ -151,8 +151,15 @@ export async function initializeServices(
     .then(() => logger.info('Knowledge prompt templates seeded'))
     .catch(err => logger.error('Failed to seed knowledge templates', { error: err }));
 
-  seedSystemPrompts(storage)
-    .then(() => {})
+  // AWAITED, unlike the seeders around it, and for the same reason setupAnonymousIdentity above is:
+  // a request can arrive for this the moment the port opens. `GET /v1/prompts/playbook/:id` and
+  // `GET /v1/prompts/:tier` are PUBLIC and read the managed record, so while this was
+  // fire-and-forget a freshly booted node answered 404 for every documented playbook until the
+  // seed happened to land. Measured as a flake rather than reasoned about:
+  // `e2e-businesslauncher` failed 2 of 3 runs on 2026-09-07 with "Expected 200, got 404" and passed
+  // the third, which is what a race looks like from the outside. Every other seeder here backs
+  // something no first request needs.
+  await seedSystemPrompts(storage)
     .catch(err => logger.error('Failed to seed system prompts', { error: String(err) }));
 
   // Bring the built-in node-scope skills into step with this build. A skill edited on THIS node is

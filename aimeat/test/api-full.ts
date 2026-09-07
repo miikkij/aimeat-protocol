@@ -233,9 +233,19 @@ await test('GET /llms-template.txt — templates are not served raw', async () =
         const res = await fetch(`${BASE}${p}`, { redirect: 'manual' });
         assert(res.status === 301, `${p} → ${res.status}, expected 301`);
     }
+    // NAME THE TOKENS, DO NOT LOOK FOR `{{`. This asked whether the body contained two braces
+    // anywhere, and by 2026-09-07 it had been red for weeks for a reason that is not a defect: the
+    // manual documents the LIVING DOCUMENT template language, so `/llms-full.txt` legitimately
+    // carries `{{ t | 1 }}`, `{{ if t > 30 }}` and `{{secret:NAME}}` inside the aimeat-living pack's
+    // own description. A check that cannot tell a leaked variable from a documented one fires on
+    // the documentation and says nothing about the leak. These five are what renderLlms
+    // (routes/bootstrap.ts) substitutes, and a sixth added there and not here is the drift this
+    // list is worth having.
+    const TOKENS = ['{{BASE_URL}}', '{{NODE_ID}}', '{{LIBRARY_PACKS_TABLE}}', '{{HUMAN_PAGES}}', '{{OPTIONAL_PAGES}}'];
     for (const p of ['/llms.txt', '/llms-full.txt', '/robots.txt']) {
         const body = await (await fetch(`${BASE}${p}`)).text();
-        assert(!body.includes('{{'), `${p} leaks an unsubstituted template token`);
+        const left = TOKENS.filter(t => body.includes(t));
+        assert(left.length === 0, `${p} leaks an unsubstituted template token: ${left.join(', ')}`);
     }
 });
 
