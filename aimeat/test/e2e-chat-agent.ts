@@ -91,8 +91,11 @@ async function startNode(opts: { port: number; gooseBin: string; tag: string }):
         env: {
             ...process.env,
             // tsx comes from here rather than from the command line, because the same NODE_OPTIONS is
-            // what carries the peer into the agent child this node spawns.
-            NODE_OPTIONS: `--import tsx --import ${PEER}`,
+            // what carries the peer into the agent child this node spawns. Whatever NODE_OPTIONS the
+            // suite itself was given stays in front: under `pnpm test:e2e:coverage` that is the
+            // coverage preload, and replacing it made this node the one node in the sweep that
+            // wrote no snapshot (measured 2026-09-08: goose-acp read 15 of 17 functions uncalled).
+            NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import tsx --import ${PEER}`.trim(),
             FAKE_GOOSE_LOG: peerLog,
             AIMEAT_PORT: String(opts.port),
             AIMEAT_BASE_URL: base,
@@ -543,15 +546,15 @@ async function run(): Promise<void> {
         const anonymous = await json(`/v1/chat/threads/${threadId}`);
         assert(anonymous.status === 401, `no credential: ${anonymous.status}`);
         const other = await registerOwner(`chatother${Date.now() % 100000}`);
+        // A thread is read under the caller's own identity, so another owner sees nothing at all:
+        // 404 rather than 403, and the same on the write door (routes/chat.ts, "No such conversation").
         const stranger = await json(`/v1/chat/threads/${threadId}`, { headers: { Authorization: `Bearer ${other}` } });
-        assert(stranger.status === 403 || stranger.status === 404,
-            `another owner reading this thread: ${stranger.status}, expected a refusal or nothing to see`);
+        assert(stranger.status === 404, `another owner reading this thread: ${stranger.status}, expected nothing to see`);
         const turnByStranger = await json(`/v1/chat/threads/${threadId}/turn`, {
             method: 'POST', headers: { Authorization: `Bearer ${other}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: 'not mine' }),
         });
-        assert(turnByStranger.status === 403 || turnByStranger.status === 404,
-            `another owner speaking into this thread: ${turnByStranger.status}`);
+        assert(turnByStranger.status === 404, `another owner speaking into this thread: ${turnByStranger.status}`);
     });
 
     await stopNode(node);
