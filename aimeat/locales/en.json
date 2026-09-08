@@ -10983,6 +10983,7 @@
         "scopesReadonly": "Reading only",
         "scopesStandard": "Read and write",
         "scopesFull": "Everything you can do",
+        "scopesFullHint": "Every permission your own session carries, including the ones you would otherwise tick one at a time. Narrow it later on the agent's Permissions dialog.",
         "runModeLabel": "How it runs",
         "runModeSpawnHint": "A worker starts when work arrives and stops after it. Right for anything bursty.",
         "runModeResidentHint": "Your connector keeps it running. Right for a front door, where a few seconds of cold start would be felt.",

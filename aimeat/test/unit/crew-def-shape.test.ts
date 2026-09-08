@@ -179,10 +179,10 @@ describe('the shape rules', () => {
         expect(rules(t)).toContain('{{ctx.prompt}}');
     });
 
-    it('refuses a task naming an agent role that does not exist', () => {
+    it('refuses a task naming a member that does not exist', () => {
         const t = sound();
         t.crewDef.tasks[1].agent = 'Nobody';
-        expect(rules(t)).toContain('must name a role defined in agents[]');
+        expect(rules(t)).toContain('must name a member of agents[]');
     });
 
     it('refuses a forward context reference, because it has nothing to read yet', () => {
@@ -191,16 +191,30 @@ describe('the shape rules', () => {
         expect(rules(t)).toContain('EARLIER task id');
     });
 
+    it('a task may name its member by NAME, which is how the Crew tab writes them', () => {
+        // crewaimeat's `_agent_key` is `name` first and `role` only when there is no name. This gate
+        // read the role alone, so a definition naming its members — every one the Crew tab's own
+        // starting shapes produce — looked like it pointed at nobody.
+        const t = sound();
+        t.crewDef.agents[0] = { name: 'researcher', role: 'Research analyst', goal: 'g', backstory: 'b', allow_delegation: false };
+        t.crewDef.tasks[0].agent = 'researcher';
+        expect(rules(t)).not.toContain('names nobody');
+    });
+
+    it('and by ROLE when the member carries no name', () => {
+        expect(rules(sound())).not.toContain('names nobody');
+    });
+
     it('refuses an agent missing a goal or a backstory', () => {
         const t = sound();
         t.crewDef.agents[0].backstory = '   ';
         expect(rules(t)).toContain('non-empty backstory');
     });
 
-    it('refuses two agents sharing a role, which makes a task ambiguous', () => {
+    it('refuses two agents sharing a key, which makes a task ambiguous', () => {
         const t = sound();
         t.crewDef.agents[1].role = 'Reader';
-        expect(rules(t)).toContain('share a role');
+        expect(rules(t)).toContain('share a key');
     });
 
     it('refuses two tasks sharing an id', () => {

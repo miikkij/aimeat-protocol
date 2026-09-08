@@ -10999,6 +10999,7 @@
         "scopesReadonly": "Vain lukeminen",
         "scopesStandard": "Luku ja kirjoitus",
         "scopesFull": "Kaikki mihin sinä pystyt",
+        "scopesFullHint": "Kaikki oikeudet jotka oma istuntosi kantaa, myös ne jotka muuten rastitetaan yksi kerrallaan. Voit kaventaa sitä myöhemmin agentin Oikeudet-ikkunassa.",
         "runModeLabel": "Miten se ajetaan",
         "runModeSpawnHint": "Työntekijä käynnistyy kun töitä tulee ja sammuu sen jälkeen. Sopii kaikkeen mikä tulee pätkissä.",
         "runModeResidentHint": "Yhdistimesi pitää sen käynnissä. Sopii etuovelle, jossa parin sekunnin kylmäkäynnistys tuntuisi.",
