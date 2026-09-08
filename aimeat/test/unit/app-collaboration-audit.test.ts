@@ -1,7 +1,9 @@
 /**
  * @file app-collaboration-audit.test.ts
  * @description Regression checks for the shared-app audit, using real SQLite records.
- * @version-history v1.0.0 - 2026-09-08 - Fail first for identity collisions and lost roadmap writes.
+ * @version-history
+ *   v1.0.1 - 2026-09-09 - The 5001-row case gets a 30 s ceiling; it timed out under gate load.
+ *   v1.0.0 - 2026-09-08 - Fail first for identity collisions and lost roadmap writes.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
@@ -25,7 +27,10 @@ describe('shared-app audit regressions', () => {
     const held = await listRightsHeldBy(s, 'bob');
     expect(held.apps).toHaveLength(5001);
     expect(new Set(held.apps.map(a => a.appId)).size).toBe(5001);
-  });
+  // 5001 grants written one at a time is a correctness fixture, not a speed one: alone it takes
+  // about a second, and under vitest's parallel load in `pnpm gate` it crossed the default 5 s
+  // twice on 2026-09-09. The ceiling is about the assertion, not the clock.
+  }, 30_000);
   it('lists every blanket app beyond 200 and preserves narrower per-app rights', async () => {
     const s = store();
     await s.transaction(async () => {
