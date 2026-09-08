@@ -15,6 +15,9 @@
  *   - scanOwnerDue(storage, config, ownerGaii) — pulse the owner's own due instances (manual trigger)
  *   - pulseInstanceServer(storage, config, ownerGaii, loc, cfg) — one instance, self-fulfilled
  * @version-history
+ *   v1.3.0 — 2026-09-08 — A section's dispatched task emits task_assigned. "The running crew picks
+ *     it up" was the assumption, and being picked up without polling is what a wake is for.
+ *     → pitfalls §58
  *   v1.2.0 — 2026-08-17 — The due-scan runs on the value-free meta projection and fetches only the
  *     matched config records (was: 10,000 full organism.* values per tick, +151..230 MB/run measured
  *     on production).
@@ -31,6 +34,7 @@ import { completeForOwner, AiCompletionError } from './ai-completion.js';
 import { librarianSearch } from './librarian.js';
 import type { PushService } from './push.js';
 import type { EmailService } from './email.js';
+import { emitDelivery } from './event-bus.js';
 
 /** Optional notify services for stop/retire alerts (web-push + email). The in-UI retired badge + ledger
  *  are written regardless; these are the extra out-of-app nudges. */
@@ -177,6 +181,9 @@ async function dispatchAgentTask(storage: Storage, config: AimeatConfig, ownerGa
     status: 'queued', createdAt: now, updatedAt: now,
   };
   await storage.createAgentTask(record);
+  // "The running crew picks it up" was the assumption, and picking up is exactly what a wake saves
+  // an agent from having to do. Without this the section's task waits for the next poll. → pitfalls §58
+  emitDelivery({ target: agentGaii, kind: 'task_assigned', id: record.id, payload: record });
   return record.id;
 }
 
