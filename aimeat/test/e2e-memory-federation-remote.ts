@@ -274,7 +274,11 @@ async function run() {
             headers: { Authorization: `Bearer ${ownerToken}` },
         });
         assert(status === 200, `the pulled key must be readable locally, got ${status}: ${JSON.stringify(body)}`);
-        assert(JSON.stringify(body.data.value) === JSON.stringify(REMOTE_VALUE),
+        // Field by field, not by serialised text: Postgres stores jsonb with its keys reordered
+        // (shortest first), so the same record reads back as {"n":42,"note":…} there and as it was
+        // written on SQLite. Measured on the first postgres sweep this suite ran in, 2026-09-08.
+        assert(body.data.value?.n === REMOTE_VALUE.n && body.data.value?.note === REMOTE_VALUE.note
+            && Object.keys(body.data.value).length === 2,
             `value: ${JSON.stringify(body.data.value)}`);
         assert(body.data.visibility === 'private', `a pulled record is private: ${body.data.visibility}`);
         assert(body.data.tags.includes(`pulled-from:${peerNodeId}`),
