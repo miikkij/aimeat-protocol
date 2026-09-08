@@ -47,6 +47,7 @@ import { renderPage } from './apps/page.js';
 
 export default function AppsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
+  const [publishApp, setPublishApp] = useState(null);
   const [apps, setApps] = useState(null);          // the owner's apps, null while loading
   const [community, setCommunity] = useState(0);   // other people's apps on this node
   const [communityOwners, setCommunityOwners] = useState(0);
@@ -99,21 +100,8 @@ export default function AppsTab({ session, showToast, onStats }) {
       setGrants(res?.data?.grants || []);
     } catch (err) { swallowed('apps-tab: grants', err); setGrants([]); }
     try {
-      // WHO ELSE MAY BUILD THESE. The blanket list is one read; the per-app rights are one read per
-      // app, which is fine because it is the owner's own apps and the page already has that list.
-      // Kept apart from the loads above for the same reason they are apart from each other: a
-      // failure here must not blank the apps.
-      const all = await apiGet('/v1/app-dev-grants');
-      const own = (await listApps()).filter((x) => x.owner === session.owner);
-      const perApp = {};
-      await Promise.all(own.map(async (x) => {
-        try {
-          const r = await apiGet(`/v1/apps/${encodeURIComponent(x.owner)}/${encodeURIComponent(x.filename)}/dev-grants`);
-          const rows = r?.data?.grants || [];
-          if (rows.length) perApp[`${x.owner}/${x.filename}`] = rows;
-        } catch (err) { swallowed('apps-tab: dev-grants per app', err); }
-      }));
-      setBuilders({ blanket: all?.data?.grants || [], perApp });
+      const all = await apiGet('/v1/app-dev-grants?include_apps=true');
+      setBuilders({ blanket: all?.data?.grants || [], perApp: all?.data?.per_app || {} });
     } catch (err) {
       // `false`, not an empty list. A failed read that renders as "nobody builds these" is a
       // screen telling the owner something untrue about who has power over their apps.
@@ -137,18 +125,19 @@ export default function AppsTab({ session, showToast, onStats }) {
 
   /* ── drafts ── */
 
-  function publishDraft(app) {
+  function publishDraft(app) { setPublishApp(app); }
+
+  async function submitPublish(app, roadmap) {
     const ref = appRef(app);
-    confirm(a('publishConfirm', { name: nameOf(app) }), async () => {
-      setBusy(ref);
-      try {
-        await apiPost(`/v1/apps/${encodeURIComponent(app.owner)}/${encodeURIComponent(app.filename)}/publish-draft`, {});
-        showToast?.(a('draftPublishedToast', { name: nameOf(app) }));
-        if (diff?.ref === ref) setDiff(null);
-        await load();
-      } catch (e) { fail(e); }
-      finally { setBusy(null); }
-    });
+    setBusy(ref);
+    try {
+      const res = await apiPost(`/v1/apps/${encodeURIComponent(app.owner)}/${encodeURIComponent(app.filename)}/publish-draft`, { roadmap });
+      showToast?.(res?.data?.roadmap_hint || a('draftPublishedToast', { name: nameOf(app) }));
+      setPublishApp(null);
+      if (diff?.ref === ref) setDiff(null);
+      await load();
+    } catch (e) { fail(e); }
+    finally { setBusy(null); }
   }
 
   function discardDraft(app) {
@@ -195,18 +184,18 @@ export default function AppsTab({ session, showToast, onStats }) {
 
   /* ── the finished file ── */
 
-  async function upload({ file, description, screenshot, accessCode }) {
+  async function upload({ file, description, screenshot, accessCode, roadmap }) {
     if (!file) { showToast?.(a('fileRequired'), true); return false; }
     if (!description || !description.trim()) { showToast?.(a('descRequired'), true); return false; }
     const readFile = (f) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(/** @type {string} */ (r.result).split(',')[1]); r.readAsDataURL(f); });
     setBusy('upload');
     try {
-      const opts = { description: description.trim() };
+      const opts = { description: description.trim(), roadmap };
       if (accessCode) opts.accessCode = accessCode;
       if (screenshot) { opts.screenshotBase64 = await readFile(screenshot); opts.screenshotMimeType = screenshot.type || 'image/png'; }
       const resp = await uploadApp(file.name, await readFile(file), file.type || 'text/html', opts);
       if (resp?.ok === false) throw new Error(resp?.error?.message || a('uploadFailed'));
-      showToast?.(a('uploaded'));
+      showToast?.(resp?.data?.roadmap_hint || a('uploaded'));
       await load();
       return true;
     } catch (e) { fail(e, a('uploadFailed')); return false; }
@@ -287,6 +276,7 @@ Start by asking me which app and what I want changed. Fill a data map (aimeat_da
   }
 
   const ctx = {
+    publishApp, submitPublish, closePublish: () => { if (!busy) setPublishApp(null); },
     session, apps, community, communityOwners, bound, grants, buildPrompt, busy, diff, openScopes,
     builders, buildersBusy, onGrantBuilder, onRevokeBuilder,
     kunto: computeKunto(apps || [], bound), ConfirmUI, showToast,

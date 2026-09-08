@@ -47,7 +47,7 @@ async function freshStorage(): Promise<Storage> {
 }
 
 function scope() {
-  return { ownerName: OWNER, ownerGhii: GHII };
+  return { ownerName: OWNER, ownerGhii: GHII, callerGaii: GHII };
 }
 
 function publishedApp(filename: string, content: string, version = 1): AppRecord {

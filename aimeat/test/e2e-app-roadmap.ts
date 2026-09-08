@@ -12,7 +12,16 @@
  * @version-history
  *   v1.0.0 — 2026-09-08 — Initial. Phases 4, 5 and 6 of the shared-app work.
  */
+import * as ed from '@noble/ed25519';
+import { createHash } from 'node:crypto';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { registerAppsTools } from '../src/cli/connect/mcp/tools/apps.js';
+import { appTools } from '../src/cli/connect/tool-call-defs-apps.js';
+
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
+const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
+ed.hashes.sha512 = m => new Uint8Array(createHash('sha512').update(m).digest());
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -29,8 +38,8 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
-async function setupOwner(label: string) {
-    const name = `rm${label}${Date.now().toString(36)}`;
+async function setupOwner(label: string, fixedName?: string) {
+    const name = fixedName ?? `rm${label}${Date.now().toString(36)}`;
     let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'RM', password: 'RmTest1234' }) });
     for (let i = 0; reg.status === 429 && i < 8; i++) {
         await new Promise(r => setTimeout(r, 1200));
@@ -190,6 +199,7 @@ await test('and the builder publishing into the owner\'s app owes the same line'
     const r = await json(road(), { headers: auth(owner.token) });
     const done = (r.body.data.roadmap.entries as any[]).filter(e => e.state === 'done');
     assert(done[0].what === 'The empty state says what to do next.', 'the owner reads what the builder did');
+    assert(done[0].by === builder.name, 'the note identifies the actual builder, not the app owner');
 });
 
 // ── The listing ───────────────────────────────────────────────────────────────────────────────────
@@ -217,6 +227,210 @@ await test('somebody who builds nothing gets an empty answer, not everybody\'s a
 await test('and it needs a signed-in caller', async () => {
     const r = await json('/v1/apps?building=true');
     assert(r.status === 401, `expected 401, got ${r.status}`);
+});
+
+
+await test('private roadmap POST never returns another person\'s wishes', async () => {
+    await json(road(), { method: 'PATCH', headers: auth(owner.token), body: JSON.stringify({ wanted_visibility: 'developers' }) });
+    await json(road(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ what: 'Private implementation plan.' }) });
+    const result = await json(road(), { method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ what: 'An outside request.' }) });
+    assert(result.status === 201, `POST ${result.status}`);
+    assert(!result.body.data.roadmap.entries.some((e: any) => e.state === 'wanted'), 'POST applies the same redaction as GET');
+    assert(result.body.data.entry.what === 'An outside request.', 'the author receives the id of their own new wish');
+});
+
+await test('roadmap writes require an existing app', async () => {
+    const result = await json(`/v1/apps/${owner.name}/missing.html/roadmap`, {
+        method: 'POST', headers: auth(owner.token), body: JSON.stringify({ what: 'Cannot create an orphan.' }),
+    });
+    assert(result.status === 404, `missing app ${result.status}`);
+});
+
+await test('punctuation collisions do not transfer development rights or roadmaps', async () => {
+    for (const filename of ['a.b.html', 'a-b.html']) {
+        const pub = await publish(owner.token, filename, filename);
+        assert(pub.status === 201, `setup ${pub.status}`);
+    }
+    await json(`/v1/apps/${owner.name}/a.b.html/dev-grants/${builder.name}`, {
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ level: 'publisher' }),
+    });
+    const escaped = await publish(builder.token, 'a-b.html', 'unauthorized', { owner: owner.name, roadmap: 'Should not land.' });
+    assert(escaped.status === 403, `colliding grant ${escaped.status}`);
+    await json(`/v1/apps/${owner.name}/a-b.html/roadmap`, {
+        method: 'POST', headers: auth(owner.token), body: JSON.stringify({ what: 'Unshared private plan.' }),
+    });
+    const other = await json(`/v1/apps/${owner.name}/a.b.html/roadmap`, { headers: auth(builder.token) });
+    assert(other.status === 200 && other.body.data.roadmap === null, 'other roadmap stays separate');
+});
+
+await test('colliding owner and filename boundaries stay isolated with real accounts', async () => {
+    const other = await setupOwner('collision', `${owner.name}-team`);
+    assert((await publish(owner.token, 'team-app.html', 'Victim')).status === 201, 'victim published');
+    assert((await publish(other.token, 'app.html', 'Other owner')).status === 201, 'other app published');
+    await json(`/v1/apps/${other.name}/app.html/dev-grants/${builder.name}`, {
+        method: 'PUT', headers: auth(other.token), body: JSON.stringify({ level: 'full' }),
+    });
+    const escaped = await publish(builder.token, 'team-app.html', 'Must not land', { owner: owner.name, roadmap: 'Not authorized.' });
+    assert(escaped.status === 403, 'grant does not cross the owner boundary');
+    const victimRoad = `/v1/apps/${owner.name}/team-app.html/roadmap`;
+    await json(victimRoad, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ what: 'Private across owner boundaries.' }) });
+    const ownRoad = `/v1/apps/${other.name}/app.html/roadmap`;
+    const read = await json(ownRoad, { headers: auth(other.token) });
+    assert(read.body.data.roadmap === null, 'other owner cannot read the victim roadmap');
+    await json(ownRoad, { method: 'PATCH', headers: auth(other.token), body: JSON.stringify({ wanted_visibility: 'everyone' }) });
+    const victim = await json(victimRoad, { headers: auth(owner.token) });
+    assert(victim.body.data.roadmap.wantedVisibility === 'developers', 'changing the own roadmap cannot open the victim');
+});
+
+await test('draft seed authorizes its source as well as its destination', async () => {
+    const result = await json(`/v1/apps/${owner.name}/a.b.html/draft/seed`, {
+        method: 'POST', headers: auth(builder.token), body: JSON.stringify({ from_filename: 'a-b.html' }),
+    });
+    assert(result.status === 403, `source ${result.status}`);
+    const draft = await json(`/v1/apps/${owner.name}/a.b.html/draft`, { headers: auth(owner.token) });
+    assert(draft.status === 404, 'no source bytes were copied');
+});
+
+await test('a shared app cannot mint a presigned publish without a note', async () => {
+    const result = await json('/v1/apps', { method: 'POST', headers: auth(builder.token),
+        body: JSON.stringify({ filename: APP, owner: owner.name, mode: 'presigned' }) });
+    assert(result.status === 400 && result.body.error.code === 'ROADMAP_REQUIRED', `mint ${result.status}`);
+});
+
+await test('presigned upload keeps the note, version and actual author', async () => {
+    const mint = await json('/v1/apps', { method: 'POST', headers: auth(builder.token),
+        body: JSON.stringify({ filename: APP, owner: owner.name, mode: 'presigned', roadmap: 'Presigned release note.' }) });
+    assert(mint.status === 200, `mint ${mint.status}`);
+    const upload = await fetch(mint.body.data.upload_url, { method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: Buffer.from(html('uploaded'), 'base64') });
+    const body = await upload.json() as any;
+    assert(upload.ok, `upload ${upload.status}: ${JSON.stringify(body)}`);
+    const result = await json(road(), { headers: auth(owner.token) });
+    const entry = result.body.data.roadmap.entries.find((e: any) => e.what === 'Presigned release note.');
+    assert(entry?.by === builder.name, 'presigned author retained');
+    assert(entry.version === body.version_number || entry.version === body.data?.version_number, 'presigned version retained');
+});
+
+await test('a token minted before sharing cannot bypass the roadmap gate at upload', async () => {
+    const filename = 'shared-after-mint.html';
+    const made = await publish(owner.token, filename, 'initial');
+    assert(made.status === 201, 'initial app created');
+    const mint = await json('/v1/apps', { method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ filename, mode: 'presigned' }) });
+    assert(mint.status === 200, 'unshared app can mint without a note');
+    await json(`/v1/apps/${owner.name}/${filename}/dev-grants/${stranger.name}`, {
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ level: 'drafter' }),
+    });
+    const upload = await fetch(mint.body.data.upload_url, { method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: Buffer.from(html('too late'), 'base64') });
+    assert(upload.status === 400, `upload rechecks sharing: ${upload.status}`);
+    const versions = await json(`/v1/apps/${owner.name}/${filename}/versions`, { headers: auth(owner.token) });
+    assert(versions.body.data.versions.length === 1, 'refused upload creates no version');
+});
+
+await test('a publisher cannot change operation settings through publishing', async () => {
+    for (const settings of [{ access_code: 'new-secret-code' }, { uses_cortex: ['unauthorized-cortex'] }]) {
+        const result = await publish(builder.token, APP, 'operation bypass', { owner: owner.name, roadmap: 'Must be refused.', ...settings });
+        assert(result.status === 403, `operation ${JSON.stringify(settings)}: ${result.status}`);
+    }
+});
+
+await test('successful concurrent roadmap additions all survive', async () => {
+    const results = await Promise.all(Array.from({ length: 8 }, (_, i) => json(road(), {
+        method: 'POST', headers: auth(owner.token), body: JSON.stringify({ what: `Concurrent audit wish ${i}.` }),
+    })));
+    assert(results.every(r => r.status === 201), 'all additions acknowledged');
+    const result = await json(road(), { headers: auth(owner.token) });
+    assert(result.body.data.roadmap.entries.filter((e: any) => e.what.startsWith('Concurrent audit wish ')).length === 8, 'none disappeared');
+});
+
+await test('shared listing paginates and exposes drafts only for authorized apps', async () => {
+    await json(`/v1/apps/${owner.name}/${APP}/draft`, { method: 'PUT', headers: auth(builder.token), body: JSON.stringify({ content: html('draft') }) });
+    const first = await json('/v1/apps?building=true&limit=1', { headers: auth(builder.token) });
+    const second = await json('/v1/apps?building=true&limit=1&offset=1', { headers: auth(builder.token) });
+    assert(first.body.data.apps.length === 1 && second.body.data.apps.length === 1, 'limit honored');
+    assert(first.body.data.apps[0].filename !== second.body.data.apps[0].filename, 'offset honored');
+    const all = await json('/v1/apps?building=true', { headers: auth(builder.token) });
+    assert(all.body.data.apps.find((x: any) => x.filename === APP)?.has_draft, 'builder can discover pending work');
+    const grants = await json('/v1/app-dev-grants?include_apps=true', { headers: auth(owner.token) });
+    assert(grants.body.data.per_app[`${owner.name}/${APP}`].some((g: any) => g.account === builder.name), 'one aggregate answer retains per-app invitations');
+});
+
+await test('node MCP publishes and promotes shared apps with the person behind the agent', async () => {
+    const agent = await json('/v1/agents', { method: 'POST', headers: auth(builder.token),
+        body: JSON.stringify({ name: 'roadmap-builder', owner: builder.name, capabilities: ['appdev'] }) });
+    assert(agent.status === 201, `agent ${agent.status}`);
+    const gaii = agent.body.data.agent.gaii;
+    const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'roadmap-audit', redirect_uris: [] }) });
+    const timestamp = new Date().toISOString();
+    const signature = Buffer.from(await ed.signAsync(new TextEncoder().encode(gaii + NODE_ID + timestamp),
+        Buffer.from(agent.body.data.private_key, 'base64'))).toString('base64');
+    const params = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii, timestamp, signature });
+    const approval = await json(`/v1/mcp/authorize?${params}`);
+    const token = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({
+        grant_type: 'authorization_code', code: approval.body.code, client_id: reg.body.client_id, client_secret: reg.body.client_secret,
+    }) });
+    assert(typeof token.body.access_token === 'string', 'MCP authorization succeeded');
+    const client = new Client({ name: 'roadmap-audit', version: '1.0.0' });
+    try {
+        await client.connect(new StreamableHTTPClientTransport(new URL('/v1/mcp', BASE),
+            { requestInit: { headers: auth(token.body.access_token) } }));
+        const refused = await client.callTool({ name: 'aimeat_app_publish', arguments: { owner: owner.name, filename: APP, name: 'Roadmap demo', content_base64: html('mcp') } });
+        assert(refused.isError === true, 'MCP requires a release note');
+        const made = await client.callTool({ name: 'aimeat_app_publish', arguments: {
+            owner: owner.name, filename: APP, name: 'Roadmap demo', content_base64: html('mcp'), roadmap: 'Node MCP inline release.',
+        } });
+        assert(!made.isError, `MCP publish ${JSON.stringify(made)}`);
+        const deniedSeed = await client.callTool({ name: 'aimeat_app_draft_seed', arguments: {
+            owner: owner.name, filename: APP, from_filename: 'a-b.html',
+        } });
+        assert(deniedSeed.isError === true, 'MCP authorizes the seed source separately');
+        const staged = await client.callTool({ name: 'aimeat_app_draft_save', arguments: {
+            owner: owner.name, filename: APP, content_base64: html('mcp draft'),
+        } });
+        assert(!staged.isError, 'MCP saved the shared draft');
+        const promoted = await client.callTool({ name: 'aimeat_app_draft_publish', arguments: {
+            owner: owner.name, filename: APP, roadmap: 'Node MCP draft release.',
+        } });
+        assert(!promoted.isError, `MCP promotion ${JSON.stringify(promoted)}`);
+        const result = await json(road(), { headers: auth(owner.token) });
+        for (const note of ['Node MCP inline release.', 'Node MCP draft release.']) {
+            assert(result.body.data.roadmap.entries.some((e: any) => e.what === note && e.by === builder.name), 'MCP records the person behind the agent');
+        }
+    } finally { await client.close(); }
+});
+
+await test('connector and CLI draft publication reach the real authorized REST route', async () => {
+    const liveClient = {
+        post: async (path: string, body?: unknown) => (await json(path, { method: 'POST', headers: auth(builder.token), body: JSON.stringify(body) })).body,
+    };
+    const callbacks = new Map<string, (input: Record<string, unknown>) => Promise<any>>();
+    registerAppsTools({ tool: (name: string, ...args: unknown[]) => callbacks.set(name, args.at(-1) as never) } as never,
+        { resolve: () => ({ owner: builder.name, client: liveClient }) } as never);
+    for (const surface of ['connector', 'CLI']) {
+        const staged = await json(`/v1/apps/${owner.name}/${APP}/draft`, {
+            method: 'PUT', headers: auth(builder.token), body: JSON.stringify({ content: html(surface) }),
+        });
+        assert(staged.status === 200, 'draft staged');
+        const input = { owner: owner.name, filename: APP, roadmap: `${surface} release through real REST.` };
+        const out = surface === 'connector'
+            ? await callbacks.get('aimeat_app_draft_publish')!(input)
+            : await appTools.find(t => t.name === 'aimeat_app_draft_publish')!.handler({ client: liveClient, config: { owner: builder.name } } as never, input);
+        assert(out.isError !== true && out.ok !== false, `${surface}: ${JSON.stringify(out)}`);
+        const result = await json(road(), { headers: auth(owner.token) });
+        assert(result.body.data.roadmap.entries.some((e: any) => e.what === input.roadmap && e.by === builder.name), `${surface} preserved destination and author`);
+    }
+});
+
+await test('a former builder can withdraw a wish but cannot erase a completed change', async () => {
+    const mint = await json('/v1/apps', { method: 'POST', headers: auth(builder.token),
+        body: JSON.stringify({ filename: APP, owner: owner.name, mode: 'presigned', roadmap: 'A token that will be revoked.' }) });
+    assert(mint.status === 200, 'token issued while authorized');
+    const entry = await json(road(), { method: 'POST', headers: auth(builder.token), body: JSON.stringify({ state: 'done', what: 'A completed change.' }) });
+    const id = entry.body.data.roadmap.entries[0].id;
+    await json(`/v1/apps/${owner.name}/${APP}/dev-grants/${builder.name}`, { method: 'DELETE', headers: auth(owner.token) });
+    const upload = await fetch(mint.body.data.upload_url, { method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: Buffer.from(html('revoked'), 'base64') });
+    assert(upload.status === 403, 'old upload token stops working after revocation');
+    const removed = await json(`${road()}/${id}`, { method: 'DELETE', headers: auth(builder.token) });
+    assert(removed.status === 403, 'revoked author cannot delete a done entry');
 });
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

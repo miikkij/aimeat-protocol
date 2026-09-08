@@ -205,6 +205,8 @@ export const appTools: ConnectCliToolDefinition[] = [
             filename: { type: 'string', required: true, description: 'App filename, e.g. "starwars.html". Alphanumeric, dots, hyphens, underscores.' },
             owner: { type: 'string', description: 'Whose catalogue the app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.' },
             roadmap: { type: 'string', description: 'One sentence saying what this version changes, in your own words. It goes on the app roadmap, and it is required when somebody else helps build this app.' },
+            spec_token: { type: 'string', description: 'Current app build spec digest.' },
+            spec_ack: { type: 'string', description: 'Owner-declared build spec acknowledgement.' },
             content: { type: 'string', description: 'The app HTML as plain text — this door base64-encodes it for you. Use @file:path to load from disk.' },
             content_base64: { type: 'string', description: 'Already-encoded HTML, if you did the encoding yourself.' },
             name: { type: 'string', required: true, description: 'Display name shown in the catalogue.' },
@@ -227,7 +229,7 @@ export const appTools: ConnectCliToolDefinition[] = [
                 name: requiredString(input, 'name'),
                 ...(encoded !== undefined ? { content: encoded } : {}),
             };
-            for (const field of ['description', 'category', 'icon', 'version', 'mime_type', 'owner', 'roadmap'] as const) {
+            for (const field of ['description', 'category', 'icon', 'version', 'mime_type', 'owner', 'roadmap', 'spec_token', 'spec_ack'] as const) {
                 const v = optionalString(input, field);
                 if (v) body[field] = v;
             }
@@ -260,6 +262,7 @@ export const appTools: ConnectCliToolDefinition[] = [
             search: { type: 'string', description: 'Free-text search over name and description.' },
             category: { type: 'string', description: 'Filter by category.' },
             tag: { type: 'string', description: 'Filter by tag.' },
+            building: { type: 'boolean', description: 'List apps another owner lets you build.' },
             ...PAGING_INPUT, own: { type: 'boolean', description: 'List only your own owner\'s apps.' },
         },
         handler: ({ client }, input) => client.get(`/v1/apps${query({
@@ -268,7 +271,8 @@ export const appTools: ConnectCliToolDefinition[] = [
             search: optionalString(input, 'search'),
             category: optionalString(input, 'category'),
             tag: optionalString(input, 'tag'),
-            own: optionalBoolean(input, 'own') ? 'true' : undefined, ...paging(input),
+            own: optionalBoolean(input, 'own') ? 'true' : undefined,
+            building: optionalBoolean(input, 'building') ? 'true' : undefined, ...paging(input),
         })}`),
     },
     {
@@ -497,6 +501,7 @@ export const appTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_app_draft_save',
         description: 'Save the app\'s NEXT version as a draft (staging) without touching the live app. content is base64-encoded HTML.',
         input: {
+            owner: { type: 'string', description: 'App owner. Omit for your own apps.' },
             filename: { type: 'string', required: true, description: 'App filename, e.g. "shop.html".' },
             content: { type: 'string', required: true, description: 'Base64-encoded HTML of the draft.' },
             name: { type: 'string', description: 'Display name (defaults to the live app\'s).' },
@@ -513,22 +518,30 @@ export const appTools: ConnectCliToolDefinition[] = [
             const category = optionalString(input, 'category'); if (category) body.category = category;
             const icon = optionalString(input, 'icon'); if (icon) body.icon = icon;
             const tags = optionalArray(input, 'tags'); if (tags) body.tags = tags;
-            return client.put(`/v1/apps/${encodeURIComponent(config.owner)}/${encodeURIComponent(filename)}/draft`, body);
+            return client.put(`/v1/apps/${encodeURIComponent(optionalString(input, 'owner') ?? config.owner)}/${encodeURIComponent(filename)}/draft`, body);
         },
     },
     {
         // → POST /v1/apps/:owner/:filename/publish-draft — promote the saved draft to a new live version.
         name: 'aimeat_app_draft_publish',
         description: 'Promote the saved draft to a new live version and clear the draft slot.',
-        input: { filename: { type: 'string', required: true, description: 'App filename whose draft to publish.' } },
-        handler: ({ client, config }, input) => client.post(`/v1/apps/${encodeURIComponent(config.owner)}/${encodeURIComponent(requiredString(input, 'filename'))}/publish-draft`),
+        input: { owner: { type: 'string', description: 'App owner. Omit for your own apps.' }, filename: { type: 'string', required: true, description: 'App filename whose draft to publish.' },
+            roadmap: { type: 'string', description: 'What this version changes. Required on shared apps.' },
+            spec_token: { type: 'string', description: 'Current app build spec digest.' },
+            spec_ack: { type: 'string', description: 'Owner-declared build spec acknowledgement.' },
+        },
+        handler: ({ client, config }, input) => client.post(`/v1/apps/${encodeURIComponent(optionalString(input, 'owner') ?? config.owner)}/${encodeURIComponent(requiredString(input, 'filename'))}/publish-draft`, {
+            roadmap: optionalString(input, 'roadmap'), spec_token: optionalString(input, 'spec_token'), spec_ack: optionalString(input, 'spec_ack'),
+            ...(input.ai_provenance ? { ai_provenance: input.ai_provenance } : {}),
+            ...(input.ai_provenance_id ? { ai_provenance_id: input.ai_provenance_id } : {}),
+        }),
     },
     {
         // → DELETE /v1/apps/:owner/:filename/draft — discard the draft (live app untouched).
         name: 'aimeat_app_draft_discard',
         description: 'Discard the saved draft; the live app is untouched.',
-        input: { filename: { type: 'string', required: true, description: 'App filename whose draft to discard.' } },
-        handler: ({ client, config }, input) => client.delete(`/v1/apps/${encodeURIComponent(config.owner)}/${encodeURIComponent(requiredString(input, 'filename'))}/draft`),
+        input: { owner: { type: 'string', description: 'App owner. Omit for your own apps.' }, filename: { type: 'string', required: true, description: 'App filename whose draft to discard.' } },
+        handler: ({ client, config }, input) => client.delete(`/v1/apps/${encodeURIComponent(optionalString(input, 'owner') ?? config.owner)}/${encodeURIComponent(requiredString(input, 'filename'))}/draft`),
     },
     // The settings group (search visibility, badge and install chip, legal pages, audit log)
     // lives in tool-call-defs-apps-settings.ts, a pure extraction at the line ceiling.

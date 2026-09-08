@@ -153,7 +153,7 @@ export const PRESIGNED_META_KEYS = {
     // which no app had a provenance record at all. Carried through the SIGNED token, so the
     // declaration that arrives with the bytes is the one the caller made when they asked for the URL.
     app: ['filename', 'name', 'description', 'category', 'tags', 'icon', 'version',
-          'ai_provenance', 'ai_provenance_id', 'spec_token', 'spec_ack'],
+          'ai_provenance', 'ai_provenance_id', 'spec_token', 'spec_ack', 'roadmap'],
     storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs'],
     extension: ['update', 'activate'],
     cortex: ['update', 'activate'],

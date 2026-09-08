@@ -46,10 +46,11 @@
  *     is built and tested here first, and the doors are opened one at a time after it.
  */
 import type { AimeatConfig } from '../config.js';
+import { canonicalAppId, listAppRecords } from './app-record-keys.js';
 import type { Storage } from '../storage/interface.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import {
-  accountOf, getMemberRow, isLive, memberKey, sameApp, slugOf, writePrivateRecord,
+  accountOf, getMemberRow, isLive, memberKey, sameApp, writePrivateRecord,
   type AppMemberRecord,
 } from './app-members.js';
 
@@ -204,9 +205,7 @@ export async function listDevGrants(
   // `appmember.<slug>.<name>` in their own space and appear on somebody else's list of builders. It
   // would grant nothing — the gate reads one key in NS_MEMBER, which no principal can address — but a
   // list of who holds power over your app has to be true on the screen as well as in the check.
-  const { items } = await storage.listAllMemory({
-    ownerPrefix: NS_MEMBER, prefix: `appmember.${slugOf(appId)}.`, limit: 2000,
-  });
+  const { items } = await listAppRecords(storage, NS_MEMBER, 'appmember.', appId);
   return items
     .filter(r => r.ownerGaii === NS_MEMBER)
     .map(r => r.value as AppMemberRecord)
@@ -285,9 +284,7 @@ export async function listBlanketGrants(
   storage: Storage, owner: string, now: Date = new Date(),
 ): Promise<AppDevBlanketGrant[]> {
   // Pinned to NS_BLANKET for the same reason listDevGrants is pinned to NS_MEMBER.
-  const { items } = await storage.listAllMemory({
-    ownerPrefix: NS_BLANKET, prefix: `appdevall.${accountOf(owner)}.`, limit: 2000,
-  });
+  const { items } = await listAppRecords(storage, NS_BLANKET, `appdevall.${accountOf(owner)}.`);
   return items
     .filter(r => r.ownerGaii === NS_BLANKET)
     .map(r => r.value as AppDevBlanketGrant)
@@ -358,8 +355,8 @@ export async function listRightsHeldBy(
 ): Promise<{ apps: Array<{ appId: string; level: number }>; owners: Array<{ owner: string; level: number }> }> {
   const me = accountOf(principal);
   const [memberRows, blanketRows] = await Promise.all([
-    storage.listAllMemory({ ownerPrefix: NS_MEMBER, prefix: 'appmember.', limit: 5000 }),
-    storage.listAllMemory({ ownerPrefix: NS_BLANKET, prefix: 'appdevall.', limit: 5000 }),
+    listAppRecords(storage, NS_MEMBER, 'appmember.'),
+    listAppRecords(storage, NS_BLANKET, 'appdevall.'),
   ]);
   const apps = memberRows.items
     .filter(r => r.ownerGaii === NS_MEMBER)
@@ -398,20 +395,25 @@ export async function listAppsBuiltFor(
     if (!o || !f) continue;
     const row = await storage.getAppByOwnerName(o, f);
     if (!row) continue;
-    seen.add(`${row.ownerName}/${row.filename}`.toLowerCase());
+    seen.add(canonicalAppId(`${row.ownerName}/${row.filename}`));
     out.push({ ...row, devLevel: a.level });
   }
   for (const o of held.owners) {
     const theirGhii = await resolveGhii(storage, o.owner, `${o.owner}@${config.nodeId}`);
-    const theirs = await storage.listApps({
-      ownerGaii: theirGhii, limit: 200, offset: 0,
-      ...(input.viewerGhii ? { viewerGhii: input.viewerGhii } : {}),
-    });
-    for (const row of theirs.apps) {
-      const key = `${row.ownerName}/${row.filename}`.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({ ...row, devLevel: o.level });
+    for (let offset = 0; ; ) {
+      const theirs = await storage.listApps({
+        ownerGaii: theirGhii, limit: 200, offset,
+        viewerGhii: theirGhii,
+      });
+      for (const row of theirs.apps) {
+        const key = canonicalAppId(`${row.ownerName}/${row.filename}`);
+        // A specific grant overrides the blanket grant, including when it narrows the right.
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ ...row, devLevel: o.level });
+      }
+      offset += theirs.apps.length;
+      if (!theirs.apps.length || offset >= theirs.total) break;
     }
   }
   // Never the caller's own: this answers "what am I helping with", and their own apps are the other
