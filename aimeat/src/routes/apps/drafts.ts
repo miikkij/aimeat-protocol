@@ -57,13 +57,16 @@ import {
     writeAppDraft, replaceInAppDraft, readAppDraft, seedAppDraft,
 } from '../../services/app-draft-edit.js';
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
-import { appOriginUrl, type CanonicalOwner } from './helpers.js';
+import { appOriginUrl, appTargetOr, type AppTargetFor } from './helpers.js';
+import { isSharedApp } from '../../services/app-dev-grant.js';
+import { roadmapGate, addRoadmapEntry } from '../../services/app-roadmap.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerDraftRoutes(
     router: Router,
     config: AimeatConfig,
     storage: Storage,
-    canonicalOwner: CanonicalOwner,
+    appTarget: AppTargetFor,
 ): void {
     // ── App drafts (staging): edit + test the NEXT version without touching the
     //    live one. A draft is a single unpublished slot per app; it is owner-only,
@@ -76,7 +79,9 @@ export function registerDraftRoutes(
     // app when omitted, so a draft that only changes the HTML keeps its name/category.
     router.put('/v1/apps/:owner/:filename/draft', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
-        const { owner, ownerGhii } = await canonicalOwner(req);
+        const t = await appTargetOr(appTarget, config, req, res, 'draft');
+        if (!t) return;
+        const { owner, ownerGhii } = t;
         const { content, mime_type, name, description, category, tags, icon, uses_cortex, protection } = req.body ?? {};
 
         if (!content || typeof content !== 'string') {
@@ -139,7 +144,9 @@ export function registerDraftRoutes(
     // POST /v1/apps/:owner/:filename/draft/write — append a piece, or replace the whole draft.
     router.post('/v1/apps/:owner/:filename/draft/write', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
-        const { owner, ownerGhii } = await canonicalOwner(req);
+        const t = await appTargetOr(appTarget, config, req, res, 'draft');
+        if (!t) return;
+        const { owner, ownerGhii } = t;
         const { content, mode, expected_size_bytes, name, description } = req.body ?? {};
 
         if (typeof content !== 'string') {
@@ -183,7 +190,9 @@ export function registerDraftRoutes(
     // POST /v1/apps/:owner/:filename/draft/replace — exact old → new inside the draft.
     router.post('/v1/apps/:owner/:filename/draft/replace', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
-        const { owner, ownerGhii } = await canonicalOwner(req);
+        const t = await appTargetOr(appTarget, config, req, res, 'draft');
+        if (!t) return;
+        const { owner, ownerGhii } = t;
         const { old_string, new_string, replace_all } = req.body ?? {};
 
         if (typeof old_string !== 'string' || typeof new_string !== 'string') {
@@ -217,7 +226,9 @@ export function registerDraftRoutes(
     // twenty lines it is about to change.
     router.get('/v1/apps/:owner/:filename/draft/lines', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
-        const { ownerGhii, owner } = await canonicalOwner(req);
+        const t = await appTargetOr(appTarget, config, req, res, 'draft');
+        if (!t) return;
+        const { ownerGhii, owner } = t;
         const rawOffset = req.query.offset;
         const rawLimit = req.query.limit;
 
@@ -247,7 +258,9 @@ export function registerDraftRoutes(
     // POST /v1/apps/:owner/:filename/draft/seed — copy a published version into the slot.
     router.post('/v1/apps/:owner/:filename/draft/seed', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
-        const { owner, ownerGhii } = await canonicalOwner(req);
+        const t = await appTargetOr(appTarget, config, req, res, 'draft');
+        if (!t) return;
+        const { owner, ownerGhii } = t;
         const { from_filename, version } = req.body ?? {};
 
         if (version !== undefined && typeof version !== 'number') {
@@ -285,7 +298,9 @@ export function registerDraftRoutes(
     // Owner-only: canonicalOwner resolves the caller, so a draft is never readable by anyone else.
     router.get('/v1/apps/:owner/:filename/draft', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
-        const { ownerGhii } = await canonicalOwner(req);
+        const t = await appTargetOr(appTarget, config, req, res, 'draft');
+        if (!t) return;
+        const { ownerGhii } = t;
         const draft = await storage.getAppDraft(ownerGhii, filename);
         if (!draft) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft exists for "${filename}".`));
@@ -307,7 +322,9 @@ export function registerDraftRoutes(
     // it OFF, at the apex inline URL. Either way it opens TOP-LEVEL as a clean page.
     router.post('/v1/apps/:owner/:filename/draft/preview-token', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
-        const { owner, ownerGhii } = await canonicalOwner(req);
+        const t = await appTargetOr(appTarget, config, req, res, 'draft');
+        if (!t) return;
+        const { owner, ownerGhii } = t;
         const draft = await storage.getAppDraft(ownerGhii, filename);
         if (!draft) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft exists for "${filename}". Save one with PUT .../draft first.`));
@@ -342,7 +359,9 @@ export function registerDraftRoutes(
     // so its size does not depend on anything the user accumulates.
     router.post('/v1/apps/:owner/:filename/frame-token', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
-        const { owner, ownerGhii } = await canonicalOwner(req);
+        const t = await appTargetOr(appTarget, config, req, res, 'draft');
+        if (!t) return;
+        const { owner, ownerGhii } = t;
 
         const app = await storage.getAppByOwnerName(owner, filename);
         if (!app) {
@@ -377,7 +396,9 @@ export function registerDraftRoutes(
     // untouched. Idempotent (404 only signals there was nothing to discard).
     router.delete('/v1/apps/:owner/:filename/draft', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
-        const { ownerGhii } = await canonicalOwner(req);
+        const t = await appTargetOr(appTarget, config, req, res, 'draft');
+        if (!t) return;
+        const { ownerGhii } = t;
         const deleted = await discardAppDraft(storage, ownerGhii, filename);
         if (!deleted) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to discard for "${filename}"`));
@@ -394,11 +415,23 @@ export function registerDraftRoutes(
     router.post('/v1/apps/:owner/:filename/publish-draft', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
-        const { owner, ownerGhii } = await canonicalOwner(req);
+        const t = await appTargetOr(appTarget, config, req, res, 'publish');
+        if (!t) return;
+        const { owner, ownerGhii } = t;
 
         const draft = await storage.getAppDraft(ownerGhii, filename);
         if (!draft) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to publish for "${filename}". Save one with PUT .../draft first.`));
+            return;
+        }
+
+        // The same question POST /v1/apps asks: what did this change? A warning on your own app, a
+        // refusal on one somebody else helps build. Asked before the promotion, so a refusal never
+        // arrives after the bytes are live.
+        const shared = await isSharedApp(storage, owner, filename);
+        const road = roadmapGate({ line: typeof req.body?.roadmap === 'string' ? req.body.roadmap : undefined, shared });
+        if (!road.ok) {
+            res.status(400).json(error(config.nodeId, 'ROADMAP_REQUIRED', road.message));
             return;
         }
 
@@ -436,6 +469,19 @@ export function registerDraftRoutes(
             res.status(out.refusal.status).json(error(
                 config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
             return;
+        }
+
+        // The line lands on the roadmap with the version it became. Never fatal: the version is live
+        // either way, and failing the call afterwards would deny something that happened.
+        if (road.line) {
+            try {
+                await addRoadmapEntry(storage, {
+                    appId: `${owner}/${filename}`, state: 'done', what: road.line,
+                    by: owner, version: out.versionNumber,
+                });
+            } catch (err) {
+                logger.warn('publish-draft: the roadmap line was not written, the version stands', { error: String(err) });
+            }
         }
 
         res.status(201).json(success(config.nodeId, {

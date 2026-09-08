@@ -110,6 +110,8 @@ import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.j
 import { publishSkill, type SkillScope } from '../services/skills.js';
 import { parseGAII } from '../utils/gaii.js';
 import { publishApp } from '../services/app-publish.js';
+import { effectiveDevLevel, mayAct } from '../services/app-dev-grant.js';
+import { accountOf } from '../services/app-members.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import type { DeclaredProvenance } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
@@ -243,6 +245,22 @@ async function handleAppUpload(
     const ownerName = parsed ? parsed.owner : (sub.includes('@') ? sub.split('@')[0] : sub);
     const ownerGaii = parsed ? `${parsed.owner}@${parsed.node}` : sub;
     const filename = meta.filename as string;
+
+    // ASKED AGAIN HERE, not just where the token was minted. This is the second door of the publish,
+    // and a permission word is enforced on every door or it does not exist: the token names another
+    // owner's bucket only because a rung said it could, and the token outlives a revocation by up to
+    // its hour. Nothing to check when the caller IS the owner, which is every publish but the shared
+    // ones.
+    if (accountOf(actor) !== accountOf(ownerName)) {
+        const held = await effectiveDevLevel(storage, { owner: ownerName, filename, principal: actor });
+        if (!held || !mayAct(held.level, 'publish')) {
+            res.status(403).json({
+                success: false, error: 'FORBIDDEN',
+                message: `You no longer hold a right to publish ${ownerName}'s app.`,
+            });
+            return;
+        }
+    }
 
     // Everything from here to the response is services/app-publish.ts, shared with POST /v1/apps and
     // publish-draft. This door's own business is only the token meta → requested-manifest mapping:

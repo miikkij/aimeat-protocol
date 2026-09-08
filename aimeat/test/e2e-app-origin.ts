@@ -420,7 +420,13 @@ async function main() {
             const r = await json(`/v1/apps/${owner}/${filename}/frame-token`, {
                 method: 'POST', headers: { Authorization: `Bearer ${tk.body.data.token}`, Origin: FRAMER }, body: '{}',
             });
-            assert(r.status === 404, `outsider must not mint (expected 404, got ${r.status})`);
+            // 403 since 2026-09-08, and the change is a decision rather than a drift. The `:owner`
+            // segment used to be read and ignored on this door, so an outsider naming somebody
+            // else's app was silently asking about their OWN, found nothing, and got a 404 that
+            // said "no such app" when the true answer was "not yours". Now the segment means what
+            // it says and the refusal names the reason. Nothing leaks: an app's existence is
+            // already public, and the refusal is the same whether or not it exists.
+            assert(r.status === 403, `outsider must not mint (expected 403, got ${r.status})`);
         });
 
         // ── Phase 6: the app origin answers as ITSELF ──────────────────────────────────────

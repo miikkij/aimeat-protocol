@@ -89,9 +89,11 @@ import { requirementsOf, appRef as depAppRef } from '../services/dependency-map.
 import { descriptionFor } from './catalog/shape.js';
 import { publishApp } from '../services/app-publish.js';
 import {
-    appFilenameRefusal, resolveAppOwnerScope, stageAppDraft, discardAppDraft,
+    appFilenameRefusal, resolveAppOwnerScope, resolveAppTargetScope, stageAppDraft, discardAppDraft,
     publishAppDraft, deleteOwnedApp,
 } from '../services/app-lifecycle.js';
+import { isSharedApp, listAppsBuiltFor, levelName } from '../services/app-dev-grant.js';
+import { roadmapGate, addRoadmapEntry } from '../services/app-roadmap.js';
 import { publicPosture } from '../services/app-ai-posture.js';
 import { resolveAppUrls } from '../routes/apps/helpers.js';
 import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta, appUiAvailable } from './apps-ui.js';
@@ -144,6 +146,8 @@ export function registerAppsTools(
         descriptionFor('aimeat_app_publish'),
         {
             filename: z.string().describe('App filename (e.g. "starwars.html"). Alphanumeric, dots, hyphens, underscores. Max 100 chars.'),
+            owner: z.string().optional()
+                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
             content_base64: z.string().optional().describe('Base64-encoded HTML content. Omit to get an upload URL instead (recommended for files > 1KB).'),
             name: z.string().describe('Display name of the app'),
             description: z.string().optional().describe('Short description of the app'),
@@ -155,16 +159,31 @@ export function registerAppsTools(
                 'Declarative crew-defs this app ships (Agent-Bundled Apps). Each entry is a crewaimeat crew_def JSON document (agent_name, agents[], tasks[], ...) validated at publish — DATA the owner\'s own fleet interprets, never code. Stored as manifest.cortex.agents. Omit on update to carry the existing list forward; send [] to clear.'),
             ...aiProvenanceInputs,
             ...specGateInputs,
+            roadmap: z.string().optional()
+                .describe('One sentence saying what this version changes, in your own words. It goes on the app\'s roadmap. REQUIRED when somebody else helps build this app: it is the only way they learn what happened.'),
         },
         annotationsFor('aimeat_app_publish'),
-        async ({ filename, content_base64, name, description, category, tags, icon, version, cortex_agents, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
+        async ({ filename, owner, roadmap, content_base64, name, description, category, tags, icon, version, cortex_agents, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
             const agentGaii = getAgentGaii();
-            // The same owner scope the HTTP door resolves. Composing `owner@nodeId` here addressed a
-            // different bucket than routes/apps.ts for any owner whose GHII record says otherwise.
-            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            // The same target the HTTP door resolves, through the same function: whose catalogue this
+            // lands in, and whether a rung carries publishing into it. Composing `owner@nodeId` here
+            // addressed a different bucket than routes/apps.ts for any owner whose GHII record says
+            // otherwise, which is why neither surface builds that string for itself any more.
+            const scope = await resolveAppTargetScope(storage, config,
+                { principal: agentGaii, owner, filename, act: 'publish' });
             if (!scope) {
                 return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
             }
+            if ('refusal' in scope) {
+                return { content: [{ type: 'text' as const, text: scope.refusal }], isError: true };
+            }
+            // What did this change? A warning alone, a refusal on an app somebody else helps build.
+            // Asked here rather than only on the HTTP door, because this tool does not go through it.
+            const road = roadmapGate({
+                line: roadmap,
+                shared: await isSharedApp(storage, scope.ownerName, filename),
+            });
+            if (!road.ok) return { content: [{ type: 'text' as const, text: road.message }], isError: true };
 
             const badName = appFilenameRefusal(filename);
             if (badName) {
@@ -263,12 +282,26 @@ export function registerAppsTools(
                 logger.info(`App ${out.isUpdate ? 'updated' : 'published'} via MCP: ${filename} v${out.versionNumber}`, { by: agentGaii });
                 emitResourceListChanged(agentGaii);
 
+                // The line goes on the roadmap with the version it landed in. A failure here never
+                // fails the publish: the version is live, and refusing it afterwards would deny
+                // something that happened.
+                if (road.line) {
+                    try {
+                        await addRoadmapEntry(storage, {
+                            appId: `${scope.ownerName}/${filename}`, state: 'done', what: road.line,
+                            by: scope.ownerName, version: out.versionNumber,
+                        });
+                    } catch (err) {
+                        logger.warn('app publish: the roadmap line was not written, the version stands', { error: String(err) });
+                    }
+                }
                 return {
                     content: [{
                         type: 'text' as const,
                         text: JSON.stringify({
                             mode: 'inline',
                             filename,
+                            ...('warning' in road ? { roadmap_hint: road.warning } : {}),
                             version_number: out.versionNumber,
                             name: out.manifest.name,
                             size: out.size,
@@ -301,6 +334,8 @@ export function registerAppsTools(
         descriptionFor('aimeat_app_draft_save'),
         {
             filename: z.string().describe('App filename (e.g. "starwars.html"). The draft is the staging copy of THIS app.'),
+            owner: z.string().optional()
+                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
             content_base64: z.string().describe('Base64-encoded HTML of the draft (the next version to test).'),
             name: z.string().optional().describe('Display name (defaults to the live app\'s name when omitted).'),
             description: z.string().optional().describe('Description (defaults to the live app\'s when omitted).'),
@@ -309,10 +344,12 @@ export function registerAppsTools(
             icon: z.string().optional().describe('Emoji icon (defaults to the live app\'s).'),
         },
         annotationsFor('aimeat_app_draft_save'),
-        async ({ filename, content_base64, name, description, category, tags, icon }) => {
+        async ({ filename, owner, content_base64, name, description, category, tags, icon }) => {
             const agentGaii = getAgentGaii();
-            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            const scope = await resolveAppTargetScope(storage, config,
+                { principal: agentGaii, owner, filename, act: 'draft' });
             if (!scope) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
+            if ('refusal' in scope) return { content: [{ type: 'text' as const, text: scope.refusal }], isError: true };
             const data = Buffer.from(content_base64, 'base64');
             try {
                 // The draft slot is written in services/app-lifecycle.ts, the same function
@@ -360,14 +397,25 @@ export function registerAppsTools(
         descriptionFor('aimeat_app_draft_publish'),
         {
             filename: z.string().describe('App filename whose saved draft should be promoted to a new live version.'),
+            roadmap: z.string().optional()
+                .describe('One sentence saying what this version changes, in your own words. It goes on the app\'s roadmap. REQUIRED when somebody else helps build this app: it is the only way they learn what happened.'),
+            owner: z.string().optional()
+                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
             ...aiProvenanceInputs,
             ...specGateInputs,
         },
         annotationsFor('aimeat_app_draft_publish'),
-        async ({ filename, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
+        async ({ filename, owner, roadmap, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
             const agentGaii = getAgentGaii();
-            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            const scope = await resolveAppTargetScope(storage, config,
+                { principal: agentGaii, owner, filename, act: 'publish' });
             if (!scope) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
+            if ('refusal' in scope) return { content: [{ type: 'text' as const, text: scope.refusal }], isError: true };
+            const road = roadmapGate({
+                line: roadmap,
+                shared: await isSharedApp(storage, scope.ownerName, filename),
+            });
+            if (!road.ok) return { content: [{ type: 'text' as const, text: road.message }], isError: true };
             // Loaded here rather than in the service so this door can name ITS remedy; the HTTP door
             // points at `PUT .../draft` for the same condition.
             const draft = await storage.getAppDraft(scope.ownerGhii, filename);
@@ -392,6 +440,19 @@ export function registerAppsTools(
                 if ('refusal' in out) {
                     // The draft stays: a refused promotion is work to fix, not work to lose.
                     return { content: [{ type: 'text' as const, text: refusalText(out.refusal) }], isError: true };
+                }
+                // The line goes on the roadmap with the version it landed in. A failure here never
+                // fails the publish: the version is live, and refusing it afterwards would deny
+                // something that happened.
+                if (road.line) {
+                    try {
+                        await addRoadmapEntry(storage, {
+                            appId: `${scope.ownerName}/${filename}`, state: 'done', what: road.line,
+                            by: scope.ownerName, version: out.versionNumber,
+                        });
+                    } catch (err) {
+                        logger.warn('app publish: the roadmap line was not written, the version stands', { error: String(err) });
+                    }
                 }
                 emitResourceListChanged(agentGaii);
                 logger.info(`App draft published via MCP: ${filename} v${out.versionNumber}`, { by: agentGaii });
@@ -423,12 +484,18 @@ export function registerAppsTools(
     mcp.tool(
         'aimeat_app_draft_discard',
         descriptionFor('aimeat_app_draft_discard'),
-        { filename: z.string().describe('App filename whose saved draft should be discarded (the live app is untouched).') },
+        {
+            filename: z.string().describe('App filename whose saved draft should be discarded (the live app is untouched).'),
+            owner: z.string().optional()
+                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
+        },
         annotationsFor('aimeat_app_draft_discard'),
-        async ({ filename }) => {
+        async ({ filename, owner }) => {
             const agentGaii = getAgentGaii();
-            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            const scope = await resolveAppTargetScope(storage, config,
+                { principal: agentGaii, owner, filename, act: 'draft' });
             if (!scope) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
+            if ('refusal' in scope) return { content: [{ type: 'text' as const, text: scope.refusal }], isError: true };
             const discarded = await discardAppDraft(storage, scope.ownerGhii, filename);
             if (!discarded) {
                 return { content: [{ type: 'text' as const, text: `No draft to discard for "${filename}".` }], isError: true };
@@ -452,6 +519,8 @@ export function registerAppsTools(
                 search: z.string().optional().describe('Search query string'),
                 tag: z.string().optional().describe('Filter by tag'),
                 own: z.boolean().optional().describe('If true, list only apps owned by the current agent'),
+                building: z.boolean().optional()
+                    .describe('Apps somebody else asked you to help build, instead of your own. Yours are the other answer.'),
                 limit: z.number().int().min(1).max(200).optional()
                     .describe('How many to return (default 50, max 200).'),
                 offset: z.number().int().min(0).optional()
@@ -464,7 +533,7 @@ export function registerAppsTools(
             // cannot build the page, so a host is never pointed at a resource that is not there.
             ...(appUiAvailable() ? { _meta: uiToolMeta(APP_INDEX_UI_URI) } : {}),
         },
-        async ({ category, search, tag, own, limit, offset }) => {
+        async ({ category, search, tag, own, building, limit, offset }) => {
             const agentGaii = getAgentGaii();
             // The same bucket key the write tools use, so `own: true` cannot list a set the delete
             // tool then fails to find.
@@ -491,7 +560,10 @@ export function registerAppsTools(
                 ...(own ? { ownerGaii: ownerGhii } : {}),
             };
 
-            const { apps, total } = await storage.listApps(opts);
+            // `building` is a different question from `own`, and the same function answers it here
+            // as answers it on GET /v1/apps: the apps somebody else asked this person to help build.
+            const built = building ? await listAppsBuiltFor(storage, config, { principal: agentGaii, viewerGhii: ownerGhii }) : null;
+            const { apps, total } = built ? { apps: built, total: built.length } : await storage.listApps(opts);
 
             // Per-app metrics in TWO batch queries (was getAppDownloads + countAppForks PER app = 2N).
             const refs = apps.map(a => ({ ownerGaii: a.ownerGaii, filename: a.filename }));
@@ -507,6 +579,11 @@ export function registerAppsTools(
                 const forks = forksByApp[metricKey] ?? 0;
                 return {
                     owner: app.ownerName,
+                    // Only on the `building` answer: whose app it is, and at which rung.
+                    ...((app as { devLevel?: number }).devLevel !== undefined
+                        ? { dev_level_name: levelName((app as { devLevel?: number }).devLevel as number),
+                            building_for: app.ownerName }
+                        : {}),
                     filename: app.filename,
                     name: app.manifest.name,
                     description: app.manifest.description,

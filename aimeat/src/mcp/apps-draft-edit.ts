@@ -30,7 +30,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { resolveAppOwnerScope } from '../services/app-lifecycle.js';
+import { resolveAppTargetScope } from '../services/app-lifecycle.js';
 import {
     writeAppDraft, replaceInAppDraft, readAppDraft, seedAppDraft,
     DRAFT_READ_DEFAULT_LINES, DRAFT_READ_MAX_LINES,
@@ -61,6 +61,8 @@ export function registerAppDraftEditTools(
         descriptionFor('aimeat_app_draft_write'),
         {
             filename: z.string().describe('App filename this draft stages (e.g. "pong.html").'),
+            owner: z.string().optional()
+                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
             content: z.string().describe('The text to write. Plain UTF-8, not base64.'),
             mode: z.enum(['append', 'replace']).optional()
                 .describe('append (default) adds to the end; replace overwrites the whole draft.'),
@@ -70,10 +72,12 @@ export function registerAppDraftEditTools(
             description: z.string().optional().describe('Description (defaults to the live app\'s, or the draft\'s once set).'),
         },
         annotationsFor('aimeat_app_draft_write'),
-        async ({ filename, content, mode, expected_size_bytes, name, description }) => {
+        async ({ filename, owner, content, mode, expected_size_bytes, name, description }) => {
             const agentGaii = getAgentGaii();
-            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            const scope = await resolveAppTargetScope(storage, config,
+                { principal: agentGaii, owner, filename, act: 'draft' });
             if (!scope) return fail('Failed to parse agent GAII');
+            if ('refusal' in scope) return fail(scope.refusal);
             try {
                 const out = await writeAppDraft(storage, config, {
                     ownerName: scope.ownerName,
@@ -108,16 +112,20 @@ export function registerAppDraftEditTools(
         descriptionFor('aimeat_app_draft_replace'),
         {
             filename: z.string().describe('App filename whose draft to edit.'),
+            owner: z.string().optional()
+                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
             old_string: z.string().describe('The exact text to replace, including indentation.'),
             new_string: z.string().describe('What to put there instead.'),
             replace_all: z.boolean().optional()
                 .describe('Replace every occurrence instead of requiring exactly one. Default false.'),
         },
         annotationsFor('aimeat_app_draft_replace'),
-        async ({ filename, old_string, new_string, replace_all }) => {
+        async ({ filename, owner, old_string, new_string, replace_all }) => {
             const agentGaii = getAgentGaii();
-            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            const scope = await resolveAppTargetScope(storage, config,
+                { principal: agentGaii, owner, filename, act: 'draft' });
             if (!scope) return fail('Failed to parse agent GAII');
+            if ('refusal' in scope) return fail(scope.refusal);
             try {
                 const out = await replaceInAppDraft(storage, config, {
                     ownerName: scope.ownerName,
@@ -147,15 +155,19 @@ export function registerAppDraftEditTools(
         descriptionFor('aimeat_app_draft_read'),
         {
             filename: z.string().describe('App filename whose draft to read.'),
+            owner: z.string().optional()
+                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
             offset: z.number().int().min(1).optional().describe('First line to return, 1-based. Default 1.'),
             limit: z.number().int().min(1).optional()
                 .describe(`How many lines to return. Default ${DRAFT_READ_DEFAULT_LINES}, maximum ${DRAFT_READ_MAX_LINES}.`),
         },
         annotationsFor('aimeat_app_draft_read'),
-        async ({ filename, offset, limit }) => {
+        async ({ filename, owner, offset, limit }) => {
             const agentGaii = getAgentGaii();
-            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            const scope = await resolveAppTargetScope(storage, config,
+                { principal: agentGaii, owner, filename, act: 'draft' });
             if (!scope) return fail('Failed to parse agent GAII');
+            if ('refusal' in scope) return fail(scope.refusal);
             try {
                 const out = await readAppDraft(storage, {
                     ownerName: scope.ownerName,
@@ -185,14 +197,18 @@ export function registerAppDraftEditTools(
         descriptionFor('aimeat_app_draft_seed'),
         {
             filename: z.string().describe('The draft slot to write into.'),
+            owner: z.string().optional()
+                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
             from_filename: z.string().optional().describe('The published app to copy from. Defaults to filename.'),
             version: z.number().int().min(1).optional().describe('Which published version. Defaults to the newest.'),
         },
         annotationsFor('aimeat_app_draft_seed'),
-        async ({ filename, from_filename, version }) => {
+        async ({ filename, owner, from_filename, version }) => {
             const agentGaii = getAgentGaii();
-            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            const scope = await resolveAppTargetScope(storage, config,
+                { principal: agentGaii, owner, filename, act: 'draft' });
             if (!scope) return fail('Failed to parse agent GAII');
+            if ('refusal' in scope) return fail(scope.refusal);
             try {
                 const out = await seedAppDraft(storage, config, {
                     ownerName: scope.ownerName,

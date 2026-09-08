@@ -34,6 +34,8 @@
  *   - putDevGrant / getDevGrant / removeDevGrant — the per-app right, on the roster row
  *   - putBlanketGrant / listBlanketGrants / removeBlanketGrant — "all my apps", in one place
  *   - effectiveDevLevel — the two sources, and which one wins
+ *   - isSharedApp — whether more than one person builds it, which is what the roadmap gate asks
+ *   - listRightsHeldBy / listAppsBuiltFor — what somebody may build that is not theirs
  *   - resolveAppTarget — the seam: which owner's bucket this act lands in, or a refusal
  * @usage
  *   const t = await resolveAppTarget(storage, config, { callerOwner, requestedOwner, filename, act: 'publish' });
@@ -341,6 +343,95 @@ export async function effectiveDevLevel(
   }
   const blanket = await getBlanketLevel(storage, owner, input.principal, now);
   return typeof blanket === 'number' ? { level: blanket, via: 'all' } : null;
+}
+
+/**
+ * What THIS person may build that is not theirs.
+ *
+ * Two shapes, because the two grants answer different questions: a per-app right names one app, and
+ * a blanket right names an owner and therefore every app they have. A listing needs both, and it
+ * needs them separately, because resolving "every app of theirs" is the catalogue's job and not
+ * this module's.
+ */
+export async function listRightsHeldBy(
+  storage: Storage, principal: string, now: Date = new Date(),
+): Promise<{ apps: Array<{ appId: string; level: number }>; owners: Array<{ owner: string; level: number }> }> {
+  const me = accountOf(principal);
+  const [memberRows, blanketRows] = await Promise.all([
+    storage.listAllMemory({ ownerPrefix: NS_MEMBER, prefix: 'appmember.', limit: 5000 }),
+    storage.listAllMemory({ ownerPrefix: NS_BLANKET, prefix: 'appdevall.', limit: 5000 }),
+  ]);
+  const apps = memberRows.items
+    .filter(r => r.ownerGaii === NS_MEMBER)
+    .map(r => r.value as AppMemberRecord)
+    .filter(v => v && v.owner === me && typeof v.dev === 'number' && isLive(v, now))
+    .map(v => ({ appId: v.appId, level: v.dev as number }));
+  const owners = blanketRows.items
+    .filter(r => r.ownerGaii === NS_BLANKET)
+    .map(r => r.value as AppDevBlanketGrant)
+    .filter(v => v && v.grantee === me && blanketLive(v, now))
+    .map(v => ({ owner: v.owner, level: v.level }));
+  return { apps, owners };
+}
+
+/**
+ * The apps this person may build that are not theirs, as catalogue rows.
+ *
+ * One implementation for both surfaces. The HTTP listing and the MCP tool answer the same question
+ * and reading it twice is how two doors start disagreeing about what a person can see.
+ *
+ * Resolved by asking what rights the caller holds and then reading exactly those apps, never by
+ * filtering the catalogue: one person's rights are a short list and the catalogue is not.
+ */
+export type BuiltForRow = Awaited<ReturnType<Storage['listApps']>>['apps'][number] & { devLevel: number };
+
+export async function listAppsBuiltFor(
+  storage: Storage, config: AimeatConfig,
+  input: { principal: string; viewerGhii?: string | undefined },
+): Promise<BuiltForRow[]> {
+  const held = await listRightsHeldBy(storage, input.principal);
+  const out: BuiltForRow[] = [];
+  const seen = new Set<string>();
+
+  for (const a of held.apps) {
+    const [o, f] = a.appId.split('/');
+    if (!o || !f) continue;
+    const row = await storage.getAppByOwnerName(o, f);
+    if (!row) continue;
+    seen.add(`${row.ownerName}/${row.filename}`.toLowerCase());
+    out.push({ ...row, devLevel: a.level });
+  }
+  for (const o of held.owners) {
+    const theirGhii = await resolveGhii(storage, o.owner, `${o.owner}@${config.nodeId}`);
+    const theirs = await storage.listApps({
+      ownerGaii: theirGhii, limit: 200, offset: 0,
+      ...(input.viewerGhii ? { viewerGhii: input.viewerGhii } : {}),
+    });
+    for (const row of theirs.apps) {
+      const key = `${row.ownerName}/${row.filename}`.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ ...row, devLevel: o.level });
+    }
+  }
+  // Never the caller's own: this answers "what am I helping with", and their own apps are the other
+  // question.
+  return out.filter(a => !input.viewerGhii || a.ownerGaii !== input.viewerGhii);
+}
+
+/**
+ * Is more than one person building this app?
+ *
+ * The question the roadmap gate asks, and it is asked of the APP rather than of the caller: an owner
+ * publishing alone owes a note to nobody, and the moment they invite somebody the note is the only
+ * thing that other person can read. A blanket grant counts, because it reaches this app too.
+ */
+export async function isSharedApp(
+  storage: Storage, owner: string, filename: string, now: Date = new Date(),
+): Promise<boolean> {
+  const perApp = await listDevGrants(storage, `${accountOf(owner)}/${filename}`, now);
+  if (perApp.length > 0) return true;
+  return (await listBlanketGrants(storage, owner, now)).length > 0;
 }
 
 // ── The seam ──────────────────────────────────────────────────────────────────────────────────────
