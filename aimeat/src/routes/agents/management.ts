@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 -- 2026-09-09 -- Five guards that could not fire are gone: four cross-owner 403s that sat
+ *     behind getAgentsByOwner (another owner's agent is a 404 from the lookup itself) and the
+ *     self-delete refusal, which the registeredBy rule already covers. A branch that cannot run
+ *     told the reader the door answers 403 where it answers 404.
  *   v1.6.1 -- 2026-09-08 -- Clearing agent CORS passes null so PostgreSQL clears the stored list.
  *   v1.6.0 -- 2026-09-06 -- PATCH scopes pushes scopes_changed down the live tunnel as well as
  *     emitting the tool-list change: an MCP session re-lists its tools on that signal, but a
@@ -344,12 +348,6 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       return;
     }
 
-    // Defense-in-depth: verify ownership even though getAgentsByOwner is scoped
-    if (agent.owner !== req.auth!.owner) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own agents'));
-      return;
-    }
-
     const updated = await storage.updateAgent(agent.gaii, { defaultScopes: scopes });
     if (!updated) {
       res.status(500).json(error(config.nodeId, 'INTERNAL', 'This one is on us — the permissions could not be saved. It is already reported; try again in a moment.'));
@@ -392,10 +390,6 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     const agent = agents.find(a => a.name === agentName);
     if (!agent) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent "${agentName}" not found under owner "${ownerName}"`));
-      return;
-    }
-    if (agent.owner !== req.auth!.owner) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own agents'));
       return;
     }
 
@@ -447,10 +441,6 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent "${agentName}" not found under owner "${ownerName}"`));
       return;
     }
-    if (agent.owner !== req.auth!.owner) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own agents'));
-      return;
-    }
 
     if (!isOwnerSession) {
       // The scope was already required at the door (requireRoleOrScope above, which is also what
@@ -459,15 +449,11 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       // creation, so it names the principal that actually asked for this agent — not whoever
       // reconnected it last. An agent with no entry (created before this field existed) is not
       // deletable this way at all, which is the safe direction: absence is not evidence of parentage.
+      // It is also what keeps an agent from deleting itself: registeredBy holds the owner's name or
+      // the approving sibling's GAII, never the agent's own, so a self-delete is refused here.
       if (agent.registeredBy !== req.auth!.sub) {
         res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
           `You may only delete agents you registered yourself. "${agentName}" was not registered under your authorization.`));
-        return;
-      }
-      // Nothing may delete itself: the caller would be revoking the credential mid-request, and an
-      // instance tearing itself down first has no principal left to clean up with.
-      if (agent.gaii === req.auth!.sub) {
-        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'An agent cannot delete itself'));
         return;
       }
     }
@@ -567,12 +553,6 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     const agent = agents.find(a => a.name === agentName);
     if (!agent) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent "${agentName}" not found`));
-      return;
-    }
-
-    // Defense-in-depth: verify ownership even though getAgentsByOwner is scoped
-    if (agent.owner !== req.auth!.owner) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own agents'));
       return;
     }
 
