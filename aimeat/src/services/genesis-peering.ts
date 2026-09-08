@@ -3,15 +3,16 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Service managing cross-federation "genesis" peerings — request/approve/suspend/remove
- *   peer records, aggregate a cross-node catalogue, and compute network-reach statistics.
+ *   peer records, and compute network-reach statistics. The cross-node catalogue is aggregated by
+ *   the route (routes/federation-genesis.ts), not here.
  *
  * @structure
- *   - GenesisPeeringService: interface for the peering lifecycle + catalogue/stats reads
+ *   - GenesisPeeringService: interface for the peering lifecycle + stats read
  *   - createGenesisPeeringService(config, storage): implementation enforcing maxGenesisPeers + uniqueness
- *   - getCrossCatalogue: merges local federate=true CSMs with active peer summaries
  *   - getNetworkStats: totals peers/organisms/owners/agents and derives networkReach
  *
  * @version-history
+ *   v1.1.0 — 2026-09-08 — getCrossCatalogue removed: no caller, the route builds its own aggregate.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { randomUUID } from 'node:crypto';
@@ -24,7 +25,6 @@ export interface GenesisPeeringService {
   approvePeering(id: string): Promise<GenesisPeerRecord | null>;
   suspendPeering(id: string): Promise<GenesisPeerRecord | null>;
   removePeering(id: string): Promise<boolean>;
-  getCrossCatalogue(): Promise<Record<string, unknown>[]>;
   getNetworkStats(): Promise<Record<string, unknown>>;
 }
 
@@ -70,38 +70,6 @@ export function createGenesisPeeringService(config: AimeatConfig, storage: Stora
 
     async removePeering(id) {
       return storage.deleteGenesisPeer(id);
-    },
-
-    async getCrossCatalogue() {
-      // Aggregate catalogues from all active genesis peers
-      const activePeers = await storage.listGenesisPeers({ status: 'active' });
-      const catalogues: Record<string, unknown>[] = [];
-
-      // Add local catalogue entries (only CSMs marked for federation)
-      const localCsms = await storage.listCsms();
-      for (const csm of localCsms) {
-        if (!csm.federate) continue; // Phase 3.4: only federate=true CSMs
-        catalogues.push({
-          type: 'csm',
-          name: csm.name,
-          serviceType: csm.serviceType,
-          sourceNode: config.nodeId,
-          federated: true,
-        });
-      }
-
-      // Add entries from active peers (in production, these would be fetched via sync)
-      for (const peer of activePeers) {
-        catalogues.push({
-          type: 'genesis_peer',
-          nodeId: peer.genesisNodeId,
-          url: peer.genesisUrl,
-          status: peer.status,
-          lastSyncAt: peer.lastSyncAt,
-        });
-      }
-
-      return catalogues;
     },
 
     async getNetworkStats() {

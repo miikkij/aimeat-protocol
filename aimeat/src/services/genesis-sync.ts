@@ -13,6 +13,8 @@
  *   - GenesisSyncResult: per-run tally (peers checked/updated/failed, entries fetched/stored/removed, hash)
  *
  * @version-history
+ *   v1.1.0 — 2026-09-08 — The stale-entry prune leaves the operator's subscription record and the
+ *     memory cache alone (they share the prefix), and stop() clears the initial timer too.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
@@ -51,6 +53,7 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
   }
 
   let intervalTimer: NodeJS.Timeout | null = null;
+  let initialTimer: NodeJS.Timeout | null = null;
 
   /**
    * Fetch catalogue from a genesis peer's cross-catalogue endpoint.
@@ -238,6 +241,12 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
     try {
       const existingEntries = await storage.listMemory(GENESIS_SYSTEM_GAII, { prefix: genesisPrefix });
       for (const existing of existingEntries) {
+        // Three things share the `genesis:{peer}:` prefix: the catalogue entries this prune is
+        // for, the operator's subscription record (PUT .../subscriptions) and the cross-genesis
+        // memory cache. Until 2026-09-08 the prune took all three, so a subscription lasted
+        // exactly one sync and syncSubscribedMemory, later in the same cycle, never saw one
+        // (e2e-genesis-federation).
+        if (existing.key.endsWith(':subscriptions') || (existing.tags ?? []).includes('genesis-cache')) continue;
         if (!incomingKeys.has(existing.key)) {
           await storage.deleteMemory(GENESIS_SYSTEM_GAII, existing.key);
           removed++;
@@ -442,8 +451,9 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
         }, nextMs);
       }
 
-      // Initial sync 30s after start (allow server startup to complete)
-      const initialTimer = setTimeout(() => {
+      // Initial sync 30s after start (allow server startup to complete). Kept so stop() can clear
+      // it: background-jobs.ts discards the returned handle.
+      initialTimer = setTimeout(() => {
         syncNow().catch(err => {
           logger.error('Genesis initial sync failed', { error: (err as Error).message });
         });
@@ -458,6 +468,10 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
       if (intervalTimer) {
         clearTimeout(intervalTimer);
         intervalTimer = null;
+      }
+      if (initialTimer) {
+        clearTimeout(initialTimer);
+        initialTimer = null;
       }
     },
 

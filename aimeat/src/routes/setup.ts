@@ -13,6 +13,8 @@
  *   - GET /v1/setup/wizard + POST /v1/setup/init: serve the wizard and provision the first owner
  *
  * @version-history
+ *   v1.4.0 -- 2026-09-08 -- The `anonymous` system owner does not count as an owner: in anonymous
+ *     mode a node nobody had set up reported itself configured and refused its own setup.
  *   v1.3.0 -- 2026-09-06 -- Review item 2.8: /v1/setup/init mints an OWNER session, which is what
  *     the wizard does with it. It used to put roles ['agent','owner','operator'] on a token whose
  *     `sub` was an agent GAII, with scopes omitted (so ['*']) -- the last invariant-12 mint.
@@ -66,7 +68,10 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
     // GET /v1/setup/status — Check if node needs setup
     router.get('/v1/setup/status', async (_req, res) => {
         try {
-            const owners = await storage.listOwners();
+            // The `anonymous` system owner is created at boot in anonymous mode and is nobody's:
+            // counting it told a brand-new node it was already configured (2026-09-08,
+            // e2e-setup-and-verification). owners.ts skips it the same way for the operator grant.
+            const owners = (await storage.listOwners()).filter(o => o.name !== 'anonymous');
             const needsSetup = owners.length === 0;
             res.json(success(config.nodeId, {
                 needsSetup,
@@ -101,7 +106,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
         if (!checkSetupIp(req, res)) return;
         try {
             // Guard: only works when no owners exist
-            const existingOwners = await storage.listOwners();
+            const existingOwners = (await storage.listOwners()).filter(o => o.name !== 'anonymous');
             if (existingOwners.length > 0) {
                 res.status(403).json(error(config.nodeId, 'ALREADY_CONFIGURED', 'This node is already configured. Setup can only run once.'));
                 return;

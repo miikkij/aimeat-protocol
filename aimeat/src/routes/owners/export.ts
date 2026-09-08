@@ -13,6 +13,10 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   v1.3.0 — 2026-09-08 — Three sections that existed for values nothing produced: organism
+ *     memberships and flags filed are keyed by the bare owner name where they are written and were
+ *     read by GHII only, and the consent audit trail skipped the pending buffer, so the last
+ *     minute was missing. All three found by e2e-owner-export.
  *   v1.2.0 — 2026-08-29 — The owner's OWN memory entries and storage files are in the export. They
  *     never were: memory and files were read inside the per-agent loop only, so the GHII namespace
  *     where an owner session actually writes was skipped entirely, and this route's own comment
@@ -32,6 +36,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal } from '../../auth/middleware.js';
 import { error, success } from '../../middleware/envelope.js';
 import { calculateTrustScore } from '../../services/trust.js';
+import { getPendingConsentAudit } from '../../services/consent-audit-buffer.js';
 
 /** Mount GET /v1/owners/:name/export on an existing router. */
 export function registerOwnerExportRoute(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -124,8 +129,15 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
 
       // Consent records granted by this agent
       const consentsGranted = await storage.listConsents(agent.gaii);
-      // Consent audit trail for this agent
-      const consentAudit = await storage.listConsentAudit(agent.gaii);
+      // Consent audit trail for this agent. Entries are buffered for up to a minute before they
+      // are stored (consent-audit-buffer.ts), so the pending queue is merged in the way
+      // GET /v1/consent/audit does; without it the trail handed to the person was missing
+      // everything from the last minute (2026-09-08, e2e-owner-export).
+      const consentAudit = [
+        ...getPendingConsentAudit(agent.gaii)
+          .sort((a, b) => (a.timestamp < b.timestamp ? 1 : a.timestamp > b.timestamp ? -1 : 0)),
+        ...await storage.listConsentAudit(agent.gaii),
+      ];
 
       // Flags filed by this agent (from the pre-loaded flag list)
       const flagsFiled = allFlags.filter(f => f.flaggedBy === agent.gaii).map(f => ({
@@ -416,7 +428,13 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
     // ── Organism memberships (via GHII) ─────────────────────────────
     let organismMemberships: unknown[] = [];
     if (ghii) {
-      const memberships = await storage.listMembershipsByGhii(ghii);
+      // Membership rows are written under the bare owner name (organism-lifecycle on create and
+      // join, workspace-access on an invitation) and were read here by GHII only, so this section
+      // was empty on every account (2026-09-08, e2e-owner-export). Both alphabets are read.
+      const byGhii = await storage.listMembershipsByGhii(ghii);
+      const byName = await storage.listMembershipsByGhii(name);
+      const seen = new Set(byGhii.map(m => m.organismId));
+      const memberships = [...byGhii, ...byName.filter(m => !seen.has(m.organismId))];
       const membershipExport = [];
       for (const mem of memberships) {
         const organism = await storage.getOrganism(mem.organismId);
@@ -449,7 +467,9 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
     let ghiiFlags: unknown[] = [];
     if (ghii) {
       const allFlags = await storage.listFlags();
-      ghiiFlags = allFlags.filter(f => f.flaggedBy === ghii).map(f => ({
+      // POST /v1/flags stamps flaggedBy with the bare account name on an owner session, so a
+      // filter on the GHII alone matched nothing (2026-09-08, e2e-owner-export).
+      ghiiFlags = allFlags.filter(f => f.flaggedBy === ghii || f.flaggedBy === name).map(f => ({
         id: f.id,
         target_type: f.targetType,
         target_id: f.targetId,

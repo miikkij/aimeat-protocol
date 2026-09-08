@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Federated memory browsing routes: pull, push-home, list-home (federated sessions) + list-remote, pull-remote (home users). Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-08 — push-home signs the replicate payload with the node key, over the seven
+ *     fields the receiving door verifies. It had sent none, so it could not land on a real node.
  *   v1.1.0 — 2026-08-10 — Security audit H-15: list-home and list-remote sign the peer memory-list request
  *     with this node's key, matching the verification the receiving end now performs.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
@@ -181,7 +183,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
     const replicateUrl = `${resolvedUrl.replace(/\/+$/, '')}/v1/federation/replicate`;
 
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         source_node: config.nodeId,
         gaii: `${req.auth!.owner}@${homeNode}`,
         key,
@@ -191,6 +193,17 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
         timestamp: record.updatedAt,
         tags: record.tags ?? [],
       };
+      // Signed over the same seven fields the receiving door verifies (federation-sync/messaging.ts,
+      // P1-11) and services/memory-replication.ts signs. Until 2026-09-08 this door sent no
+      // signature at all, so a push-home could never land on a real node; the receiving door's
+      // answer is 401 "Missing signature on replication request". Found by e2e-federated-session.
+      const nodeKey = await storage.getNodeKey();
+      if (nodeKey) {
+        payload.signature = await sign(nodeKey.privateKey, JSON.stringify({
+          source_node: payload.source_node, gaii: payload.gaii, key, value: record.value,
+          visibility: record.visibility, version: record.version, timestamp: record.updatedAt,
+        }));
+      }
 
       const response = await fetch(replicateUrl, {
         method: 'POST',

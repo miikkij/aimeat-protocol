@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-08 — export with ?agent is an owner-session door like its three neighbours;
+ *     an agent could export a sibling's keyspace by naming it.
  *   v1.1.0 — 2026-08-10 — Security audit H-11: export and bundle enforce memory:read, matching the
  *     list and single-key reads. They returned full values to any token in the owner bucket.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
@@ -136,6 +138,13 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     let gaii = req.auth!.sub;
     const agentParam = req.query.agent as string | undefined;
     if (agentParam && agentParam !== gaii) {
+      // The same rule as bulk, import and bulk-delete: naming a target agent is an owner-session
+      // door. Until 2026-09-08 this one lacked that half, so an agent holding memory:read could
+      // export a sibling agent's whole keyspace by naming it (e2e-memory-doors).
+      if (!isOwnerSession) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only owner sessions may export memory of a specific agent'));
+        return;
+      }
       const targetAgent = await storage.getAgent(agentParam);
       if (!targetAgent || targetAgent.owner !== req.auth!.owner) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only export memory of your own agents'));

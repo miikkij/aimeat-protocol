@@ -6,6 +6,8 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-09-08 — A signed attestation with `verified: false` is a refusal (401), not a
+ *     session: the field had been parsed and never read.
  *   v1.6.0 — 2026-09-01 — Federated login verifies the home node's attestation UNCONDITIONALLY. It
  *     read `if (homePeer.publicKey && attestation.signature)`, so the two ways of having nothing to
  *     check were the two ways of skipping it: a peer with no pinned key, or a reply with no
@@ -480,6 +482,14 @@ export function registerRegisterLoginRoutes(
                     });
                     res.status(401).json(error(config.nodeId, 'INVALID_ATTESTATION',
                         'The reply from your home node is not signed by the key this node holds for it.'));
+                    return;
+                }
+                // The signature proves who answered; `verified` is what they answered. A home node
+                // says "wrong password" with a signed { verified: false }, and until 2026-09-08 that
+                // still minted a session because only `ghii` was read (e2e-federated-session).
+                if (attestation.verified !== true) {
+                    res.status(401).json(error(config.nodeId, 'FEDERATION_AUTH_FAILED',
+                        'Your home node did not verify these credentials.'));
                     return;
                 }
 

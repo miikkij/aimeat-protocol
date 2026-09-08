@@ -19,11 +19,16 @@
  *   fake-oauth-provider.ts does: single-flight refresh is only provable against a provider that
  *   behaves this way, and it counts what it was asked for so a test can assert ONCE rather than
  *   infer it from the absence of an error.
- * @structure FakeUpstreams (the recorder and its knobs) · installFakeUpstreams() · route() and one
- *   handler per host
+ * @structure FakeUpstreams (the recorder and its knobs) · installFakeUpstreams() · tokenEndpoint ·
+ *   gmail · graph · mastodonPublishing · youtubeResumable · route() and one branch per host
  * @usage const { up, restore } = installFakeUpstreams(); try { ... } finally { restore(); }
  * @version-history
  *   v1.0.0 — 2026-09-08 — Initial, for test/e2e-mail-connections.ts.
+ *   v1.1.0 — 2026-09-08 — The publishing and metric surfaces, for test/e2e-publish-upstreams.ts:
+ *     Mastodon media with its transcode wait, YouTube's stateful resumable session and its resume
+ *     probe, Bluesky createRecord and getPostThread, the LinkedIn image pair, and the metric reads
+ *     of all four. A recorded call now carries its byte count and its multipart form, because a
+ *     chunked upload is proven by the size of each chunk rather than by its text.
  */
 
 /** One request the node made, as the upstream saw it. */
@@ -34,6 +39,17 @@ export interface RecordedCall {
   host: string;
   headers: Record<string, string>;
   body: string;
+  /**
+   * How many bytes the body carried, whatever its shape. `body` is the text of it and is empty for
+   * a multipart form or a chunk of binary, which is exactly where the interesting assertion is: a
+   * resumable upload is proven by the SIZE of each chunk and the range that announced it.
+   */
+  bodyBytes: number;
+  /**
+   * The multipart form itself, when one was sent. `body` cannot carry it: reading a Blob is async
+   * and the recorder is not, so the form is kept and each handler reads what it needs.
+   */
+  form?: FormData;
 }
 
 /** What Graph was handed on a send, already parsed. */
@@ -60,6 +76,12 @@ export interface FakeUpstreams {
     graphSends: number;
     revocations: number;
     instanceRegistrations: number;
+    /** Media uploads offered to a Mastodon instance. */
+    mastodonMediaUploads: number;
+    /** GETs of an uploaded Mastodon medium, which is how a transcode is waited out. */
+    mastodonMediaPolls: number;
+    /** Resumable upload sessions YouTube handed out. */
+    youtubeSessions: number;
   };
   /** The mailbox every identity lookup reports. Change it to connect a SECOND account. */
   mailbox: string;
@@ -80,6 +102,74 @@ export interface FakeUpstreams {
   lastGraphSend: GraphSend | null;
   lastLinkedinPost: Record<string, unknown> | null;
   lastXPost: Record<string, unknown> | null;
+
+  // ── Publishing and metrics ────────────────────────────────────────────────────
+  // Every `…Status` below forces ONE answer and then clears itself, so a failure knob cannot leak
+  // into the next test and be diagnosed as a defect in whatever ran after it.
+
+  /** Force POST /api/v2/media to this status. 422 is the instance refusing the FILE. */
+  mastodonMediaStatus: number | null;
+  /** Answer the media upload with no id at all, which is the temporary refusal. */
+  mastodonMediaNoId: boolean;
+  /**
+   * How many GETs of the medium a transcode costs. 0 answers the upload 200 and there is no wait;
+   * 2 answers it 202 and then 206, 200 — the case a status posted too early loses its video to.
+   */
+  mastodonTranscodePolls: number;
+  /** Counts down from mastodonTranscodePolls as the polls arrive. Set by the media upload. */
+  mastodonPollsRemaining: number;
+  /** Force the next transcode poll to this status. */
+  mastodonPollStatus: number | null;
+  /** Force POST /api/v1/statuses to this status. */
+  mastodonStatusStatus: number | null;
+  /** Force GET /api/v1/statuses/{id}, the metric read, to this status. */
+  mastodonMetricsStatus: number | null;
+  /** What the multipart media upload carried. */
+  lastMastodonMedia: { name: string; size: number; type: string; description: string | null } | null;
+
+  /** Force the resumable-upload start to this status. */
+  youtubeStartStatus: number | null;
+  /** Start the upload without naming a session, which leaves the client with nowhere to PUT. */
+  youtubeNoLocation: boolean;
+  /** How the NEXT session behaves: accept the chunks, fail one and be resumed, or be expired. */
+  youtubeSessionMode: 'ok' | 'fail-once' | 'expired';
+  /** What the resume probe claims arrived. The client's next offset can only come from here. */
+  youtubeResumeOffset: number;
+  /** The sessions handed out, by id, so a test can see which mode each one carried. */
+  youtubeSessionsById: Map<string, { mode: 'ok' | 'fail-once' | 'expired'; total: number; failed: boolean }>;
+  /** Force GET /youtube/v3/videos, the metric read, to this status. */
+  youtubeVideosStatus: number | null;
+  /** Answer the metric read with a video that carries no statistics block. */
+  youtubeNoStatistics: boolean;
+
+  /** Force com.atproto.repo.createRecord to this status. */
+  blueskyPostStatus: number | null;
+  /** Force app.bsky.feed.getPostThread to this status. */
+  blueskyThreadStatus: number | null;
+  /** Report the thread with neither repostCount nor quoteCount, which must read as null not zero. */
+  blueskyOmitShareCounts: boolean;
+
+  /** Force POST /2/tweets to this status. */
+  xPostStatus: number | null;
+  /** Accept the post and name no id, which costs the permalink and not the post. */
+  xPostNoId: boolean;
+  /** Force GET /2/tweets/{id}, the metric read, to this status. */
+  xMetricsStatus: number | null;
+  /** Answer the metric read with a post carrying no public_metrics. */
+  xMetricsEmpty: boolean;
+
+  /** Force the image upload's initialisation to this status. */
+  linkedinImageInitStatus: number | null;
+  /** Initialise an image upload without saying where to put the bytes. */
+  linkedinImageInitEmpty: boolean;
+  /** Force the PUT of the image bytes to this status. */
+  linkedinImagePutStatus: number | null;
+  /** Force POST /rest/posts to this status. */
+  linkedinPostStatus: number | null;
+  /** Publish the post and return no urn header, which is a success with no link. */
+  linkedinPostNoUrn: boolean;
+  /** What the image PUT carried. */
+  lastLinkedinImage: { contentType: string; bytes: number } | null;
   /** Refresh tokens this fake has retired. Presenting one is the failure single-flight prevents. */
   retired: Set<string>;
   /** A marker into `calls`, so a test can ask what happened since a point. */
@@ -111,6 +201,16 @@ function bodyText(body: RequestInit['body']): string {
   return '';
 }
 
+/** How many bytes the body was, whatever its shape. A multipart form reports 0: it is kept whole. */
+function bodySize(body: RequestInit['body']): number {
+  if (body === null || body === undefined) return 0;
+  if (typeof body === 'string') return Buffer.byteLength(body);
+  if (body instanceof URLSearchParams) return Buffer.byteLength(body.toString());
+  if (ArrayBuffer.isView(body)) return body.byteLength;
+  if (body instanceof ArrayBuffer) return body.byteLength;
+  return 0;
+}
+
 /** Header names lowercased, so an assertion does not depend on how the caller spelled one. */
 function headerMap(init: RequestInit['headers']): Record<string, string> {
   const out: Record<string, string> = {};
@@ -135,6 +235,7 @@ export function installFakeUpstreams(): { up: FakeUpstreams; restore: () => void
     stats: {
       tokenExchanges: 0, refreshes: 0, staleRefreshAttempts: 0,
       gmailSends: 0, graphSends: 0, revocations: 0, instanceRegistrations: 0,
+      mastodonMediaUploads: 0, mastodonMediaPolls: 0, youtubeSessions: 0,
     },
     mailbox: 'owner@mail.example.test',
     aliases: [
@@ -151,6 +252,40 @@ export function installFakeUpstreams(): { up: FakeUpstreams; restore: () => void
     lastGraphSend: null,
     lastLinkedinPost: null,
     lastXPost: null,
+
+    mastodonMediaStatus: null,
+    mastodonMediaNoId: false,
+    mastodonTranscodePolls: 0,
+    mastodonPollsRemaining: 0,
+    mastodonPollStatus: null,
+    mastodonStatusStatus: null,
+    mastodonMetricsStatus: null,
+    lastMastodonMedia: null,
+
+    youtubeStartStatus: null,
+    youtubeNoLocation: false,
+    youtubeSessionMode: 'ok',
+    youtubeResumeOffset: 1024 * 1024,
+    youtubeSessionsById: new Map(),
+    youtubeVideosStatus: null,
+    youtubeNoStatistics: false,
+
+    blueskyPostStatus: null,
+    blueskyThreadStatus: null,
+    blueskyOmitShareCounts: false,
+
+    xPostStatus: null,
+    xPostNoId: false,
+    xMetricsStatus: null,
+    xMetricsEmpty: false,
+
+    linkedinImageInitStatus: null,
+    linkedinImageInitEmpty: false,
+    linkedinImagePutStatus: null,
+    linkedinPostStatus: null,
+    linkedinPostNoUrn: false,
+    lastLinkedinImage: null,
+
     retired: new Set<string>(),
     mark() { return up.calls.length; },
     since(mark: number) { return up.calls.slice(mark); },
@@ -169,6 +304,8 @@ export function installFakeUpstreams(): { up: FakeUpstreams; restore: () => void
       host: url.hostname,
       headers: headerMap(init.headers),
       body: bodyText(init.body),
+      bodyBytes: bodySize(init.body),
+      ...(init.body instanceof FormData ? { form: init.body } : {}),
     };
     up.calls.push(call);
     const answer = await route(up, url, call);
@@ -337,6 +474,120 @@ function graph(up: FakeUpstreams, url: URL, call: RecordedCall): Response | null
   return null;
 }
 
+/**
+ * A Mastodon instance's publishing and metric surface.
+ *
+ * THE 202 IS THE WHOLE REASON THIS IS NOT THREE LINES. An instance that is still transcoding
+ * answers the upload 202 and the medium's GET 206, and a status posted with that id lands with no
+ * video on it — successful to everyone including the node, and empty to a reader. The knobs make
+ * that sequence reproducible instead of describable.
+ */
+function mastodonPublishing(up: FakeUpstreams, url: URL, call: RecordedCall): Response | null {
+  const path = url.pathname;
+
+  if (call.method === 'POST' && path === '/api/v2/media') {
+    up.stats.mastodonMediaUploads++;
+    const forced = up.mastodonMediaStatus;
+    up.mastodonMediaStatus = null;
+    if (forced) return json({ error: 'Validation failed: File content type is invalid' }, forced);
+    const file = call.form?.get('file');
+    const description = call.form?.get('description');
+    up.lastMastodonMedia = {
+      name: file instanceof Blob ? (file as File).name : '',
+      size: file instanceof Blob ? file.size : 0,
+      type: file instanceof Blob ? file.type : '',
+      description: typeof description === 'string' ? description : null,
+    };
+    if (up.mastodonMediaNoId) return json({ type: 'video' });
+    const id = nextId('mastomedia');
+    if (up.mastodonTranscodePolls > 0) {
+      up.mastodonPollsRemaining = up.mastodonTranscodePolls;
+      // 202: accepted, not ready. The id is real and the file behind it is not there yet.
+      return json({ id, type: 'video', url: null }, 202);
+    }
+    return json({ id, type: 'image', url: 'https://mastodon.social/media/ready' });
+  }
+
+  const medium = /^\/api\/v1\/media\/([^/]+)$/.exec(path);
+  if (medium) {
+    up.stats.mastodonMediaPolls++;
+    const forced = up.mastodonPollStatus;
+    up.mastodonPollStatus = null;
+    if (forced) return json({ error: 'processing failed' }, forced);
+    up.mastodonPollsRemaining = Math.max(0, up.mastodonPollsRemaining - 1);
+    if (up.mastodonPollsRemaining > 0) return json({ id: medium[1], url: null }, 206);
+    return json({ id: medium[1], url: 'https://mastodon.social/media/ready' });
+  }
+
+  if (call.method === 'POST' && path === '/api/v1/statuses') {
+    const forced = up.mastodonStatusStatus;
+    up.mastodonStatusStatus = null;
+    if (forced) return json({ error: 'Validation failed: Text character limit exceeded' }, forced);
+    const id = String(1100000000 + ++counter);
+    return json({ id, url: `https://mastodon.social/@tester/${id}`, created_at: '2026-09-08T09:00:00Z' });
+  }
+
+  const status = /^\/api\/v1\/statuses\/(\d+)$/.exec(path);
+  if (status) {
+    const forced = up.mastodonMetricsStatus;
+    up.mastodonMetricsStatus = null;
+    if (forced) return json({ error: 'This action is not allowed' }, forced);
+    return json({
+      id: status[1], url: `https://mastodon.social/@tester/${status[1]}`,
+      favourites_count: 9, replies_count: 4, reblogs_count: 3,
+    });
+  }
+
+  return null;
+}
+
+/**
+ * YouTube's resumable upload, which is a protocol rather than a request.
+ *
+ * The session is stateful on purpose: the client's next offset must come from the SERVER's account
+ * of what arrived, and a fake that echoed the client's own numbers back would let a resume that
+ * corrupts the file pass. `youtubeResumeOffset` is deliberately not a chunk boundary.
+ */
+function youtubeResumable(up: FakeUpstreams, url: URL, call: RecordedCall): Response | null {
+  if (call.method === 'POST' && url.pathname === '/upload/youtube/v3/videos') {
+    up.stats.youtubeSessions++;
+    const forced = up.youtubeStartStatus;
+    up.youtubeStartStatus = null;
+    if (forced) return json({ error: { message: 'the upload was not started' } }, forced);
+    if (up.youtubeNoLocation) return json({});
+    const id = nextId('ytsession');
+    up.youtubeSessionsById.set(id, {
+      mode: up.youtubeSessionMode,
+      total: Number(call.headers['x-upload-content-length'] ?? '0'),
+      failed: false,
+    });
+    // 200 with a location, NOT a redirect: safeFetch follows a 3xx and would swallow the session.
+    return json({}, 200, { location: `https://www.googleapis.com/upload/session/${id}` });
+  }
+
+  const session = /^\/upload\/session\/([^/]+)$/.exec(url.pathname);
+  if (!session) return null;
+  const state = up.youtubeSessionsById.get(session[1]);
+  if (!state) return json({ error: { message: 'no such session' } }, 404);
+  // An expired session answers every PUT the same way, the resume probe included: there is nothing
+  // left to resume into.
+  if (state.mode === 'expired') return json({ error: { message: 'session expired' } }, 404);
+
+  const range = call.headers['content-range'] ?? '';
+  if (/^bytes \*\/\d+$/.test(range)) {
+    // THE RESUME QUERY. The answer is the server's own account, and the client must take it.
+    return new Response(null, { status: 308, headers: { range: `bytes=0-${up.youtubeResumeOffset - 1}` } });
+  }
+  const chunk = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(range);
+  if (!chunk) return json({ error: { message: `unusable Content-Range: ${range}` } }, 400);
+  if (state.mode === 'fail-once' && !state.failed) {
+    state.failed = true;
+    return json({ error: { message: 'backend error' } }, 500);
+  }
+  if (Number(chunk[2]) + 1 >= Number(chunk[3])) return json({ id: nextId('ytvideo'), kind: 'youtube#video' });
+  return new Response(null, { status: 308, headers: { range: `bytes=0-${chunk[2]}` } });
+}
+
 /** Everything, dispatched by host. Returns null when this host has nothing at that path. */
 async function route(up: FakeUpstreams, url: URL, call: RecordedCall): Promise<Response | null> {
   const host = url.hostname;
@@ -365,19 +616,53 @@ async function route(up: FakeUpstreams, url: URL, call: RecordedCall): Promise<R
     if (path === '/youtube/v3/channels') {
       return json({ items: [{ id: 'UCfake0001', snippet: { title: 'The Test Channel' } }] });
     }
-    return null;
+    if (path === '/youtube/v3/videos') {
+      const forced = up.youtubeVideosStatus;
+      up.youtubeVideosStatus = null;
+      if (forced) return json({ error: { message: 'the video was not read' } }, forced);
+      const id = url.searchParams.get('id') ?? '';
+      if (up.youtubeNoStatistics) return json({ items: [{ id }] });
+      // STRINGS, which is what YouTube actually answers and the reason ns() exists.
+      return json({
+        items: [{
+          id,
+          statistics: { viewCount: '4210', likeCount: '87', commentCount: '12', favoriteCount: '0' },
+        }],
+      });
+    }
+    return youtubeResumable(up, url, call);
   }
 
   if (host === 'www.linkedin.com') {
     if (path === '/oauth/v2/accessToken') return tokenEndpoint(up, call);
     if (path === '/oauth/v2/revoke') { up.stats.revocations++; return json({}); }
+    // The bytes go to a host LinkedIn names in its own answer, not to a fixed endpoint.
+    if (path.startsWith('/dms-uploads/')) {
+      const forced = up.linkedinImagePutStatus;
+      up.linkedinImagePutStatus = null;
+      if (forced) return json({ message: 'the image was not stored' }, forced);
+      up.lastLinkedinImage = { contentType: call.headers['content-type'] ?? '', bytes: call.bodyBytes };
+      return new Response(null, { status: 201 });
+    }
     return null;
   }
 
   if (host === 'api.linkedin.com') {
     if (path === '/v2/userinfo') return json({ sub: 'li-member-0001', name: 'A Member' });
+    if (path === '/rest/images') {
+      const forced = up.linkedinImageInitStatus;
+      up.linkedinImageInitStatus = null;
+      if (forced) return json({ message: 'the upload was not initialised' }, forced);
+      if (up.linkedinImageInitEmpty) return json({ value: {} });
+      const id = nextId('liimage');
+      return json({ value: { uploadUrl: `https://www.linkedin.com/dms-uploads/${id}`, image: `urn:li:image:${id}` } });
+    }
     if (path === '/rest/posts') {
+      const forced = up.linkedinPostStatus;
+      up.linkedinPostStatus = null;
+      if (forced) return json({ message: 'the post was refused' }, forced);
       up.lastLinkedinPost = JSON.parse(call.body || '{}') as Record<string, unknown>;
+      if (up.linkedinPostNoUrn) return new Response(null, { status: 201 });
       return new Response(null, { status: 201, headers: { 'x-restli-id': 'urn:li:share:777' } });
     }
     return null;
@@ -388,8 +673,27 @@ async function route(up: FakeUpstreams, url: URL, call: RecordedCall): Promise<R
     if (path === '/2/oauth2/revoke') { up.stats.revocations++; return json({}); }
     if (path === '/2/users/me') return json({ data: { id: 'x-user-0001', username: 'testhandle' } });
     if (path === '/2/tweets') {
+      const forced = up.xPostStatus;
+      up.xPostStatus = null;
+      if (forced) return json({ title: 'refused', detail: 'X would not take that post' }, forced);
       up.lastXPost = JSON.parse(call.body || '{}') as Record<string, unknown>;
+      if (up.xPostNoId) return json({ data: { text: 'ok' } });
       return json({ data: { id: '1900000000000000001', text: 'ok' } });
+    }
+    const tweet = /^\/2\/tweets\/(\d+)$/.exec(path);
+    if (tweet) {
+      const forced = up.xMetricsStatus;
+      up.xMetricsStatus = null;
+      if (forced) return json({ title: 'not read', detail: 'the numbers were not read' }, forced);
+      if (up.xMetricsEmpty) return json({ data: { id: tweet[1] } });
+      return json({
+        data: {
+          id: tweet[1],
+          public_metrics: {
+            impression_count: 1840, like_count: 23, reply_count: 5, retweet_count: 4, quote_count: 2,
+          },
+        },
+      });
     }
     return null;
   }
@@ -404,7 +708,7 @@ async function route(up: FakeUpstreams, url: URL, call: RecordedCall): Promise<R
     if (path === '/api/v1/accounts/verify_credentials') {
       return json({ id: '110001', acct: 'tester', username: 'tester' });
     }
-    return null;
+    return mastodonPublishing(up, url, call);
   }
 
   if (host === 'bsky.social') {
@@ -412,6 +716,29 @@ async function route(up: FakeUpstreams, url: URL, call: RecordedCall): Promise<R
       return json({
         accessJwt: nextId('bsky-access'), refreshJwt: nextId('bsky-refresh'),
         did: 'did:plc:faketester', handle: 'tester.bsky.social',
+      });
+    }
+    if (path === '/xrpc/com.atproto.repo.createRecord') {
+      const forced = up.blueskyPostStatus;
+      up.blueskyPostStatus = null;
+      if (forced) return json({ error: 'InvalidRequest', message: 'the record was refused' }, forced);
+      const rkey = nextId('bskypost');
+      return json({ uri: `at://did:plc:faketester/app.bsky.feed.post/${rkey}`, cid: 'bafyfakecid' });
+    }
+    if (path === '/xrpc/app.bsky.feed.getPostThread') {
+      const forced = up.blueskyThreadStatus;
+      up.blueskyThreadStatus = null;
+      if (forced) return json({ error: 'NotFound', message: 'the post was not found' }, forced);
+      return json({
+        thread: {
+          post: {
+            uri: url.searchParams.get('uri'),
+            likeCount: 12, replyCount: 3,
+            // Absent on purpose under the knob: two missing share counts must read as null, and a
+            // fake that always reports them cannot tell null from zero apart.
+            ...(up.blueskyOmitShareCounts ? {} : { repostCount: 5, quoteCount: 2 }),
+          },
+        },
       });
     }
     return null;

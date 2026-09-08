@@ -13,6 +13,10 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-16 — rebuildIndex batches owner-agents + consents (was O(owners×agents))
+ *   v1.2.0 — 2026-09-08 — A person's location is read in the shape its own schema documents
+ *     (`geo: [lat, lon]`) as well as `lat`/`lon`; radius queries had skipped everyone who filled
+ *     the field in as told. A federation consent the person granted themselves (owner session,
+ *     stored under the GHII) opts them in; only an agent's grant had counted.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -173,7 +177,12 @@ export class DirectoryService {
     const agentsByOwner = await this.storage.getAgentsByOwners([...new Set(ghiis.map(g => g.ownerName))]);
     tracePhase('getAgentsByOwners');
     const allAgentGaiis = Object.values(agentsByOwner).flat().map(a => a.gaii);
-    const consentsByAgent = await this.storage.listConsentsForAgents(allAgentGaiis, { status: 'active' });
+    // The person's own grant (an owner session writes consent under the GHII) counts as well as
+    // one of their agents': until 2026-09-08 only agent-granted consent was read, so a consent
+    // given from the profile page never reached the directory (e2e-directory-index).
+    const consentsByAgent = await this.storage.listConsentsForAgents(
+      [...allAgentGaiis, ...ghiis.map(g => g.ghii)], { status: 'active' },
+    );
     tracePhase('listConsentsForAgents');
 
     for (const ghii of ghiis) {
@@ -182,10 +191,12 @@ export class DirectoryService {
         const agents = agentsByOwner[ghii.ownerName] ?? [];
         if (agents.length === 0) continue;
 
-        // Check for federation consent on any of the owner's agents
-        let hasFederationConsent = false;
-        let consentAgentGaii = '';
+        // Check for federation consent by the person, then on any of the owner's agents
+        const isFederation = (c: { scope: string; status: string }) => c.scope === 'federation' && c.status === 'active';
+        let hasFederationConsent = (consentsByAgent[ghii.ghii] ?? []).some(isFederation);
+        let consentAgentGaii = hasFederationConsent ? agents[0].gaii : '';
         for (const agent of agents) {
+          if (hasFederationConsent) break;
           const consents = consentsByAgent[agent.gaii] ?? [];
           const federationConsent = consents.find(
             c => c.scope === 'federation' && c.status === 'active',
@@ -238,6 +249,14 @@ export class DirectoryService {
           if (typeof loc.country === 'string') country = loc.country;
           if (typeof loc.lat === 'number') lat = loc.lat;
           if (typeof loc.lon === 'number') lon = loc.lon;
+          // The locked schema for profile.*.location (profile-schemas.ts) documents the coordinates
+          // as `geo: [latitude, longitude]`, the shape the organism branch below already reads;
+          // until 2026-09-08 a person who filled the field in as documented was indexed with no
+          // coordinates and skipped by every radius query (e2e-directory-index).
+          if (Array.isArray(loc.geo) && typeof loc.geo[0] === 'number' && typeof loc.geo[1] === 'number') {
+            if (lat === undefined) lat = loc.geo[0];
+            if (lon === undefined) lon = loc.geo[1];
+          }
         }
 
         const entry: DirectoryEntry = {

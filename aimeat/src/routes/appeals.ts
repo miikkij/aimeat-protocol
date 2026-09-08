@@ -11,6 +11,10 @@
  *   - appealsRouter(config, storage): POST /v1/flags/:flagId/appeal, GET /v1/appeals, POST /v1/appeals/:id/review
  *
  * @version-history
+ *   2026-09-08 — Two identities read in the wrong alphabet: the organism-admin arms compared
+ *     admins[] (bare owner names) to a GHII and never matched, and a memory flag's `gaii::key`
+ *     target was looked up whole as a key, so the record's owner could not appeal. Both found by
+ *     e2e-appeals the first day the routes were driven.
  *   Appeal reason limit 1 000 → 10 000 — 2026-07-30 — the gate was tighter than the spec promised (2 000).
  *   v1.1.0 — 2026-07-16 — review response reads the related flag once (was getFlag twice in one hint)
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -22,6 +26,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -38,8 +43,15 @@ async function getContentOwner(
 ): Promise<string | null> {
     switch (targetType) {
         case 'memory': {
-            // targetId format: could be the memory key — need agent context
-            // Memory records are keyed by `${gaii}::${key}`, we search all
+            // A flag on memory carries `${ownerGaii}::${key}` (that is what POST /v1/flags stores),
+            // and until 2026-09-08 the whole string was looked up as a key, so the owner of the
+            // flagged record was never found and could not appeal (e2e-appeals). A bare key is
+            // still accepted and searched across every agent.
+            if (targetId.includes('::')) {
+                const sep = targetId.indexOf('::');
+                const direct = await storage.getMemory(targetId.slice(0, sep), targetId.slice(sep + 2));
+                if (direct) return direct.ownerGaii;
+            }
             const agents = await storage.listAgents();
             for (const agent of agents) {
                 const mem = await storage.getMemory(agent.gaii, targetId);
@@ -101,13 +113,14 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        // Verify the caller is the content owner
+        // Verify the caller is the content owner. An owner session's `sub` is the bare account
+        // name while memory is owned by the GHII, so the resolved identity is compared as well.
         const caller = req.auth!.sub;
         const contentOwner = await getContentOwner(storage, flag.targetType, flag.targetId);
 
         // Also check by owner name (for owner-level tokens)
         const callerOwner = req.auth!.owner;
-        let isOwner = contentOwner === caller;
+        let isOwner = contentOwner === caller || contentOwner === resolveIdentity(req.auth!, config.nodeId);
 
         // If content owner is an agent GAII, check if the caller's owner matches the agent's owner
         if (!isOwner && contentOwner) {
@@ -171,7 +184,10 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
             adminOrgIds = new Set<string>();
             const allOrganisms = await storage.listOrganisms();
             for (const org of allOrganisms) {
-                if (org.admins.includes(callerGhii)) {
+                // admins[] holds the bare owner name everywhere it is written (organism-lifecycle,
+                // membership, workspace-access); comparing it to the GHII alone matched nothing, so
+                // the organism-admin arm was unreachable until 2026-09-08 (e2e-appeals).
+                if (org.admins.includes(callerGhii) || org.admins.includes(req.auth!.owner as string)) {
                     adminOrgIds.add(org.id);
                 }
             }
@@ -249,7 +265,8 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
                     const organism = await storage.getOrganism(orgMatch[1]);
                     if (organism) {
                         const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner);
-                        if (ghiiRecord && organism.admins.includes(ghiiRecord.ghii)) {
+                        if (organism.admins.includes(req.auth!.owner as string)
+                            || (ghiiRecord && organism.admins.includes(ghiiRecord.ghii))) {
                             isOrganismAdmin = true;
                         }
                     }
