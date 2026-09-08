@@ -16,6 +16,11 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-13 — Wire + internal types extracted to ./realtime-types.ts (max-file-lines)
+ *   v1.2.0 — 2026-09-08 — Deleted two members nothing called: getRoomCount() (getStats().rooms is
+ *     the reader everywhere) and loadYjsSnapshot() (the reload half of a persistence path whose
+ *     write half runs on shutdown only). Found while writing test/e2e-realtime-rooms.ts, the first
+ *     suite in this repo to open a realtime socket at all. Until it, 23 of this class's 28 members
+ *     ran in no test, which is how two of them could be dead without anybody noticing.
  */
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
@@ -519,10 +524,6 @@ export class RealtimeManager {
     return this.rooms.get(roomId) ?? null;
   }
 
-  getRoomCount(): number {
-    return this.rooms.size;
-  }
-
   // ── Cleanup ──
 
   startCleanupJob(): void {
@@ -582,12 +583,6 @@ export class RealtimeManager {
         });
       }
     }
-  }
-
-  async loadYjsSnapshot(roomId: string, docId: string, createdBy: string): Promise<string | null> {
-    const key = `realtime.yjs.${roomId}.${docId}`;
-    const record = await this.storage.getMemory(createdBy, key);
-    return record ? (record.value as string) : null;
   }
 
   // ── Metrics ──

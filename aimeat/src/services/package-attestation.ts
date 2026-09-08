@@ -63,7 +63,7 @@ export interface AttestationDoc {
     signature: string;
 }
 
-/** sha256 of a UTF-8 string, hex, the same shape package-hash and the registrar use. */
+/** sha256 of a UTF-8 string, hex, the same shape the registrar uses. */
 function sha256(text: string): string {
     return createHash('sha256').update(text, 'utf-8').digest('hex');
 }
