@@ -22,6 +22,8 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-08 — aimeat_admin_cors_overview and aimeat_admin_cors_set on the operator surface,
+ *     beside the Security pair.
  *   2026-09-06 — The three secrets-vault tools on the agent and admin surfaces: setting up an
  *     integration is the work an owner's own agent does, and a key it stores is one the owner never
  *     has to paste anywhere. Nothing anywhere reads a value back.
@@ -280,6 +282,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_admin_owner_disable', 'aimeat_admin_owner_enable', 'aimeat_admin_totp_reset',
         // The Security page in one read, and resolving a refused-and-kept incident.
         'aimeat_admin_security_overview', 'aimeat_admin_incident_resolve',
+        // The CORS page in one read, and the write that sets a person's or an agent's list.
+        'aimeat_admin_cors_overview', 'aimeat_admin_cors_set',
         // Arranging this node's front page and the page its members land on.
         'aimeat_surface_layout_get', 'aimeat_surface_layout_set',
         // The operator's break-glass over an organism whose creator account is unreachable, plus the

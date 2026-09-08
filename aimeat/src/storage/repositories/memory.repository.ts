@@ -14,6 +14,8 @@
  *   - listMemoryVersions/listAllMemory: trackable-key history and admin-wide enumeration
  *
  * @version-history
+ *   v1.2.0 — 2026-09-08 — countMemoryWithOrigins: how many records carry a CORS list of their own,
+ *     for the operator's CORS page.
  *   v1.1.0 — 2026-08-17 — listAllMemoryMeta: the cross-owner enumeration gains the same value-free
  *     META projection listMemoryMeta has, so scheduled scans stop loading values they discard.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -170,6 +172,11 @@ export interface MemoryRepository {
    * (e.g. "N Muistit") that need only the number, not the records.
    */
   countMemory(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter }): Promise<number>;
+  /**
+   * Count the active memory records, across every owner, that carry a CORS list of their own
+   * (allowedOrigins set and non-empty). One number for the operator's CORS page; nothing is loaded.
+   */
+  countMemoryWithOrigins(): Promise<number>;
   /**
    * Sum the byte size of all of ONE owner's memory VALUES, computed DB-side (no values loaded/
    * transferred). Backs the memory total-size quota (§8.2). Cheap and O(1)-ish via a stored

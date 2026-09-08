@@ -34,6 +34,8 @@
  *     CONNECT_CLI_TOOLS is now the concatenation of those groups (order preserved).
  *   v1.9.0 -- 2026-09-06 -- secretTools joins the table: the owner's vault on the THIRD surface,
  *     which is the one a fleet daemon actually calls and the one a new tool is forgotten on.
+ *   v1.10.0 -- 2026-09-08 -- adminCliTools joins the table: the operator's CORS page in one read and
+ *     the write that sets a person's or an agent's list, on the third surface from day one.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -56,6 +58,7 @@ import { aiJobTools } from './tool-call-defs-ai-jobs.js';
 import { appDraftEditTools } from './tool-call-defs-app-draft-edit.js';
 import { exchangeTools } from './tool-call-defs-exchange.js';
 import { connectionCliTools } from './tool-call-defs-connections.js';
+import { adminCliTools } from './tool-call-defs-admin.js';
 import { withProvenanceCarrying } from './ai-provenance-carry.js';
 
 // The full tool catalog is assembled from sibling group modules, preserving declaration order.
@@ -80,6 +83,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...appDraftEditTools,
     ...exchangeTools,
     ...connectionCliTools,
+    ...adminCliTools,
 ].map(withProvenanceCarrying).map(withDeclaredInputOnly);
 
 /**

@@ -20,6 +20,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.20.0 -- 2026-09-08 -- aimeat_admin_cors_overview and aimeat_admin_cors_set join the
+ *     operator-gated list, beside the Security pair.
  *   v1.19.0 -- 2026-09-06 -- The three secrets-vault tools → secrets:manage, the same word the three
  *     REST doors use. A new word rather than a memory one: memory:write is already held by live
  *     agents and grants, and putting a credential store behind it would have handed every one of
@@ -121,6 +123,9 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     // the admin tools above them.
     'aimeat_admin_security_overview',
     'aimeat_admin_incident_resolve',
+    // The CORS page's read and its one write: the same decision.
+    'aimeat_admin_cors_overview',
+    'aimeat_admin_cors_set',
     // Reading how a page is arranged, and the catalogue of blocks this node can serve. Gated in the
     // handler on the operator, like the admin tools above it, and there is nothing here to narrow:
     // a layout is a list of block names, and the front page's describes a page anyone can look at.

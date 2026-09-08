@@ -22,6 +22,8 @@
  *   v1.2.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 1): the memory-level origin lookup
  *     reads by the resolved identity, not the raw `sub`, so an owner session finds its own
  *     allowedOrigins instead of falling back to the node default.
+ *   v1.3.0 — 2026-09-08 — COOKIE_AUTHED_PATHS is exported, so the operator's CORS page reads the
+ *     three doors from here instead of naming them a second time.
  */
 
 import type { RequestHandler, Request } from 'express';
@@ -36,7 +38,7 @@ import { resolveIdentity } from '../utils/gaii.js';
  * legitimate caller needs a cross-origin CORS grant here. Kept as exact paths (not a `/v1/auth/`
  * prefix) so signature-authenticated doors like POST /v1/auth/token keep working from a browser.
  */
-const COOKIE_AUTHED_PATHS = new Set([
+export const COOKIE_AUTHED_PATHS = new Set([
     '/v1/auth/app-grant-silent',
     '/v1/auth/refresh',
     '/v1/auth/revoke',

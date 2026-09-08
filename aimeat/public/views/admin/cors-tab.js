@@ -2,255 +2,225 @@
  * @file public/views/admin/cors-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin dashboard CORS tab — shows the node-default allowed origins and lets
- *   the operator add/edit/clear per-GHII and per-agent CORS allow-list overrides.
- *
- * @structure
- *   - OriginSuggestions: quick-add buttons for common origins (localhost ports, wildcard)
- *   - InlineEditor: edit an existing override's comma-separated origin list
- *   - AddOverrideForm: pick a GHII/agent and assign an origin allow-list
- *   - CorsTab (default): composes node-default + GHII + agent override cards, wires save/clear to admin service
- *
+ * @description Admin CORS page in the poster face (design canvas "AIMEAT Admin CORS", direction A).
+ *   One read, GET /v1/admin/cors/overview, which the aimeat_admin_cors_overview tool returns too,
+ *   and five sections in the order an operator asks: what a browser on another origin gets right
+ *   now (the status word, the default list, the three cookie doors that take no wildcard, and who
+ *   is different), the numeral strip, the people with a list of their own, the agents with one,
+ *   how the four lists rank when more than one applies, and the paste for the operator's own AI.
+ *   The two writes go through the same PUT routes as before, which now call the same service the
+ *   aimeat_admin_cors_set tool calls.
+ * @structure CorsTab({ data, switchPage }) — load · RightNow · Strip · the two ListSections from
+ *   cors-tab.form.js · OrderSection · AskAiSection · the actions (save, clear)
  * @version-history
+ *   v2.0.0 — 2026-09-08 — The poster face and the one read: the three cards become five sections,
+ *     the native selects become a picker that narrows as you type, the cookie doors and the
+ *     precedence ladder appear on a screen for the first time, and every write re-reads on a live
+ *     update.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
-import { useToast, Toast } from './shared.js';
+import { useViewCSS } from '/components/useViewCSS.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
+import { num, Badge, Spinner, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
-import { clearGhiiCors, clearAgentCors, setGhiiCors, setAgentCors } from '/js/services/admin.js';
+import { CopyButton } from '/components/CopyButton.js';
+import { getNodeUrl } from '/js/services/auth.js';
+import { getCorsOverview, setGhiiCors, clearGhiiCors, setAgentCors, clearAgentCors } from '/js/services/admin.js';
+import { ListSection } from './cors-tab.form.js';
+import { buildCorsPrompt } from './cors-tab.prompt.js';
+import { swallowed } from '/js/swallowed.js';
 
-const COMMON_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:8080',
-  'https://yourdomain.com',
-  '*',
-];
+const html = htm.bind(h);
+const C = (key, params) => t('admin.cors.' + key, params);
 
-/** Suggestion buttons that append an origin to an input value */
-function OriginSuggestions({ value, onChange }) {
-  function add(origin) {
-    const parts = value ? value.split(',').map(s => s.trim()).filter(Boolean) : [];
-    if (!parts.includes(origin)) { parts.push(origin); }
-    onChange(parts.join(', '));
-  }
-  return html`
-    <div class="adm-flex-wrap adm-mt-sm" style="gap:.35rem;align-items:center">
-      <span class="adm-text-sm adm-text-dim">${t('dashboard.corsCommonOrigins')}</span>
-      ${COMMON_ORIGINS.map(o => html`
-        <button type="button" class="adm-btn-sm" style="font-size:.75rem;padding:2px 8px"
-          onClick=${() => add(o)}>${o}</button>
-      `)}
-    </div>
-  `;
+/** "one person", "3 people and one agent": who keeps a list, as words for the status sentence. Only
+ *  the kinds that have one are named, so a page with people and no agents never says "and nobody". */
+function whoWord(people, agents) {
+  const parts = [];
+  if (people > 0) parts.push(people === 1 ? C('now.peopleOne') : C('now.peopleMany', { n: num(people) }));
+  if (agents > 0) parts.push(agents === 1 ? C('now.agentsOne') : C('now.agentsMany', { n: num(agents) }));
+  return parts.join(' ' + C('now.and') + ' ');
 }
 
-/** Inline editor row for existing CORS overrides */
-function InlineEditor({ origins, onSave, onCancel }) {
-  const [val, setVal] = useState(origins.join(', '));
-  function save() {
-    const arr = val.split(',').map(s => s.trim()).filter(Boolean);
-    if (arr.length === 0) return;
-    onSave(arr);
-  }
-  return html`
-    <div class="adm-flex-col" style="gap:.4rem;padding:.5rem 0">
-      <input class="adm-input adm-input-full" type="text" value=${val} onInput=${e => setVal(e.target.value)}
-        placeholder=${t('dashboard.corsOriginPlaceholder')}
-        style="font-family:monospace" />
-      <${OriginSuggestions} value=${val} onChange=${setVal} />
-      <div class="adm-flex" style="gap:.4rem;margin-top:.25rem">
-        <button class="adm-btn-action" onClick=${save}>${t('dashboard.corsSave')}</button>
-        <button class="adm-btn-sm" onClick=${onCancel}>${t('dashboard.corsCancel')}</button>
-      </div>
-    </div>
-  `;
+/** The status word and its sentence: the default list, and whether anyone is different from it. */
+function statusOf(ov) {
+  const named = ov.default.origins.filter(o => o !== '*');
+  const people = ov.people.with_list.length;
+  const agents = ov.agents.with_list.length;
+  const some = people + agents > 0;
+  const who = { who: whoWord(people, agents) };
+  if (ov.default.wildcard) return { word: C('now.wordAny'), line: some ? C('now.lineAnySome', who) : C('now.lineAnyNone') };
+  if (named.length > 0) return { word: C('now.wordNamed'), line: some ? C('now.lineNamedSome', { n: num(named.length), ...who }) : C('now.lineNamedNone', { n: num(named.length) }) };
+  return { word: C('now.wordNone'), line: some ? C('now.lineNamedSome', { n: 0, ...who }) : C('now.lineNamedNone', { n: 0 }) };
 }
 
-/** Add-override form for GHII or Agent */
-function AddOverrideForm({ items, labelKey, idKey, nameKey, onSave }) {
-  const [selectedId, setSelectedId] = useState('');
-  const [origins, setOrigins] = useState('');
-
-  async function save() {
-    if (!selectedId || !origins.trim()) return;
-    const arr = origins.split(',').map(s => s.trim()).filter(Boolean);
-    if (arr.length === 0) return;
-    await onSave(selectedId, arr);
-    setSelectedId('');
-    setOrigins('');
-  }
-
+/** Section 01: the status word, its sentence, the log line, and the five rows. */
+function RightNow({ ov, switchPage }) {
+  const named = ov.default.origins.filter(o => o !== '*');
+  const { word, line } = statusOf(ov);
+  const log = (ov.default.wildcard ? C('now.logAny') : C('now.logNamed', { list: ov.default.origins.join(', ') || '—' }))
+    + (ov.anonymous_mode ? ' · ' + C('now.logAnon') : '');
+  const people = ov.people.with_list.length;
+  const agents = ov.agents.with_list.length;
+  const records = ov.records.with_list;
+  const countChip = (n) => n === 0
+    ? html`<${Badge} type="muted" label=${C('now.chipNone')} />`
+    : html`<${Badge} type="info" label=${C('now.chipSet', { n: num(n) })} />`;
+  const row = (title, why, chip, value, last) => html`
+    <div class="adm-mrow ${last ? 'adm-mrow--last' : ''}">
+      <span><b>${title}</b><span class="adm-why">${why}</span></span>
+      <span>${chip}</span>
+      <span class="adm-mval">${value}</span>
+    </div>`;
   return html`
-    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--glass-border)">
-      <h3 style="font-size:.9rem;margin-bottom:.5rem">${t('dashboard.corsAddOverride')}</h3>
-      <div class="adm-flex-col" style="gap:.4rem">
-        <select class="adm-input" value=${selectedId} onChange=${e => setSelectedId(e.target.value)}>
-          <option value="">${t(labelKey)}</option>
-          ${items.map(it => html`
-            <option value=${it[idKey]}>${escHtml(it[nameKey] || it[idKey])}</option>
-          `)}
-        </select>
-        <input class="adm-input adm-input-full" type="text" value=${origins} onInput=${e => setOrigins(e.target.value)}
-          placeholder=${t('dashboard.corsOriginPlaceholder')}
-          style="font-family:monospace" />
-        <${OriginSuggestions} value=${origins} onChange=${setOrigins} />
-        <div style="margin-top:.25rem">
-          <button class="adm-btn-action" onClick=${save}>${t('dashboard.corsSave')}</button>
+    <section class="og-sec og-sec--first" id="adm-cors-01">
+      <div class="og-sec-h"><h2>${C('now.title')}<small>01</small></h2>
+        <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('config')}>${C('now.toSettings')}</button></div></div>
+      <div class="adm-ov-grid">
+        <div>
+          <div class="adm-ov-status">${word}</div>
+          <p class="adm-alert-line">${line}</p>
+          <div class="adm-ov-up">${log}</div>
+        </div>
+        <div>
+          ${row(
+            ov.default.wildcard ? C('now.default') : C('now.defaultNamed', { n: num(named.length) }),
+            ov.default.wildcard ? C('now.defaultWhy') : C('now.defaultNamedWhy', { list: named.join(', ') }),
+            html`<${Badge} type="healthy" />`, ov.default.env)}
+          ${row(C('now.cookieDoors'),
+            ov.cookie_doors.named.length === 0 ? C('now.cookieDoorsWhy') : C('now.cookieDoorsNamedWhy', { n: num(ov.cookie_doors.named.length), list: ov.cookie_doors.named.join(', ') }),
+            html`<${Badge} type="healthy" />`, C('now.named', { n: num(ov.cookie_doors.named.length) }))}
+          ${row(C('now.people'), C('now.peopleWhy'), countChip(people), C('now.ofAccounts', { n: num(ov.people.total) }))}
+          ${row(C('now.agents'), C('now.agentsWhy'), countChip(agents), C('now.ofAgents', { n: num(ov.agents.total) }))}
+          ${row(C('now.records'), C('now.recordsWhy'), countChip(records), 'PUT /v1/memory/cors/:key', true)}
         </div>
       </div>
-    </div>
-  `;
+    </section>`;
 }
 
-export default function CorsTab({ data, reload }) {
-  const configSchema = data.configSchema;
-  const nodeOrigins = configSchema?.schema?.['cors.allowedOrigins']?.value
-    || data.dash?.cors_allowed_origins || null;
+/** The numeral strip: the default in one word, who is different, and the cookie doors. */
+function Strip({ ov, toSection }) {
+  const named = ov.default.origins.filter(o => o !== '*');
+  const cell = (onClick, value, label, sub, cls = '') => onClick
+    ? html`<button type="button" onClick=${onClick}><b class=${cls}>${value}</b><span>${label}</span><small>${sub}</small></button>`
+    : html`<div><b class=${cls}>${value}</b><span>${label}</span><small>${sub}</small></div>`;
+  return html`
+    <div class="og-strip">
+      ${ov.default.wildcard
+        ? cell(null, C('strip.any'), C('strip.anyLabel'), C('strip.anySub'), 'adm-cors-any')
+        : cell(null, num(named.length), C('strip.namedLabel'), C('strip.namedSub'))}
+      ${cell(() => toSection('02'), num(ov.people.with_list.length), C('strip.people'), C('strip.peopleSub', { n: num(ov.people.total) }))}
+      ${cell(() => toSection('03'), num(ov.agents.with_list.length), C('strip.agents'), C('strip.agentsSub', { n: num(ov.agents.total) }))}
+      ${cell(null, num(ov.cookie_doors.paths.length), ov.cookie_doors.named.length === 0 ? C('strip.doors') : C('strip.doorsNamed'), C('strip.doorsSub'))}
+    </div>`;
+}
 
-  // GHII overrides
-  const ghiiRows = (data.ghiiUsers || []).filter(u => u.allowed_origins?.length > 0);
-  // Agent overrides
-  const agentRows = (data.agents?.agents || []).filter(a => a.allowed_origins?.length > 0);
+/** Section 04: the four lists in the order the door asks them. */
+function OrderSection({ ov, switchPage }) {
+  const step = (n, key, value, last) => html`
+    <div class="adm-cors-step ${last ? 'adm-cors-step--last' : ''}">
+      <span class="adm-cors-step-num">${n}</span>
+      <span><b>${C('order.' + key)}</b><span class="adm-why">${C('order.' + key + 'Why', { value: ov.default.origins.join(', ') || '—' })}</span></span>
+      ${value}
+    </div>`;
+  return html`
+    <section class="og-sec" id="adm-cors-04">
+      <div class="og-sec-h"><h2>${C('order.title')}<small>04</small></h2></div>
+      <p class="adm-cors-lead">${C('order.lead')}</p>
+      ${step(1, 'record', html`<span class="adm-mval">PUT /v1/memory/cors/:key</span>`)}
+      ${step(2, 'agent', html`<span class="adm-mval">PUT /v1/agents/:name/cors</span>`)}
+      ${step(3, 'person', html`<span class="adm-mval">PUT /v1/ghii/cors</span>`)}
+      ${step(4, 'default', html`<span class="adm-mval"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('config')}>${C('order.settings')}</button></span>`, true)}
+    </section>`;
+}
 
-  // Track which row is being edited
-  const [editGhii, setEditGhii] = useState(null);
-  const [editAgent, setEditAgent] = useState(null);
-  const [toast, showErr, , clearToast] = useToast();
+/** Section 05: the paste for the operator's own AI. */
+function AskAiSection() {
+  const paste = buildCorsPrompt({ url: getNodeUrl() });
+  return html`
+    <section class="og-sec" id="adm-cors-05">
+      <div class="og-sec-h"><h2>${C('ai.title')}<small>05</small></h2>
+        <div class="og-doors"><${CopyButton} text=${paste} label=${C('ai.copy')} className="og-door og-door--quiet" /></div></div>
+      <p class="adm-cors-lead">${C('ai.lead')}</p>
+      <div class="og-box">
+        <span class="og-box-label">${C('ai.label')}</span>
+        <div class="adm-cors-paste">${paste}</div>
+      </div>
+    </section>`;
+}
+
+export default function CorsTab(props) {
+  const { data, switchPage } = props;
+  useViewCSS('/css/views/admin-cors.css');
+  const [ov, setOv] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const [toast, showErr, showOk, clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
 
-  async function doClearGhii(ghii) {
-    confirm(t('dashboard.corsClearConfirm'), async () => {
-      try {
-        await clearGhiiCors(ghii);
-        reload();
-      } catch (e) { showErr(e.message); }
-    }, { danger: true });
-  }
-
-  async function doClearAgent(gaii) {
-    confirm(t('dashboard.corsClearConfirm'), async () => {
-      try {
-        await clearAgentCors(gaii);
-        reload();
-      } catch (e) { showErr(e.message); }
-    }, { danger: true });
-  }
-
-  async function doSaveGhii(ghii, origins) {
+  const load = useCallback(async () => {
     try {
-      await setGhiiCors(ghii, origins);
-      setEditGhii(null);
-      reload();
-    } catch (e) { showErr(e.message); }
-  }
+      const r = await getCorsOverview();
+      if (!r.ok) throw new Error(r.error?.message || 'read failed');
+      setOv(r.data);
+      setFailed(false);
+    } catch (e) {
+      setFailed(true);
+      showErr(e.message);
+    }
+  }, [showErr]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => onLiveUpdate(['features', 'config', 'ghii', 'agents'], () => load()), [load]);
 
-  async function doSaveAgent(gaii, origins) {
+  const toSection = (n) => document.getElementById('adm-cors-' + n)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  /** One write through the door, one re-read, one word to the operator. */
+  const write = async (fn, word) => {
     try {
-      await setAgentCors(gaii, origins);
-      setEditAgent(null);
-      reload();
-    } catch (e) { showErr(e.message); }
+      const r = await fn();
+      if (!r.ok) throw new Error(r.error?.message || 'write failed');
+      showOk(C(word));
+      await load();
+      return true;
+    } catch (e) {
+      // The operator reads the refusal in the toast and the form keeps what they typed.
+      swallowed('cors-tab: write', e);
+      showErr(e.message);
+      return false;
+    }
+  };
+  const savePerson = (ghii, origins) => write(() => setGhiiCors(ghii, origins), 'saved');
+  const saveAgent = (gaii, origins) => write(() => setAgentCors(gaii, origins), 'saved');
+  const clearPerson = (ghii) => confirm(C('clearConfirm'), () => write(() => clearGhiiCors(ghii), 'cleared'), { danger: true });
+  const clearAgent = (gaii) => confirm(C('clearConfirm'), () => write(() => clearAgentCors(gaii), 'cleared'), { danger: true });
+
+  if (!ov) {
+    return html`
+      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+      ${failed ? html`<div class="adm-cors-empty">${C('loadFailed')}</div>` : html`<${Spinner} text=${t('dashboard.loading')} />`}`;
   }
 
-  // All GHII users (for add-override dropdown), excluding those already overridden
-  const ghiiOverriddenSet = new Set(ghiiRows.map(r => r.ghii));
-  const ghiiAvailable = (data.ghiiUsers || []).filter(u => !ghiiOverriddenSet.has(u.ghii));
-
-  // All agents (for add-override dropdown), excluding those already overridden
-  const agentOverriddenSet = new Set(agentRows.map(a => a.gaii));
-  const agentAvailable = (data.agents?.agents || []).filter(a => !agentOverriddenSet.has(a.gaii));
+  const listed = new Set([...ov.people.with_list.map(p => p.ghii), ...ov.agents.with_list.map(a => a.gaii)]);
+  const peopleRows = ov.people.with_list.map(p => ({ id: p.ghii, name: p.owner_name, sub: p.ghii, origins: p.allowed_origins }));
+  const agentRows = ov.agents.with_list.map(a => ({ id: a.gaii, name: a.gaii.split('@')[0], sub: `${C('agents.of')} ${a.owner} · ${a.gaii}`, origins: a.allowed_origins }));
+  const peopleFree = (data?.ghiiUsers || []).filter(u => !listed.has(u.ghii)).map(u => ({ id: u.ghii, name: u.owner_name || u.username || u.ghii, sub: u.ghii }));
+  const agentsFree = ((data?.agents && data.agents.agents) || []).filter(a => !listed.has(a.gaii)).map(a => ({ id: a.gaii, name: a.display_name || a.gaii.split('@')[0], sub: a.gaii }));
 
   return html`
-    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-    <!-- Node default -->
-    <div class="adm-card">
-      <h2>${t('dashboard.corsNodeDefault')}</h2>
-      <p class="adm-text-dim adm-text-base" style="margin-bottom:.75rem">${t('dashboard.corsNodeDefaultDesc')}</p>
-      <code style="font-size:.85rem">${nodeOrigins ? escHtml(Array.isArray(nodeOrigins) ? nodeOrigins.join(', ') : String(nodeOrigins)) : '*'}</code>
-    </div>
-
-    <!-- GHII overrides -->
-    <div class="adm-card">
-      <h2>${t('dashboard.corsGhiiOverrides')}</h2>
-      <p class="adm-text-dim adm-text-base" style="margin-bottom:.75rem">${t('dashboard.corsGhiiOverridesDesc')}</p>
-      ${ghiiRows.length === 0
-        ? html`<div class="adm-text-dim adm-text-base">${t('dashboard.corsNoOverrides')}</div>`
-        : html`<table>
-          <thead><tr><th>${t('dashboard.owner')}</th><th>${t('dashboard.corsOrigins')}</th><th></th></tr></thead>
-          <tbody>
-            ${ghiiRows.map(r => html`<tr>
-              <td>${escHtml(r.owner_name || r.ghii)}</td>
-              <td style="width:100%">
-                ${editGhii === r.ghii
-                  ? html`<${InlineEditor}
-                      origins=${r.allowed_origins}
-                      onSave=${(arr) => doSaveGhii(r.ghii, arr)}
-                      onCancel=${() => setEditGhii(null)} />`
-                  : html`<span class="mono adm-text-sm">${escHtml(r.allowed_origins.join(', '))}</span>`
-                }
-              </td>
-              <td style="white-space:nowrap">
-                ${editGhii !== r.ghii && html`<span style="display:inline-flex;gap:.3rem">
-                  <button class="adm-btn-sm" onClick=${() => setEditGhii(r.ghii)}>${t('dashboard.corsEdit')}</button>
-                  <button class="adm-btn-sm" onClick=${() => doClearGhii(r.ghii)}>${t('dashboard.corsClear')}</button>
-                </span>`}
-              </td>
-            </tr>`)}
-          </tbody>
-        </table>`
-      }
-      <${AddOverrideForm}
-        items=${ghiiAvailable}
-        labelKey="dashboard.corsSelectUser"
-        idKey="ghii"
-        nameKey="owner_name"
-        onSave=${(ghii, origins) => doSaveGhii(ghii, origins)} />
-    </div>
-
-    <!-- Agent overrides -->
-    <div class="adm-card">
-      <h2>${t('dashboard.corsAgentOverrides')}</h2>
-      <p class="adm-text-dim adm-text-base" style="margin-bottom:.75rem">${t('dashboard.corsAgentOverridesDesc')}</p>
-      ${agentRows.length === 0
-        ? html`<div class="adm-text-dim adm-text-base">${t('dashboard.corsNoOverrides')}</div>`
-        : html`<table>
-          <thead><tr><th>GAII</th><th>${t('dashboard.owner')}</th><th>${t('dashboard.corsOrigins')}</th><th></th></tr></thead>
-          <tbody>
-            ${agentRows.map(a => html`<tr>
-              <td class="mono adm-text-sm">${escHtml(a.gaii)}</td>
-              <td>${escHtml(a.owner)}</td>
-              <td style="width:100%">
-                ${editAgent === a.gaii
-                  ? html`<${InlineEditor}
-                      origins=${a.allowed_origins}
-                      onSave=${(arr) => doSaveAgent(a.gaii, arr)}
-                      onCancel=${() => setEditAgent(null)} />`
-                  : html`<span class="mono adm-text-sm">${escHtml(a.allowed_origins.join(', '))}</span>`
-                }
-              </td>
-              <td style="white-space:nowrap">
-                ${editAgent !== a.gaii && html`<span style="display:inline-flex;gap:.3rem">
-                  <button class="adm-btn-sm" onClick=${() => setEditAgent(a.gaii)}>${t('dashboard.corsEdit')}</button>
-                  <button class="adm-btn-sm" onClick=${() => doClearAgent(a.gaii)}>${t('dashboard.corsClear')}</button>
-                </span>`}
-              </td>
-            </tr>`)}
-          </tbody>
-        </table>`
-      }
-      <${AddOverrideForm}
-        items=${agentAvailable}
-        labelKey="dashboard.corsSelectAgent"
-        idKey="gaii"
-        nameKey="name"
-        onSave=${(gaii, origins) => doSaveAgent(gaii, origins)} />
-    </div>
-    <${ConfirmUI} />
-  `;
+    <div class="adm-cors">
+      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+      <p class="adm-intro">${C('intro')}</p>
+      <${RightNow} ov=${ov} switchPage=${switchPage} />
+      <${Strip} ov=${ov} toSection=${toSection} />
+      <${ListSection} kind="people" number="02" rows=${peopleRows} total=${num(ov.people.total)} candidates=${peopleFree}
+        onSave=${savePerson} onClear=${clearPerson} door=${C('people.toGhii')} onDoor=${() => switchPage('ghii')} />
+      <${ListSection} kind="agents" number="03" rows=${agentRows} total=${num(ov.agents.total)} candidates=${agentsFree}
+        onSave=${saveAgent} onClear=${clearAgent} door=${C('agents.toAgents')} onDoor=${() => switchPage('agents')} />
+      <${OrderSection} ov=${ov} switchPage=${switchPage} />
+      <${AskAiSection} />
+      <${ConfirmUI} />
+    </div>`;
 }

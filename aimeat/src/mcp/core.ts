@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.20.0 — 2026-09-08 — registerAdminCorsTools: the CORS page in one read and the one write it
+ *     has, through the same service the HTTP doors call.
  *   v1.19.0 — 2026-09-05 — registerAdminSecurityTools: the Security page in one read and the
  *     incident action, through the same services the HTTP doors call.
  *   v1.18.0 — 2026-08-30 — aimeat_board_read leaves out a post flags have hidden, through the same
@@ -112,6 +114,7 @@ import { writeProvenanceEcho, readProvenance } from './ai-provenance-result.js';
 import { registerCoreAdminTools } from './core-admin.js';
 import { registerAdminSsoTools } from './admin-sso.js';
 import { registerAdminSecurityTools } from './admin-security.js';
+import { registerAdminCorsTools } from './admin-cors.js';
 import { registerCoreStorageTools } from './core-storage.js';
 import { registerCoreDataPackageTools } from './core-datapackage.js';
 import { logger } from '../utils/logger.js';
@@ -736,4 +739,6 @@ export function registerCoreTools(
     registerAdminSsoTools(mcp, storage, config, getAgentGaii);
     // The Security page in one read, and the incident action a chat could not do before.
     registerAdminSecurityTools(mcp, storage, config, getAgentGaii);
+    // The CORS page in one read, and the write that sets a person's or an agent's list.
+    registerAdminCorsTools(mcp, storage, config, getAgentGaii);
 }

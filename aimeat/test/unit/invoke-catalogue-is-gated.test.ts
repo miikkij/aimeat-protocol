@@ -16,6 +16,7 @@
  *   absent from the tables, or the reverse — this is the one that says so.
  *
  * @version-history
+ *   v1.1.0 — 2026-09-08 — The exemption bound grows to 26 for aimeat_admin_cors_set.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, post-audit item 2).
  */
 import { describe, it, expect } from 'vitest';
@@ -59,7 +60,9 @@ describe('the invoke catalogue is a gated surface', () => {
         // This number is the honest shape of the surface: `invoke` reaches these with no scope word,
         // exactly as a direct call does, and each one has a reason recorded beside it. It is written
         // down here so that growing it is a visible act rather than a silent one.
-        expect(exempt.length).toBeLessThanOrEqual(25);
+        // 26 since 2026-09-08: aimeat_admin_cors_set, gated in its handler on the operator role like
+        // the other admin writes (scopes.ts says why no scope word narrows an operator).
+        expect(exempt.length).toBeLessThanOrEqual(26);
         expect(mutating.length).toBeGreaterThan(100);
     });
 });

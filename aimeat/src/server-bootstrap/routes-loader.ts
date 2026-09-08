@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.13.0 — 2026-09-08 — Mounts the admin CORS router (GET /v1/admin/cors/overview).
  *   v1.12.0 — 2026-09-06 — Mounts the secrets router (/v1/secrets: the owner's credential vault).
  *   v1.11.0 — 2026-09-03 — Mounts the dependencies router (GET /v1/dependencies).
  *   v1.10.0 — 2026-08-27 — Mount connectInstallRouter (GET /v1/connect/mcp.json — the downloadable
@@ -113,6 +114,7 @@ import { federationRouter } from '../routes/federation.js';
 import { organismsRouter } from '../routes/organisms.js';
 import { notificationsRouter } from '../routes/notifications.js';
 import { adminSecurityRouter } from '../routes/admin-security.js';
+import { adminCorsRouter } from '../routes/admin-cors.js';
 import { sharingGroupsRouter } from '../routes/sharing-groups.js';
 import { connectionsRouter } from '../routes/connections.js';
 import { specRouter } from '../routes/spec.js';
@@ -576,6 +578,7 @@ export async function mountRoutes(
   app.use(organismsRouter(config, storage));
   app.use(notificationsRouter(config, storage));
   app.use(adminSecurityRouter(config, storage));
+  app.use(adminCorsRouter(config, storage));
   app.use(sharingGroupsRouter(config, storage));
   app.use(connectionsRouter(config, storage));  // TARGET-057: outbound connections + delegations
   app.use(federationRouter(config, storage, peers, networkDirectory));

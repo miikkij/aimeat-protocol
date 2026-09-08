@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-08 — aimeat_admin_cors_overview (read-only) and aimeat_admin_cors_set.
  *   2026-09-06 — The owner's secrets vault: aimeat_secret_list (read-only), _set (idempotent, not
  *     destructive — what it replaces is a value nobody could read) and _delete (destructive:
  *     whatever named that secret stops working).
@@ -458,6 +459,10 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_admin_totp_reset: { title: 'Admin: Remove Two-Step Sign-In', readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     aimeat_admin_security_overview: { title: 'Admin: Security Overview', readOnlyHint: true },
     aimeat_admin_incident_resolve: { title: 'Admin: Resolve Security Incident', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    aimeat_admin_cors_overview: { title: 'Admin: CORS Overview', readOnlyHint: true },
+    // Replacing a list is not destructive (the previous one was a setting, not data), and setting
+    // the same list twice leaves the same list.
+    aimeat_admin_cors_set: { title: 'Admin: Set Allowed Origins', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     aimeat_compliance_report: { title: 'Compliance: Node Report', readOnlyHint: true },
     aimeat_datamap_get: { title: 'Data map: read', readOnlyHint: true },
     aimeat_datamap_set: { title: 'Data map: state it', destructiveHint: true, idempotentHint: true },
