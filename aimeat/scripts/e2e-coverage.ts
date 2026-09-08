@@ -22,6 +22,10 @@
  *   Output: aimeat/coverage-e2e/<db>/ (index.html, coverage-summary.json, by-directory.md) and
  *   aimeat/coverage-e2e/compare.md. All gitignored.
  * @version-history
+ *   v1.2.0 — 2026-09-08 — Type-only files leave the measure: the compiler transpiles each src/ file
+ *     and one that comes out empty is excluded from c8, listed in type-only-files.txt. They were a
+ *     fifth of the "uncovered" lines and none of it could ever execute.
+ *   v1.1.0 — 2026-09-07 — `report --db=union`; Node's own exit-time files merged too; __tests__ out.
  *   v1.0.0 — 2026-09-07 — Initial.
  */
 import { mergeProcessCovs, type ProcessCov } from '@bcoe/v8-coverage';
@@ -29,6 +33,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import ts from 'typescript';
 
 const ROOT = process.cwd();
 const OUT_ROOT = resolve(ROOT, 'coverage-e2e');
@@ -129,6 +134,30 @@ function mergeSnapshots(raws: string[], sourceMaps: Record<string, unknown>): { 
     return { merged, files: files.length };
 }
 
+/**
+ * The .ts files under src/ that compile to nothing: interfaces, type aliases, `import type`. c8's
+ * `--all` would count every line of them as uncovered, and on 2026-09-08 that was 8 943 lines in 90
+ * files (the 70 storage/repositories interfaces among them), a fifth of everything "uncovered" and
+ * not a line of it executable. The compiler decides, not a filename pattern: a file is type-only
+ * when transpiling it leaves an empty module.
+ */
+function typeOnlyFiles(): string[] {
+    const srcDir = resolve(ROOT, 'src');
+    const out: string[] = [];
+    for (const entry of readdirSync(srcDir, { recursive: true, withFileTypes: true })) {
+        if (!entry.isFile() || !entry.name.endsWith('.ts') || entry.name.endsWith('.d.ts')) continue;
+        const abs = join(entry.parentPath, entry.name);
+        const rel = relative(ROOT, abs).split(sep).join('/');
+        if (rel.includes('/dist/') || rel.includes('/__tests__/')) continue;
+        const js = ts.transpileModule(readFileSync(abs, 'utf8'), {
+            compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext, removeComments: true },
+            reportDiagnostics: false,
+        }).outputText;
+        if (js.replace(/\bexport\s*\{\s*\};?/g, '').trim() === '') out.push(rel);
+    }
+    return out.sort();
+}
+
 function report(db: Db): void {
     const raws = rawDirs(db);
     const out = outDir(db);
@@ -139,15 +168,18 @@ function report(db: Db): void {
     rmSync(mergedDir, { recursive: true, force: true });
     mkdirSync(mergedDir, { recursive: true });
     writeFileSync(join(mergedDir, 'coverage-merged.json'), JSON.stringify({ result: merged.result, 'source-map-cache': sourceMaps }));
-    console.log(`Merged ${files} node snapshots into ${merged.result.length} scripts (${Object.keys(sourceMaps).length} source maps).`);
+    const typeOnly = typeOnlyFiles();
+    writeFileSync(join(out, 'type-only-files.txt'), `${typeOnly.join('\n')}\n`);
+    console.log(`Merged ${files} node snapshots into ${merged.result.length} scripts (${Object.keys(sourceMaps).length} source maps). ${typeOnly.length} type-only files left out of the measure.`);
 
     const c8 = spawnSync(process.execPath, [
         resolve(ROOT, 'node_modules/c8/bin/c8.js'), 'report', `--temp-directory=${mergedDir}`, `--reports-dir=${out}`,
         '--reporter=html', '--reporter=json-summary', '--reporter=text-summary',
-        '--src=src', '--include=src/**/*.ts', '--exclude=src/**/*.d.ts', '--exclude=**/dist/**', '--exclude=src/**/__tests__/**', '--all',
+        '--src=src', '--include=src/**/*.ts', '--exclude=src/**/*.d.ts', '--exclude=**/dist/**', '--exclude=src/**/__tests__/**',
+        ...typeOnly.map(f => `--exclude=${f}`), '--all',
     ], { stdio: 'inherit', cwd: ROOT });
     if (c8.status !== 0) throw new Error(`c8 report exited with ${c8.status}`);
-    byDirectory(db);
+    byDirectory(db, typeOnly.length);
     console.log(`\nReport: ${join(out, 'index.html')}\nBy directory: ${join(out, 'by-directory.md')}`);
 }
 
@@ -203,7 +235,7 @@ function table(rows: Map<string, Stat>, label: string): string {
     return lines.join('\n');
 }
 
-function byDirectory(db: Db): void {
+function byDirectory(db: Db, typeOnlyCount: number): void {
     const files = readSummary(db);
     const total = rollup(files, 0).get('') ?? empty();
     const never = [...files.entries()].filter(([, s]) => s.covered === 0).map(([f]) => f).sort();
@@ -212,7 +244,7 @@ function byDirectory(db: Db): void {
     const md = [
         `# E2E coverage of src/ on ${db}`,
         '',
-        `Generated ${new Date().toISOString()}. Lines: ${total.covered} of ${total.total} (${pct(total.covered, total.total)}). Functions: ${total.fnCovered} of ${total.fnTotal} (${pct(total.fnCovered, total.fnTotal)}). Files: ${files.size}, never executed: ${never.length}.`,
+        `Generated ${new Date().toISOString()}. Lines: ${total.covered} of ${total.total} (${pct(total.covered, total.total)}). Functions: ${total.fnCovered} of ${total.fnTotal} (${pct(total.fnCovered, total.fnTotal)}). Files: ${files.size}, never executed: ${never.length}. Left out as type-only (no executable code; listed in type-only-files.txt): ${typeOnlyCount}.`,
         '',
         '## By top-level directory',
         '',
