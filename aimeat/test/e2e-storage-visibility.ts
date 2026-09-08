@@ -1068,6 +1068,36 @@ await test('59. Deleting a key that never existed → 404, and the message names
     assert(String(body.error?.message).includes('your namespace'), `message should name the namespace: ${body.error?.message}`);
 });
 
+// A person reads what their own agents hold, and their agents do not read back. The owner-self
+// bypass used to be an exact identity match: it stopped a scoped agent riding its human's ownership,
+// which is right, and it also hid a person's own files from them, which is not. Ruled 2026-09-08.
+await test('60. The owner reads a PRIVATE file their own agent stored', async () => {
+    const key = `agent-private-${Date.now()}.txt`;
+    const up = await json(`/v1/storage`, {
+        method: 'POST', headers: { Authorization: `Bearer ${agentAToken}` },
+        body: JSON.stringify({ key, data: Buffer.from('the agent wrote this').toString('base64'), mime_type: 'text/plain', visibility: 'private' }),
+    });
+    assert(up.body.ok === true, `agent upload: ${JSON.stringify(up.body)}`);
+
+    const asOwner = await json(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(key)}?mode=handle`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(asOwner.status === 200, `the owner must read their own agent's file, got ${asOwner.status}: ${JSON.stringify(asOwner.body)}`);
+});
+
+await test('61. A STRANGER still cannot read that file (the rule is about one account, not about privacy)', async () => {
+    const key2 = `agent-private-2-${Date.now()}.txt`;
+    await json(`/v1/storage`, {
+        method: 'POST', headers: { Authorization: `Bearer ${agentAToken}` },
+        body: JSON.stringify({ key: key2, data: Buffer.from('still private').toString('base64'), mime_type: 'text/plain', visibility: 'private' }),
+    });
+    const asStranger = await json(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(key2)}?mode=handle`, {
+        headers: { Authorization: `Bearer ${owner2Token}` },
+    });
+    assert(asStranger.status === 403 || asStranger.status === 404,
+        `another owner must not read it, got ${asStranger.status}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

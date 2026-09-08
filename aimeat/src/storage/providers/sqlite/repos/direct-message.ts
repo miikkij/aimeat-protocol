@@ -367,9 +367,23 @@ export function listOutboundForRetry(db: Database.Database, limit = 200): Direct
   return rows.map(deserializeMessage);
 }
 
+/**
+ * The messages the attachment sweep has work to do on: an inbound copy still holding an attachment
+ * that has neither been duplicated nor expired. The predicate belongs in the query — selecting the
+ * 200 oldest rows that had any attachment at all meant the window sat on finished mail from months
+ * ago and never reached a recent message, so a held attachment was retried never rather than every
+ * minute. Oldest first is right once the filter is: those are the ones closest to expiry.
+ */
 export function listInboundWithAttachments(db: Database.Database, limit = 200): DirectMessageRecord[] {
-  const rows = db.prepare(
-    "SELECT * FROM direct_messages WHERE direction = 'inbound' AND attachments IS NOT NULL ORDER BY createdAt ASC LIMIT ?",
+  const rows = db.prepare(`
+    SELECT * FROM direct_messages
+    WHERE direction = 'inbound' AND attachments IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM json_each(direct_messages.attachments) AS a
+        WHERE json_extract(a.value, '$.mode') = 'reference'
+          AND COALESCE(json_extract(a.value, '$.expired'), 0) = 0
+      )
+    ORDER BY createdAt ASC LIMIT ?`,
   ).all(limit) as Record<string, unknown>[];
   return rows.map(deserializeMessage);
 }
