@@ -557,9 +557,9 @@ await test('16. the public unsubscribe answers identically for unknown tokens (n
 async function readOptOutToken(contactId: string): Promise<string | null> {
   const backend = process.env.AIMEAT_STORAGE ?? process.env.AIMEAT_DB ?? 'memory';
   if (backend === 'sqlite') {
-    const { resolve } = await import('node:path');
+    const { serverSqlitePath } = await import('./helpers/server-db.js');
     const Database = (await import('better-sqlite3')).default;
-    const db = new Database(resolve(process.cwd(), process.env.AIMEAT_SQLITE_PATH || process.env.AIMEAT_DB_PATH || 'test/.test-e2e.db'), { readonly: true });
+    const db = new Database(serverSqlitePath(), { readonly: true });
     try {
       const row = db.prepare('SELECT optOutToken FROM outbound_contacts WHERE id = ?').get(contactId) as { optOutToken?: string } | undefined;
       return row?.optOutToken ?? null;

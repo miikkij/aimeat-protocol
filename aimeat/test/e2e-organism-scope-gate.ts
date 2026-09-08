@@ -24,6 +24,7 @@ import { createHash } from 'node:crypto';
 import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
 import { migrateAgentScopeVocabulary } from '../src/services/scope-vocabulary-migration.js';
 import type { Storage } from '../src/storage/interface.js';
+import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -350,8 +351,10 @@ async function main() {
     console.log('\nPhase 5: The boot migration hands the word to an agent that already had the reach');
 
     const provider = (process.env.AIMEAT_DB ?? 'memory') as StorageProvider;
-    const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
-    const sqlitePath = process.env.AIMEAT_DB_PATH ?? '';
+    const dbUrl = serverDbUrl();
+    // The file the runner pinned on the server. In a multi-lane run the env file names lane zero's
+    // database and the server is on its own, so phase 5 would assert against the wrong one.
+    const sqlitePath = pinnedSqlitePath();
     // An in-memory backend lives inside the server process, so a second handle would open a DIFFERENT
     // empty database and the phase would assert against nothing. Say so rather than passing hollow.
     const canOpenBackend = (provider === 'sqlite' && !!sqlitePath) || (provider === 'postgres-kysely' && !!dbUrl);
