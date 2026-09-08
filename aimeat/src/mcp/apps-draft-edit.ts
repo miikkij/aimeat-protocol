@@ -211,6 +211,7 @@ export function registerAppDraftEditTools(
             if ('refusal' in scope) return fail(scope.refusal);
             try {
                 const out = await seedAppDraft(storage, config, {
+                    callerGaii: agentGaii,
                     ownerName: scope.ownerName,
                     ownerGhii: scope.ownerGhii,
                     filename, fromFilename: from_filename, version,

@@ -508,6 +508,10 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
+            roadmap: { type: 'string', description: 'What this version changes. Required when the app is shared with another developer.' },
+            spec_token: { type: 'string', description: 'Current app build spec digest.' },
+            spec_ack: { type: 'string', description: 'Owner-declared build spec acknowledgement.' },
             ...aiProvenanceCatalogInput,
             filename: { type: 'string', required: true, description: 'App filename, e.g. "starwars.html". Alphanumeric, dots, hyphens, underscores.' },
             name: { type: 'string', required: true, description: 'Display name shown in the catalogue.' },
@@ -526,6 +530,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            building: { type: 'boolean', description: 'List apps another owner lets you build; opt-in and separate from your own.' },
             search: { type: 'string', description: 'Free-text search over name and description.' },
             category: { type: 'string', description: 'Filter by category.' },
             tag: { type: 'string', description: 'Filter by tag.' },
@@ -582,6 +587,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
             filename: { type: 'string', required: true, description: 'App filename this draft stages (e.g. "drumpad.html").' },
             content: { type: 'string', required: true, description: 'The draft HTML (the next version to test). Use @file:path with the CLI fallback.' },
             name: { type: 'string', description: 'Display name (defaults to the live app\'s).' },
@@ -594,6 +600,10 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
+            roadmap: { type: 'string', description: 'What this version changes. Required when the app is shared with another developer.' },
+            spec_token: { type: 'string', description: 'Current app build spec digest.' },
+            spec_ack: { type: 'string', description: 'Owner-declared build spec acknowledgement.' },
             ...aiProvenanceCatalogInput,
             filename: { type: 'string', required: true, description: 'App filename whose draft to publish.' },
         },
@@ -604,6 +614,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
             filename: { type: 'string', required: true, description: 'App filename whose draft to discard.' },
         },
     },
@@ -613,6 +624,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
             filename: { type: 'string', required: true, description: 'App filename this draft stages (e.g. "pong.html").' },
             content: { type: 'string', required: true, description: 'The text to write. Plain UTF-8, not base64.' },
             mode: { type: 'string', enum: ['append', 'replace'], description: 'append (default) adds to the end; replace overwrites the whole draft.' },
@@ -627,6 +639,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
             filename: { type: 'string', required: true, description: 'App filename whose draft to edit.' },
             old_string: { type: 'string', required: true, description: 'The exact text to replace, including indentation.' },
             new_string: { type: 'string', required: true, description: 'What to put there instead.' },
@@ -639,6 +652,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
             filename: { type: 'string', required: true, description: 'App filename whose draft to read.' },
             offset: { type: 'number', description: 'First line to return, 1-based. Default 1.' },
             limit: { type: 'number', description: 'How many lines to return. Default 400, maximum 2000.' },
@@ -650,6 +664,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
             filename: { type: 'string', required: true, description: 'The draft slot to write into.' },
             from_filename: { type: 'string', description: 'The published app to copy from. Defaults to filename.' },
             version: { type: 'number', description: 'Which published version. Defaults to the newest.' },
@@ -661,6 +676,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
             filename: { type: 'string', required: true, description: 'The published app to photograph (e.g. "pong.html").' },
         },
     },

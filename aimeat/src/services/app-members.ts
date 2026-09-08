@@ -33,6 +33,7 @@
  *     record shape instead of growing a second copy beside it.
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055 phase 2): the roster becomes a platform capability.
  */
+import { appKeySegment, equalAppId, readAppRecord, listAppRecords } from './app-record-keys.js';
 import type { Storage } from '../storage/interface.js';
 
 /** Platform-owned namespaces. Never an `ext:` one: that is the namespace the world can read. */
@@ -125,7 +126,7 @@ export async function noteVisit(storage: Storage, appId: string, principal: stri
   const account = accountOf(principal);
   if (!account) return false;
   const now = new Date();
-  const prev = (await storage.getMemory(NS_SEEN, seenKey(appId, account)))?.value as AppMemberVisit | undefined;
+  const prev = (await readAppRecord(storage, NS_SEEN, seenKey(appId, account), appId))?.value as AppMemberVisit | undefined;
   if (prev && sameApp(prev.appId, appId) && now.getTime() - new Date(prev.lastSeen).getTime() < VISIT_WINDOW_MS) {
     return false;
   }
@@ -142,7 +143,7 @@ export async function noteVisit(storage: Storage, appId: string, principal: stri
 
 /** Everybody who turned up. The owner's view of who is there to approve. */
 export async function listVisits(storage: Storage, appId: string): Promise<AppMemberVisit[]> {
-  const { items } = await storage.listAllMemory({ prefix: `appmemseen.${slugOf(appId)}.`, limit: 2000 });
+  const { items } = await listAppRecords(storage, NS_SEEN, 'appmemseen.', appId);
   return items
     .map(r => r.value as AppMemberVisit)
     .filter(v => v && sameApp(v.appId, appId))
@@ -151,6 +152,7 @@ export async function listVisits(storage: Storage, appId: string): Promise<AppMe
 
 /** Forget one visitor. Used when they become a member, and when the owner dismisses them. */
 export async function forgetVisit(storage: Storage, appId: string, principal: string): Promise<void> {
+  await readAppRecord(storage, NS_SEEN, seenKey(appId, principal), appId);
   await storage.deleteMemory(NS_SEEN, seenKey(appId, principal));
 }
 
@@ -164,25 +166,21 @@ export interface AppMemberRequest {
 }
 
 /**
- * An app id (`alice/app.html`) as a key segment. Slashes and dots are the separators this key space
- * already uses, so they are folded away rather than escaped.
+ * An app id as an injective key segment. The historical export name stays for existing callers.
+ * Encoding preserves filename case and punctuation; only the owner coordinate is case-normalized.
  */
 export function slugOf(appId: string): string {
-  return String(appId).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return appKeySegment(appId);
 }
 
 /**
  * Are these two spellings the same app?
  *
- * Compared as the KEY compares them, which is the only comparison that can be right here: the row is
- * addressed by `slugOf(appId)`, so `Alice/paja.html` and `alice/paja.html` have always written to one
- * record — and a reader testing the stored `appId` for exact equality then failed to find the row it
- * had just written. Whichever spelling reached the door first is the one stored, and every other
- * spelling read back as "no such member". Both routes build the id from `:owner` as the URL spells
- * it, so this was reachable by typing a capital letter.
+ * Owner case is normalized, but filenames and the owner/filename boundary are exact.
+ * A lossy slug comparison previously transferred grants between distinct resources.
  */
 export function sameApp(a: string, b: string): boolean {
-  return slugOf(a) === slugOf(b);
+  return equalAppId(a, b);
 }
 
 /**
@@ -210,7 +208,7 @@ export const requestKey = (appId: string, account: string) => `appmemreq.${slugO
 
 /** Every approved member of one app. */
 export async function listMembers(storage: Storage, appId: string): Promise<AppMemberRecord[]> {
-  const { items } = await storage.listAllMemory({ prefix: `appmember.${slugOf(appId)}.`, limit: 2000 });
+  const { items } = await listAppRecords(storage, NS_MEMBER, 'appmember.', appId);
   return items
     .map(r => r.value as AppMemberRecord)
     .filter(v => v && sameApp(v.appId, appId))
@@ -219,7 +217,7 @@ export async function listMembers(storage: Storage, appId: string): Promise<AppM
 
 /** One member, or null. Reads the PERSON's row, so any of their agents resolves to the same answer. */
 export async function getMember(storage: Storage, appId: string, principal: string): Promise<AppMemberRecord | null> {
-  const rec = await storage.getMemory(NS_MEMBER, memberKey(appId, principal));
+  const rec = await readAppRecord(storage, NS_MEMBER, memberKey(appId, principal), appId);
   const v = rec?.value as AppMemberRecord | undefined;
   if (!v || !sameApp(v.appId, appId)) return null;
   // The clock decides, not the sweep. A lapsed member stops reaching the app at the moment their
@@ -229,7 +227,7 @@ export async function getMember(storage: Storage, appId: string, principal: stri
 
 /** The raw row including a lapsed one, for the owner's panel and the sweep. */
 export async function getMemberRow(storage: Storage, appId: string, principal: string): Promise<AppMemberRecord | null> {
-  const rec = await storage.getMemory(NS_MEMBER, memberKey(appId, principal));
+  const rec = await readAppRecord(storage, NS_MEMBER, memberKey(appId, principal), appId);
   const v = rec?.value as AppMemberRecord | undefined;
   return v && sameApp(v.appId, appId) ? v : null;
 }
@@ -333,7 +331,7 @@ export interface AppCarryPlan {
 
 /** Everyone on one app's roster whose term has run out. The sweep's input. */
 export async function listLapsed(storage: Storage, now: Date = new Date()): Promise<AppMemberRecord[]> {
-  const { items } = await storage.listAllMemory({ prefix: 'appmember.', limit: 5000 });
+  const { items } = await listAppRecords(storage, NS_MEMBER, 'appmember.');
   return items
     .map(r => r.value as AppMemberRecord)
     .filter(v => v && v.expiresAt && !isLive(v, now));
@@ -349,7 +347,7 @@ export const planKey = (appId: string) => `appmemplan.${slugOf(appId)}`;
 
 /** The app's carry plan, or null if the owner has not declared one. */
 export async function getCarryPlan(storage: Storage, appId: string): Promise<AppCarryPlan | null> {
-  const rec = await storage.getMemory(NS_PLAN, planKey(appId));
+  const rec = await readAppRecord(storage, NS_PLAN, planKey(appId), appId);
   const v = rec?.value as AppCarryPlan | undefined;
   return v && sameApp(v.appId, appId) ? v : null;
 }
@@ -397,13 +395,14 @@ export async function removeMember(storage: Storage, appId: string, principal: s
   // finding nothing to delete, so the dead row stayed on the roster and kept holding a seat.
   const prev = await getMemberRow(storage, appId, principal);
   if (!prev) return null;
+  await readAppRecord(storage, NS_MEMBER, memberKey(appId, principal), appId);
   await storage.deleteMemory(NS_MEMBER, memberKey(appId, principal));
   return prev;
 }
 
 /** Everyone who has asked and not yet been decided on. */
 export async function listRequests(storage: Storage, appId: string, state: 'pending' | 'all' = 'pending'): Promise<AppMemberRequest[]> {
-  const { items } = await storage.listAllMemory({ prefix: `appmemreq.${slugOf(appId)}.`, limit: 2000 });
+  const { items } = await listAppRecords(storage, NS_REQUEST, 'appmemreq.', appId);
   return items
     .map(r => r.value as AppMemberRequest)
     .filter(v => v && sameApp(v.appId, appId) && (state === 'all' || v.state === 'pending'))
@@ -416,7 +415,7 @@ export async function putRequest(
   input: { appId: string; account: string; note?: string; state?: AppMemberRequest['state'] },
 ): Promise<AppMemberRequest> {
   const account = accountOf(input.account);
-  const existing = await storage.getMemory(NS_REQUEST, requestKey(input.appId, account));
+  const existing = await readAppRecord(storage, NS_REQUEST, requestKey(input.appId, account), input.appId);
   const prev = existing?.value as AppMemberRequest | undefined;
   const rec: AppMemberRequest = {
     appId: input.appId,
@@ -431,6 +430,7 @@ export async function putRequest(
 
 /** Drop an ask entirely (the owner declining and forgetting, or an approval consuming it). */
 export async function removeRequest(storage: Storage, appId: string, principal: string): Promise<void> {
+  await readAppRecord(storage, NS_REQUEST, requestKey(appId, principal), appId);
   await storage.deleteMemory(NS_REQUEST, requestKey(appId, principal));
 }
 

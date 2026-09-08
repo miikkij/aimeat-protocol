@@ -71,6 +71,10 @@
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 8 step 0a. Extracted from routes/apps/publish.ts,
  *     routes/upload.ts and routes/apps/drafts.ts, which each held a partial copy of it.
  */
+import { isDeepStrictEqual } from 'node:util';
+import { accountOf } from './app-members.js';
+import { effectiveDevLevel, mayAct, isSharedApp } from './app-dev-grant.js';
+import { roadmapGate, addRoadmapEntry, roadmapStamp } from './app-roadmap.js';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest, AppManifestCortex, AppProtection } from '../storage/interface.js';
@@ -117,6 +121,7 @@ export interface RequestedManifest {
 }
 
 export interface PublishAppInput {
+  roadmap?: string;
   /** Bare owner name — the display/URL form. Never the @node-suffixed GHII. */
   ownerName: string;
   /** The canonical app bucket key. Apps are OWNER-scoped whoever publishes them. */
@@ -167,6 +172,7 @@ export interface PublishAppRefusal {
 }
 
 export interface PublishAppResult {
+  roadmapHint?: string;
   filename: string;
   versionNumber: number;
   isUpdate: boolean;
@@ -205,6 +211,15 @@ export async function publishApp(
   storage: Storage, config: AimeatConfig, input: PublishAppInput,
 ): Promise<PublishAppResult | PublishAppRefusal> {
   const { ownerName, ownerGhii, callerGaii, filename, data, mimeType, requested } = input;
+
+  const delegate = accountOf(callerGaii) !== accountOf(ownerName)
+    ? await effectiveDevLevel(storage, { owner: ownerName, filename, principal: callerGaii }) : null;
+  const delegated = accountOf(callerGaii) !== accountOf(ownerName);
+  if (delegated && (!delegate || !mayAct(delegate.level, 'publish'))) {
+    return { refusal: { status: 403, code: 'FORBIDDEN', message: 'You do not hold a right to publish this app.' } };
+  }
+  const road = roadmapGate({ line: input.roadmap, shared: await isSharedApp(storage, ownerName, filename) });
+  if (!road.ok) return { refusal: { status: 400, code: 'ROADMAP_REQUIRED', message: road.message } };
 
   const existingVersion = await storage.getLatestVersionNumber(ownerGhii, filename);
   const isUpdate = existingVersion > 0;
@@ -253,6 +268,17 @@ export async function publishApp(
 
   const live = isUpdate ? await storage.getApp(ownerGhii, filename) : null;
   const prev = live?.manifest;
+  if (delegated) {
+    const forbidden = (requested.priceMorsels !== undefined && requested.priceMorsels !== (prev?.priceMorsels ?? 0))
+      || (requested.licenseType !== undefined && requested.licenseType !== prev?.licenseType)
+      || (!mayAct(delegate!.level, 'operate') && (
+        (requested.protection !== undefined && !isDeepStrictEqual(requested.protection, prev?.protection ?? {}))
+        || (requested.cortexAgents !== undefined && !isDeepStrictEqual(requested.cortexAgents, prev?.cortex?.agents ?? []))
+        || (requested.usesCortex !== undefined && !isDeepStrictEqual(requested.usesCortex, prev?.usesCortex ?? []))
+        || (input.accessCode.mode === 'explicit' && input.accessCode.value !== live?.accessCode)
+      ));
+    if (forbidden) return { refusal: { status: 403, code: 'FORBIDDEN', message: 'Your development right does not permit changing these app settings.' } };
+  }
 
   // A description is REQUIRED for a NEW app so the catalogue and the landing wall always have one.
   // On an update, silence carries the existing one forward — a re-publish or a restore must never
@@ -399,24 +425,34 @@ export async function publishApp(
     enabled: config.aiProvenance,
   });
 
-  await storage.createApp({
-    ownerGaii: ownerGhii,
-    ownerName,
-    filename,
-    versionNumber: newVersion,
-    manifest,
-    mimeType,
-    size: data.length,
-    data,
-    accessCode,
-    parked,
-    forkable,
-    operatorHidden: !!live?.operatorHidden,
-    operatorHiddenBy: live?.operatorHiddenBy,
-    operatorHiddenAt: live?.operatorHiddenAt,
-    operatorHideReason: live?.operatorHideReason,
-    createdAt: new Date().toISOString(),
-    ...(aiProvenanceId ? { aiProvenanceId } : {}),
+  await storage.transaction(async () => {
+    if (road.line) {
+      const updatedRoadmap = await addRoadmapEntry(storage, {
+        appId: `${ownerName}/${filename}`, state: 'done', what: road.line,
+        by: accountOf(callerGaii), version: newVersion,
+      });
+      manifest.roadmap = roadmapStamp(updatedRoadmap);
+    } else if (prev?.roadmap) manifest.roadmap = prev.roadmap;
+    await storage.createApp({
+      ownerGaii: ownerGhii,
+      ownerName,
+      filename,
+      versionNumber: newVersion,
+      manifest,
+      mimeType,
+      size: data.length,
+      data,
+      accessCode,
+      parked,
+      forkable,
+      operatorHidden: !!live?.operatorHidden,
+      operatorHiddenBy: live?.operatorHiddenBy,
+      operatorHiddenAt: live?.operatorHiddenAt,
+      operatorHideReason: live?.operatorHideReason,
+      createdAt: new Date().toISOString(),
+      ...(aiProvenanceId ? { aiProvenanceId } : {}),
+  });
+
   });
 
   // The dependency map follows the bytes: what this version loads and calls, read from the source
@@ -471,7 +507,7 @@ export async function publishApp(
       + `${input.source === 'draft' ? ' from draft' : ''}`
       + `${input.source === 'package-install' ? ' from a package' : ''} (${(data.length / 1024).toFixed(1)} KB)`
       + (specCheck.status === 'ok' ? '' : ` [build spec: ${specCheck.status}]`),
-    changedBy: ownerName,
+    changedBy: callerGaii,
     changedAt: now,
   });
 
@@ -528,6 +564,7 @@ export async function publishApp(
   }
 
   return {
+    ...('warning' in road ? { roadmapHint: road.warning } : {}),
     filename,
     versionNumber: newVersion,
     isUpdate,

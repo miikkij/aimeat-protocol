@@ -33,11 +33,12 @@
  *   v1.0.0 — 2026-09-08 — Initial. Phase 5 of the shared-app work.
  */
 import type { Storage } from '../storage/interface.js';
-import { writePrivateRecord } from './app-members.js';
+import { randomUUID } from 'node:crypto';
+import { appKeySegment, readAppRecord, equalAppId } from './app-record-keys.js';
 
 export const APP_ROADMAP_SPEC = 'aimeat.approadmap/1' as const;
 
-/** How many entries one app keeps. The oldest `done` lines fall off first; wishes never do. */
+/** Separate capacity for each half: wishes cannot evict the changelog. */
 export const APP_ROADMAP_MAX = 300;
 
 /** The platform's own namespace, so the record is not writable through the memory API. */
@@ -79,18 +80,35 @@ export interface AppRoadmapStamp {
 }
 
 export const appRoadmapKey = (appId: string) =>
-  `approadmap.${String(appId).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+  `approadmap.${appKeySegment(appId)}`;
 
 /** This app's roadmap, or null when nobody has written one. Null is a real answer. */
 export async function readAppRoadmap(storage: Storage, appId: string): Promise<AppRoadmap | null> {
-  const rec = await storage.getMemory(NS_ROADMAP, appRoadmapKey(appId));
+  const rec = await readAppRecord(storage, NS_ROADMAP, appRoadmapKey(appId), appId);
   const v = rec?.value as AppRoadmap | undefined;
-  if (!v || v.spec !== APP_ROADMAP_SPEC) return null;
+  if (!v || v.spec !== APP_ROADMAP_SPEC || !equalAppId(v.appId, appId)) return null;
   return v;
 }
 
-async function writeAppRoadmap(storage: Storage, road: AppRoadmap): Promise<void> {
-  await writePrivateRecord(storage, NS_ROADMAP, appRoadmapKey(road.appId), road, { tags: ['app-roadmap'] });
+/** Retry the change against the current record; never acknowledge a lost update. */
+async function changeRoadmap(storage: Storage, appId: string, change: (road: AppRoadmap) => void): Promise<AppRoadmap> {
+  if (!storage.createMemoryIfAbsent || !storage.setMemoryIfVersion) throw new Error('Roadmap writes require atomic storage.');
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const existing = await readAppRecord(storage, NS_ROADMAP, appRoadmapKey(appId), appId);
+    const road = existing ? structuredClone(existing.value as AppRoadmap) : emptyRoadmap(appId);
+    change(road);
+    road.updatedAt = new Date().toISOString();
+    const record = {
+      key: appRoadmapKey(appId), ownerGaii: NS_ROADMAP, value: road,
+      visibility: 'private' as const, tags: ['app-roadmap'], ttlHours: null,
+      version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? road.updatedAt, updatedAt: road.updatedAt,
+    };
+    const saved = existing
+      ? await storage.setMemoryIfVersion(record, existing.version)
+      : await storage.createMemoryIfAbsent(record);
+    if (saved) return road;
+  }
+  throw new Error('Roadmap changed repeatedly. Retry this operation.');
 }
 
 /** A fresh, empty roadmap for an app that has none yet. */
@@ -101,8 +119,7 @@ function emptyRoadmap(appId: string): AppRoadmap {
   };
 }
 
-let counter = 0;
-const nextId = () => `r${Date.now().toString(36)}${(counter++ % 1296).toString(36).padStart(2, '0')}`;
+const nextId = () => randomUUID();
 
 /**
  * Add a line. Returns the whole roadmap, because that is what a caller renders next.
@@ -114,47 +131,37 @@ export async function addRoadmapEntry(
   storage: Storage,
   input: { appId: string; state: AppRoadmapEntry['state']; what: string; by: string; version?: number },
 ): Promise<AppRoadmap> {
-  const road = (await readAppRoadmap(storage, input.appId)) ?? emptyRoadmap(input.appId);
   const entry: AppRoadmapEntry = {
-    id: nextId(),
-    state: input.state,
-    what: input.what.trim().slice(0, 600),
-    by: input.by,
-    at: new Date().toISOString(),
+    id: nextId(), state: input.state, what: input.what.trim().slice(0, 600),
+    by: input.by, at: new Date().toISOString(),
     ...(typeof input.version === 'number' ? { version: input.version } : {}),
   };
-  road.entries = [entry, ...road.entries];
-  if (road.entries.length > APP_ROADMAP_MAX) {
-    const wanted = road.entries.filter(e => e.state === 'wanted');
-    const done = road.entries.filter(e => e.state === 'done').slice(0, Math.max(0, APP_ROADMAP_MAX - wanted.length));
-    road.entries = [...wanted, ...done].sort((a, b) => (a.at < b.at ? 1 : -1));
-  }
-  road.updatedAt = entry.at;
-  await writeAppRoadmap(storage, road);
-  return road;
+  if (entry.what.length < 3) throw new Error('A roadmap entry needs at least three characters.');
+  return changeRoadmap(storage, input.appId, road => {
+    if (entry.state === 'wanted' && road.entries.filter(e => e.state === 'wanted').length >= APP_ROADMAP_MAX) {
+      throw Object.assign(new Error('The wish list is full. Withdraw or complete an existing wish first.'), { status: 409 });
+    }
+    const entries = [entry, ...road.entries];
+    let done = 0;
+    road.entries = entries.filter(e => e.state === 'wanted' || ++done <= APP_ROADMAP_MAX);
+  });
 }
 
 /** Take one line off. Returns whether there was one. */
 export async function removeRoadmapEntry(storage: Storage, appId: string, entryId: string): Promise<boolean> {
-  const road = await readAppRoadmap(storage, appId);
-  if (!road) return false;
-  const before = road.entries.length;
-  road.entries = road.entries.filter(e => e.id !== entryId);
-  if (road.entries.length === before) return false;
-  road.updatedAt = new Date().toISOString();
-  await writeAppRoadmap(storage, road);
-  return true;
+  let removed = false;
+  await changeRoadmap(storage, appId, road => {
+    removed = road.entries.some(e => e.id === entryId);
+    road.entries = road.entries.filter(e => e.id !== entryId);
+  });
+  return removed;
 }
 
 /** Open the wishes to everybody, or close them again. */
 export async function setWantedVisibility(
   storage: Storage, appId: string, visibility: AppRoadmap['wantedVisibility'],
 ): Promise<AppRoadmap> {
-  const road = (await readAppRoadmap(storage, appId)) ?? emptyRoadmap(appId);
-  road.wantedVisibility = visibility;
-  road.updatedAt = new Date().toISOString();
-  await writeAppRoadmap(storage, road);
-  return road;
+  return changeRoadmap(storage, appId, road => { road.wantedVisibility = visibility; });
 }
 
 /**
@@ -200,6 +207,7 @@ export function roadmapGate(input: { line: string | undefined; shared: boolean }
   | { ok: true; line: null; warning: string }
   | { ok: false; message: string } {
   const line = typeof input.line === 'string' ? input.line.trim() : '';
+  if (line && line.length < 3) return { ok: false, message: 'The roadmap line needs at least three characters.' };
   if (line) return { ok: true, line };
   if (input.shared) {
     return {
