@@ -16,6 +16,12 @@
  *   GET /roadmap · POST /roadmap · DELETE /roadmap/:entryId · PATCH /roadmap
  * @usage registerRoadmapRoutes(router, config, storage, appTarget);
  * @version-history
+ *   v1.0.1 — 2026-09-08 — `signedIn(req)` replaces the two `if (!req.auth)` lines. On a node in
+ *     anonymous mode optionalAuth hands a stranger a reader identity, so `req.auth` is set for one
+ *     and neither line refused anybody. What refused the visitor was the check AFTER it — the
+ *     target resolver, and the two scopes an anonymous identity does not carry — so nothing leaked;
+ *     the line was simply not the gate it read as. Reported by the audit gate
+ *     optional-auth-if-not-req-auth-gate (invariant 6).
  *   v1.0.0 — 2026-09-08 — Initial. Phase 5 of the shared-app work.
  */
 import type { Router } from 'express';
@@ -48,20 +54,31 @@ export function registerRoadmapRoutes(
     };
 
     /**
+     * Is somebody actually signed in on this request?
+     *
+     * `req.auth` on its own does not answer that. This node can run in anonymous mode, where
+     * optionalAuth injects a reader identity for a caller who presented no credential at all, so
+     * `!req.auth` is false for a stranger and every check built on it would let one through. The
+     * anonymous flag is what separates a visitor from a person (invariant 6).
+     */
+    const signedIn = (req: import('express').Request): boolean =>
+        Boolean(req.auth) && req.auth?.anonymous !== true;
+
+    /**
      * Is this caller inside the build? The owner, or somebody holding a rung.
      *
      * Asked through the same resolver every write door asks, with the lowest act there is: anybody
      * who may touch the draft is inside the build, and everybody else is a reader.
      */
     const insideTheBuild = async (req: import('express').Request): Promise<boolean> => {
-        if (!req.auth) return false;
+        if (!signedIn(req)) return false;
         return (await appTarget(req, 'draft')).ok;
     };
 
     /** Only the owner, for the two doors that are the owner's alone. */
     const isOwner = (req: import('express').Request): boolean => {
-        if (!req.auth) return false;
-        return accountOf(resolveIdentity(req.auth, config.nodeId)) === String(req.params.owner ?? '').toLowerCase();
+        if (!signedIn(req)) return false;
+        return accountOf(resolveIdentity(req.auth!, config.nodeId)) === String(req.params.owner ?? '').toLowerCase();
     };
 
     /** Resolve the real resource before touching its side records. Builders can see their work. */
