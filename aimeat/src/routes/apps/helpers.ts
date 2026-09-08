@@ -7,16 +7,23 @@
  *   CanonicalOwner closure type. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @structure
  *   - CanonicalOwner — authenticated-caller → owner resolver closure type
+ *   - AppTargetFor / appTargetOr — whose bucket this act lands in, or the refusal to send
  *   - appOriginScheme() — scheme + port inherited from the apex baseUrl
  *   - appOriginUrl() — WRITES: assigns a subdomain on first use, then builds the URL
  *   - resolveAppUrls() — READ-ONLY: one listSubdomainSites() for a batch of apps
  * @version-history
+ *   v1.2.0 — 2026-09-08 — AppTargetFor and appTargetOr: an app write can land in ANOTHER owner's
+ *     bucket when they granted the caller a development right, and one helper asks that question so
+ *     that thirty doors do not each carry their own version of the answer.
  *   v1.1.0 — 2026-08-09 — resolveAppUrls: the same public URL without the subdomain assignment,
  *     so a read-only lister can serve it. appOriginScheme extracted (shared by both).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
  */
+import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
+import type { AppDevAct, DelegatedDev } from '../../services/app-dev-grant.js';
+import { error } from '../../middleware/envelope.js';
 import { ensureAppSubdomain } from '../subdomains.js';
 import { logger } from '../../utils/logger.js';
 
@@ -25,6 +32,39 @@ import { logger } from '../../utils/logger.js';
  * group. Resolves the authenticated caller to a single bare owner name + owner GHII.
  */
 export type CanonicalOwner = (req: Express.Request) => Promise<{ owner: string; ownerGhii: string }>;
+
+/** What a door gets back when it asks whose app it is about to touch. */
+export type AppTargetOutcome =
+  | { ok: true; owner: string; ownerGhii: string; delegated: DelegatedDev | null }
+  | { ok: false; status: number; code: string; message: string };
+
+/**
+ * The resolver every app write door asks: WHOSE bucket does this act land in?
+ *
+ * Built once in appsRouter and handed to each route group. It reads the owner the request names -
+ * the `:owner` path segment where there is one, `owner` in the body where there is not - and answers
+ * either with a bucket or with the refusal to send back. `act` is what the caller means to do, and
+ * it is what a rung is measured against.
+ */
+export type AppTargetFor = (req: Request, act: AppDevAct) => Promise<AppTargetOutcome>;
+
+/**
+ * Ask, and on a refusal write it and return null so the handler can `return`.
+ *
+ * A helper rather than three lines in thirty places, because those three lines are the whole
+ * authorisation of an app write and a door that gets them subtly wrong looks exactly like a door
+ * that gets them right.
+ */
+export async function appTargetOr(
+  appTarget: AppTargetFor, config: AimeatConfig, req: Request, res: Response, act: AppDevAct,
+): Promise<{ owner: string; ownerGhii: string; delegated: DelegatedDev | null } | null> {
+  const t = await appTarget(req, act);
+  if (!t.ok) {
+    res.status(t.status).json(error(config.nodeId, t.code, t.message));
+    return null;
+  }
+  return { owner: t.owner, ownerGhii: t.ownerGhii, delegated: t.delegated };
+}
 
 /**
  * Scheme + port for the app origin, inherited from the apex baseUrl so only the host

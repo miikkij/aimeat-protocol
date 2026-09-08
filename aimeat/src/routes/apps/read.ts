@@ -62,7 +62,7 @@ import { collectAppLineage, resolveAppStatus } from '../../services/app-lineage.
 import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js';
 import { prefersMarkdown } from '../../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../../services/agent-face.js';
-import { appOriginUrl, type CanonicalOwner } from './helpers.js';
+import { appOriginUrl, appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 import { recordAppOpen } from '../../services/usage/record-app-open.js';
 import { countPageView } from '../../services/signals/page-views.js';
@@ -115,6 +115,7 @@ export function registerReadRoutes(
     config: AimeatConfig,
     storage: Storage,
     canonicalOwner: CanonicalOwner,
+    appTarget: AppTargetFor,
 ): void {
     // GET /v1/apps/:owner/:filename/versions — List all versions
     router.get('/v1/apps/:owner/:filename/versions', async (req, res) => {
@@ -257,11 +258,10 @@ export function registerReadRoutes(
         }
 
         const isOperator = req.auth!.roles?.includes('operator') ?? false;
-        const { owner: callerOwner } = await canonicalOwner(req);
-        if (!isOperator && callerOwner !== app.ownerName) {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only capture screenshots of your own apps'));
-            return;
-        }
+        // The app's own owner, or somebody they gave a rung that carries `presentation`. The
+        // resolver reads the SAME `:owner` segment this handler already used to find the app, so
+        // there is no second spelling of "whose app is this" to keep in step.
+        if (!isOperator && !(await appTargetOr(appTarget, config, req, res, 'presentation'))) return;
 
         const out = await captureAppScreenshot(config, storage, { ownerName: app.ownerName, filename });
         if (!out.ok) {
@@ -300,11 +300,10 @@ export function registerReadRoutes(
 
         // Ownership: the app's owner, or a node operator (the screenshot worker runs as operator).
         const isOperator = req.auth!.roles?.includes('operator') ?? false;
-        const { owner: callerOwner } = await canonicalOwner(req);
-        if (!isOperator && callerOwner !== app.ownerName) {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only set the screenshot for your own apps'));
-            return;
-        }
+        // The app's own owner, or somebody they gave a rung that carries `presentation`. The
+        // resolver reads the SAME `:owner` segment this handler already used to find the app, so
+        // there is no second spelling of "whose app is this" to keep in step.
+        if (!isOperator && !(await appTargetOr(appTarget, config, req, res, 'presentation'))) return;
 
         const { screenshot, screenshot_mime_type } = req.body ?? {};
         if (!screenshot || typeof screenshot !== 'string') {
@@ -366,11 +365,10 @@ export function registerReadRoutes(
         }
 
         const isOperator = req.auth!.roles?.includes('operator') ?? false;
-        const { owner: callerOwner } = await canonicalOwner(req);
-        if (!isOperator && callerOwner !== app.ownerName) {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only clear the screenshot for your own apps'));
-            return;
-        }
+        // The app's own owner, or somebody they gave a rung that carries `presentation`. The
+        // resolver reads the SAME `:owner` segment this handler already used to find the app, so
+        // there is no second spelling of "whose app is this" to keep in step.
+        if (!isOperator && !(await appTargetOr(appTarget, config, req, res, 'presentation'))) return;
 
         await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`);
         emitChange('apps');

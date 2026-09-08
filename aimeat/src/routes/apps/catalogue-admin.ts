@@ -29,6 +29,8 @@
  *   v1.5.0 — 2026-08-19 — the copy-scan reads listAppsWithContent; the plain listing no longer carries bytes.
  */
 import type { Router } from 'express';
+import { listAppsBuiltFor, levelName } from '../../services/app-dev-grant.js';
+import { resolveIdentity } from '../../utils/gaii.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { PeerInfo } from '../../services/federation.js';
@@ -82,6 +84,15 @@ export function registerCatalogueAdminRoutes(
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'own=true needs a signed-in caller'));
             return;
         }
+        // `building=true` answers a different question from `own=true`: not the apps you have, the
+        // apps somebody else asked you to help build. Deliberately opt-in and never mixed into the
+        // default answer — an agent that iterates "my apps" and starts editing another person's
+        // would be a listing change with consequences nobody asked for.
+        const buildingOnly = req.query.building === 'true';
+        if (buildingOnly && (!viewerGhii || req.auth?.anonymous)) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'building=true needs a signed-in caller'));
+            return;
+        }
         const opts = {
             category: req.query.category as string | undefined,
             q: req.query.q as string | undefined,
@@ -94,7 +105,18 @@ export function registerCatalogueAdminRoutes(
             ...(ownOnly ? { ownerGaii: viewerGhii } : {}),
         };
 
-        const { apps, total } = await storage.listApps(opts);
+        let { apps, total } = await storage.listApps(opts);
+
+        // The apps this caller may build for somebody else. Resolved by asking what rights they
+        // hold and then reading exactly those apps, rather than by filtering the whole catalogue:
+        // one person's rights are a short list and the catalogue is not.
+        if (buildingOnly) {
+            apps = await listAppsBuiltFor(storage, config, {
+                principal: resolveIdentity(req.auth!, config.nodeId),
+                viewerGhii,
+            });
+            total = apps.length;
+        }
 
         // Per-app metrics in THREE batch queries (was getAppDownloads + countAppForks +
         // getStorageFile PER app = 3N, up to ~600 for a full page).
@@ -154,6 +176,13 @@ export function registerCatalogueAdminRoutes(
             };
             return {
                 owner: app.ownerName,
+                // Only on the `building=true` answer, and it is what stops a co-built app from
+                // reading like one of your own: whose it is, and at which rung you hold it.
+                ...((app as { devLevel?: number }).devLevel !== undefined
+                    ? { dev_level: (app as { devLevel?: number }).devLevel,
+                        dev_level_name: levelName((app as { devLevel?: number }).devLevel as number),
+                        building_for: app.ownerName }
+                    : {}),
                 filename: app.filename,
                 version_number: app.versionNumber,
                 manifest: shownManifest,

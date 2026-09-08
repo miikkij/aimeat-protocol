@@ -22917,6 +22917,7 @@ paths:
         - { in: query, name: offset, required: false, schema: { type: integer, default: 0 } }
         - { in: query, name: free_only, required: false, schema: { type: boolean } }
         - { in: query, name: own, required: false, schema: { type: boolean }, description: Only the caller's own apps. Answers 401 without a session, since nobody anonymous has an own. }
+        - { in: query, name: building, required: false, schema: { type: boolean }, description: "Only the apps somebody ELSE asked this caller to help build. A different question from `own`, and deliberately opt-in: an agent iterating its own apps must never quietly start editing another person's. Each row carries `building_for` and `dev_level_name`. 401 without a session." }
         - { in: query, name: include_peers, required: false, schema: { type: boolean }, description: Include federated peer apps }
       responses:
         '200':
@@ -24533,6 +24534,96 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/apps/{owner}/{filename}/roadmap:
+    get:
+      operationId: appRoadmapGet
+      summary: What has been done to this app, and what people wish would be
+      description: >
+        Two halves with two audiences. The `done` half is a changelog and is public, because it is
+        what tells somebody whether the app is looked after. The `wanted` half is what is missing,
+        which is a builder's conversation rather than a shop window, so it goes to the owner and to
+        whoever holds a development right until the owner opens it (PATCH below). Returns
+        `{ roadmap, inside_the_build, meaning }`.
+
+
+        It cannot be derived from anything else the node keeps: the version history says a version
+        appeared and the audit log says which settings changed, and neither says WHY or carries a
+        wish.
+      tags: [Apps]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+    post:
+      operationId: appRoadmapAdd
+      summary: Leave a wish, or record what a change did
+      description: >
+        Body `{ what, state? }`. `what` is one sentence in the caller's own words. `state` defaults
+        to `wanted` and anybody signed in may leave one; `done` is a claim about the app and needs
+        the owner or somebody holding a development right, so a stranger asserting it is refused with
+        403 rather than quietly downgraded.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    patch:
+      operationId: appRoadmapVisibility
+      summary: Open the wishes to everybody, or close them again
+      description: >
+        Owner-only. Body `{ wanted_visibility }`, either `developers` (the default) or `everyone`.
+        The done half is public either way.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/apps/{owner}/{filename}/roadmap/{entryId}:
+    delete:
+      operationId: appRoadmapRemove
+      summary: Take one line off the roadmap
+      description: >
+        The owner prunes anything; anybody else may withdraw a wish they left themselves. A list
+        nobody prunes is a list nobody reads, and a wish somebody cannot take back is a wish they
+        will not leave.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: entryId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/apps/{owner}/{filename}/dev-grants:
     get:
       operationId: appDevGrantsList

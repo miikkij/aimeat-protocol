@@ -106,14 +106,15 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
-import { ownAppScope } from '../services/app-dev-grant.js';
-import type { CanonicalOwner } from './apps/helpers.js';
+import type { AppTargetFor, CanonicalOwner } from './apps/helpers.js';
+import { resolveAppTarget, type AppDevAct } from '../services/app-dev-grant.js';
 import { registerCatalogueAdminRoutes } from './apps/catalogue-admin.js';
 import { registerReadRoutes } from './apps/read.js';
 import { registerPublishRoutes } from './apps/publish.js';
 import { registerDraftRoutes } from './apps/drafts.js';
 import { registerForkManageRoutes } from './apps/fork-manage.js';
 import { registerLegalRoutes } from './apps/legal.js';
+import { registerRoadmapRoutes } from './apps/roadmap.js';
 import { registerAppAgentRoutes } from './apps/agents-deploy.js';
 import { registerAdminSeoRoutes } from './admin-seo.js';
 
@@ -135,16 +136,47 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         // which strings they accept. What they agreed on — resolve the identity record, fall back to
         // `owner@node` — is now one function, so a change to where an app lands lands in one place.
         const owner = rawOwner.includes('@') ? rawOwner.split('@')[0] : rawOwner;
-        const { ownerName, ownerGhii } = await ownAppScope(storage, config, owner);
-        return { owner: ownerName, ownerGhii };
+        const t = await resolveAppTarget(storage, config, { callerOwner: owner, act: 'draft' });
+        // The own-owner branch cannot refuse, and this closure has no way to report one: every door
+        // that can name a DIFFERENT owner asks `appTarget` instead, which answers with the refusal.
+        return t.ok ? { owner: t.ownerName, ownerGhii: t.ownerGhii } : { owner, ownerGhii: `${owner}@${config.nodeId}` };
+    };
+
+    /**
+     * WHOSE bucket does this act land in?
+     *
+     * The owner the request NAMES is `:owner` where the path carries one and `owner` in the body
+     * where it does not; `me`, an empty value and the caller's own name all mean the same thing and
+     * mean it the way they always did. Everything else is a claim on somebody else's app, and it is
+     * `resolveAppTarget` that decides whether the caller holds a rung that carries this act.
+     *
+     * The `:owner` segment was READ AND IGNORED on the draft routes until now: whatever a client put
+     * there, the draft it edited was its own. Honouring it is what makes co-development reachable
+     * from a URL, and `me` stays spelled out because the legal routes already publish that spelling.
+     */
+    const appTarget: AppTargetFor = async (req, act: AppDevAct) => {
+        const raw = String(req.params?.owner ?? (req.body as Record<string, unknown> | undefined)?.owner ?? '');
+        const named = raw === 'me' ? '' : raw;
+        const rawOwner = req.auth!.owner;
+        const callerOwner = rawOwner.includes('@') ? rawOwner.split('@')[0] : rawOwner;
+        const t = await resolveAppTarget(storage, config, {
+            callerOwner,
+            requestedOwner: named,
+            filename: String(req.params?.filename ?? (req.body as Record<string, unknown> | undefined)?.filename ?? ''),
+            act,
+        });
+        return t.ok
+            ? { ok: true as const, owner: t.ownerName, ownerGhii: t.ownerGhii, delegated: t.delegated }
+            : { ok: false as const, status: t.status, code: t.code, message: t.message };
     };
 
     registerCatalogueAdminRoutes(router, config, storage, peers, canonicalOwner);
-    registerReadRoutes(router, config, storage, canonicalOwner);
-    registerPublishRoutes(router, config, storage, canonicalOwner);
-    registerDraftRoutes(router, config, storage, canonicalOwner);
-    registerForkManageRoutes(router, config, storage, canonicalOwner);
+    registerReadRoutes(router, config, storage, canonicalOwner, appTarget);
+    registerPublishRoutes(router, config, storage, appTarget);
+    registerDraftRoutes(router, config, storage, appTarget);
+    registerForkManageRoutes(router, config, storage, canonicalOwner, appTarget);
     registerLegalRoutes(router, config, storage, canonicalOwner);
+    registerRoadmapRoutes(router, config, storage, appTarget);
     registerAppAgentRoutes(router, config, storage);
     // The operator's search-visibility surface: the node's own status, and the per-app block and
     // approval. Registered here rather than in its own mount so it reuses this router's

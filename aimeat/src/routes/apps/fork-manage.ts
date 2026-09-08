@@ -39,13 +39,14 @@ import { applyOwnerMarksUpdate, appMarksState } from '../../services/app-marks.j
 import { applyOwnerLegalUpdate, appLegalState, legalReadiness, appSellsForMoney } from '../../services/app-legal.js';
 import { recordAppAudit, type AppAuditAction } from '../../services/app-audit.js';
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
-import type { CanonicalOwner } from './helpers.js';
+import { appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.js';
 
 export function registerForkManageRoutes(
     router: Router,
     config: AimeatConfig,
     storage: Storage,
     canonicalOwner: CanonicalOwner,
+    appTarget: AppTargetFor,
 ): void {
     // POST /v1/apps/:owner/:filename/fork — Fork an app into YOUR OWN catalogue.
     // Authorization has two independent gates, both must pass:
@@ -142,7 +143,17 @@ export function registerForkManageRoutes(
     // independent: each is applied only when present.
     router.patch('/v1/apps/:filename', requireAuth(), requireScope('app:write'), async (req, res) => {
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
-        const { owner, ownerGhii } = await canonicalOwner(req);
+        // WHICH act this PATCH is depends on what it carries. Renaming an app and rewriting its
+        // description is how it presents itself; everything else here is how it is OFFERED - who may
+        // fork it, what it costs to get in, its legal pages, its search visibility - and a rung that
+        // stops at `presentation` does not reach any of that. Read from the body BEFORE the target is
+        // resolved, because the act is what the rung is measured against.
+        const patchBody = (req.body ?? {}) as Record<string, unknown>;
+        const PRESENTATION = new Set(['name', 'description', 'descriptions', 'owner', 'ai_provenance', 'ai_provenance_id']);
+        const touchesOffering = Object.keys(patchBody).some(k => !PRESENTATION.has(k));
+        const t = await appTargetOr(appTarget, config, req, res, touchesOffering ? 'operate' : 'presentation');
+        if (!t) return;
+        const { owner, ownerGhii, delegated } = t;
         const filename = req.params.filename as string;
 
         // Same lookup order as DELETE: canonical owner-GHII bucket first,
@@ -351,7 +362,11 @@ export function registerForkManageRoutes(
         // The owner NAME is not that test; every principal here carries it.
         if ('marks' in body || 'author' in body) {
             const roles = req.auth!.roles;
-            const ownerPrincipal = roles.includes('owner') && !roles.includes('app')
+            // Never for a delegate, whatever rung they hold. Declaring the natural person who
+            // answers for an app is the account holder's own act, and somebody signed in as the
+            // owner of THEIR account is not the owner of this one.
+            const ownerPrincipal = delegated === null
+                && roles.includes('owner') && !roles.includes('app')
                 && !roles.includes('agent') && !roles.includes('ecosystem');
             const out = await applyOwnerMarksUpdate(storage, { ownerGaii: effectiveGaii, filename }, {
                 ...('marks' in body ? { marks: body.marks } : {}),

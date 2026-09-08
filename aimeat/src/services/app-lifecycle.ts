@@ -51,7 +51,7 @@ import type {
   Storage, AppManifest, AppProtection, AppRecord, AppDraftRecord,
 } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
-import { ownAppScope } from './app-dev-grant.js';
+import { ownAppScope, resolveAppTarget, type AppDevAct } from './app-dev-grant.js';
 import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
 import { recordPublicActivity } from './public-activity.js';
@@ -96,6 +96,29 @@ export interface AppOwnerScope {
  *
  * Returns null when the principal is not a GAII, which is the tools' existing "Failed to parse" case.
  */
+/**
+ * The same question with a TARGET owner allowed: which bucket, or the sentence to refuse with.
+ *
+ * The MCP tools are the second surface of every app door, and a parameter that exists on one surface
+ * and not the other is a capability half the fleet cannot reach. `owner` is optional and absent means
+ * what it has always meant. The decision itself is `resolveAppTarget`, the same function the HTTP
+ * doors ask, so there is one place where a rung is measured against an act.
+ */
+export async function resolveAppTargetScope(
+  storage: Storage, config: AimeatConfig,
+  input: { principal: string; owner?: string | undefined; filename?: string | undefined; act: AppDevAct },
+): Promise<AppOwnerScope | { refusal: string } | null> {
+  const parsed = parseGAII(input.principal);
+  if (!parsed) return null;
+  const t = await resolveAppTarget(storage, config, {
+    callerOwner: parsed.owner,
+    requestedOwner: input.owner,
+    filename: input.filename,
+    act: input.act,
+  });
+  return t.ok ? { ownerName: t.ownerName, ownerGhii: t.ownerGhii } : { refusal: t.message };
+}
+
 export async function resolveAppOwnerScope(
   storage: Storage, config: AimeatConfig, principal: string,
 ): Promise<AppOwnerScope | null> {

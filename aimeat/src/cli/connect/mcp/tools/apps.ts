@@ -37,6 +37,8 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
 
   mcp.tool('aimeat_app_publish', descriptionFor('aimeat_app_publish'), {
     filename: z.string().describe('App filename, e.g. "starwars.html"'),
+    roadmap: z.string().optional().describe('One sentence saying what this version changes, in your own words. It goes on the app roadmap, and it is REQUIRED when somebody else helps build this app.'),
+    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
     content: z.string().optional().describe('The app HTML as plain text — this door base64-encodes it for you'),
     content_base64: z.string().optional().describe('Already-encoded HTML, if you did the encoding yourself'),
     name: z.string().describe('Display name shown in the catalogue'),
@@ -47,10 +49,18 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     version: z.string().optional().describe('Semver display version. Generated if omitted.'),
     ...aiProvenanceInputs,
   }, annotationsFor('aimeat_app_publish'), async (a) => {
+    const targetOwner = a.owner;
     // POST /v1/apps takes `content` base64-encoded and 400s on plain text; encode here so the
     // caller does not have to know the rule.
     const encoded = a.content_base64 ?? (a.content !== undefined ? Buffer.from(a.content, 'utf-8').toString('base64') : undefined);
-    const body: Record<string, unknown> = { filename: a.filename, name: a.name, ...(encoded !== undefined ? { content: encoded } : {}) };
+    const body: Record<string, unknown> = {
+      filename: a.filename, name: a.name,
+      // No path to carry it on this door, so the target owner travels in the body, which is what
+      // POST /v1/apps reads.
+      ...(targetOwner ? { owner: targetOwner } : {}),
+      ...(a.roadmap ? { roadmap: a.roadmap } : {}),
+      ...(encoded !== undefined ? { content: encoded } : {}),
+    };
     for (const f of ['description', 'category', 'icon', 'version'] as const) if (a[f]) body[f] = a[f];
     if (a.tags) body.tags = a.tags;
     if (a.ai_provenance_id) body.ai_provenance_id = a.ai_provenance_id;
@@ -114,9 +124,10 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     category: z.string().optional().describe('Filter by category'),
     tag: z.string().optional().describe('Filter by tag'),
     own: z.boolean().optional().describe("List only your own owner's apps"),
+    building: z.boolean().optional().describe('Apps somebody else asked you to help build, instead of your own. Needs a signed-in caller.'),
     limit: z.number().int().min(1).max(200).optional().describe('How many to return (default 50, max 200)'),
     offset: z.number().int().min(0).optional().describe('How many to skip; with has_more this reads the whole catalogue'),
-  }, annotationsFor('aimeat_app_list'), async ({ search, category, tag, own, limit, offset }) => {
+  }, annotationsFor('aimeat_app_list'), async ({ search, category, tag, own, building, limit, offset }) => {
     const params = new URLSearchParams();
     // GET /v1/apps reads `q`, not `search`. Sent under the wrong name the filter was dropped and the
     // whole catalogue came back as though it had been searched.
@@ -124,6 +135,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     if (category) params.set('category', category);
     if (tag) params.set('tag', tag);
     if (own) params.set('own', 'true');
+    if (building) params.set('building', 'true');
     if (limit !== undefined) params.set('limit', String(limit));
     if (offset !== undefined) params.set('offset', String(offset));
     const qs = params.toString() ? `?${params.toString()}` : '';
@@ -282,75 +294,80 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   // → PUT /v1/apps/:owner/:filename/draft — stage the next version (owner resolved server-side).
   mcp.tool('aimeat_app_draft_save', descriptionFor('aimeat_app_draft_save'), {
     filename: z.string().describe('App filename, e.g. "shop.html".'),
+    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
     content: z.string().describe('Base64-encoded HTML of the draft.'),
     name: z.string().optional().describe('Display name (defaults to the live app\'s).'),
     description: z.string().optional().describe('Description (defaults to the live app\'s).'),
     category: z.string().optional().describe('Category (defaults to the live app\'s).'),
     tags: z.array(z.string()).optional().describe('Tags (default: the live app\'s).'),
     icon: z.string().optional().describe('Emoji icon (defaults to the live app\'s).'),
-  }, annotationsFor('aimeat_app_draft_save'), async ({ filename, content, name, description, category, tags, icon }) => {
+  }, annotationsFor('aimeat_app_draft_save'), async ({ owner: targetOwner, filename, content, name, description, category, tags, icon }) => {
     const body: Record<string, unknown> = { content };
     if (name) body.name = name;
     if (description !== undefined) body.description = description;
     if (category) body.category = category;
     if (tags) body.tags = tags;
     if (icon) body.icon = icon;
-    return out(await client.put(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft`, body));
+    return out(await client.put(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/draft`, body));
   });
 
   // → POST /v1/apps/:owner/:filename/draft/write — append a piece of the draft, or replace it.
   //   Plain text rather than base64: the caller is composing HTML, not moving a file.
   mcp.tool('aimeat_app_draft_write', descriptionFor('aimeat_app_draft_write'), {
     filename: z.string().describe('App filename this draft stages (e.g. "pong.html").'),
+    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
     content: z.string().describe('The text to write. Plain UTF-8, not base64.'),
     mode: z.enum(['append', 'replace']).optional().describe('append (default) adds to the end; replace overwrites the whole draft.'),
     expected_size_bytes: z.number().int().nonnegative().optional().describe('Refuse unless the draft is currently this many bytes.'),
     name: z.string().optional().describe('Display name (defaults to the live app\'s, or the draft\'s once set).'),
     description: z.string().optional().describe('Description (defaults to the live app\'s, or the draft\'s once set).'),
-  }, annotationsFor('aimeat_app_draft_write'), async ({ filename, content, mode, expected_size_bytes, name, description }) => {
+  }, annotationsFor('aimeat_app_draft_write'), async ({ owner: targetOwner, filename, content, mode, expected_size_bytes, name, description }) => {
     const body: Record<string, unknown> = { content };
     if (mode) body.mode = mode;
     if (expected_size_bytes !== undefined) body.expected_size_bytes = expected_size_bytes;
     if (name) body.name = name;
     if (description !== undefined) body.description = description;
-    return out(await client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/write`, body));
+    return out(await client.post(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/draft/write`, body));
   });
 
   // → POST /v1/apps/:owner/:filename/draft/replace — exact old → new inside the draft.
   mcp.tool('aimeat_app_draft_replace', descriptionFor('aimeat_app_draft_replace'), {
     filename: z.string().describe('App filename whose draft to edit.'),
+    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
     old_string: z.string().describe('The exact text to replace, including indentation.'),
     new_string: z.string().describe('What to put there instead.'),
     replace_all: z.boolean().optional().describe('Replace every occurrence instead of requiring exactly one. Default false.'),
-  }, annotationsFor('aimeat_app_draft_replace'), async ({ filename, old_string, new_string, replace_all }) => {
+  }, annotationsFor('aimeat_app_draft_replace'), async ({ owner: targetOwner, filename, old_string, new_string, replace_all }) => {
     const body: Record<string, unknown> = { old_string, new_string };
     if (replace_all) body.replace_all = true;
-    return out(await client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/replace`, body));
+    return out(await client.post(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/draft/replace`, body));
   });
 
   // → GET /v1/apps/:owner/:filename/draft/lines — a line range, not the whole slot.
   mcp.tool('aimeat_app_draft_read', descriptionFor('aimeat_app_draft_read'), {
     filename: z.string().describe('App filename whose draft to read.'),
+    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
     offset: z.number().int().min(1).optional().describe('First line to return, 1-based. Default 1.'),
     limit: z.number().int().min(1).optional().describe('How many lines to return. Default 400, maximum 2000.'),
-  }, annotationsFor('aimeat_app_draft_read'), async ({ filename, offset, limit }) => {
+  }, annotationsFor('aimeat_app_draft_read'), async ({ owner: targetOwner, filename, offset, limit }) => {
     const qs = new URLSearchParams();
     if (offset !== undefined) qs.set('offset', String(offset));
     if (limit !== undefined) qs.set('limit', String(limit));
     const query = qs.toString() ? `?${qs.toString()}` : '';
-    return out(await client.get(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/lines${query}`));
+    return out(await client.get(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/draft/lines${query}`));
   });
 
   // → POST /v1/apps/:owner/:filename/draft/seed — copy a published version into the slot.
   mcp.tool('aimeat_app_draft_seed', descriptionFor('aimeat_app_draft_seed'), {
     filename: z.string().describe('The draft slot to write into.'),
+    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
     from_filename: z.string().optional().describe('The published app to copy from. Defaults to filename.'),
     version: z.number().int().min(1).optional().describe('Which published version. Defaults to the newest.'),
-  }, annotationsFor('aimeat_app_draft_seed'), async ({ filename, from_filename, version }) => {
+  }, annotationsFor('aimeat_app_draft_seed'), async ({ owner: targetOwner, filename, from_filename, version }) => {
     const body: Record<string, unknown> = {};
     if (from_filename) body.from_filename = from_filename;
     if (version !== undefined) body.version = version;
-    return out(await client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/seed`, body));
+    return out(await client.post(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/draft/seed`, body));
   });
 
   // → POST /v1/ai/image — make a picture on the owner's key; the bytes land in storage, not here.
@@ -381,9 +398,11 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   // → POST /v1/apps/:owner/:filename/publish-draft — promote the draft to a new live version.
   mcp.tool('aimeat_app_draft_publish', descriptionFor('aimeat_app_draft_publish'), {
     filename: z.string().describe('App filename whose draft to publish.'),
+    roadmap: z.string().optional().describe('One sentence saying what this version changes, in your own words. It goes on the app roadmap, and it is REQUIRED when somebody else helps build this app.'),
+    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
     ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_app_draft_publish'), async ({ filename, ai_provenance, ai_provenance_id }) => {
-    const resp = await client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/publish-draft`);
+  }, annotationsFor('aimeat_app_draft_publish'), async ({ owner: targetOwner, filename, ai_provenance, ai_provenance_id }) => {
+    const resp = await client.post(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/publish-draft`);
     if (resp.ok === false) return out(resp);
     return provenanceEchoedResult(client,
       { tool: 'aimeat_app_draft_publish', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
@@ -392,8 +411,9 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   // → DELETE /v1/apps/:owner/:filename/draft — discard the draft (live app untouched).
   mcp.tool('aimeat_app_draft_discard', descriptionFor('aimeat_app_draft_discard'), {
     filename: z.string().describe('App filename whose draft to discard.'),
-  }, annotationsFor('aimeat_app_draft_discard'), async ({ filename }) => {
-    return out(await client.delete(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft`));
+    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
+  }, annotationsFor('aimeat_app_draft_discard'), async ({ owner: targetOwner, filename }) => {
+    return out(await client.delete(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/draft`));
   });
 
   // → PATCH /v1/apps/:filename — the app owner's own search-visibility switch and wording.

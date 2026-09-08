@@ -203,6 +203,8 @@ export const appTools: ConnectCliToolDefinition[] = [
         description: 'Publish a single-file web app to this node. It gets a public web address a person can open.',
         input: {
             filename: { type: 'string', required: true, description: 'App filename, e.g. "starwars.html". Alphanumeric, dots, hyphens, underscores.' },
+            owner: { type: 'string', description: 'Whose catalogue the app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.' },
+            roadmap: { type: 'string', description: 'One sentence saying what this version changes, in your own words. It goes on the app roadmap, and it is required when somebody else helps build this app.' },
             content: { type: 'string', description: 'The app HTML as plain text — this door base64-encodes it for you. Use @file:path to load from disk.' },
             content_base64: { type: 'string', description: 'Already-encoded HTML, if you did the encoding yourself.' },
             name: { type: 'string', required: true, description: 'Display name shown in the catalogue.' },
@@ -225,7 +227,7 @@ export const appTools: ConnectCliToolDefinition[] = [
                 name: requiredString(input, 'name'),
                 ...(encoded !== undefined ? { content: encoded } : {}),
             };
-            for (const field of ['description', 'category', 'icon', 'version', 'mime_type'] as const) {
+            for (const field of ['description', 'category', 'icon', 'version', 'mime_type', 'owner', 'roadmap'] as const) {
                 const v = optionalString(input, field);
                 if (v) body[field] = v;
             }

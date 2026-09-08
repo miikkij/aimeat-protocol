@@ -1,16 +1,17 @@
 /**
  * @file e2e-app-dev-grant.ts
  * @description The development right: the owner saying who, other than themselves, may build one of
- *   their apps. Phase 1 and 2 of the shared-app work, so what is asserted here is the GRANT and the
- *   refusals around it, plus one thing that has to still be true afterwards.
+ *   their apps: the grant, the refusals around it, and the rung actually reaching their catalogue.
  *
- *   The last group is the point of the file. Nothing about where an app write LANDS is meant to have
- *   changed yet: both doors now ask one function instead of two copies, and with nobody else's app
- *   named the answer has to be the caller's own bucket, exactly as before. A holder of a full
- *   development right publishing today still lands in their OWN catalogue, because no door accepts a
- *   target owner yet. That assertion is what makes the next phase a change rather than a discovery.
+ *   The last group is the point of the file: a rung actually reaching somebody else's catalogue, and
+ *   every edge around it. A publish that names an owner lands in THEIR bucket and not the caller's,
+ *   a rung that stops short is refused with the rung it holds named, the price is refused whatever
+ *   the rung, and a revoked right stops the next call. The owner publishing their own app is
+ *   asserted in the same group, because that is the path every other app on the node still takes.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-dev-grant
  * @version-history
+ *   v1.1.0 — 2026-09-08 — Phase 3: the doors accept a target owner, so the suite stops asserting
+ *     that the right reaches nothing and starts asserting what it reaches.
  *   v1.0.0 — 2026-09-08 — Initial.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -45,10 +46,10 @@ async function setupOwner(label: string) {
 
 const html = (s: string) => Buffer.from(`<!doctype html><meta name="viewport" content="width=device-width"><h1>${s}</h1>`).toString('base64');
 
-async function publish(token: string, filename: string, body: string) {
+async function publish(token: string, filename: string, body: string, extra: Record<string, unknown> = {}) {
     return json('/v1/apps', {
         method: 'POST', headers: auth(token),
-        body: JSON.stringify({ filename, name: 'Dev grant demo', description: 'dev grant e2e', content: html(body) }),
+        body: JSON.stringify({ filename, name: 'Dev grant demo', description: 'dev grant e2e', content: html(body), ...extra }),
     });
 }
 
@@ -212,31 +213,150 @@ await test('a role change at the roster door does not quietly revoke the right',
     assert(grants.body.data.grants[0].levelName === 'full', 'and it is still the rung that was given');
 });
 
-// ── What must NOT have changed yet ────────────────────────────────────────────────────────────────
+// -- Building somebody else's app ------------------------------------------------------------------
 
 await test('the owner still publishes their own app exactly as before', async () => {
     const before = await json(`/v1/apps/${owner.name}/${APP}/versions`, { headers: auth(owner.token) });
     const n = (before.body.data.versions as any[]).length;
-    const pub = await publish(owner.token, APP, 'v2');
+    const pub = await publish(owner.token, APP, 'v2', { roadmap: 'A second version, for the version count.' });
     assert(pub.status === 200 || pub.status === 201, `re-publish ${pub.status}`);
     const after = await json(`/v1/apps/${owner.name}/${APP}/versions`, { headers: auth(owner.token) });
-    assert((after.body.data.versions as any[]).length === n + 1, 'a version was added to the owner\'s own app');
+    assert((after.body.data.versions as any[]).length === n + 1, "a version was added to the owner's own app");
 });
 
-await test('a full development right does not yet reach the other owner\'s catalogue', async () => {
-    // Phase 3 is what opens the doors to a named target owner. Until then a holder publishing the
-    // same filename is publishing THEIR OWN app, and the assertion exists so that turning phase 3 on
-    // is a visible change here rather than something discovered in production.
-    const ownerBefore = await json(`/v1/apps/${owner.name}/${APP}/versions`, { headers: auth(owner.token) });
-    const n = (ownerBefore.body.data.versions as any[]).length;
+await test("a full right publishes INTO the owner's catalogue, not the builder's own", async () => {
+    const before = await json(`/v1/apps/${owner.name}/${APP}/versions`, { headers: auth(owner.token) });
+    const n = (before.body.data.versions as any[]).length;
 
-    const pub = await publish(builder.token, APP, 'from the builder');
-    assert(pub.status === 200 || pub.status === 201, `builder publish ${pub.status}`);
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: auth(builder.token),
+        body: JSON.stringify({
+            filename: APP, owner: owner.name, name: 'Dev grant demo',
+            description: 'published by the builder', content: html('from the builder'),
+            roadmap: 'The builder published this one.',
+        }),
+    });
+    assert(pub.status === 200 || pub.status === 201, `delegated publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
 
-    const mine = await json(`/v1/apps/${builder.name}/${APP}/versions`, { headers: auth(builder.token) });
-    assert(mine.status === 200, 'it landed in the builder\'s own catalogue');
-    const ownerAfter = await json(`/v1/apps/${owner.name}/${APP}/versions`, { headers: auth(owner.token) });
-    assert((ownerAfter.body.data.versions as any[]).length === n, 'and the owner\'s app was untouched');
+    const after = await json(`/v1/apps/${owner.name}/${APP}/versions`, { headers: auth(owner.token) });
+    assert((after.body.data.versions as any[]).length === n + 1, "the OWNER's app gained the version");
+    const mine = await json(`/v1/apps/${builder.name}/${APP}`, {});
+    assert(mine.status === 404, `and nothing landed in the builder's own catalogue (got ${mine.status})`);
+});
+
+await test("the builder writes the owner's draft through the path that names them", async () => {
+    const w = await json(`/v1/apps/${owner.name}/${APP}/draft/write`, {
+        method: 'POST', headers: auth(builder.token),
+        body: JSON.stringify({ content: '<p>a line from the builder</p>', mode: 'append' }),
+    });
+    assert(w.status === 200, `draft write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+    const read = await json(`/v1/apps/${owner.name}/${APP}/draft`, { headers: auth(owner.token) });
+    assert(read.status === 200, 'and the owner can read the draft that resulted');
+});
+
+await test('a stranger with no right is refused, and the app is untouched', async () => {
+    const before = await json(`/v1/apps/${owner.name}/${APP}/versions`, { headers: auth(owner.token) });
+    const n = (before.body.data.versions as any[]).length;
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: auth(stranger.token),
+        body: JSON.stringify({ filename: APP, owner: owner.name, name: 'x', description: 'x', content: html('nope') }),
+    });
+    assert(pub.status === 403, `expected 403, got ${pub.status}`);
+    const after = await json(`/v1/apps/${owner.name}/${APP}/versions`, { headers: auth(owner.token) });
+    assert((after.body.data.versions as any[]).length === n, 'no version was added by the attempt');
+});
+
+await test('a name nobody answers to is a 404, not a new catalogue', async () => {
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: auth(builder.token),
+        body: JSON.stringify({ filename: APP, owner: 'nobodyhere9999', name: 'x', description: 'x', content: html('nope') }),
+    });
+    assert(pub.status === 404, `expected 404, got ${pub.status}`);
+});
+
+await test('a drafter may write the draft and may not publish it', async () => {
+    const set = await json(grantPath(owner.name, builder.name), {
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ level: 'drafter' }),
+    });
+    assert(set.status === 200, `narrow to drafter ${set.status}`);
+
+    const w = await json(`/v1/apps/${owner.name}/${APP}/draft/write`, {
+        method: 'POST', headers: auth(builder.token),
+        body: JSON.stringify({ content: '<p>still allowed</p>', mode: 'append' }),
+    });
+    assert(w.status === 200, `draft write ${w.status}`);
+
+    const pub = await json(`/v1/apps/${owner.name}/${APP}/publish-draft`, {
+        method: 'POST', headers: auth(builder.token), body: JSON.stringify({}),
+    });
+    assert(pub.status === 403, `expected 403 on publish-draft, got ${pub.status}`);
+    assert(String(pub.body.error?.message).includes('drafter'), 'and the refusal names the rung they hold');
+});
+
+await test('no rung carries what the app costs', async () => {
+    await json(grantPath(owner.name, builder.name), {
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ level: 'full' }),
+    });
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: auth(builder.token),
+        body: JSON.stringify({
+            filename: APP, owner: owner.name, name: 'Dev grant demo', description: 'x',
+            content: html('priced'), price_morsels: 500,
+        }),
+    });
+    assert(pub.status === 403, `expected 403, got ${pub.status}`);
+    assert(String(pub.body.error?.message).toLowerCase().includes('price'), 'and it says why');
+});
+
+await test('a publisher may not touch how the app is offered', async () => {
+    await json(grantPath(owner.name, builder.name), {
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ level: 'publisher' }),
+    });
+    // `parked` is not presentation: it decides whether anybody can reach the app at all.
+    const patch = await json(`/v1/apps/${APP}`, {
+        method: 'PATCH', headers: auth(builder.token),
+        body: JSON.stringify({ owner: owner.name, parked: true }),
+    });
+    assert(patch.status === 403, `expected 403, got ${patch.status}`);
+
+    const rename = await json(`/v1/apps/${APP}`, {
+        method: 'PATCH', headers: auth(builder.token),
+        body: JSON.stringify({ owner: owner.name, description: 'renamed by the builder' }),
+    });
+    assert(rename.status === 200, `but a description IS presentation (got ${rename.status})`);
+});
+
+await test('taking the right back stops the next publish', async () => {
+    const r = await json(grantPath(owner.name, builder.name), { method: 'DELETE', headers: auth(owner.token) });
+    assert(r.status === 200, `revoke ${r.status}`);
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: auth(builder.token),
+        body: JSON.stringify({ filename: APP, owner: owner.name, name: 'x', description: 'x', content: html('after revoke') }),
+    });
+    assert(pub.status === 403, `expected 403 after revoke, got ${pub.status}`);
+});
+
+await test('a blanket right reaches an app that has no roster row of its own', async () => {
+    const OTHER = 'devgrant-second.html';
+    const made = await publish(owner.token, OTHER, 'second app');
+    assert(made.status === 200 || made.status === 201, `publish second app ${made.status}`);
+
+    const before = await json(`/v1/apps/${owner.name}/${OTHER}/versions`, { headers: auth(owner.token) });
+    const n = (before.body.data.versions as any[]).length;
+
+    await json(`/v1/app-dev-grants/${builder.name}`, {
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ level: 'publisher' }),
+    });
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: auth(builder.token),
+        body: JSON.stringify({
+            filename: OTHER, owner: owner.name, name: 'Second', description: 'x',
+            content: html('blanket'), roadmap: 'Reached through the blanket right.',
+        }),
+    });
+    assert(pub.status === 200 || pub.status === 201, `blanket publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+    const after = await json(`/v1/apps/${owner.name}/${OTHER}/versions`, { headers: auth(owner.token) });
+    assert((after.body.data.versions as any[]).length === n + 1, "the owner's second app gained the version");
 });
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

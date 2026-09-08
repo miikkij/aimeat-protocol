@@ -11,6 +11,9 @@
  * @structure AppsTab — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'apps'.
  * @version-history
+ *   v2.1.0 — 2026-09-08 — Who else may build these apps: the blanket list, the per-app rights,
+ *     and the form that gives one. A right that can only be read back by asking an AI is a
+ *     right whose holder its owner eventually forgets.
  *   v2.0.0 — 2026-09-02 — The poster face (design canvas "AIMEAT Sovellukset-sivu", direction A).
  *     The card per app is gone: on the production node that was 155 cards, 61 screens and 166
  *     requests on open (the list twice, one skill fetch per card). Skills are read once through the
@@ -34,7 +37,7 @@ import { t } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
 import { listApps, uploadApp, patchApp } from '/js/services/apps.js';
 import * as skillsService from '/js/services/skills.js';
-import { apiGet, apiGetText, apiPost, apiDelete } from '/js/api.js';
+import { apiGet, apiGetText, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { recordRecent } from '/js/recents.js';
 import { swallowed } from '/js/swallowed.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
@@ -49,6 +52,8 @@ export default function AppsTab({ session, showToast, onStats }) {
   const [communityOwners, setCommunityOwners] = useState(0);
   const [bound, setBound] = useState({});          // "owner/filename" → the skills bound to it
   const [grants, setGrants] = useState([]);
+  const [builders, setBuilders] = useState(null);  // who else may build these apps
+  const [buildersBusy, setBuildersBusy] = useState(false);
   const [buildPrompt, setBuildPrompt] = useState('');
   const [busy, setBusy] = useState(null);          // the row or job in flight
   const [diff, setDiff] = useState(null);          // { ref, state, result } for the one open draft
@@ -93,6 +98,28 @@ export default function AppsTab({ session, showToast, onStats }) {
       const res = await apiGet('/v1/app-grants');
       setGrants(res?.data?.grants || []);
     } catch (err) { swallowed('apps-tab: grants', err); setGrants([]); }
+    try {
+      // WHO ELSE MAY BUILD THESE. The blanket list is one read; the per-app rights are one read per
+      // app, which is fine because it is the owner's own apps and the page already has that list.
+      // Kept apart from the loads above for the same reason they are apart from each other: a
+      // failure here must not blank the apps.
+      const all = await apiGet('/v1/app-dev-grants');
+      const own = (await listApps()).filter((x) => x.owner === session.owner);
+      const perApp = {};
+      await Promise.all(own.map(async (x) => {
+        try {
+          const r = await apiGet(`/v1/apps/${encodeURIComponent(x.owner)}/${encodeURIComponent(x.filename)}/dev-grants`);
+          const rows = r?.data?.grants || [];
+          if (rows.length) perApp[`${x.owner}/${x.filename}`] = rows;
+        } catch (err) { swallowed('apps-tab: dev-grants per app', err); }
+      }));
+      setBuilders({ blanket: all?.data?.grants || [], perApp });
+    } catch (err) {
+      // `false`, not an empty list. A failed read that renders as "nobody builds these" is a
+      // screen telling the owner something untrue about who has power over their apps.
+      swallowed('apps-tab: dev-grants', err);
+      setBuilders(false);
+    }
   }, [session]);
 
   useEffect(() => { if (session) load(); }, [session, load]);
@@ -229,8 +256,39 @@ Start by asking me which app and what I want changed. Fill a data map (aimeat_da
 
   const recordOpen = (app) => recordRecent({ type: 'app', id: appRef(app), label: nameOf(app), data: { owner: app.owner, filename: app.filename } });
 
+  /* ── who else may build these apps ── */
+
+  async function onGrantBuilder({ account, level, appId }) {
+    setBuildersBusy(true);
+    try {
+      const path = appId
+        ? `/v1/apps/${appId.split('/').map(encodeURIComponent).join('/')}/dev-grants/${encodeURIComponent(account)}`
+        : `/v1/app-dev-grants/${encodeURIComponent(account)}`;
+      await apiPut(path, { level });
+      showToast?.(a('bldGrantedToast', { who: account }));
+      await load();
+    } catch (e) { fail(e); }
+    finally { setBuildersBusy(false); }
+  }
+
+  function onRevokeBuilder({ account, appId }) {
+    confirm(a('bldRevokeConfirm', { who: account }), async () => {
+      setBuildersBusy(true);
+      try {
+        const path = appId
+          ? `/v1/apps/${appId.split('/').map(encodeURIComponent).join('/')}/dev-grants/${encodeURIComponent(account)}`
+          : `/v1/app-dev-grants/${encodeURIComponent(account)}`;
+        await apiDelete(path);
+        showToast?.(a('bldRevokedToast', { who: account }));
+        await load();
+      } catch (e) { fail(e); }
+      finally { setBuildersBusy(false); }
+    });
+  }
+
   const ctx = {
     session, apps, community, communityOwners, bound, grants, buildPrompt, busy, diff, openScopes,
+    builders, buildersBusy, onGrantBuilder, onRevokeBuilder,
     kunto: computeKunto(apps || [], bound), ConfirmUI, showToast,
     publishDraft, discardDraft, toggleDiff, revokeGrant, toggleScopes: (g) => setOpenScopes(openScopes === g.grant_id ? null : g.grant_id),
     upload, recordOpen, managePrompt,

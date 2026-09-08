@@ -141,22 +141,32 @@ async function main() {
             for (const door of doors) {
                 await test(`another owner: ${door} cannot overwrite the first owner's app`, async () => {
                     const before = await rawLive();
+                    // THE INVARIANT IS UNCHANGED AND IS THE LAST LINE OF THIS TEST: another owner
+                    // must not overwrite the first owner's app. What changed on 2026-09-08 is the
+                    // MECHANISM, and this test asserted the mechanism.
+                    //
+                    // A supplied `owner` used to be ignored, so a cross-owner publish quietly landed
+                    // in the CALLER's own bucket and answered 201. Naming another owner now means
+                    // what it says, and without a development right from them it is refused. Same
+                    // invariant, a refusal instead of a silent redirection — and the refusal is the
+                    // better answer, because the old one told the caller they had published to
+                    // somebody else's app when they had published to their own.
                     if (door === 'draft') {
                         await draft('first-owner-pending');
                         const r = await invoke(door, otherToken, 'cross-owner');
-                        assert(r.status === 404, `cross-owner promotion ${r.status}`);
+                        assert(r.status === 403, `cross-owner promotion ${r.status}`);
                         const saved = await json(`/v1/apps/${owner}/${filename}/draft`, ownerToken, undefined, 'GET');
                         assert(saved.status === 200, 'other owner consumed the draft');
                     } else {
-                        // Publishing is caller-scoped: supplied owner fields cannot redirect the bucket.
                         const r = await json('/v1/apps', otherToken, { owner, ownerGaii: `${owner}@${reg.body.node}`,
                             filename, name: 'Other owner', description: 'Cross-owner publishing regression.',
                             ...(door === 'inline' ? { content: b64(html(filename, 'cross-owner')) } : { mode: 'presigned' }) });
-                        assert(r.status === (door === 'presigned' ? 200 : 201), `own-bucket publishing ${r.status}`);
-                        if (door === 'presigned') {
-                            const uploaded = await fetch(r.body.data.upload_url, { method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: html(filename, 'cross-owner') });
-                            assert(uploaded.ok, `own-bucket upload ${uploaded.status}`);
-                        }
+                        assert(r.status === 403, `naming another owner without a right ${r.status}`);
+                        // And nothing landed anywhere: not in the first owner's bucket (asserted
+                        // below) and not in the caller's own either, which is what the 201 used to
+                        // leave behind.
+                        const mine = await json(`/v1/apps/${other}/${filename}`, otherToken, undefined, 'GET');
+                        assert(mine.status === 404, `refused publish left a copy behind (${mine.status})`);
                     }
                     assert(await rawLive() === before, 'another owner overwrote the first owner');
                 });

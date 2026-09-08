@@ -13,6 +13,7 @@
  * @usage import { renderPage } from './apps/page.js';
  * @version-history
  *   v1.0.0 — 2026-09-02 — Initial.
+ *   v1.2.0 — 2026-09-08 — The builders section: who else may build these apps.
  *   v1.1.0 — 2026-09-03 — A newest row says what the app needs (requiresLine): the cortexes it loads and the extensions it calls, with a pinned version after the at sign.
  */
 import { h } from 'preact';
@@ -23,6 +24,7 @@ import { CopyButton } from '/components/CopyButton.js';
 import { Section, scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { a, day, rel, kb, locale, nameOf, appRef, appUrl, catalogUrl, noteFor, initials, crumb, pageLinks, goTab } from './frame.js';
 import { secAgents, secBuild } from './build.js';
+import { secBuilders } from './builders.js';
 
 export function renderPage(ctx) {
   const apps = ctx.apps || [];
@@ -53,7 +55,7 @@ export function renderPage(ctx) {
 
   const railItems = none
     ? [['01', 'ap-first', a('secFirst'), ''], ['02', 'ap-waiting', a('secWaiting'), 0], ['03', 'ap-kunto', a('secKunto'), ''], ['04', 'ap-build', a('uploadLabel'), '']]
-    : [['01', 'ap-waiting', a('secWaiting'), waiting], ['02', 'ap-kunto', a('secKunto'), ''], ['03', 'ap-newest', a('secNewest'), Math.min(apps.length, 6)], ['04', 'ap-agents', a('secAgents'), ''], ['05', 'ap-build', a('secBuild'), '']];
+    : [['01', 'ap-waiting', a('secWaiting'), waiting], ['02', 'ap-kunto', a('secKunto'), ''], ['03', 'ap-newest', a('secNewest'), Math.min(apps.length, 6)], ['04', 'ap-agents', a('secAgents'), ''], ['05', 'ap-build', a('secBuild'), ''], ['06', 'ap-builders', a('secBuilders'), '']];
 
   return html`
     <div class="og og-apps">
@@ -84,7 +86,7 @@ export function renderPage(ctx) {
         <div class="og-main">
           ${none ? html`${secFirst(ctx)}${secWaiting(ctx, drafts, grants, '02')}${secKunto(ctx, '03')}${secBuild(ctx, { formOnly: true, num: '04' })}`
             : loading ? html`<p class="og-empty">${t('common.loading')}</p>`
-            : html`${secWaiting(ctx, drafts, grants, '01')}${secKunto(ctx, '02')}${secNewest(ctx, apps)}${secAgents(ctx)}${secBuild(ctx, { formOnly: false, num: '05' })}`}
+            : html`${secWaiting(ctx, drafts, grants, '01')}${secKunto(ctx, '02')}${secNewest(ctx, apps)}${secAgents(ctx)}${secBuild(ctx, { formOnly: false, num: '05' })}${secBuilders(ctx)}`}
         </div>
         <nav class="og-rail" aria-label=${a('railTitle')}>
           <span class="og-rail-label">${a('railTitle')}</span>

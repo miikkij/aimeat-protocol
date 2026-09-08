@@ -8,6 +8,13 @@
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
+ *   v2.6.0 -- 2026-09-08 -- `roadmap`: one sentence saying what this version changed. A warning on
+ *     your own app and a REFUSAL on one somebody else helps build, because there the person who
+ *     loses by the silence is not the person who chose it. The line rides in this call, so
+ *     satisfying the gate costs no second round trip -- a gate that costs one gets worked around.
+ *   v2.5.0 -- 2026-09-08 -- The body may name an `owner`: publishing into somebody else's catalogue,
+ *     when they granted this caller a rung that carries `publish`. The price and the licence are
+ *     refused for a delegate, because no rung carries what the app costs.
  *   v2.4.0 -- 2026-09-07 -- Require app:write before inline publishing or presigned authorization.
  *   v2.3.0 — 2026-08-24 — The publish response carries `data_map` and `data_map_hints`, on the same
  *     terms as `ai_posture` / `ai_hints`: what the node now believes, and what to fix. Neither has
@@ -51,15 +58,18 @@ import { generateUploadToken, buildUploadMeta } from '../../services/upload-toke
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { publishApp } from '../../services/app-publish.js';
+import { isSharedApp } from '../../services/app-dev-grant.js';
+import { roadmapGate, addRoadmapEntry } from '../../services/app-roadmap.js';
+import { logger } from '../../utils/logger.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection } from '../../utils/app-protect.js';
-import type { CanonicalOwner } from './helpers.js';
+import { appTargetOr, type AppTargetFor } from './helpers.js';
 
 export function registerPublishRoutes(
     router: Router,
     config: AimeatConfig,
     storage: Storage,
-    canonicalOwner: CanonicalOwner,
+    appTarget: AppTargetFor,
 ): void {
     // Permission is checked before either publishing bytes or minting a presigned upload token.
     router.post('/v1/apps', requireAuth(), requireScope('app:write'), async (req, res) => {
@@ -69,13 +79,26 @@ export function registerPublishRoutes(
         // version counter is shared (not two parallel buckets that shadow
         // each other). The caller's GAII is preserved in audit logs only.
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
-        const { owner, ownerGhii } = await canonicalOwner(req);
+        // `owner` in the body names somebody else's catalogue; absent, it is the caller's own, which
+        // is what this door has always done. A rung that does not carry `publish` is refused here,
+        // before a single byte is decoded.
+        const t = await appTargetOr(appTarget, config, req, res, 'publish');
+        if (!t) return;
+        const { owner, ownerGhii, delegated } = t;
+        // What an app COSTS is the owner's business relationship with a buyer, and no rung carries
+        // it. Refused rather than ignored: a publish that silently dropped the price would leave the
+        // caller believing they had set one.
+        if (delegated && (req.body?.price_morsels !== undefined || req.body?.license_type !== undefined)) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+                `You may build ${owner}'s app, but its price and licence are theirs to set.`));
+            return;
+        }
         const {
             filename, content, mime_type, access_code,
             screenshot, screenshot_mime_type,
             name, description, descriptions, version: semver, category, tags, icon,
             uses_cortex, cortex, price_morsels, license_type, protection,
-            ai_provenance, ai_provenance_id, spec_token, spec_ack,
+            ai_provenance, ai_provenance_id, spec_token, spec_ack, roadmap,
         } = req.body ?? {};
 
         // Validated at the door, against the SAME block every other surface uses. A malformed
@@ -139,6 +162,15 @@ export function registerPublishRoutes(
 
         if (!content || typeof content !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'content is required (base64 encoded)'));
+            return;
+        }
+
+        // WHAT DID THIS CHANGE? Asked before the bytes are decoded, because on a shared app it is a
+        // refusal and a refusal that arrives after the work is a refusal that arrives too late.
+        const shared = await isSharedApp(storage, owner, filename);
+        const road = roadmapGate({ line: typeof roadmap === 'string' ? roadmap : undefined, shared });
+        if (!road.ok) {
+            res.status(400).json(error(config.nodeId, 'ROADMAP_REQUIRED', road.message));
             return;
         }
 
@@ -249,8 +281,23 @@ export function registerPublishRoutes(
             hasScreenshot = true;
         }
 
+        // The line goes on the roadmap with the version it landed in, once there IS a version. A
+        // failure to write it never fails the publish: the app is live either way, and refusing to
+        // acknowledge that would be a lie about what happened.
+        if (road.line) {
+            try {
+                await addRoadmapEntry(storage, {
+                    appId: `${owner}/${filename}`, state: 'done', what: road.line,
+                    by: owner, version: out.versionNumber,
+                });
+            } catch (err) {
+                logger.warn('publish: the roadmap line was not written, the version stands', { error: String(err) });
+            }
+        }
+
         res.status(201).json(success(config.nodeId, {
             filename,
+            ...('warning' in road ? { roadmap_hint: road.warning } : {}),
             version_number: out.versionNumber,
             manifest: out.manifest,
             size: out.size,
