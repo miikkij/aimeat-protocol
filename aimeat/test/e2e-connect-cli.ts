@@ -409,6 +409,16 @@ await test('connect send --body posts the message, and the node has it afterward
     `the message the CLI reported sending is not on the node: ${JSON.stringify(history.body.data).slice(0, 300)}`);
 });
 
+await test('the credential the CLI holds is an agent\'s: no credential is 401, an operator door is 403', async () => {
+  // What every subcommand above reads and writes is fenced by the token in the connector home.
+  // The same doors without it, and an operator door with it, are the two refusals that prove
+  // the fence is there; delete a scope check and the commands above would still print.
+  const anonymous = await json(`/v1/agents/${AGENT}/messages/inbox`);
+  assert(anonymous.status === 401, `the inbox with no credential: ${anonymous.status}`);
+  const operatorDoor = await json('/v1/realtime/stats', auth(acc.agentToken));
+  assert(operatorDoor.status === 403, `an agent token on an operator door: ${operatorDoor.status}`);
+});
+
 await test('connect send with no --body prints the usage and exits 1', async () => {
   const r = await runCli(['connect', 'send'], { home, timeoutMs: 30_000 });
   exited(r, 1);

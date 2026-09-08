@@ -539,6 +539,21 @@ async function run(): Promise<void> {
             `exactly one more process was started, got ${peerRequests('initialize').length - starts}`);
     });
 
+    await test('a thread is its owner\'s: no credential is 401, another owner cannot read it', async () => {
+        const anonymous = await json(`/v1/chat/threads/${threadId}`);
+        assert(anonymous.status === 401, `no credential: ${anonymous.status}`);
+        const other = await registerOwner(`chatother${Date.now() % 100000}`);
+        const stranger = await json(`/v1/chat/threads/${threadId}`, { headers: { Authorization: `Bearer ${other}` } });
+        assert(stranger.status === 403 || stranger.status === 404,
+            `another owner reading this thread: ${stranger.status}, expected a refusal or nothing to see`);
+        const turnByStranger = await json(`/v1/chat/threads/${threadId}/turn`, {
+            method: 'POST', headers: { Authorization: `Bearer ${other}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: 'not mine' }),
+        });
+        assert(turnByStranger.status === 403 || turnByStranger.status === 404,
+            `another owner speaking into this thread: ${turnByStranger.status}`);
+    });
+
     await stopNode(node);
     node = null;
 
