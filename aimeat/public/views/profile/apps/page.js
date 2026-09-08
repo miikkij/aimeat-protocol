@@ -24,6 +24,7 @@ import { CopyButton } from '/components/CopyButton.js';
 import { Section, scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { a, day, rel, kb, locale, nameOf, appRef, appUrl, catalogUrl, noteFor, initials, crumb, pageLinks, goTab } from './frame.js';
 import { secAgents, secBuild } from './build.js';
+import { CollaborationSection, PublishDialog } from './collaboration.js';
 import { secBuilders } from './builders.js';
 
 export function renderPage(ctx) {
@@ -87,6 +88,7 @@ export function renderPage(ctx) {
           ${none ? html`${secFirst(ctx)}${secWaiting(ctx, drafts, grants, '02')}${secKunto(ctx, '03')}${secBuild(ctx, { formOnly: true, num: '04' })}`
             : loading ? html`<p class="og-empty">${t('common.loading')}</p>`
             : html`${secWaiting(ctx, drafts, grants, '01')}${secKunto(ctx, '02')}${secNewest(ctx, apps)}${secAgents(ctx)}${secBuild(ctx, { formOnly: false, num: '05' })}${secBuilders(ctx)}`}
+          ${!loading ? html`<${CollaborationSection} ctx=${ctx} />` : null}
         </div>
         <nav class="og-rail" aria-label=${a('railTitle')}>
           <span class="og-rail-label">${a('railTitle')}</span>
@@ -97,6 +99,7 @@ export function renderPage(ctx) {
         </nav>
       </div>
       <${ctx.ConfirmUI} />
+      ${ctx.publishApp ? html`<${PublishDialog} key=${appRef(ctx.publishApp)} app=${ctx.publishApp} busy=${!!ctx.busy} onPublish=${ctx.submitPublish} onClose=${ctx.closePublish} />` : null}
     </div>`;
 }
 

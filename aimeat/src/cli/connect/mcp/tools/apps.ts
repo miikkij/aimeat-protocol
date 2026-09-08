@@ -391,8 +391,9 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   // → POST /v1/apps/:owner/:filename/screenshot/capture — render the live app and store the picture.
   mcp.tool('aimeat_app_screenshot', descriptionFor('aimeat_app_screenshot'), {
     filename: z.string().describe('The published app to photograph (e.g. "pong.html").'),
-  }, annotationsFor('aimeat_app_screenshot'), async ({ filename }) => {
-    return out(await client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/screenshot/capture`, {}));
+    owner: z.string().optional().describe('App owner. Omit for your own apps.'),
+  }, annotationsFor('aimeat_app_screenshot'), async ({ filename, owner: targetOwner }) => {
+    return out(await client.post(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/screenshot/capture`, {}));
   });
 
   // → POST /v1/apps/:owner/:filename/publish-draft — promote the draft to a new live version.
@@ -401,8 +402,10 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     roadmap: z.string().optional().describe('One sentence saying what this version changes, in your own words. It goes on the app roadmap, and it is REQUIRED when somebody else helps build this app.'),
     owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
     ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_app_draft_publish'), async ({ owner: targetOwner, filename, ai_provenance, ai_provenance_id }) => {
-    const resp = await client.post(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/publish-draft`);
+    spec_token: z.string().optional().describe('Current app build spec digest.'),
+    spec_ack: z.string().optional().describe('Owner-declared build spec acknowledgement.'),
+  }, annotationsFor('aimeat_app_draft_publish'), async ({ owner: targetOwner, filename, roadmap, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
+    const resp = await client.post(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/publish-draft`, { roadmap, ai_provenance, ai_provenance_id, spec_token, spec_ack });
     if (resp.ok === false) return out(resp);
     return provenanceEchoedResult(client,
       { tool: 'aimeat_app_draft_publish', declared: ai_provenance, declaredId: ai_provenance_id }, resp);

@@ -93,7 +93,7 @@ import {
     publishAppDraft, deleteOwnedApp,
 } from '../services/app-lifecycle.js';
 import { isSharedApp, listAppsBuiltFor, levelName } from '../services/app-dev-grant.js';
-import { roadmapGate, addRoadmapEntry } from '../services/app-roadmap.js';
+import { roadmapGate } from '../services/app-roadmap.js';
 import { publicPosture } from '../services/app-ai-posture.js';
 import { resolveAppUrls } from '../routes/apps/helpers.js';
 import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta, appUiAvailable } from './apps-ui.js';
@@ -206,7 +206,7 @@ export function registerAppsTools(
                     // lives with the token, so a new option is covered by declaring it there once.
                     meta: buildUploadMeta('app', {
                         filename, name, description, category, tags, icon, version,
-                        ai_provenance, ai_provenance_id, spec_token, spec_ack,
+                        ai_provenance, ai_provenance_id, spec_token, spec_ack, roadmap,
                     }),
                     maxBytes: MAX_APP_SIZE,
                     contentType: 'text/html',
@@ -274,6 +274,7 @@ export function registerAppsTools(
                     declaredProvenance: toDeclaredProvenance(ai_provenance),
                     specToken: spec_token,
                     specAck: spec_ack,
+                    roadmap,
                 });
                 if ('refusal' in out) {
                     return { content: [{ type: 'text' as const, text: refusalText(out.refusal) }], isError: true };
@@ -282,19 +283,6 @@ export function registerAppsTools(
                 logger.info(`App ${out.isUpdate ? 'updated' : 'published'} via MCP: ${filename} v${out.versionNumber}`, { by: agentGaii });
                 emitResourceListChanged(agentGaii);
 
-                // The line goes on the roadmap with the version it landed in. A failure here never
-                // fails the publish: the version is live, and refusing it afterwards would deny
-                // something that happened.
-                if (road.line) {
-                    try {
-                        await addRoadmapEntry(storage, {
-                            appId: `${scope.ownerName}/${filename}`, state: 'done', what: road.line,
-                            by: scope.ownerName, version: out.versionNumber,
-                        });
-                    } catch (err) {
-                        logger.warn('app publish: the roadmap line was not written, the version stands', { error: String(err) });
-                    }
-                }
                 return {
                     content: [{
                         type: 'text' as const,
@@ -436,23 +424,11 @@ export function registerAppsTools(
                     declaredProvenance: toDeclaredProvenance(ai_provenance),
                     specToken: spec_token,
                     specAck: spec_ack,
+                    roadmap,
                 });
                 if ('refusal' in out) {
                     // The draft stays: a refused promotion is work to fix, not work to lose.
                     return { content: [{ type: 'text' as const, text: refusalText(out.refusal) }], isError: true };
-                }
-                // The line goes on the roadmap with the version it landed in. A failure here never
-                // fails the publish: the version is live, and refusing it afterwards would deny
-                // something that happened.
-                if (road.line) {
-                    try {
-                        await addRoadmapEntry(storage, {
-                            appId: `${scope.ownerName}/${filename}`, state: 'done', what: road.line,
-                            by: scope.ownerName, version: out.versionNumber,
-                        });
-                    } catch (err) {
-                        logger.warn('app publish: the roadmap line was not written, the version stands', { error: String(err) });
-                    }
                 }
                 emitResourceListChanged(agentGaii);
                 logger.info(`App draft published via MCP: ${filename} v${out.versionNumber}`, { by: agentGaii });
@@ -463,6 +439,7 @@ export function registerAppsTools(
                             filename, version_number: out.versionNumber, is_update: out.isUpdate,
                             parked: out.parked, download_url: out.downloadUrl, inline_url: `${out.downloadUrl}?mode=inline`,
                             note: 'Draft published as the new live version; the draft slot is cleared.',
+                            ...(out.roadmapHint ? { roadmap_hint: out.roadmapHint } : {}),
                             ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
                             ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
                             ...(out.manifest.dataMap ? { data_map: out.manifest.dataMap } : {}),
@@ -563,7 +540,10 @@ export function registerAppsTools(
             // `building` is a different question from `own`, and the same function answers it here
             // as answers it on GET /v1/apps: the apps somebody else asked this person to help build.
             const built = building ? await listAppsBuiltFor(storage, config, { principal: agentGaii, viewerGhii: ownerGhii }) : null;
-            const { apps, total } = built ? { apps: built, total: built.length } : await storage.listApps(opts);
+            const matching = built?.filter(app => (!category || app.manifest.category === category)
+                && (!tag || app.manifest.tags?.includes(tag))
+                && (!search || `${app.manifest.name} ${app.manifest.description}`.toLowerCase().includes(search.toLowerCase())));
+            const { apps, total } = matching ? { apps: matching.slice(skip, skip + take), total: matching.length } : await storage.listApps(opts);
 
             // Per-app metrics in TWO batch queries (was getAppDownloads + countAppForks PER app = 2N).
             const refs = apps.map(a => ({ ownerGaii: a.ownerGaii, filename: a.filename }));

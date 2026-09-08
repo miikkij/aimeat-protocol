@@ -59,8 +59,7 @@ import {
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { appOriginUrl, appTargetOr, type AppTargetFor } from './helpers.js';
 import { isSharedApp } from '../../services/app-dev-grant.js';
-import { roadmapGate, addRoadmapEntry } from '../../services/app-roadmap.js';
-import { logger } from '../../utils/logger.js';
+import { roadmapGate } from '../../services/app-roadmap.js';
 
 export function registerDraftRoutes(
     router: Router,
@@ -269,6 +268,7 @@ export function registerDraftRoutes(
         }
 
         const out = await seedAppDraft(storage, config, {
+            callerGaii: resolveIdentity(req.auth!, config.nodeId),
             ownerName: owner, ownerGhii, filename,
             fromFilename: typeof from_filename === 'string' ? from_filename : undefined,
             version,
@@ -456,6 +456,7 @@ export function registerDraftRoutes(
             ownerName: owner,
             ownerGhii,
             callerGaii,
+            roadmap: typeof req.body?.roadmap === 'string' ? req.body.roadmap : undefined,
             filename,
             draft,
             declaredProvenanceId: typeof ai_provenance_id === 'string' ? ai_provenance_id : undefined,
@@ -471,21 +472,10 @@ export function registerDraftRoutes(
             return;
         }
 
-        // The line lands on the roadmap with the version it became. Never fatal: the version is live
-        // either way, and failing the call afterwards would deny something that happened.
-        if (road.line) {
-            try {
-                await addRoadmapEntry(storage, {
-                    appId: `${owner}/${filename}`, state: 'done', what: road.line,
-                    by: owner, version: out.versionNumber,
-                });
-            } catch (err) {
-                logger.warn('publish-draft: the roadmap line was not written, the version stands', { error: String(err) });
-            }
-        }
 
         res.status(201).json(success(config.nodeId, {
             filename,
+            ... (out.roadmapHint ? { roadmap_hint: out.roadmapHint } : {}),
             version_number: out.versionNumber,
             manifest: out.manifest,
             size: out.size,

@@ -59,8 +59,7 @@ import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { publishApp } from '../../services/app-publish.js';
 import { isSharedApp } from '../../services/app-dev-grant.js';
-import { roadmapGate, addRoadmapEntry } from '../../services/app-roadmap.js';
-import { logger } from '../../utils/logger.js';
+import { roadmapGate } from '../../services/app-roadmap.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection } from '../../utils/app-protect.js';
 import { appTargetOr, type AppTargetFor } from './helpers.js';
@@ -122,6 +121,15 @@ export function registerPublishRoutes(
             return;
         }
 
+        // WHAT DID THIS CHANGE? Asked before the bytes are decoded, because on a shared app it is a
+        // refusal and a refusal that arrives after the work is a refusal that arrives too late.
+        const shared = await isSharedApp(storage, owner, filename);
+        const road = roadmapGate({ line: typeof roadmap === 'string' ? roadmap : undefined, shared });
+        if (!road.ok) {
+            res.status(400).json(error(config.nodeId, 'ROADMAP_REQUIRED', road.message));
+            return;
+        }
+
         // --- PRESIGNED MODE: return upload URL instead of requiring content ---
         if (req.body.mode === 'presigned') {
             const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
@@ -144,7 +152,7 @@ export function registerPublishRoutes(
                     filename, description, category, tags, icon,
                     ...(typeof req.body.name === 'string' ? { name: req.body.name } : {}),
                     ...(typeof semver === 'string' ? { version: semver } : {}),
-                    ai_provenance, ai_provenance_id, spec_token, spec_ack,
+                    ai_provenance, ai_provenance_id, spec_token, spec_ack, roadmap,
                 }),
                 maxBytes: MAX_APP_SIZE,
                 contentType: 'text/html',
@@ -162,15 +170,6 @@ export function registerPublishRoutes(
 
         if (!content || typeof content !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'content is required (base64 encoded)'));
-            return;
-        }
-
-        // WHAT DID THIS CHANGE? Asked before the bytes are decoded, because on a shared app it is a
-        // refusal and a refusal that arrives after the work is a refusal that arrives too late.
-        const shared = await isSharedApp(storage, owner, filename);
-        const road = roadmapGate({ line: typeof roadmap === 'string' ? roadmap : undefined, shared });
-        if (!road.ok) {
-            res.status(400).json(error(config.nodeId, 'ROADMAP_REQUIRED', road.message));
             return;
         }
 
@@ -241,8 +240,9 @@ export function registerPublishRoutes(
             },
             // The inline door is the only one whose payload can carry an access code, so it states
             // one explicitly. The other two carry the live app's forward — they have no way to say.
-            accessCode: { mode: 'explicit', value: accessCode },
+            accessCode: Object.hasOwn(req.body, 'access_code') ? { mode: 'explicit', value: accessCode } : { mode: 'carry' },
             source: 'inline',
+            roadmap,
             declaredProvenanceId: typeof ai_provenance_id === 'string' ? ai_provenance_id : undefined,
             declaredProvenance: declared.declared,
             specToken: typeof spec_token === 'string' ? spec_token : undefined,
@@ -281,19 +281,6 @@ export function registerPublishRoutes(
             hasScreenshot = true;
         }
 
-        // The line goes on the roadmap with the version it landed in, once there IS a version. A
-        // failure to write it never fails the publish: the app is live either way, and refusing to
-        // acknowledge that would be a lie about what happened.
-        if (road.line) {
-            try {
-                await addRoadmapEntry(storage, {
-                    appId: `${owner}/${filename}`, state: 'done', what: road.line,
-                    by: owner, version: out.versionNumber,
-                });
-            } catch (err) {
-                logger.warn('publish: the roadmap line was not written, the version stands', { error: String(err) });
-            }
-        }
 
         res.status(201).json(success(config.nodeId, {
             filename,

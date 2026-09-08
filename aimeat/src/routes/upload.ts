@@ -290,6 +290,7 @@ async function handleAppUpload(
         },
         accessCode: { mode: 'carry' },
         source: 'presigned',
+        roadmap: typeof meta.roadmap === 'string' ? meta.roadmap : undefined,
         // The declaration the caller made when they asked for this URL, carried in the signed token.
         // Re-validated rather than trusted: the token is ours and cannot be forged, but a block that
         // no longer parses (an enum retired between mint and PUT, an hour apart at most, but still)
@@ -317,6 +318,7 @@ async function handleAppUpload(
         success: true,
         type: 'app',
         filename,
+        ...(out.roadmapHint ? { roadmap_hint: out.roadmapHint } : {}),
         version_number: out.versionNumber,
         name: out.manifest.name,
         size: out.size,

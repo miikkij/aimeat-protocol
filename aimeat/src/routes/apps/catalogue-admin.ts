@@ -115,7 +115,13 @@ export function registerCatalogueAdminRoutes(
                 principal: resolveIdentity(req.auth!, config.nodeId),
                 viewerGhii,
             });
+            const q = (opts.q ?? '').toLowerCase();
+            apps = apps.filter(app => (!opts.category || app.manifest.category === opts.category)
+                && (!opts.tag || app.manifest.tags?.includes(opts.tag))
+                && (!opts.freeOnly || !app.manifest.priceMorsels)
+                && (!q || `${app.manifest.name} ${app.manifest.description}`.toLowerCase().includes(q)));
             total = apps.length;
+            apps = apps.slice(Math.max(0, opts.offset), Math.max(0, opts.offset) + Math.max(1, opts.limit));
         }
 
         // Per-app metrics in THREE batch queries (was getAppDownloads + countAppForks +
@@ -129,6 +135,12 @@ export function registerCatalogueAdminRoutes(
         const viewerDraftFilenames = viewerGhii
             ? new Set(await storage.listAppDraftFilenames(viewerGhii))
             : new Set<string>();
+        const sharedDrafts = new Map<string, Set<string>>();
+        if (buildingOnly) {
+            for (const ownerGhii of new Set(apps.map(app => app.ownerGaii))) {
+                sharedDrafts.set(ownerGhii, new Set(await storage.listAppDraftFilenames(ownerGhii)));
+            }
+        }
         const screenshotKeys = new Set<string>();
         for (const [gaii, files] of Object.entries(filesByOwner)) {
             for (const f of files) if (f.key.startsWith('apps/screenshots/')) screenshotKeys.add(`${gaii} ${f.key}`);
@@ -199,7 +211,8 @@ export function registerCatalogueAdminRoutes(
                 ...(isOwn && app.accessCode ? { access_code: app.accessCode } : {}),
                 parked: !!app.parked,
                 forkable: !!app.forkable,
-                has_draft: viewerGhii ? (app.ownerGaii === viewerGhii && viewerDraftFilenames.has(app.filename)) : false,
+                has_draft: buildingOnly ? !!sharedDrafts.get(app.ownerGaii)?.has(app.filename)
+                    : viewerGhii ? (app.ownerGaii === viewerGhii && viewerDraftFilenames.has(app.filename)) : false,
                 operator_hidden: !!app.operatorHidden,
                 operator_hide_reason: app.operatorHideReason ?? null,
                 // Search visibility, as the STATE rather than the switch: 'off' | 'on' | 'pending'

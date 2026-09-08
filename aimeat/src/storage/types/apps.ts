@@ -121,6 +121,8 @@ export function mergeLegal(
 }
 
 export interface AppManifest {
+  /** Summary of the roadmap committed with this app version. */
+  roadmap?: { at: string; version: number; done: number; wanted: number };
   name: string;
   description: string;
   // Per-locale descriptions (BCP-47-ish keys, e.g. 'en', 'fi'), extensible to more languages.
