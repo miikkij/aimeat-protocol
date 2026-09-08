@@ -21,8 +21,11 @@
  *   Part C the parse ladder · Part D status hashing · Part E uninstall · Part F refusals
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-components
  * @version-history
+ *   v1.0.1 -- 2026-09-08 -- Compare memory objects independently of PostgreSQL JSON key order.
  *   v1.0.0 — 2026-09-08 — Initial.
  */
+
+import { deepStrictEqual } from 'node:assert';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -220,7 +223,7 @@ await test('B3. JSON with no `entries` lands whole, under the component\'s regis
     const name = main.at('settings');
     const r = await json(`/v1/memory/${encodeURIComponent(name)}`, { headers: authH(A.token) });
     assert(r.status === 200, `${name} → ${r.status}: ${JSON.stringify(r.body.error)}`);
-    assert(JSON.stringify(r.body.data.value) === '{"threshold":7,"unit":"days"}', `the whole object: ${JSON.stringify(r.body.data.value)}`);
+    deepStrictEqual(r.body.data.value, { threshold: 7, unit: 'days' }, 'the whole object');
     const man = await json(`/v1/memory/${encodeURIComponent(`_pkg:${name}`)}`, { headers: authH(A.token) });
     assert(JSON.stringify(man.body.data.value) === JSON.stringify([name]), `the manifest names the one key: ${JSON.stringify(man.body.data.value)}`);
 });
