@@ -18,9 +18,19 @@
  *   storage backends, and the roster cannot be read by the world because it never lives in an app's
  *   own namespace.
  * @structure NS · slugOf/memberKey/requestKey · listMembers/getMember/putMember/removeMember ·
- *   listRequests/putRequest/removeRequest · AppMemberRecord/AppMemberRequest
+ *   listRequests/putRequest/removeRequest · AppMemberRecord/AppMemberRequest · writePrivateRecord
  * @usage const roster = await listMembers(storage, 'alice/app.html');
  * @version-history
+ *   v1.2.0 — 2026-09-08 — Every reader compares the app id the way the KEY already compares it
+ *     (sameApp). The row is addressed by a lowercased slug, so two spellings of one app id have
+ *     always shared a record, and the exact-equality test then hid that record from whichever
+ *     spelling did not write it first. Reachable by typing a capital letter into the URL.
+ *   v1.1.0 — 2026-09-08 — The row can carry a DEVELOPMENT right (`dev`/`devSince`/`devBy`), which is
+ *     what its holder may do to the app itself rather than inside it; services/app-dev-grant.ts owns
+ *     the ladder and every decision made with it. putMember carries the three fields forward, because
+ *     this door is the app's own roster and must never drop what another door granted. The private
+ *     writer is exported as writePrivateRecord so the grant records share one implementation of the
+ *     record shape instead of growing a second copy beside it.
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055 phase 2): the roster becomes a platform capability.
  */
 import type { Storage } from '../storage/interface.js';
@@ -55,6 +65,21 @@ export interface AppMemberRecord {
   expiresAt: string | null;
   /** How the term is meant to continue. Descriptive: nothing here charges anybody. */
   renewal: 'manual' | 'self-serve' | 'none' | null;
+  /**
+   * What this person may do to the app ITSELF, as opposed to what they may do INSIDE it: absent for
+   * an ordinary member, a rung of the ladder in services/app-dev-grant.ts for someone the owner
+   * invited to build the thing with them.
+   *
+   * A field rather than a reserved `role` name, and the difference is not cosmetic. Role strings are
+   * each app's own vocabulary and the node has never had an opinion about them; the moment the
+   * platform starts reading one, an app that happened to call a role "developer" begins handing out
+   * publishing rights it never meant to give. The gate reads a value the platform owns.
+   */
+  dev?: number | null;
+  /** When the development right was first given, so a revoke-and-regrant reads as what it is. */
+  devSince?: string;
+  /** Who gave it. The app's audit log carries the act; this carries the current state. */
+  devBy?: string;
 }
 
 /** A row is live if it has no term, or its term has not run out yet. */
@@ -101,7 +126,7 @@ export async function noteVisit(storage: Storage, appId: string, principal: stri
   if (!account) return false;
   const now = new Date();
   const prev = (await storage.getMemory(NS_SEEN, seenKey(appId, account)))?.value as AppMemberVisit | undefined;
-  if (prev && prev.appId === appId && now.getTime() - new Date(prev.lastSeen).getTime() < VISIT_WINDOW_MS) {
+  if (prev && sameApp(prev.appId, appId) && now.getTime() - new Date(prev.lastSeen).getTime() < VISIT_WINDOW_MS) {
     return false;
   }
   const rec: AppMemberVisit = {
@@ -111,7 +136,7 @@ export async function noteVisit(storage: Storage, appId: string, principal: stri
     lastSeen: now.toISOString(),
     visits: (prev?.visits ?? 0) + 1,
   };
-  await write(storage, NS_SEEN, seenKey(appId, account), rec, prev ? undefined : rec.firstSeen);
+  await writePrivateRecord(storage, NS_SEEN, seenKey(appId, account), rec, { createdAt: prev ? undefined : rec.firstSeen });
   return true;
 }
 
@@ -120,7 +145,7 @@ export async function listVisits(storage: Storage, appId: string): Promise<AppMe
   const { items } = await storage.listAllMemory({ prefix: `appmemseen.${slugOf(appId)}.`, limit: 2000 });
   return items
     .map(r => r.value as AppMemberVisit)
-    .filter(v => v && v.appId === appId)
+    .filter(v => v && sameApp(v.appId, appId))
     .sort((a, b) => (a.lastSeen < b.lastSeen ? 1 : -1));
 }
 
@@ -146,11 +171,38 @@ export function slugOf(appId: string): string {
   return String(appId).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-/** The bare account name behind any principal (`alice`, `alice@node`, `bot#alice@node`). */
-export function accountOf(principal: string): string {
+/**
+ * Are these two spellings the same app?
+ *
+ * Compared as the KEY compares them, which is the only comparison that can be right here: the row is
+ * addressed by `slugOf(appId)`, so `Alice/paja.html` and `alice/paja.html` have always written to one
+ * record — and a reader testing the stored `appId` for exact equality then failed to find the row it
+ * had just written. Whichever spelling reached the door first is the one stored, and every other
+ * spelling read back as "no such member". Both routes build the id from `:owner` as the URL spells
+ * it, so this was reachable by typing a capital letter.
+ */
+export function sameApp(a: string, b: string): boolean {
+  return slugOf(a) === slugOf(b);
+}
+
+/**
+ * The owner name behind any principal (`alice`, `alice@node`, `bot#alice@node`), with its case left
+ * alone. Owner names are looked up with an EXACT match in both storage providers, so anything that
+ * feeds an identity lookup has to keep the capitals the account was registered with.
+ */
+export function bareOwner(principal: string): string {
   const s = String(principal || '');
   const afterHash = s.includes('#') ? s.slice(s.indexOf('#') + 1) : s;
-  return afterHash.split('@')[0].toLowerCase();
+  return afterHash.split('@')[0];
+}
+
+/**
+ * The same name as a KEY segment, lowercased. Every record in this file is addressed this way, so
+ * one person is one row however their agent spelled them. Never feed this to an identity lookup:
+ * that is what bareOwner is for.
+ */
+export function accountOf(principal: string): string {
+  return bareOwner(principal).toLowerCase();
 }
 
 export const memberKey = (appId: string, account: string) => `appmember.${slugOf(appId)}.${accountOf(account)}`;
@@ -161,7 +213,7 @@ export async function listMembers(storage: Storage, appId: string): Promise<AppM
   const { items } = await storage.listAllMemory({ prefix: `appmember.${slugOf(appId)}.`, limit: 2000 });
   return items
     .map(r => r.value as AppMemberRecord)
-    .filter(v => v && v.appId === appId)
+    .filter(v => v && sameApp(v.appId, appId))
     .sort((a, b) => a.owner.localeCompare(b.owner));
 }
 
@@ -169,7 +221,7 @@ export async function listMembers(storage: Storage, appId: string): Promise<AppM
 export async function getMember(storage: Storage, appId: string, principal: string): Promise<AppMemberRecord | null> {
   const rec = await storage.getMemory(NS_MEMBER, memberKey(appId, principal));
   const v = rec?.value as AppMemberRecord | undefined;
-  if (!v || v.appId !== appId) return null;
+  if (!v || !sameApp(v.appId, appId)) return null;
   // The clock decides, not the sweep. A lapsed member stops reaching the app at the moment their
   // term runs out; the sweep exists to take the GRANTS back, which is the part money depends on.
   return isLive(v) ? v : null;
@@ -179,7 +231,7 @@ export async function getMember(storage: Storage, appId: string, principal: stri
 export async function getMemberRow(storage: Storage, appId: string, principal: string): Promise<AppMemberRecord | null> {
   const rec = await storage.getMemory(NS_MEMBER, memberKey(appId, principal));
   const v = rec?.value as AppMemberRecord | undefined;
-  return v && v.appId === appId ? v : null;
+  return v && sameApp(v.appId, appId) ? v : null;
 }
 
 /** Approve someone, or change what their role is. Idempotent: `since` survives a role change. */
@@ -205,8 +257,15 @@ export async function putMember(
     offerings: input.offerings ?? prev?.offerings ?? [],
     expiresAt: input.expiresAt !== undefined ? input.expiresAt : (prev?.expiresAt ?? null),
     renewal: input.renewal !== undefined ? input.renewal : (prev?.renewal ?? null),
+    // Carried, never taken. This door is the app's own roster and knows nothing about development
+    // rights, so an owner changing somebody's role — or a self-serve renewal writing the row — must
+    // not silently drop what a different door granted. Taking the right away is putDevGrant's job
+    // and it says so out loud (services/app-dev-grant.ts).
+    ...(prev?.dev === undefined || prev.dev === null ? {} : { dev: prev.dev }),
+    ...(prev?.devSince ? { devSince: prev.devSince } : {}),
+    ...(prev?.devBy ? { devBy: prev.devBy } : {}),
   };
-  await write(storage, NS_MEMBER, memberKey(input.appId, account), rec, prev ? undefined : now);
+  await writePrivateRecord(storage, NS_MEMBER, memberKey(input.appId, account), rec, { createdAt: prev ? undefined : now });
   return rec;
 }
 
@@ -292,7 +351,7 @@ export const planKey = (appId: string) => `appmemplan.${slugOf(appId)}`;
 export async function getCarryPlan(storage: Storage, appId: string): Promise<AppCarryPlan | null> {
   const rec = await storage.getMemory(NS_PLAN, planKey(appId));
   const v = rec?.value as AppCarryPlan | undefined;
-  return v && v.appId === appId ? v : null;
+  return v && sameApp(v.appId, appId) ? v : null;
 }
 
 /** Declare (or replace) it. Roles are taken as given: the node has no opinion about their names. */
@@ -327,7 +386,7 @@ export async function putCarryPlan(
     rosterVisibility: input.rosterVisibility === 'members' ? 'members' : 'owner',
     updatedAt: new Date().toISOString(), setBy: input.setBy,
   };
-  await write(storage, NS_PLAN, planKey(input.appId), rec);
+  await writePrivateRecord(storage, NS_PLAN, planKey(input.appId), rec);
   return rec;
 }
 
@@ -347,7 +406,7 @@ export async function listRequests(storage: Storage, appId: string, state: 'pend
   const { items } = await storage.listAllMemory({ prefix: `appmemreq.${slugOf(appId)}.`, limit: 2000 });
   return items
     .map(r => r.value as AppMemberRequest)
-    .filter(v => v && v.appId === appId && (state === 'all' || v.state === 'pending'))
+    .filter(v => v && sameApp(v.appId, appId) && (state === 'all' || v.state === 'pending'))
     .sort((a, b) => String(a.at).localeCompare(String(b.at)));
 }
 
@@ -366,7 +425,7 @@ export async function putRequest(
     at: prev?.at ?? new Date().toISOString(),
     state: input.state ?? 'pending',
   };
-  await write(storage, NS_REQUEST, requestKey(input.appId, account), rec, prev ? undefined : rec.at);
+  await writePrivateRecord(storage, NS_REQUEST, requestKey(input.appId, account), rec, { createdAt: prev ? undefined : rec.at });
   return rec;
 }
 
@@ -376,7 +435,10 @@ export async function removeRequest(storage: Storage, appId: string, principal: 
 }
 
 /** One private write, in the shape the memory substrate expects. */
-async function write(storage: Storage, ns: string, key: string, value: unknown, createdAt?: string): Promise<void> {
+export async function writePrivateRecord(
+  storage: Storage, ns: string, key: string, value: unknown,
+  opts: { tags?: string[]; createdAt?: string } = {},
+): Promise<void> {
   const existing = await storage.getMemory(ns, key);
   const now = new Date().toISOString();
   await storage.setMemory({
@@ -386,10 +448,10 @@ async function write(storage: Storage, ns: string, key: string, value: unknown, 
     // PRIVATE, always. Who is a member is personal data about someone else, and the reason this
     // moved off the app side is that the default there was the opposite.
     visibility: 'private',
-    tags: ['app-member'],
+    tags: opts.tags ?? ['app-member'],
     ttlHours: null,
     version: (existing?.version ?? 0) + 1,
-    createdAt: existing?.createdAt ?? createdAt ?? now,
+    createdAt: existing?.createdAt ?? opts.createdAt ?? now,
     updatedAt: now,
   });
 }

@@ -19,16 +19,23 @@
  *   string, so the owner's own agents administer the roster too (an owner who manages members from
  *   an AI chat is the normal case here, not an edge one). Everyone else may only ask, and read
  *   their own standing.
- * @structure appMembersRouter(config, storage) — GET/POST/DELETE members, GET/POST requests, GET me
+ * @structure appMembersRouter(config, storage) — GET/POST/DELETE members, GET/POST requests, GET me,
+ *   GET/PUT/DELETE dev-grants (per app), GET/PUT/DELETE /v1/app-dev-grants (across all of them)
  * @usage app.use(appMembersRouter(config, storage))
  * @version-history
+ *   v1.1.0 — 2026-09-08 — The DEVELOPMENT right: who, other than the owner, may build this app. Three
+ *     rungs from services/app-dev-grant.ts, written on the roster row because it is the same person
+ *     keyed the same way, and a blanket "any app of mine" list that is its own record so an owner can
+ *     see and withdraw it in one place. The per-app door is app management and the owner's agents do
+ *     it; the blanket door is the account holder in person, because a right over every app they will
+ *     ever publish is not app management.
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055 phase 2): the roster becomes a platform capability,
  *     with the notification and the grant withdrawal that an app could not do for itself.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
@@ -37,6 +44,13 @@ import {
   getCarryPlan, putCarryPlan, seatsTaken, type AppCarryPlan,
   noteVisit, listVisits, forgetVisit,
 } from '../services/app-members.js';
+import {
+  APP_DEV_LEVEL_LIST, actsFor, levelName, parseDevLevel,
+  putDevGrant, removeDevGrant, listDevGrants,
+  putBlanketGrant, listBlanketGrants, removeBlanketGrant,
+} from '../services/app-dev-grant.js';
+import { recordAppAudit } from '../services/app-audit.js';
+import { resolveGhii } from '../utils/ghii-resolver.js';
 import { notify } from '../services/notify.js';
 import { syncGrantsForMember } from '../services/grant-sync.js';
 import { sweepLapsedMemberships } from '../services/app-member-sweep.js';
@@ -50,17 +64,26 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   /** The app under `:owner/:filename`, plus whether this caller may administer it. */
   type Ctx =
     | { bad: string }
-    | { appId: string; owner: string; filename: string; callerAccount: string; isOwner: boolean };
+    | { appId: string; owner: string; filename: string; callerAccount: string; callerGaii: string; isOwner: boolean };
 
   async function context(req: import('express').Request): Promise<Ctx> {
     const owner = String(req.params.owner ?? '');
     const filename = String(req.params.filename ?? '');
     if (!FILENAME_RE.test(filename)) return { bad: 'Invalid filename.' as const };
     const appId = `${owner}/${filename}`;
-    // The caller's OWNER, so an agent acting for the app's owner administers as the owner does.
-    const callerAccount = accountOf(resolveIdentity(req.auth!, config.nodeId));
-    return { appId, owner, filename, callerAccount, isOwner: callerAccount === owner.toLowerCase() };
+    // The caller's OWNER, so an agent acting for the app's owner administers as the owner does. The
+    // full principal is kept beside it: the roster asks WHO the person is, and an audit line asks
+    // which of their agents did the thing.
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const callerAccount = accountOf(callerGaii);
+    return { appId, owner, filename, callerAccount, callerGaii, isOwner: callerAccount === owner.toLowerCase() };
   }
+
+  /**
+   * The app's bucket key. Resolved where it is needed rather than in `context`, because every roster
+   * call goes through that and only the development-right doors have to touch the app row itself.
+   */
+  const bucketOf = (owner: string) => resolveGhii(storage, owner, `${owner}@${config.nodeId}`);
 
   /** A deep link back to the app, which is where every one of these notifications should land. */
   const appLink = (appId: string) => {
@@ -444,6 +467,160 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     const account = accountOf(String(req.params.account ?? ''));
     await putRequest(storage, { appId: c.appId, account, state: 'declined' });
     return res.json(success(config.nodeId, { declined: true }));
+  });
+
+  // ── The development right: who, other than the owner, may BUILD this app ────────────────────────
+  //
+  // Beside the roster rather than somewhere of its own, because it is written on the same row and
+  // keyed to the same person. What separates the two is what they are about: a role says what
+  // somebody may do INSIDE the app, and this says what they may do TO it.
+
+  /** The rungs as a door answers them, so a client never has to hardcode the numbers. */
+  const rungs = APP_DEV_LEVEL_LIST.map(l => ({ name: l.name, level: l.level, carries: actsFor(l.level) }));
+
+  // ── GET .../dev-grants — who can build this app. Owner only. ──
+  // app:write, not a read word: the app domain carries write and manage, and an agent that may
+  // manage an app may read who else builds it. Without a scope this list is readable by any
+  // app-grant token whatever single word its owner ticked.
+  router.get('/v1/apps/:owner/:filename/dev-grants', requireAuth(), requireScope('app:write'), async (req, res) => {
+    const c = await context(req);
+    if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner sees who may build it'));
+    const grants = await listDevGrants(storage, c.appId);
+    return res.json(success(config.nodeId, {
+      grants: grants.map(g => ({ ...g, levelName: levelName(g.level), carries: actsFor(g.level) })),
+      levels: rungs,
+      never: ['delete the app', 'change its price or licence', 'pass the right on'],
+    }));
+  });
+
+  // ── PUT .../dev-grants/:account — invite somebody to build it. Owner only. ──
+  router.put('/v1/apps/:owner/:filename/dev-grants/:account', requireAuth(), requireScope('app:manage'), async (req, res) => {
+    const c = await context(req);
+    if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner says who may build it'));
+
+    const level = parseDevLevel((req.body ?? {}).level);
+    if (level === null) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        `level must be one of: ${APP_DEV_LEVEL_LIST.map(l => l.name).join(', ')}.`, 400, { levels: rungs }));
+    }
+    const account = accountOf(String(req.params.account ?? ''));
+    if (!account) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'account is required'));
+    if (account === c.callerAccount) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        'You already own this app. A development right is for somebody else.'));
+    }
+    // Both of these are refusals BEFORE anything is written. A grant to a name nobody answers to
+    // waits forever and looks, on the owner's own page, exactly like a grant that works.
+    if (!(await storage.getGHIIByOwner(account))) {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No owner named "${account}" on this node.`));
+    }
+    const ownerGhii = await bucketOf(c.owner);
+    if (!(await storage.getApp(ownerGhii, c.filename))) {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such app.'));
+    }
+
+    const note = typeof (req.body ?? {}).note === 'string' ? String((req.body as Record<string, unknown>).note).slice(0, 400) : undefined;
+    const rec = await putDevGrant(storage, {
+      appId: c.appId, account, level, grantedBy: c.callerGaii, ...(note !== undefined ? { note } : {}),
+    });
+    await recordAppAudit(storage, {
+      ownerGhii, filename: c.filename, by: c.callerGaii,
+      action: 'dev.granted', detail: { account, level, levelName: levelName(level) },
+    });
+    try {
+      await notify(storage, `${account}@${config.nodeId}`, {
+        type: 'app_dev_grant',
+        title: `${c.owner} invited you to build ${c.filename.replace(/\.html?$/i, '')}`,
+        body: `You may ${actsFor(level).join(', ')} on this app. Your agents are covered by the same invitation.`,
+        link: appLink(c.appId),
+      });
+    } catch (err) {
+      logger.warn('app-members: dev-grant notification failed, the grant stands', { error: String(err) });
+    }
+    return res.json(success(config.nodeId, {
+      granted: true, account, level, levelName: levelName(level), carries: actsFor(level), member: rec,
+    }));
+  });
+
+  // ── DELETE .../dev-grants/:account — take the right back. Owner only. ──
+  // The roster row survives: somebody can pay for an app they no longer help build, and deleting the
+  // row here would take their access away with the right.
+  router.delete('/v1/apps/:owner/:filename/dev-grants/:account', requireAuth(), requireScope('app:manage'), async (req, res) => {
+    const c = await context(req);
+    if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner says who may build it'));
+    const account = accountOf(String(req.params.account ?? ''));
+    const had = await removeDevGrant(storage, c.appId, account);
+    if (had) {
+      await recordAppAudit(storage, {
+        ownerGhii: await bucketOf(c.owner), filename: c.filename, by: c.callerGaii,
+        action: 'dev.revoked', detail: { account },
+      });
+    }
+    return res.json(success(config.nodeId, { revoked: had, account }));
+  });
+
+  // ── The blanket right: "this person may build ANY app of mine" ──────────────────────────────────
+  //
+  // Its own list rather than a row on every roster, and that is the entire reason it exists
+  // separately: a right written into forty rosters is a right its owner cannot see in one place and
+  // cannot take back in one act.
+  //
+  // Behind the account holder in person, unlike the per-app grant. An owner handing out one app is
+  // doing app management, which their agents do for them all day. An owner handing out every app
+  // they will ever publish is doing something to the account, and this repo's rule for that is the
+  // person, not something acting in their name.
+
+  router.get('/v1/app-dev-grants', requireAuth(), requireScope('app:write'), async (req, res) => {
+    const me = accountOf(resolveIdentity(req.auth!, config.nodeId));
+    const grants = await listBlanketGrants(storage, me);
+    return res.json(success(config.nodeId, {
+      grants: grants.map(g => ({ ...g, levelName: levelName(g.level), carries: actsFor(g.level) })),
+      levels: rungs,
+      meaning: 'These people may build any app of yours, including ones you have not published yet. A right on a single app is set on that app instead.',
+    }));
+  });
+
+  router.put('/v1/app-dev-grants/:account', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
+    const me = accountOf(resolveIdentity(req.auth!, config.nodeId));
+    const level = parseDevLevel((req.body ?? {}).level);
+    if (level === null) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        `level must be one of: ${APP_DEV_LEVEL_LIST.map(l => l.name).join(', ')}.`, 400, { levels: rungs }));
+    }
+    const account = accountOf(String(req.params.account ?? ''));
+    if (!account) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'account is required'));
+    if (account === me) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'These are your own apps already.'));
+    }
+    if (!(await storage.getGHIIByOwner(account))) {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No owner named "${account}" on this node.`));
+    }
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const rec = await putBlanketGrant(storage, {
+      owner: me, grantee: account, level, grantedBy: resolveIdentity(req.auth!, config.nodeId),
+      ...(typeof body.note === 'string' ? { note: body.note.slice(0, 400) } : {}),
+      ...(typeof body.expires_at === 'string' ? { expiresAt: body.expires_at } : {}),
+    });
+    try {
+      await notify(storage, `${account}@${config.nodeId}`, {
+        type: 'app_dev_grant',
+        title: `${me} invited you to build their apps`,
+        body: `You may ${actsFor(level).join(', ')} on any app of theirs. Your agents are covered by the same invitation.`,
+      });
+    } catch (err) {
+      logger.warn('app-members: blanket dev-grant notification failed, the grant stands', { error: String(err) });
+    }
+    return res.json(success(config.nodeId, { granted: true, grant: rec, levelName: levelName(level), carries: actsFor(level) }));
+  });
+
+  router.delete('/v1/app-dev-grants/:account', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
+    const me = accountOf(resolveIdentity(req.auth!, config.nodeId));
+    const account = accountOf(String(req.params.account ?? ''));
+    const had = await removeBlanketGrant(storage, me, account);
+    return res.json(success(config.nodeId, { revoked: had, account }));
   });
 
   return router;
