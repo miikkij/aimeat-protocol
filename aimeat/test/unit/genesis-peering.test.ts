@@ -5,7 +5,6 @@ import type { AimeatConfig } from '../../src/config.js';
 import type {
     Storage,
     GenesisPeerRecord,
-    CsmRecord,
     OrganismRecord,
     OwnerRecord,
     AgentRecord,
@@ -24,7 +23,6 @@ function makeConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
 function makeMockStorage() {
     const peers = new Map<string, GenesisPeerRecord>();
     const peersByNodeId = new Map<string, GenesisPeerRecord>();
-    const csms: CsmRecord[] = [];
     const organisms: OrganismRecord[] = [];
     const owners: OwnerRecord[] = [];
     const agents: AgentRecord[] = [];
@@ -59,7 +57,6 @@ function makeMockStorage() {
             peersByNodeId.delete(existing.genesisNodeId);
             return true;
         }),
-        listCsms: vi.fn(async () => csms),
         listOrganisms: vi.fn(async () => organisms),
         listOwners: vi.fn(async () => owners),
         listAgents: vi.fn(async () => agents),
@@ -138,20 +135,7 @@ describe('Genesis Peering Service', () => {
         });
     });
 
-    describe('getCrossCatalogue', () => {
-        it('returns catalogue entries from local CSMs and active peers', async () => {
-            // Add a peer and approve it
-            const peer = await service.requestPeering('remote-node-001', 'https://remote.example.com', 'pubkey-123');
-            await service.approvePeering(peer.id);
-
-            const catalogue = await service.getCrossCatalogue();
-            // Should include the active peer entry
-            const peerEntries = catalogue.filter(e => e.type === 'genesis_peer');
-            expect(peerEntries.length).toBeGreaterThanOrEqual(1);
-            expect(peerEntries[0].nodeId).toBe('remote-node-001');
-            expect(peerEntries[0].status).toBe('active');
-        });
-    });
+    // getCrossCatalogue was deleted on 2026-09-08: it had no caller, the route aggregates on its own.
 
     describe('getNetworkStats', () => {
         it('returns correct statistics', async () => {
