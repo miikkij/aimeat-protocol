@@ -16,6 +16,9 @@
  * @usage
  *   import { generateDownloadToken, verifyDownloadToken } from '../services/download-token.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-08 -- A token may carry the name the file is saved as. The key is an address,
+ *     and for a DM attachment its last segment is an id, so the browser saved a file called
+ *     `23ea6d2c`. Whoever mints the handle knows the real name; the token carries it to the door.
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 2 (F11): presigned download handle for storage files
  */
 
@@ -36,6 +39,8 @@ export interface DownloadTokenPayload {
     key: string;
     mimeType: string;
     size: number;
+    /** The name the file should be SAVED as, when the caller knows it and the key does not. */
+    filename?: string;
 }
 
 export interface VerifiedDownloadToken {
@@ -43,6 +48,7 @@ export interface VerifiedDownloadToken {
     key: string;
     mimeType: string;
     size: number;
+    filename?: string;
 }
 
 export type DownloadTokenErrorCode = 'TOKEN_EXPIRED' | 'TOKEN_INVALID';
@@ -64,6 +70,7 @@ export async function generateDownloadToken(payload: DownloadTokenPayload, ttlSe
         key: payload.key,
         mimeType: payload.mimeType,
         size: payload.size,
+        ...(payload.filename ? { filename: payload.filename } : {}),
     })
         .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
         .setSubject(payload.sub)
@@ -96,5 +103,6 @@ export async function verifyDownloadToken(token: string): Promise<VerifiedDownlo
         key: payload.key as string,
         mimeType: payload.mimeType as string,
         size: payload.size as number,
+        filename: typeof payload.filename === 'string' ? payload.filename : undefined,
     };
 }
