@@ -12,6 +12,8 @@
  *   - Route groups: GHII users, notification templates, directory, push, genesis peering
  *
  * @version-history
+ *   v1.1.0 — 2026-09-08 — The GHII CORS write goes through services/cors-overview.ts (setCorsList),
+ *     the one implementation the aimeat_admin_cors_set tool calls too.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router, type Request, type Response } from 'express';
@@ -20,6 +22,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { setCorsList } from '../services/cors-overview.js';
 import type { EmailService } from '../services/email.js';
 import { verificationEmailHtml, magicLinkEmailHtml, notificationEmailHtml } from '../services/email-templates.js';
 import type { DirectoryService } from '../services/directory.js';
@@ -134,7 +137,9 @@ export function adminFeaturesRouter(
         emitChange('features');
     }));
 
-    // PUT /v1/admin/ghii/:ghii/cors — Operator sets/clears CORS for any GHII user
+    // PUT /v1/admin/ghii/:ghii/cors — Operator sets/clears CORS for any GHII user. The check, the
+    // write and the change event live in services/cors-overview.ts, which aimeat_admin_cors_set
+    // calls too; the door here refuses a missing person before anything is checked, as it always has.
     router.put('/v1/admin/ghii/:ghii/cors', ...auth, handle(async (req, res) => {
         const ghii = param(req.params.ghii);
         const record = await storage.getGHII(ghii);
@@ -142,33 +147,12 @@ export function adminFeaturesRouter(
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `GHII not found: ${ghii}`));
             return;
         }
-
-        const { allowed_origins } = req.body ?? {};
-        if (allowed_origins !== null && !Array.isArray(allowed_origins)) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'allowed_origins must be an array of origin URLs or null to clear'));
+        const r = await setCorsList(storage, config, ghii, (req.body ?? {}).allowed_origins);
+        if (!r.ok) {
+            res.status(r.code === 'NOT_FOUND' ? 404 : r.code === 'INVALID_INPUT' ? 400 : 500).json(error(config.nodeId, r.code, r.message));
             return;
         }
-        if (Array.isArray(allowed_origins)) {
-            for (const origin of allowed_origins) {
-                if (typeof origin !== 'string' || (origin !== '*' && !/^https?:\/\//.test(origin))) {
-                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid origin: ${origin}. Must be an http(s) URL or '*'`));
-                    return;
-                }
-            }
-        }
-
-        const updated = await storage.updateGHII(ghii, {
-            allowedOrigins: allowed_origins === null ? undefined : allowed_origins,
-        });
-        if (!updated) {
-            res.status(500).json(error(config.nodeId, 'INTERNAL', 'This one is on us — the change could not be saved. It is already reported; try again in a moment.'));
-            return;
-        }
-        res.json(success(config.nodeId, {
-            ghii: updated.ghii,
-            allowed_origins: updated.allowedOrigins ?? null,
-        }));
-        emitChange('features');
+        res.json(success(config.nodeId, { ghii: r.kind === 'person' ? r.ghii : ghii, allowed_origins: r.allowed_origins }));
     }));
 
     // ── Email Status ────────────────────────────────────────

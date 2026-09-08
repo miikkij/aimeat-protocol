@@ -13,10 +13,11 @@
  *   never learned `workspaceRef` or `groupId`. A duplicate that nothing calls cannot be kept honest by
  *   a comment, so the copies were deleted rather than repaired. If you need memory CRUD, it lives in
  *   methods/owner.ts; do not reintroduce a second one here.
- * @structure archivedSql · sumMemoryBytes / sumMemoryBytesForOwners / countMemory ·
+ * @structure archivedSql · sumMemoryBytes / sumMemoryBytesForOwners / countMemory / countMemoryWithOrigins ·
  *   searchTextMemory (+ its private FTS helpers) · archive/unarchive/countArchivedByKeyPrefix
  * @usage import { searchTextMemory, archivedSql } from './repos/memory.js';
  * @version-history
+ *   v2.1.0 — 2026-09-08 — countMemoryWithOrigins, for the operator's CORS page.
  *   v2.0.0 — 2026-08-01 — Removed nine dead exports (getMemory, setMemory, listMemory, listAllMemory,
  *     deleteMemory, deleteAllMemory, listMemoryHistory, incrementMemoryFlagCount, searchMemory) and the
  *     two private helpers only they used (annotationOf, appendHistory). No importer existed for any of
@@ -113,6 +114,12 @@ export function sumMemoryBytesForOwners(db: Database.Database, ownerGaiis: strin
   const placeholders = ownerGaiis.map(() => '?').join(',');
   const row = db.prepare(`SELECT COALESCE(SUM(byteSize), 0) AS s FROM memory WHERE ownerGaii IN (${placeholders})`).get(...ownerGaiis) as { s: number };
   return row.s;
+}
+
+/** Active records, any owner, that carry a CORS list of their own (a JSON array with at least one entry). */
+export function countMemoryWithOrigins(db: Database.Database): number {
+  const row = db.prepare(`SELECT COUNT(*) AS c FROM memory WHERE allowedOrigins IS NOT NULL AND allowedOrigins <> '[]'${archivedSql()}`).get() as { c: number };
+  return row.c;
 }
 
 export function countMemory(db: Database.Database, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter }): number {

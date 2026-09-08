@@ -477,6 +477,7 @@ const ALL_SUITES = [
     'test/e2e-metrics.ts',
     'test/e2e-auth-refusals.ts',
     'test/e2e-admin-security-page.ts',
+    'test/e2e-admin-cors-page.ts',
     'test/e2e-living-pulse.ts',
     'test/e2e-registration-mode.ts',
     'test/e2e-mcp-session-expiry.ts',

@@ -6,6 +6,8 @@
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
  *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
+ *   v1.4.0 — 2026-09-08 — aimeat_admin_cors_overview (the CORS page in one read) and
+ *     aimeat_admin_cors_set, beside the Security pair.
  *   v1.3.0 — 2026-09-05 — aimeat_admin_security_overview (the Security page in one read) and
  *     aimeat_admin_incident_resolve, beside the other operator tools.
  *   v1.2.0 — 2026-08-30 — Board tool descriptions say what a board is for (RFC v4.0 §27 reinstated):
@@ -344,6 +346,23 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             id: { type: 'string', required: true, description: 'The incident id, from the overview\'s incidents list.' },
+        },
+    },
+    {
+        name: 'aimeat_admin_cors_overview',
+        description: 'Operator-only. The CORS page in one read: the default list of browser origins this instance answers (and whether it is the wildcard), the three cookie doors that take no wildcard and what is named for them, every person and every agent with a list of their own, how many memory records carry one, and the order the lists rank in (record, agent, person, default; the first non-empty list wins). The same data as GET /v1/admin/cors/overview. Returns an operator-role error for non-operators.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {},
+    },
+    {
+        name: 'aimeat_admin_cors_set',
+        description: 'Operator-only. Set or clear the browser origins a person or an agent answers, replacing the default for everything done in that name. `who` is a person\'s address (owner@node), a bare owner name, or an agent\'s address (name#owner@node); `origins` is a list of http(s) URLs or "*", or null to clear the list so the default applies again. Read aimeat_admin_cors_overview first. Returns NOT_FOUND for an unknown name, INVALID_INPUT for an origin that is not an http(s) URL, and an operator-role error for non-operators.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            who: { type: 'string', required: true, description: 'A person\'s address (owner@node), a bare owner name, or an agent\'s address (name#owner@node).' },
+            origins: { type: 'array', required: true, description: 'The origins to allow, each an http(s) URL or "*"; null clears the list.' },
         },
     },
     {

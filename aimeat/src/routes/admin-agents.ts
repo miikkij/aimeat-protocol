@@ -8,9 +8,11 @@
  * @structure
  *   - adminAgentsRouter(config, storage): Router factory
  *   - GET /v1/admin/agents: list agents (gaii, owner, trust, balance, origins, federate, timestamps)
- *   - PUT /v1/admin/agents/:gaii/cors: validate + persist allowedOrigins, then emitChange('config')
+ *   - PUT /v1/admin/agents/:gaii/cors: refuse a missing agent, then services/cors-overview.ts setCorsList
  *
  * @version-history
+ *   v1.2.0 — 2026-09-08 — The agent CORS write goes through services/cors-overview.ts (setCorsList),
+ *     the one implementation the aimeat_admin_cors_set tool calls too.
  *   v1.1.0 — 2026-08-18 — The operator can see what a principal MAY DO, not only that it exists.
  *     /v1/admin/agents carries each agent's approved scopes, and the new /v1/admin/app-grants lists
  *     every live app grant on the node beside the app's CURRENT declaration, naming the words the
@@ -24,7 +26,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { emitChange } from '../services/event-bus.js';
+import { setCorsList } from '../services/cors-overview.js';
 import { parseAppScopes } from '../services/protected-resource.js';
 import { logger } from '../utils/logger.js';
 
@@ -131,7 +133,9 @@ export function adminAgentsRouter(
         }));
     });
 
-    // PUT /v1/admin/agents/:gaii/cors — Operator sets/clears CORS for any agent
+    // PUT /v1/admin/agents/:gaii/cors — Operator sets/clears CORS for any agent. The check, the
+    // write and the change event live in services/cors-overview.ts, which aimeat_admin_cors_set
+    // calls too; the door here refuses a missing agent before anything is checked, as it always has.
     router.put('/v1/admin/agents/:gaii/cors', requireAuth(), requireRole('operator'), async (req, res) => {
         const gaii = req.params.gaii as string;
         const agent = await storage.getAgent(gaii);
@@ -139,33 +143,12 @@ export function adminAgentsRouter(
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent not found: ${gaii}`));
             return;
         }
-
-        const { allowed_origins } = req.body ?? {};
-        if (allowed_origins !== null && !Array.isArray(allowed_origins)) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'allowed_origins must be an array of origin URLs or null to clear'));
+        const r = await setCorsList(storage, config, gaii, (req.body ?? {}).allowed_origins);
+        if (!r.ok) {
+            res.status(r.code === 'NOT_FOUND' ? 404 : r.code === 'INVALID_INPUT' ? 400 : 500).json(error(config.nodeId, r.code, r.message));
             return;
         }
-        if (Array.isArray(allowed_origins)) {
-            for (const origin of allowed_origins) {
-                if (typeof origin !== 'string' || (origin !== '*' && !/^https?:\/\//.test(origin))) {
-                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid origin: ${origin}. Must be an http(s) URL or '*'`));
-                    return;
-                }
-            }
-        }
-
-        const updated = await storage.updateAgent(gaii, {
-            allowedOrigins: allowed_origins === null ? undefined : allowed_origins,
-        });
-        if (!updated) {
-            res.status(500).json(error(config.nodeId, 'INTERNAL', 'This one is on us — the change could not be saved. It is already reported; try again in a moment.'));
-            return;
-        }
-        res.json(success(config.nodeId, {
-            gaii: updated.gaii,
-            allowed_origins: updated.allowedOrigins ?? null,
-        }));
-        emitChange('config');
+        res.json(success(config.nodeId, { gaii: r.kind === 'agent' ? r.gaii : gaii, allowed_origins: r.allowed_origins }));
     });
 
     return router;

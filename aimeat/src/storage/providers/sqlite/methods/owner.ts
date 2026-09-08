@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.9.0 -- 2026-09-08 -- countMemoryWithOrigins, for the operator's CORS page.
  *   v1.6.0 -- 2026-09-06 -- Review item 5.5: listAllMemory takes the Postgres order and default --
  *     key unless newestFirst, and no implicit limit -- so the same call answers the same on both.
  *   v1.8.0 — 2026-09-04 — deleteOwner clears eco_auth, the ecosystem-app device handshakes keyed on
@@ -40,7 +41,7 @@ import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '.
 import { resolveGroupId } from '../../../memory-sharing.js';
 import { pseudonymiseWriter } from '../repos/memory-tally.js';
 import type { SqliteStorage } from '../index.js';
-import { searchTextMemory, countMemory as countMemoryRepo, sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
+import { searchTextMemory, countMemory as countMemoryRepo, countMemoryWithOrigins as countMemoryWithOriginsRepo, sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
 
 export const ownerMethods = {
   // ══════════════════════════════════════════════════════════
@@ -385,6 +386,10 @@ export const ownerMethods = {
 
   async countMemory(this: SqliteStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string }): Promise<number> {
     return countMemoryRepo(this.db, ownerGaiis, opts);
+  },
+
+  async countMemoryWithOrigins(this: SqliteStorage): Promise<number> {
+    return countMemoryWithOriginsRepo(this.db);
   },
 
   async sumMemoryBytes(this: SqliteStorage, ownerGaii: string): Promise<number> {

@@ -9,6 +9,7 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   v1.5.0 -- 2026-09-08 -- countMemoryWithOrigins, for the operator's CORS page.
  *   v1.4.0 -- 2026-09-06 -- Review item 5.1: countArchivedByKeyPrefix returns { active, archived },
  *     the shape the interface declares. It returned a number, so structure-overview read
  *     `.archived` off it and got undefined on the production backend, with no throw to notice.
@@ -363,6 +364,15 @@ export const memoryMethods = {
     if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);
     q = applyArchive(q, opts?.archived);
     const r = await q.executeTakeFirst();
+    return Number(r?.n ?? 0);
+  },
+
+  async countMemoryWithOrigins(this: PostgresKyselyStorage): Promise<number> {
+    const r = await applyArchive(
+      this.db.selectFrom('Memory').select(sql<number>`count(*)`.as('n'))
+        .where('allowedOrigins', 'is not', null)
+        .where(sql`cardinality("allowedOrigins")`, '>', 0),
+    ).executeTakeFirst();
     return Number(r?.n ?? 0);
   },
 

@@ -8,6 +8,8 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.13.0 -- 2026-09-08 -- aimeat_admin_cors_overview and aimeat_admin_cors_set, thin over
+ *     GET /v1/admin/cors/overview and the two PUT cors routes the CORS page uses.
  *   v1.12.0 -- 2026-09-05 -- aimeat_admin_security_overview and aimeat_admin_incident_resolve, thin
  *     over GET /v1/admin/security/overview and the incident resolve route the Security page uses.
  *   v1.11.0 -- 2026-08-24 -- BR-04: the nine SSO-administration and account-lifecycle tools, thin
@@ -604,5 +606,26 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_admin_incident_resolve'), async ({ agent_name, id }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.post(`/v1/admin/security/incidents/${encodeURIComponent(id)}/resolve`));
+  });
+
+  // The CORS page in one read, and the one write it has, over the same routes the page uses. An
+  // agent's address carries a `#`, a person's does not; that is what picks the door.
+  mcp.tool('aimeat_admin_cors_overview', descriptionFor('aimeat_admin_cors_overview'), {
+    agent_name: agentNameSchema,
+  }, annotationsFor('aimeat_admin_cors_overview'), async ({ agent_name }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.get('/v1/admin/cors/overview'));
+  });
+
+  mcp.tool('aimeat_admin_cors_set', descriptionFor('aimeat_admin_cors_set'), {
+    agent_name: agentNameSchema,
+    who: z.string().describe('A person\'s address (owner@node), a bare owner name, or an agent\'s address (name#owner@node).'),
+    origins: z.array(z.string()).nullable().describe('The origins to allow: each an http(s) URL or "*"; null clears the list so the default applies again.'),
+  }, annotationsFor('aimeat_admin_cors_set'), async ({ agent_name, who, origins }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const path = who.includes('#')
+      ? `/v1/admin/agents/${encodeURIComponent(who)}/cors`
+      : `/v1/admin/ghii/${encodeURIComponent(who)}/cors`;
+    return asText(await client.put(path, { allowed_origins: origins }));
   });
 }

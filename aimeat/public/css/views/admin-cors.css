@@ -1,0 +1,99 @@
+/* ── Admin CORS page, in the poster face ──
+ * @file admin-cors.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's CORS page (design canvas "AIMEAT Admin CORS", direction A): the rows
+ *   of people and agents with a list of their own, the origins as code chips, the underline fields
+ *   and the picker that narrows as you type, the quick-add chips, the precedence ladder and the
+ *   paste box. The frame, the sections, the metric rows, the numeral strip and the buttons come
+ *   from admin.css and organism.css; only what this page adds lives here. Every value is a
+ *   theme.css token, so the page flips with the theme.
+ * @version-history
+ *   v1.0.0 — 2026-09-08 — Initial.
+ */
+
+/* The last row of a section carries no rule under it; the section's own rule is the next one. */
+.adm-cors .adm-mrow--last { border-bottom: 0; }
+/* A row's value is a mono token (an environment variable, a route) that has no space to break at;
+   on a narrow screen it breaks anywhere rather than running under the edge. */
+.adm-cors .adm-mrow .adm-mval { overflow-wrap: anywhere; }
+/* A strip cell's second line wraps rather than truncates: at 1280 the four cells are narrow. */
+.adm-cors .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+/* The wildcard is a word in the strip, not a numeral. */
+.adm-cors .og-strip b.adm-cors-any { color: var(--accent); font-size: 1.5rem; text-transform: uppercase; }
+
+.adm-cors-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 90ch; }
+.adm-cors-empty { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: .88rem; color: var(--text-dim); }
+.adm-cors-code { display: inline-block; padding: 1px 6px; font-family: var(--font-mono); font-size: .75rem; background: var(--code-bg); color: var(--text); }
+.adm-cors-mono { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.adm-cors-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.adm-cors-note { margin: 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+
+/* One person or agent with a list: who, the origins, the actions. */
+.adm-cors-orow { display: grid; grid-template-columns: 240px minmax(0, 1fr) 190px; gap: 0 22px; align-items: start; padding: 13px 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text); }
+.adm-cors-orow--last { border-bottom: 0; }
+.adm-cors-orow b { font-weight: 700; }
+.adm-cors-orow .adm-why.adm-cors-mono { font-size: .75rem; }
+.adm-cors-origins { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.adm-cors-acts { display: flex; gap: 12px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+
+/* An underline field: the page's one input shape. The mono one holds origins. */
+.adm-cors-fld { display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 4px 2px 5px; }
+.adm-cors-fld:focus-within { border-bottom-color: var(--accent); }
+.adm .adm-cors-fld input[type="text"] { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .9rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-cors-fld input[type="text"]::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm .adm-cors-fld--mono input[type="text"] { font-family: var(--font-mono); font-size: .8rem; font-weight: 500; }
+.adm .adm-cors-fld--mono input[type="text"]::placeholder { font-weight: 500; }
+.adm-cors-fld svg { width: 16px; height: 16px; flex: none; stroke: var(--text); fill: none; stroke-width: 2.5; }
+
+/* The picker narrows as you type; the matches open under the field. */
+.adm-cors-pick { position: relative; }
+.adm-cors-pick-list { position: absolute; left: 0; right: 0; top: 100%; z-index: 20; margin-top: 2px; background: var(--card-bg); border: 2px solid var(--text); max-height: 260px; overflow-y: auto; }
+.adm-cors-pick-list button { display: block; width: 100%; text-align: left; background: none; border: 0; border-radius: 0; padding: 7px 10px; font: inherit; font-size: .85rem; color: var(--text); cursor: pointer; }
+.adm-cors-pick-list button:hover, .adm-cors-pick-list button.on { background: var(--bg-surface); }
+.adm-cors-pick-list button b { font-weight: 700; }
+.adm-cors-pick-list button small { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.adm-cors-pick-list .adm-cors-pick-none { padding: 7px 10px; font-size: .85rem; color: var(--text-dim); }
+
+/* Quick add: square mono chips that append an origin. */
+.adm-cors-quick { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; font-size: .78rem; color: var(--text-dim); }
+.adm-cors-chip { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 9px; border: 2px solid var(--border); background: none; color: var(--text-dim); cursor: pointer; border-radius: 0; }
+.adm-cors-chip:hover { border-color: var(--text); color: var(--text); }
+
+/* The inline editor inside a row, and the give-a-list form under the rows. */
+.adm-cors-edit { display: flex; flex-direction: column; gap: 0; }
+.adm-cors-edit-acts { display: flex; gap: 16px; align-items: center; margin-top: 14px; }
+.adm-cors-give { margin-top: 22px; max-width: 760px; }
+.adm-cors-give-grid { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 0 22px; align-items: end; }
+.adm-cors-give-acts { display: flex; gap: 16px; align-items: baseline; margin-top: 16px; flex-wrap: wrap; }
+
+/* The precedence ladder: a coral numeral, the list, the door that sets it. */
+.adm-cors-step { display: grid; grid-template-columns: 44px minmax(0, 1fr) minmax(220px, auto); gap: 0 19px; align-items: baseline; padding: 11px 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text); }
+.adm-cors-step--last { border-bottom: 0; }
+.adm-cors-step b { font-weight: 700; }
+.adm-cors-step-num { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.5rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); color: var(--accent); }
+
+/* Ask your AI: the paste in the dashed coral box. */
+.adm-cors .og-box { max-width: 960px; }
+.adm-cors-paste { white-space: pre-wrap; font-size: .85rem; line-height: 1.55; color: var(--text); }
+
+@media (max-width: 1100px) {
+  /* Two strip cells are buttons here, and organism.css folds only its div cells to two a row. */
+  .adm-cors .og-strip { flex-wrap: wrap; }
+  .adm-cors .og-strip > div, .adm-cors .og-strip > button { flex: 1 1 50%; border-right: 0; border-bottom: 1px solid var(--border); }
+  .adm-cors-orow { grid-template-columns: 200px minmax(0, 1fr); gap: 6px 19px; }
+  .adm-cors-orow .adm-cors-acts { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+/* A phone: a metric row keeps its name readable and puts the chip and the value under each other on
+   the right; a row with a list is three lines; the form stacks its two fields. */
+@media (max-width: 768px) {
+  .adm-cors .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; }
+  .adm-cors .adm-mrow > :nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+  .adm-cors .adm-mrow > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .adm-cors .adm-mrow > :nth-child(3) { grid-column: 2; grid-row: 2; max-width: 11rem; white-space: normal; }
+  .adm-cors-orow { grid-template-columns: 1fr; gap: 6px 0; }
+  .adm-cors-give-grid { grid-template-columns: 1fr; gap: 14px 0; }
+  .adm-cors-step { grid-template-columns: 36px minmax(0, 1fr); gap: 4px 12px; }
+  .adm-cors-step > .adm-mval { grid-column: 2; text-align: left; }
+}

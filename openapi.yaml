@@ -48057,6 +48057,85 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /v1/admin/cors/overview:
+    get:
+      operationId: adminCorsOverview
+      tags: [Admin, CORS]
+      summary: The CORS page in one read (operator)
+      description: |
+        Operator-only. Which browser origins this instance answers: the default list and whether
+        it is the wildcard, the three cookie doors that take no wildcard and what is named for
+        them, every person and every agent with a list of their own, how many memory records
+        carry one, and the order the lists rank in (record, agent, person, default; the first
+        non-empty list wins). The same data the `aimeat_admin_cors_overview` tool returns.
+        Requires the `operator` role.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The overview
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          generated_at: { type: string, format: date-time }
+                          default:
+                            type: object
+                            properties:
+                              origins: { type: array, items: { type: string } }
+                              wildcard: { type: boolean, description: True when the default list answers every origin }
+                              env: { type: string, enum: [AIMEAT_CORS_ALLOWED_ORIGINS] }
+                              config_key: { type: string, enum: [cors.allowed_origins] }
+                          cookie_doors:
+                            type: object
+                            description: The doors that hand back a token on the sign-in cookie; they answer only an origin named in the default list
+                            properties:
+                              paths: { type: array, items: { type: string } }
+                              named: { type: array, items: { type: string } }
+                          people:
+                            type: object
+                            properties:
+                              total: { type: integer }
+                              with_list:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    ghii: { type: string }
+                                    owner_name: { type: string }
+                                    display_name: { type: string, nullable: true }
+                                    allowed_origins: { type: array, items: { type: string } }
+                          agents:
+                            type: object
+                            properties:
+                              total: { type: integer }
+                              with_list:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    gaii: { type: string }
+                                    owner: { type: string }
+                                    display_name: { type: string, nullable: true }
+                                    allowed_origins: { type: array, items: { type: string } }
+                          records:
+                            type: object
+                            properties:
+                              with_list: { type: integer, description: Memory records that carry a list of their own }
+                          anonymous_mode: { type: boolean }
+                          precedence:
+                            type: array
+                            items: { type: string, enum: [record, agent, person, default] }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /v1/admin/security/incidents:
     get:
       operationId: listSecurityIncidents
