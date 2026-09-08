@@ -4,14 +4,16 @@
  * SPDX-License-Identifier: MIT
  * @description Storage-backend-agnostic interface for node-level state: node keypair, maintenance
  *   mode, push subscriptions, trusted issuers, verification nonces, realtime rooms, site change log,
- *   extensions, escrow holds, and cortex extensions/lib files. Implemented per backend.
+ *   extensions, and cortex extensions/lib files. Implemented per backend.
  *
  * @structure
  *   - NodeRepository: node key + maintenance getters/setters
- *   - push/trusted-issuer/verification-nonce CRUD; realtime room + site-change-log ops
- *   - extension, escrow-hold, and cortex-extension/lib-file CRUD
+ *   - push CRUD, trusted-issuer create/list, verification-nonce CRUD; realtime room + site-change-log ops
+ *   - extension and cortex-extension/lib-file CRUD
  *
  * @version-history
+ *   v1.3.0 — 2026-09-09 — Generic escrow holds (create/get/list/release/refund), getTrustedIssuer,
+ *     getTrustedIssuerByUrl, deleteTrustedIssuer and listRealtimeRooms deleted: no caller.
  *   v1.2.0 — 2026-08-17 — `lean` option on listExtensions (no scriptContent) and
  *     listCortexExtensions (no manifest / seed-data entries) for metadata-only readers.
  *   v1.1.0 — 2026-08-11 — Push subscriptions are per DEVICE (audit H-8): listPushSubscriptionsByOwner
@@ -26,7 +28,6 @@ import type {
   RealtimeRoomRecord,
   SiteChangeLogEntry,
   ExtensionRecord,
-  EscrowHoldRecord,
   CortexExtensionRecord,
 } from '../interface.js';
 
@@ -50,17 +51,13 @@ export interface NodeRepository {
   deletePushSubscription(ownerName: string, endpoint?: string): Promise<boolean>;
   listPushSubscriptions(): Promise<PushSubscriptionRecord[]>;
   createTrustedIssuer(record: TrustedIssuerRecord): Promise<TrustedIssuerRecord>;
-  getTrustedIssuer(id: string): Promise<TrustedIssuerRecord | null>;
-  getTrustedIssuerByUrl(url: string): Promise<TrustedIssuerRecord | null>;
   listTrustedIssuers(opts?: { type?: string }): Promise<TrustedIssuerRecord[]>;
-  deleteTrustedIssuer(id: string): Promise<boolean>;
   createVerificationNonce(record: VerificationNonceRecord): Promise<VerificationNonceRecord>;
   getVerificationNonce(state: string): Promise<VerificationNonceRecord | null>;
   deleteVerificationNonce(state: string): Promise<void>;
   cleanExpiredNonces(): Promise<number>;
   createRealtimeRoom(room: RealtimeRoomRecord): Promise<RealtimeRoomRecord>;
   getRealtimeRoom(id: string): Promise<RealtimeRoomRecord | null>;
-  listRealtimeRooms(filter?: { appType?: string; isPublic?: boolean }): Promise<RealtimeRoomRecord[]>;
   updateRealtimeRoom(id: string, updates: Partial<RealtimeRoomRecord>): Promise<RealtimeRoomRecord | null>;
   deleteRealtimeRoom(id: string): Promise<boolean>;
   addSiteChangeLog(entry: SiteChangeLogEntry): Promise<SiteChangeLogEntry>;
@@ -76,11 +73,6 @@ export interface NodeRepository {
   listExtensions(opts?: { status?: string; lean?: boolean }): Promise<ExtensionRecord[]>;
   updateExtension(name: string, updates: Partial<ExtensionRecord>): Promise<ExtensionRecord | null>;
   deleteExtension(name: string): Promise<boolean>;
-  createEscrowHold(record: EscrowHoldRecord): Promise<EscrowHoldRecord>;
-  getEscrowHold(holdId: string): Promise<EscrowHoldRecord | null>;
-  listEscrowHolds(fromGaii: string, opts?: { status?: string }): Promise<EscrowHoldRecord[]>;
-  releaseEscrowHold(holdId: string, toGaii: string): Promise<EscrowHoldRecord | null>;
-  refundEscrowHold(holdId: string): Promise<EscrowHoldRecord | null>;
   createCortexExtension(record: CortexExtensionRecord): Promise<CortexExtensionRecord>;
   getCortexExtension(name: string): Promise<CortexExtensionRecord | null>;
   /**

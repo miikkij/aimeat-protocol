@@ -6,6 +6,7 @@
  *   package reviews (KnowledgeReview). Translated 1:1 from the Prisma implementation. findBrokenLinks
  *   walks the contributor's links and checks both endpoints via getMemory.
  * @version-history
+ *   v1.1.0 — 2026-09-09 — getLink and listAllReviews deleted: no caller.
  *   v1.0.0 — 2026-07-15 — Phase 5: knowledge on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -26,10 +27,6 @@ export const knowledgeMethods = {
   async createLink(this: PostgresKyselyStorage, r: MemoryLinkRecord): Promise<MemoryLinkRecord> {
     await this.db.insertInto('KnowledgeLink').values({ source: r.source, target: r.target, relation: r.relation, description: r.description, linkedAt: new Date(r.linked_at), linkedBy: r.linked_by }).execute();
     return r;
-  },
-  async getLink(this: PostgresKyselyStorage, source: string, target: string): Promise<MemoryLinkRecord | null> {
-    const r = await this.db.selectFrom('KnowledgeLink').selectAll().where('source', '=', source).where('target', '=', target).executeTakeFirst();
-    return r ? toLink(r) : null;
   },
   async listLinks(this: PostgresKyselyStorage, key: string, opts?: { direction?: 'outgoing' | 'incoming' | 'both'; relation?: string }): Promise<MemoryLinkRecord[]> {
     const dir = opts?.direction ?? 'both';
@@ -65,10 +62,6 @@ export const knowledgeMethods = {
   },
   async listReviews(this: PostgresKyselyStorage, packageId: string): Promise<OperatorReviewRecord[]> {
     return (await this.db.selectFrom('KnowledgeReview').selectAll().where('packageId', '=', packageId).execute()).map(toReview);
-  },
-  async listAllReviews(this: PostgresKyselyStorage, opts?: { page?: number; perPage?: number }): Promise<OperatorReviewRecord[]> {
-    const page = opts?.page ?? 1, perPage = opts?.perPage ?? 20;
-    return (await this.db.selectFrom('KnowledgeReview').selectAll().orderBy('timestamp', 'desc').limit(perPage).offset((page - 1) * perPage).execute()).map(toReview);
   },
   async deleteReviewsByOperator(this: PostgresKyselyStorage, gaii: string): Promise<number> {
     const r = await this.db.deleteFrom('KnowledgeReview').where('operatorGaii', '=', gaii).executeTakeFirst();

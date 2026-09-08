@@ -7,11 +7,13 @@
  * @structure memoryTallyMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryTallyMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-09-09 — listMemoryFamilyTally, countTalliedKeys and pseudonymiseTallyWriter deleted:
+ *     no caller outside their unit test. deleteOwner calls repo.pseudonymiseWriter directly.
  *   v1.0.0 — 2026-08-24 — Initial creation for TARGET-073 step 8.
  */
 import type { SqliteStorage } from '../index.js';
 import type {
-  MemoryWriteTallyRow, MemoryFamilyTallyRow,
+  MemoryWriteTallyRow,
   MemoryWriteTallyUpsert, MemoryFamilyTallyUpsert,
 } from '../../../repositories/memory-tally.repository.js';
 import * as repo from '../repos/memory-tally.js';
@@ -27,16 +29,5 @@ export const memoryTallyMethods = {
     this: SqliteStorage, filter: { ownerGaii: string; key?: string; keyPrefix?: string; limit?: number },
   ): Promise<MemoryWriteTallyRow[]> {
     return repo.listWriteTally(this.db, filter);
-  },
-  async listMemoryFamilyTally(
-    this: SqliteStorage, filter: { ownerGaii: string; family?: string; limit?: number },
-  ): Promise<MemoryFamilyTallyRow[]> {
-    return repo.listFamilyTally(this.db, filter);
-  },
-  async countTalliedKeys(this: SqliteStorage, ownerGaii: string, familyPrefix: string): Promise<number> {
-    return repo.countTalliedKeys(this.db, ownerGaii, familyPrefix);
-  },
-  async pseudonymiseTallyWriter(this: SqliteStorage, ownerName: string, nodeId: string): Promise<number> {
-    return repo.pseudonymiseWriter(this.db, ownerName, nodeId);
   },
 };

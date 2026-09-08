@@ -59,8 +59,8 @@ import { resolveIdentity } from '../utils/gaii.js';
  *   trust            the operator's review verdict and the vouch count. This is the one that was
  *                    exploitable: an owner PUT `{"trust":{"operatorReviewed":true,"codeAudited":true}}`
  *                    on their own capability and the public directory then showed it as reviewed and
- *                    audited by the node operator. It is written by storage.setCapabilityTrust and
- *                    the vouch counters, nowhere else.
+ *                    audited by the node operator. It is written by the vouch counters, nowhere
+ *                    else (storage.setCapabilityTrust had no caller and went on 2026-09-09).
  *   stats            invocation counters, written by storage.incrementCapabilityStats after a call
  *                    that really happened. A patch could claim any usage history it liked.
  *   operatorOverride the operator's disable switch and notes. It has its own operator-gated door,

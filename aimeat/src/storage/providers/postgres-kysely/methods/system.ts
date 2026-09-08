@@ -7,6 +7,7 @@
  *   boot (config-init) and the stats flusher. Translated 1:1 from the Prisma implementations against the
  *   same tables (SystemSetting keyed `config:*` / `maintenance`, NodeKey, StatsCounter, StatsDailyHistory).
  * @version-history
+ *   v1.1.0 — 2026-09-09 — getConfigValue deleted: no caller (readers take getAllConfigValues).
  *   v1.0.0 — 2026-07-15 — Phase 5: startup/system domain on Postgres+Kysely.
  */
 import { sql } from 'kysely';
@@ -17,11 +18,6 @@ import { jsonb } from '../helpers.js';
 export const systemMethods = {
   // ── Config persistence (SystemSetting, key `config:<dotPath>`) ──
   supportsConfigPersistence(this: PostgresKyselyStorage): boolean { return true; },
-
-  async getConfigValue(this: PostgresKyselyStorage, key: string): Promise<string | null> {
-    const r = await this.db.selectFrom('SystemSetting').select('value').where('key', '=', `config:${key}`).executeTakeFirst();
-    return r?.value ?? null;
-  },
 
   async setConfigValue(this: PostgresKyselyStorage, key: string, value: string): Promise<void> {
     await this.db.insertInto('SystemSetting').values({ key: `config:${key}`, value })

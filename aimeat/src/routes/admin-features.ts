@@ -12,6 +12,8 @@
  *   - Route groups: GHII users, notification templates, directory, push, genesis peering
  *
  * @version-history
+ *   v1.2.0 — 2026-09-09 — GET /v1/admin/marketplace deleted: it read a table nothing writes and
+ *     answered total 0 on every node, and the admin view fetched it without rendering it.
  *   v1.1.0 — 2026-09-08 — The GHII CORS write goes through services/cors-overview.ts (setCorsList),
  *     the one implementation the aimeat_admin_cors_set tool calls too.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -373,39 +375,6 @@ export function adminFeaturesRouter(
         const stats = services.directoryService.getStats();
         res.json(success(config.nodeId, { rebuilt: true, stats }));
         emitChange('features');
-    }));
-
-    // ── Marketplace ─────────────────────────────────────────
-
-    router.get('/v1/admin/marketplace', ...auth, handle(async (_req, res) => {
-        const listings = await storage.listListings({});
-        const byStatus: Record<string, number> = {};
-        for (const l of listings) {
-            byStatus[l.status] = (byStatus[l.status] ?? 0) + 1;
-        }
-        const recent = listings
-            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-            .slice(0, 20);
-
-        res.json(success(config.nodeId, {
-            enabled: config.marketplaceEnabled,
-            listing_fee: config.marketplaceListingFeeMorsels,
-            tx_fee_percent: config.marketplaceTransactionFeePercent,
-            escrow_enabled: config.marketplaceEscrowEnabled,
-            stats: {
-                total: listings.length,
-                by_status: byStatus,
-                recent_listings: recent.map(l => ({
-                    id: l.id,
-                    title: l.title,
-                    category: l.category,
-                    price_morsels: l.priceMorsels,
-                    status: l.status,
-                    seller_ghii: l.sellerGhii,
-                    created_at: l.createdAt,
-                })),
-            },
-        }));
     }));
 
     // ── Push Notifications ──────────────────────────────────

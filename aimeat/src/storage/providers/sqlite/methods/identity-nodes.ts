@@ -7,6 +7,8 @@
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  *   v1.2.0 — 2026-07-16 — Add getGHIIsByGhiis batch (Phase 3): many GHII records by ghii in one query.
  *   v1.1.0 — 2026-07-16 — listStorageFilesForOwners batch primitive.
+ *   v1.3.0 — 2026-09-09 — getGHIIsByGhiis, getGHIIByGoogleSub, getEmailVerificationsByOwner and
+ *     deleteExpiredEmailVerifications deleted: no caller.
  */
 import type {
   PeeringRequestRecord, ChunkedUploadRecord, GHIIRecord, PersonalNodeRecord, MailboxItemRecord,
@@ -162,15 +164,6 @@ export const identityNodesMethods = {
     }
   },
 
-  async getGHIIsByGhiis(this: SqliteStorage, ghiis: string[]): Promise<Record<string, GHIIRecord>> {
-    if (ghiis.length === 0) return {};
-    const placeholders = ghiis.map(() => '?').join(',');
-    const rows = this.db.prepare(`SELECT * FROM ghiis WHERE ghii IN (${placeholders})`).all(...ghiis) as Record<string, unknown>[];
-    const out: Record<string, GHIIRecord> = {};
-    for (const row of rows) { const rec = this.deserializeGHII(row); out[rec.ghii] = rec; }
-    return out;
-  },
-
   async getGHII(this: SqliteStorage, ghii: string): Promise<GHIIRecord | null> {
     const row = this.db.prepare('SELECT * FROM ghiis WHERE ghii = ?').get(ghii) as Record<string, unknown> | undefined;
     return row ? this.deserializeGHII(row) : null;
@@ -189,11 +182,6 @@ export const identityNodesMethods = {
   async getGHIIsByEmailHash(this: SqliteStorage, emailHash: string): Promise<GHIIRecord[]> {
     const rows = this.db.prepare('SELECT * FROM ghiis WHERE emailHash = ?').all(emailHash) as Record<string, unknown>[];
     return rows.map(r => this.deserializeGHII(r));
-  },
-
-  async getGHIIByGoogleSub(this: SqliteStorage, googleSub: string): Promise<GHIIRecord | null> {
-    const row = this.db.prepare('SELECT * FROM ghiis WHERE googleSub = ?').get(googleSub) as Record<string, unknown> | undefined;
-    return row ? this.deserializeGHII(row) : null;
   },
 
   async getGHIIByExternalId(this: SqliteStorage, provider: string, sub: string): Promise<GHIIRecord | null> {
@@ -434,19 +422,6 @@ export const identityNodesMethods = {
       updated.createdAt, updated.verifiedAt, id,
     );
     return updated;
-  },
-
-  async getEmailVerificationsByOwner(this: SqliteStorage, ownerName: string): Promise<EmailVerificationRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM email_verifications WHERE ownerName = ? ORDER BY createdAt DESC').all(ownerName) as Record<string, unknown>[];
-    return rows.map(r => this.deserializeEmailVerification(r));
-  },
-
-  async deleteExpiredEmailVerifications(this: SqliteStorage): Promise<number> {
-    const now = new Date().toISOString();
-    const result = this.db.prepare(
-      `DELETE FROM email_verifications WHERE status = 'pending' AND expiresAt < ?`
-    ).run(now);
-    return result.changes;
   },
 
   deserializeEmailVerification(this: SqliteStorage, row: Record<string, unknown>): EmailVerificationRecord {

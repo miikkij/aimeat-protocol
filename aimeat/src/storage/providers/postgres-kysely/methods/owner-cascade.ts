@@ -30,6 +30,8 @@
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.2.1 — 2026-09-09 — The tally comment names the function this cascade actually calls
+ *     (pseudonymiseTallyWriterDb); the Storage method it named was deleted for having no caller.
  *   v1.2.0 — 2026-09-06 — Secret joins the cascade. A row there is a live credential to somebody
  *     else's service, held under a username that is released for reuse.
  *   v1.1.0 — 2026-09-04 — Seven tables join the cascade: MemoryVersion, OwnerAgentDefault,
@@ -59,7 +61,8 @@ export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<v
   // would hand the next registrant somebody else's history. Rows where this identity was the WRITER
   // into somebody ELSE'S namespace are deliberately NOT deleted here — they are that owner's record
   // of who touched their data, and removing them would turn their "four hands" into three. Those are
-  // pseudonymised instead, by pseudonymiseTallyWriter, called from deleteOwner.
+  // pseudonymised instead, by pseudonymiseTallyWriterDb (methods/memory-tally.ts), which this
+  // cascade calls directly below.
   await db.deleteFrom('MemoryWriteTally').where('ownerGaii', '=', gaii).execute();
   await db.deleteFrom('MemoryFamilyTally').where('ownerGaii', '=', gaii).execute();
 

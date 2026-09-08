@@ -4,6 +4,8 @@
  *   sending, the directory and matching runs, push templates, CSM and MSM, genesis peers, and the
  *   node config doors mounted alongside them.
  * @version-history
+ *   v1.3.0 — 2026-09-09 — GET /v1/admin/marketplace left the sweep and lost its test: the route was
+ *     deleted with the marketplace storage methods (no writer, no reader).
  *   v1.2.0 — 2026-08-19 — The front-page switch: site.front_page=demo serves the static showroom
  *     at / (Finnish sibling by Accept-Language, JSON bootstrap untouched), classic restores the
  *     SPA, and a value outside classic|demo is refused.
@@ -168,7 +170,6 @@ const ADMIN_DOORS: Array<{ method: string; path: string; body?: unknown }> = [
     // route that does not exist answers 404 to everyone, which reads as "did not refuse" to a door
     // sweep. The sweep is right to say so — a 404 is not a refusal — and the entries were the stale
     // half.
-    { method: 'GET', path: '/v1/admin/marketplace' },
     { method: 'GET', path: '/v1/admin/push' },
     { method: 'PUT', path: '/v1/admin/push/templates/nonexistent/en', body: { title: 'x', body: 'y' } },
     { method: 'POST', path: '/v1/admin/push/test', body: { ghii: 'nonexistent@nowhere' } },
@@ -316,20 +317,6 @@ console.log('\nMatching');
 // GET /v1/matches could never return one. Its routes, its scheduler wiring, its email template and
 // its table went with it, and matchmaking between profiles is an application on this platform rather
 // than part of it. These two outlived the feature and answered 404 for six days.
-
-// ─── Marketplace ───
-console.log('\nMarketplace');
-
-await test('GET /v1/admin/marketplace \u2192 200, has enabled and stats', async () => {
-    const { status, body } = await json('/v1/admin/marketplace', authed());
-    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-    assert(body.ok === true, 'ok');
-    assert(typeof body.data?.enabled === 'boolean', 'has enabled field');
-    assert(typeof body.data?.listing_fee === 'number', 'has listing_fee');
-    assert(typeof body.data?.tx_fee_percent === 'number', 'has tx_fee_percent');
-    assert(typeof body.data?.stats === 'object', 'has stats');
-    assert(typeof body.data?.stats?.total === 'number', 'stats has total');
-});
 
 // ─── Push ───
 console.log('\nPush');

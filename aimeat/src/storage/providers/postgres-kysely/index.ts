@@ -18,6 +18,7 @@
  *   v1.0.0 — 2026-07-15 — Phase 5: provider skeleton + migration runner + memory domain.
  *   v1.1.0 — 2026-08-11 — Storage.transaction(): `db` becomes a getter over an AsyncLocalStorage-
  *     bound transaction, so every existing `this.db` call joins an open one without being changed.
+ *   v1.5.0 — 2026-09-09 — marketplaceMethods unbound and its module deleted: no caller.
  *   v1.4.0 — 2026-09-06 — secretMethods bound (the owner's secrets vault).
  *   v1.3.0 — 2026-09-04 — passkeyMethods bound.
  *   v1.2.0 — 2026-09-03 — dependencyMethods and componentVersionMethods bound.
@@ -70,7 +71,6 @@ import { otkMethods } from './methods/otk.js';
 import { federationMethods } from './methods/federation.js';
 import { directMessageMethods } from './methods/direct-message.js';
 import { moderationMethods } from './methods/moderation.js';
-import { marketplaceMethods } from './methods/marketplace.js';
 import { catalogueMethods } from './methods/catalogue.js';
 import { subdomainSiteMethods } from './methods/subdomain-sites.js';
 import { notificationMethods } from './methods/notifications.js';
@@ -189,7 +189,6 @@ Object.assign(
   federationMethods,
   directMessageMethods,
   moderationMethods,
-  marketplaceMethods,
   catalogueMethods,
   subdomainSiteMethods,
   notificationMethods,

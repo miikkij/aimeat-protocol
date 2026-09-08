@@ -6,6 +6,7 @@
  *   agentGaii). Agent registration creates one, so this unblocks POST /v1/agents. Translated 1:1 from the
  *   Prisma implementation.
  * @version-history
+ *   v1.1.0 — 2026-09-09 — listOnboardingByOwner deleted: no caller.
  *   v1.0.0 — 2026-07-15 — Phase 5: agent onboarding on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -75,11 +76,6 @@ export const agentOnboardingMethods = {
   async deleteOnboarding(this: PostgresKyselyStorage, agentGaii: string): Promise<boolean> {
     const r = await this.db.deleteFrom('AgentOnboarding').where('agentGaii', '=', agentGaii).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0) > 0;
-  },
-
-  async listOnboardingByOwner(this: PostgresKyselyStorage, owner: string): Promise<AgentOnboardingRecord[]> {
-    const rows = await this.db.selectFrom('AgentOnboarding').selectAll().where('agentGaii', 'like', `%#${owner}@%`).orderBy('startedAt', 'desc').execute();
-    return rows.map(toRecord);
   },
 
   async listOnboardingByStatus(this: PostgresKyselyStorage, status: string): Promise<AgentOnboardingRecord[]> {

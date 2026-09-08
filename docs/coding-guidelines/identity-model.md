@@ -75,7 +75,7 @@ in whose name an agent acts.
 - **Balance location:** `GHIIRecord.morselBalance` — the only balance in the system
 - **Agent balance field:** `AgentRecord.morselBalance` exists in schema for backward compat but is always 0. Never write to it.
 - **Balance operations:** `storage.debitBalance(gaii, amount)` internally resolves any GAII/GHII/bare-name → owner → GHII record. Routes don't need dual-path logic.
-- **`storage.creditBalance()`**, **`creditBalanceCapped()`**, **`transferBalance()`** — same internal resolution.
+- **`storage.creditBalance()`**, **`creditBalanceCapped()`** — same internal resolution.
 - **Transactions:** Keyed to GHII identity (`owner@nodeId`)
 - **Wallet API:** Returns single GHII balance, no aggregation needed
 - **Per-agent spending limits:** Optional `AgentRecord.dailySpendLimit` (not yet enforced, field ready)

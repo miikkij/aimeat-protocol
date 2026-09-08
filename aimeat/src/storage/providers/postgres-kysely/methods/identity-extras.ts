@@ -6,6 +6,7 @@
  *   Postgres+Kysely backend — the parts of the identity repository not in methods/identity.ts.
  *   Translated 1:1 from the Prisma provider.
  * @version-history
+ *   v1.1.0 — 2026-09-09 — getEmailVerificationsByOwner and deleteExpiredEmailVerifications deleted: no caller.
  *   v1.0.0 — 2026-07-15 — Phase 5: chat instances + email verifications on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -85,15 +86,6 @@ export const identityExtraMethods = {
       .where('status', '=', 'pending').where('expiresAt', '>', new Date()).orderBy('createdAt', 'desc').executeTakeFirst();
     return r ? toEmail(r) : null;
   },
-  // Implemented on both backends as of 2026-09-06 (review item 5.9). It was declared optional on the
-  // interface and written for SQLite alone, so a caller that appeared on a Postgres node would have
-  // found nothing there -- an optional method with one implementation is a trap laid for whoever
-  // needs it next. Newest first, like getActiveEmailVerification above.
-  async getEmailVerificationsByOwner(this: PostgresKyselyStorage, ownerName: string): Promise<EmailVerificationRecord[]> {
-    const rows = await this.db.selectFrom('EmailVerification').selectAll()
-      .where('ownerName', '=', ownerName).orderBy('createdAt', 'desc').execute();
-    return rows.map(toEmail);
-  },
   async updateEmailVerification(this: PostgresKyselyStorage, id: string, updates: Partial<EmailVerificationRecord>): Promise<EmailVerificationRecord | null> {
     const data: Record<string, unknown> = {};
     if (updates.status !== undefined) data.status = updates.status;
@@ -104,9 +96,5 @@ export const identityExtraMethods = {
     if (Object.keys(data).length === 0) return this.getEmailVerification(id);
     const rows = await this.db.updateTable('EmailVerification').set(data as never).where('id', '=', id).returningAll().execute();
     return rows[0] ? toEmail(rows[0]) : null;
-  },
-  async deleteExpiredEmailVerifications(this: PostgresKyselyStorage): Promise<number> {
-    const r = await this.db.deleteFrom('EmailVerification').where('expiresAt', '<', new Date()).executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0);
   },
 };

@@ -11,6 +11,8 @@
  *   - PendingApproval methods: create/get/list/update plus listOverduePendingApprovals
  *
  * @version-history
+ *   v1.2.0 — 2026-09-09 — getOrganismReputation deleted: no caller (services/organism-reputation.ts
+ *     computes and writes, and nothing reads the stored row).
  *   v1.1.0 — 2026-07-16 — Add listPendingApprovalsForOrgs batch primitive (Phase 3 fan-out→IN).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -33,7 +35,6 @@ export interface OrganismRepository {
   listJoinRequests(organismId: string, opts?: { status?: string }): Promise<JoinRequestRecord[]>;
   updateJoinRequest(id: string, updates: Partial<JoinRequestRecord>): Promise<JoinRequestRecord | null>;
   setOrganismReputation(record: OrganismReputationRecord): Promise<OrganismReputationRecord>;
-  getOrganismReputation(organismId: string): Promise<OrganismReputationRecord | null>;
   // Phase 4 — Gate primitive (PendingApproval)
   createPendingApproval(record: PendingApprovalRecord): Promise<PendingApprovalRecord>;
   getPendingApproval(id: string): Promise<PendingApprovalRecord | null>;
