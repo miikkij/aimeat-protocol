@@ -12,6 +12,10 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   v1.8.0 -- 2026-09-08 -- aimeat_dm_send_as_owner names the agent that is acting, so the send can
+ *     find the files. The tool sends AS the owner while the AGENT uploaded them, and a file lives
+ *     under the identity that stored it: the descriptor pointed at storage that never held it, and
+ *     the recipient got an attachment they could not open while the tool answered `delivered`.
  *   v1.7.0 -- 2026-09-06 -- A refusal now says which part of the address was wrong, and a send that
  *     is waiting behind the recipient's first-contact gate says so instead of reporting `delivered`
  *     and nothing else. Both come from the service, so the REST door and the connector carry them
@@ -387,6 +391,11 @@ export function registerDmMessageTools(
             const result = await sendDirectMessage(ctx, {
                 senderGhii: ownerGhii, recipientGhii, body: body ?? '', replyToId: reply_to, attachments: mapped,
                 conversationId: conversation_id, subject, aiProvenanceId,
+                // The message is the owner's, the files are the agent's. aimeat_storage_upload stores
+                // under the identity that called it, so every file this agent uploaded lives under the
+                // GAII while the descriptor above names the owner. The send resolves which of the two
+                // actually holds each file, and refuses if neither does.
+                actingGaii: agentGaii,
             });
 
             if (!result.ok) {

@@ -9,6 +9,10 @@
  *   an ink rule, and the pages (broadcast, tracked, results) with the head the mast already carries
  *   removed. Tokens only. NOTE: this file must be linked in spa.html after inbox.css.
  * @version-history
+ *   v1.1.0 — 2026-09-08 — The ink on the sun reaches the words. A message one wrote oneself renders
+ *     its body through .md-body, which sets its own colour, so in the dark theme the text came out
+ *     near-white on sun yellow: measured 1.52:1 against the 4.5:1 floor for body text. Every
+ *     markdown element that carries a colour of its own is named here.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 
@@ -50,6 +54,47 @@
 .og-ib .inbox-bubble--mine .inbox-bubble-meta, .og-ib .inbox-bubble--mine .inbox-tick { color: var(--on-sun); }
 .og-ib .inbox-bubble-who { display: block; font-size: .64rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
 .og-ib .inbox-bubble--mine .inbox-bubble-who { color: var(--on-sun); }
+
+/* Ink on the sun, all the way down. The bubble sets the ink on itself, but a message body is
+   rendered markdown and .md-body sets `color: var(--text)` of its own, which the dark theme makes
+   near-white: the text one wrote oneself measured 1.52:1 on the sun. Inheritance cannot fix it,
+   so every element that carries a colour is named. The code plate inverts rather than takes the
+   ink, because its own dark background stays dark in both themes. */
+.og-ib .inbox-bubble--mine .md-body,
+.og-ib .inbox-bubble--mine .md-body p,
+.og-ib .inbox-bubble--mine .md-body li,
+.og-ib .inbox-bubble--mine .md-body h1,
+.og-ib .inbox-bubble--mine .md-body h2,
+.og-ib .inbox-bubble--mine .md-body h3,
+.og-ib .inbox-bubble--mine .md-body h4,
+.og-ib .inbox-bubble--mine .md-body h5,
+.og-ib .inbox-bubble--mine .md-body h6,
+.og-ib .inbox-bubble--mine .md-body strong,
+.og-ib .inbox-bubble--mine .md-body em,
+.og-ib .inbox-bubble--mine .md-body a,
+.og-ib .inbox-bubble--mine .md-body .md-wikilink,
+.og-ib .inbox-bubble--mine .inbox-attach-name,
+.og-ib .inbox-bubble--mine .inbox-attach-pending { color: var(--on-sun); }
+.og-ib .inbox-bubble--mine .md-body h1,
+.og-ib .inbox-bubble--mine .md-body h2,
+.og-ib .inbox-bubble--mine .md-body hr,
+.og-ib .inbox-bubble--mine .md-body th,
+.og-ib .inbox-bubble--mine .md-body td { border-color: var(--on-sun); }
+.og-ib .inbox-bubble--mine .md-body .md-code { background: var(--on-sun); border-color: var(--on-sun); color: var(--sun); }
+.og-ib .inbox-bubble--mine .md-body .md-pre { background: var(--on-sun); border-color: var(--on-sun); }
+.og-ib .inbox-bubble--mine .md-body .md-pre .md-code { color: var(--sun); }
+.og-ib .inbox-bubble--mine .md-body blockquote { background: transparent; color: var(--on-sun); border-left-color: var(--on-sun); }
+.og-ib .inbox-bubble--mine .md-body th,
+.og-ib .inbox-bubble--mine .md-body tbody tr:nth-child(even) { background: transparent; }
+/* The chip's own plate is a theme surface, so on the sun it reads as a hole. It takes the sun's own
+   ground and the ink border the poster face uses everywhere else. */
+.og-ib .inbox-bubble--mine .inbox-attach-chip { background: transparent; border-color: var(--on-sun); }
+.og-ib .inbox-bubble--mine .inbox-attach-chip--pending { opacity: 1; border-style: dashed; }
+
+/* The meta badges wear the poster's square corners, and the ink when they sit on the sun. */
+.og-ib .inbox-ai-badge, .og-ib .inbox-model-badge { border-radius: 0; font-family: var(--font-mono); }
+.og-ib .inbox-bubble--mine .inbox-ai-badge,
+.og-ib .inbox-bubble--mine .inbox-model-badge { border-color: var(--on-sun); color: var(--on-sun); }
 .og-ib .inbox-bubble-quote { border-radius: 0; }
 .og-ib .inbox-composer { border-top: 3px solid var(--text); background: var(--card-bg); }
 .og-ib .inbox-panel--empty { border-left: 0; }

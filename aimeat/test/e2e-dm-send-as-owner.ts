@@ -6,7 +6,9 @@
 //  - calling it sends the DM AS THE AGENT'S OWNER (server-derived), landing in the OWNER's thread, so the
 //    recipient sees it from the human — NOT from the agent;
 //  - an agent may only ever send as its OWN owner (no cross-owner impersonation — there is no owner param);
-//  - an agent WITHOUT the scope cannot use it.
+//  - an agent WITHOUT the scope cannot use it;
+//  - a file the AGENT uploaded arrives as the recipient's own readable copy, and a file nothing holds
+//    refuses the send rather than reporting it delivered (4c, 4d — the defect measured 2026-09-08).
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -138,7 +140,10 @@ let broadbot = { gaii: '', key: '' };   // agent with '*'
 await test('Setup: owners Alice + Bob; agents (with / without / *) the delegation scope', async () => {
     alice = await registerOwner(aliceName);
     bob = await registerOwner(bobName);
-    sendbot = await createAgent(aliceName, alice.token, 'sendbot', ['messages:send', 'messages:send-as-owner']);
+    // storage:write is what an agent needs to put a file anywhere before it can attach one, so it is
+    // part of the shape this suite tests rather than an extra: the delegated send exists to carry the
+    // agent's own work, and its own work includes the files it made.
+    sendbot = await createAgent(aliceName, alice.token, 'sendbot', ['messages:send', 'messages:send-as-owner', 'storage:write', 'storage:read']);
     plainbot = await createAgent(aliceName, alice.token, 'plainbot', ['messages:send']);
     broadbot = await createAgent(aliceName, alice.token, 'broadbot', ['*']);
     assert(sendbot.gaii.startsWith('sendbot#'), `sendbot gaii ${sendbot.gaii}`);
@@ -218,6 +223,62 @@ await test('4b. the provenance names the AGENT while the message displays as Ali
     assert(!!delivered, `Bob must have the message: ${JSON.stringify((inbox.body.data.messages as any[]).map(x => x.body))}`);
     assert(delivered.aiProvenanceId === res.ai_provenance.id,
         `the delivered copy must carry the same provenance id: ${delivered.aiProvenanceId} != ${res.ai_provenance.id}`);
+});
+
+// The files, which nothing here asserted for the two months the tool has taken them. The agent
+// uploads under its OWN identity (aimeat_storage_upload stores under whoever called it) and the
+// message goes out under the owner's, so the descriptor named an identity whose storage never held
+// the file: the recipient's copy step found nothing, the attachment stayed `reference` for the seven
+// days it takes to expire, and the inbox read "attachment pending" the whole time while the tool had
+// answered `delivered`. Both halves are asserted here — the file arrives, and it can be read.
+await test('4c. a file the AGENT uploaded arrives as the recipient\'s OWN copy', async () => {
+    const client = await connectMcp(sendbot.gaii, sendbot.key);
+    const fileText = `brief ${stamp}: EU compliance, code-switching.`;
+    const key = `briefs/eve-voice-${stamp}.md`;
+
+    const up = await client.call('aimeat_storage_upload', {
+        key, data_base64: Buffer.from(fileText).toString('base64'), mime_type: 'text/markdown', visibility: 'private',
+    });
+    assert(up.ok, `agent upload: ${JSON.stringify(up.body).slice(0, 200)}`);
+    assert(toolResult(up.body).owner_gaii === sendbot.gaii,
+        `the file is stored under the AGENT, which is the whole point: ${toolResult(up.body).owner_gaii}`);
+
+    const ATT_BODY = `Attachment ${stamp}: tiedosto liitteenä.`;
+    const { ok, body } = await client.call('aimeat_dm_send_as_owner', {
+        to: bob.ghii, body: ATT_BODY,
+        attachments: [{ storage_key: key, mime: 'text/markdown', size: fileText.length, kind: 'file', name: 'eve-voice-brief.md' }],
+    });
+    assert(ok, `send with attachment: ${JSON.stringify(body.result ?? body.error).slice(0, 300)}`);
+
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
+    const delivered = (inbox.body.data.messages as any[]).find(x => x.body === ATT_BODY);
+    assert(!!delivered, 'Bob must have the message with the attachment');
+    const att = delivered.attachments?.[0];
+    assert(!!att, `the delivered copy must carry the attachment: ${JSON.stringify(delivered.attachments)}`);
+    assert(att.mode === 'duplicate',
+        `Bob must own his own copy, not a pointer at storage he cannot read (mode=${att.mode})`);
+    assert(typeof att.localKey === 'string' && att.localKey.length > 0, `localKey: ${att.localKey}`);
+
+    // And the bytes are actually there, which is the difference between a fixed record and a fixed bug.
+    const file = await json(`/v1/storage/${att.localKey.split('/').map(encodeURIComponent).join('/')}`,
+        { headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(file.status === 200, `Bob reads his copy: ${file.status} ${JSON.stringify(file.body).slice(0, 200)}`);
+});
+
+await test('4d. a file that is in NOBODY\'s storage refuses the send instead of reporting delivered', async () => {
+    const client = await connectMcp(sendbot.gaii, sendbot.key);
+    const GHOST_BODY = `Ghost ${stamp}: liite jota ei ole.`;
+    const { ok, body } = await client.call('aimeat_dm_send_as_owner', {
+        to: bob.ghii, body: GHOST_BODY,
+        attachments: [{ storage_key: `briefs/never-uploaded-${stamp}.md`, mime: 'text/markdown', size: 12, kind: 'file', name: 'ghost.md' }],
+    });
+    assert(!ok, 'a send naming a file nothing holds must be refused');
+    assert(/ATTACHMENT_NOT_FOUND/.test(JSON.stringify(body.result ?? body.error)),
+        `the refusal must name the reason: ${JSON.stringify(body.result ?? body.error).slice(0, 240)}`);
+
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(!(inbox.body.data.messages as any[]).some(m => m.body === GHOST_BODY),
+        'nothing may be delivered when the send was refused');
 });
 
 await test('5. plainbot (no scope) cannot use the delegated tool', async () => {

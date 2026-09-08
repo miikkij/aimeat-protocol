@@ -785,6 +785,15 @@
 .inbox-track-badge--done  { border-color: var(--border); color: var(--text-dim); }
 .inbox-track-badge--err   { border-color: var(--danger); color: var(--danger); }
 
+/* That a model produced the text at all. It sits with the timestamp beside the model name rather
+   than above the body, because it is a fact about the message and not a warning about it — but it
+   carries the accent, because "who wrote this" is the one thing a reader may want before the words.
+   A message with no provenance record gets no badge: absence is a silence, not a denial. */
+.inbox-ai-badge {
+  font-size: 11px; padding: 1px 6px; border-radius: var(--radius-full);
+  border: 1px solid var(--accent-border); color: var(--accent); white-space: nowrap;
+}
+
 /* The model an agent named for a message it wrote. Deliberately quiet: it belongs with the timestamp
    as a fact about the message, not as a status the reader has to act on. */
 .inbox-model-badge {

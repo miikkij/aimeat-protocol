@@ -121,6 +121,17 @@ await test('2. Agent WITH messages:send sends a DM — sender is the agent GAII'
 });
 
 await test('3. Agent sends a DM with two attachments (storage-key references)', async () => {
+    // The files are uploaded first, because that is what attaching one means. This test used to name
+    // two keys nothing had ever stored and assert 201: the send answered delivered, and the recipient
+    // got two chips that opened nothing. A send whose bytes are nowhere is refused now, so the setup
+    // has to match what a client actually does.
+    for (const [key, mime] of [[`dmbot-shot-${stamp}.png`, 'image/png'], [`dmbot-notes-${stamp}.md`, 'text/markdown']] as const) {
+        const up = await json('/v1/storage', {
+            method: 'POST', headers: { Authorization: `Bearer ${dmbot.token}` },
+            body: JSON.stringify({ key, data: Buffer.from(`bytes for ${key}`).toString('base64'), mime_type: mime, visibility: 'private' }),
+        });
+        assert(up.body.ok === true, `upload ${key}: ${JSON.stringify(up.body)}`);
+    }
     const { status, body } = await json('/v1/messages', {
         method: 'POST', headers: { Authorization: `Bearer ${dmbot.token}` },
         body: JSON.stringify({
@@ -205,6 +216,11 @@ console.log('\nPhase C — owner DMs its OWN agent through the inbox (uniform ch
 await test('10. Owner can DM its own agent (with an attachment); the agent reads it; owner sees the thread', async () => {
     const owner = await registerOwner(`selfowner${stamp}`);
     const myAgent = await createAgent(`selfowner${stamp}`, owner.token, 'mybot', ['messages:read']);
+    const up = await json('/v1/storage', {
+        method: 'POST', headers: { Authorization: `Bearer ${owner.token}` },
+        body: JSON.stringify({ key: `selftask-${stamp}.pdf`, data: Buffer.from('fake-pdf-bytes').toString('base64'), mime_type: 'application/pdf', visibility: 'private' }),
+    });
+    assert(up.body.ok === true, `upload: ${JSON.stringify(up.body)}`);
     const send = await json('/v1/messages', {
         method: 'POST', headers: { Authorization: `Bearer ${owner.token}` },
         body: JSON.stringify({
