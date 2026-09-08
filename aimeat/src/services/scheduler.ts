@@ -7,6 +7,10 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.15.0 — 2026-09-08 — Both places that materialise an agent task emit task_assigned on the
+ *     connector tunnel. The comment above one of them already said "same channels a normally-created
+ *     task uses" and that was not true: a webhook subscriber heard about a scheduled task and an
+ *     agent holding a socket did not. → pitfalls §58
  *   v2.14.1 — 2026-09-05 — Notifies MCP through mcp/resource-events.ts, the leaf, not mcp/index.ts:
  *     the registry that file assembles imports the workflow engine, which reaches this scheduler,
  *     and the dependency cruiser named the cycle the day feat/ai-jobs was merged.
@@ -79,7 +83,7 @@ import type { EmailService } from './email.js';
 import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
-import { emitChange } from './event-bus.js';
+import { emitChange, emitDelivery } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/resource-events.js';
 import { logger } from '../utils/logger.js';
 import { SlotPool } from './slot-pool.js';
@@ -629,6 +633,11 @@ export class Scheduler {
         schedule_id: job.id,
       });
     }
+    // The connector tunnel, which the line above's "same channels a normally-created task uses"
+    // claimed and did not deliver. A webhook subscriber heard about a scheduled task and an agent
+    // holding a socket did not, so the task waited for whatever polled next. Same miss as the
+    // workflow engine's, found in the same sweep. → pitfalls §58
+    emitDelivery({ target: agentGaii, kind: 'task_assigned', id: record.id, payload: created });
     try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/tasks`); } catch (err) { logger.warn('cfg: MCP not connected', { error: String(err) }); }
     emitChange('agent-tasks');
 
@@ -709,6 +718,9 @@ export class Scheduler {
         auto_activated: autoActivated,
       });
     }
+    // Same pair. This method's own doc says callers reuse it to get "the exact wake path without
+    // duplicating the dispatch machinery", so the path it hands them has to be the whole one.
+    emitDelivery({ target: args.agentGaii, kind: 'task_assigned', id: record.id, payload: created });
     try { emitResourceUpdated(args.agentGaii, `aimeat://agents/${args.agentName}/tasks`); } catch (err) { logger.warn('cfg: MCP not connected', { error: String(err) }); }
     emitChange('agent-tasks');
 
