@@ -324,9 +324,25 @@ export const directMessageMethods = {
     return rows.map(toDirectMessageRecord);
   },
 
+  /**
+   * The messages the attachment sweep has work to do on: an inbound copy still holding an attachment
+   * that has neither been duplicated nor expired.
+   *
+   * The predicate is in the QUERY, not in the caller. It used to select the 200 oldest inbound rows
+   * that had any attachments at all — nearly all of them long since duplicated — so on a node with
+   * real traffic the window sat permanently on ancient finished mail and the sweep never once looked
+   * at a message from this week. A held attachment on aimeat.io was therefore retried never, not
+   * every minute, and the retry that this whole job exists for was dead on the only node that
+   * matters. Oldest first is right once the filter is: those are the ones closest to expiry.
+   */
   async listInboundWithAttachments(this: PostgresKyselyStorage, limit = 200): Promise<DirectMessageRecord[]> {
     const rows = await this.db.selectFrom('DirectMessage').selectAll()
-      .where('direction', '=', 'inbound').where('attachments', 'is not', null).orderBy('createdAt', 'asc').limit(limit).execute();
+      .where('direction', '=', 'inbound')
+      .where(sql<boolean>`jsonb_typeof("attachments") = 'array' AND EXISTS (
+        SELECT 1 FROM jsonb_array_elements("attachments") AS a
+        WHERE a->>'mode' = 'reference' AND COALESCE((a->>'expired')::boolean, false) = false
+      )`)
+      .orderBy('createdAt', 'asc').limit(limit).execute();
     return rows.map(toDirectMessageRecord);
   },
 

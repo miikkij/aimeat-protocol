@@ -17,6 +17,11 @@
  *   });
  *   if (!r.allowed) { res.status(403)...; return; }
  * @version-history
+ *   v1.4.0 -- 2026-09-08 -- A person reads what their own agents and apps hold. The owner-self bypass
+ *     was an exact identity match, which kept a scoped agent from riding its human's ownership (still
+ *     does, the rule is one-directional now) but also hid a person's own files from them: an
+ *     attachment their agent had sent in their name was unreadable to them. Ruled by the developer,
+ *     2026-09-08: the owner always sees their agents' things.
  *   v1.3.0 -- 2026-08-11 -- Key-space shares are checked before any tier is refused, because a share
  *     is deliberately independent of visibility: a `private` record covered by a live share is
  *     readable by that group and by nobody else. Both memory and storage files get it here, so the
@@ -33,6 +38,20 @@ import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { checkConsentForRead, auditDataAccess } from './consent.js';
 import { isKeyShared } from './group-shares.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
+
+/**
+ * Is `accessor` the HUMAN behind `resourceOwner`? True for `alice@n` reading something owned by
+ * `bot#alice@n` or `eco:app#alice@n`; false in the other direction, false between two agents, and
+ * false across nodes. The accessor must be the bare GHII: a principal with a `#` in it is acting
+ * under a grant, not as the account.
+ */
+function isOwnerOf(accessor: string, resourceOwner: string): boolean {
+  if (accessor.includes('#')) return false;
+  if (!resourceOwner.includes('#')) return false;
+  const a = parseGaiiLoose(accessor), r = parseGaiiLoose(resourceOwner);
+  return a.owner === r.owner && a.node === r.node;
+}
 
 export interface AuthorizeReadArgs {
   /** GAII/GHII that owns the resource. */
@@ -77,11 +96,23 @@ export async function authorizeRead(
   // (GET /v1/pub) where the accessor happens to BE the owner — e.g. the author viewing
   // their own workspace-scoped image embed in a filed doc. Without this, a file whose
   // owner is not (or no longer) a member of the workspace it's bound to could not be read
-  // by its own owner. EXACT identity only (not isSameOwner) so an owner's scoped agent
-  // still goes through the normal visibility/consent checks and can't ride the human's
-  // ownership to read arbitrary private data. 'anonymous' never owns a resource. Not audited.
+  // by its own owner. 'anonymous' never owns a resource. Not audited.
   if (accessorGaii && accessorGaii !== 'anonymous' && accessorGaii === ownerGaii) {
     return { allowed: true, reason: 'owner' };
+  }
+
+  // A HUMAN reads what their own agents and apps hold, always. An agent works in this person's
+  // name, in their account, with permissions they granted and can pull: a file it stored is the
+  // person's own, and a store that hides it from them is not a store they own.
+  //
+  // ONE DIRECTION ONLY, and the asymmetry is the whole point. Owner → own agent is allowed; agent →
+  // owner is not, and stays behind the visibility and consent checks below, so a scoped agent still
+  // cannot ride the human's ownership to read whatever it likes. That was the reason the check was
+  // written as an exact match, and it is preserved; what it also did, without being asked, was hide
+  // a person's own files from them. `isOwnerOf` compares the owner AND the node, because a bare
+  // owner name is not unique across nodes.
+  if (accessorGaii && accessorGaii !== 'anonymous' && isOwnerOf(accessorGaii, ownerGaii)) {
+    return { allowed: true, reason: 'own_principal' };
   }
 
   if (visibility === 'public') {

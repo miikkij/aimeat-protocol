@@ -101,6 +101,40 @@ await test('3. Expired attachment is not retried again', async () => {
     'expired attachment remains expired/reference');
 });
 
+// The window, which is the difference between "retried every minute" and "never looked at". The
+// sweep reads a bounded page of inbound messages; when that page was "the oldest 200 rows that have
+// any attachment at all", a node with real traffic filled it with mail from months ago that was
+// finished long since, and a message from this week was never once considered. Measured on
+// aimeat.io 2026-09-08: an attachment held for two days had been retried zero times.
+await test('3b. A held attachment is swept even behind hundreds of finished ones', async () => {
+  const base = Date.now() - 30 * 24 * 3600_000;
+  for (let i = 0; i < 205; i++) {
+    const at = new Date(base + i * 1000).toISOString();
+    await storage.createDirectMessage(inbound(`msg-done-${i}`, at, {
+      id: 'a1', inline: false, storageKey: `done-${i}`, ownerGhii: sender, originNodeId: NODE,
+      mode: 'duplicate', localKey: `dm/done/${i}`, mime: 'image/png', size: 5, kind: 'image',
+    }));
+  }
+
+  await storage.createStorageFile({
+    // Deliberately not 6 bytes of image/png: test 5 detects a leak by size + mime, and a fixture
+    // that collides with its needle would fail that test instead of this one.
+    key: 'att-recent', ownerGaii: sender, visibility: 'private',
+    mimeType: 'text/markdown', size: 13, data: Buffer.from('recent bytes!'), tags: [], createdAt: new Date().toISOString(),
+  });
+  const id = 'msg-recent';
+  await storage.createDirectMessage(inbound(id, new Date().toISOString(), {
+    id: 'a1', inline: false, storageKey: 'att-recent', ownerGhii: sender, originNodeId: NODE,
+    mode: 'reference', mime: 'text/markdown', size: 13, kind: 'file',
+  }));
+
+  await sweepReferenceAttachments(ctx);
+
+  const m = await storage.getDirectMessage(id, recipient);
+  assert(m?.attachments?.[0]?.mode === 'duplicate',
+    `the newest held attachment must be swept, not crowded out by finished ones (got ${m?.attachments?.[0]?.mode})`);
+});
+
 await test('4. Delivery telemetry: append → stats → list (no content/identities)', async () => {
   await storage.appendMessageDeliveryLog({ id: 'log1', messageId: 'm1', origin: 'federation', targetNodeId: 'aimeat-fi-001-peer', status: 'delivered', latencyMs: 12, createdAt: new Date().toISOString() });
   await storage.appendMessageDeliveryLog({ id: 'log2', messageId: 'm2', origin: 'federation', targetNodeId: 'aimeat-fi-001-peer', status: 'undeliverable', errorMessage: 'blocked', latencyMs: 5, createdAt: new Date().toISOString() });

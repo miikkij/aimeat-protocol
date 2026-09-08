@@ -31,6 +31,11 @@
  *   const convo = await createGroupConversation(ctx, { createdBy, participants, subject });
  *   await sendGroupMessage(ctx, { conversationId: convo.id, senderGhii, body });
  * @version-history
+ *   v1.2.0 — 2026-09-08 — A file sent into a group thread is duplicated into each recipient's own
+ *     storage, as it always has been in a 1:1 DM. It never was here: every mailbox got the sender's
+ *     descriptor, so nobody but the sender could open the file, and the retry sweep had nothing to
+ *     pick up. support@operators runs on this path, which is where an agent reports a fault with the
+ *     evidence attached.
  *   v1.0.0 — 2026-08-11 — Initial: group threads, built for support@operators and for any thread
  *     with several people and AIs in it.
  *   v1.1.0 — 2026-08-23 — Two refusals that hit the one-owner node hardest. A mailbox shared by
@@ -43,6 +48,7 @@
 import { randomUUID } from 'node:crypto';
 import type { ConversationRecord, DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
 import { deliverDirectMessage, type DeliveryCtx } from './message-delivery.js';
+import { duplicateMessageAttachments } from './attachment-duplication.js';
 import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { deliveryTargetFor, messagePreviewWithAttachments } from '../utils/messaging.js';
 import { notify } from './notify.js';
@@ -304,6 +310,19 @@ export async function fanOutToParticipants(
       createdAt: msg.createdAt,
       deliveredAt: msg.deliveredAt,
     });
+
+    // The recipient co-owns their copy of a file here too. A group thread wrote the sender's
+    // descriptor into every mailbox and called that delivery: nobody but the sender could open the
+    // file, on the channel support@operators runs on, and no sweep ever picked it up because the
+    // retry job reads inbound copies and these were never given anything to retry. Same rule as a
+    // 1:1 DM, same service, so quota, refusal and provenance behave identically.
+    if (!isSenderMailbox && msg.attachments?.length) {
+      const copy = await storage.getDirectMessage(msg.id, mailbox);
+      if (copy) {
+        const dup = await duplicateMessageAttachments(ctx, mailbox, copy);
+        if (dup.changed) await storage.updateMessageAttachments(msg.id, mailbox, dup.attachments);
+      }
+    }
 
     // Everyone in this mailbox who is not the author. Empty means the sender lives here alone.
     const others = members.filter(m => m !== msg.senderGhii);

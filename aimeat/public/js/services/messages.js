@@ -201,8 +201,15 @@ export async function transcribeAttachment(messageId, attachmentId, opts = {}) {
   });
 }
 
-/** Resolve a presigned, no-auth download URL for one of the caller's own storage keys (for <img>). */
-export async function attachmentUrl(localKey) {
-  const r = await apiGet(`/v1/storage/${localKey.split('/').map(enc).join('/')}?mode=handle`);
+/** Resolve a presigned, no-auth download URL for a storage key (for <img> and download links).
+ *  `owner` names who holds the file when that is not the reader: a message one's own AGENT sent in
+ *  one's name carries the agent's file, and /v1/storage reads only the caller's own namespace, so
+ *  the whole attachment read as missing to the person whose name was on the message. Cross-namespace
+ *  reads have one door, /v1/pub, and it lets a person read what their own agents hold. */
+export async function attachmentUrl(localKey, owner) {
+  const path = owner
+    ? `/v1/pub/${enc(owner)}/${localKey.split('/').map(enc).join('/')}?mode=handle`
+    : `/v1/storage/${localKey.split('/').map(enc).join('/')}?mode=handle`;
+  const r = await apiGet(path);
   return r?.data?.download_url || r?.data?.url || null;
 }

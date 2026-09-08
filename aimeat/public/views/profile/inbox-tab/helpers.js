@@ -134,7 +134,13 @@ export async function resolveThreadAttachmentUrls(msgs, conversationId, prevCach
       const key = (a.mode === 'duplicate' && a.localKey) ? a.localKey
         : (m.direction === 'outbound' && a.storageKey) ? a.storageKey : null;
       if (!key) return;
-      const u = await resolveUrl(key).catch(err => { swallowed('helpers: key', err); return null; });
+      // A message one's own AGENT sent in one's name carries the agent's file, so the key is not in
+      // the reader's own namespace and the plain read 404s. On one's own outbound copy an agent GAII
+      // here is always one's own agent (the send resolves the holder inside the sender's account),
+      // and /v1/pub is the door that reads across namespaces. A duplicated copy is the reader's own.
+      const holder = (a.mode !== 'duplicate' && m.direction === 'outbound' && String(a.ownerGhii || '').includes('#'))
+        ? a.ownerGhii : undefined;
+      const u = await resolveUrl(key, holder).catch(err => { swallowed('helpers: key', err); return null; });
       if (u) { map[uk] = u; ts[uk] = now; }
     })));
   return { convId: conversationId, map, ts };

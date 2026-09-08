@@ -450,6 +450,35 @@ await test('S4. The operator replies into the same thread and the sender sees it
     assert(bodies.some((b: string) => b.includes('configure_delivery')), 'the original question is in the same thread');
 });
 
+// The evidence, which is most of what a support message is worth. A group thread wrote the sender's
+// descriptor into every mailbox and never duplicated the bytes, so the operator saw a file name they
+// could not open — on the one channel an agent uses to report a fault with the proof attached.
+await test('S4b. A file sent into a support thread is the operator\'s own readable copy', async () => {
+    const key = `support-evidence-${stamp}.md`;
+    const up = await json('/v1/storage', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ key, data: Buffer.from('# the log\nit failed here').toString('base64'), mime_type: 'text/markdown', visibility: 'private' }),
+    });
+    assert(up.body.ok === true, `upload: ${JSON.stringify(up.body)}`);
+
+    const send = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({
+            conversation_id: supportConvId, body: 'Here is the log.',
+            attachments: [{ storage_key: key, mime: 'text/markdown', size: 24, kind: 'file', name: 'the-log.md' }],
+        }),
+    });
+    assert(send.status === 201, `send status ${send.status}: ${JSON.stringify(send.body)}`);
+
+    const thread = await json(`/v1/messages/conversations/${supportConvId}`, { headers: { Authorization: `Bearer ${op.token}` } });
+    const msg = thread.body.data.messages.find((m: any) => (m.attachments ?? []).length > 0 && m.body === 'Here is the log.');
+    assert(!!msg, 'the operator has the message with the attachment');
+    const att = msg.attachments[0];
+    assert(att.mode === 'duplicate', `the operator must own their copy, not a pointer at the sender's storage (mode=${att.mode})`);
+    const file = await json(`/v1/storage/${att.localKey.split('/').map(encodeURIComponent).join('/')}`, { headers: { Authorization: `Bearer ${op.token}` } });
+    assert(file.status === 200, `the operator reads the bytes: ${file.status}`);
+});
+
 await test('S5. support@<node-id> is the same address in long form', async () => {
     const { status, body } = await json('/v1/messages', {
         method: 'POST', headers: { Authorization: `Bearer ${bob.token}` },
