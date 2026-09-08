@@ -8,6 +8,8 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.7.0 - 2026-09-08 - aimeat-onto.js joins SDK_LIB_NAMES, the second time a lib was built and
+ *   listed in the packs table but not here (rows, 2026-08-29, was the first).
  * v2.6.0 - 2026-09-05 - New library aimeat-living.js: the living document — ONE JSON record
  *   (arrangement plus a dependency graph of values, formulas with units, controls, bindings,
  *   sentences, a statechart and live sources) mounted as a screen where touching one thing moves
@@ -193,6 +195,9 @@ const SDK_LIB_NAMES = [
   // scripts/build-sdk-libs.ts since 2026-08-29; this list is the second place a lib is named,
   // and a lib missing here is a 404 that the publish gate turns into APP_ARTIFACT_BROKEN.
   'rows',
+  // aimeat-onto.js — what a record MEANS. Registered in scripts/build-sdk-libs.ts on 2026-09-08 and
+  // not here, so the same 404 as rows: the packs table named it and e2e-library-packs went red.
+  'onto',
 ] as const;
 
 function sendJavascriptLibrary(res: Response, source: string): void {
