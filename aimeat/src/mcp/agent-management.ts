@@ -17,6 +17,10 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   v1.6.0 -- 2026-09-08 -- aimeat_agent_propose, which aimeat_agent_basics_get's own description
+ *     had been telling agents to call since 2026-09-02 without it existing. Creates nothing: the
+ *     approve door stays the owner in person. The registration now takes the session's scopes,
+ *     because the ceiling this applies is "no more than the caller holds".
  *   v1.5.0 -- 2026-08-31 -- aimeat_agent_basics_get: the chat road to the one-press basic agents.
  *     Read-only on purpose. The creating door is requireOwnerPrincipal() and stays there, so the
  *     tool tells the agent what to say and where to send the person, and the person presses.
@@ -42,6 +46,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, setAgentDescription, setAgentConsoleUrl } from '../services/agent-profile-write.js';
 import { describeBasicAgents, requestBasicAgents } from '../services/basic-agents.js';
+import { proposeAgent } from '../services/agent-proposals.js';
 import { VALID_MODES } from '../routes/agents/constants.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -53,6 +58,9 @@ export function registerAgentManagementTools(
     getAgentGaii: () => string,
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
+    /** What THIS session was granted. The proposal ceiling reads it: an agent may not propose a
+     *  principal that can do more than the agent proposing it. */
+    sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -232,6 +240,54 @@ export function registerAgentManagementTools(
             const data: Record<string, unknown> = { ...out };
             delete data.ok;
             return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+        },
+    );
+
+    // ── Tool: aimeat_agent_propose ──
+    // The chat road to a NEW agent, and it creates nothing either. The approve door is
+    // requireOwnerPrincipal(); this writes a proposal and one line on the owner's open items. The
+    // tool's own description told agents to call this from 2026-09-02, and it did not exist until
+    // 2026-09-08, so every agent that followed the advice got an unknown-tool error.
+    mcp.tool(
+        'aimeat_agent_propose',
+        descriptionFor('aimeat_agent_propose'),
+        {
+            name: z.string().describe('The agent name: 3 to 40 characters, lowercase letters, digits and hyphens, starting with a letter.'),
+            purpose: z.string().describe('What this agent is for, in a sentence the owner can decide from.'),
+            display_name: z.string().optional().describe('The name shown to the person. Defaults to the agent name.'),
+            scopes: z.array(z.string()).optional().describe('Exactly what it may do. Never more than the calling agent holds.'),
+            mode: z.string().optional().describe("Task handling: task-runner, autonomous, interactive, coordinator or workstation."),
+            run_mode: z.string().optional().describe("'spawn' (a worker per piece of work) or 'resident' (stays up)."),
+            crew_def: z.record(z.string(), z.unknown()).optional().describe('What it would BE, in the crewaimeat crew_def shape.'),
+        },
+        annotationsFor('aimeat_agent_propose'),
+        async (input) => {
+            const callerParsed = parseGAII(agentGaii);
+            if (!callerParsed) {
+                return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
+            }
+            // The SCOPES AND ROLES OF THIS TOKEN, not the agent record's defaults: the ceiling this
+            // service applies is "no more than the caller holds", and the caller is this session.
+            const out = await proposeAgent({ config, storage }, {
+                sub: agentGaii,
+                owner: callerParsed.owner,
+                roles: ['agent'],
+                scopes: sessionScopes,
+            }, input as Parameters<typeof proposeAgent>[2]);
+            if (!out.ok) return { content: [{ type: 'text' as const, text: out.message }], isError: true };
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        proposal: out.proposal,
+                        created: false,
+                        already_waiting: out.alreadyWaiting ?? false,
+                        next_step: out.alreadyWaiting
+                            ? `${out.proposal.display_name} is already waiting for ${callerParsed.owner} to approve it in their profile under Agents.`
+                            : `Nothing has been created. ${out.proposal.display_name} is waiting for you to approve it in your profile under Agents.`,
+                    }, null, 2),
+                }],
+            };
         },
     );
 

@@ -36,6 +36,10 @@
  * @structure registerBasicAgentsRoutes(router, config, storage)
  * @usage registerBasicAgentsRoutes(router, config, storage);
  * @version-history
+ *   v1.3.0 — 2026-09-08 — The grant, the offer and the read-back move to
+ *     services/agent-enrolment-offer.ts. They lived here, so the one other path that creates an
+ *     agent (an approved proposal) had none of it and produced records with no keys. The words this
+ *     button uses stay this button's; only the sequence is shared.
  *   v1.2.0 — 2026-09-01 — The button seeds each agent's crew definition at creation, before the
  *     enrolment offer, and rolls back everything it created if any seed fails.
  *   v1.1.0 — 2026-08-31 — The GET moves to services/basic-agents.ts and drops to requireAuth(), so a
@@ -44,30 +48,23 @@
  *   v1.0.0 — 2026-08-31 — Initial (Agent v2, V1).
  */
 import type { Router } from 'express';
-import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { BASIC_AGENTS } from '../../data/basic-agents.js';
-import { describeBasicAgents, requestBasicAgents, daemonPrincipals, connectedDaemons } from '../../services/basic-agents.js';
+import { describeBasicAgents, requestBasicAgents, daemonPrincipals } from '../../services/basic-agents.js';
 import { crewSeedAuthored, type CrewCaller } from '../../services/crew-ops.js';
-import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
+import { offerEnrolment } from '../../services/agent-enrolment-offer.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordAccountEvent } from '../../services/account-events.js';
-import { cardUri, jwksUri } from './card.js';
 import { logger } from '../../utils/logger.js';
 
-/** The capability name the enrolment offer travels under, on the tunnel's existing `invoke` frame. */
-export const ENROL_CAPABILITY = 'aimeat.agents.enrol';
-
-/**
- * How long the node waits for the daemon to enrol before answering the owner. Long enough for three
- * keypairs, three signatures and one round trip; short enough that a daemon that cannot do this
- * (an older connector) is reported as such rather than as a spinner.
- */
-const ENROL_INVOKE_TIMEOUT_MS = 45_000;
+// The capability name and the wait live with the sequence that uses them
+// (services/agent-enrolment-offer.ts). Re-exported here because the migration route imported them
+// from this file when this was the only place either existed.
+export { ENROL_CAPABILITY, ENROL_INVOKE_TIMEOUT_MS } from '../../services/agent-enrolment-offer.js';
 
 export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── GET — what the set is, and whether it can be created right now ──
@@ -262,103 +259,32 @@ export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, 
       return;
     }
 
-    // The grant: exactly these agents, for this owner, for a few minutes, once.
-    const grantId = `aeg-${randomBytes(16).toString('hex')}`;
-    await storage.createAgentEnrolmentGrant({
-      id: grantId,
-      owner,
-      agents: toEnrol,
-      createdBy: owner,
-      createdAt: now,
-      expiresAt: new Date(Date.now() + config.agentEnrolmentGrantTtlSeconds * 1000).toISOString(),
-      usedAt: null,
-      usedBy: null,
-    });
+    // Mint the grant and hand it to the daemon over a socket it is already holding.
+    // services/agent-enrolment-offer.ts owns that sequence, because the ONE other path that creates
+    // an agent (an approved proposal) skipped it entirely and produced records with no keys.
     emitChange('agents');
+    const enrolment = await offerEnrolment({ config, storage }, owner, toEnrol.map(name => {
+      const template = BASIC_AGENTS.find(t => t.name === name)!;
+      return {
+        name,
+        gaii: buildGAII(name, owner, config.nodeId),
+        displayName: template.displayName,
+        description: template.description,
+        runMode: template.runMode,
+        mode: template.mode,
+        scopes: template.scopes,
+      };
+    }), { installId: typeof req.body?.install_id === 'string' ? req.body.install_id : undefined });
 
-    // Offer it to the daemon over a socket it is already holding.
-    //
-    // WHICH daemon, when there are two. Each machine presents an install id, so two laptops are two
-    // entries here rather than one undifferentiated set of principals — the limitation the V1
-    // report recorded. The caller may name one with `install_id`; without that the first by sorted
-    // id is taken, which is stable across retries. A named id that is not connected is refused
-    // rather than quietly served by the other machine, because "run this on my laptop" answered by
-    // the server is not a smaller version of the request.
-    const daemons = connectedDaemons(owner);
-    const askedFor = typeof req.body?.install_id === 'string' ? req.body.install_id.trim() : '';
-    const chosen = askedFor ? daemons.find(d => d.installId === askedFor) : daemons[0];
-    if (!chosen) {
-      res.status(409).json(error(config.nodeId, 'DAEMON_NOT_CONNECTED',
-        askedFor
-          ? 'That connector is not connected right now. Start it, or leave install_id out to use whichever one is.'
-          : 'Your connector is not connected right now. Start it and press again.',
-        undefined, { connected: daemons.map(d => ({ install_id: d.installId, principals: d.principals.length })) }));
+    if (!enrolment.ok) {
+      // The words this button used stay this button's: it promises working agents from one press,
+      // so its refusals say "press again" and name what this press created.
+      const pressAgain = enrolment.message.replace(/try again/g, 'press again');
+      res.status(enrolment.status).json(error(config.nodeId, enrolment.code, pressAgain,
+        undefined, { created, reused, skipped, ...(enrolment.details ?? {}) }));
       return;
     }
-    const target = chosen.target;
-    const offer = {
-      grant_id: grantId,
-      node_url: config.baseUrl,
-      node_id: config.nodeId,
-      owner,
-      enrol_url: '/v1/agents/v2/enrol',
-      token_url: '/v1/agents/v2/token',
-      agents: toEnrol.map(name => {
-        const template = BASIC_AGENTS.find(t => t.name === name)!;
-        const gaii = buildGAII(name, owner, config.nodeId);
-        return {
-          name,
-          gaii,
-          display_name: template.displayName,
-          description: template.description,
-          run_mode: template.runMode,
-          mode: template.mode,
-          // What the record grants. Sent so the daemon can put it in the card it signs; the node
-          // reads the record either way, so a card that asks for more still gets this.
-          scopes: template.scopes,
-          card_url: cardUri(config.baseUrl, gaii),
-          jwks_url: jwksUri(config.baseUrl, gaii),
-        };
-      }),
-    };
-
-    let enrolResult: { ok: boolean; result: unknown };
-    try {
-      enrolResult = await getActiveConnectTunnelManager()!.invokeOnPrincipal(
-        target,
-        { capability: ENROL_CAPABILITY, input: offer, caller: `${owner}@${config.nodeId}` },
-        ENROL_INVOKE_TIMEOUT_MS,
-      );
-    } catch (err) {
-      const code = (err as { code?: string }).code ?? 'ENROL_FAILED';
-      logger.warn('Basic-agents enrolment offer failed', { event: 'agent_v2.offer_failed', owner, target, error: (err as Error).message });
-      res.status(502).json(error(config.nodeId, code === 'ECOSYSTEM_TIMEOUT' ? 'ENROL_TIMEOUT' : 'ENROL_FAILED',
-        code === 'ECOSYSTEM_TIMEOUT'
-          ? 'Your connector did not answer in time. The agents are here and unconnected; press again once it is responding.'
-          : 'Your connector could not be reached to finish this. The agents are here and unconnected.',
-        undefined, { created, reused, skipped, grant_id: grantId }));
-      return;
-    }
-
-    // The daemon enrolled through POST /v1/agents/v2/enrol while we waited, so the record is the
-    // truth about what happened — not the reply. Re-read it.
-    const after = await storage.getAgentsByOwner(owner);
-    const enrolled = after.filter(a => toEnrol.includes(a.name) && a.enrolledAt).map(a => ({
-      name: a.name,
-      gaii: a.gaii,
-      run_mode: a.runMode ?? 'spawn',
-      card_url: cardUri(config.baseUrl, a.gaii),
-    }));
-
-    if (enrolled.length === 0) {
-      const detail = (enrolResult.result as { code?: string; message?: string } | null) ?? null;
-      res.status(502).json(error(config.nodeId, detail?.code === 'NO_HANDLER' ? 'CONNECTOR_TOO_OLD' : 'ENROL_FAILED',
-        detail?.code === 'NO_HANDLER'
-          ? 'Your connector is connected but does not know how to take on new agents yet. Update it (npm i -g aimeat) and press this again.'
-          : 'Your connector did not take on the agents. They are here and unconnected.',
-        undefined, { created, reused, skipped, grant_id: grantId, connector_said: detail }));
-      return;
-    }
+    const { enrolled, served_by: target } = enrolment;
 
     for (const name of created) {
       void recordAccountEvent(storage, {

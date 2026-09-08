@@ -185,6 +185,6 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerDesignbookTools(mcp, storage, config, agentGaii);
     registerAgentTelemetryTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAgentOnboardingTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
-    registerAgentManagementTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerAgentManagementTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerAgentCrewTools(mcp, storage, config, agentGaii, scopes);
 }

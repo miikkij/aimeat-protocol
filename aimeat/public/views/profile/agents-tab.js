@@ -6,6 +6,9 @@
  *   expandable agent cards with Two-Zone Header + 8-tab interface,
  *   device auth flow, scope management modal.
  * @version-history
+ *   v3.12.0 -- 2026-09-08 -- The new-agent panel below the basic-agents one: an agent of the
+ *     person's own, the proposals their agents have made, and the attach control for any agent that
+ *     has no key. The proposal routes had shipped six days earlier with no surface at all.
  *   v3.11.0 -- 2026-09-06 -- A search field above the board, matching an agent's name, display
  *     name or GAII, narrowing the board and the list together. Seventy-one agents on one account
  *     and the only way to reach one was to scroll past the other seventy.
@@ -95,6 +98,7 @@ import { loadAgentOrder, saveAgentOrder, UNGROUPED_ID, loadCollapsedGroups, save
 import { AgentSearch, renderFilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
 import ScopesModal from './agents/scopes-modal.js';
 import BasicAgentsPanel from './agents/basic-agents-panel.js';
+import NewAgentPanel from './agents/new-agent-panel.js';
 import { swallowed } from '/js/swallowed.js';
 
 // The familiar GitHub "Octocat" mark. fill=currentColor so it inherits the link's themed color.
@@ -503,6 +507,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
     ${/* The one-press road in. Above the connect panel on purpose: for somebody whose connector is
           already running, this is the whole job, and the panel below is the long way round. */''}
     <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
+
+    ${/* An agent of the person's own, and what their agents have proposed. Below the two fixed
+          names on purpose: those are what a new account should take first, and this is the door
+          for the job they do not cover. */''}
+    <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} agents=${agents} />
 
     ${connectExpanded && html`
       <div class="pf-agd-connect-content">

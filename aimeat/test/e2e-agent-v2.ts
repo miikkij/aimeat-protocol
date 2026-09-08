@@ -19,6 +19,9 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2
  * @version-history
+ *   v1.1.0 — 2026-09-08 — Section 8a: approval credentials the agent, a connector that cannot take
+ *     it on leaves it standing with the reason, attach repairs it once and refuses twice, attach is
+ *     the owner in person, and a name already waiting returns the standing proposal.
  *   v1.0.0 — 2026-08-31 — Initial, with the feature.
  */
 import { WebSocket } from 'ws';
@@ -1110,6 +1113,112 @@ async function run() {
             }),
         });
         assert(r.status === 400 && r.body?.error?.code === 'INVALID_CREW_DEF', `got ${r.status} ${r.body?.error?.code}`);
+    });
+
+    // ── 8a. Approving credentials the agent, or says why it could not ────────
+    //
+    // Until 2026-09-08 approval stopped at the seed and told the owner to start their connector. A
+    // connector start mints no enrolment grant, so the agent had no key, never reached the daemon's
+    // roster and never ran — fully recorded, fully defined, and dead. These four fix the state and
+    // the honesty of the sentence about it.
+    const APPROVED_DEF = {
+        readme_md: '# Watcher', tags: [], process: 'sequential' as const, listen_for: ['tasks'],
+        agents: [{ role: 'Watcher', goal: 'watch', backstory: 'You watch.', allow_delegation: false, tools: ['memory'] }],
+        tasks: [{ id: 'watch', description: 'Watch this: {{ctx.prompt}}', expected_output: 'notes', agent: 'Watcher' }],
+    };
+
+    /** Propose as the owner in person and approve in the same breath — the panel's own two calls. */
+    async function proposeAndApprove(name: string, purpose: string) {
+        const p = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({ name, purpose, scopes: ['memory:read'], crew_def: APPROVED_DEF }),
+        });
+        assert(p.status === 201, `propose ${name}: ${p.status} ${JSON.stringify(p.body?.error)}`);
+        return json(`/v1/agents/v2/agent-proposals/${p.body.data.proposal.id}/approve`, { method: 'POST', headers: authA });
+    }
+
+    /** The daemon half of an enrolment: one key per offered agent, cards signed and submitted. */
+    function enrolWith(daemonToken: string, owner: string) {
+        return async (offer: any) => {
+            const cards: string[] = [];
+            for (const offered of offer.agents) {
+                const key = await makeKey();
+                cards.push(await signWith(cardFor(offered, owner, key), key));
+            }
+            const res = await json('/v1/agents/v2/enrol', {
+                method: 'POST', headers: { Authorization: `Bearer ${daemonToken}` },
+                body: JSON.stringify({ grant_id: offer.grant_id, cards }),
+            });
+            if (res.status !== 200) return { ok: false, result: res.body?.error ?? null };
+            return { ok: true, result: { attached: (res.body.data.enrolled as any[]).map(e => e.name) } };
+        };
+    }
+
+    await test('approving with a connector running gives the new agent its key', async () => {
+        dA.onEnrol = enrolWith(daemonA.token, a.owner);
+        const r = await proposeAndApprove('attached-watcher', 'Watches the sources and reports what changed.');
+        assert(r.status === 200, `approve ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.attached === true, `expected attached, got ${JSON.stringify(r.body.data.attach_problem)}`);
+
+        // The RECORD is the truth about this, not the reply: enrolment happens on a second request
+        // while the approve call waits.
+        const rec = (await json('/v1/agents?owner=' + a.owner, { headers: authA }))
+            .body.data.agents.find((x: any) => x.name === 'attached-watcher');
+        assert(!!rec?.enrolled_at, `the agent should carry an enrolment, got ${JSON.stringify(rec)}`);
+    });
+
+    await test('a connector that cannot take it on leaves the agent standing, and says why', async () => {
+        // The seed is about what the agent IS and cannot be repaired later; credentials are about a
+        // machine that may simply be off. So this one does NOT roll back — it reports.
+        dA.onEnrol = async () => ({ ok: false, result: { code: 'NO_HANDLER', message: 'an older connector' } });
+        const r = await proposeAndApprove('unattached-watcher', 'Exists even though nothing could take it on.');
+        assert(r.status === 200, `approve ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.created === true && r.body.data.seeded === true, 'the agent and its definition survive');
+        assert(r.body.data.attached === false, 'and it is honest about not being attached');
+        assert(r.body.data.attach_problem?.code === 'CONNECTOR_TOO_OLD',
+            `expected the connector's own reason, got ${JSON.stringify(r.body.data.attach_problem)}`);
+        assert(!/will come up/.test(r.body.data.next_step as string),
+            `the next step must not promise a restart will fix it: ${r.body.data.next_step}`);
+    });
+
+    await test('attach repairs it in one press, and refuses a second', async () => {
+        dA.onEnrol = enrolWith(daemonA.token, a.owner);
+        const r = await json('/v1/agents/v2/agents/unattached-watcher/attach', { method: 'POST', headers: authA });
+        assert(r.status === 200, `attach ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.attached === true, 'it should hold a key now');
+
+        const again = await json('/v1/agents/v2/agents/unattached-watcher/attach', { method: 'POST', headers: authA });
+        assert(again.status === 409 && again.body?.error?.code === 'ALREADY_ATTACHED',
+            `a second attach must not pin a second key over a working one, got ${again.status} ${again.body?.error?.code}`);
+    });
+
+    await test('attach is the owner in person, and never reaches another account', async () => {
+        const asAgent = await json('/v1/agents/v2/agents/attached-watcher/attach', {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+        });
+        assert(asAgent.status === 403, `an agent carrying the owner's name is not the owner: got ${asAgent.status}`);
+
+        const asOther = await json('/v1/agents/v2/agents/attached-watcher/attach', { method: 'POST', headers: authB });
+        assert(asOther.status === 404, `another owner must not even learn it exists: got ${asOther.status}`);
+    });
+
+    await test('proposing a name that is already waiting returns the standing one', async () => {
+        const first = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+            body: JSON.stringify({ name: 'asked-twice', purpose: 'Two agents reached the same conclusion.', scopes: ['memory:read'] }),
+        });
+        assert(first.status === 201, `first ${first.status}`);
+        const second = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+            body: JSON.stringify({ name: 'asked-twice', purpose: 'Said again by somebody else.', scopes: ['memory:read'] }),
+        });
+        assert(second.status === 201, `second ${second.status}`);
+        assert(second.body.data.proposal.id === first.body.data.proposal.id,
+            'the second ask should come back as the standing proposal, not a new one');
+
+        const waiting = (await json('/v1/agents/v2/agent-proposals', { headers: authA }))
+            .body.data.proposals.filter((p: any) => p.name === 'asked-twice' && p.state === 'proposed');
+        assert(waiting.length === 1, `the owner should have one line to read, got ${waiting.length}`);
     });
 
     // ── 8b. A first crew definition for an agent that has no runtime ─────────

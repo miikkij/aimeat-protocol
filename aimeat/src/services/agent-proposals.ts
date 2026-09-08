@@ -30,6 +30,8 @@
  * @usage
  *   const out = await proposeAgent({ config, storage }, principal, { name, purpose, scopes });
  * @version-history
+ *   v1.1.0 — 2026-09-08 — A name already waiting comes back as the standing proposal instead of a
+ *     second line on the owner's open items. Two agents reaching the same conclusion is normal.
  *   v1.0.0 — 2026-09-02 — Initial, replacing crew-forge as the way an agent comes into being.
  */
 import { randomUUID } from 'node:crypto';
@@ -98,7 +100,7 @@ export async function proposeAgent(
     name: string; display_name?: string; purpose: string; scopes?: string[];
     mode?: string; run_mode?: string; crew_def?: CrewDefDoc | null; for_owner?: string;
   },
-): Promise<{ ok: true; proposal: AgentProposal } | Fail> {
+): Promise<{ ok: true; proposal: AgentProposal; alreadyWaiting?: boolean } | Fail> {
   const { config, storage } = ctx;
 
   // An app grant is consent to USE this account; an ecosystem app is a different principal class
@@ -129,6 +131,15 @@ export async function proposeAgent(
   if (existing.some(a => a.name === name)) {
     return fail(409, 'NAME_TAKEN', `You already have an agent called "${name}".`);
   }
+
+  // ALREADY WAITING IS NOT A NEW ASK. Two agents reaching the same conclusion about what this
+  // account needs is the normal case, and a second line on the owner's open items for the same name
+  // is noise they have to read twice to find out it says the same thing. The standing proposal
+  // comes back instead, so the caller can tell the person what is already in front of them. Same
+  // shape as `already_asked` on the basic-agents request, for the same reason.
+  const waiting = (await listProposals({ config, storage }, owner))
+    .find(p => p.state === 'proposed' && p.name === name);
+  if (waiting) return { ok: true, proposal: waiting, alreadyWaiting: true };
 
   // IF A DEFINITION IS OFFERED, IT HAS TO BE ABLE TO RUN. The seed door validates nothing — it
   // cannot, which is its whole justification: there is no runtime to ask, and asking the target's

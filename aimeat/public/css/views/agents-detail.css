@@ -6,6 +6,8 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.26.0 -- 2026-09-08 -- The new-agent panel (.pf-agd-new*): a two-column form that folds to
+ *     one on a phone, the attach strip, and the waiting-proposal rows.
  *   v1.25.0 -- 2026-09-06 -- The fleet search field over the board (.pf-agd-fleet-search) and the
  *     GAII as a press-to-copy control on the agent rows (.pf-agd-gaii). The GAII ellipsizes rather
  *     than wraps: it is one unbreakable token, and a wrap costs the row a whole second line.
@@ -2030,6 +2032,89 @@
   background: var(--bg-dim);
   font-size: 0.78rem;
   color: var(--text-muted);
+}
+
+/* ── The new-agent panel: a name, a shape, and what the owner's agents have proposed ── */
+.pf .pf-agd-new {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.pf .pf-agd-new-form {
+  display: grid;
+  /* Two columns where there is room, one on a phone. `minmax(0, …)` rather than a bare fraction:
+     a grid item's automatic minimum is its content, and a long placeholder would otherwise hold
+     the page open. docs/pitfalls.md §30. */
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+.pf .pf-agd-new-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.pf .pf-agd-new-field--wide {
+  grid-column: 1 / -1;
+}
+.pf .pf-agd-new-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.pf .pf-agd-new-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.pf .pf-agd-new-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+}
+.pf .pf-agd-new-attach {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.6rem;
+  border-left: 2px solid var(--warning, #f59e0b);
+  background: var(--bg-dim);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.pf .pf-agd-new-waiting {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+.pf .pf-agd-new-waiting-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.pf .pf-agd-new-waiting-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border);
+}
+.pf .pf-agd-new-waiting-row:first-of-type {
+  border-top: none;
+}
+.pf .pf-agd-new-waiting-row > div:first-child {
+  min-width: 0;
+}
+.pf .pf-agd-new-waiting-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex: 0 0 auto;
 }
 
 /* Tag chip strip on expanded card */

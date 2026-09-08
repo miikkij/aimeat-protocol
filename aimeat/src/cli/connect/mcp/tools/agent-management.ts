@@ -62,6 +62,23 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
+  // A NEW agent, put in front of the owner. Creates nothing here either: the approve door is the
+  // owner in person, and this writes the proposal and one line on their open items.
+  mcp.tool('aimeat_agent_propose', descriptionFor('aimeat_agent_propose'), {
+    agent_name: agentNameSchema,
+    name: z.string().describe('The agent name: 3 to 40 characters, lowercase letters, digits and hyphens, starting with a letter.'),
+    purpose: z.string().describe('What this agent is for, in a sentence the owner can decide from.'),
+    display_name: z.string().optional().describe('The name shown to the person. Defaults to the agent name.'),
+    scopes: z.array(z.string()).optional().describe('Exactly what it may do. Never more than the calling agent holds.'),
+    mode: z.string().optional().describe('Task handling: task-runner, autonomous, interactive, coordinator or workstation.'),
+    run_mode: z.string().optional().describe("'spawn' (a worker per piece of work) or 'resident' (stays up)."),
+    crew_def: z.record(z.string(), z.unknown()).optional().describe('What it would BE, in the crewaimeat crew_def shape.'),
+  }, annotationsFor('aimeat_agent_propose'), async ({ agent_name, ...body }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const resp = await client.post('/v1/agents/v2/agent-proposals', body);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
   mcp.tool(
     'aimeat_agent_tags_set',
     descriptionFor('aimeat_agent_tags_set'),
