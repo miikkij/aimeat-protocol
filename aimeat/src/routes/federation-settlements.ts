@@ -11,6 +11,9 @@
  *   - uses buildHopSigningMessage / computeRelayFeeDistribution for relayed multi-hop settlements
  *
  * @version-history
+ *   v1.2.0 — 2026-09-09 — The relay-share credit loop is gone: it looked a node id up with
+ *     storage.getAgent (a GAII) and had never credited anyone. The distribution is still reported;
+ *     who a relay share belongs to is docs/known_gaps.md GAP-001.
  *   v1.1.0 — 2026-08-10 — Security audit (June H-4, unchanged since June): the replay guard looks the
  *     tracking code up exactly instead of scanning the last fifty transactions, a window a busy
  *     account scrolls past, after which a validly signed settlement could be credited twice.
@@ -151,25 +154,14 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
             }
 
             if (chainValid) {
-                // Compute relay fee distribution
+                // Compute relay fee distribution. It is REPORTED in the response and credited to
+                // nobody: a share names a relay NODE, and no principal on this node stands for
+                // another node's share (the loop that used to sit here looked a node id up with
+                // storage.getAgent, which takes a GAII, and so never credited anything). Who a
+                // relay share belongs to, and how it reaches the relay's own node, is an open
+                // protocol question: docs/known_gaps.md GAP-001.
                 const networkFee = Math.floor(amount * 0.1); // 10% network fee
                 relayDistribution = computeRelayFeeDistribution(networkFee, routeManifest.hops);
-
-                // Credit relay nodes their shares
-                for (const share of relayDistribution.relay_shares) {
-                    const relayAgent = await storage.getAgent(share.node_id).catch(err => { logger.warn('POST /v1/federation/settle: continuing after a suppressed failure', { error: String(err) }); return null; });
-                    if (relayAgent) {
-                        await storage.creditBalance(relayAgent.gaii, share.amount);
-                        await storage.addTransaction({
-                            id: `txn-${randomBytes(8).toString('hex')}`,
-                            gaii: relayAgent.gaii,
-                            type: 'relay_fee',
-                            amount: share.amount,
-                            trackingCode: `relay:${tracking_code}`,
-                            timestamp: new Date().toISOString(),
-                        });
-                    }
-                }
             } else {
                 logger.warn(`Route manifest verification failed for settlement ${tracking_code}`);
             }
