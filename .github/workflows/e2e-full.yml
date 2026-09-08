@@ -5,8 +5,9 @@ name: E2E full sweep
 # sweep never stopped a merge; the guard tier does that) and decided the wall clock of every push
 # (82 minutes, most of it here). Here it runs at 03:00 Helsinki, and a red run opens an issue —
 # one per backend, reused while it is open — so a failure is a thing somebody sees in the morning
-# rather than a line in a log nobody reads. The way OUT of advisory is unchanged: fix a suite so it
-# can be promoted into the guard tier in ci.yml.
+# rather than a line in a log nobody reads. A green run closes that issue again, because an issue
+# that only ever opens stops meaning "something is broken now". The way OUT of advisory is
+# unchanged: fix a suite so it can be promoted into the guard tier in ci.yml.
 
 on:
   schedule:
@@ -85,4 +86,22 @@ jobs:
           else
             gh label create nightly-sweep --description "Opened by the nightly E2E sweep" --color B60205 2>/dev/null || true
             gh issue create --title "$TITLE" --label nightly-sweep --body "$BODY"
+          fi
+
+      # A green night closes what a red one opened. Without this the issue outlives its cause: #3 and
+      # #4 collected a "still red" comment every night from 2026-09-06 and nothing would ever have
+      # taken them down, so the open count stopped meaning "something is broken now" and the person
+      # who fixed the last red suite had to remember to close the issue by hand. The permission for
+      # this is already on the job (issues: write), and the step is silent when nothing is open.
+      - name: Close the issue when the sweep is green
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BACKEND: ${{ matrix.backend }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TITLE="Nightly E2E sweep is red on $BACKEND"
+          EXISTING="$(gh issue list --label nightly-sweep --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')"
+          if [ -n "$EXISTING" ]; then
+            gh issue close "$EXISTING" --comment "Green on $(date -u +%Y-%m-%d): $RUN_URL"
           fi
