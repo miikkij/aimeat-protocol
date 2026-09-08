@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Action, Work, Wallet, Board, OTK, Node-key, Dispute, Micro-memory methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.5.1 — 2026-09-08 — The twin the v1.1.0 note warns about is gone: ../repos/board.ts and ten
+ *     other repos files nothing imported were deleted after the E2E coverage sweep executed none of
+ *     them on either backend. The methods here were the live ones all along.
  *   v1.5.0 — 2026-08-30 — boards.rules round-trips; updateBoardRules, updatePostExpiry and
  *     boardAuthorStanding (posts, thanks, first post per author in one grouped query); listReplies
  *     and replyCounts, since listPosts leaves replies out and nothing listed them.
