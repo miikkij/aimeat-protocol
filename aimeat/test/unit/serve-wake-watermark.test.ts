@@ -79,3 +79,51 @@ describe('AgentChannel unified wake watermark', () => {
     await expect(ch.nextWake(0)).resolves.toBe(false);
   });
 });
+
+/**
+ * Dedup must stop double WORK, never double NOTICE. seenTaskIds and seenMessageIds live for the
+ * daemon's whole life, and both handlers used to return on a seen id BEFORE signalWake — so one id
+ * was worth exactly one wake, for ever. A delivery that arrived while nobody was listening could
+ * never be re-announced: no resend, no re-list, no second chance, and every surface still read
+ * healthy (task active, agent online, park open, nothing in an error state). handleRecord and
+ * handleDm never had the fault; they signal on every event and let the queue hold the item.
+ * Measured by crewaimeat 2026-09-07 and 2026-09-08: two nights, 0/6 steps, agents reachable.
+ */
+describe('a re-delivered id still announces itself', () => {
+  it('the same task delivered twice wakes twice', async () => {
+    const ch = new AgentChannel(entry);
+    ch.handleTask({ id: 'task-1', title: 'the evening fetch' }, 'deliver');
+    await expect(ch.nextWake(0)).resolves.toBe(true);
+
+    // The node re-pushes it (a reconnect backlog, a resend, a second deliver). The consumer has
+    // already reported the first wake, so this is the only signal it will get.
+    ch.handleTask({ id: 'task-1', title: 'the evening fetch' }, 'backlog');
+    await expect(ch.nextWake(0)).resolves.toBe(true);
+  });
+
+  it('but the task is queued once, so the runner and the long-poll still see it once', async () => {
+    const ch = new AgentChannel(entry);
+    ch.handleTask({ id: 'task-1', title: 'the evening fetch' }, 'deliver');
+    ch.handleTask({ id: 'task-1', title: 'the evening fetch' }, 'backlog');
+
+    await expect(ch.nextTask(0)).resolves.toMatchObject({ task: { id: 'task-1' } });
+    await expect(ch.nextTask(0)).resolves.toBeNull();
+  });
+
+  it('the same message delivered twice wakes twice', async () => {
+    const ch = new AgentChannel(entry);
+    ch.handleMessages([{ id: 'msg-1' }]);
+    await expect(ch.nextWake(0)).resolves.toBe(true);
+
+    // Messages have no drainable queue: the wake is the whole mechanism, so losing it hides the
+    // message until some unrelated event happens to start a cycle.
+    ch.handleMessages([{ id: 'msg-1' }]);
+    await expect(ch.nextWake(0)).resolves.toBe(true);
+  });
+
+  it('a messages frame with nothing in it wakes nobody', async () => {
+    const ch = new AgentChannel(entry);
+    ch.handleMessages([]);
+    await expect(ch.nextWake(0)).resolves.toBe(false);
+  });
+});
