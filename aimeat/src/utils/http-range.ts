@@ -148,7 +148,7 @@ export function rangeNotSatisfiable(res: Response, size: number, reason: string)
  */
 export function sendPartialContent(
     res: Response,
-    file: { key: string; mimeType: string; size: number; data?: Buffer; utf8Verified?: boolean },
+    file: { key: string; mimeType: string; size: number; data?: Buffer; utf8Verified?: boolean; downloadName?: string },
     range: { start: number; end: number },
     chunk: Buffer,
 ): void {
@@ -195,7 +195,7 @@ export interface StoredFileReader {
  */
 export async function serveStoredFile(
     res: Response,
-    file: { key: string; mimeType: string; size: number; utf8Verified?: boolean; createdAt?: string },
+    file: { key: string; mimeType: string; size: number; utf8Verified?: boolean; createdAt?: string; downloadName?: string },
     rangeHeader: string | undefined,
     read: StoredFileReader,
     opts: { headOnly?: boolean } = {},
