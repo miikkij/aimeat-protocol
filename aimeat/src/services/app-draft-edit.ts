@@ -33,6 +33,8 @@
  *     larger than one model response, and continue one it published a week ago (aimeat_app_get does
  *     not return source, and stageAppDraft only ever took bytes from its caller).
  */
+import { bareOwner } from './app-members.js';
+import { resolveAppTarget } from './app-dev-grant.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppDraftRecord } from '../storage/interface.js';
 import type { PublishAppRefusal } from './app-publish.js';
@@ -90,6 +92,7 @@ export interface ReadAppDraftInput extends AppDraftEditScope {
 }
 
 export interface SeedAppDraftInput extends AppDraftEditScope {
+  callerGaii: string;
   /** The draft to write into. */
   filename: string;
   /** The published app to copy from. Defaults to `filename`. */
@@ -331,6 +334,13 @@ export async function seedAppDraft(
 ): Promise<SeededAppDraft | PublishAppRefusal> {
   const { ownerName, ownerGhii, filename } = input;
   const from = input.fromFilename ?? filename;
+  for (const targetFilename of new Set([filename, from])) {
+    const target = await resolveAppTarget(storage, config, {
+      callerOwner: bareOwner(input.callerGaii), requestedOwner: ownerName, filename: targetFilename, act: 'draft',
+    });
+    if (!target.ok) return { refusal: target };
+    if (target.ownerGhii !== ownerGhii) return refuse(403, 'FORBIDDEN', 'Source owner does not match the authorized app bucket.');
+  }
 
   const live = await storage.getApp(ownerGhii, from, input.version);
   if (!live) {

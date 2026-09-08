@@ -38,11 +38,12 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { listAppRecords } from '../services/app-record-keys.js';
 import {
   listMembers, getMember, putMember, removeMember,
   listRequests, putRequest, removeRequest, accountOf,
   getCarryPlan, putCarryPlan, seatsTaken, type AppCarryPlan,
-  noteVisit, listVisits, forgetVisit,
+  noteVisit, listVisits, forgetVisit, isLive,
 } from '../services/app-members.js';
 import {
   APP_DEV_LEVEL_LIST, actsFor, levelName, parseDevLevel,
@@ -576,9 +577,19 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   router.get('/v1/app-dev-grants', requireAuth(), requireScope('app:write'), async (req, res) => {
     const me = accountOf(resolveIdentity(req.auth!, config.nodeId));
     const grants = await listBlanketGrants(storage, me);
+    const perApp: Record<string, unknown[]> = {};
+    if (req.query.include_apps === 'true') {
+      const rows = await listAppRecords(storage, 'app-member', 'appmember.');
+      for (const { value } of rows.items) {
+        const row = value as import('../services/app-members.js').AppMemberRecord;
+        if (!row?.appId || accountOf(row.appId.split('/')[0]) !== me || typeof row.dev !== 'number' || !isLive(row)) continue;
+        (perApp[row.appId] ??= []).push({ account: row.owner, level: row.dev, levelName: levelName(row.dev), since: row.devSince, grantedBy: row.devBy });
+      }
+    }
     return res.json(success(config.nodeId, {
       grants: grants.map(g => ({ ...g, levelName: levelName(g.level), carries: actsFor(g.level) })),
       levels: rungs,
+      ...(req.query.include_apps === 'true' ? { per_app: perApp } : {}),
       meaning: 'These people may build any app of yours, including ones you have not published yet. A right on a single app is set on that app instead.',
     }));
   });

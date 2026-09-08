@@ -27,7 +27,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { resolveAppOwnerScope } from '../services/app-lifecycle.js';
+import { resolveAppTargetScope } from '../services/app-lifecycle.js';
 import { captureAppScreenshot } from '../services/screenshot-capture.js';
 
 export function registerAppScreenshotTool(
@@ -41,13 +41,17 @@ export function registerAppScreenshotTool(
         descriptionFor('aimeat_app_screenshot'),
         {
             filename: z.string().describe('The published app to photograph (e.g. "pong.html").'),
+            owner: z.string().optional().describe('App owner. Omit for your own apps.'),
         },
         annotationsFor('aimeat_app_screenshot'),
-        async ({ filename }) => {
+        async ({ filename, owner }) => {
             const agentGaii = getAgentGaii();
-            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            const scope = await resolveAppTargetScope(storage, config, { principal: agentGaii, owner, filename, act: 'presentation' });
             if (!scope) {
                 return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
+            }
+            if ('refusal' in scope) {
+                return { content: [{ type: 'text' as const, text: scope.refusal }], isError: true };
             }
 
             // Deliberately no storage lookup here. "Is there an app to render, and which bucket does

@@ -100,16 +100,19 @@ function UploadForm({ onUpload, busy }) {
   const shotRef = useRef(null);
   const [desc, setDesc] = useState('');
   const [code, setCode] = useState('');
+  const [roadmap, setRoadmap] = useState('');
   return html`
     <div class="ap-form">
       <label class="ap-field"><span class="og-label">${a('fileLabel')}</span><input type="file" class="og-input ap-file" ref=${fileRef} accept=".html,.htm" /></label>
       <label class="ap-field"><span class="og-label">${a('shotLabel')}</span><input type="file" class="og-input ap-file" ref=${shotRef} accept="image/*" /></label>
       <label class="ap-field ap-field--wide"><span class="og-label">${a('descLabel')}</span><textarea class="og-input" rows="2" maxLength="2000" placeholder=${a('descPlaceholder')} value=${desc} onInput=${(e) => setDesc(e.target.value)}></textarea></label>
       <label class="ap-field"><span class="og-label">${a('codeLabel')}</span><input class="og-input" placeholder=${a('codePlaceholder')} value=${code} onInput=${(e) => setCode(e.target.value)} /></label>
+      <label class="ap-field ap-field--wide"><span class="og-label">${a('roadPublishLabel')}</span><textarea class="og-input" rows="2" maxLength="600" value=${roadmap} onInput=${e => setRoadmap(e.target.value)} /></label>
+      <p class="ap-hint ap-field--wide">${a('roadPublishHint')}</p>
       <div class="ap-field ap-field--send">
         <button type="button" class="og-door" disabled=${busy} onClick=${async () => {
-          const ok = await onUpload({ file: fileRef.current?.files?.[0], description: desc, screenshot: shotRef.current?.files?.[0], accessCode: code });
-          if (ok) { setDesc(''); setCode(''); if (fileRef.current) fileRef.current.value = ''; if (shotRef.current) shotRef.current.value = ''; }
+          const ok = await onUpload({ file: fileRef.current?.files?.[0], description: desc, screenshot: shotRef.current?.files?.[0], accessCode: code, roadmap });
+          if (ok) { setDesc(''); setCode(''); setRoadmap(''); if (fileRef.current) fileRef.current.value = ''; if (shotRef.current) shotRef.current.value = ''; }
         }}>${a('publishFile')}</button>
       </div>
     </div>`;

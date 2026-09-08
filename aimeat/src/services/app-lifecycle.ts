@@ -244,6 +244,7 @@ export async function discardAppDraft(
 }
 
 export interface PublishAppDraftInput {
+  roadmap?: string;
   ownerName: string;
   ownerGhii: string;
   /** WHO pressed publish, resolved server-side. Audit + provenance principal. */
@@ -290,6 +291,7 @@ export async function publishAppDraft(
     },
     accessCode: { mode: 'carry' },
     source: 'draft',
+    roadmap: input.roadmap,
     declaredProvenanceId: input.declaredProvenanceId,
     declaredProvenance: input.declaredProvenance,
     specToken: input.specToken,

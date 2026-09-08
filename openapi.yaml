@@ -3427,7 +3427,11 @@ components:
         protected: { type: boolean, description: True when an access code gates downloads }
         parked: { type: boolean, description: True when the app is hidden from the public catalogue (visible only to its owner) }
         forkable: { type: boolean, description: True when other users are allowed to fork this app (the owner and their agents can always fork it) }
-        has_draft: { type: boolean, description: True when the VIEWER owns this app and it has a pending staging draft awaiting publish. Always false for apps the caller does not own (a draft is owner-private) and for unauthenticated listings. }
+        has_draft: { type: boolean, description: True for a pending draft when the viewer owns the app or explicitly requests building=true and holds its development right. False for other viewers. }
+        dev_level: { type: integer, enum: [0, 10, 20], description: Effective development right. Present only in building=true listings. }
+        dev_level_name: { type: string, enum: [full, publisher, drafter] }
+        building_for: { type: string, description: Owner whose app the caller helps build. }
+        roadmap_hint: { type: string, description: Publication warning when an unshared app was published without a roadmap line. }
         operator_hidden: { type: boolean, description: True when an operator has hidden the app from every public surface (visible only to its owner, who cannot lift it) }
         operator_hide_reason: { type: string, nullable: true, description: Optional operator-supplied reason, shown to the owner }
         has_screenshot: { type: boolean }
@@ -22962,6 +22966,8 @@ paths:
               type: object
               required: [filename]
               properties:
+                owner: { type: string, description: App owner. Omit for your own catalogue; another owner requires a development grant. }
+                roadmap: { type: string, minLength: 3, maxLength: 600, description: What this version changes. Required for shared apps on inline and presigned paths. }
                 filename: { type: string }
                 content: { type: string, description: Base64-encoded file content (omit when mode=presigned) }
                 mode: { type: string, enum: [presigned], description: Request a presigned upload URL instead of inline content }
@@ -24573,9 +24579,19 @@ paths:
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [what]
+              properties:
+                what: { type: string, minLength: 3, maxLength: 600 }
+                state: { type: string, enum: [wanted, done], default: wanted }
       responses:
         '201':
-          description: Created
+          description: Created. Returns the new entry and a roadmap filtered for the caller. A full list of 300 wishes refuses new wishes with 409.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
@@ -24593,6 +24609,15 @@ paths:
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wanted_visibility]
+              properties:
+                wanted_visibility: { type: string, enum: [developers, everyone] }
       responses:
         '200':
           description: OK
@@ -24715,6 +24740,11 @@ paths:
       tags: [Apps]
       security:
         - BearerAuth: []
+      parameters:
+        - name: include_apps
+          in: query
+          schema: { type: boolean, default: false }
+          description: Include per_app, a map of this owner's app identities to their development grants.
       responses:
         '200':
           description: OK
@@ -25300,6 +25330,9 @@ paths:
             schema:
               type: object
               properties:
+                roadmap: { type: string, minLength: 3, maxLength: 600, description: What this version changes. Required for shared apps. }
+                spec_token: { type: string }
+                spec_ack: { type: string, enum: [skipped-by-owner] }
                 ai_provenance:
                   allOf:
                     - $ref: '#/components/schemas/AiProvenanceDeclaration'

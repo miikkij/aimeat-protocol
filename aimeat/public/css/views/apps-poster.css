@@ -100,3 +100,8 @@
   .ap-form { grid-template-columns: 1fr; }
   .ap-field--send { justify-content: flex-start; }
 }
+
+/* Roadmap prose is user text and may contain an unbroken URL. */
+.ap-road-text { overflow-wrap: anywhere; white-space: pre-wrap; }
+.og-apps .ap-publish-modal { max-width: 40rem; }
+.ap-publish-modal .ap-hint { grid-column: 1 / -1; }
