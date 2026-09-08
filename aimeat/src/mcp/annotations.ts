@@ -273,6 +273,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_agent_console_set: { title: 'Set Agent Console Address', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_agent_basics_get: { title: 'Basic Agents: What and Whether', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_agent_basics_request: { title: 'Ask the Owner for the Basic Agents', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    // Idempotent because proposing a name that is already waiting returns the standing proposal
+    // rather than writing a second one.
+    aimeat_agent_propose: { title: 'Propose a New Agent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Crew definition (the chat path to building a JSON agent) ──
     aimeat_crew_get: { title: 'Read Crew Definition', readOnlyHint: true },

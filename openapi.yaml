@@ -7584,6 +7584,13 @@ paths:
 
         `registeredBy` records WHO ASKED, not who approved -- it is the creation ledger and the
         fence the sibling-delete gate reads. The owner's approval is recorded as an account event.
+
+        AND IT CREDENTIALS THE AGENT. Approving mints an enrolment grant and offers the agent to the
+        owner's running connector, which is what gives it a key and a token; without that the record
+        exists, never reaches the daemon's roster and never runs. A connector that cannot be reached
+        does NOT undo the approval: `attached` comes back false with the reason in `attach_problem`,
+        and the agent is repaired in one press on
+        `POST /v1/agents/v2/agents/{name}/attach`.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -7607,12 +7614,78 @@ paths:
                         properties:
                           created: { type: boolean }
                           seeded: { type: boolean }
+                          attached:
+                            type: boolean
+                            description: Whether the owner's connector took it on and it now holds a key
+                          attach_problem:
+                            type: object
+                            nullable: true
+                            description: Why it is not attached, verbatim, when it is not
+                            properties:
+                              code: { type: string }
+                              message: { type: string }
                           next_step: { type: string }
                           agent: { type: object }
         '403': { description: Not the account holder in person }
         '404': { description: No such proposal on this account }
         '409': { description: Already settled, or the name has been taken since }
         '502': { description: The definition could not be seeded, so nothing was created }
+
+  /v1/agents/v2/agents/{name}/attach:
+    post:
+      operationId: attachAgentV2
+      summary: Give an existing agent its credentials on the connector that is running now
+      description: |
+        The repair for an agent this account owns that has no key: it was approved while the owner's
+        connector was down, so nothing minted an enrolment grant for it and nothing runs it.
+
+        THE ACCOUNT HOLDER IN PERSON, like every door that hands a machine the authority to mint an
+        agent's key. Refuses an agent that already carries one (`ALREADY_ATTACHED`) rather than
+        pinning a second key over a working one, and refuses a v1 agent (`V1_AGENT`), which moves
+        through the migration route instead so the record upgrade and the key pinning stay one step.
+
+        Everything in the offer comes from the stored record -- scopes included -- never from this
+        request.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: The bare agent name
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                install_id:
+                  type: string
+                  description: Which connected machine should take it on; omitted means whichever one is connected
+      responses:
+        '200':
+          description: The agent holds its own key and the connector is serving it
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          attached: { type: boolean }
+                          served_by: { type: string }
+                          next_step: { type: string }
+                          agent: { type: object, nullable: true }
+        '403': { description: Not the account holder in person }
+        '404': { description: No agent of this account by that name }
+        '409': { description: Already attached, a v1 agent, or no connector is running }
+        '502': { description: The connector could not be reached, or did not take it on }
 
   /v1/agents/v2/agent-proposals/{id}/decline:
     post:

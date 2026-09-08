@@ -26,6 +26,7 @@
  * @structure agentsV2Router(config, storage) — mounts basic-agents, enrolment, token and card routes
  * @usage app.use(agentsV2Router(config, storage));  // BEFORE agentsRouter
  * @version-history
+ *   v1.3.0 — 2026-09-08 — The attach route, mounted before the card routes like everything literal.
  *   v1.2.0 — 2026-09-01 — V5: the task doors, in MCP's task shape with the A2A state derived.
  *   v1.1.0 — 2026-09-01 — V4: the message doors and the delivery target, mounted before the card
  *     routes for the same reason everything literal is.
@@ -43,6 +44,7 @@ import { registerAgentV2MessagingRoutes } from './agents-v2/messaging.js';
 import { registerAgentV2TaskRoutes } from './agents-v2/tasks.js';
 import { registerAgentV2MigrateRoutes } from './agents-v2/migrate.js';
 import { registerAgentProposalRoutes } from './agents-v2/agent-proposals.js';
+import { registerAgentAttachRoute } from './agents-v2/attach.js';
 
 export function agentsV2Router(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -54,6 +56,9 @@ export function agentsV2Router(config: AimeatConfig, storage: Storage): Router {
   registerAgentV2MessagingRoutes(router, config, storage);
   registerAgentV2TaskRoutes(router, config, storage);
   registerAgentV2MigrateRoutes(router, config, storage);
+  // `/v1/agents/v2/agents/:name/attach` is literal up to the name, so it goes before the card
+  // routes for the same reason everything else here does.
+  registerAgentAttachRoute(router, config, storage);
   registerAgentCardRoutes(router, config, storage);
   registerAgentProposalRoutes(router, config, storage);
 

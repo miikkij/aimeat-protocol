@@ -212,6 +212,21 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_agent_propose',
+        description: "Put a NEW agent in front of your owner for approval: one you have designed for a job the basic agents do not cover. CREATES NOTHING. The proposal lands on the owner's open-items list, and only their own press on it creates the agent, seeds its definition and hands it to their connector — adding a principal to an account is the one moment a person belongs in, and an agent calling in the owner's name is not the owner. Send `crew_def` with it whenever you can: an agent approved without one exists and cannot run, and its runtime has to be up before anyone can publish one (the circle that ended crew-forge), so the definition you attach here is the only one it can start with. It is checked as a definition before the proposal is written, so a broken one is refused now rather than at approval. `scopes` may not exceed what you hold yourself. Proposing a name that is already waiting returns the standing proposal instead of putting a second line on the owner's list.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            name: { type: 'string', required: true, description: 'The agent name: 3 to 40 characters, lowercase letters, digits and hyphens, starting with a letter.' },
+            purpose: { type: 'string', required: true, description: 'What this agent is for, in a sentence the owner can decide from. This is what they read.' },
+            display_name: { type: 'string', description: 'The name shown to the person. Defaults to the agent name.' },
+            scopes: { type: 'array', description: 'Exactly what it may do, e.g. ["memory:read","memory:write"]. Never more than you hold yourself.' },
+            mode: { type: 'string', description: "How the node treats its tasks: 'task-runner' activates a queued task without asking the owner each time; also autonomous, interactive, coordinator, workstation." },
+            run_mode: { type: 'string', description: "'spawn' starts a worker per piece of work (right for bursty jobs); 'resident' stays up (right for a front door, at a few seconds of cold start saved)." },
+            crew_def: { type: 'object', description: 'What it would BE, in the crewaimeat crew_def shape — the same document aimeat_crew_publish takes. Strongly recommended.' },
+        },
+    },
+    {
         name: 'aimeat_message_inbox',
         description: 'Fetch this agent\'s pending inbound messages from its owner (each with id, thread_id, sender, content, timestamp). Poll this to pick up new instructions or replies from the human; reply with aimeat_message_send (pass the same thread_id to stay in the conversation). For delegated work use the aimeat_task_* tools instead.',
         caller: 'agent',

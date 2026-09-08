@@ -20,9 +20,14 @@
  *   nothing to be"), and `aimeat_crew_publish` cannot fix it afterwards because it asks the target's
  *   runtime to validate and a new agent has none. That circle is what ended crew-forge. So the
  *   definition goes down with the record or neither does, and a failed seed deletes the agent.
- * @structure registerAgentProposalRoutes()
+ * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   v1.1.0 — 2026-09-08 — Approve CREDENTIALS the agent too, through services/agent-enrolment-offer.
+ *     It stopped at the seed and told the owner to start their connector, which mints no enrolment
+ *     grant: the agent had no key, no token, never reached `serve.json` and never ran. A connector
+ *     that cannot be reached now leaves the agent standing and says so, with the attach route in
+ *     the answer, because that state is repairable in one press where a missing definition is not.
  *   v1.0.0 — 2026-09-02 — Initial. Replaces crew-forge as how an agent comes into being.
  */
 import type { Router } from 'express';
@@ -32,6 +37,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { crewSeedAuthored, type CrewCaller } from '../../services/crew-ops.js';
+import { offerEnrolment } from '../../services/agent-enrolment-offer.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordAccountEvent } from '../../services/account-events.js';
 import {
@@ -41,6 +47,19 @@ import { logger } from '../../utils/logger.js';
 
 const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'];
 const VALID_RUN_MODES = ['resident', 'spawn'];
+
+/**
+ * What is true now and what the person does next, in one sentence, for the four states an approval
+ * can land in. Written out rather than assembled from fragments because the wrong half of this
+ * sentence is what cost six days: "start your connector and it will come up" was said about an
+ * agent that had no credentials, so starting the connector changed nothing.
+ */
+function nextStep(displayName: string, defined: boolean, attached: boolean): string {
+  if (attached && defined) return `${displayName} is running: it has its instructions and your connector has taken it on.`;
+  if (attached) return `${displayName} exists and your connector has taken it on. It needs a crew definition before it can run.`;
+  if (defined) return `${displayName} exists and has its instructions, but nothing is running it: your connector could not be reached. Start it and press Attach.`;
+  return `${displayName} exists. It needs a crew definition, and your connector could not be reached to take it on.`;
+}
 
 export function registerAgentProposalRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── PROPOSE. Creates nothing; puts it in front of the owner. ────────────────
@@ -180,6 +199,31 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       }
     }
 
+    // ── Credentials, so something actually runs it ──
+    //
+    // WHY THIS IS HERE AND NOT LEFT TO A RESTART. Until 2026-09-08 this route stopped at the seed
+    // and told the owner to start their connector. That sentence was not true: a connector start
+    // mints no enrolment grant, so the agent had no key and no token, never appeared in the
+    // daemon's `serve.json`, and never reached the spawner's roster. It existed, fully defined, and
+    // nothing ever ran it.
+    //
+    // WHY A FAILURE HERE DOES NOT UNDO THE AGENT, where a failed seed does. The seed is about what
+    // the agent IS, and one with nothing to be cannot be fixed afterwards. Credentials are about
+    // what is running right now on a machine the owner may simply not have switched on, and that
+    // state is repairable in one press: POST /v1/agents/v2/agents/:name/attach. So an unreachable
+    // connector leaves the agent standing and says so, rather than throwing away an approval the
+    // owner just made.
+    const enrolment = await offerEnrolment({ config, storage }, owner, [{
+      name: proposal.name,
+      gaii,
+      displayName: proposal.display_name,
+      description: proposal.purpose,
+      runMode: proposal.run_mode,
+      mode: proposal.mode,
+      // From the record we just wrote, which took its scopes from the proposal the owner approved.
+      scopes: proposal.scopes,
+    }]);
+
     await settleProposal({ config, storage }, owner, proposal, 'approved');
 
     void recordAccountEvent(storage, {
@@ -193,16 +237,24 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
 
     logger.info('Agent proposal approved', {
       event: 'agent_v2.proposal_approved', owner, name: proposal.name, by: proposal.proposed_by,
+      enrolled: enrolment.ok,
     });
     res.json(success(config.nodeId, {
       created: true,
       agent: { name: proposal.name, gaii, mode: proposal.mode, run_mode: proposal.run_mode, scopes: proposal.scopes },
       seeded: !!proposal.crew_def,
-      next_step: proposal.crew_def
-        ? `${proposal.display_name} exists and has its instructions. Start your connector and it will come up.`
-        : `${proposal.display_name} exists. It needs a crew definition before it can run.`,
+      attached: enrolment.ok,
+      // The reason, verbatim, when it is not attached: "unconnected" without a why sends the owner
+      // looking at the wrong machine.
+      attach_problem: enrolment.ok ? null : { code: enrolment.code, message: enrolment.message },
+      next_step: nextStep(proposal.display_name, !!proposal.crew_def, enrolment.ok),
     }, [
       { description: 'See it in your fleet', method: 'GET', url: `/v1/agents?owner=${owner}` },
+      ...(enrolment.ok ? [] : [{
+        description: 'Attach it once the connector is running',
+        method: 'POST',
+        url: `/v1/agents/v2/agents/${encodeURIComponent(proposal.name)}/attach`,
+      }]),
     ]));
     emitChange('agents');
   });
