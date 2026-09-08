@@ -3,15 +3,14 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Storage-interface contract for the wallet/morsel transaction ledger: append a
- *   transaction, read a principal's (or all) transaction history, and purge a principal's records —
- *   implemented per backend (SQLite/Prisma).
+ *   transaction and read a principal's (or all) transaction history — implemented per backend.
  *
  * @structure
  *   - WalletRepository: interface implemented per backend
  *   - addTransaction / getTransactions(gaii) / listAllTransactions: append + per-gaii / global reads
- *   - deleteTransactions(gaii): purge a principal's ledger entries
  *
  * @version-history
+ *   v1.2.0 — 2026-09-09 — deleteTransactions deleted: no caller.
  *   v1.1.0 — 2026-08-10 — findTransactionByTrackingCode for the settlement replay guard (audit June H-4).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -25,5 +24,4 @@ export interface WalletRepository {
    *  like a new one (audit: the June H-4 finding). */
   findTransactionByTrackingCode(gaii: string, trackingCode: string, type: string): Promise<WalletTransaction | null>;
   listAllTransactions(limit?: number): Promise<WalletTransaction[]>;
-  deleteTransactions(gaii: string): Promise<number>;
 }

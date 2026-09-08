@@ -10,6 +10,7 @@
  *   Mongo backend), a unique-version clash surfaces as PACKAGE_EXISTS, and archivePackageGroup flips every
  *   still-live version to archived.
  * @version-history
+ *   v1.1.0 — 2026-09-09 — listInstancesByPackage deleted: no caller (listInstances filters by package).
  *   v1.0.0 — 2026-07-15 — Phase 5: package catalog + instances on Postgres+Kysely.
  */
 import { sql } from 'kysely';
@@ -211,14 +212,5 @@ export const packageMethods = {
   async deleteInstance(this: PostgresKyselyStorage, id: string): Promise<boolean> {
     const r = await this.db.deleteFrom('PackageInstance').where('id', '=', id).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0) > 0;
-  },
-
-  async listInstancesByPackage(this: PostgresKyselyStorage, packageGroupId: string): Promise<{ instances: PackageInstanceRecord[]; total: number }> {
-    const q = this.db.selectFrom('PackageInstance').where('packageGroupId', '=', packageGroupId);
-    const [rows, totalRow] = await Promise.all([
-      q.selectAll().orderBy('installedAt', 'desc').execute(),
-      q.select(sql<number>`count(*)`.as('c')).executeTakeFirst(),
-    ]);
-    return { instances: rows.map(toInstance), total: Number(totalRow?.c ?? 0) };
   },
 };

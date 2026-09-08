@@ -6,6 +6,8 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.9.0 — 2026-09-09 — The marketplace stats fetch goes: its route was deleted, and nothing here
+ *     ever rendered the value it loaded.
  *   v1.8.0 — 2026-09-05 — The sign-in card's lock emoji goes: no emoji anywhere in the interface.
  *   v1.5.0 — 2026-07-16 — Drop the per-item emoji icons from the sidebar nav and page title
  *     (label-only menu — the icons added visual noise without aiding scanning).
@@ -268,7 +270,7 @@ export default function Admin({ navigate, locale }) {
       // Phase 3: features
       const features = await Promise.allSettled([
         api.getGhiiUsers(), api.getEmailStatus(), api.getDirectoryStats(),
-        api.getMarketplaceStats(), api.getPushStats(),
+        api.getPushStats(),
         api.getCsmTemplates(), api.getMsmIntegrations(), api.getGenesisPeers(),
         api.getConfig(),
         api.getConsulStatus().catch(() => ({ data: null })),
@@ -281,16 +283,15 @@ export default function Admin({ navigate, locale }) {
       d.ghiiUsers       = features[0].status === 'fulfilled' ? (features[0].value.data.ghii_users || []) : [];
       d.email           = features[1].status === 'fulfilled' ? features[1].value.data : null;
       d.directoryStats  = features[2].status === 'fulfilled' ? features[2].value.data : null;
-      d.marketplaceStats = features[3].status === 'fulfilled' ? features[3].value.data : null;
-      d.push            = features[4].status === 'fulfilled' ? features[4].value.data : null;
-      d.csmTemplates    = features[5].status === 'fulfilled' ? features[5].value.data : null;
-      d.msmIntegrations = features[6].status === 'fulfilled' ? features[6].value.data : null;
-      d.genesis         = features[7].status === 'fulfilled' ? features[7].value.data : null;
-      d.configSchema    = features[8].status === 'fulfilled' ? features[8].value.data : null;
-      d.consul          = features[9].status === 'fulfilled' ? features[9].value.data : null;
-      d.schedulerJobs   = features[10].status === 'fulfilled' ? features[10].value.data : null;
-      d.extensions      = features[11].status === 'fulfilled' ? features[11].value.data : null;
-      d.systemPrompts   = features[12].status === 'fulfilled' ? features[12].value?.data : null;
+      d.push            = features[3].status === 'fulfilled' ? features[3].value.data : null;
+      d.csmTemplates    = features[4].status === 'fulfilled' ? features[4].value.data : null;
+      d.msmIntegrations = features[5].status === 'fulfilled' ? features[5].value.data : null;
+      d.genesis         = features[6].status === 'fulfilled' ? features[6].value.data : null;
+      d.configSchema    = features[7].status === 'fulfilled' ? features[7].value.data : null;
+      d.consul          = features[8].status === 'fulfilled' ? features[8].value.data : null;
+      d.schedulerJobs   = features[9].status === 'fulfilled' ? features[9].value.data : null;
+      d.extensions      = features[10].status === 'fulfilled' ? features[10].value.data : null;
+      d.systemPrompts   = features[11].status === 'fulfilled' ? features[11].value?.data : null;
 
       // Scheduler execution log (non-blocking)
       d.schedulerLog = await api.fetchSchedulerExecutionLog({ limit: 50 }).catch(() => ({ entries: [], total: 0 }));

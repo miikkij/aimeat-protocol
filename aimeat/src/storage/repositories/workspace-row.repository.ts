@@ -22,9 +22,9 @@
  *   - trimWorkspaceRows(...)                  -- retention by count
  *   - workspaceRowStats(...)                  -- count/bytes/span without reading rows
  *   - workspaceRowUsage(scope)                -- what the quota gate reads
- *   - deleteWorkspaceRowSpace(...)            -- the whole namespace, when a space is removed
  * @usage import type { WorkspaceRowRepository } from './repositories/workspace-row.repository.js';
  * @version-history
+ *   v1.1.0 — 2026-09-09 — deleteWorkspaceRowSpace deleted: no caller outside its own unit test.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import type {
@@ -77,7 +77,4 @@ export interface WorkspaceRowRepository {
 
   /** Rows and bytes for a scope. The quota gate's only read. */
   workspaceRowUsage(scope: WorkspaceRowScope): Promise<WorkspaceRowUsage>;
-
-  /** Remove an entire namespace. Used when a space leaves the manifest or a workspace is deleted. */
-  deleteWorkspaceRowSpace(organismId: string, wsId: string, namespace?: string): Promise<number>;
 }

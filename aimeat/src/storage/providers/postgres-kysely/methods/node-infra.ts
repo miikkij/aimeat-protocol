@@ -8,9 +8,11 @@
  *   Excludes node key / maintenance / extensions / escrow / cortex (implemented elsewhere).
  * @structure
  *   - module-level mappers (toPushSub / toTrustedIssuer / toVerificationNonce / toRealtimeRoom / toSiteChangeLog)
- *   - nodeInfraMethods: push-subscription upsert+CRUD, trusted-issuer CRUD, nonce CRUD + expiry sweep,
- *     realtime-room CRUD, site-change-log append + cursor-paginated list
+ *   - nodeInfraMethods: push-subscription upsert+CRUD, trusted-issuer create/list, nonce CRUD + expiry
+ *     sweep, realtime-room create/get/update/delete, site-change-log append + cursor-paginated list
  * @version-history
+ *   v1.2.0 — 2026-09-09 — getTrustedIssuer, getTrustedIssuerByUrl, deleteTrustedIssuer and
+ *     listRealtimeRooms deleted: no caller.
  *   v1.1.0 — 2026-08-11 — Push subscriptions key on (ownerName, endpoint), so an owner's second
  *     device joins the first instead of evicting it (audit H-8). Needs migration 0032.
  *   v1.0.0 — 2026-07-15 — Phase 5: node-infra domain on Postgres+Kysely.
@@ -98,24 +100,11 @@ export const nodeInfraMethods = {
     }).execute();
     return record;
   },
-  async getTrustedIssuer(this: PostgresKyselyStorage, id: string): Promise<TrustedIssuerRecord | null> {
-    const r = await this.db.selectFrom('TrustedIssuer').selectAll().where('id', '=', id).executeTakeFirst();
-    return r ? toTrustedIssuer(r) : null;
-  },
-  async getTrustedIssuerByUrl(this: PostgresKyselyStorage, url: string): Promise<TrustedIssuerRecord | null> {
-    const r = await this.db.selectFrom('TrustedIssuer').selectAll().where('url', '=', url).executeTakeFirst();
-    return r ? toTrustedIssuer(r) : null;
-  },
   async listTrustedIssuers(this: PostgresKyselyStorage, opts?: { type?: string }): Promise<TrustedIssuerRecord[]> {
     let q = this.db.selectFrom('TrustedIssuer').selectAll();
     if (opts?.type) q = q.where('type', '=', opts.type);
     return (await q.execute()).map(toTrustedIssuer);
   },
-  async deleteTrustedIssuer(this: PostgresKyselyStorage, id: string): Promise<boolean> {
-    const r = await this.db.deleteFrom('TrustedIssuer').where('id', '=', id).executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0) > 0;
-  },
-
   // ── Verification nonces (EUDIW/FTN/OIDC state tracking) ──
   async createVerificationNonce(this: PostgresKyselyStorage, record: VerificationNonceRecord): Promise<VerificationNonceRecord> {
     await this.db.insertInto('VerificationNonce').values({
@@ -149,12 +138,6 @@ export const nodeInfraMethods = {
   async getRealtimeRoom(this: PostgresKyselyStorage, id: string): Promise<RealtimeRoomRecord | null> {
     const r = await this.db.selectFrom('RealtimeRoom').selectAll().where('id', '=', id).executeTakeFirst();
     return r ? toRealtimeRoom(r) : null;
-  },
-  async listRealtimeRooms(this: PostgresKyselyStorage, filter?: { appType?: string; isPublic?: boolean }): Promise<RealtimeRoomRecord[]> {
-    let q = this.db.selectFrom('RealtimeRoom').selectAll();
-    if (filter?.appType) q = q.where('appType', '=', filter.appType);
-    if (filter?.isPublic !== undefined) q = q.where('isPublic', '=', filter.isPublic);
-    return (await q.execute()).map(toRealtimeRoom);
   },
   async updateRealtimeRoom(this: PostgresKyselyStorage, id: string, updates: Partial<RealtimeRoomRecord>): Promise<RealtimeRoomRecord | null> {
     const data: Record<string, unknown> = {};

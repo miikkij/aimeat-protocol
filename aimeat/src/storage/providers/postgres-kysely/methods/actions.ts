@@ -8,6 +8,7 @@
  *   (input/output schema, perUnit, semantic) round-trip through jsonb, and the (actionId, providerGaii)
  *   unique key is enforced by an explicit existence check on create (ACTION_EXISTS).
  * @version-history
+ *   v1.1.0 — 2026-09-09 — deleteActionsByProvider deleted: no caller.
  *   v1.0.0 — 2026-07-15 — Phase 5: action domain on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -71,10 +72,6 @@ export const actionMethods = {
     const r = await this.db.deleteFrom('Action')
       .where('actionId', '=', id).where('providerGaii', '=', providerGaii).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0) > 0;
-  },
-  async deleteActionsByProvider(this: PostgresKyselyStorage, gaii: string): Promise<number> {
-    const r = await this.db.deleteFrom('Action').where('providerGaii', '=', gaii).executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0);
   },
   async listActionsByProvider(this: PostgresKyselyStorage, gaii: string): Promise<ActionRecord[]> {
     return (await this.db.selectFrom('Action').selectAll().where('providerGaii', '=', gaii).execute()).map(toAction);

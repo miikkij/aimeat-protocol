@@ -2,15 +2,16 @@
  * @file src/storage/providers/sqlite/methods/extensions-notify.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Site-log, Extension, Escrow, Cortex, Push, Notification, Session, PAT, Email-invitation methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
+ * @description Site-log, Extension, Cortex, Push, Notification, Session, PAT, Email-invitation methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.3.0 — 2026-09-09 — Generic escrow holds and pruneExpiredSessions deleted: no caller.
  *   v1.2.0 — 2026-08-17 — `lean` listings on extensions (no scriptContent) and cortex (no manifest /
  *     seed-data entries), same contract as the Postgres provider.
  *   v1.1.0 — 2026-08-13 — revokeSessionsByGaii, matching the Postgres provider.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  */
 import type {
-  SiteChangeLogEntry, ExtensionRecord, EscrowHoldRecord, CortexExtensionRecord, PersonalPushSubscriptionRecord, NotificationPreferences,
+  SiteChangeLogEntry, ExtensionRecord, CortexExtensionRecord, PersonalPushSubscriptionRecord, NotificationPreferences,
   NotificationTemplateRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
@@ -140,81 +141,6 @@ export const extensionsNotifyMethods = {
     };
     if (row.activatedAt) record.activatedAt = row.activatedAt as string;
     if (row.instances) record.instances = JSON.parse(row.instances as string);
-    return record;
-  },
-
-  // ══════════════════════════════════════════════════════════
-  // ── Escrow Holds ──
-  // ══════════════════════════════════════════════════════════
-
-  async createEscrowHold(this: SqliteStorage, record: EscrowHoldRecord): Promise<EscrowHoldRecord> {
-    this.db.prepare(
-      `INSERT INTO escrow_holds (holdId, fromGaii, amount, reason, status, extensionName, createdAt, releasedAt, releasedTo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      record.holdId, record.fromGaii, record.amount, record.reason,
-      record.status, record.extensionName, record.createdAt,
-      record.releasedAt ?? null, record.releasedTo ?? null,
-    );
-    return record;
-  },
-
-  async getEscrowHold(this: SqliteStorage, holdId: string): Promise<EscrowHoldRecord | null> {
-    const row = this.db.prepare('SELECT * FROM escrow_holds WHERE holdId = ?').get(holdId) as Record<string, unknown> | undefined;
-    return row ? this.deserializeEscrowHold(row) : null;
-  },
-
-  async listEscrowHolds(this: SqliteStorage, fromGaii: string, opts?: { status?: string }): Promise<EscrowHoldRecord[]> {
-    let sql = 'SELECT * FROM escrow_holds WHERE fromGaii = ?';
-    const params: unknown[] = [fromGaii];
-    if (opts?.status) { sql += ' AND status = ?'; params.push(opts.status); }
-    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
-    return rows.map(r => this.deserializeEscrowHold(r));
-  },
-
-  async releaseEscrowHold(this: SqliteStorage, holdId: string, toGaii: string): Promise<EscrowHoldRecord | null> {
-    const hold = await this.getEscrowHold(holdId);
-    if (!hold) return null;
-    if (hold.status !== 'held') return null;
-    const updated: EscrowHoldRecord = {
-      ...hold,
-      status: 'released',
-      releasedTo: toGaii,
-      releasedAt: new Date().toISOString(),
-    };
-    this.db.prepare(
-      'UPDATE escrow_holds SET status = ?, releasedTo = ?, releasedAt = ? WHERE holdId = ?'
-    ).run(updated.status, updated.releasedTo, updated.releasedAt, holdId);
-    return updated;
-  },
-
-  async refundEscrowHold(this: SqliteStorage, holdId: string): Promise<EscrowHoldRecord | null> {
-    const hold = await this.getEscrowHold(holdId);
-    if (!hold) return null;
-    if (hold.status !== 'held') return null;
-    const updated: EscrowHoldRecord = {
-      ...hold,
-      status: 'refunded',
-      releasedAt: new Date().toISOString(),
-    };
-    this.db.prepare(
-      'UPDATE escrow_holds SET status = ?, releasedAt = ? WHERE holdId = ?'
-    ).run(updated.status, updated.releasedAt, holdId);
-    return updated;
-  },
-
-  deserializeEscrowHold(this: SqliteStorage, row: Record<string, unknown>): EscrowHoldRecord {
-    const record: EscrowHoldRecord = {
-      holdId: row.holdId as string,
-      fromGaii: row.fromGaii as string,
-      amount: row.amount as number,
-      reason: row.reason as string,
-      status: row.status as EscrowHoldRecord['status'],
-      extensionName: row.extensionName as string,
-      createdAt: row.createdAt as string,
-    };
-    if (row.releasedAt) record.releasedAt = row.releasedAt as string;
-    if (row.releasedTo) record.releasedTo = row.releasedTo as string;
     return record;
   },
 
@@ -590,18 +516,6 @@ export const extensionsNotifyMethods = {
     const row = this.db.prepare('SELECT revoked FROM sessions WHERE sessionId = ?').get(sessionId) as { revoked: number } | undefined;
     if (!row) return false; // session not tracked = not revoked
     return row.revoked === 1;
-  },
-
-  async pruneExpiredSessions(this: SqliteStorage, nowIso: string): Promise<number> {
-    // Remove fully-dead rows: past their expiry (legacy JWT exp / owner idle window)
-    // or past the absolute cap. Revoked-but-unexpired rows are kept so isSessionRevoked
-    // still rejects their (short-lived) access tokens.
-    const result = this.db.prepare(
-      `DELETE FROM sessions
-        WHERE expiresAt < ?
-           OR (absoluteExpiresAt IS NOT NULL AND absoluteExpiresAt < ?)`
-    ).run(nowIso, nowIso);
-    return result.changes;
   },
 
   // ══════════════════════════════════════════════════════════

@@ -6,16 +6,15 @@
  *   stored under a "config:" prefix in the backend), implemented per backend (SQLite / Prisma).
  *
  * @structure
- *   - ConfigRepository: supportsConfigPersistence + get/set/delete a single value + getAll values
+ *   - ConfigRepository: supportsConfigPersistence + set/delete a single value + getAll values
  *
  * @version-history
+ *   v1.1.0 — 2026-09-09 — getConfigValue deleted: no caller (readers take getAllConfigValues).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 export interface ConfigRepository {
   /** Returns true if this storage supports config persistence (false for in-memory) */
   supportsConfigPersistence(): boolean;
-  /** Get a single config value by dot-path key */
-  getConfigValue(key: string): Promise<string | null>;
   /** Set (upsert) a config value by dot-path key */
   setConfigValue(key: string, value: string): Promise<void>;
   /** Delete a config value by dot-path key */

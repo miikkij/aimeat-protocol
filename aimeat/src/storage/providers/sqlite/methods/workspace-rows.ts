@@ -7,6 +7,7 @@
  * @structure workspaceRowMethods
  * @usage Object.assign(SqliteStorage.prototype, workspaceRowMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-09-09 — deleteWorkspaceRowSpace deleted: no caller outside its unit test.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import type { SqliteStorage } from '../index.js';
@@ -54,10 +55,5 @@ export const workspaceRowMethods = {
   },
   async workspaceRowUsage(this: SqliteStorage, scope: WorkspaceRowScope): Promise<WorkspaceRowUsage> {
     return repo.workspaceRowUsage(this.db, scope);
-  },
-  async deleteWorkspaceRowSpace(
-    this: SqliteStorage, organismId: string, wsId: string, namespace?: string,
-  ): Promise<number> {
-    return repo.deleteWorkspaceRowSpace(this.db, organismId, wsId, namespace);
   },
 };

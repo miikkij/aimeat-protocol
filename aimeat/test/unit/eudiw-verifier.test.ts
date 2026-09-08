@@ -35,12 +35,6 @@ function makeConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
 
 function makeMockStorage(trustedIssuers: Map<string, TrustedIssuerRecord> = new Map()) {
     return {
-        getTrustedIssuerByUrl: vi.fn(async (url: string) => {
-            for (const issuer of trustedIssuers.values()) {
-                if (issuer.url === url) return issuer;
-            }
-            return null;
-        }),
         listTrustedIssuers: vi.fn(async (_opts?: { type?: string }) => {
             return [...trustedIssuers.values()];
         }),

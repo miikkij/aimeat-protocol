@@ -9,6 +9,7 @@
  *   threaded discussions. Translated 1:1 from the Prisma (Mongo/PG) implementation — all columns are
  *   scalar or text[] (no JSONB), so mapping is direct; rating recompute aggregates avg + count in-DB.
  * @version-history
+ *   v1.1.0 — 2026-09-09 — deleteReview and deleteDiscussion deleted: no caller.
  *   v1.0.0 — 2026-07-15 — Phase 5: template-listing layer on Postgres+Kysely.
  */
 import { sql } from 'kysely';
@@ -219,16 +220,6 @@ export const templateListingMethods = {
     } catch (err) { throw dbError('updateReview', err); }
   },
 
-  async deleteReview(this: PostgresKyselyStorage, id: string): Promise<boolean> {
-    try {
-      const row = await this.db.selectFrom('TemplateReview').select('listingId').where('id', '=', id).executeTakeFirst();
-      if (!row) return false;
-      await this.db.deleteFrom('TemplateReview').where('id', '=', id).execute();
-      await templateListingMethods.recalculateRating.call(this, row.listingId);
-      return true;
-    } catch (err) { throw dbError('deleteReview', err); }
-  },
-
   async recalculateRating(this: PostgresKyselyStorage, listingId: string): Promise<{ rating: number; reviewCount: number }> {
     const agg = await this.db.selectFrom('TemplateReview').where('listingId', '=', listingId)
       .select([this.db.fn.avg<number>('rating').as('avg'), this.db.fn.count<number>('rating').as('cnt')])
@@ -260,12 +251,5 @@ export const templateListingMethods = {
     const rows = await base.selectAll().orderBy('createdAt', 'asc').limit(limit ?? 50).offset(offset ?? 0).execute();
     const totalRow = await base.select(this.db.fn.countAll<number>().as('n')).executeTakeFirst();
     return { discussions: rows.map(toTemplateDiscussion), total: Number(totalRow?.n ?? 0) };
-  },
-
-  async deleteDiscussion(this: PostgresKyselyStorage, id: string): Promise<boolean> {
-    try {
-      const r = await this.db.deleteFrom('TemplateDiscussion').where('id', '=', id).executeTakeFirst();
-      return Number(r.numDeletedRows ?? 0) > 0;
-    } catch (err) { throw dbError('deleteDiscussion', err); }
   },
 };

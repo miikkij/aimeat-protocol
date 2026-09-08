@@ -51671,54 +51671,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
-  /v1/admin/marketplace:
-    get:
-      operationId: getAdminMarketplace
-      tags: [Admin]
-      summary: Marketplace configuration and listing stats
-      description: Operator-only (requireRole('operator')). Returns marketplace settings plus aggregate listing statistics and the 20 most recent listings.
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: Marketplace overview
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          enabled: { type: boolean }
-                          listing_fee: { type: number }
-                          tx_fee_percent: { type: number }
-                          escrow_enabled: { type: boolean }
-                          stats:
-                            type: object
-                            properties:
-                              total: { type: integer }
-                              by_status:
-                                type: object
-                                additionalProperties: { type: integer }
-                              recent_listings:
-                                type: array
-                                items:
-                                  type: object
-                                  properties:
-                                    id: { type: string }
-                                    title: { type: string }
-                                    category: { type: string }
-                                    price_morsels: { type: number }
-                                    status: { type: string }
-                                    seller_ghii: { type: string }
-                                    created_at: { type: string }
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
   # ── GHII Identity ──────────────────────────
   /v1/ghii:
     post:

@@ -13,6 +13,10 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   v1.4.0 — 2026-09-09 — The `listings`, `purchases` and per-agent `escrow_holds` sections are gone
+ *     with the storage methods behind them: nothing on any node ever wrote a marketplace listing, a
+ *     purchase or a generic escrow hold, so the sections could only ever be empty (e2e-owner-export
+ *     test 14 had pinned that). The tables stay; the export no longer names them.
  *   v1.3.0 — 2026-09-08 — Three sections that existed for values nothing produced: organism
  *     memberships and flags filed are keyed by the bare owner name where they are written and were
  *     read by GHII only, and the consent audit trail skipped the pending buffer, so the last
@@ -172,9 +176,6 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
       // Board subscriptions
       const boardSubscriptions = await storage.listSubscriptionsByAgent(agent.gaii);
 
-      // Escrow holds
-      const escrowHolds = await storage.listEscrowHolds(agent.gaii);
-
       // agent.owner === name for every agent here (all from getAgentsByOwner(name)), so the owner
       // GHII is the already-loaded ghiiRecord — no per-agent getGHIIByOwner re-fetch. The morsel
       // balance lives on the owner GHII (agent balances are always 0 in the morsel economy).
@@ -253,16 +254,6 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
           callback_url: s.callbackUrl,
           filters: s.filters,
           created_at: s.createdAt,
-        })),
-        escrow_holds: escrowHolds.map(e => ({
-          hold_id: e.holdId,
-          amount: e.amount,
-          reason: e.reason,
-          status: e.status,
-          extension_name: e.extensionName,
-          created_at: e.createdAt,
-          released_at: e.releasedAt,
-          released_to: e.releasedTo,
         })),
       });
     }
@@ -344,55 +335,6 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
       created_at: pushSub.createdAt,
       last_used_at: pushSub.lastUsedAt,
     } : null;
-
-    // ── Marketplace: listings and purchases ──────────────────────────
-    const listings = await storage.listListings({ sellerOwner: name });
-    const listingsExport = listings.map(l => ({
-      id: l.id,
-      title: l.title,
-      description: l.description,
-      category: l.category,
-      price_morsels: l.priceMorsels,
-      condition: l.condition,
-      availability: l.availability,
-      location: l.location,
-      tags: l.tags,
-      status: l.status,
-      flag_count: l.flagCount,
-      created_at: l.createdAt,
-      updated_at: l.updatedAt,
-    }));
-
-    const purchasesAsBuyer = await storage.listPurchasesByBuyer(name);
-    const purchasesAsSeller = await storage.listPurchasesBySeller(name);
-    const purchasesExport = {
-      as_buyer: purchasesAsBuyer.map(p => ({
-        id: p.id,
-        listing_id: p.listingId,
-        seller_owner: p.sellerOwner,
-        price_morsels: p.priceMorsels,
-        transaction_fee_morsels: p.transactionFeeMorsels,
-        total_cost_morsels: p.totalCostMorsels,
-        status: p.status,
-        rating: p.rating,
-        tracking_code: p.trackingCode,
-        created_at: p.createdAt,
-        completed_at: p.completedAt,
-      })),
-      as_seller: purchasesAsSeller.map(p => ({
-        id: p.id,
-        listing_id: p.listingId,
-        buyer_owner: p.buyerOwner,
-        price_morsels: p.priceMorsels,
-        transaction_fee_morsels: p.transactionFeeMorsels,
-        total_cost_morsels: p.totalCostMorsels,
-        status: p.status,
-        rating: p.rating,
-        tracking_code: p.trackingCode,
-        created_at: p.createdAt,
-        completed_at: p.completedAt,
-      })),
-    };
 
     // ── The owner's OWN memory and files (via GHII) ─────────────────
     // An owner session resolves to the GHII, so everything a person writes themselves — and
@@ -495,8 +437,6 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
       personal_node: personalNodeData,
       personal_push_subscriptions: personalPushSubscriptions,
       push_subscription: pushSubscription,
-      listings: listingsExport,
-      purchases: purchasesExport,
       organism_memberships: organismMemberships,
       chat_instances: chatInstancesExport,
       ghii_flags_filed: ghiiFlags,
