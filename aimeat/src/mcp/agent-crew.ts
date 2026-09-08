@@ -24,10 +24,11 @@ import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import {
     crewState, crewValidate, crewTryStart, crewTryWait, crewDraftSave, crewDraftDiscard, crewPublish, crewRestore, crewSeed, crewData,
-    type CrewCaller, type CrewRefusal,
+    resolveCrewAgent, type CrewCaller, type CrewRefusal,
 } from '../services/crew-ops.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { crewMenu, writeLlmChoice } from '../services/crew-menu.js';
 
 const DocSchema = z.record(z.string(), z.unknown());
 const agentNameSchema = z.string().describe('The agent whose definition this is (bare name of one of your owner\'s agents, or its full GAII). An agent may name itself or a same-owner sibling.');
@@ -183,6 +184,49 @@ export function registerAgentCrewTools(
             const out = await crewSeed(deps, callerOf('mcp.crew_seed'), target_agent_name, doc, validate_with);
             if (!out.ok) return refused(out);
             return ok({ seeded: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, validated_by: out.validatedBy });
+        },
+    );
+
+    // What the RUNTIME offers, asked rather than guessed. The fixed tool list in this node's own
+    // publish description drifted two names behind crewaimeat's TOOL_REGISTRY; this is the runtime
+    // answering for itself, and it carries the model profiles that machine can reach as well.
+    mcp.tool(
+        'aimeat_crew_menu',
+        descriptionFor('aimeat_crew_menu'),
+        { target_agent_name: agentNameSchema },
+        annotationsFor('aimeat_crew_menu'),
+        async ({ target_agent_name }) => {
+            const out = await crewMenu(deps, callerOf('mcp.crew_menu'), target_agent_name);
+            if (!out.ok) return refused(out);
+            return ok(out.menu);
+        },
+    );
+
+    // Which model an agent thinks with. Same service the web door calls, so a choice made in chat
+    // and a choice made on the page cannot mean two different things.
+    mcp.tool(
+        'aimeat_crew_llm_set',
+        descriptionFor('aimeat_crew_llm_set'),
+        {
+            target_agent_name: agentNameSchema.optional()
+                .describe("The agent to set it for. Omit to set the owner's DEFAULT for every agent they have."),
+            choice: z.record(z.string(), z.unknown()).nullish()
+                .describe("{kind:'profile', profile} or {kind:'model', label, provider}. Omit or null to clear."),
+        },
+        annotationsFor('aimeat_crew_llm_set'),
+        async ({ target_agent_name, choice }) => {
+            const caller = callerOf('mcp.crew_llm_set');
+            let name: string | null = null;
+            if (target_agent_name) {
+                // Resolved before writing, so a typo becomes a refusal rather than a record under a
+                // key no runtime will ever read.
+                const target = await resolveCrewAgent(deps, caller, target_agent_name);
+                if (!target.ok) return refused(target);
+                name = target.agent.name;
+            }
+            const out = await writeLlmChoice(deps, caller, name, choice ?? null);
+            if (!out.ok) return refused(out);
+            return ok({ key: out.key, cleared: out.cleared, scope: name ? 'agent' : 'default' });
         },
     );
 }

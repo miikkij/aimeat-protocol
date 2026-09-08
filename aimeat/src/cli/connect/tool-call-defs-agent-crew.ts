@@ -112,4 +112,29 @@ export const agentCrewCliTools: ConnectCliToolDefinition[] = [
             { doc: requiredRecord(input, 'doc'), validate_with: optionalString(input, 'validate_with') },
         ),
     },
+    {
+        name: 'aimeat_crew_menu',
+        description: "What an agent's RUNTIME offers: the tool names it resolves, the model profiles its machine can reach, and which model is chosen for it now. Read this before writing a definition's tools list.",
+        input: {
+            target_agent_name: { type: 'string', required: true, description: 'The agent whose runtime to ask.' },
+        },
+        handler: ({ client }, input) => client.get(
+            `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/crew/menu`,
+        ),
+    },
+    {
+        name: 'aimeat_crew_llm_set',
+        description: "Choose which model an agent thinks with, or clear it. Omit target_agent_name to set the owner's default for every agent. A provider may NAME the environment variable holding the key and is refused if it carries one.",
+        input: {
+            target_agent_name: { type: 'string', description: "The agent to set it for. Omit for the owner's default." },
+            choice: { type: 'object', description: "{kind:'profile', profile} or {kind:'model', label, provider}. Omit to clear." },
+        },
+        handler: ({ client }, input) => {
+            const body = { choice: optionalRecord(input, 'choice') ?? null };
+            const target = optionalString(input, 'target_agent_name');
+            return target
+                ? client.put(`/v1/agents/${encodeURIComponent(target)}/crew/llm`, body)
+                : client.put('/v1/agents/llm-default', body);
+        },
+    },
 ];

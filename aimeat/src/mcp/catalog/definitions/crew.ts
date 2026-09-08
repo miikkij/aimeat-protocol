@@ -2,11 +2,15 @@
  * @file crew.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The five crew-definition tools: read, validate, try, draft, publish a JSON crew
+ * @description The crew-definition tools: read, validate, try, draft, publish and seed a JSON crew
+ *   definition, plus what the runtime offers (menu) and which model it thinks with (llm_set).
  *   definition on one of the caller's agents. One slice of CLI_FALLBACK_TOOL_DEFINITIONS;
  *   re-assembled in order by definitions.ts. The descriptions are the canonical text every surface
  *   shows (descriptionFor()).
  * @version-history
+ *   v1.2.0 — 2026-09-09 — aimeat_crew_menu and aimeat_crew_llm_set: the runtime answers for its
+ *     own tool list, and the owner's model choice is a record rather than a file on one machine.
+ *   v1.1.0 — 2026-09-09 — app_tools joins the menu text, which had named crew_registry but not it.
  *   v1.0.0 — 2026-08-28 — Initial (the chat path to building an agent).
  */
 
@@ -14,7 +18,7 @@ import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 
 const AGENT_NAME = { type: 'string' as const, required: true, description: "The agent whose definition this is: the bare name of one of your owner's agents, or its full GAII. An agent may name itself or a same-owner sibling." };
-const DOC = { type: 'object' as const, description: 'The crew definition (crewaimeat crew_def shape): agent_name, agents[] {name, role, goal, backstory, tools[], allow_delegation}, tasks[] {id, description, expected_output, agent, context[], async}, and optionally llm_profile, temperature, process, listen_for, tags, capabilities {technical: [{name, type}], domain, languages}, skills, offers, signals, readme_md. At least one task description must contain {{ctx.prompt}}; task context may only name EARLIER task ids. Tools come from the runtime\'s own menu — memory, web, article_fetch, schedule, dm, delegate, image, app_build, local_memory, exchange (and exchange_* verbs), crew_registry — which the runtime owns and adds to, so this list can be behind it; the runtime refuses a tool that does not exist. A definition that needs a tool of its own is a Python crew, not a definition. `listen_for` says which wake starts the crew (tasks, messages, records, dms) and defaults to ["tasks"], which is wrong for any agent whose work arrives as a message.' };
+const DOC = { type: 'object' as const, description: 'The crew definition (crewaimeat crew_def shape): agent_name, agents[] {name, role, goal, backstory, tools[], allow_delegation}, tasks[] {id, description, expected_output, agent, context[], async}, and optionally llm_profile, temperature, process, listen_for, tags, capabilities {technical: [{name, type}], domain, languages}, skills, offers, signals, readme_md. At least one task description must contain {{ctx.prompt}}; task context may only name EARLIER task ids. Tools come from the runtime\'s own menu — memory, web, article_fetch, schedule, dm, delegate, image, app_build, local_memory, app_tools, crew_registry, exchange (and exchange_* verbs) — which the runtime owns and adds to, so this list can be behind it; the runtime refuses a tool that does not exist. A definition that needs a tool of its own is a Python crew, not a definition. `listen_for` says which wake starts the crew (tasks, messages, records, dms) and defaults to ["tasks"], which is wrong for any agent whose work arrives as a message.' };
 
 export const crewTools: AimeatToolDefinition[] = [
     {
@@ -60,6 +64,23 @@ export const crewTools: AimeatToolDefinition[] = [
             target_agent_name: AGENT_NAME,
             doc: { ...DOC, description: `${DOC.description} The definition to make live.` },
             revision: { type: 'number', description: 'Instead of doc: the kept revision to republish (it becomes a new revision).' },
+        },
+    },
+    {
+        name: 'aimeat_crew_menu',
+        description: "What an agent's RUNTIME actually offers, asked rather than guessed: the tool names its interpreter resolves, the model profiles the machine it runs on can reach, the models behind them, and which model is chosen for this agent right now. Read this before writing a definition's `tools` — the fixed list in aimeat_crew_publish's own description is this node's copy and has been two tools behind the runtime. `source` says who answered: 'runtime' (the agent, over the tunnel), 'catalog' (it is offline, this is what it published at its last start), 'none' (nobody has ever said). `choice.scope` is 'agent' when this agent has its own and 'default' when it is the owner's, and null means neither, so the machine's own configuration decides.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: { target_agent_name: AGENT_NAME },
+    },
+    {
+        name: 'aimeat_crew_llm_set',
+        description: "Choose which model an agent thinks with, or clear the choice. Pass `target_agent_name` for one agent, or omit it to set the owner's DEFAULT for every agent they have. `choice` is {kind:'profile', profile:'<name>'} naming a profile from aimeat_crew_menu, or {kind:'model', label, provider} pinning one model; pass null to clear and fall back. Precedence, strongest first: a pin made on the machine itself, this agent's own choice, the machine's `crews` map, the crew definition's own `llm_profile`, the owner's default, the machine's default. A `provider` may NAME the environment variable holding the key (api_key_env) and is refused if it carries a key: the credential stays on the machine that runs the agent. Needs memory:write; the choice is a record in the owner's own namespace (crews.llm.<agent>), so their own tools can read it.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            target_agent_name: { ...AGENT_NAME, required: false, description: `${AGENT_NAME.description} Omit it to set the owner's default for every agent.` },
+            choice: { type: 'object', description: "The choice: {kind:'profile', profile} or {kind:'model', label, provider}. Omit or pass null to clear it." },
         },
     },
     {
