@@ -79,6 +79,24 @@ function runtimeReply(f: any): { ok: boolean; result: unknown } {
   if (f.capability === 'crew.try') {
     return { ok: true, result: { output: `ran once with: ${f.input?.prompt}`, duration_ms: 12 } };
   }
+  if (f.capability === 'crew.menu') {
+    // Two tools this node's served list does NOT carry, which is the whole point: the runtime is the
+    // one that knows, and the node had been answering from a copy that drifted two names behind.
+    return {
+      ok: true,
+      result: {
+        spec: 'aimeat.crew-menu/1',
+        tools: [
+          { id: 'web', purpose: 'search the live web' },
+          { id: 'taikasauva', purpose: 'a tool only this runtime has' },
+        ],
+        llm: {
+          profiles: ['content', 'coding'],
+          models: [{ label: 'openrouter:m/one', type: 'openrouter', id: 'm/one', api_key_env: 'OPENROUTER_API_KEY' }],
+        },
+      },
+    };
+  }
   return { ok: false, result: { code: 'UNSUPPORTED', message: `no ${f.capability}` } };
 }
 
@@ -324,6 +342,64 @@ await test('21. Thirteen publishes keep the last ten revisions', async () => {
   assert(revs[0] === 13 && revs[9] === 4, `window 4..13, got ${revs.join(',')}`);
   const pruned = await json(`/v1/memory/${encodeURIComponent(agentGaii)}/crews.registry.${agentName}.version.1`, { headers: auth(ownerToken) });
   assert(pruned.status === 404, 'revision 1 pruned');
+});
+
+console.log("Phase 5: the runtime's own menu, and which model it thinks with");
+
+await test("22. The menu comes from the RUNTIME, not from this node's copy of it", async () => {
+  const r = await json(crew('/menu'), { headers: auth(ownerToken) });
+  assert(r.status === 200, `menu ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.body.data.source === 'runtime', `expected the agent to answer, got ${r.body.data.source}`);
+  const ids = (r.body.data.tools as any[]).map(x => x.id);
+  // The node's own served list has no `taikasauva`. If this came from the copy, it could not be here.
+  assert(ids.includes('taikasauva'), `the runtime's own names should come through: ${ids.join(',')}`);
+  assert(r.body.data.profiles.includes('coding'), "the machine's profiles come with it");
+  assert(r.body.data.choice === null, 'nothing is chosen yet');
+});
+
+await test("23. A choice is stored, read back, and is the agent's own", async () => {
+  const w = await json(crew('/llm'), { method: 'PUT', headers: auth(ownerToken), body: JSON.stringify({ choice: { kind: 'profile', profile: 'coding' } }) });
+  assert(w.status === 200 && w.body.data.key === `crews.llm.${agentName}`, `set ${w.status}: ${JSON.stringify(w.body)}`);
+
+  const r = await json(crew('/menu'), { headers: auth(ownerToken) });
+  assert(r.body.data.choice?.scope === 'agent', `scope ${r.body.data.choice?.scope}`);
+  assert(r.body.data.choice?.value?.profile === 'coding', `profile ${JSON.stringify(r.body.data.choice)}`);
+
+  // In the OWNER's namespace, which is the one the runtime reads with an owner-scope lookup. A copy
+  // under the agent would be written happily and read by nobody.
+  const mem = await json(`/v1/memory/crews.llm.${agentName}`, { headers: auth(ownerToken) });
+  assert(mem.status === 200, `the owner should hold the record, got ${mem.status}`);
+});
+
+await test("24. The owner's default is inherited, and the agent's own overrides it", async () => {
+  const d = await json('/v1/agents/llm-default', { method: 'PUT', headers: auth(ownerToken), body: JSON.stringify({ choice: { kind: 'profile', profile: 'content' } }) });
+  assert(d.status === 200, `default ${d.status}: ${JSON.stringify(d.body?.error)}`);
+
+  let r = await json(crew('/menu'), { headers: auth(ownerToken) });
+  assert(r.body.data.choice?.scope === 'agent', 'its own still wins while it has one');
+
+  const c = await json(crew('/llm'), { method: 'PUT', headers: auth(ownerToken), body: JSON.stringify({ choice: null }) });
+  assert(c.status === 200 && c.body.data.cleared === true, `clear ${c.status}`);
+
+  r = await json(crew('/menu'), { headers: auth(ownerToken) });
+  assert(r.body.data.choice?.scope === 'default' && r.body.data.choice?.value?.profile === 'content',
+    `after clearing it should inherit, got ${JSON.stringify(r.body.data.choice)}`);
+});
+
+await test('25. A provider carrying a credential is refused', async () => {
+  // The record is written from a browser and read by a process that would use whatever it finds.
+  const r = await json(crew('/llm'), {
+    method: 'PUT', headers: auth(ownerToken),
+    body: JSON.stringify({ choice: { kind: 'model', label: 'x', provider: { type: 'openrouter', api_key: 'sk-a-real-looking-secret' } } }),
+  });
+  assert(r.status === 400 && r.body?.error?.code === 'SECRET_IN_CHOICE', `got ${r.status} ${r.body?.error?.code}`);
+});
+
+await test('26. Another owner can neither read the menu nor set the choice', async () => {
+  const m = await json(crew('/menu'), { headers: auth(otherToken) });
+  assert(m.status === 404 || m.status === 403, `menu as another owner: ${m.status}`);
+  const w = await json(crew('/llm'), { method: 'PUT', headers: auth(otherToken), body: JSON.stringify({ choice: { kind: 'profile', profile: 'coding' } }) });
+  assert(w.status === 404 || w.status === 403, `set as another owner: ${w.status}`);
 });
 
 await test('Teardown — close tunnel', async () => { await tunnel?.close(); });

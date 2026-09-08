@@ -46,8 +46,9 @@ import { validateBody } from '../models/schemas.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
   crewState, crewValidate, crewTryStart, crewTryPoll, crewDraftSave, crewDraftDiscard, crewPublish, crewRestore, crewSeed, crewData,
-  type CrewCaller, type CrewRefusal,
+  resolveCrewAgent, type CrewCaller, type CrewRefusal,
 } from '../services/crew-ops.js';
+import { crewMenu, writeLlmChoice } from '../services/crew-menu.js';
 
 /** A crew definition as the request carries it. Shape only; the rules are the runtime's. */
 const DocSchema = z.record(z.string(), z.unknown());
@@ -57,6 +58,9 @@ const TryBody = z.object({ doc: DocSchema, prompt: z.string().min(1).max(20_000)
 const PublishBody = z.object({ doc: DocSchema });
 const SeedBody = z.object({ doc: DocSchema, validate_with: z.string().min(1).max(200).optional() });
 const RestoreBody = z.object({ revision: z.number().int().positive() });
+// A model choice, or null to clear it. The SHAPES are checked in the service, which is also what
+// the MCP door calls, so a browser and a chat cannot disagree about what a choice is.
+const LlmBody = z.object({ choice: z.record(z.string(), z.unknown()).nullable().optional() });
 
 export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -139,6 +143,34 @@ export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router 
     const out = await crewRestore(deps, callerOf(req, 'rest.agent-crew.restore'), name(req), req.body.revision);
     if (!out.ok) return refuse(res, out);
     res.json(success(config.nodeId, { published: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key }));
+  });
+
+  // GET /v1/agents/:name/crew/menu — what this agent's RUNTIME offers (tool names, model profiles
+  // and models) plus the model choice in force for it. Asked rather than copied: the served list
+  // this node carries drifted two tools behind crewaimeat's TOOL_REGISTRY, and a list you do not own
+  // can only ever be behind. Falls back to the catalogue the runtime published at its last start.
+  router.get('/v1/agents/:name/crew/menu', requireAuth(), requireScope('memory:read'), async (req, res) => {
+    const out = await crewMenu(deps, callerOf(req, 'rest.agent-crew.menu'), name(req));
+    if (!out.ok) return refuse(res, out);
+    res.json(success(config.nodeId, out.menu));
+  });
+
+  // PUT /v1/agents/:name/crew/llm — which model this ONE agent thinks with. Body: the choice, or
+  // `{ choice: null }` to clear it and fall back to the owner's default.
+  router.put('/v1/agents/:name/crew/llm', requireAuth(), requireScope('memory:write'), validateBody(LlmBody, config.nodeId), async (req, res) => {
+    const target = await resolveCrewAgent(deps, callerOf(req, 'rest.agent-crew.llm'), name(req));
+    if (!target.ok) return refuse(res, target);
+    const out = await writeLlmChoice(deps, callerOf(req, 'rest.agent-crew.llm'), target.agent.name, req.body.choice ?? null);
+    if (!out.ok) return refuse(res, out);
+    res.json(success(config.nodeId, { key: out.key, cleared: out.cleared }));
+  });
+
+  // PUT /v1/agents/llm-default — the same choice, for every agent this owner has. A literal path, so
+  // it is registered here rather than under `:name`, which would read "llm-default" as an agent.
+  router.put('/v1/agents/llm-default', requireAuth(), requireScope('memory:write'), validateBody(LlmBody, config.nodeId), async (req, res) => {
+    const out = await writeLlmChoice(deps, callerOf(req, 'rest.agent-crew.llm-default'), null, req.body.choice ?? null);
+    if (!out.ok) return refuse(res, out);
+    res.json(success(config.nodeId, { key: out.key, cleared: out.cleared }));
   });
 
   return router;
