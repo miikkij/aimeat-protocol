@@ -21,6 +21,8 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   v1.10.0 -- 2026-09-08 -- A send naming a file that is in nobody's storage is 400
+ *     ATTACHMENT_NOT_FOUND, not 201 with an attachment the recipient can never open.
  *   v1.9.0 -- 2026-09-06 -- A 404 here names the part of the address that was wrong (the account is
  *     real, the agent under it is not), and a 201 says when the message is waiting in the
  *     recipient's contact requests rather than their inbox. Both come from the service.
@@ -227,6 +229,13 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       if (result.code === 'RECIPIENT_NOT_FOUND') {
         res.status(404).json(error(config.nodeId, 'RECIPIENT_NOT_FOUND',
           result.reason ?? `No such recipient: ${recipientGhii}`));
+        return;
+      }
+      // The named file is not in the sender's storage, so there would be nothing for the recipient to
+      // open. Refused whole rather than sent with a name that leads nowhere.
+      if (result.code === 'ATTACHMENT_NOT_FOUND') {
+        res.status(400).json(error(config.nodeId, 'ATTACHMENT_NOT_FOUND',
+          result.reason ?? 'One of the attached files is not in your storage.'));
         return;
       }
       res.status(403).json(error(config.nodeId, 'BLOCKED', 'This person is not taking messages from you. Ask them to add you as a contact.'));

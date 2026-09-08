@@ -8,6 +8,12 @@
  *   chat.commands), SchedulePanel (own-agent scheduler), and ReplyWithAiPopover (TARGET-031). Each is
  *   self-contained (owns its own hooks). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-09-08 — A bubble says when a model wrote it, not only which model. The node has
+ *     served `ai` on every message since August, and the inbox read only `ai.model` — so an agent's
+ *     message that named no model looked exactly like one a person typed, on the surface Article 50
+ *     cares most about. A message with no record still shows nothing, because absence is unstated.
+ *     AttachmentItem's unavailable chip says what happened and whose move is next instead of naming
+ *     the machine's state ("attachment pending").
  *   v1.13.0 — 2026-08-29 — MessageBubble names its writer (`who`) above the body, so a bubble reads
  *     without the avatar and the sun of one's own bubbles carries no ambiguity.
  *   v1.12.0 — 2026-08-18 — The composer opens as the thin auto-growing line on every screen, the way a
@@ -91,8 +97,12 @@ export function AttachmentItem({ a, url, onOpenMarkdown, msgId, onTranscribe, ca
   const ready = !!url && !a.expired;
 
   if (!ready) {
+    // What the reader needs is not the machine's word for the state ("pending") but what happened to
+    // them and whose move it is next. The chip carries the short form and the title the whole
+    // sentence, because a chip is four words wide and the answer is longer than that.
     const status = a.expired ? t('inbox.attachmentExpired') : (a.mode !== 'duplicate' ? t('inbox.attachmentPending') : null);
-    return html`<div class="inbox-attach-chip inbox-attach-chip--pending">
+    const help = a.expired ? t('inbox.attachmentExpiredHelp') : (a.mode !== 'duplicate' ? t('inbox.attachmentPendingHelp') : null);
+    return html`<div class="inbox-attach-chip inbox-attach-chip--pending" title=${help || undefined}>
       <span class="inbox-attach-ico">${ATTACH_ICO[kind]}</span>
       <span class="inbox-attach-name">${escHtml(name)}</span>
       ${status ? html`<span class="inbox-attach-pending">${status}</span>` : null}
@@ -269,6 +279,14 @@ export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack
           </div>`}
         <div class="inbox-bubble-meta">
           ${trk ? html`<span class=${`inbox-track-badge inbox-track-badge--${trk.tone}`} title=${t('inbox.trackResponse')}>🔗 ${trk.text}</span>` : null}
+          <!-- That a model wrote this at all, which is a different fact from WHICH model and arrives
+               far more often: an agent's message is stamped whether or not it names one, and until
+               now a stamped message with no model name looked exactly like a message a person typed.
+               Absence stays silent on purpose — no record means nothing was claimed, and "a human
+               wrote this" is not something the node is in a position to say. -->
+          ${msg.ai ? html`<span class="inbox-ai-badge" title=${t('inbox.aiRecorded')}>${
+            msg.ai.level === 'ai-generated' ? t('inbox.aiWrote') : t('inbox.aiAssisted')
+          }</span>` : null}
           <!-- Which model wrote this, when an AI wrote it and named one. The name is the agent's own
                claim (the node cannot verify it), so the tooltip says so rather than the badge
                implying a measurement. -->

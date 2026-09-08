@@ -11,6 +11,13 @@
  * @structure sendDirectMessage(ctx, input) → { ok, message } | { ok:false, code }
  * @usage import { sendDirectMessage } from '../services/message-send.js';
  * @version-history
+ *   v1.6.0 — 2026-09-08 — An attachment names the identity that HOLDS the file, and a send whose
+ *     bytes are nowhere is refused instead of reported delivered. `aimeat_dm_send_as_owner` stamped
+ *     the owner on a file its AGENT had uploaded, so the recipient's copy step looked under the
+ *     wrong identity, found nothing, and left the attachment as `reference` for the seven days it
+ *     takes to expire — reading "attachment pending" in the inbox the whole time while the sender
+ *     had been told `delivered`. Measured in a browser on 2026-09-08. The holder is resolved here,
+ *     in the one service every send door calls, so no door can miss it.
  *   v1.5.0 — 2026-09-06 — A local recipient must EXIST, and be the one that was addressed. The check
  *     asked whether the owner existed; an agent's and an app's mail is delivered to their owner's
  *     inbox, so every name under a real owner passed. A DM to an agent nobody had ever registered was
@@ -35,7 +42,7 @@
  *     the tick. Dynamic import avoids the responder↔message-send cycle; the responder no-ops for non-system.
  */
 import { randomUUID } from 'node:crypto';
-import type { DirectMessageRecord, DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
+import type { Storage, DirectMessageRecord, DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
 import type { MessageAttachmentInput } from '../models/message-schemas.js';
 import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { conversationIdFor, messagePreview, messagePreviewWithAttachments, deliveryTargetFor } from '../utils/messaging.js';
@@ -81,6 +88,53 @@ export interface SendMessageInput {
    * record itself across the boundary is a federation-payload change this phase does not make.
    */
   aiProvenanceId?: string;
+  /**
+   * The agent acting on the sender's behalf, when the two differ — `aimeat_dm_send_as_owner` sends AS
+   * the owner while an AGENT did the work, including uploading the files. A file lives under the
+   * identity that stored it, so the owner's name on the descriptor pointed at storage that never
+   * held it. Naming the acting agent here lets the send find the bytes and record their real holder.
+   */
+  actingGaii?: string;
+}
+
+/**
+ * Point every attachment at the identity that actually HOLDS the file, and say which files nothing
+ * holds. A descriptor carries an owner and a key, and the pair is what the recipient's copy step
+ * reads; get the owner wrong and the copy silently never happens, which is a failure the sender is
+ * never told about and the recipient can do nothing about.
+ *
+ * Only this node's own files are checked, and only before duplication: a `duplicate` attachment has
+ * been copied already, and one from another node is the peer's to answer for.
+ */
+async function resolveAttachmentHolders(
+  storage: Storage,
+  attachments: DirectMessageAttachment[] | undefined,
+  senderGhii: string,
+  actingGaii: string | undefined,
+  nodeId: string,
+): Promise<{ attachments?: DirectMessageAttachment[]; missing: string[] }> {
+  if (!attachments?.length) return { attachments, missing: [] };
+
+  // The sender first: on every door but the delegated one, that is where the file is. The acting
+  // agent is the only other identity a send may read from, and it is server-derived rather than
+  // client-supplied, so this cannot be pointed at a third party's storage.
+  const holders = actingGaii && actingGaii !== senderGhii ? [senderGhii, actingGaii] : [senderGhii];
+  const resolved: DirectMessageAttachment[] = [];
+  const missing: string[] = [];
+
+  for (const att of attachments) {
+    if (att.mode === 'duplicate' || att.originNodeId !== nodeId) { resolved.push(att); continue; }
+    let holder: string | undefined;
+    for (const who of holders) {
+      // Metadata only: the bytes are not needed to answer "does this exist", and a 30 MB video read
+      // into memory once per recipient of a broadcast is a different kind of defect.
+      if (await storage.getStorageFileMeta(who, att.storageKey)) { holder = who; break; }
+    }
+    if (!holder) { missing.push(att.name || att.storageKey); continue; }
+    resolved.push(holder === att.ownerGhii ? att : { ...att, ownerGhii: holder });
+  }
+
+  return { attachments: resolved, missing };
 }
 
 /**
@@ -132,7 +186,7 @@ export type SendMessageResult =
   }
   | {
     ok: false;
-    code: 'RECIPIENT_NOT_FOUND' | 'BLOCKED';
+    code: 'RECIPIENT_NOT_FOUND' | 'BLOCKED' | 'ATTACHMENT_NOT_FOUND';
     /** What was wrong with the address, in the words of whoever wrote it. Callers show this instead
      *  of their own generic line when it is present. */
     reason?: string;
@@ -146,13 +200,25 @@ export type SendMessageResult =
  */
 export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInput): Promise<SendMessageResult> {
   const { config, storage } = ctx;
-  const { senderGhii, recipientGhii, body, replyToId, attachments, subject, interactive, broadcastId, respondable, kind, aiProvenanceId } = input;
+  const { senderGhii, recipientGhii, body, replyToId, subject, interactive, broadcastId, respondable, kind, aiProvenanceId } = input;
 
   // recipientGhii is what the thread is WITH (may be an agent/eco GAII). deliveryGhii is where the
   // message physically lands (the owner's human GHII for an agent/eco recipient; itself for a human).
   const deliveryGhii = deliveryTargetFor(recipientGhii);
   const recipientNode = parseGaiiLoose(deliveryGhii).node;
   const isLocal = recipientNode === config.nodeId;
+
+  // Refuse before you write, and before you promise. A message whose file cannot be found is worse
+  // than a refused one: the text goes out, the recipient sees a name they cannot open, and the
+  // sender is told it was delivered.
+  const held = await resolveAttachmentHolders(storage, input.attachments, senderGhii, input.actingGaii, config.nodeId);
+  if (held.missing.length) {
+    return {
+      ok: false, code: 'ATTACHMENT_NOT_FOUND',
+      reason: `Not in your storage, so nothing could be sent: ${held.missing.join(', ')}. Upload the file first, then attach it by its storage key.`,
+    };
+  }
+  const attachments = held.attachments;
 
   const id = randomUUID();
   const now = new Date().toISOString();

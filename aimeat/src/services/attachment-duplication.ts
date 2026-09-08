@@ -12,6 +12,13 @@
  *   - requestStorageGrant(ctx, message, attachment) — recipient→origin signed grant + download
  * @usage import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
  * @version-history
+ *   v1.2.1 -- 2026-09-08 -- A same-node file the named principal does not have is looked for under
+ *     that account's own agents, so messages written before the send-side fix heal on the next sweep
+ *     rather than expiring unread.
+ *   v1.2.0 -- 2026-09-08 -- The sender's ACCOUNT, not the sender's exact principal. A file an agent
+ *     uploaded and then sent as its owner was refused here, silently, and the attachment sat as
+ *     `reference` reading "attachment pending" until it expired. Owner and node are both compared,
+ *     because a bare owner name is not unique across nodes.
  *   v1.1.0 -- 2026-08-15 -- The bytes are read from the SENDER's storage or from nobody's. A
  *     descriptor naming a third party is refused before the same-node read, which is what an
  *     inbound federated message could use to have this node open a local owner's private file.
@@ -26,6 +33,7 @@ import { sign } from '../auth/keypair.js';
 import { checkStorageQuota } from './quota.js';
 import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
 import { safeFetch } from '../utils/url-validator.js';
 
 export interface AttachmentCtx {
@@ -38,6 +46,17 @@ function peerForNode(peers: Map<string, PeerInfo>, nodeId: string): PeerInfo | u
   return [...peers.values()].find(p => p.nodeId === nodeId);
 }
 
+/**
+ * Do these two identities belong to the same person on the same node? `alice@n`, `bot#alice@n` and
+ * `eco:app#alice@n` do; `alice@n` and `alice@other-node` do not, which is why the node is compared
+ * as well as the owner (isSameOwner alone reads only the name, and a name is not unique across
+ * nodes).
+ */
+function sameAccount(a: string, b: string): boolean {
+  const x = parseGaiiLoose(a), y = parseGaiiLoose(b);
+  return x.owner === y.owner && x.node === y.node;
+}
+
 /** Recipient-side storage key for a duplicated attachment. */
 function localKeyFor(message: DirectMessageRecord, att: DirectMessageAttachment): string {
   return `dm/${message.conversationId}/${message.id}/${att.id}`;
@@ -48,12 +67,18 @@ function localKeyFor(message: DirectMessageRecord, att: DirectMessageAttachment)
  * Cross-node: request a signed download grant from the origin node, then fetch the bytes.
  */
 async function fetchAttachmentBytes(ctx: AttachmentCtx, message: DirectMessageRecord, att: DirectMessageAttachment): Promise<Buffer | null> {
-  // The only storage an attachment may be read from is the SENDER's. The descriptor names an owner
-  // and a key, and on an inbound federated message that name came off the wire, so reading it
+  // The only storage an attachment may be read from is the SENDER's ACCOUNT. The descriptor names an
+  // owner and a key, and on an inbound federated message that name came off the wire, so reading it
   // unchecked turns "here is my photo" into "open this local owner's private file for me". The
   // intake normalizes both fields (routes/federation-sync/messaging.ts); this is the same rule at
   // the door that does the reading, so a second intake path cannot reopen it.
-  if (att.ownerGhii !== message.senderGhii) {
+  //
+  // The account, not the exact principal: `aimeat_dm_send_as_owner` sends AS the human while the
+  // AGENT holds the file, and the two are one account by construction (the tool derives the owner
+  // from the agent's own session, so an agent can only ever speak for its own owner). Requiring an
+  // exact match refused those reads, and refusing was invisible: the attachment simply stayed
+  // `reference` and read "attachment pending" until it expired a week later.
+  if (!sameAccount(att.ownerGhii, message.senderGhii)) {
     logger.warn('attachment duplication: descriptor names a third party, refused', {
       messageId: message.id, attachmentId: att.id, claimedOwner: att.ownerGhii, sender: message.senderGhii,
     });
@@ -61,9 +86,33 @@ async function fetchAttachmentBytes(ctx: AttachmentCtx, message: DirectMessageRe
   }
   if (att.originNodeId === ctx.config.nodeId) {
     const file = await ctx.storage.getStorageFile(att.ownerGhii, att.storageKey);
-    return file ? file.data : null;
+    if (file) return file.data;
+    // The descriptor named the right account and the wrong principal within it. Sends have pointed
+    // at the holder since 2026-09-08, but every message written before that is still sitting in a
+    // mailbox with the owner's name on a file its agent uploaded, and the sweep would retry it every
+    // minute until it expired. The same account's own agents are searched once, so those messages
+    // heal on the next sweep instead of needing the sender to send them again.
+    return readFromOwnAgents(ctx, att);
   }
   return requestStorageGrant(ctx, message, att);
+}
+
+/** The sender account's own agents, searched for a file the named principal does not have. */
+async function readFromOwnAgents(ctx: AttachmentCtx, att: DirectMessageAttachment): Promise<Buffer | null> {
+  const { owner } = parseGaiiLoose(att.ownerGhii);
+  const agents = await ctx.storage.getAgentsByOwner(owner).catch(err => {
+    logger.warn('attachment duplication: agent lookup failed', { error: String(err), owner });
+    return [];
+  });
+  for (const agent of agents) {
+    if (!agent.gaii || agent.gaii === att.ownerGhii) continue;
+    const file = await ctx.storage.getStorageFile(agent.gaii, att.storageKey);
+    if (file) {
+      logger.info('attachment duplication: found under the account\'s own agent', { key: att.storageKey, holder: agent.gaii });
+      return file.data;
+    }
+  }
+  return null;
 }
 
 /** Recipient→origin: signed storage grant, then download the bytes from the returned URL. */
