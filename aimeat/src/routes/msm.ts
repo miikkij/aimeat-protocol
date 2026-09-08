@@ -40,12 +40,19 @@ interface MsmTemplateMeta {
 function loadMsmTemplates(): MsmTemplateMeta[] {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
-  // MSM examples live at repo root: docs/msm-examples/
-  // From src/routes/ we go up 3 levels to reach the repo root
-  const templatesDir = join(__dirname, '..', '..', '..', 'docs', 'msm-examples');
+  // MSM examples live at the REPO root (docs/msm-examples/), outside this package directory, so
+  // npm cannot ship them from there: `files` packs relative to package.json and no entry can name
+  // `../docs`. The build copies them into dist/docs instead (scripts/copy-dist-assets.mjs), which
+  // is the second candidate. Until that copy existed, every packaged node answered this route with
+  // an empty list — no error, no log, just no templates.
+  const candidates = [
+    join(__dirname, '..', '..', '..', 'docs', 'msm-examples'), // dev: src/routes → the repo root
+    join(__dirname, '..', '..', 'docs', 'msm-examples'),       // built + npm: dist/src/routes → dist/docs
+  ];
+  const templatesDir = candidates.find(existsSync);
   const templates: MsmTemplateMeta[] = [];
 
-  if (!existsSync(templatesDir)) return templates;
+  if (!templatesDir) return templates;
 
   const files = readdirSync(templatesDir).filter(f => f.endsWith('.msm.yaml'));
   for (const file of files) {

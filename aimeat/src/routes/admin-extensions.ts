@@ -55,9 +55,14 @@ function isSafeSegment(s: unknown): s is string {
 }
 
 function getBundledExtensionsDir(): string {
+  // Same shape as msm.ts: the source lives at the REPO root, outside this package, so the build
+  // copies it into dist/docs (scripts/copy-dist-assets.mjs) and the second candidate is the one a
+  // packaged node hits. The labels below were the wrong way round, which is worth naming: an npm
+  // install DOES have a `<pkg>/docs` (files ships two entries into it), so the first candidate
+  // looks plausible while missing, and the whole thing degrades to an empty list.
   const candidates = [
-    join(__dirname, '..', '..', '..', 'docs', 'extensions'),   // dist
-    join(__dirname, '..', '..', 'docs', 'extensions'),          // dev (src/)
+    join(__dirname, '..', '..', '..', 'docs', 'extensions'),   // dev: src/routes → the repo root
+    join(__dirname, '..', '..', 'docs', 'extensions'),          // built + npm: dist/src/routes → dist/docs
   ];
   for (const c of candidates) {
     if (existsSync(c)) return c;

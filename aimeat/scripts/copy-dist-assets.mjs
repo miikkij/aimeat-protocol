@@ -63,6 +63,16 @@ copy('public', 'dist/public', { recursive: true, filter: allow });
 copy('src/static', 'dist/static', { recursive: true });
 copy('.env.example', 'dist/.env.example');
 copy('docs', 'dist/docs', { recursive: true });
+
+// The two catalogues that live at the REPO root, outside this package directory. npm packs
+// relative to package.json, so `files` cannot name `../docs/...` and no entry there can ever ship
+// them; copying them into dist/docs is the only route. Without this a packaged node answers
+// /v1/msm/templates with an empty list and shows no bundled extensions in the admin view, both
+// silently, as an empty list rather than an error — which is why nobody reported it for months.
+// The routes that read them look at dist/docs in a package: src/routes/msm.ts,
+// src/routes/admin-extensions.ts.
+copy('../docs/msm-examples', 'dist/docs/msm-examples', { recursive: true });
+copy('../docs/extensions', 'dist/docs/extensions', { recursive: true });
 copy(
   'src/storage/providers/postgres-kysely/migrations',
   'dist/src/storage/providers/postgres-kysely/migrations',
