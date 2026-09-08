@@ -10717,6 +10717,7 @@
         "scopesReadonly": "Solo lectura",
         "scopesStandard": "Leer y escribir",
         "scopesFull": "Todo lo que puedes tú",
+        "scopesFullHint": "Todos los permisos que lleva tu propia sesión, incluidos los que si no marcarías uno a uno. Puedes estrecharlo después en el diálogo de permisos del agente.",
         "runModeLabel": "Cómo se ejecuta",
         "runModeSpawnHint": "Un proceso arranca cuando llega trabajo y se apaga después. Va bien para lo que llega a rachas.",
         "runModeResidentHint": "Tu conector lo mantiene en marcha. Va bien para una puerta de entrada, donde unos segundos de arranque en frío se notarían.",

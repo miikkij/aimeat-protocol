@@ -111,7 +111,10 @@ export interface BasicAgentTemplate {
  * ships definitions of it (`data/businesslauncher-app-back-office.ts`); it is typed here so a seed
  * that drifts from it fails to compile rather than at somebody's first start.
  *
- * A task's `agent` names an entry in `agents` by its ROLE, and `context` names earlier task ids.
+ * A task's `agent` names an entry in `agents` by its `name` when it has one and by its ROLE
+ * otherwise — crewaimeat's `_agent_key`, which is the validator that runs it. The definitions in
+ * this file carry no `name`, so theirs are roles; the Crew tab's starting shapes carry one, and
+ * theirs are names. `context` names earlier task ids.
  */
 export interface CrewDefDoc {
   readme_md: string;
@@ -127,7 +130,7 @@ export interface CrewDefDoc {
    * the one that would, and the mode and the definition disagreed about how work reaches it.
    */
   listen_for: string[];
-  agents: Array<{ role: string; goal: string; backstory: string; allow_delegation: boolean; tools?: string[] }>;
+  agents: Array<{ name?: string; role: string; goal: string; backstory: string; allow_delegation: boolean; tools?: string[] }>;
   tasks: Array<{ id: string; description: string; expected_output: string; agent: string; context?: string[] }>;
 }
 

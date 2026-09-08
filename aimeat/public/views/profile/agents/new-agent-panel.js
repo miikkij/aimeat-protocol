@@ -214,7 +214,11 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents })
               <option value="standard">${t('profile.agents.new.scopesStandard')}</option>
               <option value="full">${t('profile.agents.new.scopesFull')}</option>
             </select>
-            <span class="pf-agd-new-hint">${areaLine(scopeList, t)}</span>
+            ${/* The wildcard has no areas to name — areaLine renders it as a bare asterisk, which
+                  tells the reader nothing about what they are handing over. */''}
+            <span class="pf-agd-new-hint">
+              ${form.scopes === 'full' ? t('profile.agents.new.scopesFullHint') : areaLine(scopeList, t)}
+            </span>
           </label>
 
           <label class="pf-agd-new-field">

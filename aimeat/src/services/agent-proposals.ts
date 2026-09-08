@@ -163,8 +163,13 @@ export async function proposeAgent(
       return fail(400, 'INVALID_CREW_DEF',
         'At least one task must take {{ctx.prompt}}, or the agent answers the same thing every run.');
     }
-    const roles = new Set(agents.map(x => x?.role));
-    const orphan = tasks.find(t => !roles.has(t?.agent));
+    // THE REFERENCE IS `name` FIRST AND `role` ONLY WHEN THERE IS NO NAME — crewaimeat's
+    // `_agent_key`, which is the validator that actually runs the thing. This read the role alone,
+    // so every definition the Crew tab's own starting shapes produce (member `name: 'researcher'`,
+    // task `agent: 'researcher'`) was refused here as naming nobody. Measured in a browser
+    // 2026-09-08: all three shapes, every time.
+    const keys = new Set(agents.map(x => x?.name || x?.role).filter(Boolean));
+    const orphan = tasks.find(t => !keys.has(t?.agent));
     if (orphan) {
       return fail(400, 'INVALID_CREW_DEF',
         `Task "${orphan.id}" names "${orphan.agent}", which is not one of the definition's agents.`);

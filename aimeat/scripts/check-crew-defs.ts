@@ -209,9 +209,13 @@ function checkDefinition(name: string, def: CrewDefDoc, mode: string): void {
           'a tool name is lowercase letters, digits and underscores, starting with a letter — this is a shape check, not a menu; crewaimeat decides which tools exist');
       }
     }
-    if (typeof agent?.role === 'string') {
-      if (roles.has(agent.role)) fail(at(`agents[${i}].role`), agent.role, 'two agents share a role, so a task naming it is ambiguous');
-      roles.add(agent.role);
+    // THE KEY A TASK NAMES is `name` when the member has one and `role` otherwise — crewaimeat's
+    // `_agent_key`. Reading the role alone made every definition that names its members (the Crew
+    // tab's own starting shapes) look like it pointed at nobody.
+    const key = (typeof agent?.name === 'string' && agent.name) || agent?.role;
+    if (typeof key === 'string' && key) {
+      if (roles.has(key)) fail(at(`agents[${i}].name`), key, 'two agents share a key, so a task naming it is ambiguous');
+      roles.add(key);
     }
   }
 
@@ -228,7 +232,7 @@ function checkDefinition(name: string, def: CrewDefDoc, mode: string): void {
       }
     }
     if (typeof task?.agent === 'string' && !roles.has(task.agent)) {
-      fail(at(`tasks[${i}].agent`), task.agent, `a task's agent must name a role defined in agents[] — this one names nobody`);
+      fail(at(`tasks[${i}].agent`), task.agent, `a task's agent must name a member of agents[] by its name, or by its role when it has no name — this one names nobody`);
     }
     // `context` may only name EARLIER tasks: the run is a chain, and a forward reference has
     // nothing to read when it executes.

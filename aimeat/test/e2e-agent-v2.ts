@@ -1202,6 +1202,26 @@ async function run() {
         assert(asOther.status === 404, `another owner must not even learn it exists: got ${asOther.status}`);
     });
 
+    await test('a task may name its member by NAME, which is what the Crew tab\'s own shapes do', async () => {
+        // crewaimeat's `_agent_key` is `name` first and `role` only when there is no name. This
+        // check read the role alone, so every definition the three starting shapes produce was
+        // refused as naming nobody — the panel could create an agent only with no definition at
+        // all. Found in a browser 2026-09-08, on all three shapes.
+        const r = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({
+                name: 'named-member', purpose: 'Its task names the member by name, not by role.',
+                scopes: ['memory:read'],
+                crew_def: {
+                    readme_md: '# x', tags: [], process: 'sequential', listen_for: ['tasks'],
+                    agents: [{ name: 'researcher', role: 'Research analyst', goal: 'g', backstory: 'b', allow_delegation: false, tools: ['web'] }],
+                    tasks: [{ id: 'go', description: 'Look into {{ctx.prompt}}', expected_output: 'a brief', agent: 'researcher' }],
+                },
+            }),
+        });
+        assert(r.status === 201, `expected 201, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    });
+
     await test('proposing a name that is already waiting returns the standing one', async () => {
         const first = await json('/v1/agents/v2/agent-proposals', {
             method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
