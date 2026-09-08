@@ -2,12 +2,17 @@
  * @file email-templates.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Clean, minimal HTML email templates with AIMEAT branding. Supports 'en' (default)
- *   and 'fi' locales. Templates: verification code, magic link, notification, match suggestion,
- *   organism invitation, and provisioned-code access-key invitation.
+ * @description Clean, minimal HTML email templates with AIMEAT branding. Supports 'en' (default),
+ *   'fi' and 'es' locales. Templates: verification code, magic link, notification, organism
+ *   invitation, contact invitation, node registration invitation, provisioned-code access key,
+ *   first-login credentials, and the outbound door's generic layout.
  * @structure i18n string table + wrapHtml() layout + per-template builder functions.
  * @usage import { inviteEmailHtml, inviteEmailSubject } from './email-templates.js';
  * @version-history
+ *   v1.6.0 — 2026-09-08 — Remove matchSuggestionEmailHtml, the MatchSuggestion type, the six `match*`
+ *     strings in all three languages and the five `.match-*` CSS rules. Nothing in src/ has ever
+ *     called it: the only caller was EmailService.sendMatchSuggestion(), which no route, service or
+ *     job reached either, so the whole path was dead weight that read as a feature.
  *   v1.5.0 — 2026-08-30 — Add contactInviteEmail: a person inviting a person to join this AIMEAT,
  *     no organism behind it (the Contacts page's invitation), in the organism invitation's layout.
  *   v1.0.0 — 2026-04-10 — Initial (verification, magic link, notification, match).
@@ -20,13 +25,6 @@
  *   v1.3.0 — 2026-07-07 — Add keyCredentialsEmailHtml/keyCredentialsEmailSubject: durable login
  *     (username + freshly issued password) emailed on a provisioned-code account's first sign-in (TARGET-011).
  */
-
-export interface MatchSuggestion {
-  ghii: string;
-  displayName: string;
-  sharedInterests: string[];
-  distance?: string;
-}
 
 // ── i18n strings ─────────────────────────────────────────
 
@@ -64,12 +62,6 @@ const i18n: Record<string, Record<string, string>> = {
     magicLinkIgnore: 'If you did not request this, you can safely ignore this email.',
     magicLinkFallback: 'Or copy and paste this URL into your browser:',
     notificationHeading: 'AIMEAT Notification',
-    matchSubject: 'New Match Suggestions on AIMEAT',
-    matchHeading: 'Match Suggestions',
-    matchBody: 'We found some interesting matches for you:',
-    matchSharedInterests: 'Shared interests:',
-    matchDistance: 'Distance:',
-    matchViewProfile: 'View Profile',
     inviteSubject: "You're invited to join {org} on AIMEAT",
     inviteHeading: "You're invited to AIMEAT",
     inviteSentence: '{inviter} invited you to join {org} on AIMEAT.',
@@ -138,12 +130,6 @@ const i18n: Record<string, Record<string, string>> = {
     magicLinkIgnore: 'Jos et pyytänyt tätä, voit ohittaa tämän viestin.',
     magicLinkFallback: 'Tai kopioi ja liitä tämä URL selaimeesi:',
     notificationHeading: 'AIMEAT-ilmoitus',
-    matchSubject: 'Uusia ehdotuksia AIMEAT:ssa',
-    matchHeading: 'Ehdotukset',
-    matchBody: 'Löysimme sinulle mielenkiintoisia osumia:',
-    matchSharedInterests: 'Yhteiset kiinnostukset:',
-    matchDistance: 'Etäisyys:',
-    matchViewProfile: 'Näytä profiili',
     inviteSubject: 'Sinut on kutsuttu liittymään: {org}',
     inviteHeading: 'Sinut on kutsuttu AIMEAT-palveluun',
     inviteSentence: '{inviter} kutsui sinut liittymään: {org}.',
@@ -212,12 +198,6 @@ const i18n: Record<string, Record<string, string>> = {
     magicLinkIgnore: 'Si no pediste esto, puedes ignorar este correo sin problema.',
     magicLinkFallback: 'O copia esta dirección en tu navegador:',
     notificationHeading: 'Aviso de AIMEAT',
-    matchSubject: 'Nuevas coincidencias para ti en AIMEAT',
-    matchHeading: 'Coincidencias',
-    matchBody: 'Encontramos algunas coincidencias que te pueden interesar:',
-    matchSharedInterests: 'Intereses en común:',
-    matchDistance: 'Distancia:',
-    matchViewProfile: 'Ver el perfil',
     inviteSubject: 'Te invitaron a unirte a {org} en AIMEAT',
     inviteHeading: 'Tienes una invitación a AIMEAT',
     inviteSentence: '{inviter} te invitó a unirte a {org} en AIMEAT.',
@@ -312,11 +292,6 @@ export function wrapHtml(heading: string, bodyHtml: string, locale?: string, opt
     .btn { display: inline-block; background: #4f46e5; color: #ffffff !important; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-size: 15px; font-weight: 600; margin: 16px 0; }
     .url-fallback { word-break: break-all; font-size: 13px; color: #777; }
     .footer { text-align: center; padding: 20px 0; font-size: 12px; color: #999; }
-    .match-card { border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px; margin: 12px 0; }
-    .match-name { font-weight: 600; color: #333; font-size: 16px; }
-    .match-ghii { font-size: 13px; color: #777; }
-    .match-interests { font-size: 13px; color: #555; margin-top: 8px; }
-    .match-distance { font-size: 13px; color: #888; }
   </style>
 </head>
 <body>
@@ -713,52 +688,6 @@ export function notificationEmailHtml(subject: string, body: string, locale?: st
     subject,
     '',
     body,
-    '',
-    `-- ${t(locale, 'footer')}`,
-  ].join('\n');
-
-  return { html, text };
-}
-
-export function matchSuggestionEmailHtml(matches: MatchSuggestion[], locale?: string): { html: string; text: string } {
-  const matchCardsHtml = matches.map(m => {
-    const interests = m.sharedInterests.length > 0
-      ? `<p class="match-interests">${t(locale, 'matchSharedInterests')} ${m.sharedInterests.join(', ')}</p>`
-      : '';
-    const distance = m.distance
-      ? `<p class="match-distance">${t(locale, 'matchDistance')} ${m.distance}</p>`
-      : '';
-    return `
-      <div class="match-card">
-        <div class="match-name">${m.displayName}</div>
-        <div class="match-ghii">${m.ghii}</div>
-        ${interests}
-        ${distance}
-      </div>`;
-  }).join('\n');
-
-  const html = wrapHtml(t(locale, 'matchHeading'), `
-    <p>${t(locale, 'matchBody')}</p>
-    ${matchCardsHtml}
-  `, locale);
-
-  const matchTexts = matches.map(m => {
-    const parts = [`  ${m.displayName} (${m.ghii})`];
-    if (m.sharedInterests.length > 0) {
-      parts.push(`    ${t(locale, 'matchSharedInterests')} ${m.sharedInterests.join(', ')}`);
-    }
-    if (m.distance) {
-      parts.push(`    ${t(locale, 'matchDistance')} ${m.distance}`);
-    }
-    return parts.join('\n');
-  }).join('\n\n');
-
-  const text = [
-    t(locale, 'matchHeading'),
-    '',
-    t(locale, 'matchBody'),
-    '',
-    matchTexts,
     '',
     `-- ${t(locale, 'footer')}`,
   ].join('\n');

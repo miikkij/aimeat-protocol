@@ -15,6 +15,8 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.6.0 — 2026-09-08 — The disconnect that ends a turn is read off the response, not the
+ *     request: on Express 5 the request's `close` had already fired before the listener existed.
  *   v1.5.0 — 2026-08-17 — A turn may carry `starter` (which starter button fired it); the first
  *     turn writes the write-once onboarding.first_chat_turn funnel marker, closing the gap where a
  *     chat-cohort account that landed, talked and left had written no marker at all.
@@ -221,9 +223,14 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
 
         // A disconnect ends the TURN, not just the stream. Without this the node stops listening
         // and goose keeps working on an answer that has nowhere to go, billed to the node's key.
+        // On Express 5 the REQUEST emits `close` once, the moment its body has been read, which is
+        // before this handler's awaits return; a listener attached here to `req` waits for an
+        // event that has already happened, and the person leaving is never seen. The RESPONSE's
+        // `close` is the one that fires when the connection goes. Measured 2026-09-08 by
+        // e2e-chat-agent: the agent kept answering for the whole turn after the socket was gone.
         const abort = new AbortController();
         let finished = false;
-        req.on('close', () => {
+        res.on('close', () => {
             finished = true;
             clearInterval(keepalive);
             abort.abort();

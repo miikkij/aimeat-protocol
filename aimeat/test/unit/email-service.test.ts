@@ -44,11 +44,9 @@ describe('createEmailService (disabled)', () => {
         expect(result).toBe(false);
     });
 
-    it('sendMatchSuggestion returns false when disabled', async () => {
+    it('sendWithAttachments returns false when disabled', async () => {
         const service = createEmailService(makeConfig({ emailEnabled: false }));
-        const result = await service.sendMatchSuggestion('test@example.com', [
-            { ghii: 'alice@node1', displayName: 'Alice', sharedInterests: ['AI'] },
-        ]);
+        const result = await service.sendWithAttachments('test@example.com', 'Test', '<p>x</p>', 'x', []);
         expect(result).toBe(false);
     });
 });
