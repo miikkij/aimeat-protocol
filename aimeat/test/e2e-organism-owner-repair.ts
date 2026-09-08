@@ -24,6 +24,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
 import type { Storage } from '../src/storage/interface.js';
+import { pinnedSqlitePath } from './helpers/server-db.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -104,7 +105,9 @@ async function mintAgentToken(a: { gaii: string; key: string }): Promise<string>
  *  already spent. Grant it on the record directly so the suite does not depend on run order. */
 async function grantOperator(name: string): Promise<void> {
     const provider = (process.env.AIMEAT_DB ?? 'sqlite') as StorageProvider;
-    const sqlitePath = process.env.AIMEAT_DB_PATH ?? '';
+    // The file the runner pinned on the server, which in a multi-lane run is not the one the env
+    // file names: opening that one grants the role in a database this node never reads.
+    const sqlitePath = pinnedSqlitePath();
     const dbUrl = process.env.AIMEAT_DB_URL;
     // An in-memory backend lives inside the server process: a second handle would open a different
     // empty database and grant the role to nobody. The first owner on a fresh node is an operator

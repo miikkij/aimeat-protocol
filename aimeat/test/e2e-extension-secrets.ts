@@ -12,6 +12,7 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { serverSqlitePath } from './helpers/server-db.js';
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 
@@ -147,8 +148,9 @@ await test('ciphertext at rest (SQLite raw-read) — stored as {encrypted}, not 
   let Database: any;
   try { Database = (await import('better-sqlite3')).default; }
   catch { console.log('    (skip: better-sqlite3 unavailable)'); return; }
-  const dbPath = resolve(process.cwd(), process.env.AIMEAT_DB_PATH ?? 'test/.test-e2e.db');
-  const db = new Database(dbPath, { readonly: true });
+  // The path the RUNNER pinned on the server, not the one the env file names: in a four-lane run
+  // they are different files, and reading the env file's one finds none of the rows just written.
+  const db = new Database(serverSqlitePath(), { readonly: true });
   try {
     const row = db.prepare('SELECT config FROM extension_instances WHERE extensionName = ? AND id = ?')
       .get('rest-connector', 'acme') as { config: string } | undefined;
