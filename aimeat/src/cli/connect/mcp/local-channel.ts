@@ -13,6 +13,12 @@
  * @usage
  *   const ch = new AgentChannel(entry); ch.handleTask(payload, 'deliver'); await ch.nextTask(25_000);
  * @version-history
+ *   v1.2.0 — 2026-09-08 — Dedup stops double WORK, never double NOTICE. handleTask and
+ *     handleMessages returned on a seen id BEFORE signalWake, and both id sets live as long as the
+ *     daemon, so one id was worth one wake for ever: a delivery that arrived while nobody listened
+ *     could never be re-announced, and neither has a resend behind it. The signal now goes out for
+ *     every delivery and the dedup keeps guarding the runner launch and the queue push.
+ *     handleMessages also stops waking on an empty frame. → pitfalls §58
  *   v1.1.0 — 2026-09-04 — Carries `forward`, the identity's ONE door to the node, with the stamp
  *     saying whose call it is already baked in. Call sites reaching for `tunnel.forward()` lost that
  *     stamp and were attributed to whichever identity opened the shared socket. → pitfalls §43
@@ -180,7 +186,21 @@ export class AgentChannel {
   handleTask(payload: unknown, via: QueuedTask['via']): void {
     const task = payload as Record<string, unknown> | null;
     const id = typeof task?.id === 'string' ? task.id : null;
-    if (!task || !id || this.seenTaskIds.has(id)) return;
+    if (!task || !id) return;
+
+    // THE SIGNAL GOES OUT FIRST, FOR EVERY DELIVERY, SEEN OR NOT. seenTaskIds lives as long as the
+    // daemon, so returning on a seen id before this line made one id worth exactly one wake for
+    // ever: a delivery nobody was listening for could never be re-announced, and there is no
+    // resend, no re-list and no second chance behind it. Dedup's job is to stop double WORK — the
+    // runner launch and the queue push below — and a wake is not work. handleRecord and handleDm
+    // have always been this shape. Measured by crewaimeat 2026-09-07 and 2026-09-08: two nights,
+    // 0/6 steps, agents reachable throughout, nothing anywhere in an error state.
+    //
+    // Signalling before the queue push is safe: signalWake resolves a parked waiter as a microtask,
+    // so the rest of this synchronous body has filled the queue before the woken consumer runs.
+    this.signalWake();
+
+    if (this.seenTaskIds.has(id)) return;
     this.seenTaskIds.add(id);
 
     // Same side effects the poll loop used to produce on a new queued task.
@@ -199,10 +219,10 @@ export class AgentChannel {
     const waiter = this.waiters.shift();
     if (waiter) waiter(item);
     else this.queue.push(item);
-    this.signalWake();
   }
 
   handleMessages(messages: unknown[]): void {
+    if (messages.length === 0) return;
     let fresh = 0;
     for (const m of messages) {
       const id = typeof (m as { id?: unknown })?.id === 'string' ? (m as { id: string }).id : null;
@@ -210,12 +230,14 @@ export class AgentChannel {
       this.seenMessageIds.add(id);
       fresh++;
     }
-    if (fresh > 0) {
-      void wakeAgent(legacyWakeAdapter(this.entry), 'message_new', `${fresh} new message(s)`);
-      // Also fire the unified wake so a daemon parked on /local/wake/next re-polls its inbox now
-      // (messages have no drainable queue -- the wake just triggers the cycle's _poll_messages).
-      this.signalWake();
-    }
+    // The legacy per-agent wake stays gated on something actually being new: it is a notification
+    // with a count in it, and re-announcing "1 new message" for a message from an hour ago is wrong.
+    if (fresh > 0) void wakeAgent(legacyWakeAdapter(this.entry), 'message_new', `${fresh} new message(s)`);
+    // The unified wake is not: it fires for every frame that carried anything. Messages have NO
+    // drainable queue -- the comment below used to say so while the dedup above threw the signal
+    // away -- so a lost wake hid the message until some unrelated event started a cycle. The wake
+    // just triggers the cycle's _poll_messages, which reads the node, which is the source of truth.
+    this.signalWake();
   }
 
   /** Long-poll: next undelivered task, or null after `waitMs` with none. */

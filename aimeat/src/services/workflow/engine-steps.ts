@@ -6,6 +6,13 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-09-08 — A dispatched task emits `task_assigned` on the connector tunnel, at both
+ *     places this file creates one. It never did: the engine writes its own record straight to
+ *     storage and copied agent-task-write.ts's webhook line without the emitDelivery on the line
+ *     after it, so a workflow's task woke a webhook subscriber and no connected agent. Two nights
+ *     of a nightly workflow, 0/6 steps, every surface reading healthy. → pitfalls §58
+ *     dispatchInspector moved to engine-inspector.ts as a pure extraction (same signature, same
+ *     single caller): the added comment took this file one line past the 800-line cap.
  *   v1.0.0 — 2026-07-13 — Extracted from engine.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — askHumanInput: deliver a human-input step's question to the owner (in-app
  *     inbox + push, best-effort) and return the templated question snapshot to pin into the run.
@@ -32,13 +39,15 @@ import { notify } from '../notify.js';
 import { readNotificationSettings, appendMailLog } from '../notification-settings.js';
 import { logger } from '../../utils/logger.js';
 import { globToRegExp } from './signal-eval.js';
-import { collectSignalKeys, runKey, type ResolvedStep } from './store.js';
+import { collectSignalKeys, type ResolvedStep } from './store.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
 import { getActiveConnectTunnelManager } from '../connect-tunnel.js';
+import { emitDelivery } from '../event-bus.js';
 import { runExtensionActionAsSystem, type SystemRunResult } from '../extension-system-run.js';
 import { publishPackage, recordFailure } from '../datapackage/store.js';
 import { loc, template } from './engine-util.js';
 import { dispatchAiStep } from './engine-ai-step.js';
+import { dispatchInspector } from './engine-inspector.js';
 import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
 import type { WorkflowRun, WorkflowRunStep, WorkflowStep } from '../../models/workflow-schemas.js';
 
@@ -139,6 +148,15 @@ export async function dispatchStep(deps: StepDeps, ownerGhii: string, run: Workf
       has_todos: false, todo_count: 0, scope_summary: scope.map(s => `${s.type}:${s.value}`),
       created_at: now, auto_activated: true, workflow_id: run.workflowId,
     });
+    // AND THE TUNNEL, which is the half this had been missing. agent-task-write.ts emits this on
+    // the line after its webhook; the engine builds its own record and writes it straight to
+    // storage, so nothing shared enforced the pair and nothing errored when only the webhook went:
+    // the task was created and active, the webhook fired, the socket heard nothing, and a spawn
+    // daemon parked on /local/wake/next slept through it. Measured by crewaimeat on two consecutive
+    // nights, 2026-09-07 and 2026-09-08: 0/6 steps, 50 agents reachable the whole time, every
+    // surface reading healthy. A target holding no tunnel is unaffected — the task waits in the
+    // store and is replayed on connect, which is what should happen.
+    emitDelivery({ target: agentGaii, kind: 'task_assigned', id: record.id, payload: record });
     ids.push(record.id);
   }
   void resolved;
@@ -598,49 +616,6 @@ export async function onStepFail(deps: StepDeps, ownerGhii: string, run: Workflo
   if (taskId) {
     run.inspections = [...(run.inspections ?? []), { stepId, taskId, reason, at: new Date().toISOString() }];
   }
-}
-
-/**
- * Queue a task to the owner's `workflow-inspector` agent (crew-owned) with full run context: the
- * run record (defSnapshot + every step's state + expected-vs-observed) is at a known memory key.
- * Tagged `workflow-inspect` (NOT `workflow-run`) so completing it never advances the run. Returns
- * the task id, or null when no inspector agent is installed.
- */
-export async function dispatchInspector(deps: StepDeps, ownerGhii: string, ownerName: string, run: WorkflowRun, stepId: string, reason: WorkflowRunStep['state']): Promise<string | null> {
-  const inspectorGaii = buildGAII('workflow-inspector', ownerName, deps.config.nodeId);
-  const inspector = await deps.storage.getAgent(inspectorGaii);
-  if (!inspector) return null;
-
-  const rk = runKey(run.workflowId, run.runId);
-  const failing = run.steps[stepId];
-  const failingAgents = (run.defSnapshot.steps.find(s => s.id === stepId)?.agent) ?? '';
-  const now = new Date().toISOString();
-  const scope: AgentTaskScope[] = [
-    { name: 'workflow-inspect', value: `${run.workflowId}/${run.runId}`, type: 'text', description: stepId },
-  ];
-  const record: AgentTaskRecord = {
-    id: randomUUID(), agentGaii: inspectorGaii, ownerGaii: ownerGhii,
-    title: `Inspect workflow "${run.workflowId}" — step "${stepId}" ${reason}`,
-    description: [
-      `A workflow step failed (${reason}).`,
-      `Read the full run record at owner memory key "${rk}" — it carries defSnapshot, every step's`,
-      `state (green / input-red / output-red / timed-out / skipped), and per-leaf expected-vs-observed.`,
-      `Failing step: "${stepId}" (agent: ${Array.isArray(failingAgents) ? failingAgents.join(', ') : failingAgents}).`,
-      `Observed: ${JSON.stringify(failing?.outputObserved ?? failing?.inputObserved ?? {}).slice(0, 1000)}.`,
-      `Diagnose, auto-run any safe deterministic repairs, and report recommendations.`,
-    ].join(' '),
-    scope, rules: [], verification: { userExpects: '', technicalChecks: [] },
-    resources: { memoryKeys: [rk] },
-    todos: [], status: 'active', createdAt: now, updatedAt: now, lastEventAt: now,
-  };
-  await deps.storage.createAgentTask(record);
-  await deps.storage.appendTaskEvent({ id: randomUUID(), taskId: record.id, type: 'started', message: `Workflow inspection requested for "${run.workflowId}" step "${stepId}" (${reason})`, timestamp: now });
-  deps.webhookDispatcher?.dispatchWebhookEvent(inspectorGaii, 'task.approved', {
-    task_id: record.id, title: record.title, description: record.description ?? '',
-    has_todos: false, todo_count: 0, scope_summary: scope.map(s => `${s.name}:${s.value}`),
-    created_at: now, auto_activated: true, workflow_id: run.workflowId,
-  });
-  return record.id;
 }
 
 /**
