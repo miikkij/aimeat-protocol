@@ -22,6 +22,8 @@
  * @structure PublishRunInput · PublishRunOutcome · runOwnPublish
  * @usage import { runOwnPublish } from './publish-run.js';
  * @version-history
+ *   v1.2.0 — 2026-09-08 — The first publish reports no `url` for an empty externalRef, as the replay
+ *     had since v1.1.0; the two answers for one outcome had differed.
  *   v1.1.0 — 2026-08-08 — A replay reports no `url` for an empty externalRef. LinkedIn answers a
  *     successful share without a URN header, so `''` reached callers and every truthiness check
  *     downstream drew it as a link to nothing.
@@ -151,7 +153,9 @@ export async function runOwnPublish(
     await storage.updatePublishAttempt(gate.attempt.id, { status: 'done', externalRef: outcome.externalRef });
     await storage.touchConnectionOk(gate.connection.id);
     const attempt = await storage.getPublishAttempt(gate.attempt.id);
-    return { ok: true, replay: false, attempt: attempt ?? gate.attempt, url: outcome.externalRef };
+    // The same guard as the replay branch: a share LinkedIn answered without a URN is a success
+    // with no link, on the first call as much as on the retry (2026-09-08, e2e-publish-upstreams).
+    return { ok: true, replay: false, attempt: attempt ?? gate.attempt, url: outcome.externalRef || undefined };
   }
 
   // `rejected` never retries; `failed` may. The distinction is the provider's, not ours.

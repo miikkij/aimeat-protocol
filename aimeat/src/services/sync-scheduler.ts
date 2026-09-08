@@ -11,6 +11,7 @@
  *   - batchTimer / batchedPeerIds: module-level debounce state for the batch window
  *
  * @version-history
+ *   v1.1.0 — 2026-09-08 — The debounced flush waits for its enqueues before it drains.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
@@ -63,17 +64,19 @@ export function notifyCatalogueChange(
 
     if (peerIds.length === 0) return;
 
-    // Enqueue syncs
-    for (const peerId of peerIds) {
-      enqueueCatalogueSync(peerId, config, storage).catch(err => {
-        logger.warn(`Failed to enqueue catalogue sync for peer ${peerId}`, {
-          error: err instanceof Error ? err.message : String(err),
+    // Enqueue every sync, THEN drain: until 2026-09-08 the drain was started without waiting for
+    // the enqueues, so it could reach the queue before the rows it was meant to carry were in it,
+    // and the job sat pending until the next drain (e2e-federation-settlements-sync).
+    (async () => {
+      for (const peerId of peerIds) {
+        await enqueueCatalogueSync(peerId, config, storage).catch(err => {
+          logger.warn(`Failed to enqueue catalogue sync for peer ${peerId}`, {
+            error: err instanceof Error ? err.message : String(err),
+          });
         });
-      });
-    }
-
-    // Immediately drain the queue
-    drainSyncQueue(config, storage, peers).catch(err => {
+      }
+      await drainSyncQueue(config, storage, peers);
+    })().catch(err => {
       logger.error('Failed to drain sync queue after catalogue change', {
         error: err instanceof Error ? err.message : String(err),
       });

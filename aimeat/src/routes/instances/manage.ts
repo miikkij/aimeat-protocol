@@ -6,6 +6,8 @@
  *   check-update diff, instance details, and instance removal (optional component cleanup).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-09-08 — GET /:id/status answers with the customizedAt it just wrote, not the one
+ *     read before the write.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/instances.ts (max-file-lines)
  */
 
@@ -78,6 +80,10 @@ export function registerManageRoutes(
 
         let currentHash: string | null = null;
         let customized = ic.customized;
+        // Answered from the value that was just written, not from the record read before the
+        // write: until 2026-09-08 the call that DETECTED an edit reported customizedAt as undefined
+        // and only the next call carried it (e2e-package-components).
+        let customizedAt = ic.customizedAt;
 
         if (currentContent !== null) {
           currentHash = computeHash(currentContent);
@@ -85,9 +91,10 @@ export function registerManageRoutes(
 
           // Update instance record if customization status changed
           if (customized !== ic.customized) {
+            customizedAt = customized ? new Date().toISOString() : undefined;
             const updatedComponents = instance.installedComponents.map(c =>
               c.componentId === ic.componentId
-                ? { ...c, customized, customizedAt: customized ? new Date().toISOString() : undefined }
+                ? { ...c, customized, customizedAt }
                 : c,
             );
             await storage.updateInstance(id, {
@@ -105,7 +112,7 @@ export function registerManageRoutes(
           originalHash: ic.originalHash,
           currentHash,
           customized,
-          customizedAt: ic.customizedAt,
+          customizedAt,
         };
       }),
     );

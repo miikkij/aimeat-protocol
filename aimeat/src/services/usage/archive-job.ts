@@ -20,16 +20,29 @@
  * @usage
  *   scheduler.registerCoreHandler('usage-archive', () => runUsageArchiveJob(storage));
  * @version-history
+ *   v1.1.0 — 2026-09-08 — AIMEAT_USAGE_HOT_DAYS=0 means zero, not ninety: the windows no longer fall
+ *     through `|| default` on a falsy zero.
  *   v1.0.0 — 2026-08-14 — Initial: the 90-day hot window becomes enforceable.
  */
 import type { Storage, UsageArchiveResult } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 
+/**
+ * A window from the environment, or the default when the variable is unset or not a number. Zero is
+ * a value: "keep nothing hot". Until 2026-09-08 these read `Number(x) || 90`, and an operator's 0 fell
+ * through to the default in silence (found by e2e-core-jobs).
+ */
+function daysFromEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === '') return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
 /** How long raw stays queryable in the hot tables. */
-const HOT_DAYS = Number(process.env.AIMEAT_USAGE_HOT_DAYS) || 90;
+const HOT_DAYS = daysFromEnv('AIMEAT_USAGE_HOT_DAYS', 90);
 /** Hour-grain rollups are a live-dashboard resolution; the day grain carries the history. */
-const HOUR_ROLLUP_DAYS = Number(process.env.AIMEAT_USAGE_HOUR_ROLLUP_DAYS) || 30;
-const BATCH = Number(process.env.AIMEAT_USAGE_ARCHIVE_BATCH) || 2_000;
+const HOUR_ROLLUP_DAYS = daysFromEnv('AIMEAT_USAGE_HOUR_ROLLUP_DAYS', 30);
+const BATCH = Math.max(1, daysFromEnv('AIMEAT_USAGE_ARCHIVE_BATCH', 2_000));
 /** Sweeps per run. Bounded so one run cannot occupy the database for an unbounded time. */
 const MAX_SWEEPS = 50;
 

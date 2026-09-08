@@ -12,6 +12,7 @@
  *   - createServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   v1.1.0 — 2026-09-08 — /v1/mcp is parsed at the large body limit like the file doors it fronts.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import express from 'express';
@@ -117,7 +118,11 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     // Files tab posts to) and was missing from this list, so an inline upload there was capped at
     // jsonBodyLimitMb — 5 MB of JSON, about 3.7 MB of actual file, no matter what the operator set
     // quota.storage_max_file_size_mb to. Prefer `mode: 'presigned'`, which skips parsing entirely.
-    const needsLargeBody = req.path.startsWith('/v1/apps') || req.path.startsWith('/v1/extensions') || req.path.startsWith('/v1/cortex') || req.path.startsWith('/v1/storage') || req.path.startsWith('/v1/memory/files');
+    // /v1/mcp carries the same inline files (aimeat_app_publish, aimeat_extension_install,
+    // aimeat_datapackage_publish with its 8 MB one-call cap) and was parsed at the small limit, so
+    // the tools' own caps and the advice they carry were unreachable: express answered 413 first
+    // (2026-09-08, e2e-mcp-dm-datapackage and e2e-mcp-extensions-apps).
+    const needsLargeBody = req.path.startsWith('/v1/apps') || req.path.startsWith('/v1/extensions') || req.path.startsWith('/v1/cortex') || req.path.startsWith('/v1/storage') || req.path.startsWith('/v1/memory/files') || req.path.startsWith('/v1/mcp');
     const limit = needsLargeBody ? `${config.jsonBodyLimitLargeMb}mb` : `${config.jsonBodyLimitMb}mb`;
     express.json({ limit })(req, res, next);
   });

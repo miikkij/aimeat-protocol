@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 -- 2026-09-08 -- The write caller carries `federated`, so memory-write can refuse a
+ *     federated session the write scope its owner role used to bypass.
  *   v1.3.0 -- 2026-09-06 -- Review item 6.4: GET /v1/memory/search takes `include=meta` (snippet +
  *     bytes instead of the whole value) and `include_versions`, which is what the node MCP tool had
  *     been doing in-tool. Both opt-in, so every REST caller keeps the answer it had.
@@ -144,6 +146,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       targetGaii: gaii,
       scopes: req.auth!.scopes ?? [],
       roles: req.auth!.roles,
+      federated: req.auth!.federated === true,
     }, {
       key,
       value,

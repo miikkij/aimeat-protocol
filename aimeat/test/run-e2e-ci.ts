@@ -9,6 +9,13 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.37.0 -- 2026-09-08 -- Coverage tranche 2: 28 suites for the doors the sweep never drove
+ *            (appeals, owner export, setup and verification, account and membership doors, the MCP
+ *            surfaces, extensions, memory, prompts, mailbox push, the people directory, genesis
+ *            federation, settlements and sync, core jobs, the AI provider stub, admin, IAM,
+ *            packages, publish upstreams, federated sessions). Fixed-port ones are named on their
+ *            lines. None in the guard tier yet: each earns that with three identical green runs
+ *            alone on both backends.
  *   v1.36.0 -- 2026-09-08 -- Add e2e-ontology.ts: the core ontology served at the namespace our own
  *            responses cite, and the two write doors that used to store an annotation naming a
  *            vocabulary nobody defined. No fixed port, no receiver; 19 assertions, five of them
@@ -172,6 +179,11 @@ import {
 const ALL_SUITES = [
     'test/api-full.ts',
     'test/e2e-admin-features.ts',
+    // The operator doors the sweep never wrote through: admin-extensions (installs, scaffold,
+    // scripts, actions), the admin-features writes, admin-monitoring, admin.ts setup doors,
+    // knowledge admin. e2e-admin-features keeps the refusals and reads.
+    'test/e2e-admin-doors.ts',
+    'test/e2e-admin-doors-2.ts',
     'test/e2e-agent-activity.ts',
     'test/e2e-agent-capabilities.ts',
     'test/e2e-anonymous.ts',
@@ -233,6 +245,13 @@ const ALL_SUITES = [
     // LinkedIn, X and Bluesky inside the process: the mail providers address their upstreams with
     // module constants, so replacing globalThis.fetch is the only seam there is.
     'test/e2e-mail-connections.ts',
+    // A node of its own on 40312 with real VAPID keys, an SMTP sink on 40313 and an HTTPS push
+    // receiver: services/push.ts, services/mailbox-notification.ts and both notification sweeps are
+    // dead code on the shared server, which pins the VAPID pair empty. Lane 0, two fixed ports.
+    'test/e2e-mailbox-push.ts',
+    // The three publish recipes and five metrics readers against the same fake upstreams, on an
+    // own in-process node (40317): Mastodon's transcode poll, YouTube's resumable chunks, Bluesky.
+    'test/e2e-publish-upstreams.ts',
     'test/e2e-disputes.ts',
     // DISABLED: e2e-email.ts always fails locally/CI because there are no SMTP
     // credentials configured to actually send email. Re-enable once a test mail
@@ -332,12 +351,30 @@ const ALL_SUITES = [
     // The agent surface for the same thing: the REST routes shipped without one.
     'test/e2e-mcp-beneficiary.ts',
     'test/e2e-extension-secrets.ts',
+    // The refusal arms of the same doors: instance create/list/detail/PATCH/DELETE, the ext:
+    // namespace cleanup a deleted instance takes with it, and the crud.ts lifecycle 404s.
+    'test/e2e-extension-doors.ts',
     'test/e2e-iam-extension.ts',
+    // The extension defineAppIam generates when the app id carries an owner: the three scripts,
+    // the ladder, the empty arms, through aimeat_iam_define over MCP (its only door).
+    'test/e2e-iam-generated-extension.ts',
     'test/e2e-upsert.ts',
     'test/e2e-federation.ts',
+    // Cross-federation "genesis": peering CRUD, signed catalogue ingest, the aggregated
+    // cross-catalogue and its filters, cross-genesis memory read both ways, subscriptions and the
+    // sync service. Boots its OWN in-process node on 40321 with its own SQLite file, and serves the
+    // other federation on loopback — a genesis peer is a second federation, not a second node.
+    'test/e2e-genesis-federation.ts',
+    // Settlements, routing, cross-node templates and the four sync services. It boots TWO in-process
+    // nodes on 40322-40323 (plus a fake peer on an ephemeral loopback port), so it needs neither the
+    // runner's server nor its port, and it is the only suite that turns packageFederationEnabled on.
+    'test/e2e-federation-settlements-sync.ts',
     // The two federated memory routes a HOME user drives, against a peer the suite serves itself on
     // loopback: the signed inventory request, the pulled record, and every refusal on both doors.
     'test/e2e-memory-federation-remote.ts',
+    // The federated half: a session minted by POST /v1/ghii/login with name@otherNode, against a
+    // home node the suite serves on loopback. pull, push-home, list-home, and what the login refuses.
+    'test/e2e-federated-session.ts',
     'test/e2e-presence.ts',
     'test/e2e-federation-visiting.ts',
     'test/e2e-federation-contact-link.ts',
@@ -350,9 +387,17 @@ const ALL_SUITES = [
     'test/federation-multinode.ts',
     'test/federation-messages.ts',
     'test/e2e-memory-full.ts',
+    // The batch and per-key memory doors the happy paths never reach: the ?agent refusal arms on
+    // bulk/export/import/bulk-delete, discover and copy, TTL expiry on read, the anonymous
+    // namespace refusals, the 413 and 422 arms, the CORS inheritance ladder and the bin listing.
+    'test/e2e-memory-doors.ts',
     'test/e2e-hello-mcp.ts',
     'test/e2e-device-token-grace.ts',
     'test/e2e-agent-reapproval.ts',
+    // The account doors nothing drove: the GHII register/login validators, and the whole agent
+    // lifecycle surface (export, import, rekey, port, scopes, federate, delete, CORS) plus both
+    // registration doors. Most of its assertions are refusals.
+    'test/e2e-account-doors.ts',
     // What the agent ASKED FOR reaching the person who approves it — and not reaching the
     // unauthenticated door, and not rewriting a grant already made.
     'test/e2e-device-auth-requested-scopes.ts',
@@ -369,6 +414,13 @@ const ALL_SUITES = [
     'test/e2e-login-by-email.ts',
     'test/e2e-owner-usage.ts',
     'test/e2e-owner-home.ts',
+    // One export, every section of it: the Article 15 and 20 door read against fixtures built first.
+    'test/e2e-owner-export.ts',
+    // The setup wizard and the verification doors: spawns nodes of its own on 40320
+    // (E2E_SETUP_SECOND_PORT). Lane 0 in the coverage runner.
+    'test/e2e-setup-and-verification.ts',
+    // The moderation appeal end to end: the four target arms, the queue, the review, every refusal.
+    'test/e2e-appeals.ts',
     // BR-04: deactivation ends every credential family, now; each assertion is a refusal.
     'test/e2e-owner-deactivation.ts',
     // BR-04 again, on the two email doors: they used to re-key the owner and THEN refuse. Runs its
@@ -382,6 +434,9 @@ const ALL_SUITES = [
     // BR-04: SCIM provisioning — the directory's lifecycle, and every isolation boundary as a refusal.
     'test/e2e-scim-users.ts',
     'test/e2e-ai-jobs.ts',
+    // The AI paths BEHIND the gate. Spawns its own node on 40314 with a scriptable OpenAI-compatible
+    // provider on 40315, because every other AI suite stops at the door for want of one.
+    'test/e2e-ai-provider-stub.ts',
     'test/e2e-ai-usage-history.ts',
     'test/e2e-ai-provenance.ts',
     'test/e2e-ai-provenance-surfaces.ts',
@@ -461,12 +516,18 @@ const ALL_SUITES = [
     'test/e2e-x402.ts',
     'test/e2e-x402-testnet.ts',
     'test/e2e-organism-membership.ts',
+    // The refusals on the same routes, and the handlers the suite above never reaches: the
+    // members_hidden arm, review, promote/demote, unban, transfer, the additive owner pair with its
+    // last-owner refusal, the shared invitation gate, direct add, and agent attach/detach.
+    'test/e2e-organism-membership-doors.ts',
     'test/e2e-organism-member-visibility.ts',
     'test/e2e-anonymous-identity-leaks.ts',
     'test/e2e-organism-search.ts',
     'test/e2e-organism-dangling-refs.ts',
     'test/e2e-librarian.ts',
     'test/e2e-discover.ts',
+    // The people directory: consent gate, the semantic record, radius and keyword search.
+    'test/e2e-directory-index.ts',
     'test/e2e-agent-readiness.ts',
     'test/e2e-transparency-page.ts',
     'test/e2e-notebook-plan.ts',
@@ -479,6 +540,9 @@ const ALL_SUITES = [
     'test/e2e-admin-security-page.ts',
     'test/e2e-admin-cors-page.ts',
     'test/e2e-living-pulse.ts',
+    // Every core scheduled job fired through the operator's trigger door, on a node of its own
+    // (40310) with an SMTP sink, short windows and the flags the seeding keys on. Lane 0.
+    'test/e2e-core-jobs.ts',
     'test/e2e-registration-mode.ts',
     'test/e2e-mcp-session-expiry.ts',
     'test/e2e-usage-telemetry.ts',
@@ -511,6 +575,19 @@ const ALL_SUITES = [
     'test/e2e-mcp-wallet-extended.ts',
     'test/e2e-mcp-companies.ts',
     'test/e2e-mcp-packages.ts',
+    // The MCP tools nobody had ever called, each seeded through its green REST twin and asserted
+    // against the same record: exchange (ten tools), groups and shares (seven), onboarding (five),
+    // the package tools (six) with the task list/todo/fail tools.
+    'test/e2e-mcp-exchange.ts',
+    'test/e2e-mcp-groups-shares.ts',
+    'test/e2e-mcp-onboarding.ts',
+    'test/e2e-mcp-packages-tools.ts',
+    // The same sweep, three files further: the core doors nobody had called (the work lifecycle,
+    // the memory owner-scope branches, both resource templates), the DM and data-package tools,
+    // and the extension and app tools with their refusal arms.
+    'test/e2e-mcp-core-doors.ts',
+    'test/e2e-mcp-dm-datapackage.ts',
+    'test/e2e-mcp-extensions-apps.ts',
     'test/e2e-mcp-consent.ts',
     'test/e2e-mcp-chat-instances.ts',
     'test/e2e-mcp-flags.ts',
@@ -519,6 +596,9 @@ const ALL_SUITES = [
     'test/e2e-mcp-install.ts',
     'test/e2e-packages.ts',
     'test/e2e-package-compose.ts',
+    // The msm and memory component types through compose, install, status, and uninstall: the arms
+    // of component-registrar no package in the sweep had ever carried.
+    'test/e2e-package-components.ts',
     'test/e2e-federation-packages.ts',
     'test/e2e-businesslauncher.ts',
     'test/e2e-company-brain.ts',
@@ -609,6 +689,12 @@ const ALL_SUITES = [
     'test/e2e-attachment-sweep.ts',
     'test/e2e-agent-services.ts',
     'test/e2e-prompt-modules.ts',
+    // The prompt doors nothing had fetched: build-cortex, organism-setup, ai-instructions and the
+    // organism instruction block, every query arm.
+    'test/e2e-prompt-doors.ts',
+    // The prompt arms beside them: the per-role surface handbook, the offerings page, the tier1
+    // 301, draft-offer, the ?format=txt doors, the anonymous share text and the openclaw tier.
+    'test/e2e-prompt-arms.ts',
     'test/e2e-integration-kit.ts',
     'test/e2e-inbox-cursor.ts',
     'test/e2e-unfurl.ts',

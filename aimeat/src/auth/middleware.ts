@@ -13,6 +13,7 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-09-08 — requireScope: a federated session gets no owner bypass; its scope list is enforced.
  *   2026-09-06 — withCurrentScopes() (body in ./effective-scopes.ts): an agent's effective scopes are its token's INTERSECTED with
  *     its record's, resolved per request beside the revocation check and for the same stated reason.
  *     A JWT's scope list is a snapshot, a connector holds one for the life of its socket, and an
@@ -718,7 +719,9 @@ export function requireScope(...requiredScopes: string[]) {
     // Owner-role requests bypass scope checks (owners act on behalf of all their agents).
     // But agent- AND ecosystem-role requests MUST respect scopes, even if their owner is an
     // operator: a GEAI is a scoped external principal and must NEVER receive the owner bypass.
-    if (req.auth.roles.includes('owner') &&
+    // Nor a FEDERATED session: its owner role is the mint's courtesy and its scope list is what the
+    // receiving node granted; until 2026-09-08 the role waved a memory:read visitor past a write.
+    if (req.auth.roles.includes('owner') && !req.auth.federated &&
         !req.auth.roles.includes('agent') && !req.auth.roles.includes('ecosystem')) {
       next();
       return;

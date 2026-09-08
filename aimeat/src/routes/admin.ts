@@ -11,6 +11,8 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   v1.5.0 — 2026-09-08 — setup/register judges the password before it creates the owner; a weak
+ *     one used to leave a half-made account behind.
  *   v1.4.0 — 2026-09-04 — DELETE /v1/admin/owners/:name/totp: the operator reset for two-step
  *     sign-in. Removing it needs a code from the very device that was lost, so until now losing
  *     the phone and the backup codes ended the account. Records an account event on the target.
@@ -173,6 +175,17 @@ export function adminRouter(
             return;
         }
 
+        // Refuse before you write: until 2026-09-08 the owner row was created first and the
+        // password judged after, so a weak password answered 400 and left a half-made account
+        // behind with the name taken (e2e-admin-doors-2). The strength check comes first now.
+        if (password !== undefined && typeof password === 'string') {
+            const pwErr = validatePasswordStrength(password);
+            if (pwErr) {
+                res.status(400).json({ ok: false, error: pwErr });
+                return;
+            }
+        }
+
         const keyPair = await generateKeyPair();
         // Setup wizard is admin-password-protected — always grant operator
         const roles = ['owner', 'operator'];
@@ -193,11 +206,6 @@ export function adminRouter(
         if (!existingGhii) {
             let passwordHash: string | undefined;
             if (password && typeof password === 'string') {
-                const pwErr = validatePasswordStrength(password);
-                if (pwErr) {
-                    res.status(400).json({ ok: false, error: pwErr });
-                    return;
-                }
                 passwordHash = await hashPassword(password);
             }
             if (passwordHash) hasPassword = true;

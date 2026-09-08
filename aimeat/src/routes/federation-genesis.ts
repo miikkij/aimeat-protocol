@@ -14,6 +14,9 @@
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  *
  * @version-history
+ *   v1.4.0 — 2026-09-08 — A genesis entry in the cross-catalogue is addressed by its memory key,
+ *     with the remote id kept as remote_id; the stored value no longer overwrites the fields set
+ *     by the handler.
  *   v1.3.0 — 2026-09-04 — POST genesis-memory-read requires memory:read. It had requireAuth alone, so
  *     any principal carrying the account name could make this node fan out one request per active
  *     genesis peer whatever it had been granted. Noted as an open question by
@@ -197,14 +200,19 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                         if (keyword && !matchesGenesisKeyword(val, keyword)) continue;
                         if (location && !matchesLocation(val, location)) continue;
 
+                        // The stored value goes underneath: until 2026-09-08 it was spread over
+                        // the fields set here, so `id` was the REMOTE entry's id and two
+                        // federations sending the same id were indistinguishable
+                        // (e2e-genesis-federation). The remote id survives as remote_id.
                         entries.push({
+                            ...val,
                             type: val.type ?? 'genesis_entry',
                             id: mem.key,
+                            remote_id: val.id,
                             source_type: 'genesis',
                             source_genesis: val.source_genesis,
                             source_node: val.sourceNode ?? val.source_node,
                             fetched_at: val.fetched_at,
-                            ...val,
                         });
                     }
                 } catch (err) {

@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.5.0 — 2026-09-08 — A federated session is a scoped principal: no owner bypass on the write
+ *     scope. The caller carries `federated` so the gate can tell.
  *   v1.4.0 — 2026-08-28 — A crews.registry.* / crews.runtime.* key is refused unless it lands in the
  *     namespace of the agent it names (services/crew-def-store.ts misdirectedCrewKey). A chat
  *     session writing an agent's definition under its own principal produced a definition the
@@ -97,6 +99,8 @@ export interface MemoryWriteCaller {
     /** Scopes on the session. An owner or operator role passes without one, as requireScope does. */
     scopes: string[];
     roles: string[];
+    /** A federated session: minted with the owner role and a scope list the receiving node chose. */
+    federated?: boolean;
 }
 
 export interface MemoryWriteInput {
@@ -178,7 +182,11 @@ export async function writeMemoryRecord(
     //    owner/operator roles onto every agent JWT, so a session holding no memory scope at all
     //    arrived here reading as privileged and skipped the check. Writing the exclusion out rather
     //    than trusting the mint means the next surface that assembles a role list cannot reopen it.
-    const scopedPrincipal = caller.roles.includes('agent') || caller.roles.includes('ecosystem');
+    //    A FEDERATED session is scoped the same way: its owner role is a courtesy of the mint and its
+    //    scope list is the receiving node's grant (2026-09-08, e2e-federated-session: a visitor with
+    //    memory:read wrote memory here).
+    const scopedPrincipal = caller.roles.includes('agent') || caller.roles.includes('ecosystem')
+        || caller.federated === true;
     const privileged = !scopedPrincipal
         && (caller.roles.includes('owner') || caller.roles.includes('operator'));
     const needed = input.authorisingScope ?? 'memory:write';

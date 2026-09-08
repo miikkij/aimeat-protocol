@@ -14,6 +14,7 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.11.0 — 2026-09-08 — GET /models takes ?modality=image; it had narrowed the word to chat.
  *   v1.10.0 — 2026-09-04 — POST /complete spends under `calibrator:<projectId>` for a calibration
  *     project, so the usage table says which calibration cost what; a generator project keeps
  *     `openrouter:complete`.
@@ -321,9 +322,11 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       // Which slice of the catalogue. This is NOT a client-side filter dressed up as a parameter:
       // OpenRouter's default catalogue contains no transcription or speech models at all (measured
       // 2026-08-01: 336 models, zero whisper), so `chat` and `transcription` are different listings.
+      // `image` joined ModelModality on 2026-09-04 and this door did not follow, so the picker's
+      // ?modality=image answered with the chat catalogue (found by e2e-ai-provider-stub, 2026-09-08).
       const requested = String(req.query.modality ?? 'chat');
       const modality: ModelModality =
-        (requested === 'transcription' || requested === 'speech') ? requested : 'chat';
+        (requested === 'transcription' || requested === 'speech' || requested === 'image') ? requested : 'chat';
 
       // Check cache (keyed by baseUrl AND modality — different listings must not share an entry)
       const cacheKey = `${gaii}:${baseUrl}:${modality}`;

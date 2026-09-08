@@ -10,6 +10,8 @@
  *   import { registerSharingGroupTools } from './sharing-groups.js';
  *   registerSharingGroupTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.1.0 -- 2026-09-08 -- A refusal carries its code (`CODE: message`), as the REST doors and the
+ *     neighbouring MCP files do; an agent had only the sentence to match on (e2e-mcp-groups-shares).
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -176,7 +178,7 @@ export function registerSharingGroupTools(
             // service also emits the `groups` change event to the owner's open browser; the
             // notification below is the MCP session's own.
             const created = await createSharingGroup({ storage, config }, ownerGhii, { name, description, members });
-            if (!created.ok) return { content: [{ type: 'text' as const, text: created.message }], isError: true };
+            if (!created.ok) return { content: [{ type: 'text' as const, text: `${created.code}: ${created.message}` }], isError: true };
             const record = created.group;
 
             emitResourceListChanged(agentGaii);
@@ -226,7 +228,7 @@ export function registerSharingGroupTools(
                 identifier_type,
                 permissions,
             });
-            if (!added.ok) return { content: [{ type: 'text' as const, text: added.message }], isError: true };
+            if (!added.ok) return { content: [{ type: 'text' as const, text: `${added.code}: ${added.message}` }], isError: true };
             const newMember = added.member;
 
             // The members view must not go stale while an agent changes it. The service has already
@@ -263,7 +265,7 @@ export function registerSharingGroupTools(
             const ownerGhii = getOwnerGhii();
 
             const removed = await removeSharingGroupMember({ storage, config }, ownerGhii, group_id, identifier);
-            if (!removed.ok) return { content: [{ type: 'text' as const, text: removed.message }], isError: true };
+            if (!removed.ok) return { content: [{ type: 'text' as const, text: `${removed.code}: ${removed.message}` }], isError: true };
 
             // The members view must not go stale while an agent changes it. The service has already
             // told the owner's browser; this tells the MCP session holding the resource.
@@ -319,7 +321,7 @@ export function registerSharingGroupTools(
                 caller(),
                 { groupId: group_id, keyPattern: key_pattern, note, expiresAt: expires_at ?? null },
             );
-            if (!created.ok) return { content: [{ type: 'text' as const, text: created.message }], isError: true };
+            if (!created.ok) return { content: [{ type: 'text' as const, text: `${created.code}: ${created.message}` }], isError: true };
             emitResourceUpdated(agentGaii, `aimeat://groups/${encodeURIComponent(group_id)}`);
             emitChange('groups');
             return { content: [{ type: 'text' as const, text: JSON.stringify({ share: shareJson(created.value) }, null, 2) }] };
@@ -356,7 +358,7 @@ export function registerSharingGroupTools(
         annotationsFor('aimeat_share_revoke'),
         async ({ share_id }) => {
             const revoked = await revokeShare({ storage }, caller(), share_id);
-            if (!revoked.ok) return { content: [{ type: 'text' as const, text: revoked.message }], isError: true };
+            if (!revoked.ok) return { content: [{ type: 'text' as const, text: `${revoked.code}: ${revoked.message}` }], isError: true };
             emitResourceUpdated(agentGaii, `aimeat://groups/${encodeURIComponent(revoked.value.groupId)}`);
             emitChange('groups');
             return { content: [{ type: 'text' as const, text: JSON.stringify({ revoked: true, share: shareJson(revoked.value) }, null, 2) }] };
