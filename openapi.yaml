@@ -24533,6 +24533,147 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/apps/{owner}/{filename}/dev-grants:
+    get:
+      operationId: appDevGrantsList
+      summary: Who, other than the owner, may build this app
+      description: >
+        Owner-only. The development right is what somebody may do TO the app, as opposed to what a
+        role says they may do INSIDE it, and it is given to a PERSON so that every agent of theirs is
+        covered by the one entry. Returns `{ grants, levels, never }`: who holds a right and which
+        rung, the three rungs with what each one carries, and the three acts no rung ever carries.
+
+
+        The rungs are `full` (0), `publisher` (10) and `drafter` (20), lower being more power as
+        everywhere else here. `full` is deliberately full: an invited agent works as freely as it
+        would on its own owner's app, because one that hits a wall halfway through a job does the job
+        badly. What no rung carries is deleting the app, changing its price or licence, and passing
+        the right on. Declaring the natural person who answers for the app is outside this entirely -
+        no agent may do it, including the owner's own.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/apps/{owner}/{filename}/dev-grants/{account}:
+    put:
+      operationId: appDevGrantSet
+      summary: Invite somebody to build this app, at one of three rungs
+      description: >
+        Owner-only, idempotent. Body `{ level, note? }`, where `level` is `full`, `publisher` or
+        `drafter` (or the number). The right is written on the app's roster row, creating one when
+        the person is not already a member; their role string stays empty, so the app's carry plan -
+        which carries by ROLE - issues them none of its paid offerings for free.
+
+
+        Refused before anything is written: `404` when no such owner or no such app, `400` for a rung
+        that is not a rung and for granting it to yourself.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: account, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: appDevGrantRevoke
+      summary: Take the development right back
+      description: >
+        Owner-only. The roster row survives: somebody can pay for an app they no longer help build,
+        and deleting the row here would take their access away with the right. Returns
+        `{ revoked, account }`, where `revoked` is false when there was nothing to take.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: account, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/app-dev-grants:
+    get:
+      operationId: appDevBlanketList
+      summary: Everybody you have let build ANY app of yours
+      description: >
+        The blanket right, which is its own list rather than a row on every roster: a right written
+        into forty rosters is one its owner cannot see in one place and cannot take back in one act.
+        Answers what YOU have given, never what you hold. Returns `{ grants, levels, meaning }`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+  /v1/app-dev-grants/{account}:
+    put:
+      operationId: appDevBlanketSet
+      summary: Let somebody build any app of yours, including ones not published yet
+      description: >
+        Body `{ level, note?, expires_at? }`. Behind the ACCOUNT HOLDER in person, unlike the per-app
+        grant: an owner handing out one app is doing app management, which their agents do for them
+        all day, while an owner handing out every app they will ever publish is doing something to
+        the account. A term is optional and is how a trial ends by itself.
+
+
+        A right on the app's own row wins over this one in BOTH directions, which is how an owner
+        opens one app wider than the rest and how they narrow one without withdrawing everything.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: account, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: appDevBlanketRevoke
+      summary: Take the blanket right back
+      description: >
+        The account holder in person, like giving it. Returns `{ revoked, account }`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: account, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v1/apps/{owner}/{filename}/draft:
     get:
       operationId: getAppDraft

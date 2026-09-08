@@ -51,7 +51,7 @@ import type {
   Storage, AppManifest, AppProtection, AppRecord, AppDraftRecord,
 } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
-import { resolveGhii } from '../utils/ghii-resolver.js';
+import { ownAppScope } from './app-dev-grant.js';
 import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
 import { recordPublicActivity } from './public-activity.js';
@@ -101,8 +101,10 @@ export async function resolveAppOwnerScope(
 ): Promise<AppOwnerScope | null> {
   const parsed = parseGAII(principal);
   if (!parsed) return null;
-  const ownerName = parsed.owner;
-  return { ownerName, ownerGhii: await resolveGhii(storage, ownerName, `${ownerName}@${config.nodeId}`) };
+  // The parse stays here, because it is this door's own rule about what a principal may look like and
+  // the REST door's rule is a different one. Where the app LANDS is the part both doors share, and it
+  // now lives in services/app-dev-grant.ts so that opening it to a second owner is one change.
+  return ownAppScope(storage, config, parsed.owner);
 }
 
 // ── The draft slot ────────────────────────────────────────────────────────────────────────────────

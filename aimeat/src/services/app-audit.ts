@@ -35,6 +35,10 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   v1.2.0 — 2026-09-08 — `dev.granted` / `dev.revoked`: the owner letting somebody else build this
+ *     app, and taking it back. It belongs in this log rather than only on the roster row for the
+ *     reason the log exists at all — the row says who may build it now, and answering for the app
+ *     means being able to show when that changed and which of the owner's agents changed it.
  *   v1.1.0 — 2026-09-02 — `playtest` on the read: the same door also opens the app in a headless
  *     browser and answers with what it saw (services/app-playtest.ts). The log is unchanged by it,
  *     because looking at an app is not a change to how it is offered.
@@ -60,7 +64,8 @@ export type AppAuditAction =
   | 'forkable'
   | 'access_code.set' | 'access_code.cleared'
   | 'protection'
-  | 'name' | 'description';
+  | 'name' | 'description'
+  | 'dev.granted' | 'dev.revoked';
 
 export interface AppAuditEntry {
   at: string;

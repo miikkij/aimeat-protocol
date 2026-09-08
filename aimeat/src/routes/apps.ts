@@ -97,12 +97,16 @@
  *   v1.20.0 -- 2026-07-16 -- Agent-Bundled Apps Slice 1: apps/agents-deploy.ts — deploy/undeploy/
  *     status for crew-defs declared under manifest.cortex.agents (owner-scoped pointer tasks).
  *   2026-08-29 -- registerLegalRoutes: the app's own legal pages and its audit log (apps/legal.ts).
+ *   2026-09-08 -- canonicalOwner resolves the bucket through services/app-dev-grant.ts
+ *     (ownAppScope), the one place that answers "whose app does this write land in". Pure move:
+ *     this door still extracts the owner from its own `owner` claim, and with nobody else's app
+ *     named the answer is the caller's own, exactly as before.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
-import { resolveGhii } from '../utils/ghii-resolver.js';
+import { ownAppScope } from '../services/app-dev-grant.js';
 import type { CanonicalOwner } from './apps/helpers.js';
 import { registerCatalogueAdminRoutes } from './apps/catalogue-admin.js';
 import { registerReadRoutes } from './apps/read.js';
@@ -126,9 +130,13 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     // migration consolidates onto, so route and migration never diverge.
     const canonicalOwner: CanonicalOwner = async (req) => {
         const rawOwner = req.auth!.owner;
+        // This door's OWN extraction, unchanged: the `owner` claim is a bare name or `name@node`,
+        // and it stays here because the MCP door parses a GAII instead and the two disagree about
+        // which strings they accept. What they agreed on — resolve the identity record, fall back to
+        // `owner@node` — is now one function, so a change to where an app lands lands in one place.
         const owner = rawOwner.includes('@') ? rawOwner.split('@')[0] : rawOwner;
-        const ownerGhii = await resolveGhii(storage, owner, `${owner}@${config.nodeId}`);
-        return { owner, ownerGhii };
+        const { ownerName, ownerGhii } = await ownAppScope(storage, config, owner);
+        return { owner: ownerName, ownerGhii };
     };
 
     registerCatalogueAdminRoutes(router, config, storage, peers, canonicalOwner);
