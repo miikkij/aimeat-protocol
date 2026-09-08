@@ -24,6 +24,14 @@
  *            to the world (living-hooks, shipped with the node). It binds 40665 for a real receiver,
  *            so it is a fixed-port suite and lands in lane 0; the body that arrives there is what
  *            proves a send, and the call count is what proves the ten-second cache.
+ *   v1.33.0 -- 2026-09-08 -- Seven suites from the coverage work, each for code the sweep had never
+ *            executed: e2e-email-delivery (the email service, own node + SMTP sink), e2e-realtime-rooms
+ *            (the realtime WebSocket), e2e-personal-tunnel (the personal tunnel WebSocket),
+ *            e2e-memory-federation-remote (list-remote and pull-remote), e2e-connect-cli (every
+ *            connect subcommand but serve, and the other CLI entry points), e2e-chat-agent (a node
+ *            with a fake ACP agent: goose-acp, chat-session, file-text), e2e-mail-connections (the
+ *            Gmail and Graph providers, in-process with fetch replaced). Five of them boot a node of
+ *            their own and so sit in lane 0.
  *   v1.32.0 -- 2026-09-06 -- The runner REFUSES to start on a port a suite in this run writes down.
  *            It had computed that answer since fixedPorts() existed and never said it, and the
  *            silence cost two sessions in one day: a throwaway node on 40262 turned e2e-app-origin
@@ -219,6 +227,10 @@ const ALL_SUITES = [
     // Starts a REAL OAuth provider on a fixed loopback port (agreed with the server env above) that
     // rotates its refresh token, so the concurrency assertions test the guard rather than a stub.
     'test/e2e-connections.ts',
+    // Boots its own node on :40286 with its own SQLite file and answers Google, Microsoft, Mastodon,
+    // LinkedIn, X and Bluesky inside the process: the mail providers address their upstreams with
+    // module constants, so replacing globalThis.fetch is the only seam there is.
+    'test/e2e-mail-connections.ts',
     'test/e2e-disputes.ts',
     // DISABLED: e2e-email.ts always fails locally/CI because there are no SMTP
     // credentials configured to actually send email. Re-enable once a test mail
@@ -321,6 +333,9 @@ const ALL_SUITES = [
     'test/e2e-iam-extension.ts',
     'test/e2e-upsert.ts',
     'test/e2e-federation.ts',
+    // The two federated memory routes a HOME user drives, against a peer the suite serves itself on
+    // loopback: the signed inventory request, the pulled record, and every refusal on both doors.
+    'test/e2e-memory-federation-remote.ts',
     'test/e2e-presence.ts',
     'test/e2e-federation-visiting.ts',
     'test/e2e-federation-contact-link.ts',
@@ -357,6 +372,9 @@ const ALL_SUITES = [
     // BR-04 again, on the two email doors: they used to re-key the owner and THEN refuse. Runs its
     // own node with a real SMTP sink, because the secret these paths turn on arrives only by mail.
     'test/e2e-magic-link-refusal.ts',
+    // The email service, which no other suite executes: every .env.test.* leaves AIMEAT_SMTP_HOST
+    // unset. Runs its own node on 40294 with a real SMTP sink and drives all eight send methods.
+    'test/e2e-email-delivery.ts',
     // BR-04: SAML organisation sign-in over live HTTP — doors, discovery, invite/disable refusals.
     'test/e2e-saml-login.ts',
     // BR-04: SCIM provisioning — the directory's lifecycle, and every isolation boundary as a refusal.
@@ -502,12 +520,20 @@ const ALL_SUITES = [
     'test/e2e-businesslauncher.ts',
     'test/e2e-company-brain.ts',
     'test/e2e-personal-node.ts',
+    // The personal tunnel itself, over a real WebSocket: welcome, mailbox sync and ack, heartbeat,
+    // replacement, graceful disconnect. Its last phase self-spawns a node on 40299 with a ten-second
+    // heartbeat to reach the degraded and timeout branches, so it is a fixed-port suite (lane 0).
+    'test/e2e-personal-tunnel.ts',
     'test/e2e-connect-tunnel.ts',
     'test/e2e-connect-tunnel-multiplex.ts',
     'test/e2e-connect-tunnel-delivery.ts',
     'test/e2e-connect-tunnel-records.ts',
     'test/e2e-agent-crew.ts',
     'test/e2e-connect-serve-loopback.ts',
+    // Every `aimeat connect` subcommand but serve, plus config, config export/import, validate,
+    // skill install and the screenshot worker's dry run, each spawned as the real binary against
+    // the shared node. Eight to ten minutes, nearly all of it tsx cold-starting fifty-five children.
+    'test/e2e-connect-cli.ts',
     'test/e2e-phase0.ts',
     // The semantic layer: the core ontology served at the namespace our own responses cite, and the
     // two doors that used to store an annotation naming a vocabulary nobody defined.
@@ -549,6 +575,9 @@ const ALL_SUITES = [
     'test/e2e-ai-transcribe.ts',
     'test/e2e-ai-image.ts',
     'test/e2e-chat.ts',
+    // The other half of e2e-chat: a node that HAS an agent. Runs two nodes of its own (40300 and
+    // 40301) with a fake ACP peer as goose, because AIMEAT_GOOSE_BIN is process-wide configuration.
+    'test/e2e-chat-agent.ts',
     'test/e2e-llm-proxy.ts',
     'test/e2e-message-transcript.ts',
     'test/ai.ts',
@@ -603,6 +632,9 @@ const ALL_SUITES = [
     // The step kind a workflow was missing: an extension action, run on this node with no agent
     // online and no model in the path, gated by the same success_signal as every other step.
     'test/e2e-workflow-extension-step.ts',
+    // The realtime rooms and the WebSocket at /v1/realtime/ws: every route, every message type and
+    // every refusal on the upgrade. Nothing had ever opened that socket.
+    'test/e2e-realtime-rooms.ts',
     'test/e2e-public-activity.ts',
     'test/e2e-public-totals.ts',
     'test/e2e-cortex-upload-ownership.ts',

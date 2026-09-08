@@ -22,6 +22,8 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.5.0 — 2026-09-08 — An agent process that exited is replaced on the next turn instead of
+ *     being kept as a client that refuses everything.
  *   v1.4.0 — 2026-08-17 — A spreadsheet, a Word document and a PDF become text instead of being
  *     turned away. A .xlsx arrives as CSV, which is what the next question usually wants. The
  *     pre-2007 binary formats are named as unsupported with the one step that fixes them.
@@ -67,6 +69,14 @@ export function chatEnabled(config: AimeatConfig): boolean {
  * reason goose's own session manager holds a per-session creation lock.
  */
 async function agent(config: AimeatConfig): Promise<GooseAcpClient> {
+    // A process that died stays dead; the client wrapping it refuses every call. Until 2026-09-08
+    // it was kept anyway, so one crash left chat answering "goose agent is not running" until the
+    // node restarted (found by e2e-chat-agent). A dead one is dropped and the next turn starts a
+    // fresh process; the generation stamp then retires every session the old one issued.
+    if (client?.isClosed) {
+        logger.warn(`[chat] agent process is gone (generation ${generation}); the next turn starts another`);
+        client = null;
+    }
     if (client) return client;
     if (starting) return starting;
 

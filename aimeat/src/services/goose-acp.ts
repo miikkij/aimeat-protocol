@@ -25,6 +25,8 @@
  *   const sessionId = await acp.newSession({ mcpServers: [aimeatMcpServer(base, token)] });
  *   for await (const u of acp.prompt(sessionId, 'build me a pong game')) { … }
  * @version-history
+ *   v2.4.0 — 2026-09-08 — `isClosed`, so chat-session can tell a dead process from a live one and
+ *     start another instead of refusing every turn until the node restarts.
  *   v2.3.0 — 2026-08-16 — prompt() takes images and sends them as ACP image blocks. A picture the
  *     person attached goes to the model as bytes: a private address on this node is one the
  *     provider's servers cannot fetch, and a link they silently fail to open is indistinguishable
@@ -98,6 +100,9 @@ export class GooseAcpClient {
     private readonly bus = new EventEmitter();
     private buffer = '';
     private closed = false;
+
+    /** True once the process has exited or failed to start; every later call is refused. */
+    get isClosed(): boolean { return this.closed; }
 
     private constructor(private readonly child: ChildProcessWithoutNullStreams) {
         // One listener per in-flight turn; the default of 10 is too few once a handful of people are

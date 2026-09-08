@@ -13,6 +13,9 @@
  *   - setNotificationService(): wires optional mailbox-notification delivery
  *
  * @version-history
+ *   v1.1.0 — 2026-09-08 — A replaced socket's close handler no longer unregisters the socket that
+ *     replaced it. The registry entry is deleted, and the node marked offline, only by the socket
+ *     the registry still points at. Found by e2e-personal-tunnel the day it first opened the tunnel.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { WebSocket } from 'ws';
@@ -138,6 +141,12 @@ export class TunnelManager {
     });
 
     ws.on('close', () => {
+      // A socket that was replaced (handleConnection closed it because the same node reconnected)
+      // is no longer the registry's entry for this node id: the new socket is. Deleting by id here
+      // dropped that live socket from the registry, so connections_active read 0 and the status
+      // route said offline while a healthy tunnel was open. Measured 2026-09-08 by
+      // e2e-personal-tunnel. Only the socket the registry still points at gets to close the book.
+      if (this.connections.get(nodeId)?.ws !== ws) return;
       this.connections.delete(nodeId);
       const stats = getStats();
       if (stats) {

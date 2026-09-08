@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Email service -- SMTP-based email delivery with retry logic, template support,
  *   and privacy-first logging (never logs email addresses). Supports verification codes,
- *   magic links, notifications, match suggestions, and raw HTML emails.
+ *   magic links, notifications, invitations, access keys and raw HTML emails.
  * @structure
- *   - EmailService interface (sendVerificationCode, sendMagicLink, sendNotification, sendMatchSuggestion, sendInvite, sendRaw)
+ *   - EmailService interface (sendVerificationCode, sendMagicLink, sendNotification, sendInvite, sendKeyInvite, sendKeyCredentials, sendRaw, sendWithAttachments)
  *   - withRetry() exponential backoff helper
  *   - createDisabledService() stub for when SMTP is not configured
  *   - createEmailService() factory (configures nodemailer transport)
@@ -26,6 +26,12 @@
  *   v1.6.0 -- 2026-08-06 -- Add sendWithAttachments() (invoice PDFs via the outbound door) with
  *     reply-to + display-name support: the envelope sender stays the node's own address
  *     (SPF/DKIM), the business's name and reply address ride on top.
+ *   v1.7.0 -- 2026-09-08 -- sendWithAttachments() passes opts.headers to sendMail(). It had taken
+ *     the parameter and dropped it since v1.6.0, so an AI disclosure declared on POST
+ *     /v1/outbound/send never reached a message sent through the node's own transport, while the
+ *     mailbox and company-SMTP paths carried it. Found by test/e2e-email-delivery.ts, the first
+ *     suite to run this service at all. Same commit removes sendMatchSuggestion(), which had no
+ *     caller anywhere in src/.
  */
 
 import { createTransport, type Transporter } from 'nodemailer';
@@ -36,7 +42,6 @@ import {
   verificationEmailHtml,
   magicLinkEmailHtml,
   notificationEmailHtml,
-  matchSuggestionEmailHtml,
   inviteEmailHtml,
   inviteEmailSubject,
   keyInviteEmailHtml,
@@ -44,8 +49,6 @@ import {
   keyCredentialsEmailHtml,
   keyCredentialsEmailSubject,
 } from './email-templates.js';
-
-export type { MatchSuggestion } from './email-templates.js';
 
 export interface EmailAttachment {
   filename: string;
@@ -58,7 +61,6 @@ export interface EmailService {
   sendVerificationCode(to: string, code: string, locale?: string): Promise<boolean>;
   sendMagicLink(to: string, loginUrl: string, locale?: string): Promise<boolean>;
   sendNotification(to: string, subject: string, body: string): Promise<boolean>;
-  sendMatchSuggestion(to: string, matches: import('./email-templates.js').MatchSuggestion[], locale?: string): Promise<boolean>;
   sendInvite(to: string, args: import('./email-templates.js').InviteEmailArgs, locale?: string): Promise<boolean>;
   sendKeyInvite(to: string, args: import('./email-templates.js').KeyInviteEmailArgs, locale?: string): Promise<boolean>;
   sendKeyCredentials(to: string, args: import('./email-templates.js').KeyCredentialsEmailArgs, locale?: string): Promise<boolean>;
@@ -110,7 +112,6 @@ function createDisabledService(): EmailService {
     sendVerificationCode: () => warn('sendVerificationCode'),
     sendMagicLink: () => warn('sendMagicLink'),
     sendNotification: () => warn('sendNotification'),
-    sendMatchSuggestion: () => warn('sendMatchSuggestion'),
     sendInvite: () => warn('sendInvite'),
     sendKeyInvite: () => warn('sendKeyInvite'),
     sendKeyCredentials: () => warn('sendKeyCredentials'),
@@ -181,12 +182,6 @@ export function createEmailService(config: AimeatConfig): EmailService {
       return send(to, subject, html, text, 'notification');
     },
 
-    async sendMatchSuggestion(to: string, matches: import('./email-templates.js').MatchSuggestion[], locale?: string): Promise<boolean> {
-      const { html, text } = matchSuggestionEmailHtml(matches, locale);
-      const subject = locale === 'fi' ? 'Uusia ehdotuksia AIMEAT:ssa' : 'New Match Suggestions on AIMEAT';
-      return send(to, subject, html, text, 'match_suggestion');
-    },
-
     async sendInvite(to: string, args: import('./email-templates.js').InviteEmailArgs, locale?: string): Promise<boolean> {
       const { html, text } = inviteEmailHtml(args, locale);
       const subject = inviteEmailSubject(args.orgName, locale);
@@ -217,6 +212,13 @@ export function createEmailService(config: AimeatConfig): EmailService {
           () => transporter.sendMail({
             from: fromHeader, to, subject, html, text,
             replyTo: opts?.replyTo,
+            // The disclosure header rides here. It was accepted in the signature and dropped before
+            // the wire until 2026-09-08, so a caller that declared AI authorship on the outbound
+            // door got a message with no mark on it, and the two other send paths (a person's own
+            // mailbox, a company's SMTP) carried the same header correctly. A disclosure that
+            // appears on some paths and not others is worse than none, because it makes the
+            // messages without it look human-written.
+            ...(opts?.headers && Object.keys(opts.headers).length ? { headers: opts.headers } : {}),
             attachments: attachments.map((a) => ({ filename: a.filename, content: a.content, contentType: a.contentType })),
           }),
           subject,
