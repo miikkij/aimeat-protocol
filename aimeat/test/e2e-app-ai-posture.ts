@@ -22,6 +22,7 @@
  *   lineage · the manifest all-or-nothing check · cross-owner and cross-scope refusals
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-ai-posture
  * @version-history
+ *   v1.0.1 -- 2026-09-08 -- Assert the shared-development refusal and hide draft existence.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 5.
  */
 import * as ed from '@noble/ed25519';
@@ -322,14 +323,20 @@ const b64 = (s: string) => Buffer.from(s, 'utf-8').toString('base64');
         assert(row && row.parked === false, 'another owner parked my app');
     });
 
-    await test('another owner cannot read my staging draft (owner-only, resolved in their namespace)', async () => {
+    await test('an owner without development rights cannot read or probe my staging draft', async () => {
         const put = await json(`/v1/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(silentName)}/draft`, {
             method: 'PUT', headers: auth(o.token),
             body: JSON.stringify({ content: b64(SILENT_APP), mime_type: 'text/html' }),
         });
         assert(put.status === 200 || put.status === 201, `draft save ${put.status}`);
         const theirs = await json(`/v1/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(silentName)}/draft`, { headers: auth(other.token) });
-        assert(theirs.status === 404, `a draft must be owner-only, got ${theirs.status}`);
+        assert(theirs.status === 403 && theirs.body.error?.code === 'FORBIDDEN', `development rights required, got ${theirs.status}`);
+        assert(theirs.body.data === undefined, 'the refusal must not include draft data');
+        const missing = await json(`/v1/apps/${encodeURIComponent(o.name)}/absent-draft.html/draft`, { headers: auth(other.token) });
+        assert(missing.status === theirs.status && missing.body.error?.code === theirs.body.error?.code,
+            'the refusal must not disclose whether a draft exists');
+        assert(missing.body.error?.message === theirs.body.error?.message && missing.body.data === undefined,
+            'existing and absent drafts must have the same refusal body');
     });
 
     console.log(`\n  ${passed} passed, ${failed} failed`);

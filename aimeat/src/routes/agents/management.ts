@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.1 -- 2026-09-08 -- Clearing agent CORS passes null so PostgreSQL clears the stored list.
  *   v1.6.0 -- 2026-09-06 -- PATCH scopes pushes scopes_changed down the live tunnel as well as
  *     emitting the tool-list change: an MCP session re-lists its tools on that signal, but a
  *     connector holding a minted token heard nothing at all, in either direction.
@@ -592,7 +593,8 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     }
 
     const updated = await storage.updateAgent(agent.gaii, {
-      allowedOrigins: allowed_origins === null ? undefined : allowed_origins,
+      // Undefined leaves the PostgreSQL column unchanged; null restores inherited origins.
+      allowedOrigins: allowed_origins,
     });
     if (!updated) {
       res.status(500).json(error(config.nodeId, 'INTERNAL', 'This one is on us — the change could not be saved. It is already reported; try again in a moment.'));
