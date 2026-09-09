@@ -11,13 +11,19 @@
  * @structure WORKFLOW_SEEDS — workflow-improve-mcp · workflow-create-mcp · workflow-create-chat
  * @usage import { WORKFLOW_SEEDS } from './prompt-defaults/workflows.js';
  * @version-history
+ *   v1.1.0 — 2026-09-09 — The prompts know about `parallel` and the skipped start: one live run is
+ *     the default and a second start says it started nothing; a chain that handles many cases at
+ *     once sets parallel with a case variable in its keys. Without this the AI reading the prompt
+ *     could not have offered what the node now does.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import type { PromptSeedEntry } from '../prompt-defaults.js';
 
 const WHAT_A_WORKFLOW_IS = `## What a workflow is here
 
-A workflow is a chain of agent jobs. Each step is ONE agent's ONE published offer, and the offer brings two checks with it: what must already be in memory before the step is worth running (required_to_function, the input gate) and how the node sees that the step produced (success_signal: a memory key and a condition). A run pins the definition and dispatches each ready step as a task to its agent; a step is green when its success signal is true in memory, red when it ran and did not produce (output-red) or when its input was never there (input-red). A run is "done" only when every step is green; otherwise it is "partial", and the reason sits on the step. Steps run in the order of their \`after\` edges; a step with no \`after\` starts at once. A human-input step parks the run until the person answers. Variables ({date}, {edition}, ...) are declared once and appear in key templates in braces.`;
+A workflow is a chain of agent jobs. Each step is ONE agent's ONE published offer, and the offer brings two checks with it: what must already be in memory before the step is worth running (required_to_function, the input gate) and how the node sees that the step produced (success_signal: a memory key and a condition). A run pins the definition and dispatches each ready step as a task to its agent; a step is green when its success signal is true in memory, red when it ran and did not produce (output-red) or when its input was never there (input-red). A run is "done" only when every step is green; otherwise it is "partial", and the reason sits on the step. Steps run in the order of their \`after\` edges; a step with no \`after\` starts at once. A human-input step parks the run until the person answers. Variables ({date}, {edition}, ...) are declared once and appear in key templates in braces.
+
+One live run at a time is the default: a second start while a run is in flight starts nothing and answers \`skipped: true\` with the running run's id. A workflow whose keys tell its runs apart (a case reference in the variables, or the built-in {run} in the keys) may set \`parallel: true\` in its definition, and then every start runs, side by side. \`parallel\` cannot be combined with \`fresh\` (clearing the produced keys at run start), because that would clear the other run's work.`;
 
 export const WORKFLOW_SEEDS: PromptSeedEntry[] = [
   {
@@ -58,7 +64,7 @@ ${WHAT_A_WORKFLOW_IS}
 
 1. Read my agents with \`aimeat_agents_list\`, then each agent's offers. Only an offer that publishes a success_signal, a required_to_function and a deliverable location can be a step; list the ones that can, each as "agent · offer: what it reads, what it writes".
 2. Ask me two things, one at a time: what the chain must produce in the end (which memory key, in what shape), and when it should run (by hand, on a schedule with a time and a timezone, or when a key is written).
-3. Propose the steps in order, in words: "1. fetch, by news-fetcher · fetch-edition-raw: reads nothing, writes news.{date}.raw, done when it holds at least 12 categories. 2. write, by news-writer · evening-write: after fetch, ...". Name every variable the keys use and its default; the built-in {date} is the run's date and {run} the run id. Say which steps could run in parallel and which must wait.
+3. Propose the steps in order, in words: "1. fetch, by news-fetcher · fetch-edition-raw: reads nothing, writes news.{date}.raw, done when it holds at least 12 categories. 2. write, by news-writer · evening-write: after fetch, ...". Name every variable the keys use and its default; the built-in {date} is the run's date and {run} the run id. Say which steps could run in parallel and which must wait. If the chain is meant to handle many things at once (one run per case, per ticket, per order), say so and propose \`parallel: true\` with a variable in the keys that tells the runs apart; otherwise leave it off, and a second start while one runs is skipped and says so.
 4. Show me the definition as JSON only when I ask for it. Otherwise keep it in words.
 5. When I say yes, call \`aimeat_workflow_save\` with the id I choose (lowercase slug), the definition (title, description, trigger, vars, steps with agent, offer, after, timeout_min, retry, and \`on_step_fail: "inspect"\`). If the save is refused, read the errors back to me in words: they name the step.
 6. Then run a check: \`aimeat_workflow_run\` with mode \`signals-only\`. It reads memory now and dispatches nothing. Report what it says. Start a full run only if I ask.
@@ -104,7 +110,7 @@ When I say yes, reply with exactly one fenced JSON block, nothing after it:
 }
 \`\`\`
 
-Rules for the block: \`id\` is a lowercase slug; every step's agent and offer come from the list above, exactly as written; \`after\` names earlier step ids only, no cycles; a step with no input names \`"required_to_function": "none"\`; a schedule trigger is \`{ "kind": "schedule", "cron": "17 0 * * *", "timezone": "Europe/Helsinki" }\`; every {variable} used in a key is declared in \`vars\`. Do not add fields you were not shown.`,
+Rules for the block: \`id\` is a lowercase slug; every step's agent and offer come from the list above, exactly as written; \`after\` names earlier step ids only, no cycles; a step with no input names \`"required_to_function": "none"\`; a schedule trigger is \`{ "kind": "schedule", "cron": "17 0 * * *", "timezone": "Europe/Helsinki" }\`; every {variable} used in a key is declared in \`vars\`. A chain that must handle many cases at once adds \`"parallel": true\` beside \`"notify_on_finish"\` and carries the case in a variable that appears in the keys. Do not add other fields you were not shown.`,
     variables: ['owner_name', 'node_url', 'node_id', 'agents_and_offers'],
     usedIn: ['/v1/templates/workflow-create-chat'],
   },

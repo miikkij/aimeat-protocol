@@ -99,7 +99,7 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             id: { type: 'string', required: true, description: 'Workflow id (lowercase slug); existing id = update.' },
-            definition: { type: 'object', required: true, description: 'The descriptor: { title, description, trigger, vars[], steps[], on_step_fail:"inspect", llm?{approved} }.' },
+            definition: { type: 'object', required: true, description: 'The descriptor: { title, description, trigger, vars[], steps[], on_step_fail:"inspect", llm?{approved}, notify_on_finish?, resume?, fresh?, skip_done?, parallel? }. parallel:true lets two or more live runs of this workflow overlap; use it when the keys carry a run-distinguishing var (a case reference in vars, or the built-in {run}); without it a second start while one is in flight is skipped and says so. Refused together with fresh.' },
             propose: { type: 'boolean', description: 'Operator flow (server MCP only): return a diff vs the current definition + a single-use confirm_token WITHOUT saving.' },
             confirm_token: { type: 'string', description: 'Token from the propose step — applies exactly the proposed definition.' },
         },
@@ -113,7 +113,7 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workflow_run',
-        description: 'Run a workflow. mode="signals-only" is a CHECK: it evaluates every step\'s signals against existing memory with NO dispatch, costs nothing, returns each step\'s verdict inline, and is kept apart from the runs (it does not appear in the run history or the health); mode="full" executes the steps live (dispatches the agent tasks, which takes time and spends their budget; poll aimeat_workflow_get for progress). Use signals-only to validate a workflow or to see what is already in memory before a full run.',
+        description: 'Run a workflow. mode="signals-only" is a CHECK: it evaluates every step\'s signals against existing memory with NO dispatch, costs nothing, returns each step\'s verdict inline, and is kept apart from the runs (it does not appear in the run history or the health); mode="full" executes the steps live (dispatches the agent tasks, which takes time and spends their budget; poll aimeat_workflow_get for progress). Use signals-only to validate a workflow or to see what is already in memory before a full run. A full start while a live run of the same workflow is in flight starts NOTHING unless the definition sets parallel:true: the answer then carries skipped:true and the id of the run that is running, not a new one. Read the flag before treating the id as yours.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

@@ -168,6 +168,7 @@ function endFold(f, set) {
     ${yn('notify', c('setNotify'), c('notifyHint'))}
     ${yn('skipDone', c('setSkipDone'), c('skipDoneHint'))}
     ${yn('fresh', c('setFresh'), c('freshHint'))}
+    ${yn('parallel', c('setParallel'), c('parallelHint'))}
     <div class="og-field"><span class="og-label">${c('setOnFail')}</span><span class="wp-prose">${c('onFailInspect')}</span><span class="wp-hint">${c('onFailHint')}</span></div>
   </div>`;
 }
@@ -212,7 +213,7 @@ export function formOf(def) {
       retryMax: s.retry?.max || 0, backoffMin: s.retry?.backoff_min || 5, action: s.action && s.action.kind !== 'agent' ? s.action : null,
       offerKeys: '',
     })),
-    notify: !!def?.notify_on_finish, skipDone: !!def?.skip_done, fresh: !!def?.fresh, llm: !!def?.llm?.approved,
+    notify: !!def?.notify_on_finish, skipDone: !!def?.skip_done, fresh: !!def?.fresh, parallel: !!def?.parallel, llm: !!def?.llm?.approved,
   };
 }
 
@@ -239,6 +240,7 @@ export function defOf(f) {
     ...(f.notify ? { notify_on_finish: true } : {}),
     ...(f.skipDone ? { skip_done: true } : {}),
     ...(f.fresh ? { fresh: true } : {}),
+    ...(f.parallel ? { parallel: true } : {}),
     ...(f.llm ? { llm: { approved: true } } : {}),
   };
 }
