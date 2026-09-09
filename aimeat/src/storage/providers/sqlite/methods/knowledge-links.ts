@@ -9,10 +9,11 @@
  *   move: same bodies, same comments, same behaviour, merged onto SqliteStorage by the same
  *   prototype merge. Knowledge links were never an app-catalog concern; they lived there because
  *   the original extraction from index.ts cut by file size rather than by subject.
- * @structure knowledgeLinkMethods — createLink, getLink, listLinks, deleteLink, and the
- *   contributor sweep the erasure path uses.
+ * @structure knowledgeLinkMethods — createLink, listLinks, deleteLink, and the contributor sweep
+ *   the erasure path uses.
  * @usage merged into SqliteStorage alongside appsMethods (providers/sqlite/index.ts)
  * @version-history
+ *   v1.1.0 — 2026-09-09 — getLink deleted: no caller.
  *   v1.0.0 — 2026-08-25 — Extracted from methods/apps.ts (max-file-lines)
  */
 import type { MemoryLinkRecord } from '../../../interface.js';
@@ -29,11 +30,6 @@ export const knowledgeLinkMethods = {
         linked_at = excluded.linked_at, linked_by = excluded.linked_by
     `).run(record.source, record.target, record.relation, record.description, record.linked_at, record.linked_by);
     return record;
-  },
-
-  async getLink(this: SqliteStorage, source: string, target: string): Promise<MemoryLinkRecord | null> {
-    const row = this.db.prepare('SELECT * FROM knowledge_links WHERE source = ? AND target = ?').get(source, target) as MemoryLinkRecord | undefined;
-    return row ?? null;
   },
 
   async listLinks(this: SqliteStorage, key: string, opts?: { direction?: 'outgoing' | 'incoming' | 'both'; relation?: string }): Promise<MemoryLinkRecord[]> {

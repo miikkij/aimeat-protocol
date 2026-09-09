@@ -2,15 +2,16 @@
  * @file src/storage/providers/sqlite/methods/messaging.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Agent-message, Direct-message, Onboarding, Telemetry, Webhook-log methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
+ * @description Agent-message, Direct-message, Onboarding, Webhook-log methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.4.0 — 2026-09-09 — appendTelemetry, listTelemetry and listOnboardingByOwner deleted: no caller.
  *   v1.3.0 — 2026-08-22 — Pass groupScope through to listDmsAddressedTo.
  *   v1.2.0 — 2026-07-16 — Wire getDirectMessagesByIds (Phase 3 batch) through to the repo.
  *   v1.1.0 — 2026-07-16 — Wire listConversationsForOwners (Phase 3 batch) through to the repo.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  */
 import type {
-  AgentMessageRecord, DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats, TelemetryEvent,
+  AgentMessageRecord, DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats,
   WebhookDeliveryLog, AgentOnboardingRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
@@ -270,67 +271,11 @@ export const messagingMethods = {
     return result.changes > 0;
   },
 
-  async listOnboardingByOwner(this: SqliteStorage, owner: string): Promise<AgentOnboardingRecord[]> {
-    const rows = this.db.prepare(
-      `SELECT * FROM agent_onboarding WHERE agentGaii LIKE ? ORDER BY startedAt DESC`
-    ).all(`%#${owner}@%`) as Record<string, unknown>[];
-    return rows.map(row => this.deserializeOnboarding(row));
-  },
-
   async listOnboardingByStatus(this: SqliteStorage, status: string): Promise<AgentOnboardingRecord[]> {
     const rows = this.db.prepare(
       'SELECT * FROM agent_onboarding WHERE status = ? ORDER BY startedAt DESC'
     ).all(status) as Record<string, unknown>[];
     return rows.map(row => this.deserializeOnboarding(row));
-  },
-
-  // ══════════════════════════════════════════════════════════
-  // ── Telemetry Events ──
-  // ══════════════════════════════════════════════════════════
-
-  async appendTelemetry(this: SqliteStorage, event: TelemetryEvent): Promise<void> {
-    this.db.prepare(
-      `INSERT INTO telemetry_events (id, agentGaii, type, data, sessionId, taskId, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      event.id,
-      event.agentGaii,
-      event.type,
-      JSON.stringify(event.data),
-      event.sessionId ?? null,
-      event.taskId ?? null,
-      event.createdAt,
-    );
-  },
-
-  async listTelemetry(this: SqliteStorage, agentGaii: string, opts: { since?: string; type?: string; limit?: number }): Promise<TelemetryEvent[]> {
-    let whereSql = 'WHERE agentGaii = ?';
-    const params: unknown[] = [agentGaii];
-
-    if (opts.since) {
-      whereSql += ' AND createdAt > ?';
-      params.push(opts.since);
-    }
-    if (opts.type) {
-      whereSql += ' AND type = ?';
-      params.push(opts.type);
-    }
-
-    const limit = opts.limit ?? 50;
-
-    const rows = this.db.prepare(
-      `SELECT * FROM telemetry_events ${whereSql} ORDER BY createdAt DESC LIMIT ?`
-    ).all(...params, limit) as Record<string, unknown>[];
-
-    return rows.map(row => ({
-      id: row.id as string,
-      agentGaii: row.agentGaii as string,
-      type: row.type as TelemetryEvent['type'],
-      data: JSON.parse(row.data as string),
-      sessionId: row.sessionId as string | undefined,
-      taskId: row.taskId as string | undefined,
-      createdAt: row.createdAt as string,
-    }));
   },
 
   // ══════════════════════════════════════════════════════════

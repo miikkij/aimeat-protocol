@@ -213,12 +213,6 @@ describe('Organism Reputation Service', () => {
             }),
             calculatedAt: expect.any(String),
         }));
-
-        // Verify it is persisted in storage
-        const stored = await storage.getOrganismReputation('org-stored');
-        expect(stored).not.toBeNull();
-        expect(stored!.organismId).toBe('org-stored');
-        expect(stored!.score).toBe(result!.score);
     });
 
     it('score is capped between 0 and 100', async () => {

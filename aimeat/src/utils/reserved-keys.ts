@@ -18,6 +18,8 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.8.0 — 2026-09-09 — `crews.llm.` joins the list: which model an agent thinks with, and the
+ *     provider block behind it, which names the endpoint that agent's runtime will call.
  *   v1.7.0 — 2026-08-31 — `ai.jobs.` joins the list. A job record is an INSTRUCTION the server reads
  *     back: which model, whose key, what prompt, which key to write the answer to. Writing one is
  *     asking this node to spend the owner's money, so it is the same class as `ai-usage.` one step
@@ -107,6 +109,20 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // Measured 2026-08-31: nothing writes this prefix through the memory API. The legitimate writer is
   // services/ai-jobs/, server-side, which never passes through this gate.
   'ai.jobs.',
+  // 2026-09-09: `crews.llm.<agent>` and `crews.llm.default` say WHICH MODEL an agent thinks with,
+  // and a `model` choice carries the provider block whole — including `base_url`, the endpoint the
+  // agent's own runtime will then talk to, and `api_key_env`, the name of the variable it reads a
+  // key from. A granted app that could write one could point every one of the owner's agents at an
+  // endpoint of its choosing and have them read the key meant for somebody else's. That is the
+  // `openrouter.` reasoning exactly, one layer out: the same class of record, on a machine this
+  // node does not own. `crews.llm.catalog` is on the list for the other half of the same trick —
+  // it is the list the picker offers, so forging it is how a person would be led to pick the
+  // poisoned entry themselves. The legitimate writers are the owner's own routes
+  // (PUT /v1/agents/:name/crew/llm, PUT /v1/agents/llm-default) and the runtime publishing its own
+  // catalogue with its agent token; neither passes through this gate. `crews.registry.` and
+  // `crews.runtime.` stay OFF the list deliberately: a definition is checked by the runtime that
+  // will run it, and misdirectedCrewKey already refuses one written into the wrong namespace.
+  'crews.llm.',
 ] as const;
 
 /** True iff `key` falls under a reserved, server-trusted owner-namespace prefix. */

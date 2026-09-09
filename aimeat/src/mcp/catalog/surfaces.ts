@@ -210,6 +210,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_board_read',
         'aimeat_agent_profile', 'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_tags_set', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
         'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish', 'aimeat_crew_seed',
+        'aimeat_crew_menu', 'aimeat_crew_llm_set',
         'aimeat_usage_report',
         // Who holds a key to the owner's account: the Access page's read, for the agent the owner
         // trusted with account:security. Read-only; every revoke stays on the page.
@@ -252,6 +253,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
         'aimeat_agent_profile', 'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_tags_set', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
         'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish', 'aimeat_crew_seed',
+        'aimeat_crew_menu', 'aimeat_crew_llm_set',
         'aimeat_usage_report',
         'aimeat_onboarding_status', 'aimeat_onboarding_identify_platform', 'aimeat_onboarding_confirm_skill_installed',
         'aimeat_onboarding_confirm_directives_read', 'aimeat_onboarding_declare_services',
@@ -307,6 +309,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // the owner's own agents, telling the person where to press.
         'aimeat_agent_basics_get', 'aimeat_agent_basics_request', 'aimeat_agent_propose',
         'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish', 'aimeat_crew_seed',
+        'aimeat_crew_menu', 'aimeat_crew_llm_set',
         'aimeat_operator_agent_configure', 'aimeat_operator_ai_config',
     ],
     // The selling surface (/v2/mcp/commerce): everything an agent needs to price something, take

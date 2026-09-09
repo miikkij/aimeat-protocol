@@ -156,7 +156,8 @@ export function oauthLoginRouter(
 
     // POST /v1/ghii/login/<id>/finalize — Complete a brand-new signup with the chosen username.
     router.post(`/v1/ghii/login/${p.id}/finalize`,
-      rateLimit({ max: config.registrationRateLimitMax, windowMs: config.registrationRateLimitWindowMs }),
+      // By IP only, like POST /v1/ghii: this is a sign-up door and takes no credential (2026-09-09).
+      rateLimit({ max: config.registrationRateLimitMax, windowMs: config.registrationRateLimitWindowMs, keyBy: 'ip' }),
       async (req, res) => {
         try {
           const result = await finalizeExternalSignup(storage, config, req, res, { providerId: p.id, via: 'oauth' });

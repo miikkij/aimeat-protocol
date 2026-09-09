@@ -190,17 +190,6 @@ describe('CapabilityRepository (SQLite)', () => {
     expect(errors[0].error).toBe('boom');
   });
 
-  it('deleteLogsBefore', async () => {
-    const cap = makeCap();
-    await s.createCapability(cap);
-    await s.addCapabilityLog({ id: 'old', capabilityId: cap.id, callerGhii: 'a@n', input: {}, status: 'success', durationMs: 1, error: null, timestamp: '2020-01-01T00:00:00Z' });
-    await s.addCapabilityLog({ id: 'new', capabilityId: cap.id, callerGhii: 'a@n', input: {}, status: 'success', durationMs: 1, error: null, timestamp: new Date().toISOString() });
-    const deleted = await s.deleteCapabilityLogsBefore('2025-01-01T00:00:00Z');
-    expect(deleted).toBe(1);
-    const { total } = await s.listCapabilityLogs(cap.id, {});
-    expect(total).toBe(1);
-  });
-
   it('setOverride', async () => {
     const cap = makeCap();
     await s.createCapability(cap);
@@ -213,10 +202,9 @@ describe('CapabilityRepository (SQLite)', () => {
     expect(got2!.operatorOverride).toBeNull();
   });
 
-  it('setTrust, and vouches as ROWS: dedup per voucher, derived count, comment kept', async () => {
+  it('vouches as ROWS: dedup per voucher, derived count, comment kept', async () => {
     const cap = makeCap();
     await s.createCapability(cap);
-    await s.setCapabilityTrust(cap.id, { operatorReviewed: true, reviewedAt: new Date().toISOString() });
 
     // Two different people vouch; one of them tries twice — the second try is a no-op that says
     // so, which is the exact contract the old counter could not offer.
@@ -226,7 +214,6 @@ describe('CapabilityRepository (SQLite)', () => {
     expect(await s.countCapabilityVouches(cap.id)).toBe(2);
 
     const got = await s.getCapability(cap.id);
-    expect(got!.trust.operatorReviewed).toBe(true);
     expect(got!.trust.vouchCount).toBe(2); // the blob mirrors the rows
 
     // Removing takes exactly the named person's vouch, and only once.

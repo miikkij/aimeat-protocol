@@ -13,17 +13,26 @@
  *   tally says "four principals, 900 writes" is exactly what somebody answering a deletion request
  *   needs.
  *
- *   TWO GRAINS, AND BOTH EARN THEIR KEEP. The per-KEY grain answers "how many hands on this one
- *   record", which is the question a deletion request asks. The per-FAMILY grain is what a data-map
- *   row renders and what the coverage view sums, without scanning 18,446 keys for one owner. Folding
- *   to one would lose one of those two questions outright.
+ *   TWO GRAINS. The per-KEY grain answers "how many hands on this one record", which is the question
+ *   a deletion request asks, and it is what memory-hands and the data map read. The per-FAMILY grain
+ *   is written beside it by the same buffer so the question can one day be asked per family without
+ *   scanning 18,446 keys for one owner; its reader was deleted on 2026-09-09 for having no caller,
+ *   so today it accumulates and nothing reads it.
  *
  *   `keyCount` is deliberately not a column. A distinct-key count is not derivable from an upsert,
- *   and holding it in the write buffer would be wrong across a restart; countTalliedKeys does it in
- *   SQL against the (ownerGaii, key) index instead.
- * @structure MemoryWriteTallyRow · MemoryFamilyTallyRow · MemoryTallyUpsert · MemoryTallyRepository
+ *   and holding it in the write buffer would be wrong across a restart; when it is needed it is one
+ *   COUNT(DISTINCT key) against the (ownerGaii, key) index.
+ *
+ *   ERASURE runs inside deleteOwner on each provider (pseudonymiseWriter on SQLite,
+ *   pseudonymiseTallyWriterDb on Postgres): rows where the erased owner was the WRITER into somebody
+ *   else's namespace keep their counts under a stable `erased:{hash}` marker, because they are the
+ *   receiving owner's record of who touched their data.
+ * @structure MemoryWriteTallyRow · MemoryTallyUpsert · MemoryTallyRepository
  * @usage implemented by both storage providers; called through Storage.
  * @version-history
+ *   v1.1.0 — 2026-09-09 — listMemoryFamilyTally, countTalliedKeys and pseudonymiseTallyWriter deleted
+ *     from the Storage surface: no caller outside their own unit test. The erasure stays as a
+ *     provider-level function the owner cascade calls directly. MemoryFamilyTallyRow went with its reader.
  *   v1.0.0 — 2026-08-24 — Initial creation for TARGET-073 step 8.
  */
 
@@ -36,12 +45,6 @@ export interface MemoryWriteTallyRow {
   deleteCount: number;
   firstAt: string;
   lastAt: string;
-}
-
-/** The same, folded to the key family, with the basis the family was identified on at write time. */
-export interface MemoryFamilyTallyRow extends Omit<MemoryWriteTallyRow, 'key'> {
-  keyFamily: string;
-  tier: string;
 }
 
 /** One touch to fold in. Counts are DELTAS to add, never absolutes to set. */
@@ -69,24 +72,4 @@ export interface MemoryTallyRepository {
   listMemoryWriteTally(filter: {
     ownerGaii: string; key?: string; keyPrefix?: string; limit?: number;
   }): Promise<MemoryWriteTallyRow[]>;
-
-  /** Hands on one family, or on all of an owner's families. */
-  listMemoryFamilyTally(filter: {
-    ownerGaii: string; family?: string; limit?: number;
-  }): Promise<MemoryFamilyTallyRow[]>;
-
-  /** How many DISTINCT keys a family has actually seen written. Not derivable from an upsert. */
-  countTalliedKeys(ownerGaii: string, familyPrefix: string): Promise<number>;
-
-  /**
-   * Erasure. When an owner is deleted, rows in THEIR OWN namespace go with the rest of their data —
-   * a released username would otherwise hand the next registrant somebody else's history. But a row
-   * where they were the WRITER into somebody else's namespace belongs to the receiving owner: it is
-   * that owner's record of who touched their data, and deleting it would turn their "four hands"
-   * into three. So the writer is pseudonymised instead — `erased:{12 hex of sha256}`, a stable hash
-   * so two erased writers do not merge into one.
-   *
-   * Returns how many rows were rewritten.
-   */
-  pseudonymiseTallyWriter(ownerName: string, nodeId: string): Promise<number>;
 }

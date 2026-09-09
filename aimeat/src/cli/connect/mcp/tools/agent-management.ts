@@ -275,4 +275,35 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
       return text(await client.post(`/v1/agents/${encodeURIComponent(target_agent_name)}/crew/seed`, { doc, validate_with }));
     },
   );
+
+  // What the runtime offers, and which model it thinks with. Read the menu before writing a `tools`
+  // list: this node's own fixed list has been behind the runtime's registry.
+  mcp.tool(
+    'aimeat_crew_menu',
+    descriptionFor('aimeat_crew_menu'),
+    { agent_name: agentNameSchema, target_agent_name: crewAgentSchema },
+    annotationsFor('aimeat_crew_menu'),
+    async ({ agent_name, target_agent_name }) => {
+      const { client } = pickAgent(registry, agent_name);
+      return text(await client.get(`/v1/agents/${encodeURIComponent(target_agent_name)}/crew/menu`));
+    },
+  );
+
+  mcp.tool(
+    'aimeat_crew_llm_set',
+    descriptionFor('aimeat_crew_llm_set'),
+    {
+      agent_name: agentNameSchema,
+      target_agent_name: z.string().optional().describe("The agent to set it for. Omit to set the owner's default for every agent."),
+      choice: z.record(z.string(), z.unknown()).nullish().describe("{kind:'profile', profile} or {kind:'model', label, provider}. Omit or null to clear."),
+    },
+    annotationsFor('aimeat_crew_llm_set'),
+    async ({ agent_name, target_agent_name, choice }) => {
+      const { client } = pickAgent(registry, agent_name);
+      const body = { choice: choice ?? null };
+      return text(target_agent_name
+        ? await client.put(`/v1/agents/${encodeURIComponent(target_agent_name)}/crew/llm`, body)
+        : await client.put('/v1/agents/llm-default', body));
+    },
+  );
 }

@@ -140,7 +140,7 @@ export async function resolveThreadAttachmentUrls(msgs, conversationId, prevCach
       // and /v1/pub is the door that reads across namespaces. A duplicated copy is the reader's own.
       const holder = (a.mode !== 'duplicate' && m.direction === 'outbound' && String(a.ownerGhii || '').includes('#'))
         ? a.ownerGhii : undefined;
-      const u = await resolveUrl(key, holder).catch(err => { swallowed('helpers: key', err); return null; });
+      const u = await resolveUrl(key, holder, a.name).catch(err => { swallowed('helpers: key', err); return null; });
       if (u) { map[uk] = u; ts[uk] = now; }
     })));
   return { convId: conversationId, map, ts };

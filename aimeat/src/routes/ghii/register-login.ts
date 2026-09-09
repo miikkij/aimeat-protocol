@@ -6,6 +6,8 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-09-09 — Three guards behind the zod schemas are gone (username required, password
+ *     must be a string, login's username and password required); validateBody answered first.
  *   v1.7.0 — 2026-09-08 — A signed attestation with `verified: false` is a refusal (401), not a
  *     session: the field had been parsed and never read.
  *   v1.6.0 — 2026-09-01 — Federated login verifies the home node's attestation UNCONDITIONALLY. It
@@ -79,10 +81,8 @@ export function registerRegisterLoginRoutes(
             return;
         }
 
-        if (!username || typeof username !== 'string') {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
-            return;
-        }
+        // username is a required non-empty string by GhiiRegistrationSchema, which validateBody
+        // enforces ahead of this handler; the guard that used to sit here could not fire.
 
         // Accept full GHII (e.g. "alice@node-id") -- strip @node-id for local registration
         username = username.trim().toLowerCase();
@@ -118,10 +118,7 @@ export function registerRegisterLoginRoutes(
         // min-length rule, because validateBody runs first and would refuse a short password as
         // VALIDATION_ERROR, which is the wrong code and carries no reason a person can act on.
         if (password !== undefined && password !== null) {
-            if (typeof password !== 'string') {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Password must be a string'));
-                return;
-            }
+            // The schema already types password as a string; only the strength rule lives here.
             const pwErr = validatePasswordStrength(password);
             if (pwErr) {
                 res.status(400).json(error(config.nodeId, 'WEAK_PASSWORD', pwErr));
@@ -345,14 +342,8 @@ export function registerRegisterLoginRoutes(
         // Only mint a fresh owner signing key when the client has none locally.
         const wantsOwnerKey = req.body?.request_owner_key === true;
 
-        if (!username || typeof username !== 'string') {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
-            return;
-        }
-        if (!password || typeof password !== 'string') {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'password is required'));
-            return;
-        }
+        // username and password are required non-empty strings by GhiiLoginSchema (validateBody
+        // above); the two guards that used to sit here could not fire.
 
         // An email, a full GHII (local or federated), or a bare handle — see login-identifier.ts.
         // An email only SELECTS the account by its verified address; the password stays the sole

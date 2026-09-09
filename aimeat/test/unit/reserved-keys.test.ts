@@ -43,7 +43,7 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all ten, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all twelve, and a removal is a test failure rather than a silent regression', () => {
         // `audit.` (2026-08-29): the per-app audit log, which a granted app must not rewrite.
         // `notifications.` (2026-08-30): the owner's notification settings, which notify() acts on
         // to drop a muted sender before the write; an app that could write it could silence the
@@ -56,9 +56,26 @@ describe('the list holds every prefix the server reads and acts on', () => {
         // back — which model, whose key, what prompt, which key to write the answer to — so writing
         // one is asking this node to spend the owner's money. Same class as `ai-usage.`, one step
         // earlier in the same path.
+        // `crews.llm.` (2026-09-09): which model an agent thinks with. A `model` choice carries the
+        // provider block whole — `base_url`, the endpoint that agent's own runtime will call, and
+        // `api_key_env`, the variable it reads a key from — so an app that could write one could
+        // point every agent this owner has at an endpoint of its choosing. `crews.llm.catalog` is
+        // the list the picker offers, which is how a person would be led to pick it themselves.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'audit.', 'chat.', 'commerce.', 'finance.', 'notifications.', 'openrouter.', 'profile.', 'signals.'],
+            ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'finance.', 'notifications.', 'openrouter.', 'profile.', 'signals.'],
         );
+    });
+
+    it('refuses a granted app the model choice, and leaves the DEFINITION keys alone', () => {
+        expect(isReservedServerKey('crews.llm.default')).toBe(true);
+        expect(isReservedServerKey('crews.llm.news-watcher')).toBe(true);
+        expect(isReservedServerKey('crews.llm.catalog')).toBe(true);
+        // A definition is checked by the runtime that will run it, and misdirectedCrewKey already
+        // refuses one written into the wrong namespace, so these stay ordinary owner data.
+        expect(isReservedServerKey('crews.registry.news-watcher')).toBe(false);
+        expect(isReservedServerKey('crews.runtime.news-watcher')).toBe(false);
+        expect(appMayWriteKey(['app'], 'crews.llm.news-watcher')).toBe(false);
+        expect(appMayWriteKey(['app'], 'crews.registry.news-watcher')).toBe(true);
     });
 
     it('refuses a granted app the AI-job records, and leaves ordinary ai-shaped keys alone', () => {

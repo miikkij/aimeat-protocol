@@ -10,13 +10,13 @@
  *   after the read proves nothing, and building an owner per section would hide the thing this
  *   suite is for — that all of it comes back in the same answer.
  *
- *   THREE SECTIONS ARE PINNED EMPTY, with the reason: nothing in this node writes a marketplace
- *   listing, a purchase or an escrow hold, so `listings`, `purchases` and `escrow_holds` can only
- *   ever be empty (the storage methods exist on both backends and have no caller outside this
- *   route). Three more came back empty on the suite's first day and were the same defect the
- *   appeals suite found, an identity read in the wrong alphabet, plus a consent audit trail that
- *   skipped the pending buffer; all three were fixed in the route the same day and tests 7, 12 and
- *   13 assert the fix.
+ *   THREE SECTIONS ARE GONE, and test 14 asserts their absence: nothing in this node ever wrote a
+ *   marketplace listing, a purchase or a generic escrow hold, so `listings`, `purchases` and
+ *   `escrow_holds` could only ever be empty; the storage methods behind them were deleted on
+ *   2026-09-09 for having no caller, and the export stopped naming them. Three more sections came
+ *   back empty on the suite's first day and were the same defect the appeals suite found, an
+ *   identity read in the wrong alphabet, plus a consent audit trail that skipped the pending
+ *   buffer; all three were fixed in the route the same day and tests 7, 12 and 13 assert the fix.
  *
  * @structure
  *   - Setup: the furnished owner, a second owner to provide work and to be refused, one operator
@@ -27,6 +27,9 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-owner-export.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-owner-export
  * @version-history
+ *   v1.2.0 — 2026-09-09 — Test 14 asserts that `listings`, `purchases` and `escrow_holds` are absent:
+ *     the marketplace and generic-escrow storage methods were deleted (no caller) and the export
+ *     sections with them.
  *   v1.1.0 — 2026-09-08 — Tests 7, 12 and 13 assert the fixed export instead of pinning the empty
  *     sections.
  *   v1.0.0 — 2026-09-08 — Initial. 29 tests, 5 of them refusals, 4 of them pinning a section that
@@ -477,18 +480,16 @@ await test('13. A flag filed in an owner session is in ghii_flags_filed', async 
         `the export carries the flag: ${JSON.stringify(exported.ghii_flags_filed)}`);
 });
 
-await test('14. DEFECT PINNED: listings, purchases and escrow holds have no writer at all', async () => {
-    // storage.createListing, createPurchase and createEscrowHold exist on both backends and are
-    // called from nowhere outside the storage layer — no route, no MCP tool, no service. These three
-    // sections cannot carry anything on any node, so the fixture for them is that there is none.
-    assert(Array.isArray(exported.listings) && exported.listings.length === 0, `listings: ${JSON.stringify(exported.listings)}`);
-    assert(exported.purchases && Array.isArray(exported.purchases.as_buyer) && Array.isArray(exported.purchases.as_seller),
-        `purchases: ${JSON.stringify(exported.purchases)}`);
-    assert(exported.purchases.as_buyer.length === 0 && exported.purchases.as_seller.length === 0,
-        `purchases: ${JSON.stringify(exported.purchases)}`);
+await test('14. listings, purchases and escrow holds are not sections of the export any more', async () => {
+    // Until 2026-09-09 this test pinned three sections as empty: the marketplace listing, purchase
+    // and generic escrow-hold storage methods existed on both backends and were called from nowhere
+    // outside the storage layer, so the sections could only ever be empty. The methods were deleted
+    // on 2026-09-09 (no caller) and the sections went with them; an export that still carried the
+    // keys would be naming data nothing can hold.
+    assert(!('listings' in exported), `listings is still a section: ${JSON.stringify(exported.listings)}`);
+    assert(!('purchases' in exported), `purchases is still a section: ${JSON.stringify(exported.purchases)}`);
     for (const agent of exported.agents as any[]) {
-        assert(Array.isArray(agent.escrow_holds) && agent.escrow_holds.length === 0,
-            `escrow_holds on ${agent.gaii}: ${JSON.stringify(agent.escrow_holds)}`);
+        assert(!('escrow_holds' in agent), `escrow_holds is still a section on ${agent.gaii}: ${JSON.stringify(agent.escrow_holds)}`);
     }
 });
 

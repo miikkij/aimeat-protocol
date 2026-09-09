@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Capability, Stats, Agent-task, Directives, Sharing-group, Activity, Usage-ledger methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.1.0 — 2026-09-09 — deleteCapabilityLogsBefore and setCapabilityTrust deleted: no caller.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  */
 import type {
@@ -241,22 +242,9 @@ export const capabilityAgentsMethods = {
     return { logs, total };
   },
 
-  async deleteCapabilityLogsBefore(this: SqliteStorage, before: string): Promise<number> {
-    const result = this.db.prepare('DELETE FROM capability_logs WHERE timestamp < ?').run(before);
-    return result.changes;
-  },
-
   async setCapabilityOverride(this: SqliteStorage, id: string, override: import('../../../interface.js').CapabilityOverride | null): Promise<void> {
     this.db.prepare('UPDATE capabilities SET operatorOverride = ?, updatedAt = ? WHERE id = ?')
       .run(override ? JSON.stringify(override) : null, new Date().toISOString(), id);
-  },
-
-  async setCapabilityTrust(this: SqliteStorage, id: string, trustUpdates: Partial<import('../../../interface.js').CapabilityTrust>): Promise<void> {
-    const cap = await this.getCapability(id);
-    if (!cap) return;
-    const merged = { ...cap.trust, ...trustUpdates };
-    this.db.prepare('UPDATE capabilities SET trust = ?, updatedAt = ? WHERE id = ?')
-      .run(JSON.stringify(merged), new Date().toISOString(), id);
   },
 
   // ── Vouches are ROWS. The table's primary key (capabilityId, userGhii) is the dedup: one

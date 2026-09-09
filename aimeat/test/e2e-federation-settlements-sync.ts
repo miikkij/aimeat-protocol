@@ -44,6 +44,7 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-federation-settlements-sync.ts
  *   E2E_STACKS=1 adds the stack to every failure, for the ones that come from inside the node.
  * @version-history
+ *   v1.2.0 — 2026-09-09 — The relay-share note reads GAP-001 instead of pinning a loop that is gone.
  *   v1.1.0 — 2026-09-08 — The debounce test asserts the flush drains its own enqueues (fixed the
  *     same day) instead of pinning the race.
  *   v1.0.0 — 2026-09-08 — Written to cover the settlement, routing, template and sync-service paths.
@@ -319,13 +320,12 @@ async function run(): Promise<void> {
             `fee split: ${JSON.stringify(dist)}`);
         assert(dist.relay_shares.length === 1 && dist.relay_shares[0].node_id === HOP1_ID && dist.relay_shares[0].amount === 10,
             `only the forwarding hop takes a share: ${JSON.stringify(dist.relay_shares)}`);
-        // TODAY'S BEHAVIOUR, PINNED RATHER THAN ASSERTED AS RIGHT: the credit loop looks the relay
-        // up with storage.getAgent(share.node_id), and share.node_id is a NODE id while getAgent
-        // takes a GAII. No relay is ever paid. See the report that came with this suite.
+        // The distribution is reported and credited to nobody: a share names a relay NODE and no
+        // principal here stands for it (docs/known_gaps.md GAP-001). The loop that used to look a
+        // node id up with storage.getAgent, and so never paid anyone, was removed on 2026-09-09.
         const relayRows = await A.storage.getTransactions(A.ownerGhii, 1000);
         assert(!relayRows.some(r => r.type === 'relay_fee'),
-            'a relay_fee row appeared: the node-id/GAII mismatch in the credit loop may have been fixed, '
-            + 'in which case this assertion is the thing to update rather than the code');
+            'a relay_fee row appeared: GAP-001 was decided, and this assertion is the thing to update');
     });
 
     await test('a manifest whose chain is not contiguous distributes nothing, and the settlement still lands', async () => {

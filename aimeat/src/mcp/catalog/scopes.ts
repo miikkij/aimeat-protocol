@@ -184,6 +184,10 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_crew_draft:                        'memory:write',
     aimeat_crew_publish:                      'memory:write',
     aimeat_crew_seed:                         'memory:write',
+    // The menu is a read of what the runtime offers; the choice is a record in the owner's
+    // namespace, so it takes the same word every other record there takes.
+    aimeat_crew_menu:                         'memory:read',
+    aimeat_crew_llm_set:                      'memory:write',
     aimeat_agent_basics_request:              'memory:write',
     // A proposal IS a memory write — a record under `agents.proposals.` plus a line on the owner's
     // open items — and the same word the sibling ask-route takes. Creating the agent is a different

@@ -12,13 +12,16 @@
  * @structure memoryTallyMethods
  * @usage Object.assign(PostgresKyselyStorage.prototype, memoryTallyMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-09-09 — listMemoryFamilyTally, countTalliedKeys and the pseudonymiseTallyWriter
+ *     method deleted: no caller outside their unit test. pseudonymiseTallyWriterDb stays, the owner
+ *     cascade calls it directly.
  *   v1.0.0 — 2026-08-24 — Initial creation for TARGET-073 step 8.
  */
 import { sql } from 'kysely';
 import { createHash } from 'node:crypto';
 import type { PostgresKyselyStorage } from '../index.js';
 import type {
-  MemoryWriteTallyRow, MemoryFamilyTallyRow,
+  MemoryWriteTallyRow,
   MemoryWriteTallyUpsert, MemoryFamilyTallyUpsert,
 } from '../../../repositories/memory-tally.repository.js';
 
@@ -30,19 +33,6 @@ function toWriteRow(r: Record<string, unknown>): MemoryWriteTallyRow {
     ownerGaii: r.ownerGaii as string,
     key: r.key as string,
     writerPrincipal: r.writerPrincipal as string,
-    writeCount: n(r.writeCount),
-    deleteCount: n(r.deleteCount),
-    firstAt: r.firstAt as string,
-    lastAt: r.lastAt as string,
-  };
-}
-
-function toFamilyRow(r: Record<string, unknown>): MemoryFamilyTallyRow {
-  return {
-    ownerGaii: r.ownerGaii as string,
-    keyFamily: r.keyFamily as string,
-    writerPrincipal: r.writerPrincipal as string,
-    tier: (r.tier as string) ?? '',
     writeCount: n(r.writeCount),
     deleteCount: n(r.deleteCount),
     firstAt: r.firstAt as string,
@@ -102,28 +92,6 @@ export const memoryTallyMethods = {
     return rows.map(r => toWriteRow(r as unknown as Record<string, unknown>));
   },
 
-  async listMemoryFamilyTally(
-    this: PostgresKyselyStorage,
-    f: { ownerGaii: string; family?: string; limit?: number },
-  ): Promise<MemoryFamilyTallyRow[]> {
-    let q = this.db.selectFrom('MemoryFamilyTally').selectAll().where('ownerGaii', '=', f.ownerGaii);
-    if (f.family) q = q.where('keyFamily', '=', f.family);
-    const rows = await q.orderBy('writeCount', 'desc').limit(Math.min(f.limit ?? 500, 5000)).execute();
-    return rows.map(r => toFamilyRow(r as unknown as Record<string, unknown>));
-  },
-
-  async countTalliedKeys(this: PostgresKyselyStorage, ownerGaii: string, familyPrefix: string): Promise<number> {
-    const row = await this.db.selectFrom('MemoryWriteTally')
-      .select(eb => eb.fn.count<string>(sql`DISTINCT "key"`).as('n'))
-      .where('ownerGaii', '=', ownerGaii)
-      .where('key', 'like', `${escapeLike(familyPrefix)}%`)
-      .executeTakeFirst();
-    return n(row?.n);
-  },
-
-  async pseudonymiseTallyWriter(this: PostgresKyselyStorage, ownerName: string, nodeId: string): Promise<number> {
-    return pseudonymiseTallyWriterDb(this.db, ownerName, nodeId);
-  },
 };
 
 /**

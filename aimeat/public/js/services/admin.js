@@ -13,6 +13,7 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   v1.6.0 — 2026-09-09 — getMarketplaceStats removed: its route was deleted (a table nothing writes).
  *   v1.5.0 — 2026-09-08 — getCorsOverview: the CORS page in one read.
  *   v1.4.0 — 2026-09-05 — getSecurityOverview: the Security page in one read.
  *   v1.3.0 — 2026-08-24 — BR-04: SSO connection management + owner disable/enable helpers.
@@ -169,9 +170,6 @@ export const getDirectoryStats = ()     => apiGet('/v1/admin/directory/stats');
 export const rebuildDirectory  = ()     => apiPost('/v1/admin/directory/rebuild');
 
 // ── Matching ──
-
-// ── Marketplace ──
-export const getMarketplaceStats = ()   => apiGet('/v1/admin/marketplace');
 
 // ── Push ──
 export const getPushStats        = ()                   => apiGet('/v1/admin/push');

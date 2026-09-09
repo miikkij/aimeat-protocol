@@ -44201,6 +44201,163 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+  /v1/agents/{name}/crew/menu:
+    get:
+      operationId: getAgentCrewMenu
+      summary: What this agent's runtime offers, asked rather than copied
+      description: |
+        The tool names its interpreter can actually resolve, the model profiles the machine it runs
+        on can reach, the models behind those profiles, and the model choice in force for this agent.
+
+        ASKED, BECAUSE A COPY DRIFTS. This node carried a hand-written list of tool ids in three
+        places against crewaimeat's `TOOL_REGISTRY`, which is what resolves them. Measured
+        2026-09-08: the picker offered ten where the runtime resolved twelve, so two real tools could
+        not be chosen by anyone building a definition here.
+
+        `source` says where the answer came from: `runtime` when the agent answered over the tunnel,
+        `catalog` when it is offline and this is the catalogue it published at its last start, `none`
+        when nothing has ever told this node. Tools come back only from a live runtime; a page that
+        gets `catalog` or `none` falls back to the list this node serves.
+
+        A model entry names `api_key_env`, the NAME of an environment variable on the machine that
+        runs the agent. No credential crosses this door in either direction.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's bare name, or its full identity url-encoded.
+      responses:
+        '200':
+          description: The menu, and what is chosen
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          source: { type: string, enum: [runtime, catalog, none] }
+                          tools:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                purpose: { type: string }
+                          profiles: { type: array, items: { type: string } }
+                          models: { type: array, items: { type: object } }
+                          choice:
+                            type: object
+                            nullable: true
+                            properties:
+                              scope: { type: string, enum: [agent, default] }
+                              value: { type: object }
+        '403': { description: Not this account's agent }
+        '404': { description: No agent of this account by that name }
+
+  /v1/agents/{name}/crew/llm:
+    put:
+      operationId: setAgentCrewLlm
+      summary: Which model this one agent thinks with
+      description: |
+        A choice is `{kind:'profile', profile:'<name>'}` or `{kind:'model', label, provider}` — the
+        two shapes crewaimeat's own override store uses, so the runtime resolves them with the code
+        it already has. `{"choice": null}` clears it and the agent falls back to the owner's default.
+
+        STORED AS A MEMORY RECORD at `crews.llm.<agent>` in the owner's own namespace, which is where
+        their own tools already read and write. There is no table and no second permission: it needs
+        `memory:write`, like any other record in that namespace.
+
+        A `provider` may NAME the environment variable holding a key (`api_key_env`) and must never
+        carry the key itself; a field that looks like a credential is refused with `SECRET_IN_CHOICE`.
+        The key stays on the machine that runs the agent.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's bare name, or its full identity url-encoded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                choice:
+                  type: object
+                  nullable: true
+                  description: The choice, or null to clear it and fall back to the owner's default.
+      responses:
+        '200':
+          description: Stored, or cleared
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key: { type: string }
+                          cleared: { type: boolean }
+        '400': { description: Not a choice this runtime could resolve, or it carried a credential }
+        '403': { description: Not this account's agent }
+        '404': { description: No agent of this account by that name }
+
+  /v1/agents/llm-default:
+    put:
+      operationId: setOwnerLlmDefault
+      summary: Which model every agent of this account thinks with, unless it says otherwise
+      description: |
+        The same choice shape as the per-agent door, stored at `crews.llm.default` in the owner's
+        namespace. An agent's own record wins over it; a crew definition's `llm_profile` wins over
+        this too, because a crew that states its need is stating it about itself.
+
+        `{"choice": null}` clears it, and routing falls back to the `llm_providers.json` on whatever
+        machine runs the agent.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                choice:
+                  type: object
+                  nullable: true
+      responses:
+        '200':
+          description: Stored, or cleared
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key: { type: string }
+                          cleared: { type: boolean }
+        '400': { description: Not a choice this runtime could resolve, or it carried a credential }
+
   /v1/agents/{name}/crew/seed:
     post:
       operationId: seedAgentCrew
@@ -51667,54 +51824,6 @@ paths:
                         properties:
                           rebuilt: { type: boolean }
                           stats: { type: object }
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-  /v1/admin/marketplace:
-    get:
-      operationId: getAdminMarketplace
-      tags: [Admin]
-      summary: Marketplace configuration and listing stats
-      description: Operator-only (requireRole('operator')). Returns marketplace settings plus aggregate listing statistics and the 20 most recent listings.
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: Marketplace overview
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          enabled: { type: boolean }
-                          listing_fee: { type: number }
-                          tx_fee_percent: { type: number }
-                          escrow_enabled: { type: boolean }
-                          stats:
-                            type: object
-                            properties:
-                              total: { type: integer }
-                              by_status:
-                                type: object
-                                additionalProperties: { type: integer }
-                              recent_listings:
-                                type: array
-                                items:
-                                  type: object
-                                  properties:
-                                    id: { type: string }
-                                    title: { type: string }
-                                    category: { type: string }
-                                    price_morsels: { type: number }
-                                    status: { type: string }
-                                    seller_ghii: { type: string }
-                                    created_at: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

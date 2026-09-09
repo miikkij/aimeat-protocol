@@ -10,7 +10,8 @@
  * @structure
  *   - anchorErrors(lines) — group verbatim messages by field / member index / task index
  *   - ListInput / JsonInput — comma lists and JSON blobs with local text state
- *   - ToolMenu — nine core tools, the Exchange bundle, and the verbs behind a "pick verbs" toggle
+ *   - ToolMenu — the runtime's own tool list when it answered, else the served copy; the Exchange
+ *     bundle, and its verbs behind a "pick verbs" toggle
  *   - IdentitySection · CrewSection · RunSection · ContractSection
  * @version-history
  *   v1.1.0 -- 2026-08-28 -- A list field never flattens what it cannot show. capabilities.technical is
@@ -129,27 +130,44 @@ function Field({ label, hint, children, htmlFor }) {
   `;
 }
 
-/** Nine core rows, one Exchange row, and the verbs only when asked for. */
-export function ToolMenu({ selected, onChange, idPrefix }) {
+/**
+ * The core rows, one Exchange row, and the verbs only when asked for.
+ *
+ * `runtimeTools` is what the agent's OWN runtime said it resolves (GET /crew/menu). When it answered,
+ * that is the list, and each row carries the runtime's own one-line purpose. The served list is the
+ * fallback for an agent that is offline or older — and it is a copy, which is exactly why it drifted
+ * two tools behind before anybody asked the runtime.
+ */
+export function ToolMenu({ selected, onChange, idPrefix, runtimeTools }) {
   const set = new Set(Array.isArray(selected) ? selected : []);
   const [refine, setRefine] = useState(EXCHANGE_VERBS.some(v => set.has(v)));
+  const live = Array.isArray(runtimeTools) && runtimeTools.length > 0 ? runtimeTools : null;
+  const livePurpose = new Map((live ?? []).map(x => [x.id, x.purpose]));
+  // Exchange keeps its own group whichever list we are on: it is one bundle plus thirteen verbs, and
+  // spilling those into the core column is what the grouping exists to prevent.
+  const core = live
+    ? live.map(x => x.id).filter(id => id !== EXCHANGE_BUNDLE && !id.startsWith('exchange_'))
+    : CORE_TOOLS;
+  const verbs = live
+    ? live.map(x => x.id).filter(id => id.startsWith('exchange_'))
+    : EXCHANGE_VERBS;
   const toggle = (id) => {
     const next = new Set(set);
     if (next.has(id)) next.delete(id); else next.add(id);
-    onChange([...CORE_TOOLS, EXCHANGE_BUNDLE, ...EXCHANGE_VERBS].filter(x => next.has(x)));
+    onChange([...core, EXCHANGE_BUNDLE, ...verbs].filter(x => next.has(x)));
   };
   const row = (id) => html`
     <label key=${id} class="pf-agd-crew-tool">
       <input type="checkbox" id=${`${idPrefix}-${id}`} checked=${set.has(id)} onChange=${() => toggle(id)} />
       <span class="pf-agd-crew-tool-id">${id}</span>
-      <span class="pf-agd-crew-tool-desc">${t(toolLabelKey(id))}</span>
+      <span class="pf-agd-crew-tool-desc">${livePurpose.get(id) || t(toolLabelKey(id))}</span>
     </label>
   `;
   return html`
     <div class="pf-agd-crew-tools">
       <div class="pf-agd-crew-tools-group">
         <div class="pf-agd-crew-tools-title">${t(`${K}.tools.core`)}</div>
-        ${CORE_TOOLS.map(row)}
+        ${core.map(row)}
       </div>
       <div class="pf-agd-crew-tools-group">
         <div class="pf-agd-crew-tools-title">${t(`${K}.tools.exchange`)}</div>
@@ -157,7 +175,7 @@ export function ToolMenu({ selected, onChange, idPrefix }) {
         <button type="button" class="btn-ghost btn-sm pf-agd-crew-tools-refine" onClick=${() => setRefine(r => !r)}>
           ${refine ? '▾' : '▸'} ${t(`${K}.tools.exchangeRefine`)}
         </button>
-        ${refine && html`<div class="pf-agd-crew-tools-verbs">${EXCHANGE_VERBS.map(row)}</div>`}
+        ${refine && html`<div class="pf-agd-crew-tools-verbs">${verbs.map(row)}</div>`}
       </div>
     </div>
   `;
@@ -208,7 +226,7 @@ export function IdentitySection({ doc, onChange, errors }) {
 
 function memberKey(m) { return (m && (m.name || m.role)) || ''; }
 
-export function CrewSection({ doc, onChange, errors }) {
+export function CrewSection({ doc, onChange, errors, runtimeTools }) {
   const agents = Array.isArray(doc.agents) ? doc.agents : [];
   const tasks = Array.isArray(doc.tasks) ? doc.tasks : [];
   const setAgents = (next) => onChange({ ...doc, agents: next });
@@ -242,7 +260,7 @@ export function CrewSection({ doc, onChange, errors }) {
             <textarea id=${`crew-m${i}-backstory`} class="input-field" rows="2" value=${a.backstory || ''} onInput=${e => patchAgent(i, { backstory: e.target.value })}></textarea>
           <//>
           <${Field} label=${t(`${K}.fields.memberTools`)}>
-            <${ToolMenu} idPrefix=${`crew-m${i}-tool`} selected=${a.tools} onChange=${v => patchAgent(i, { tools: v })} />
+            <${ToolMenu} idPrefix=${`crew-m${i}-tool`} selected=${a.tools} runtimeTools=${runtimeTools} onChange=${v => patchAgent(i, { tools: v })} />
           <//>
           <label class="pf-agd-crew-check">
             <input type="checkbox" checked=${!!a.allow_delegation} onChange=${e => patchAgent(i, { allow_delegation: e.target.checked })} />

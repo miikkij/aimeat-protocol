@@ -7,6 +7,9 @@
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  *   v1.1.0 — 2026-08-29 — device_auth carries `requestedScopes`: what the agent asked for at
  *     authorize time, kept apart from `scopes`, which is what the approval granted.
+ *   v1.2.0 — 2026-09-09 — listAllReviews and seven OAuth methods (client delete/list, refresh-token
+ *     delete by client, approval delete / delete-by-client / delete-by-gaii / list-by-owner)
+ *     deleted: no caller.
  */
 import type {
   EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe, OperatorReviewRecord, ScheduledJobRecord, ExtensionInstanceRecord,
@@ -31,13 +34,6 @@ export const federationOauthMethods = {
 
   async listReviews(this: SqliteStorage, packageId: string): Promise<OperatorReviewRecord[]> {
     return this.db.prepare('SELECT * FROM knowledge_reviews WHERE packageId = ? ORDER BY timestamp ASC').all(packageId) as OperatorReviewRecord[];
-  },
-
-  async listAllReviews(this: SqliteStorage, opts?: { page?: number; perPage?: number }): Promise<OperatorReviewRecord[]> {
-    const page = opts?.page ?? 1;
-    const perPage = opts?.perPage ?? 20;
-    const offset = (page - 1) * perPage;
-    return this.db.prepare('SELECT * FROM knowledge_reviews ORDER BY timestamp DESC LIMIT ? OFFSET ?').all(perPage, offset) as OperatorReviewRecord[];
   },
 
   async deleteReviewsByOperator(this: SqliteStorage, gaii: string): Promise<number> {
@@ -651,27 +647,6 @@ export const federationOauthMethods = {
     };
   },
 
-  async deleteOAuthClient(this: SqliteStorage, clientId: string): Promise<boolean> {
-    const txn = this.db.transaction(() => {
-      this.db.prepare('DELETE FROM oauth_refresh_tokens WHERE clientId = ?').run(clientId);
-      this.db.prepare('DELETE FROM oauth_approvals WHERE clientId = ?').run(clientId);
-      const result = this.db.prepare('DELETE FROM oauth_clients WHERE clientId = ?').run(clientId);
-      return result.changes > 0;
-    });
-    return txn();
-  },
-
-  async listOAuthClients(this: SqliteStorage): Promise<OAuthClientRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM oauth_clients ORDER BY createdAt DESC').all() as Record<string, unknown>[];
-    return rows.map(row => ({
-      clientId: row.clientId as string,
-      clientSecret: row.clientSecret as string,
-      clientName: row.clientName as string,
-      redirectUris: JSON.parse(row.redirectUris as string),
-      createdAt: row.createdAt as string,
-    }));
-  },
-
   // ── Refresh Tokens ──
 
   async createOAuthRefreshToken(this: SqliteStorage, token: OAuthRefreshTokenRecord): Promise<void> {
@@ -702,11 +677,6 @@ export const federationOauthMethods = {
     return result.changes > 0;
   },
 
-  async deleteOAuthRefreshTokensByClient(this: SqliteStorage, clientId: string): Promise<number> {
-    const result = this.db.prepare('DELETE FROM oauth_refresh_tokens WHERE clientId = ?').run(clientId);
-    return result.changes;
-  },
-
   async deleteOAuthRefreshTokensByGaii(this: SqliteStorage, gaii: string): Promise<number> {
     const result = this.db.prepare('DELETE FROM oauth_refresh_tokens WHERE gaii = ?').run(gaii);
     return result.changes;
@@ -734,32 +704,6 @@ export const federationOauthMethods = {
       scope: row.scope as string,
       approvedAt: row.approvedAt as string,
     };
-  },
-
-  async deleteOAuthApproval(this: SqliteStorage, clientId: string, gaii: string): Promise<boolean> {
-    const result = this.db.prepare('DELETE FROM oauth_approvals WHERE clientId = ? AND gaii = ?').run(clientId, gaii);
-    return result.changes > 0;
-  },
-
-  async deleteOAuthApprovalsByClient(this: SqliteStorage, clientId: string): Promise<number> {
-    const result = this.db.prepare('DELETE FROM oauth_approvals WHERE clientId = ?').run(clientId);
-    return result.changes;
-  },
-
-  async deleteOAuthApprovalsByGaii(this: SqliteStorage, gaii: string): Promise<number> {
-    const result = this.db.prepare('DELETE FROM oauth_approvals WHERE gaii = ?').run(gaii);
-    return result.changes;
-  },
-
-  async listOAuthApprovalsByOwner(this: SqliteStorage, owner: string): Promise<OAuthApprovalRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM oauth_approvals WHERE owner = ? ORDER BY approvedAt DESC').all(owner) as Record<string, unknown>[];
-    return rows.map(row => ({
-      clientId: row.clientId as string,
-      gaii: row.gaii as string,
-      owner: row.owner as string,
-      scope: row.scope as string,
-      approvedAt: row.approvedAt as string,
-    }));
   },
 
 };

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Action, Work, Wallet, Board, OTK, Node-key, Dispute, Micro-memory methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.6.0 — 2026-09-09 — deleteActionsByProvider and deleteTransactions deleted: no caller.
  *   v1.5.1 — 2026-09-08 — The twin the v1.1.0 note warns about is gone: ../repos/board.ts and ten
  *     other repos files nothing imported were deleted after the E2E coverage sweep executed none of
  *     them on either backend. The methods here were the live ones all along.
@@ -86,11 +87,6 @@ export const workMethods = {
   async deleteAction(this: SqliteStorage, id: string, providerGaii: string): Promise<boolean> {
     const result = this.db.prepare('DELETE FROM actions WHERE providerGaii = ? AND id = ?').run(providerGaii, id);
     return result.changes > 0;
-  },
-
-  async deleteActionsByProvider(this: SqliteStorage, gaii: string): Promise<number> {
-    const result = this.db.prepare('DELETE FROM actions WHERE providerGaii = ?').run(gaii);
-    return result.changes;
   },
 
   async listActionsByProvider(this: SqliteStorage, gaii: string): Promise<ActionRecord[]> {
@@ -293,11 +289,6 @@ export const workMethods = {
   async listAllTransactions(this: SqliteStorage, limit = 10000): Promise<WalletTransaction[]> {
     const rows = this.db.prepare('SELECT * FROM wallet_transactions ORDER BY timestamp DESC LIMIT ?').all(Math.min(limit, 10000)) as Record<string, unknown>[];
     return rows.map(r => this.deserializeTransaction(r));
-  },
-
-  async deleteTransactions(this: SqliteStorage, gaii: string): Promise<number> {
-    const result = this.db.prepare('DELETE FROM wallet_transactions WHERE gaii = ?').run(gaii);
-    return result.changes;
   },
 
   deserializeTransaction(this: SqliteStorage, row: Record<string, unknown>): WalletTransaction {

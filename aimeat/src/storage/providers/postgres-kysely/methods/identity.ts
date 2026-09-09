@@ -7,6 +7,7 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-09-09 — getAgentByName, getGHIIsByGhiis and getGHIIByGoogleSub deleted: no caller.
  *   2026-08-31 — Agent v2 identity on create and read: runMode, identityVersion, cardJws,
  *     cardIssuedAt, enrolledAt (migration 0058). updateAgent needs nothing — it passes unknown keys
  *     through generically.
@@ -171,10 +172,6 @@ export const identityMethods = {
     const r = await this.db.selectFrom('Agent').selectAll().where('gaii', '=', gaii).executeTakeFirst();
     return r ? toAgentRecord(r) : null;
   },
-  async getAgentByName(this: PostgresKyselyStorage, name: string, _nodeId: string): Promise<AgentRecord | null> {
-    const r = await this.db.selectFrom('Agent').selectAll().where('name', '=', name).executeTakeFirst();
-    return r ? toAgentRecord(r) : null;
-  },
   // ORDER BY is load-bearing, not tidiness: callers take agents[0] as "the" agent (the home card),
   // and an unordered Postgres scan returns heap order, which changes whenever a row is UPDATEd —
   // and a throttled lastSeen touch IS an update. The home therefore showed a different agent after
@@ -250,14 +247,6 @@ export const identityMethods = {
       throw e;
     }
   },
-  async getGHIIsByGhiis(this: PostgresKyselyStorage, ghiis: string[]): Promise<Record<string, GHIIRecord>> {
-    if (ghiis.length === 0) return {};
-    const rows = await this.db.selectFrom('Ghii').selectAll().where('ghii', 'in', ghiis).execute();
-    const out: Record<string, GHIIRecord> = {};
-    for (const r of rows) { const rec = toGHIIRecord(r); out[rec.ghii] = rec; }
-    return out;
-  },
-
   async getGHII(this: PostgresKyselyStorage, ghii: string): Promise<GHIIRecord | null> {
     const r = await this.db.selectFrom('Ghii').selectAll().where('ghii', '=', ghii).executeTakeFirst();
     return r ? toGHIIRecord(r) : null;
@@ -277,10 +266,6 @@ export const identityMethods = {
   async getGHIIsByEmailHash(this: PostgresKyselyStorage, emailHash: string): Promise<GHIIRecord[]> {
     const rows = await this.db.selectFrom('Ghii').selectAll().where('emailHash', '=', emailHash).execute();
     return rows.map(toGHIIRecord);
-  },
-  async getGHIIByGoogleSub(this: PostgresKyselyStorage, googleSub: string): Promise<GHIIRecord | null> {
-    const r = await this.db.selectFrom('Ghii').selectAll().where('googleSub', '=', googleSub).executeTakeFirst();
-    return r ? toGHIIRecord(r) : null;
   },
   async getGHIIByExternalId(this: PostgresKyselyStorage, provider: string, sub: string): Promise<GHIIRecord | null> {
     // Google keeps its indexed mirror column; all providers also live in the externalIdentities JSON map.

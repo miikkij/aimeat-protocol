@@ -8,6 +8,7 @@
  *   cost/examples/tags JSON columns) are stored as JSONB, so the increment/trust mutators are
  *   read-modify-write on the JSON blob — identical semantics to the Prisma (Mongo/PG) implementation.
  * @version-history
+ *   v1.1.0 — 2026-09-09 — deleteCapabilityLogsBefore and setCapabilityTrust deleted: no caller.
  *   v1.0.0 — 2026-07-15 — Phase 5: capability layer on Postgres+Kysely.
  */
 import { randomUUID } from 'node:crypto';
@@ -202,22 +203,9 @@ export const capabilityMethods = {
     return { logs, total: Number(totalRow?.n ?? 0) };
   },
 
-  async deleteCapabilityLogsBefore(this: PostgresKyselyStorage, before: string): Promise<number> {
-    const r = await this.db.deleteFrom('CapabilityLog').where('timestamp', '<', new Date(before)).executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0);
-  },
-
   async setCapabilityOverride(this: PostgresKyselyStorage, id: string, override: CapabilityOverride | null): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await this.db.updateTable('Capability').set({ operatorOverride: jsonb(override ?? null) } as any).where('id', '=', id).execute();
-  },
-
-  async setCapabilityTrust(this: PostgresKyselyStorage, id: string, trustUpdates: Partial<CapabilityTrust>): Promise<void> {
-    const cap = await this.getCapability(id);
-    if (!cap) return;
-    const merged = { ...cap.trust, ...trustUpdates };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await this.db.updateTable('Capability').set({ trust: jsonb(merged) } as any).where('id', '=', id).execute();
   },
 
   // ── Vouches are ROWS. The unique (capabilityId, userGhii) index is the dedup: one person, one

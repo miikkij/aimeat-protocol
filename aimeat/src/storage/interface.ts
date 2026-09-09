@@ -16,6 +16,9 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-13 — Moved record/type declarations into ./types/* and re-exported them
  *     (max-file-lines); Storage interface + repository wiring stay here
+ *   v1.5.0 — 2026-09-09 — MarketplaceRepository and AgentTelemetryRepository leave the composite:
+ *     every method in them had no caller (the marketplace never got a writer; telemetry moved to the
+ *     in-process ring in services/telemetry-buffer.ts). Tables stay.
  *   v1.4.0 — 2026-09-06 — SecretRepository joins the Storage composite: a credential the owner
  *     stores must be readable by nobody, including its owner, which a namespace whose contract is
  *     "the owner can read this back" cannot express.
@@ -66,7 +69,6 @@ import type { ConsentRepository } from './repositories/consent.repository.js';
 import type { CatalogueRepository } from './repositories/catalogue.repository.js';
 import type { ModerationRepository } from './repositories/moderation.repository.js';
 import type { OrganismRepository } from './repositories/organism.repository.js';
-import type { MarketplaceRepository } from './repositories/marketplace.repository.js';
 import type { FederationRepository } from './repositories/federation.repository.js';
 import type { NodeRepository } from './repositories/node.repository.js';
 import type { NotificationRepository } from './repositories/notification.repository.js';
@@ -110,7 +112,7 @@ import type { WorkspaceRowRepository } from './repositories/workspace-row.reposi
 export type { UsageFoldCursor } from './repositories/usage.repository.js';
 import type { AgentMessageRepository } from './repositories/agent-message.repository.js';
 import type { DirectMessageRepository } from './repositories/direct-message.repository.js';
-import type { AgentTelemetryRepository, AgentWebhookRepository } from './repositories/agent-webhook.repository.js';
+import type { AgentWebhookRepository } from './repositories/agent-webhook.repository.js';
 import type { AgentOnboardingRepository } from './repositories/agent-onboarding.repository.js';
 import type { InvitationRepository } from './repositories/invitation.repository.js';
 import type { AiProvenanceRepository } from './repositories/ai-provenance.repository.js';
@@ -126,7 +128,7 @@ export interface Storage extends
   BoardRepository, OtkRepository, DisputeRepository,
   FileRepository, IdentityRepository,
   SchemaRepository, ConsentRepository, CatalogueRepository,
-  ModerationRepository, OrganismRepository, MarketplaceRepository,
+  ModerationRepository, OrganismRepository,
   FederationRepository, NodeRepository, NotificationRepository,
   AuthRepository, SessionRepository, PatRepository,
   AppRepository, AppMarketplaceRepository, SubdomainSiteRepository, AppGrantRepository, ConfigRepository,
@@ -150,7 +152,7 @@ export interface Storage extends
   WorkspaceRowRepository,
   AgentMessageRepository,
   DirectMessageRepository,
-  AgentTelemetryRepository, AgentWebhookRepository,
+  AgentWebhookRepository,
   AgentOnboardingRepository,
   InvitationRepository,
   AiProvenanceRepository,
@@ -183,7 +185,7 @@ export interface Storage extends
    * @example
    * await storage.transaction(async () => {
    *   await storage.debitBalance(buyer, price);
-   *   await storage.createPurchase(receipt);
+   *   await storage.addTransaction(ledgerRow);
    *   await storage.setMemory(provenanceRecord);
    * });
    */

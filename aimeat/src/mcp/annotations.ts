@@ -284,6 +284,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_crew_draft: { title: 'Save or Discard Crew Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_crew_publish: { title: 'Publish Crew Definition', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_crew_seed: { title: 'Seed a First Crew Definition', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_crew_menu: { title: "Read the Runtime's Menu", readOnlyHint: true, openWorldHint: false },
+    aimeat_crew_llm_set: { title: "Choose an Agent's Model", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Knowledge packages ──
     aimeat_knowledge_list: { title: 'List Knowledge Packages', readOnlyHint: true },

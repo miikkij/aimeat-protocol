@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description System-prompt, Package, Template-listing, Package-instance methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.1.0 — 2026-09-09 — deleteReview, deleteDiscussion and listInstancesByPackage deleted: no caller.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  */
 import type {
@@ -457,18 +458,6 @@ export const packagesMethods = {
     return merged;
   },
 
-  async deleteReview(this: SqliteStorage, id: string): Promise<boolean> {
-    const row = this.db.prepare('SELECT * FROM template_reviews WHERE id = ?').get(id) as Record<string, unknown> | undefined;
-    if (!row) return false;
-    const listingId = row.listingId as string;
-    const result = this.db.prepare('DELETE FROM template_reviews WHERE id = ?').run(id);
-    if (result.changes > 0) {
-      await this.recalculateRating(listingId);
-      return true;
-    }
-    return false;
-  },
-
   async recalculateRating(this: SqliteStorage, listingId: string): Promise<{ rating: number; reviewCount: number }> {
     const stats = this.db.prepare(
       'SELECT AVG(rating) as avg, COUNT(*) as cnt FROM template_reviews WHERE listingId = ?'
@@ -500,11 +489,6 @@ export const packagesMethods = {
       'SELECT * FROM template_discussions WHERE listingId = ? ORDER BY createdAt ASC LIMIT ? OFFSET ?'
     ).all(listingId, lim, off) as Record<string, unknown>[];
     return { discussions: rows.map(r => this.deserializeDiscussion(r)), total };
-  },
-
-  async deleteDiscussion(this: SqliteStorage, id: string): Promise<boolean> {
-    const result = this.db.prepare('DELETE FROM template_discussions WHERE id = ?').run(id);
-    return result.changes > 0;
   },
 
   // ══════════════════════════════════════════════════════════
@@ -585,14 +569,6 @@ export const packagesMethods = {
   async deleteInstance(this: SqliteStorage, id: string): Promise<boolean> {
     const result = this.db.prepare('DELETE FROM package_instances WHERE id = ?').run(id);
     return result.changes > 0;
-  },
-
-  async listInstancesByPackage(this: SqliteStorage, packageGroupId: string): Promise<{ instances: PackageInstanceRecord[]; total: number }> {
-    const total = (this.db.prepare('SELECT COUNT(*) as c FROM package_instances WHERE packageGroupId = ?').get(packageGroupId) as { c: number }).c;
-    const rows = this.db.prepare(
-      'SELECT * FROM package_instances WHERE packageGroupId = ? ORDER BY installedAt DESC'
-    ).all(packageGroupId) as Record<string, unknown>[];
-    return { instances: rows.map(r => this.deserializeInstance(r)), total };
   },
 
 };

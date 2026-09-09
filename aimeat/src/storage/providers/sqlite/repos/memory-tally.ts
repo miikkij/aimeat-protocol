@@ -5,16 +5,16 @@
  * @description SQLite SQL for the memory write tally. Counts are DELTAS: every statement adds rather
  *   than sets, keeps the EARLIEST firstAt and the LATEST lastAt, and creates the row on first
  *   sighting. There is no delete and no prune here, on purpose — see the repository contract.
- * @structure upsertWriteTally · upsertFamilyTally · listWriteTally · listFamilyTally ·
- *   countTalliedKeys · pseudonymiseWriter
+ * @structure upsertWriteTally · upsertFamilyTally · listWriteTally · pseudonymiseWriter
  * @usage import * as repo from '../repos/memory-tally.js';
  * @version-history
+ *   v1.1.0 — 2026-09-09 — listFamilyTally and countTalliedKeys deleted: no caller.
  *   v1.0.0 — 2026-08-24 — Initial creation for TARGET-073 step 8.
  */
 import type Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import type {
-  MemoryWriteTallyRow, MemoryFamilyTallyRow,
+  MemoryWriteTallyRow,
   MemoryWriteTallyUpsert, MemoryFamilyTallyUpsert,
 } from '../../../repositories/memory-tally.repository.js';
 
@@ -69,27 +69,6 @@ export function listWriteTally(
   return db.prepare(
     `SELECT * FROM memory_write_tally WHERE ${where.join(' AND ')} ORDER BY lastAt DESC LIMIT ?`,
   ).all(...args) as MemoryWriteTallyRow[];
-}
-
-export function listFamilyTally(
-  db: Database.Database,
-  f: { ownerGaii: string; family?: string; limit?: number },
-): MemoryFamilyTallyRow[] {
-  const where: string[] = ['ownerGaii = ?'];
-  const args: unknown[] = [f.ownerGaii];
-  if (f.family) { where.push('keyFamily = ?'); args.push(f.family); }
-  args.push(Math.min(f.limit ?? 500, 5000));
-  return db.prepare(
-    `SELECT * FROM memory_family_tally WHERE ${where.join(' AND ')} ORDER BY writeCount DESC LIMIT ?`,
-  ).all(...args) as MemoryFamilyTallyRow[];
-}
-
-export function countTalliedKeys(db: Database.Database, ownerGaii: string, familyPrefix: string): number {
-  const row = db.prepare(
-    `SELECT count(DISTINCT key) AS n FROM memory_write_tally
-     WHERE ownerGaii = ? AND key LIKE ? ESCAPE '\\'`,
-  ).get(ownerGaii, `${escapeLike(familyPrefix)}%`) as { n: number } | undefined;
-  return row?.n ?? 0;
 }
 
 /**

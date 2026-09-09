@@ -7,6 +7,7 @@
  *   from the Prisma implementation against the same tables. deleteOrganism cascades to memberships /
  *   join-requests / reputation / board rows / all `organism.{id}.*` memory + versions + schema locks.
  * @version-history
+ *   v1.4.0 — 2026-09-09 — getOrganismReputation deleted: no caller.
  *   v1.3.0 — 2026-07-23 — listOrganisms member-scoped queries return ALL matches (no default 20-item page cap);
  *     fixes an owner's oldest organisms silently dropping out of "My Organisms" past 20 memberships.
  *   v1.2.0 — 2026-07-16 — Memberships carry invitedWorkspaces (jsonb, migration 0006): ws grants chosen at invite time.
@@ -194,11 +195,6 @@ export const organismMethods = {
       .onConflict(oc => oc.column('organismId').doUpdateSet(shared as any)).execute();
     return r;
   },
-  async getOrganismReputation(this: PostgresKyselyStorage, organismId: string): Promise<OrganismReputationRecord | null> {
-    const r = await this.db.selectFrom('OrganismReputation').selectAll().where('organismId', '=', organismId).executeTakeFirst();
-    return r ? { organismId: r.organismId, score: r.score, breakdown: r.breakdown as OrganismReputationRecord['breakdown'], calculatedAt: iso(r.calculatedAt) } : null;
-  },
-
   async createPendingApproval(this: PostgresKyselyStorage, r: PendingApprovalRecord): Promise<PendingApprovalRecord> {
     await this.db.insertInto('PendingApproval').values({
       id: r.id, organismId: r.organismId, flowGateId: r.flowGateId ?? null, stageId: r.stageId ?? null, actor: r.actor, action: r.action,

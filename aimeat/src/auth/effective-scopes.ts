@@ -2,12 +2,15 @@
  * @file src/auth/effective-scopes.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description An agent's EFFECTIVE scopes: what its token carries AND what its record allows right
- *   now. Pure extraction from auth/middleware.ts when that file passed the 800-line ceiling; the body
- *   is verbatim and both gates there call it.
- * @structure withCurrentScopes(storage, verified) → VerifiedToken
+ * @description A principal's EFFECTIVE permissions: what its token carries AND what its record
+ *   allows right now. Scopes for an agent, the operator role for anyone claiming it. Extracted from
+ *   auth/middleware.ts when that file passed the 800-line ceiling; both gates there call it.
+ * @structure withCurrentScopes(storage, verified) → VerifiedToken (calls withCurrentOperatorRole first)
+ *   withCurrentOperatorRole(storage, verified) → VerifiedToken
  * @usage req.auth = await withCurrentScopes(storage, verified);
  * @version-history
+ *   v1.2.0 -- 2026-09-09 -- withCurrentOperatorRole: the operator role is read from the owner record
+ *     on every request whose token claims it, so a revoked operator loses the doors at once.
  *   v1.1.0 -- 2026-09-07 -- The intersection was wrong in one direction, and e2e-profile-tabs
  *     found it rather than the guard tier (that suite is not in the tier). A token carrying `*`
  *     is covered by no concrete list, so `token.filter(covered by record)` emptied it: an agent
@@ -72,6 +75,7 @@ export function intersectScopes(token: readonly string[], record: readonly strin
  * pressing "remove" means now. It costs one keyed read on a request that already makes one.
  */
 export async function withCurrentScopes(storage: Storage | null, v: VerifiedToken): Promise<VerifiedToken> {
+  v = await withCurrentOperatorRole(storage, v);
   // Agents only. An owner session bypasses scopes entirely; a GEAI and an app grant have their
   // permission lists somewhere other than an agent record, so this must not touch them.
   if (!storage || v.anonymous || !v.roles.includes('agent')) return v;
@@ -95,4 +99,27 @@ export async function withCurrentScopes(storage: Storage | null, v: VerifiedToke
     sub: v.sub, token: v.scopes.join(','), record: current.join(','), effective: effective.join(','),
   });
   return { ...v, scopes: effective };
+}
+
+/**
+ * The operator role is the one word on a token that reaches across accounts, and it was the one
+ * word read from the token alone: POST /v1/admin/roles/revoke rewrote the owner record and the
+ * revoked operator's JWT went on opening every admin door until its own exp (found 2026-09-08 by
+ * e2e-admin-doors-2). The role is read from the owner record on every request whose token claims
+ * it, which is one keyed read on operator traffic and none on anything else. A token can only LOSE
+ * the role here, never gain it: granting still takes a fresh credential, the way a scope does.
+ *
+ * Federated and anonymous principals are left alone: their `owner` names nobody in this table.
+ * A missing owner record is left alone too, for the reason withCurrentScopes gives: the route layer
+ * names that anomaly better than a silent demotion would.
+ */
+export async function withCurrentOperatorRole(storage: Storage | null, v: VerifiedToken): Promise<VerifiedToken> {
+  if (!storage || v.anonymous || v.federated === true || !v.owner || !v.roles.includes('operator')) return v;
+  const owner = await storage.getOwner(v.owner).catch((err: unknown) => {
+    logger.warn('effective-scopes: the owner record could not be read; proceeding on the token\'s own roles', { owner: v.owner, error: String(err) });
+    return null;
+  });
+  if (!owner || owner.roles.includes('operator')) return v;
+  logger.info('effective-scopes: the operator role was revoked; the token no longer carries it', { sub: v.sub, owner: v.owner });
+  return { ...v, roles: v.roles.filter(r => r !== 'operator') };
 }

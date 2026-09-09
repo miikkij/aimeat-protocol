@@ -14,6 +14,8 @@
  *   been 54x this. `oneHandWritingAllDay` reproduces that shape in miniature.
  * @usage pnpm test -- memory-write-tally
  * @version-history
+ *   v1.1.0 — 2026-09-09 — The family-grain and erasure cases went with listMemoryFamilyTally,
+ *     countTalliedKeys and pseudonymiseTallyWriter, deleted from Storage for having no caller.
  *   v1.0.0 — 2026-08-24 — Initial creation for TARGET-073 step 8.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -80,54 +82,5 @@ describe('the row outlives what it is about', () => {
         const rows = await s.listMemoryWriteTally({ ownerGaii: OWNER, key: 'gone.for.good' });
         expect(rows).toHaveLength(1);
         expect(rows[0].writerPrincipal).toBe(AGENT);
-    });
-});
-
-describe('the family grain', () => {
-    it('folds many keys into one row per hand, and keeps the basis it was identified on', async () => {
-        for (const day of ['01', '02', '03']) {
-            await s.upsertMemoryFamilyTally([{
-                ownerGaii: OWNER, keyFamily: 'news.<date>.*', writerPrincipal: AGENT,
-                tier: 'owner-named', writeCount: 1, deleteCount: 0, at: `2026-08-${day}T10:00:00.000Z`,
-            }]);
-        }
-        const rows = await s.listMemoryFamilyTally({ ownerGaii: OWNER, family: 'news.<date>.*' });
-        expect(rows).toHaveLength(1);
-        expect(rows[0].writeCount).toBe(3);
-        expect(rows[0].tier).toBe('owner-named');
-    });
-
-    it('counts DISTINCT keys, which an upsert cannot hold as a column', async () => {
-        for (const k of ['fam.a', 'fam.b', 'fam.b', 'fam.c']) await touch(k, AGENT, T1);
-        expect(await s.countTalliedKeys(OWNER, 'fam.')).toBe(3);
-    });
-
-    it('a prefix count does not spill into a neighbouring family', async () => {
-        await touch('famous.thing', AGENT, T1);
-        expect(await s.countTalliedKeys(OWNER, 'fam.')).toBe(3);
-    });
-});
-
-describe('erasure', () => {
-    it('pseudonymises this owner\'s writes into SOMEBODY ELSE\'S namespace instead of deleting them', async () => {
-        const bob = 'bob@aimeat-local-001-dev';
-        await s.upsertMemoryWriteTally([{
-            ownerGaii: bob, key: 'bobs.thing', writerPrincipal: AGENT,
-            writeCount: 5, deleteCount: 0, at: T1,
-        }]);
-        const changed = await s.pseudonymiseTallyWriter('alice', 'aimeat-local-001-dev');
-        expect(changed).toBeGreaterThan(0);
-
-        const bobs = await s.listMemoryWriteTally({ ownerGaii: bob, key: 'bobs.thing' });
-        // Bob's record of who touched his data survives, with the count intact — deleting it would
-        // have turned his "one hand" into none.
-        expect(bobs).toHaveLength(1);
-        expect(bobs[0].writeCount).toBe(5);
-        expect(bobs[0].writerPrincipal).toMatch(/^erased:[0-9a-f]{12}$/);
-    });
-
-    it('does not touch rows in the erased owner\'s OWN namespace — the cascade removes those', async () => {
-        const mine = await s.listMemoryWriteTally({ ownerGaii: OWNER, key: 'news.today.raw' });
-        expect(mine.some(r => r.writerPrincipal === AGENT)).toBe(true);
     });
 });
