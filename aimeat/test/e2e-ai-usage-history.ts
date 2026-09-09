@@ -17,7 +17,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 
-const TEST_PORT = parseInt(process.env.E2E_PORT ?? '40273', 10);
+const TEST_PORT = parseInt(process.env.E2E_PORT ?? '40406', 10);
 const BASE = process.env.E2E_BASE ?? `http://localhost:${TEST_PORT}`;
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 

@@ -33,7 +33,7 @@ import { registerExchangeRunTools } from '../src/mcp/exchange-run.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const PORT = parseInt(process.env.E2E_XMCP_PORT ?? '40273', 10);
+const PORT = parseInt(process.env.E2E_XMCP_PORT ?? '40408', 10);
 const BASE = `http://localhost:${PORT}`;
 process.env.AIMEAT_PORT = String(PORT);
 process.env.AIMEAT_DEV_MODE = 'true';

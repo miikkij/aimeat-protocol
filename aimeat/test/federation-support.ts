@@ -178,7 +178,7 @@ let ticketId = '';
 console.log('Setup');
 await test('Boot V (two operators) and C (owner + agent), linked at tier contact', async () => {
     V = await bootNode(40288, 'aimeat-test-001-supv');
-    C = await bootNode(40289, 'aimeat-test-001-supc');
+    C = await bootNode(40414, 'aimeat-test-001-supc');
     await setupOperator(V, `supv${ts}`);
     await setupOperator(C, `supc${ts}`);
     opB = await addOperator(V, `supvb${ts}`);

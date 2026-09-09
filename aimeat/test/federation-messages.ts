@@ -313,7 +313,7 @@ await test('5. Bob replies; Alice receives it freely (initiator not re-gated)', 
 // node C. Against the pre-fix source (bare "a message with this id exists") this test fails: Carol's
 // injection lands straight in Alice's inbox as accepted.
 await test('5b. A stranger on a third node who computes the thread id is still held at the gate', async () => {
-    const C = await bootNode(40272, 'aimeat-node-001-msgc');
+    const C = await bootNode(40405, 'aimeat-node-001-msgc');
     try {
         await setupOwner(C, `carol${ts}`);
         // Peer A<->C so A accepts C's signed federation frame at all (the gate is about first

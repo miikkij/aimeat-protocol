@@ -167,6 +167,7 @@
     "check:living-nodes": "tsx tools/build-living-nodes.ts --check",
     "check:route-scopes": "tsx scripts/check-route-scopes.ts --strict",
     "check:denial-coverage": "tsx scripts/check-denial-coverage.ts --strict",
+    "check:suite-ports": "tsx scripts/check-suite-ports.ts",
     "check:denial-coverage:report": "tsx scripts/check-denial-coverage.ts",
     "check:denial-coverage:seed": "tsx scripts/check-denial-coverage.ts --seed",
     "check:route-scopes:report": "tsx scripts/check-route-scopes.ts",

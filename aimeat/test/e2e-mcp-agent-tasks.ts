@@ -220,7 +220,7 @@ async function siblingSession(base: Awaited<ReturnType<typeof setup>>, name: str
 // rather than a hidden gap: what is under test is a status string that both providers write through
 // the same updateAgentTask, and the gate being proven is a shared constant in
 // services/agent-task-fanout.ts. Everything storage-shaped in this suite still runs on both.
-const STALL_PORT = process.env.E2E_MCP_TASK_STALL_PORT ?? '40289';
+const STALL_PORT = process.env.E2E_MCP_TASK_STALL_PORT ?? '40413';
 const STALL_BASE = `http://localhost:${STALL_PORT}`;
 const STALL_DB = resolve(process.cwd(), 'test/.test-mcp-task-stall.db');
 

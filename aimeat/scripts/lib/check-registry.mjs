@@ -29,6 +29,7 @@ export const FAST_CHECKS = [
     { script: 'check:protocol-versions', label: 'Protocol versions declared vs current' },
     { script: 'check:route-scopes', label: 'Route authorization gates' },
     { script: 'check:denial-coverage', label: 'Every suite asks what a second principal gets' },
+    { script: 'check:suite-ports', label: 'No two E2E suites write down the same port' },
     { script: 'check:outbound-fetch', label: 'Outbound fetch goes through safeFetch' },
     { script: 'check:trusted-keys', label: 'Server-trusted memory keys are guarded, and each exemption says why' },
     { script: 'check:storage-parity', label: 'Owner-scoped tables are in both deletion cascades' },
