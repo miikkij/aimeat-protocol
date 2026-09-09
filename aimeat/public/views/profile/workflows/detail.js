@@ -41,7 +41,8 @@ export function renderDetail(ctx, item) {
     ${gates.length ? html`<span class="og-chip">${c('gatesN', { n: gates.length })}</span>` : null}
     ${last ? html`<span class=${`og-chip ${runTone(last.status) === 'bad' ? 'og-chip--coral' : runTone(last.status) === 'wait' ? 'og-chip--sun' : ''}`}>${c('lastRunChip', { word: runWord(last.status).toLowerCase(), when: rel(last.startedAt) })}</span>` : null}
     ${def.notify_on_finish ? html`<span class="og-chip og-chip--dim">${c('chipNotify')}</span>` : null}
-    ${def.skip_done ? html`<span class="og-chip og-chip--dim">${c('chipSkipDone')}</span>` : null}`;
+    ${def.skip_done ? html`<span class="og-chip og-chip--dim">${c('chipSkipDone')}</span>` : null}
+    ${def.parallel ? html`<span class="og-chip og-chip--dim">${c('chipParallel')}</span>` : null}`;
   const doors = html`
     <button type="button" class="og-slab" onClick=${() => ctx.openConfirm(id)}>${c('run')}</button>
     <button type="button" class="og-door" disabled=${ctx.checking === id} onClick=${() => ctx.handleCheck(id)}>${c('checkNow')}</button>
@@ -163,6 +164,7 @@ function settingsFold(ctx, item) {
       ${row(c('setNotify'), def.notify_on_finish ? c('yes') : c('no'))}
       ${row(c('setSkipDone'), def.skip_done ? c('yes') : c('no'))}
       ${row(c('setFresh'), def.fresh ? c('yes') : c('no'))}
+      ${row(c('setParallel'), def.parallel ? c('yes') : c('no'))}
       ${row(c('setOnFail'), c('onFailInspect'))}
       ${row(c('setLlm'), def.llm?.approved ? c('yes') : c('no'))}
       ${row(c('setCreated'), `${day(def.createdAt)}${def.createdBy ? ` · ${String(def.createdBy).split('@')[0]}` : ''}`)}
