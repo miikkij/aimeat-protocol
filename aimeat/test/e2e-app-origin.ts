@@ -38,6 +38,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { hostRequest, type HostResponse } from './helpers/host-request.js';
+import { waitForServer } from './helpers/wait-for-server.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -114,14 +115,7 @@ async function startServer(): Promise<ChildProcess> {
     };
     const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', DB_PATH],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
-    child.stdout?.on('data', () => {}); child.stderr?.on('data', () => {});
-    const start = Date.now();
-    while (Date.now() - start < 60_000) {
-        try { if ((await fetch(`${BASE}/v1/spec`)).ok) return child; } catch { /* not up yet */ }
-        await new Promise(r => setTimeout(r, 300));
-    }
-    child.kill('SIGTERM');
-    throw new Error('Server failed to start');
+    return waitForServer(child, BASE, { label: 'the app-origin node' });
 }
 
 async function main() {

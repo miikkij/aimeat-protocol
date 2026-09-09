@@ -25,6 +25,7 @@ import { join, resolve } from 'node:path';
 import { stringify as yamlStringify } from 'yaml';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { waitForServer } from './helpers/wait-for-server.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
@@ -827,15 +828,11 @@ await test('Start a second node with AIMEAT_CONNECT_TUNNEL_ENABLED=false', async
       AIMEAT_DEFAULT_AGENT_SCOPES: '*',
       AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_RL_WORK: '1000', AIMEAT_RL_MEMORY: '1000',
     },
-    stdio: ['ignore', 'ignore', 'ignore'],
+    // Piped rather than ignored, so that when this node does not come up the helper can quote what
+    // it said. `second node failed to start` on its own has never told anybody anything.
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
-  const start = Date.now();
-  let ready = false;
-  while (Date.now() - start < 60_000) {
-    try { const r = await fetch(`${NODE2_BASE}/v1/spec`); if (r.ok) { ready = true; break; } } catch { /* booting */ }
-    await sleep(300);
-  }
-  assert(ready, 'second node failed to start');
+  await waitForServer(node2, NODE2_BASE, { label: 'the second node' });
 });
 
 await test('Daemon degrades to direct transport and still serves the proxy', async () => {

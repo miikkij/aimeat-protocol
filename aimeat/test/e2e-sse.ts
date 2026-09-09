@@ -16,6 +16,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { waitForServer } from './helpers/wait-for-server.js';
 
 const PORT = process.env.E2E_SSE_PORT ?? '40268';
 const BASE = `http://localhost:${PORT}`;
@@ -55,13 +56,7 @@ async function startServer(): Promise<ChildProcess> {
     };
     const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', DB_PATH],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
-    child.stdout?.on('data', () => {}); child.stderr?.on('data', () => {});
-    const start = Date.now();
-    while (Date.now() - start < 60_000) {
-        try { if ((await fetch(`${BASE}/v1/spec`)).ok) return child; } catch { /* not up yet */ }
-        await new Promise(r => setTimeout(r, 300));
-    }
-    child.kill('SIGTERM'); throw new Error('Server failed to start');
+    return waitForServer(child, BASE, { label: 'the SSE node' });
 }
 
 async function register(username: string): Promise<{ rt: string; token: string }> {

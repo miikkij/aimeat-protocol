@@ -36,6 +36,7 @@ import { createServer, type Server, type ServerResponse } from 'node:http';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { waitForServer } from './helpers/wait-for-server.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -156,14 +157,7 @@ async function startServer(): Promise<ChildProcess> {
     };
     const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', ...dbArgs],
         { env: env as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
-    child.stdout?.on('data', () => {}); child.stderr?.on('data', () => {});
-    const began = Date.now();
-    while (Date.now() - began < 60_000) {
-        try { if ((await fetch(`${BASE}/v1/spec`)).ok) return child; } catch { /* not up yet */ }
-        await sleep(300);
-    }
-    child.kill('SIGTERM');
-    throw new Error('Server failed to start');
+    return waitForServer(child, BASE, { label: 'the AI-jobs node' });
 }
 
 async function stopServer(child: ChildProcess, hard = false): Promise<void> {

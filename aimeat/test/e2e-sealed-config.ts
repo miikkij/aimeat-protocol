@@ -28,6 +28,7 @@ import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { waitForServer } from './helpers/wait-for-server.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -136,14 +137,7 @@ async function startServer(sealed: boolean): Promise<ChildProcess> {
     };
     const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', ...dbArgs],
         { env: env as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
-    child.stdout?.on('data', () => {}); child.stderr?.on('data', () => {});
-    const start = Date.now();
-    while (Date.now() - start < 60_000) {
-        try { if ((await fetch(`${BASE}/v1/spec`)).ok) return child; } catch { /* not up yet */ }
-        await new Promise(r => setTimeout(r, 300));
-    }
-    child.kill('SIGTERM');
-    throw new Error('Server failed to start');
+    return waitForServer(child, BASE, { label: 'the sealed-config node' });
 }
 
 /** Stop it and wait for the port to be free, so the next boot is not talking to the old process. */
