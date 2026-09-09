@@ -35,6 +35,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
+import { waitForServer } from './helpers/wait-for-server.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -205,14 +206,7 @@ async function startNode(): Promise<void> {
     });
     node.stdout?.on('data', c => { nodeLog += c.toString(); });
     node.stderr?.on('data', c => { nodeLog += c.toString(); });
-    const start = Date.now();
-    while (Date.now() - start < 90_000) {
-        try { const r = await fetch(`${BASE}/v1/spec`); if (r.ok) return; } catch { /* booting */ }
-        await sleep(300);
-    }
-    throw new Error(`node did not start
---- node output ---
-${nodeLog.slice(-3000)}`);
+    await waitForServer(node, BASE, { label: 'the magic-link node' });
 }
 
 async function stopAll(): Promise<void> {
