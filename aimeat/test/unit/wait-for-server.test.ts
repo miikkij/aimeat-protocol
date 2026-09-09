@@ -59,4 +59,28 @@ describe('waitForServer', () => {
                 .rejects.toThrow(/the widget node did not answer http:\/\/127\.0\.0\.1:1\/v1\/spec within 1000ms.*AIMEAT_E2E_BOOT_MS/s);
         } finally { c.kill('SIGKILL'); }
     });
+
+    it('says nothing bound the port, and that the node printed nothing', async () => {
+        const c = child('setTimeout(() => {}, 30_000)');
+        try {
+            await expect(waitForServer(c, 'http://127.0.0.1:1', { budgetMs: 1_000 }))
+                .rejects.toThrow(/refuses connections, so nothing ever bound it.*printed NOTHING/s);
+        } finally { c.kill('SIGKILL'); }
+    });
+
+    it('says something IS there when the port answers but the path does not', async () => {
+        // The other half of the same question: a port that accepts connections and a readiness
+        // path that never turns 200 is a stalled node or somebody else's process, not a missing one.
+        const server: Server = createServer((_, res) => { res.statusCode = 503; res.end(); });
+        await new Promise<void>(r => server.listen(0, '127.0.0.1', r));
+        const port = (server.address() as AddressInfo).port;
+        const c = child('console.log("booting"); setTimeout(() => {}, 30_000)');
+        try {
+            await expect(waitForServer(c, `http://127.0.0.1:${port}`, { budgetMs: 1_500 }))
+                .rejects.toThrow(/IS accepting connections.*printed 8 bytes/s);
+        } finally {
+            c.kill('SIGKILL');
+            await new Promise<void>(r => server.close(() => r()));
+        }
+    });
 });
