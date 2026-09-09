@@ -44,6 +44,7 @@ import { join, resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
+import { waitForServer } from './helpers/wait-for-server.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -120,13 +121,8 @@ async function startNode(opts: { port: number; gooseBin: string; tag: string }):
     proc.stdout?.on('data', (c: Buffer) => { output += c.toString(); });
     proc.stderr?.on('data', (c: Buffer) => { output += c.toString(); });
 
-    const start = Date.now();
-    while (Date.now() - start < 90_000) {
-        try { const r = await fetch(`${base}/v1/spec`); if (r.ok) return { proc, base, dbDir, peerLog, output: () => output }; }
-        catch { /* still booting */ }
-        await sleep(300);
-    }
-    throw new Error(`node did not start on ${opts.port}\n--- output ---\n${output.slice(-3000)}`);
+    await waitForServer(proc, base, { label: `the node on port ${opts.port}` });
+    return { proc, base, dbDir, peerLog, output: () => output };
 }
 
 /**

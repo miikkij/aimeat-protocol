@@ -42,6 +42,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
+import { waitForServer } from './helpers/wait-for-server.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -557,12 +558,7 @@ async function startHeartbeatNode(): Promise<void> {
     });
     hbNode.stdout?.on('data', c => { hbLog += c.toString(); });
     hbNode.stderr?.on('data', c => { hbLog += c.toString(); });
-    const start = Date.now();
-    while (Date.now() - start < 90_000) {
-        try { const r = await fetch(`${HB_BASE}/v1/spec`); if (r.ok) return; } catch { /* still booting */ }
-        await sleep(300);
-    }
-    throw new Error(`the heartbeat node did not start\n--- node output ---\n${hbLog.slice(-3000)}`);
+    await waitForServer(hbNode, HB_BASE, { label: 'the heartbeat node' });
 }
 
 async function stopHeartbeatNode(): Promise<void> {
