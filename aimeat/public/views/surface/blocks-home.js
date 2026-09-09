@@ -17,6 +17,7 @@
  *   TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v1.1.0 — 2026-08-27 — McpConnectBlock, and the mcp- platform-name shaping it shares with
  *     ChatDoorBlock lifted into one function: useShared caches by key and shapes at read time, so
  *     two blocks on '/v1/chat-instances' with two different shapes would race.
@@ -31,9 +32,10 @@ import { useShared } from '/views/surface/shared-read.js';
 import { useHomeState } from '/views/surface/home-state.js';
 import { useHomePrefs } from '/views/surface/home-prefs.js';
 import {
-  MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Playbooks, TrustLine, Achievements,
+  MailboxRow, FleetLine, Things, FavoriteApps, Playbooks, TrustLine, Achievements,
 } from '/views/home/status-parts.js';
 import { HomeHeader } from '/views/home/header.js';
+import { HomeJourney } from '../home/journey.js';
 import { HomeFeed } from '/views/home/feed.js';
 import { OpenItemsList } from '/components/OpenItemsList.js';
 import { InstallCta } from '/components/InstallCta.js';
@@ -115,9 +117,9 @@ const pickPackages = (d) => (d?.packages ?? []).filter((p) => String(p.key || ''
   .map((p) => ({ key: p.key, name: p.value?.name || p.value?.title || p.key.split('/')[1], updatedAt: p.updated_at }));
 
 export function ChatDoorBlock() {
-  const { data: chatStatus } = useShared('chat-status', '/v1/chat/status', ['chat']);
-  const { data: instances } = useShared('chat-instances', '/v1/chat-instances', ['instances'], mcpPlatformNames);
-  return html`<${ChatDoor} chatStatus=${chatStatus} mcpNames=${instances ?? []} />`;
+  const { state } = useHomeState();
+  // The onboarding layout already mounts this through home.steps.
+  return state?.initialized ? html`<${HomeJourney} />` : null;
 }
 
 /**

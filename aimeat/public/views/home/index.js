@@ -12,13 +12,11 @@
  *   operator who wants a home without a shop, or with their own words in it, no longer needs us.
  *
  *   WHAT STAYS HERE: who the page is for (the session), which of the two homes to show, the settings
- *   dialog (a modal over the whole surface rather than a thing in the flow), and the onboarding step
- *   machine. The steps are one block on purpose — branch B moves the agent step from second to
- *   third and the dimmed steps are numbered by position, so their order is not something a layout
- *   should be able to express.
- * @structure default HomeView; internal: Welcome, DimmedStep, OnboardingSteps
+ *   dialog (a modal over the whole surface), and the shared task-and-connection journey.
+ * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v3.0.0 — 2026-08-26 — The finished home renders through the surface layout engine. The eleven
  *     fetches and the raw aimeat-live-update listener that re-ran all of them on any event of any
  *     kind are gone: each block reads what it needs and re-reads on the domains that can change it.
@@ -57,88 +55,13 @@ import { useSession } from '/js/use-session.js';
 import { getSession } from '/js/services/auth.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import { Spinner } from '/components/Spinner.js';
-import { StepMat, StepMatDone } from '/views/home/step-mat.js';
-import { StepAgent } from '/views/home/step-agent.js';
-import { StepBranchB } from '/views/home/step-branch-b.js';
+import { HomeJourney } from './journey.js';
 import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
 import { SurfaceRenderer, useSurfaceLayout } from '/views/surface/renderer.js';
 import { useHomeState } from '/views/surface/home-state.js';
-import { invalidateShared } from '/views/surface/shared-read.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-/** The steps, named. `better-app` exists only on branch B; on A there are two, not three. */
-const STEP_TITLES = {
-  'welcome-mat': ['home.step1', 'Your welcome mat'],
-  'better-app': ['home.step2b', 'Get an app that can connect'],
-  'first-agent': ['home.step2', 'Connect your first agent'],
-};
-
-/** A step that is named so the person knows it is coming, and dimmed so they cannot start it. */
-function DimmedStep({ n, titleKey, fallback, note }) {
-  return html`
-    <div class="koti-step koti-step-dim" aria-disabled="true">
-      <div class="koti-step-head">
-        <span class="koti-step-num">${n}</span>
-        <h2 class="koti-step-title">${tr(titleKey, fallback)}</h2>
-      </div>
-      ${note && html`<p class="koti-step-lede">${note}</p>`}
-    </div>`;
-}
-
-/**
- * The greeting. It no longer carries the name: the name is on the nameplate a line above, and
- * printing it twice inside sixty pixels reads as a bug.
- */
-function Welcome() {
-  return html`
-    <header class="koti-welcome">
-      <h1 class="koti-h1">${tr('home.welcome', 'Welcome to your new home.')}</h1>
-      <p class="koti-welcome-sub">
-        ${tr('home.welcomeSub', 'Before the place can do anything for you, there are a couple of things to do.')}
-      </p>
-    </header>`;
-}
-
-/**
- * The setup path, as one unit. An operator can drop it or put their own words around it; its own
- * order is not arrangeable, because branch B inserts a step and the dimmed ones are numbered by
- * position. It is driven by needsBetterApp (live) rather than by branch (write-once, historical),
- * so re-pasting a mat from a capable app collapses that step by itself.
- */
-function OnboardingSteps({ state, onChanged, showToast }) {
-  const step = state.step;
-  const onBranchB = state.needsBetterApp || (state.branch === 'B' && !state.mat.done);
-  return html`
-    <ol class="koti-steps">
-      <li>
-        ${step === 'welcome-mat'
-          ? html`<${StepMat} onDone=${onChanged} />`
-          : html`<${StepMatDone} state=${state} />`}
-      </li>
-      <li>
-        ${step === 'better-app'
-          ? html`<${StepBranchB} state=${state} onChanged=${onChanged} />`
-          : step === 'first-agent' && !onBranchB
-            ? html`<${StepAgent} onChanged=${onChanged} showToast=${showToast} />`
-            : html`<${DimmedStep}
-                n="2"
-                titleKey=${onBranchB ? 'home.step2b' : (STEP_TITLES[step]?.[0] ?? 'home.step2')}
-                fallback=${onBranchB ? 'Get an app that can connect' : (STEP_TITLES[step]?.[1] ?? 'Connect your first agent')}
-                note=${tr('home.step2Dim', 'Opens once your welcome mat is up.')} />`}
-      </li>
-      ${onBranchB && html`
-        <li>
-          ${step === 'first-agent'
-            ? html`<${StepAgent} onChanged=${onChanged} showToast=${showToast} />`
-            : html`<${DimmedStep}
-                n="3"
-                titleKey="home.step3"
-                fallback="Connect your first agent"
-                note=${tr('home.step3Dim', 'Opens once you have an app that can connect.')} />`}
-        </li>`}
-    </ol>`;
-}
 
 export default function HomeView({ navigate }) {
   const session = useSession();
@@ -157,11 +80,6 @@ export default function HomeView({ navigate }) {
   const showToast = useCallback((msg) => {
     setToast(msg);
     setTimeout(() => setToast(''), 6000);
-  }, []);
-
-  // A step finishing changes the account's state, which is what decides the whole page.
-  const onStepChanged = useCallback(() => {
-    invalidateShared('home-state', '/v1/home/state');
   }, []);
 
   const openSettings = useCallback(() => setSettingsOpen(true), []);
@@ -219,9 +137,7 @@ export default function HomeView({ navigate }) {
     session,
     navigate,
     openSettings,
-    renderSteps: () => html`
-      <${Welcome} />
-      <${OnboardingSteps} state=${state} onChanged=${onStepChanged} showToast=${showToast} />`,
+    renderSteps: () => html`<${HomeJourney} />`,
   };
 
   return html`

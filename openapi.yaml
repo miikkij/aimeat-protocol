@@ -11659,20 +11659,19 @@ paths:
       operationId: getHomeState
       summary: Where this account stands on the home path
       description: >-
-        One call the home view renders entirely from: which of the three steps is open, which are
-        named but not yet reachable, and whether the home exists at all.
+        The owner's connection progress and home contents. New accounts start by connecting
+        their own AI and choosing useful work. A personal welcome webpage is optional.
 
-        `initialized` is DERIVED and never a stored flag — it requires all three of: a welcome mat,
-        a connected first agent, and the Hello MCP proof key written THROUGH that connection. A
-        stored boolean could be set by a bug; these three cannot be talked past. There is no skip
-        and no default mat: without a mat there is no home.
+        `initialized` is derived from a live agent and the Hello MCP proof key. Making or removing
+        the optional webpage does not affect readiness. The step is first-agent until the
+        connection is verified, then null.
 
         When the branch is still undecided the answer carries `question` and, for the
         which-app question, `client_options` built from the same tool table the branch decision
         reads — so the picker can never drift from the list.
 
-        Requires the ACCOUNT HOLDER's own session: an agent token inherits its owner's roles on this
-        node, so agent, ecosystem and app-grant principals are refused here.
+        Requires the account holder's own session. Agent, ecosystem and app-grant principals
+        are refused here.
 
         For a FINISHED home the answer also carries `playbooks`: the named outcomes this node can
         actually deliver (a shop that settles cards, stablecoin and agent purchases; connected
@@ -11711,7 +11710,7 @@ paths:
                               track: { type: string, enum: [remake, legacy] }
                               step:
                                 type: string
-                                enum: [welcome-mat, first-agent, hello-mcp]
+                                enum: [first-agent]
                                 nullable: true
                                 description: The step the person is ON. Null once the home is initialized.
                               mat:

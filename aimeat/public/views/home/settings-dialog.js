@@ -2,9 +2,8 @@
  * @file public/views/home/settings-dialog.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The home's own settings: the two things that belong to the home and nowhere else
- *   (whether the achievements strip shows, and which page a sign-in lands on), and the door to
- *   everything else.
+ * @description Basic account settings through the shared profile/password forms, then home
+ *   appearance and the door to all settings and controls.
  *
  *   It used to carry four tabs of the profile's sections (OpenRouter, access, wallet,
  *   notifications) imported into a modal, from the time the home and the profile were two
@@ -21,6 +20,7 @@
  *   import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
  *   html`<${HomeSettingsDialog} open=${open} onClose=${close} />`
  * @version-history
+ *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v2.1.1 — 2026-08-29 — A preview box above the chips shows the chosen figure without leaving the dialog.
  *   v2.1.0 — 2026-08-29 — The margin pattern: off or one of eight figures for the empty margins of the
  *     home, the chat and the settings. Same home.prefs record (marginPattern), applied to the page
@@ -42,6 +42,7 @@ import { api, apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { Modal } from '/components/Modal.js';
 import { StartPageSetting } from '/components/StartPageSetting.js';
+import { EditProfileModal, ChangePasswordModal } from '../profile/landing-page.modals.js';
 import { MARGIN_PATTERNS, applyMarginPattern, marginPatternOf } from '/js/margin-pattern.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -120,12 +121,29 @@ function AchievementsToggle() {
     </label>`;
 }
 
-export function HomeSettingsDialog({ open, onClose }) {
+export function HomeSettingsDialog({ open, onClose, session, showToast }) {
+  const [panel, setPanel] = useState('settings');
+  useEffect(() => { if (!open) setPanel('settings'); }, [open]);
+  if (!open) return null;
+  if (panel === 'profile') return html`<${EditProfileModal} session=${session}
+    onClose=${() => setPanel('settings')} onSaved=${() => setPanel('settings')}
+    onChangePassword=${() => setPanel('password')} />`;
+  if (panel === 'password') return html`<${ChangePasswordModal}
+    onClose=${() => setPanel('settings')}
+    onChanged=${() => { setPanel('settings'); showToast?.(t('profile.landing.passwordChanged')); }} />`;
   return html`
     <${Modal} open=${open} onClose=${onClose}
       title=${tr('home.settings.title', 'Home settings')}
       className="koti-settings-modal">
       <div class="koti-settings">
+        <section class="koti-account-settings">
+          <h3>${t('homeJourney.account')}</h3>
+          <button type="button" class="btn-outline" onClick=${() => setPanel('password')}>${t('profile.landing.changePasswordBtn')}</button>
+          <button type="button" class="btn-outline" onClick=${() => setPanel('profile')}>${t('homeJourney.profileLanguage')}</button>
+          <a class="koti-link" href="/v1/profile?tab=access">${t('homeJourney.security')} →</a>
+          <p class="koti-hint">${t('homeJourney.securityHint')}</p>
+        </section>
+        <h3>${t('homeJourney.appearance')}</h3>
         <${AchievementsToggle} />
         <${MarginPatternSetting} />
         <${StartPageSetting} className="koti-settings-startpage" />
