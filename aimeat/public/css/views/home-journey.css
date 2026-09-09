@@ -4,16 +4,13 @@
  * SPDX-License-Identifier: MIT
  * @description Useful work and account settings on the home, in the poster face.
  * @version-history
+ *   v1.0.1 — 2026-09-09 — Remove bespoke button styling; home.css supplies the existing controls.
  *   v1.0.0 — 2026-09-09 — Connection, prompts, real saved note and basic account controls.
  */
 .koti-journey { border-top: 3px solid var(--text); padding-top: 1.4rem; margin-block: 1.5rem; min-width: 0; }
 .koti-journey p { line-height: 1.6; }
-.koti-journey button, .koti-account-settings button { border-radius: 0; font-family: var(--font-body); }
-.koti-journey .btn-primary { background: var(--text); color: var(--bg); box-shadow: 4px 4px 0 var(--sun); }
-.koti-journey .btn-outline, .koti-account-settings .btn-outline { border: 2px solid var(--text); color: var(--text); background: var(--bg); }
 .koti-journey-choices, .koti-journey-status, .koti-journey-links { display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; margin-block: 1rem; }
 .koti-journey-choices button { min-height: 44px; }
-.koti-journey-choices [aria-pressed="true"] { background: var(--sun); color: var(--on-sun); border-color: var(--text); }
 .koti-journey-status { justify-content: space-between; border-block: 1px solid var(--border); padding-block: 1rem; }
 .koti-journey-connect { border: 2px solid var(--text); padding: 1rem; margin-block: 1rem; min-width: 0; }
 .koti-journey-connect .ast-tools { flex-wrap: wrap; }
@@ -26,8 +23,7 @@
 .koti-account-settings button, .koti-account-settings a { min-height: 44px; }
 .koti-settings-modal .modal-close { min-width: 44px; min-height: 44px; }
 @media (max-width: 600px) {
-  .koti-journey-choices { display: grid; grid-template-columns: 1fr 1fr; }
-  .koti-journey-choices button { white-space: normal; }
+  .koti-journey .koti-link, .koti-account-settings .koti-link { white-space: normal; text-align: left; }
   .koti-journey-connect { padding: .75rem; }
   .koti-journey .koti-prompt-head { flex-wrap: wrap; gap: .75rem; }
   .koti-journey-links { align-items: flex-start; flex-direction: column; }

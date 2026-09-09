@@ -20,6 +20,7 @@
  *   import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
  *   html`<${HomeSettingsDialog} open=${open} onClose=${close} />`
  * @version-history
+ *   2026-09-09: Account actions use the same underlined control as the home header.
  *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v2.1.1 — 2026-08-29 — A preview box above the chips shows the chosen figure without leaving the dialog.
  *   v2.1.0 — 2026-08-29 — The margin pattern: off or one of eight figures for the empty margins of the
@@ -138,8 +139,8 @@ export function HomeSettingsDialog({ open, onClose, session, showToast }) {
       <div class="koti-settings">
         <section class="koti-account-settings">
           <h3>${t('homeJourney.account')}</h3>
-          <button type="button" class="btn-outline" onClick=${() => setPanel('password')}>${t('profile.landing.changePasswordBtn')}</button>
-          <button type="button" class="btn-outline" onClick=${() => setPanel('profile')}>${t('homeJourney.profileLanguage')}</button>
+          <button type="button" class="koti-link" onClick=${() => setPanel('password')}>${t('profile.landing.changePasswordBtn')}</button>
+          <button type="button" class="koti-link" onClick=${() => setPanel('profile')}>${t('homeJourney.profileLanguage')}</button>
           <a class="koti-link" href="/v1/profile?tab=access">${t('homeJourney.security')} →</a>
           <p class="koti-hint">${t('homeJourney.securityHint')}</p>
         </section>
