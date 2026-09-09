@@ -24,6 +24,10 @@
  *   - PERMISSIVE / SPDX_OF_NOTE — the allowlist, and the ids that carry an obligation
  * @usage  imported by check-licenses.ts, gen-third-party-notices.ts and gen-sbom.ts
  * @version-history
+ *   v1.1.0 — 2026-09-09 — A failed `pnpm licenses list` reports PNPM'S OWN reason. The message
+ *     said "run pnpm install first" whatever had happened, and on a release day the real answer
+ *     was ERR_PNPM_MISSING_PACKAGE_INDEX_FILE for one package: the shared store was incomplete,
+ *     not the install, and node_modules looked perfect while the publish would not start.
  *   v1.0.1 — 2026-08-31 — Licence and notice texts are read with LF line endings whatever the
  *     package shipped. One CRLF licence (`@so-ric/colorspace`) was the third and last reason the
  *     notices gate answered differently on Linux and on Windows for the same commit.
@@ -154,6 +158,30 @@ function readLicenseFileIn(dir: string, pattern: RegExp): string | null {
  * in a build tool runs on the machine that builds a release, which is a supply-chain problem even
  * though nothing ships.
  */
+/**
+ * What pnpm itself said, in one line a person can act on.
+ *
+ * It answers a failure as `{"error":{"code":"…","message":"…"}}` on STDOUT rather than on stderr, and
+ * `execSync` attaches that to the thrown error as `stdout`. Both codes seen so far point at the same
+ * command but at different halves of it: ERR_PNPM_NO_LOCKFILE is the install, and
+ * ERR_PNPM_MISSING_PACKAGE_INDEX_FILE is the shared store, which no amount of looking at
+ * `node_modules` reveals.
+ */
+export function pnpmReason(err: unknown): string {
+  const e = err as { stdout?: string | Buffer; stderr?: string | Buffer };
+  const pick = (v: string | Buffer | undefined) => (typeof v === 'string' ? v : v?.toString('utf-8'));
+  const text = pick(e?.stdout) || pick(e?.stderr);
+  if (text) {
+    try {
+      const body = JSON.parse(text) as { error?: { code?: string; message?: string } };
+      if (body.error?.message) {
+        return `${body.error.code ?? 'pnpm'}: ${body.error.message}`;
+      }
+    } catch { /* not JSON: fall through to the generic line below */ }
+  }
+  return 'pnpm gave no reason of its own. `pnpm install` in aimeat/ repairs both an incomplete install and an incomplete store.';
+}
+
 export function npmComponents(options: { dev?: boolean } = {}): Component[] {
   let raw: string;
   try {
@@ -161,13 +189,17 @@ export function npmComponents(options: { dev?: boolean } = {}): Component[] {
       cwd: AIMEAT_ROOT,
       encoding: 'utf-8',
       maxBuffer: 64 * 1024 * 1024,
-      stdio: ['ignore', 'pipe', 'ignore'],
+      // stderr is PIPED rather than ignored so a future pnpm that reports there is still readable
+      // from the thrown error; nothing reads it on the happy path.
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (err) {
-    throw new Error(
-      'pnpm licenses list failed. It reads node_modules, so run pnpm install first.\n'
-      + `  ${(err as Error).message}`,
-    );
+    // PNPM'S OWN REASON, NOT OUR GUESS. This used to say "it reads node_modules, so run pnpm install
+    // first" and nothing else, and on 2026-09-09 that sent a release hunt at a directory that was
+    // perfectly fine: the real answer was ERR_PNPM_MISSING_PACKAGE_INDEX_FILE for one package, an
+    // incomplete STORE rather than an incomplete install. pnpm reports that as JSON on STDOUT, which
+    // execSync hands back on the error object, so it is right here — it was being thrown away.
+    throw new Error(`pnpm licenses list failed.\n  ${pnpmReason(err)}\n  ${(err as Error).message}`);
   }
 
   const byLicense = JSON.parse(raw) as Record<string, PnpmLicenseEntry[]>;
