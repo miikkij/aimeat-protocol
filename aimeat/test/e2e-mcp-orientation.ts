@@ -27,7 +27,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const PORT = process.env.E2E_MCP_ORIENTATION_PORT ?? '40268';
+const PORT = process.env.E2E_MCP_ORIENTATION_PORT ?? '40403';
 const BASE = `http://localhost:${PORT}`;
 const APP_HOST = 'apps.aimeat.test';
 const NODE_ID = 'aimeat-local-001-dev';

@@ -264,13 +264,13 @@ await test('Boot Node A (hub, port 40260)', async () => {
     console.log(`    Node A running on ${nodeA.baseUrl}`);
 });
 
-await test('Boot Node B (contributor, port 40261)', async () => {
-    nodeB = await bootNode(40261, 'aimeat-node-001-testb');
+await test('Boot Node B (contributor, port 40400)', async () => {
+    nodeB = await bootNode(40400, 'aimeat-node-001-testb');
     console.log(`    Node B running on ${nodeB.baseUrl}`);
 });
 
-await test('Boot Node C (contributor, port 40262)', async () => {
-    nodeC = await bootNode(40262, 'aimeat-node-001-testc');
+await test('Boot Node C (contributor, port 40401)', async () => {
+    nodeC = await bootNode(40401, 'aimeat-node-001-testc');
     console.log(`    Node C running on ${nodeC.baseUrl}`);
 });
 

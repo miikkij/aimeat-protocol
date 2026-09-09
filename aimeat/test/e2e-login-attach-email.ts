@@ -29,7 +29,7 @@ async function sign(privB64: string, msg: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
 }
 
-const PORT = process.env.E2E_ATTACH_EMAIL_PORT ?? '40268';
+const PORT = process.env.E2E_ATTACH_EMAIL_PORT ?? '40402';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = 'aimeat-local-001-dev';
 const DB_PATH = resolve(process.cwd(), 'test/.test-attach-email.db');

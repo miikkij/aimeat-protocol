@@ -32,7 +32,7 @@ ed.hashes.sha512 = (m: Uint8Array) =>
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
-const NODE2_PORT = 40287;
+const NODE2_PORT = 40412;
 const NODE2_BASE = `http://localhost:${NODE2_PORT}`;
 
 let passed = 0;

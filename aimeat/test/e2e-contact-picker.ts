@@ -20,7 +20,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { waitForServer } from './helpers/wait-for-server.js';
 
-const PORT = process.env.E2E_PICKER_PORT ?? '40273';
+const PORT = process.env.E2E_PICKER_PORT ?? '40407';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = 'aimeat-local-001-dev';
 const APP_HOST = 'apps.localhost';

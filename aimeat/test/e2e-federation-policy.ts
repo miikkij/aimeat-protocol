@@ -103,7 +103,7 @@ await test('0. recordHeartbeatOutcome label transitions', async () => {
 
 console.log('\nSetup nodes');
 await test('Boot A (genesis author, open-join) + P (puller)', async () => {
-  A = await bootNode(40275, 'aimeat-test-001-pola', true);
+  A = await bootNode(40410, 'aimeat-test-001-pola', true);
   P = await bootNode(40276, 'aimeat-test-001-polp', true);
   await setupOwner(A, `pola${ts}`);
   await setupOwner(P, `polp${ts}`);
