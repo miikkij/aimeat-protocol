@@ -28,6 +28,7 @@
  *   import { blocksForSurface, defaultLayout } from './registry.js';
  *   const offered = blocksForSurface('home', config);
  * @version-history
+ *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v1.2.1 — 2026-08-28 — The default home puts the fleet line before the chat door: the door is
  *     the coral band of the poster home and closes the status group. Stored layouts are untouched.
  *   v1.2.0 — 2026-08-28 — The built-in portal is the showroom: six new blocks (showroom-hero,
@@ -179,6 +180,7 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
     ],
     home: [
         b('home.nameplate'),
+        b('home.chat-door'),
         // Directly under the nameplate, because on the days it appears at all it is the most
         // important thing on the page: nothing else here works over chat until it is done. On every
         // other day it renders nothing and the mat line moves up into its place.
@@ -188,7 +190,6 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
         // The two status lines first and the door after them: on the poster home the door is the
         // coral band, and a band reads as the close of the "now" group, not as a line inside it.
         b('home.fleet'),
-        b('home.chat-door'),
         b('home.things'),
         // The playbooks and the achievements strip share one titled band, exactly as they do today.
         // This is why the schema has a nesting level at all: a flat list cannot say "these two go
