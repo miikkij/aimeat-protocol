@@ -27,6 +27,9 @@
  *   import { workflowsRouter } from './routes/workflows.js';
  *   app.use(workflowsRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-09-09 — POST /:id/run says when nothing started: `skipped: true` with the id of
+ *     the run already in flight, and no "run started" row in the account feed. The engine had
+ *     answered with that id bare and this route logged a start that never happened.
  *   v1.2.0 — 2026-08-30 — A signals-only check is not a run: the run list and the health leave it
  *     out unless asked (?include=checks | ?only=checks); GET /:id/preflight answers the confirmation
  *     before a run (agents, steps already satisfied, the longest timeout chain, the last run, vars).
@@ -202,6 +205,21 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     const result = await engine.startRun(ownerGhiiOf(req), req.auth!.owner, id, { mode, vars });
     if ('error' in result) {
       res.status(400).json(error(config.nodeId, 'WORKFLOW_RUN_FAILED', 'Could not start the run', undefined, { errors: result.error }));
+      return;
+    }
+    // NOTHING STARTED. A run of this workflow is already in flight and the definition does not allow
+    // overlap. Said in the payload, with the id of the run that IS running, and with no "run
+    // started" row in the account feed: that row was written for every skipped start until
+    // 2026-09-09, and a partner's intake read the familiar-looking id as its own new run. Still 200,
+    // because the scheduler and every caller written so far treat a non-2xx here as a failure to
+    // retry, and a skip is not that.
+    if (result.skipped) {
+      res.json(success(config.nodeId, {
+        runId: result.runId, mode, skipped: true,
+        reason: 'a run of this workflow is already in flight; nothing was started. Wait for it, or set parallel: true on the workflow to let runs overlap.',
+      }, [
+        { description: 'View the run that is in flight', method: 'GET', url: `/v1/workflows/${id}/runs/${result.runId}` },
+      ]));
       return;
     }
     emitChange('workflows');

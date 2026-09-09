@@ -10,6 +10,8 @@
  *     owner. The namespace came from the create body and went straight into the raw composite-key
  *     lookup, so any registered account could read another owner's private memory verbatim through
  *     a prompt. The routes refuse it now too; this covers jobs stored before that gate existed.
+ *   v1.2.0 — 2026-09-09 — A workflow job whose start was skipped (a run already in flight) records
+ *     a skip with the reason, not a write naming the other run as if this job had started it.
  */
 import type { AimeatConfig } from '../config.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
@@ -113,6 +115,9 @@ export async function runWorkflowJob(job: ScheduledJobRecord): Promise<JobRunRes
   if (!engine) return { reads: [], writes: [], skipped: true, skipReason: 'workflow engine not started' };
   const result = await engine.startRun(owner, owner.split('@')[0], workflowId, { mode: 'full-live' });
   if ('error' in result) throw new Error(`workflow run failed to start: ${result.error.join('; ')}`);
+  if (result.skipped) {
+    return { reads: [], writes: [], skipped: true, skipReason: `a run of "${workflowId}" is already in flight (${result.runId}); set parallel: true on the workflow to let runs overlap` };
+  }
   return { reads: [], writes: [`workflows.run.${workflowId}.${result.runId}`] };
 }
 

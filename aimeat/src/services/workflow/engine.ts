@@ -52,6 +52,13 @@
  *     The sweep applies the on_timeout policy (fail | skip | default) after timeout_min (default 24h
  *     for human steps); cancelRun skips parked human steps. Restart-safe by construction — the parked
  *     state lives in the persisted run record.
+ *   v1.7.0 — 2026-09-09 — The overlap guard SAYS when it refuses: startRun answers `skipped: true`
+ *     with the in-flight run's id instead of that id bare, which every door had read as a fresh run
+ *     (the route logged "run started", the scheduler recorded a write, and a partner's intake logged
+ *     its second case as started and left it hanging). `parallel: true` on the definition lifts the
+ *     guard for a workflow whose keys carry a run-distinguishing var. The event-trigger loops no
+ *     longer pre-check overlap themselves, because they cannot see the definition; startRun can.
+ *     The fan-out itself moved to engine-triggers.ts (pure move, max-file-lines).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -61,10 +68,11 @@ import type { PushService } from '../push.js';
 import type { EmailService } from '../email.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { evaluateSignal, extractProgress, globToRegExp, type SignalEvalCtx } from './signal-eval.js';
+import { evaluateSignal, extractProgress, type SignalEvalCtx } from './signal-eval.js';
 import { buildEvalCtx } from './eval-context.js';
 import { getWorkflow, validateWorkflow, runKey, type ResolvedStep } from './store.js';
 import { readEventTriggers, readEcosystemEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
+import { fireMemoryWrite, fireOfferOrdered, fireEcosystemEvent, type TriggerDeps } from './engine-triggers.js';
 import { template, runDateIn } from './engine-util.js';
 import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
 import {
@@ -98,6 +106,14 @@ export interface StartRunOpts {
   mode: 'signals-only' | 'full-live' | 'full-sandbox';
   vars?: Record<string, string>;
 }
+
+/**
+ * What startRun answers. `skipped: true` means NOTHING STARTED: a live run of this workflow is
+ * already in flight, the definition does not set `parallel`, and `runId` is that run's id, not a
+ * new one. Every door passes the flag on, because a skip that looks like a start is the failure no
+ * metric shows (a partner's intake logged a case as started on exactly that, 2026-09-09).
+ */
+export type StartRunResult = { runId: string; skipped: boolean } | { error: string[] };
 
 export class WorkflowEngine {
   private config: AimeatConfig;
@@ -155,22 +171,31 @@ export class WorkflowEngine {
   }
 
   // ── start a run ──────────────────────────────────────────────────────────────
-  async startRun(ownerGhii: string, ownerName: string, workflowId: string, opts: StartRunOpts): Promise<{ runId: string } | { error: string[] }> {
+  async startRun(ownerGhii: string, ownerName: string, workflowId: string, opts: StartRunOpts): Promise<StartRunResult> {
     const def = await getWorkflow(this.storage, ownerGhii, workflowId);
     if (!def) return { error: [`workflow "${workflowId}" not found`] };
 
     const v = await validateWorkflow(this.storage, this.config, ownerName, def);
     if (!v.ok || !v.resolved) return { error: v.errors };
 
-    // Overlap guard: a full run that dispatches agents must not run twice at once (the steps share
-    // templated keys). If one is already in flight for this workflow, return it instead of starting a
-    // second. signals-only is read-only, so it always runs fresh.
-    if (opts.mode === 'full-live') {
+    // Overlap guard: ONE live run per workflow per owner, unless the definition says `parallel`. The
+    // steps write to templated keys, and two runs of a definition whose keys carry nothing
+    // run-specific would write over each other, so the default refuses the second start.
+    //
+    // THE REFUSAL IS SAID. Until 2026-09-09 this returned the in-flight run's id bare, and every door
+    // took it for a run it had just started: the route logged "run started" with that id, the
+    // scheduler recorded a write, and a caller could tell only by comparing ids with the last one.
+    // A partner's support intake logged its second case as started and the case hung. `skipped:
+    // true` with the running run's id is the same fact, stated. `parallel: true` is the author
+    // saying the keys distinguish runs (a case reference in vars, the built-in {run}); the
+    // validator refuses it beside `fresh`, which wipes the produced keys at start and would take the
+    // other run's work with it. signals-only is read-only and never overlaps anything.
+    if (opts.mode === 'full-live' && !def.parallel) {
       const active = await readActiveRuns(this.storage, this.config.nodeId);
       const inFlight = active.find(a => a.workflowId === workflowId && a.ownerGhii === ownerGhii);
       if (inFlight) {
         logger.info(`workflow "${workflowId}": a run is already in flight (${inFlight.runId}); skipping this start`);
-        return { runId: inFlight.runId };
+        return { runId: inFlight.runId, skipped: true };
       }
     }
 
@@ -199,7 +224,7 @@ export class WorkflowEngine {
         await this.tick(ownerGhii, run);
       });
     }
-    return { runId };
+    return { runId, skipped: false };
   }
 
   /** The pinned per-step resolved signals (from start time) as a lookup. No mid-run re-resolution. */
@@ -473,71 +498,28 @@ export class WorkflowEngine {
   }
 
   // ── event triggers (Phase 8) ──────────────────────────────────────────────────
-  // The descriptor's `trigger.kind:'event'` is registered in a system-namespace index
-  // (lifecycle.ts). These hooks are called from the write/order sites; a match starts a run.
-  // Loop guard: skip if the workflow already has an in-flight run (so a workflow that produces a
-  // key it also listens on doesn't re-trigger itself).
+  // The fan-out lives in engine-triggers.ts (a pure move, 2026-09-09); these three stay as the
+  // methods the write/order sites call. startRun, guard included, is what a hit runs through.
+  private triggerDeps(): TriggerDeps {
+    return {
+      storage: this.storage, config: this.config,
+      startRun: (o, n, w, opts) => this.startRun(o, n, w, opts),
+      // Handed over rather than imported there: lifecycle.ts reaches the scheduler, which reaches
+      // this engine, and a second import path into that circle is what check:deps refuses.
+      readEventTriggers, readEcosystemEventTriggers,
+    };
+  }
 
   async onMemoryWrite(ownerGhii: string, key: string): Promise<void> {
-    await this.fireEventTriggers('memory.write', ownerGhii, t => {
-      const pat = t.match.key;
-      return !!pat && globToRegExp(pat).test(key);
-    });
+    return fireMemoryWrite(this.triggerDeps(), ownerGhii, key);
   }
 
   async onOfferOrdered(ownerGhii: string, offerId: string): Promise<void> {
-    await this.fireEventTriggers('offer.ordered', ownerGhii, t => {
-      const pat = t.match.offer;
-      return !!pat && globToRegExp(pat).test(offerId);
-    });
+    return fireOfferOrdered(this.triggerDeps(), ownerGhii, offerId);
   }
 
-  /**
-   * Inbound ecosystem event (a GEAI emitted `on` for `app`). Fires every `ecosystem.event` trigger
-   * the owner authored that matches {app, on}, whose pinned MAJOR `version` equals the incoming
-   * event's major (fail-safe: a major mismatch does NOT fire), and whose optional `match` globs pass
-   * against the event payload. Same owner-scoped loop guard as the other event triggers.
-   */
   async onEcosystemEvent(app: string, on: string, version: number, ownerGhii: string, data: Record<string, unknown>): Promise<void> {
-    let triggers;
-    try { triggers = await readEcosystemEventTriggers(this.storage, this.config.nodeId); }
-    catch (err) { logger.error('readEcosystemEventTriggers failed', { app, on, error: String(err) }); return; }
-    const hits = triggers.filter(t =>
-      t.ownerGhii === ownerGhii && t.app === app && t.on === on &&
-      t.version === version &&                                   // fail-safe: skip on major mismatch
-      this.ecoMatchPasses(t.match, data));
-    if (hits.length === 0) return;
-    const active = await readActiveRuns(this.storage, this.config.nodeId);
-    for (const t of hits) {
-      if (active.some(a => a.workflowId === t.workflowId && a.ownerGhii === t.ownerGhii)) continue; // loop/overlap guard
-      this.startRun(ownerGhii, ownerGhii.split('@')[0], t.workflowId, { mode: 'full-live' })
-        .catch(err => logger.error('ecosystem-event-triggered workflow run failed', { workflowId: t.workflowId, error: String(err) }));
-    }
-  }
-
-  /** Each match entry is a glob tested against the same-named field in the event payload (string-coerced). */
-  private ecoMatchPasses(match: Record<string, string> | undefined, data: Record<string, unknown>): boolean {
-    if (!match) return true;
-    for (const [field, pat] of Object.entries(match)) {
-      const val = data[field];
-      if (val === undefined || val === null) return false;
-      if (!globToRegExp(pat).test(String(val))) return false;
-    }
-    return true;
-  }
-
-  private async fireEventTriggers(on: 'memory.write' | 'offer.ordered', ownerGhii: string, matches: (t: { match: Record<string, string> }) => boolean): Promise<void> {
-    let triggers;
-    try { triggers = await readEventTriggers(this.storage, this.config.nodeId); }
-    catch (err) { logger.error('readEventTriggers failed', { on, error: String(err) }); return; }
-    const hits = triggers.filter(t => t.on === on && t.ownerGhii === ownerGhii && matches(t));
-    if (hits.length === 0) return;
-    const active = await readActiveRuns(this.storage, this.config.nodeId);
-    for (const t of hits) {
-      if (active.some(a => a.workflowId === t.workflowId && a.ownerGhii === t.ownerGhii)) continue; // loop/overlap guard (owner-scoped)
-      this.startRun(ownerGhii, ownerGhii.split('@')[0], t.workflowId, { mode: 'full-live' })
-        .catch(err => logger.error('event-triggered workflow run failed', { workflowId: t.workflowId, error: String(err) }));
-    }
+    return fireEcosystemEvent(this.triggerDeps(), app, on, version, ownerGhii, data);
   }
 
   /**

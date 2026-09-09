@@ -8,6 +8,12 @@
  *   - transcribe(apiKey, model, audio, baseUrl?, opts?) — call audio transcriptions (STT)
  *   - listModels(apiKey, baseUrl?, modality?) — fetch available models
  * @version-history
+ *   v3.2.0 — 2026-09-09 — An empty answer is a failed call, not an answer. complete() retries it
+ *     (`retries`, default 2; on OpenRouter a retry usually lands on a different provider) and then
+ *     throws with the finish_reason, where it had returned '' with a warning nobody's caller read: a
+ *     workflow step wrote the empty string to its key and went green. `reasoning` is passed to the
+ *     provider as given, because a reasoning model behind a cap spends the cap on thinking and
+ *     answers with nothing at HTTP 200. `finish_reason` joins the result.
  *   v3.1.0 — 2026-08-16 — chatCompletionRaw(): the request as given, the provider's response as it
  *     came. The chat proxy forwards both untouched, and this file is the node's only HTTP transport
  *     to a provider, which is a checked rule rather than a convention.
@@ -45,6 +51,8 @@ import { logger } from '../utils/logger.js';
 export interface OpenRouterCompletionResult {
   content: string;
   model: string;
+  /** The provider's own reason for stopping (`stop`, `length`, ...), when it said one. */
+  finish_reason?: string;
   /**
    * Token + cost usage as reported by the provider. May be partial:
    *  - OpenRouter returns prompt/completion tokens reliably, and `cost` when
@@ -243,12 +251,45 @@ export function providerHeaders(apiKey: string | undefined, baseUrl: string): Re
 /**
  * Call an OpenAI-compatible chat completions API.
  */
+/**
+ * OpenRouter's unified reasoning parameter, sent to the provider exactly as given. `enabled: false`
+ * turns a reasoning model's hidden thinking off; `effort` sizes it; `max_tokens` caps it; `exclude`
+ * keeps it out of the response. Nothing is sent when the caller sets nothing.
+ */
+export interface CompletionReasoning {
+  enabled?: boolean;
+  effort?: 'low' | 'medium' | 'high';
+  max_tokens?: number;
+  exclude?: boolean;
+}
+
+/** How many times an empty answer is asked again before it is an error, when nobody said. */
+export const DEFAULT_EMPTY_RETRIES = 2;
+/** The ceiling, the same one the owner's maxRetries setting has always had. */
+const MAX_EMPTY_RETRIES = 10;
+
+/** The error `complete()` throws when every attempt came back without content. */
+export interface EmptyCompletionError extends Error {
+  status: number;
+  empty: true;
+  finish_reason: string;
+  attempts: number;
+}
+
 export interface CompletionOptions {
   temperature?: number;
   top_p?: number;
   max_tokens?: number;
   frequency_penalty?: number;
   presence_penalty?: number;
+  reasoning?: CompletionReasoning;
+  /**
+   * How many times an answer with no content is asked again before `complete()` throws. Default
+   * DEFAULT_EMPTY_RETRIES; 0 asks once. An empty answer at HTTP 200 is what a reasoning model
+   * produces when its cap runs out mid-thought, and what a few providers produce for no reason
+   * anyone has found; on OpenRouter the next attempt usually lands on a different provider.
+   */
+  retries?: number;
   /**
    * An outside reason to stop waiting — a cancelled AI job, so far. It is COMBINED with this
    * function's own timeout rather than replacing it: a caller that can cancel still gets the
@@ -286,15 +327,6 @@ export async function complete(
     messages.push({ role: 'user', content: prompt });
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  // The timeout and the caller's own reason to stop, combined rather than chosen between. Without
-  // the composition a cancellable caller would silently lose the timeout, which is the guard that
-  // stops a hung provider holding a slot for ever.
-  const signal = options?.signal
-    ? AbortSignal.any([controller.signal, options.signal])
-    : controller.signal;
-
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...providerHeaders(apiKey, baseUrl) };
 
   const requestBody: Record<string, unknown> = { model, messages };
@@ -303,58 +335,94 @@ export async function complete(
   if (options?.max_tokens !== undefined) requestBody.max_tokens = options.max_tokens;
   if (options?.frequency_penalty !== undefined) requestBody.frequency_penalty = options.frequency_penalty;
   if (options?.presence_penalty !== undefined) requestBody.presence_penalty = options.presence_penalty;
+  if (options?.reasoning !== undefined) requestBody.reasoning = options.reasoning;
   const bodyStr = JSON.stringify(requestBody);
-  logger.info(`[openrouter] Sending: model=${model}, temp=${requestBody.temperature ?? 'default'}, top_p=${requestBody.top_p ?? 'default'}, max_tokens=${requestBody.max_tokens ?? 'default'}, bodyLen=${bodyStr.length}, userMsgLen=${messages[messages.length - 1]?.content?.length || 0}`);
+  logger.info(`[openrouter] Sending: model=${model}, temp=${requestBody.temperature ?? 'default'}, top_p=${requestBody.top_p ?? 'default'}, max_tokens=${requestBody.max_tokens ?? 'default'}, reasoning=${requestBody.reasoning ? JSON.stringify(requestBody.reasoning) : 'default'}, bodyLen=${bodyStr.length}, userMsgLen=${messages[messages.length - 1]?.content?.length || 0}`);
 
-  try {
-    const resp = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers,
-      body: bodyStr,
-      signal,
-    });
+  // One request, one answer. Each attempt carries its own timeout controller; the caller's signal
+  // is composed in below so a cancel ends the retry loop as well as the request it interrupts.
+  const once = async (): Promise<OpenRouterCompletionResult> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    // The timeout and the caller's own reason to stop, combined rather than chosen between. Without
+    // the composition a cancellable caller would silently lose the timeout, which is the guard that
+    // stops a hung provider holding a slot for ever.
+    const signal = options?.signal
+      ? AbortSignal.any([controller.signal, options.signal])
+      : controller.signal;
+    try {
+      const resp = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: bodyStr,
+        signal,
+      });
 
-    if (!resp.ok) {
-      // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
-      const body = await resp.text().catch(() => '');
-      const err = new Error(`OpenRouter ${resp.status}: ${body}`) as Error & { status: number };
-      err.status = resp.status;
-      throw err;
+      if (!resp.ok) {
+        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
+        const body = await resp.text().catch(() => '');
+        const err = new Error(`OpenRouter ${resp.status}: ${body}`) as Error & { status: number };
+        err.status = resp.status;
+        throw err;
+      }
+
+      const data = await resp.json() as {
+        choices?: Array<{ message?: { content?: string | null }; finish_reason?: string }>;
+        model?: string;
+        error?: { message?: string; code?: number };
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number };
+      };
+
+      logger.info(`[openrouter] Response: status=${resp.status}, model=${data.model}, choices=${data.choices?.length || 0}, finish=${data.choices?.[0]?.finish_reason}, promptTokens=${data.usage?.prompt_tokens}, completionTokens=${data.usage?.completion_tokens}, hasError=${!!data.error}`);
+
+      // Check for error in response body (OpenRouter sometimes returns 200 with error)
+      if (data.error) {
+        // Log the full error so we can diagnose model-specific issues (Owl Alpha
+        // and friends sometimes reject params silently with 200 + error body).
+        logger.warn(`[openrouter] error body: ${JSON.stringify(data.error).slice(0, 500)}`);
+        const errMsg = data.error.message || JSON.stringify(data.error);
+        const err = new Error(`OpenRouter error: ${errMsg}`) as Error & { status: number };
+        err.status = data.error.code || 502;
+        throw err;
+      }
+
+      const content = data.choices?.[0]?.message?.content ?? '';
+      const usage = data.usage ? {
+        prompt_tokens: data.usage.prompt_tokens,
+        completion_tokens: data.usage.completion_tokens,
+        total_tokens: data.usage.total_tokens,
+        cost_usd: typeof data.usage.cost === 'number' ? data.usage.cost : undefined,
+      } : undefined;
+      return { content, model: data.model ?? model, usage, finish_reason: data.choices?.[0]?.finish_reason };
+    } finally {
+      clearTimeout(timeout);
     }
+  };
 
-    const data = await resp.json() as {
-      choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
-      model?: string;
-      error?: { message?: string; code?: number };
-      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number };
-    };
-
-    logger.info(`[openrouter] Response: status=${resp.status}, model=${data.model}, choices=${data.choices?.length || 0}, finish=${data.choices?.[0]?.finish_reason}, promptTokens=${data.usage?.prompt_tokens}, completionTokens=${data.usage?.completion_tokens}, hasError=${!!data.error}`);
-
-    // Check for error in response body (OpenRouter sometimes returns 200 with error)
-    if (data.error) {
-      // Log the full error so we can diagnose model-specific issues (Owl Alpha
-      // and friends sometimes reject params silently with 200 + error body).
-      logger.warn(`[openrouter] error body: ${JSON.stringify(data.error).slice(0, 500)}`);
-      const errMsg = data.error.message || JSON.stringify(data.error);
-      const err = new Error(`OpenRouter error: ${errMsg}`) as Error & { status: number };
-      err.status = data.error.code || 502;
-      throw err;
+  // AN EMPTY ANSWER IS A FAILED CALL. It came back as '' with a console warning until 2026-09-09,
+  // and every caller took it as the answer: a workflow ai step wrote the empty string to its key
+  // and went green, and nothing downstream could tell a blank from a decision to say nothing. A
+  // reasoning model behind a token cap does exactly this (the cap is spent on hidden thinking; the
+  // content field is null; the status is 200), and the same prompt on the next attempt, often on
+  // another provider, answers. So: ask again, a bounded number of times, then fail with the reason.
+  const retries = Math.max(0, Math.min(MAX_EMPTY_RETRIES, Math.floor(options?.retries ?? DEFAULT_EMPTY_RETRIES)));
+  for (let attempt = 1; ; attempt++) {
+    const r = await once();
+    if (r.content.trim()) return r;
+    const finish = r.finish_reason ?? 'unknown';
+    if (attempt <= retries && !options?.signal?.aborted) {
+      logger.warn(`[openrouter] empty content: model=${r.model}, finish_reason=${finish}, attempt ${attempt} of ${retries + 1}; asking again`);
+      continue;
     }
-
-    const content = data.choices?.[0]?.message?.content ?? '';
-    if (!content) {
-      console.warn(`[openrouter] EMPTY CONTENT: model=${model}, finish_reason=${data.choices?.[0]?.finish_reason}, raw=${JSON.stringify(data).slice(0, 500)}`);
-    }
-    const usage = data.usage ? {
-      prompt_tokens: data.usage.prompt_tokens,
-      completion_tokens: data.usage.completion_tokens,
-      total_tokens: data.usage.total_tokens,
-      cost_usd: typeof data.usage.cost === 'number' ? data.usage.cost : undefined,
-    } : undefined;
-    return { content, model: data.model ?? model, usage };
-  } finally {
-    clearTimeout(timeout);
+    const err = new Error(
+      `OpenRouter returned no content after ${attempt} attempt(s): model=${r.model}, finish_reason=${finish}`
+      + (finish === 'length' ? ' (the token cap ran out before an answer; a reasoning model spends it on hidden thinking — raise the cap or set reasoning.enabled=false)' : ''),
+    ) as EmptyCompletionError;
+    err.status = 502;
+    err.empty = true;
+    err.finish_reason = finish;
+    err.attempts = attempt;
+    throw err;
   }
 }
 

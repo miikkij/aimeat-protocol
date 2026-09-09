@@ -62,10 +62,11 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import {
-  completeForOwner, AiCompletionError, getTodayUsage, getUsageHistory, getDailyBudgetUsd,
+  completeForOwner, AiCompletionError, getTodayUsage, getDailyBudgetUsd,
   DEFAULT_DAILY_BUDGET_USD,
 } from '../services/ai-completion.js';
 import { getAdminAiUsage } from '../services/ai-usage-admin.js';
+import { getUsageHistory } from '../services/ai-usage-history.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
 import { generateForOwner } from '../services/ai-image.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';

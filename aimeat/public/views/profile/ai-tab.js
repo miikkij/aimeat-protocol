@@ -13,6 +13,9 @@
  * @structure AiSettingsTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'ai' (alias 'generator')
  * @version-history
+ *   v1.1.0 — 2026-09-09 — The parameters section carries the reasoning setting: one word on the
+ *     page (default, off, light, medium, deep), OpenRouter's object on the wire. Exists because a
+ *     reasoning model behind a token limit spends the limit thinking and answers with nothing.
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Tekoäly-sivu", direction A): one page
  *     instead of a collapsible panel; the image-generation role gets its row (the field had been in
  *     the API since 2026-08-16 with nowhere to set it); a model choice is stored on the row; the
@@ -39,6 +42,13 @@ function fileToBase64(file) {
 
 const flashFor = (setter) => (text, error = false) => { setter({ text, error }); setTimeout(() => setter(null), 6000); };
 
+/** The stored reasoning object as the one word the page edits: '' (model default), 'off', or an effort level. */
+export function reasoningMode(r) {
+  if (!r || typeof r !== 'object') return '';
+  if (r.enabled === false) return 'off';
+  return r.effort === 'low' || r.effort === 'medium' || r.effort === 'high' ? r.effort : '';
+}
+
 export default function AiSettingsTab({ navigate, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [settings, setSettings] = useState(null);
@@ -62,7 +72,7 @@ export default function AiSettingsTab({ navigate, showToast }) {
   const [showAllApps, setShowAllApps] = useState(false);
   const [metric, setMetric] = useState('cost');
   const [paramsEditing, setParamsEditing] = useState(false);
-  const [params, setParamsState] = useState({ temperature: '', top_p: '', max_tokens: '', autoRetry: true, maxRetries: 3 });
+  const [params, setParamsState] = useState({ temperature: '', top_p: '', max_tokens: '', autoRetry: true, maxRetries: 3, reasoning: '' });
   const [busy, setBusy] = useState(false);
   const [connMsg, setConnMsg] = useState(null);
   const [modelsMsg, setModelsMsg] = useState(null);
@@ -110,7 +120,7 @@ export default function AiSettingsTab({ navigate, showToast }) {
       const s = r?.data || {};
       setSettings(s);
       setConnState({ provider: s.provider || 'openrouter', baseUrl: s.baseUrl || '', apiKey: '' });
-      setParamsState({ temperature: s.temperature != null ? String(s.temperature) : '', top_p: s.top_p != null ? String(s.top_p) : '', max_tokens: s.max_tokens != null ? String(s.max_tokens) : '', autoRetry: !!s.autoRetry, maxRetries: s.maxRetries || 3 });
+      setParamsState({ temperature: s.temperature != null ? String(s.temperature) : '', top_p: s.top_p != null ? String(s.top_p) : '', max_tokens: s.max_tokens != null ? String(s.max_tokens) : '', autoRetry: !!s.autoRetry, maxRetries: s.maxRetries || 3, reasoning: reasoningMode(s.reasoning) });
       loadModels(s);
     } catch (e) { swallowed('ai: settings', e); setSettings({}); }
     loadUsage();
@@ -258,6 +268,9 @@ export default function AiSettingsTab({ navigate, showToast }) {
         temperature: params.temperature !== '' ? parseFloat(params.temperature) : null,
         top_p: params.top_p !== '' ? parseFloat(params.top_p) : null,
         max_tokens: params.max_tokens !== '' ? parseInt(params.max_tokens, 10) : null,
+        // One word on the page, OpenRouter's object on the wire: off = { enabled: false }, a level =
+        // { effort }, and the model's default = null, which clears the stored setting.
+        reasoning: params.reasoning === '' ? null : params.reasoning === 'off' ? { enabled: false } : { effort: params.reasoning },
       };
       const r = await put(body);
       if (r?.ok === false) throw r;

@@ -20,6 +20,11 @@
  *     prefix-aware), and the step assembling their answers read the previous live run's data and
  *     said nothing. Reachable only through POST /v1/workflows/:id/run with target=sandbox, which is
  *     also the run a person makes when they are trying something out.
+ *   v1.3.0 — 2026-09-09 — An empty answer is red, not a green step holding ''. The transport retries
+ *     and then throws (openrouter.ts); a JSON step that got prose is the same failure one layer up
+ *     and is asked again the same bounded number of times. `reasoning` on the action reaches the
+ *     provider as given, and `uncapped` keeps the owner's max_tokens preference off this step,
+ *     which is what "NO TOKEN CAP" below had claimed and the completion service had not honoured.
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -38,7 +43,11 @@ import { logger } from '../../utils/logger.js';
  *
  * NO TOKEN CAP is passed. This project forbids one (scripts/check-no-max-tokens.ts): a cap
  * truncates a long generation silently, and a long generation is the whole point of this step.
+ * `uncapped: true` makes the completion service honour that against the owner's own preference too.
  */
+const JSON_RE = /\{[\s\S]*\}|\[[\s\S]*\]/;
+/** A JSON step that got prose is asked again this many times before it is red. Same bound as the transport's empty-answer retry. */
+const JSON_RETRIES = 2;
 export function dispatchAiStep(
   deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep,
   action: Extract<NonNullable<WorkflowStep['action']>, { kind: 'ai' }>,
@@ -84,11 +93,17 @@ export function dispatchAiStep(
       prompt += `\n\n---\nINPUT DATA. This is the whole of what you have been given; anything not\nstated here is unknown, and unknown is reported, never filled in.\n\n${parts.join('\n\n')}\n`;
     }
 
-    const r = await completeForOwner(deps.storage, deps.config, ownerGhii, {
+    // An empty answer never reaches here: the transport asks again and then throws with the
+    // provider's finish_reason, and that throw is this step's red. `reasoning` goes to the provider
+    // as the action wrote it; `uncapped` keeps the owner's max_tokens preference off this call.
+    const ask = () => completeForOwner(deps.storage, deps.config, ownerGhii, {
       prompt,
       ...(action.model ? { model: action.model } : {}),
+      ...(action.reasoning ? { reasoning: action.reasoning } : {}),
+      uncapped: true,
       appId: `workflow:${workflowId}`,
     });
+    let r = await ask();
 
     if (action.result_to_key) {
       const key = (run.keyPrefix ?? '') + template(action.result_to_key, run.vars);
@@ -96,8 +111,15 @@ export function dispatchAiStep(
       // string that every downstream reader has to re-parse and none of them validates.
       let value: unknown = r.content;
       if (action.json) {
-        const m = /\{[\s\S]*\}|\[[\s\S]*\]/.exec(r.content);
-        if (!m) throw new Error('ai step asked for json and the answer contained none');
+        // Prose where JSON was asked for is the empty answer's sibling: the model produced something,
+        // and none of it is usable. Asked again, bounded, then red with the count.
+        let m = JSON_RE.exec(r.content);
+        for (let attempt = 1; !m && attempt <= JSON_RETRIES; attempt++) {
+          logger.warn(`workflow ${workflowId} run ${runId}: ai step "${stepId}" asked for json and got none; attempt ${attempt + 1} of ${JSON_RETRIES + 1}`);
+          r = await ask();
+          m = JSON_RE.exec(r.content);
+        }
+        if (!m) throw new Error(`ai step asked for json and the answer contained none, ${JSON_RETRIES + 1} attempts`);
         value = JSON.parse(m[0]);
       }
       const existing = await deps.storage.getMemory(ownerGhii, key);
