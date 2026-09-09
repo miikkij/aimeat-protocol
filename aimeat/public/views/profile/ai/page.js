@@ -12,6 +12,8 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.1.0 — 2026-09-09 — A reasoning row in the parameters section: model default, off, or an
+ *     effort level, beside the retry row whose promise the server now keeps.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { h } from 'preact';
@@ -251,6 +253,16 @@ function secParams(ctx) {
         <div class="ai-v">${e
           ? html`<div class="ai-inline"><label class="ai-check"><input type="checkbox" checked=${p.autoRetry} onChange=${(ev) => ctx.setParams({ autoRetry: ev.target.checked })} />${x('retryOn')}</label>${p.autoRetry ? html`<label>${x('retryMax')} ${field('maxRetries', 1, 10, 1)}</label>` : null}</div>`
           : (s.autoRetry ? x('retryBody', { n: s.maxRetries || 3 }) : x('retryOff'))}<small>${x('retrySub')}</small></div>
+        <div class="ai-k">${x('param.reasoning')}</div>
+        <div class="ai-v">${e
+          ? html`<select class="og-input ai-num" aria-label=${x('param.reasoning')} value=${p.reasoning} onChange=${(ev) => ctx.setParams({ reasoning: ev.target.value })}>
+              ${['', 'off', 'low', 'medium', 'high'].map((k) => html`<option key=${k} value=${k}>${x('reasoning.' + (k || 'default'))}</option>`)}
+            </select>`
+          : (s.reasoning && s.reasoning.enabled === false
+            ? x('reasoningOff')
+            : s.reasoning && s.reasoning.effort
+              ? x('reasoningOn', { level: x('reasoning.' + s.reasoning.effort) })
+              : html`<span class="is-unset">${x('modelDefault')}</span>`)}<small>${x('reasoningSub')}</small></div>
       </div>
       <div class="og-doors">
         ${e

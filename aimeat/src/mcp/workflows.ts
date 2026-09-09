@@ -11,6 +11,8 @@
  * @usage import { registerWorkflowTools } from './workflows.js';
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.4.0 — 2026-09-09 — aimeat_workflow_run says when nothing started: `skipped: true` and the id
+ *     of the run already in flight, which the engine had returned bare as if it were new.
  *   v1.3.0 — 2026-08-30 — aimeat_workflow_run takes `vars` and `target`. POST /v1/workflows/:id/run
  *     has read both since the CRUD phase; this tool was written against the body as it stood before
  *     and never caught up, so a workflow that takes input could only be run at its defaults from a
@@ -152,6 +154,14 @@ export function registerWorkflowTools(
       const mode = a.mode === 'full' ? (a.target === 'sandbox' ? 'full-sandbox' : 'full-live') : 'signals-only';
       const result = await engine.startRun(ownerGhii, owner, a.id, { mode, ...(a.vars ? { vars: a.vars } : {}) });
       if ('error' in result) return err(`Could not start run:\n- ${result.error.join('\n- ')}`);
+      // Nothing started. The id is the run that IS in flight, and the caller needs to know it is not
+      // theirs: a skip that looks like a start is the failure no metric shows.
+      if (result.skipped) {
+        return text({
+          runId: result.runId, mode, skipped: true,
+          note: 'Nothing was started: a run of this workflow is already in flight and this is its id. Wait for it, or set parallel: true on the workflow to let runs overlap.',
+        });
+      }
       // For signals-only the run completes synchronously — return the per-step verdicts inline.
       if (a.mode === 'signals-only') {
         const runs = await listRuns(storage, ownerGhii, a.id);

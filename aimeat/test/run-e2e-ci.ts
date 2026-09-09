@@ -720,6 +720,9 @@ const ALL_SUITES = [
     'test/e2e-agent-governance.ts',
     'test/e2e-workflows.ts',
     'test/e2e-workflows-human.ts',
+    // A second start while a run is in flight SAYS it started nothing (skipped:true, the running
+    // run's id, no feed row), and a definition marked `parallel` runs twice at once.
+    'test/e2e-workflow-parallel.ts',
     // The step kind a workflow was missing: an extension action, run on this node with no agent
     // online and no model in the path, gated by the same success_signal as every other step.
     'test/e2e-workflow-extension-step.ts',

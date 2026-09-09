@@ -68,11 +68,16 @@
  *   v1.6.0 — 2026-07-10 — Enforce config.aiProviderAllowlist: on a public node, a decrypted AI key
  *     may only be sent to an allowlisted provider host, so a poisoned owner/app baseUrl can't
  *     exfiltrate it. Empty allowlist = any host (unchanged default).
+ *   v1.8.0 — 2026-09-09 — `reasoning` and `retries` reach the provider from the call or from the
+ *     owner's settings; an empty answer surfaces as EMPTY_COMPLETION after the transport's retries.
+ *     `uncapped` lets a long-generation caller (the workflow ai step) refuse the owner's max_tokens
+ *     preference, which had applied to it although the step's contract says no cap. getUsageHistory
+ *     moved to ai-usage-history.ts as a pure move (max-file-lines).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { decrypt, getEncryptionKey } from './encryption.js';
-import { complete, DEFAULT_BASE_URLS, type ProviderType } from './openrouter.js';
+import { complete, DEFAULT_BASE_URLS, type ProviderType, type CompletionReasoning } from './openrouter.js';
 import { mintProvenance } from './ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
@@ -338,6 +343,19 @@ export interface CompleteForOwnerOptions {
   /** Optional image attachments (data: or https URLs) for vision-capable models. */
   images?: string[];
   /**
+   * Passed to the provider as given (OpenRouter's unified `reasoning` parameter). When unset, the
+   * owner's settings decide, and when those say nothing, nothing is sent.
+   */
+  reasoning?: CompletionReasoning;
+  /** How many times an empty answer is asked again before it is an error. Falls back to the owner's setting, then 2. */
+  retries?: number;
+  /**
+   * The caller is a long generation and the owner's `max_tokens` preference must NOT apply. The
+   * workflow ai step passes this: its contract is no cap, and the preference had been reaching it
+   * through here regardless. An explicit `maxTokens` on the call still wins.
+   */
+  uncapped?: boolean;
+  /**
    * An outside reason to stop waiting — a cancelled AI job. Composed with the transport's own
    * timeout inside `complete()`, never replacing it.
    *
@@ -398,80 +416,8 @@ export async function getTodayUsage(storage: Storage, gaii: string): Promise<Usa
   return (rec?.value as UsageRecord | undefined) ?? emptyUsage();
 }
 
-/** A rolled-up spend window (today / 7d / 30d) — same per-app shape as a day, summed. */
-export interface UsageWindow {
-  cost_usd: number;
-  tokens: number;
-  calls: number;
-  /** Transcribed audio seconds in the window (0 before speech-to-text existed). */
-  audio_seconds: number;
-  per_app: Record<string, { cost_usd: number; tokens: number; calls: number; audio_seconds: number }>;
-}
-
-export interface UsageHistory {
-  /** Per-day series, oldest → newest, limited to the last `days` retained records. */
-  days: UsageRecord[];
-  /** Distinct app ids across the returned series, ordered by spend (desc) — stable chart series order. */
-  apps: string[];
-  /** Rollups: d1 = today's UTC bucket, d7/d30 = trailing 7/30 calendar days. */
-  windows: { d1: UsageWindow; d7: UsageWindow; d30: UsageWindow };
-}
-
-const emptyWindow = (): UsageWindow => ({ cost_usd: 0, tokens: 0, calls: 0, audio_seconds: 0, per_app: {} });
-
-function accumulateWindow(win: UsageWindow, rec: UsageRecord): void {
-  win.cost_usd += rec.total_cost_usd || 0;
-  win.tokens += rec.total_tokens || 0;
-  win.calls += rec.total_calls || 0;
-  win.audio_seconds += rec.audio_seconds || 0;
-  for (const [app, m] of Object.entries(rec.per_app || {})) {
-    const cur = win.per_app[app] ?? (win.per_app[app] = { cost_usd: 0, tokens: 0, calls: 0, audio_seconds: 0 });
-    cur.cost_usd += m.cost_usd || 0;
-    cur.tokens += m.tokens || 0;
-    cur.calls += m.calls || 0;
-    cur.audio_seconds += m.audio_seconds || 0;
-  }
-}
-
-/**
- * Read an owner's AI-spend history. Every completion persists one `ai-usage.<gaii>.<day>` record
- * (retained forever, ttlHours:null); this fans the prefix into a per-day series plus 24h/7d/30d
- * rollups for the profile home card and the Generator time-series chart. UTC-day granularity —
- * no intra-day data (see /v1/ai/usage for the live "today" number the budget bar uses).
- */
-export async function getUsageHistory(storage: Storage, gaii: string, days = 30): Promise<UsageHistory> {
-  const records = await storage.listMemory(gaii, { prefix: `ai-usage.${gaii}.` });
-  const sorted = records
-    .map((r) => r.value as UsageRecord)
-    .filter((v): v is UsageRecord => !!v && typeof v.date === 'string')
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  const clampDays = Math.min(Math.max(Math.trunc(days) || 30, 1), 365);
-  const series = sorted.slice(-clampDays);
-
-  const today = todayKey();
-  const cutoff = (n: number) => new Date(Date.now() - (n - 1) * 86_400_000).toISOString().slice(0, 10);
-  const d7cut = cutoff(7);
-  const d30cut = cutoff(30);
-
-  const windows = { d1: emptyWindow(), d7: emptyWindow(), d30: emptyWindow() };
-  for (const rec of sorted) {
-    if (rec.date === today) accumulateWindow(windows.d1, rec);
-    if (rec.date >= d7cut) accumulateWindow(windows.d7, rec);
-    if (rec.date >= d30cut) accumulateWindow(windows.d30, rec);
-  }
-
-  // App ordering derived from the CHARTED series so every dataset has a day to land on.
-  const appSpend: Record<string, number> = {};
-  for (const rec of series) {
-    for (const [app, m] of Object.entries(rec.per_app || {})) {
-      appSpend[app] = (appSpend[app] || 0) + (m.cost_usd || 0);
-    }
-  }
-  const apps = Object.keys(appSpend).sort((a, b) => appSpend[b] - appSpend[a]);
-
-  return { days: series, apps, windows };
-}
+// getUsageHistory and its UsageWindow / UsageHistory shapes live in ai-usage-history.ts since
+// 2026-09-09 (a pure move, max-file-lines). The per-day records are still written below.
 
 async function upsertUsage(storage: Storage, gaii: string, value: UsageRecord): Promise<void> {
   const key = `ai-usage.${gaii}.${todayKey()}`;
@@ -725,12 +671,27 @@ export async function completeForOwner(
   });
   const { prefs } = plan;
 
+  // The owner's settings are the fallback for every knob the call did not set. `reasoning` arrived
+  // 2026-09-09 with the empty-answer fix; its shape is validated where the settings are written
+  // (routes/openrouter.ts), so here a non-object is simply not sent. `autoRetry` and `maxRetries`
+  // had been on the Tekoäly page since 2026-03 and were read by nothing on the server: the
+  // browser's own transport retry was the only thing that ever honoured them. They now govern how
+  // many times an answer with no content is asked again, which is the retry an owner setting that
+  // name would expect to buy.
+  const prefReasoning = prefs.reasoning && typeof prefs.reasoning === 'object' && !Array.isArray(prefs.reasoning)
+    ? (prefs.reasoning as CompletionReasoning) : undefined;
+  const reasoning = opts.reasoning ?? prefReasoning;
+  const retries = typeof opts.retries === 'number' ? opts.retries
+    : prefs.autoRetry === false ? 0
+      : (typeof prefs.maxRetries === 'number' ? (prefs.maxRetries as number) : undefined);
   const options = {
     temperature: opts.temperature ?? (typeof prefs.temperature === 'number' ? prefs.temperature : undefined),
     top_p: opts.topP ?? (typeof prefs.top_p === 'number' ? prefs.top_p : undefined),
     max_tokens: typeof opts.maxTokens === 'number' && opts.maxTokens > 0
       ? (opts.maxTokens | 0)
-      : (typeof prefs.max_tokens === 'number' ? (prefs.max_tokens as number) : undefined),
+      : (!opts.uncapped && typeof prefs.max_tokens === 'number' ? (prefs.max_tokens as number) : undefined),
+    ...(reasoning ? { reasoning } : {}),
+    ...(retries !== undefined ? { retries } : {}),
     ...(opts.signal ? { signal: opts.signal } : {}),
   };
 
@@ -741,6 +702,9 @@ export async function completeForOwner(
     const status = (e as { status?: number }).status;
     if (status === 401) throw new AiCompletionError('INVALID_API_KEY', 401, 'API key was rejected by the provider.');
     if (status === 429) throw new AiCompletionError('RATE_LIMITED', 429, 'Provider rate limit hit. Try again later.');
+    // The provider answered, every attempt, with nothing. Its own name so a caller can tell "the
+    // model said nothing" from "the provider was down" and act on the finish_reason in the message.
+    if ((e as { empty?: boolean }).empty) throw new AiCompletionError('EMPTY_COMPLETION', 502, (e as Error).message);
     throw new AiCompletionError('PROVIDER_ERROR', 502, (e as Error).message);
   }
 

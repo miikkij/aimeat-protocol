@@ -14,6 +14,11 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.12.0 — 2026-09-09 — `reasoning` persists beside temperature/top_p/max_tokens: OpenRouter's
+ *     reasoning parameter, sent to the provider as given on every completion that does not set its
+ *     own; null clears it. Only the four documented fields are stored. Beside it, `autoRetry` and
+ *     `maxRetries` now mean something on the server: they bound how many times an answer with no
+ *     content is asked again (services/ai-completion.ts), which nothing had read since 2026-03.
  *   v1.11.0 — 2026-09-08 — GET /models takes ?modality=image; it had narrowed the word to chat.
  *   v1.10.0 — 2026-09-04 — POST /complete spends under `calibrator:<projectId>` for a calibration
  *     project, so the usage table says which calibration cost what; a generator project keeps
@@ -72,6 +77,33 @@ import { recordAccountEvent } from '../services/account-events.js';
 import { listModels, DEFAULT_BASE_URLS, type ProviderType, type ModelModality } from '../services/openrouter.js';
 import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
+
+/**
+ * OpenRouter's reasoning parameter as the owner's default: the four documented fields and nothing
+ * else, so a typo cannot be stored as a setting that does nothing. Returns the cleaned object, or a
+ * string saying what was wrong.
+ */
+function parseReasoningSetting(input: unknown): Record<string, unknown> | string {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return 'reasoning must be an object';
+  const src = input as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(src)) {
+    if (v === undefined || v === null) continue;
+    if (k === 'enabled' || k === 'exclude') {
+      if (typeof v !== 'boolean') return `reasoning.${k} must be a boolean`;
+      out[k] = v;
+    } else if (k === 'effort') {
+      if (v !== 'low' && v !== 'medium' && v !== 'high') return 'reasoning.effort must be low, medium or high';
+      out[k] = v;
+    } else if (k === 'max_tokens') {
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < 1 || v > 200000) return 'reasoning.max_tokens must be an integer between 1 and 200000';
+      out[k] = v;
+    } else {
+      return `reasoning.${k} is not a field OpenRouter knows (enabled, effort, max_tokens, exclude)`;
+    }
+  }
+  return out;
+}
 
 /**
  * The per-app attribution these two routes spend under, so their cost shows up in the owner's usage
@@ -150,7 +182,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
     requireAuth(), requireRole('owner'),
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
-      const { apiKey, model, reasoningModel, executionModel, visionModel, sttModel, sttLanguage, imageModel, autoRetry, maxRetries, provider, baseUrl, temperature, top_p, max_tokens } = req.body as {
+      const { apiKey, model, reasoningModel, executionModel, visionModel, sttModel, sttLanguage, imageModel, autoRetry, maxRetries, provider, baseUrl, temperature, top_p, max_tokens, reasoning } = req.body as {
         apiKey?: string;
         model?: string;
         reasoningModel?: string;
@@ -166,7 +198,13 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         temperature?: number;
         top_p?: number;
         max_tokens?: number;
+        reasoning?: unknown;
       };
+      // Refused before anything is written: a half-saved settings record is worse than a 400.
+      const parsedReasoning = reasoning === undefined || reasoning === null ? undefined : parseReasoningSetting(reasoning);
+      if (typeof parsedReasoning === 'string') {
+        return res.status(400).json(error(config.nodeId, 'INVALID_REASONING', parsedReasoning));
+      }
 
       // Resolve provider type
       const validProviders: ProviderType[] = ['openrouter', 'lmstudio', 'custom'];
@@ -245,6 +283,12 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       if (temperature !== undefined) prefs.temperature = (temperature === null || isNaN(Number(temperature))) ? null : Math.max(0, Math.min(2, Number(temperature)));
       if (top_p !== undefined) prefs.top_p = (top_p === null || isNaN(Number(top_p))) ? null : Math.max(0, Math.min(1, Number(top_p)));
       if (max_tokens !== undefined) prefs.max_tokens = (max_tokens === null || isNaN(Number(max_tokens))) ? null : Math.max(1, Math.min(128000, Math.floor(Number(max_tokens))));
+      // reasoning: OpenRouter's reasoning parameter, stored as given and sent as given on every
+      // completion that does not set its own. null clears it; an empty object is the same as null.
+      if (reasoning !== undefined) {
+        if (parsedReasoning && Object.keys(parsedReasoning).length > 0) prefs.reasoning = parsedReasoning;
+        else delete prefs.reasoning;
+      }
 
       await upsertMemory(gaii, 'openrouter.settings', prefs, ['openrouter', 'settings']);
 
@@ -280,6 +324,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         temperature: prefs.temperature ?? null,
         top_p: prefs.top_p ?? null,
         max_tokens: prefs.max_tokens ?? null,
+        reasoning: prefs.reasoning && typeof prefs.reasoning === 'object' ? prefs.reasoning : null,
         // Node-level ceilings, served with the settings that live under them. The browser recorder
         // needs to stop at THIS node's number rather than a figure compiled into the page, and this
         // response is already fetched wherever that matters.

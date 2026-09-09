@@ -39,6 +39,9 @@
  *   - phase 9: the living-document pulse's derive loop, its gate, its stop and its guards
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-provider-stub.ts
  * @version-history
+ *   v1.1.0 — 2026-09-09 — 6b asserted the defect: an empty completion answered as '' at 200. It now
+ *     proves the retry (one empty, then the answer, two requests) and 6b2 the failure after the
+ *     retries (502 EMPTY_COMPLETION naming finish_reason=length, three attempts).
  *   v1.0.0 — 2026-09-08 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -527,11 +530,31 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(carried.body.error?.code === 'RATE_LIMITED', `code ${carried.body.error?.code}`);
     });
 
-    await test('6b. An empty completion is answered as empty rather than as a failure', async () => {
+    // Until 2026-09-09 this test asserted the opposite: "an empty completion is answered as empty
+    // rather than as a failure". That was the hole a partner measured on a reasoning model behind
+    // a token cap (content null, finish_reason length, HTTP 200), and a workflow ai step wrote the
+    // empty string to its key and went green on it. The test asserted the defect (pitfalls §19).
+    await test('6b. An empty completion is asked again, and the answer that then comes is the answer', async () => {
+        const before = provider.requestsFor('chat').filter(carries('MARK-COMPLETE-EMPTY')).length;
+        // One scripted empty; the stub's default reply answers the retry.
         provider.queue('chat', chatJson('', { finishReason: 'length' }), carries('MARK-COMPLETE-EMPTY'));
         const r = await complete({ prompt: 'MARK-COMPLETE-EMPTY', app_id: 'e2e-ai-stub' });
         assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
-        assert(r.body.data.content === '', `empty content, got ${JSON.stringify(r.body.data.content)}`);
+        assert(typeof r.body.data.content === 'string' && r.body.data.content.length > 0, `the retry's answer, got ${JSON.stringify(r.body.data.content)}`);
+        const seen = provider.requestsFor('chat').filter(carries('MARK-COMPLETE-EMPTY')).length - before;
+        assert(seen === 2, `the provider was asked twice (one empty, one answer), got ${seen}`);
+    });
+
+    await test('6b2. Empty every time is a 502 EMPTY_COMPLETION naming the finish_reason, after the retries', async () => {
+        // The owner set no retry count, so the transport's default applies: two retries, three attempts.
+        for (let i = 0; i < 3; i++) provider.queue('chat', chatJson('', { finishReason: 'length' }), carries('MARK-COMPLETE-EMPTY3'));
+        const before = provider.requestsFor('chat').filter(carries('MARK-COMPLETE-EMPTY3')).length;
+        const r = await complete({ prompt: 'MARK-COMPLETE-EMPTY3', app_id: 'e2e-ai-stub' });
+        assert(r.status === 502, `expected 502, got ${r.status}: ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+        assert(r.body.error?.code === 'EMPTY_COMPLETION', `code ${r.body.error?.code}`);
+        assert(/finish_reason=length/.test(r.body.error?.message ?? ''), `the reason is named: ${r.body.error?.message}`);
+        const seen = provider.requestsFor('chat').filter(carries('MARK-COMPLETE-EMPTY3')).length - before;
+        assert(seen === 3, `three attempts, got ${seen}`);
     });
 
     await test('6c. An image attachment turns the user turn into a multimodal content array', async () => {

@@ -38,6 +38,11 @@
  *     agent, a human and another node's app, and could not reach the deterministic capability sitting
  *     on the same node, even though an HTTP caller could. Completion goes through onPushTerminal, so
  *     the success_signal decides green or red exactly as it does for an ecosystem step.
+ *   v1.9.0 — 2026-09-09 — WorkflowDef.parallel: the author says two live runs of this workflow may
+ *     overlap, because its keys carry a run-distinguishing var. The engine had refused a second start
+ *     for every workflow and answered with the first run's id, bare, so a partner's intake logged a
+ *     case as started that never was. Default false keeps the one-run guard; `fresh` beside it is
+ *     refused at save. The ai action gains `reasoning`, passed to the provider as given.
  */
 import { z } from 'zod';
 
@@ -175,6 +180,13 @@ export type WorkflowStepAction =
       json?: boolean;
       /** Override the owner's default model for this one step. */
       model?: string;
+      /**
+       * Handed to the provider as given (OpenRouter's unified `reasoning` parameter): `enabled:
+       * false` turns a reasoning model's hidden thinking off, `effort` sizes it. Nothing is sent
+       * when unset. Exists because a reasoning model behind a token cap spends the cap on thinking
+       * and answers with nothing, at HTTP 200, and the only fix is on the request.
+       */
+      reasoning?: { enabled?: boolean; effort?: 'low' | 'medium' | 'high'; max_tokens?: number; exclude?: boolean };
     }
   | { kind: 'export-out'; geai: string; capability?: string; from: string }
   | { kind: 'trigger-geai'; geai: string; capability: string; input?: Record<string, unknown> }
@@ -420,6 +432,16 @@ export interface WorkflowDef {
    * to `resume`.
    */
   skip_done?: boolean;
+  /**
+   * Owner opt-in (default false): two or more live runs of this workflow may be in flight at once.
+   * The default refuses a second start while one is running and answers `skipped: true` with the
+   * running run's id, because the steps write to templated keys and two runs of a definition whose
+   * keys carry nothing run-specific would write over each other. Set this when the keys DO
+   * distinguish runs — a case reference passed in `vars`, or the built-in `{run}` — and a queue of
+   * intakes should not wait on one another. Refused beside `fresh`: fresh wipes the produced keys
+   * at run start, which would take the other run's work with it.
+   */
+  parallel?: boolean;
   llm?: { approved: boolean };        // owner consent to use the node OpenRouter for `llm` leaves
   costCapMorsels?: number | null;     // optional per-workflow cap (OpenRouter also caps per key)
   createdBy: string;                  // GAII/GHII of the author (audit)
@@ -537,6 +559,12 @@ const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
     result_to_key: z.string().max(400).optional(),
     json: z.boolean().optional(),
     model: z.string().max(200).optional(),
+    reasoning: z.object({
+      enabled: z.boolean().optional(),
+      effort: z.enum(['low', 'medium', 'high']).optional(),
+      max_tokens: z.number().int().positive().max(200000).optional(),
+      exclude: z.boolean().optional(),
+    }).optional(),
   }),
   z.object({
     kind: z.literal('export-out'),
@@ -680,6 +708,7 @@ export const WorkflowDefInputSchema = z.object({
   resume: z.boolean().optional(),
   fresh: z.boolean().optional(),
   skip_done: z.boolean().optional(),
+  parallel: z.boolean().optional(),
   llm: z.object({ approved: z.boolean() }).optional(),
   costCapMorsels: z.number().int().nonnegative().nullable().optional(),
 });

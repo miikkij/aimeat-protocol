@@ -34,6 +34,8 @@
  *     siblings were already in. It is templated at run time like the others, so an undeclared var
  *     left a literal "{name}" in the key and the step reported the miss into its own prompt instead
  *     of failing — correct at run time, and the wrong place to find out about a typo.
+ *   v1.8.0 — 2026-09-09 — `parallel` beside `fresh` is refused at save: fresh deletes the produced
+ *     keys when a run starts, and with two runs in flight that is the other run's work.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -196,6 +198,13 @@ export async function validateWorkflow(
   for (const dep of missingAfterRefs(input.steps)) errors.push(`"after" references unknown step "${dep}"`);
   const cycle = detectCycle(input.steps);
   if (cycle) errors.push(`dependency cycle: ${cycle.join(' → ')}`);
+
+  // 3b. parallel + fresh. `fresh` deletes every key the workflow produces at run start; with a second
+  // run allowed while the first is in flight, that deletion lands on the first run's output. Refused
+  // here, at save, where the author is looking, rather than discovered as a run that lost its work.
+  if (input.parallel && input.fresh) {
+    errors.push('parallel and fresh cannot both be set: fresh deletes the produced keys when a run starts, and with two runs in flight that is the other run\'s work');
+  }
 
   // 4. offer resolution (workflow-compatibility) + 5. declared-var coverage
   // Built-in run-scoping vars are always available to key templates without declaration (the engine
@@ -382,6 +391,7 @@ export async function saveWorkflow(
     resume: input.resume ?? false,
     fresh: input.fresh ?? false,
     skip_done: input.skip_done ?? false,
+    parallel: input.parallel ?? false,
     llm: input.llm,
     costCapMorsels: input.costCapMorsels ?? null,
     createdBy: prior?.createdBy ?? createdBy,
