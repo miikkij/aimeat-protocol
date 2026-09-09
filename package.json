@@ -11,8 +11,12 @@
   "bin": {
     "aimeat": "aimeat/dist/bin/aimeat.js"
   },
+  "publishConfig": {
+    "directory": "aimeat"
+  },
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
+    "prepublishOnly": "cd aimeat && pnpm run prepublishOnly",
     "build": "cd aimeat && pnpm build",
     "build-desktop": "cd aimeat-desktop && pnpm package",
     "dev": "cd aimeat && pnpm dev",
