@@ -6,22 +6,20 @@
  *   One computed answer, read by every remake surface — the home view, the welcome-mat endpoint,
  *   the feed and the funnel — so none of them can disagree about whether a home exists.
  *
- *   "Initialized" is DERIVED, never a flag someone sets. Three things must be true at once: the
- *   welcome mat exists, a first agent is connected, and the Hello MCP proof key has been written
- *   through that connection. A stored boolean would let a home be initialized by a bug, and the
- *   whole point of the gate is that it cannot be talked past — an account either has these three
- *   or it does not.
+ *   "Initialized" is derived from a live agent and the Hello MCP proof. The person's own
+ *   webpage is optional: making or removing it never gates access to their connected home.
  *
  *   The `onboarding.home_initialized` marker is written the first time the derived state comes out
  *   true. It is a funnel timestamp, not the source of truth: deleting it would change the numbers
  *   and not the person's home.
  * @structure
  *   - readHomeState(storage, config, owner) → HomeState
- *   - HOME_STEPS: the three named steps, in order
+ *   - HOME_STEPS: connection prerequisite
  * @usage
  *   import { readHomeState } from '../services/home-state.js';
  *   const state = await readHomeState(storage, config, req.auth!.owner);
  * @version-history
+ *   v1.4.0 — 2026-09-09 — Connect first; the welcome page is optional (approved home journey).
  *   v1.3.0 — 2026-09-06 — The card's verdict reads the owner's live sockets too, so a home whose
  *     agents all run on a spawner stops reporting trouble the moment they finish a job.
  *   v1.2.0 — 2026-08-27 — `switched` left the state with the home-or-profile switch it counted.
@@ -51,12 +49,8 @@ import type { AgentOnboardingRecord } from '../storage/types/agents-messaging.js
 import { loadOwnerAgents } from './db/owner-identity.js';
 import { runInReadScope } from '../storage/read-scope/read-scope.js';
 
-/**
- * The steps, in the order a person meets them. `better-app` exists only on branch B and is what
- * pushes the agent connection to step 3 there; on branch A there are two steps, not three. Named
- * here so no surface invents a fourth.
- */
-export const HOME_STEPS = ['welcome-mat', 'better-app', 'first-agent'] as const;
+/** The connection prerequisite; useful tasks and the optional webpage are available alongside it. */
+export const HOME_STEPS = ['first-agent'] as const;
 export type HomeStep = typeof HOME_STEPS[number];
 
 export interface HomeState {
@@ -113,7 +107,7 @@ export interface HomeState {
     } | null;
     /** Whether an agent has written the proof key through its own MCP connection. */
     helloMcp: boolean;
-    /** mat ∧ agent ∧ helloMcp. Derived every time; never trusted from storage. */
+    /** Live agent and Hello MCP proof. The optional webpage does not gate this. */
     initialized: boolean;
     /** The FIRST room entered, once one has been. */
     room: OnboardingRoom | null;
@@ -161,7 +155,7 @@ async function readHomeStateInScope(
     const firstAgent = get(ONBOARDING_KEYS.firstAgentConnected);
 
     // The mat is a FILE, not a marker: the marker says a paste happened, the file says a page
-    // exists. Reading the file is what keeps a deleted portfolio from leaving a home standing.
+    // exists. A deleted portfolio must stop being offered as a link.
     let matHtmlExists = false;
     for (const gaii of await portfolioReadGaiis(storage, owner, config.nodeId)) {
         if (await storage.getStorageFile(gaii, PORTFOLIO_HTML_KEY)) { matHtmlExists = true; break; }
@@ -215,7 +209,7 @@ async function readHomeStateInScope(
     // An agent EXISTING was enough before, so an account whose every agent was dead still read
     // "your home is ready". A home is not ready on the strength of a record.
     const hasLiveAgent = agents.some(a => isLiveState(healthByGaii[a.gaii].state));
-    const initialized = matHtmlExists && hasLiveAgent && helloMcp;
+    const initialized = hasLiveAgent && helloMcp;
 
     const branch = (typeof get(ONBOARDING_KEYS.branchTaken).branch === 'string'
         ? get(ONBOARDING_KEYS.branchTaken).branch as OnboardingBranch : null);
@@ -233,10 +227,7 @@ async function readHomeStateInScope(
         ghii,
         displayName: ghiiRecord?.displayName ?? null,
         track: track.track === 'remake' ? 'remake' : 'legacy',
-        step: initialized ? null
-            : !matHtmlExists ? 'welcome-mat'
-                : needsBetterApp ? 'better-app'
-                    : 'first-agent',
+        step: initialized ? null : 'first-agent',
         mat: {
             done: matHtmlExists,
             attempts: typeof matMark.attempts === 'number' ? matMark.attempts : 0,

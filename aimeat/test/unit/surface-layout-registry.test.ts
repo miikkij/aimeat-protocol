@@ -184,12 +184,12 @@ describe('default layouts', () => {
         }
     });
 
-    it('drop a block this node cannot serve rather than offering it', () => {
-        // The chat door is gated on a capability a bare config does not have.
+    it('offers useful task prompts even without built-in chat', () => {
+        // Connected external AI tools can perform the tasks on a node without local chat.
         const declared = DEFAULT_BLOCKS.home.map(b => b.id);
         expect(declared, 'fixture assumption: the built-in home declares the chat door').toContain('home.chat-door');
         const served = defaultLayout('home', {} as AimeatConfig).blocks.map(b => b.id);
-        expect(served).not.toContain('home.chat-door');
+        expect(served).toContain('home.chat-door');
         expect(served).toContain('home.feed');
     });
 });

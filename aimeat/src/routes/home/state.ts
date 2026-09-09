@@ -12,6 +12,7 @@
  * @structure registerHomeStateRoutes(router, ctx): GET /v1/home/state
  * @usage Registered from src/routes/home.ts.
  * @version-history
+ *   v1.2.0 — 2026-09-09 — Next actions lead to connection instructions and useful work.
  *   v1.1.0 — 2026-08-19 — The response carries `playbooks`: the named outcomes this node can
  *     actually deliver (services/home-playbooks.ts), each with its prompt, step count and whatever
  *     live proof the node has. Only for a finished home.
@@ -44,7 +45,7 @@ export function registerHomeStateRoutes(router: Router, ctx: HomeRouteCtx): void
         // Re-derive the pending question from what is known, rather than storing it: the answer
         // to "what should I ask next" is a function of the state, and a stored copy would survive
         // the state changing underneath it.
-        const decision = state.mat.done
+        const decision = !state.initialized && state.mat.done
             ? decideBranch(resolveAiClient(state.ai?.client ?? null),
                 state.branch ? { clientAnswer: state.ai?.client ?? undefined } : {})
             : null;
@@ -58,16 +59,14 @@ export function registerHomeStateRoutes(router: Router, ctx: HomeRouteCtx): void
             ? await openRooms(storage, config, resolveIdentity(req.auth!, config.nodeId))
             : [];
 
-        // The playbooks this node can actually deliver. Only for a FINISHED home: somebody still
-        // putting their page up is being asked one thing at a time, and a menu of outcomes beside
-        // that is the noise the rooms were removed for.
+        // The playbooks this node can actually deliver, once the AI connection is verified.
         const playbooks = state.initialized ? await openPlaybooks(storage, config) : [];
 
         res.json(success(config.nodeId, {
             state,
             rooms,
             playbooks,
-            /** The three steps in order, so the view can name the ones still ahead. */
+            /** The connection prerequisite shared by every surface. */
             steps: HOME_STEPS,
             /** What still needs asking, if anything. */
             question,
@@ -79,11 +78,8 @@ export function registerHomeStateRoutes(router: Router, ctx: HomeRouteCtx): void
 
 /** The one thing to do next, as a hint. One action, because the view shows one action. */
 function nextActions(step: string | null) {
-    if (step === 'welcome-mat') {
-        return [{ description: 'Get the prompt for your welcome mat', method: 'GET' as const, url: '/v1/prompts/welcome-mat' }];
-    }
     if (step === 'first-agent' || step === 'hello-mcp') {
-        return [{ description: 'Connect your first agent', method: 'POST' as const, url: '/v1/agents/device-authorize' }];
+        return [{ description: 'Choose your AI and follow its connection instructions', method: 'GET' as const, url: '/v1/ai-tools' }];
     }
-    return [{ description: 'Your welcome mat', method: 'GET' as const, url: '/v1/portfolio/me' }];
+    return [{ description: 'Choose a useful task and see your results at home', method: 'GET' as const, url: '/v1/home' }];
 }
