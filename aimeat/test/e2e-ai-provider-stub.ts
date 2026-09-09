@@ -49,6 +49,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pinnedEnv } from './run-e2e-server.js';
+import { waitForServer } from './helpers/wait-for-server.js';
 import {
     startFakeAiProvider, chatJson, chatErrorBody, sseChat, modelsJson, transcriptionJson,
     imageJson, providerStatus, type FakeAiProvider, type RecordedRequest,
@@ -112,22 +113,9 @@ async function startServer(): Promise<ChildProcess> {
     };
     const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', DB_PATH],
         { env: env as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
-    const stderrTail: string[] = [];
-    child.stdout?.on('data', () => { /* drained */ });
-    child.stderr?.on('data', (d: Buffer) => { stderrTail.push(d.toString()); if (stderrTail.length > 20) stderrTail.shift(); });
-
-    const began = Date.now();
-    while (Date.now() - began < 60_000) {
-        if (child.exitCode !== null || child.signalCode !== null) {
-            throw new Error(`the node exited during startup: ${stderrTail.join('').trim()}`);
-        }
-        // Not listening yet is the normal state for the first second or two; the loop's own
-        // deadline, and the stderr tail above, are what report a real failure.
-        try { if ((await fetch(`${BASE}/v1/spec`)).ok) return child; } catch { /* not up yet */ }
-        await sleep(300);
-    }
-    child.kill('SIGKILL');
-    throw new Error(`the node failed to start: ${stderrTail.join('').trim()}`);
+    // The stderr tail and the exit check that used to live here are the helper now, so the other
+    // sixteen suites that spawn a node get them too.
+    return waitForServer(child, BASE, { label: 'the AI-provider node' });
 }
 
 async function stopServer(child: ChildProcess): Promise<void> {

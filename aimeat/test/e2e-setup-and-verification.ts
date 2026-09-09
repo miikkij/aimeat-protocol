@@ -57,6 +57,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { waitForServer } from './helpers/wait-for-server.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -161,18 +162,16 @@ async function spawnNode(port: string, extraEnv: Record<string, string> = {}): P
     };
     const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', dbPath],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
-    child.stdout?.on('data', () => { /* drained */ });
-    child.stderr?.on('data', () => { /* drained */ });
-    const start = Date.now();
-    while (Date.now() - start < 60_000) {
-        // Nothing listening yet is the normal state for the first seconds of a boot.
-        try { if ((await fetch(`${base}/v1/spec`)).ok) return { child, base, dir }; } catch { /* not up yet */ }
-        await new Promise(r => setTimeout(r, 300));
+    try {
+        await waitForServer(child, base, { label: `the node on port ${port}` });
+    } catch (err) {
+        // The helper has already killed it; wait for the handle to go before the directory does,
+        // for the same reason stopNode does — Windows keeps an open SQLite file locked.
+        if (child.exitCode === null && child.signalCode === null) await once(child, 'exit');
+        rmSync(dir, { recursive: true, force: true });
+        throw err;
     }
-    child.kill('SIGKILL');
-    await once(child, 'exit');
-    rmSync(dir, { recursive: true, force: true });
-    throw new Error(`Spawned node on ${port} never answered`);
+    return { child, base, dir };
 }
 
 async function stopNode(node: { child: ChildProcess; dir: string }) {

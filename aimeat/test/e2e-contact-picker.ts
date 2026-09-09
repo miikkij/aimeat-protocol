@@ -18,6 +18,7 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
+import { waitForServer } from './helpers/wait-for-server.js';
 
 const PORT = process.env.E2E_PICKER_PORT ?? '40273';
 const BASE = `http://localhost:${PORT}`;
@@ -41,16 +42,7 @@ async function startServer(): Promise<ChildProcess> {
     };
     const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', DB_PATH],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
-    child.stdout?.on('data', () => { /* drained */ });
-    child.stderr?.on('data', () => { /* drained */ });
-    const start = Date.now();
-    while (Date.now() - start < 60_000) {
-        // eslint-disable-next-line aimeat/no-silent-catch -- not listening yet is the normal state for the first second
-        try { if ((await fetch(`${BASE}/v1/spec`)).ok) return child; } catch { /* not up yet */ }
-        await new Promise(r => setTimeout(r, 300));
-    }
-    child.kill('SIGKILL');
-    throw new Error('Server failed to start');
+    return waitForServer(child, BASE, { label: 'the contact-picker node' });
 }
 
 let passed = 0, failed = 0;

@@ -23,6 +23,7 @@ import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { waitForServer } from './helpers/wait-for-server.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -132,14 +133,7 @@ async function startServer(port: string, base: string, dbPath: string, extraEnv:
     };
     const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', ...dbArgs(dbPath)],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
-    child.stdout?.on('data', () => {}); child.stderr?.on('data', () => {});
-    const start = Date.now();
-    while (Date.now() - start < 60_000) {
-        try { if ((await fetch(`${base}/v1/spec`)).ok) return child; } catch { /* not up yet */ }
-        await new Promise(r => setTimeout(r, 300));
-    }
-    child.kill('SIGTERM');
-    throw new Error(`Server on ${port} failed to start`);
+    return waitForServer(child, base, { label: `the node on port ${port}` });
 }
 
 /** Register an owner, an agent and an MCP token for it. Returns everything the tests need. */

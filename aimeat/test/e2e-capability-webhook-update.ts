@@ -21,6 +21,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { waitForServer } from './helpers/wait-for-server.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!';
@@ -194,15 +195,7 @@ async function startAllowlistNode(): Promise<ChildProcess> {
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd: process.cwd(),
     });
-    child.stdout?.on('data', () => {});
-    child.stderr?.on('data', () => {});
-    const started = Date.now();
-    while (Date.now() - started < 60_000) {
-        try { if ((await fetch(`${ALT_BASE}/v1/spec`)).ok) return child; } catch { /* not up yet */ }
-        await new Promise(r => setTimeout(r, 300));
-    }
-    child.kill('SIGTERM');
-    throw new Error(`allowlist node did not start on port ${ALT_PORT}`);
+    return waitForServer(child, ALT_BASE, { label: `the allowlist node on port ${ALT_PORT}` });
 }
 
 await test('Start a node with capabilityWebhooks=allowlist_only', async () => {

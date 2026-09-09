@@ -59,6 +59,7 @@ import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { waitForServer } from './helpers/wait-for-server.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, message: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -245,14 +246,7 @@ async function startStallNode(): Promise<ChildProcess> {
         },
         stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd(),
     });
-    child.stdout?.on('data', () => {}); child.stderr?.on('data', () => {});
-    const start = Date.now();
-    while (Date.now() - start < 60_000) {
-        try { if ((await fetch(`${STALL_BASE}/v1/spec`)).ok) return child; } catch { /* not up yet */ }
-        await new Promise(res => setTimeout(res, 300));
-    }
-    child.kill('SIGTERM');
-    throw new Error(`the stall node did not come up on ${STALL_BASE}`);
+    return waitForServer(child, STALL_BASE, { label: 'the stall node' });
 }
 
 /**
