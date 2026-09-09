@@ -6,6 +6,7 @@
 #   3. Frontend type check (checkJs), incremental   — pnpm typecheck:frontend
 #   4. SDK-libs type check (checkJs), incremental   — pnpm typecheck:sdk
 #   5. No silent exception handler in a STAGED file — pnpm check:silent-catch -- --strict --staged
+#   6. THIRD-PARTY-NOTICES.md matches the tree, ONLY when that file is staged — pnpm check:notices
 #
 # WHY ONLY THESE (2026-09-05). This hook had grown to 45 lines and 7–9 minutes a commit, and when
 # it was cut to eight lines and two minutes the developer's answer was still no: a day of iterative
@@ -48,5 +49,16 @@ pnpm -s typecheck:sdk
 # A new silent handler can only be in a file this commit touches; the whole tree is CI's pass.
 echo "[pre-commit] No silent exception handler in a staged file (check:silent-catch --staged)…"
 pnpm -s check:silent-catch -- --strict --staged
+
+# THIRD-PARTY-NOTICES.md is generated, not written, and a hand edit to it is invisible until CI
+# turns the Security tab red an hour later. That happened FOUR times in two days (2026-09-08 and
+# -09): a version bump edited the file by hand, three licence blocks went missing with it
+# (balanced-match, brace-expansion, concat-map), main was red for everybody, and a session
+# regenerated it — twice in the same evening. Only runs when the file is in the commit, so it
+# costs every other commit nothing.
+if git diff --cached --name-only | grep -q 'THIRD-PARTY-NOTICES\.md'; then
+  echo "[pre-commit] Third-party notices match the tree (check:notices)…"
+  pnpm -s check:notices
+fi
 
 echo "[pre-commit] ✓ fast checks passed — run \`pnpm gate\` once when the work is done"
