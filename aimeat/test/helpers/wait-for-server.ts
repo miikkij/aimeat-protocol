@@ -11,6 +11,13 @@
  *   assertions passed, e2e-sse contributed none, and the log had nothing to read. The same shape
  *   took e2e-app-origin down twice in CI's guard tier the day before, where it blocks a merge.
  *
+ *   WHAT THE ERROR HAS TO SEPARATE. A poll that only ever times out cannot tell three cases apart,
+ *   and they have three different causes: nothing bound the port, something bound it and will not
+ *   answer HTTP, and the node never printed a line at all. The last of those is what
+ *   e2e-email-delivery did on the sweep of 2026-09-09 — three minutes, two Node warnings, no log
+ *   line — while the same suite booted in nine seconds on the other backend of the same run. So
+ *   the error says which of the three it was, asked before the process is killed.
+ *
  *   THREE THINGS CHANGE. A dead process is noticed the moment it dies rather than sixty seconds
  *   later, which is where most of the wasted minute went. The last lines of stdout and stderr come
  *   back in the error, so the next person reads the node's own complaint instead of guessing. And
@@ -28,6 +35,8 @@
  *     e2e-ai-provider-stub.ts and nowhere else; this is that code with a budget, in one place.
  */
 import type { ChildProcess } from 'node:child_process';
+import { connect } from 'node:net';
+import { URL } from 'node:url';
 
 /** How long a spawned node may take to answer. Generous on purpose: see the file header. */
 const DEFAULT_BOOT_MS = 180_000;
@@ -60,7 +69,11 @@ export async function waitForServer(
 
     const out: string[] = [];
     const err: string[] = [];
+    let bytes = 0;
+    let firstOutputAt = 0;
     const keep = (into: string[]) => (d: Buffer) => {
+        bytes += d.length;
+        if (!firstOutputAt) firstOutputAt = Date.now();
         into.push(d.toString());
         while (into.length > TAIL_LINES) into.shift();
     };
@@ -87,8 +100,32 @@ export async function waitForServer(
         await new Promise(r => setTimeout(r, 300));
     }
 
+    // Three things look identical from a poll that only ever timed out, and they have three
+    // different causes: nothing is listening (the node never got as far as binding), something is
+    // listening but will not answer (it bound and then stalled, or somebody else holds the port),
+    // and the node never printed a line at all (it did not reach its first log). Ask before the
+    // process is killed, because after that the port tells you nothing.
+    const listening = await portAnswers(base);
+    const said = bytes === 0
+        ? 'the node printed NOTHING, so it never reached its first log line'
+        : `the node printed ${bytes} bytes, first at ${firstOutputAt - began}ms`;
+
     child.kill('SIGKILL');
     throw new Error(
         `${label} did not answer ${base}${path} within ${budgetMs}ms. `
+        + `The port ${listening ? 'IS accepting connections, so something is there and not answering HTTP' : 'refuses connections, so nothing ever bound it'}; `
+        + `${said}. `
         + `Raise AIMEAT_E2E_BOOT_MS if the machine is slow rather than broken.${tail()}`);
+}
+
+/** Does anything accept a TCP connection at that address? Half a second, then no. */
+async function portAnswers(base: string): Promise<boolean> {
+    const { hostname, port } = new URL(base);
+    return new Promise<boolean>(resolve => {
+        const socket = connect({ host: hostname, port: Number(port) });
+        const done = (answer: boolean) => { socket.destroy(); resolve(answer); };
+        socket.setTimeout(500, () => done(false));
+        socket.on('connect', () => done(true));
+        socket.on('error', () => done(false));
+    });
 }
