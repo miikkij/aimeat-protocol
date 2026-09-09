@@ -8,6 +8,9 @@
  *   self-contained design system (adm-* scoped); these are intentionally separate
  *   from the main /components primitives.
  * @version-history
+ *   v1.3.0 — 2026-09-09 — Badge translates its type word when dashboard.badge<Type> exists
+ *     (healthy, critical, watch, warning, info, pending, idle) and prints the type as before when
+ *     it does not. "HEALTHY" was the one English word on the Finnish admin Prompts page.
  *   v1.2.0 — 2026-06-02 — Component unification (#13 tables): DataTable is now a
  *     thin wrapper that renders `.adm-card` around the canonical
  *     /components/DataTable.js (imported, not bare-re-exported). Admin keeps its
@@ -40,7 +43,13 @@ export { num, dt, fmtUp, fmtBytes };
  * showed the tone word instead of the label.
  */
 export function Badge({ type, label }) {
-  return html`<span class="adm-badge adm-badge-${type}">${label != null ? label : type}</span>`;
+  // A badge with no label used to print its type word as it was ("healthy", "critical"), which is
+  // the one English word on an otherwise translated page. The type is a CSS class, so it stays; the
+  // text comes from dashboard.badge<Type> when a translation exists and is the type word otherwise
+  // (a category or a visibility value that has no entry still reads as before).
+  const key = `dashboard.badge${String(type).charAt(0).toUpperCase()}${String(type).slice(1)}`;
+  const auto = t(key);
+  return html`<span class="adm-badge adm-badge-${type}">${label != null ? label : (auto === key ? type : auto)}</span>`;
 }
 
 /**
