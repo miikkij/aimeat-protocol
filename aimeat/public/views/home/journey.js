@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Choose useful work, connect an AI, copy the task and see the saved note at home.
  * @version-history
+ *   v1.0.1 — 2026-09-09 — Reuse the home's fold choices and underlined actions.
  *   v1.0.0 — 2026-09-09 — Shared journey for new and returning owners; optional personal webpage.
  */
 import { h } from 'preact';
@@ -56,7 +57,7 @@ export function HomeJourney() {
       <h2 id="home-journey-title" class="koti-band-title">${t('homeJourney.title')}</h2>
       <p>${t(connected ? 'homeJourney.returning' : 'homeJourney.welcome')}</p>
       <div class="koti-journey-choices" role="group" aria-label=${t('homeJourney.title')}>
-        ${actions.map(id => html`<button type="button" key=${id} class="btn-outline"
+        ${actions.map(id => html`<button type="button" key=${id} class=${'koti-link' + (action === id ? ' koti-fold--on' : '')}
           aria-pressed=${action === id} onClick=${() => {
             setAction(id); setCopied(false);
             try { sessionStorage.setItem(choiceKey, id); }
@@ -68,7 +69,7 @@ export function HomeJourney() {
       <p class="koti-hint">${t('homeJourney.' + action + 'Hint')}</p>
       <div class="koti-journey-status" role="status">
         <span>${t(connected ? 'homeJourney.connected' : 'homeJourney.notConnected')}</span>
-        <button type="button" class=${connected ? 'btn-ghost' : 'btn-primary'}
+        <button type="button" class="koti-link"
           aria-expanded=${connecting} onClick=${() => setConnecting(v => !v)}>
           ${t(connecting ? 'homeJourney.hideConnection' : connected ? 'homeJourney.anotherAi' : 'homeJourney.connect')}
         </button>
@@ -78,9 +79,9 @@ export function HomeJourney() {
         <${McpSetupGuide} />
         <h3>${t('homeJourney.prove')}</h3>
         <p>${t('homeJourney.proveHint')}</p>
-        <${PromptCard} label=${t('homeJourney.prove')} prompt=${proof?.prompt || ''}
+        <${PromptCard} label=${t('homeJourney.prove')} prompt=${proof?.prompt || ''} className="koti-link"
           copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')} />
-        <button type="button" class="btn-outline" onClick=${refresh}>${t('homeJourney.check')}</button>
+        <button type="button" class="koti-link" onClick=${refresh}>${t('homeJourney.check')}</button>
         <details class="koti-journey-details"><summary>${t('homeJourney.deviceFlow')}</summary>
           <${StepAgent} onChanged=${refresh} showToast=${setMessage} />
         </details>
@@ -88,12 +89,12 @@ export function HomeJourney() {
       <div class="koti-journey-task">
         <p>${t('homeJourney.copyHint')}</p>
         <${PromptCard} key=${action} label=${t('homeJourney.' + action)} prompt=${prompt}
-          className=${connected ? 'btn-primary' : 'btn-outline'}
+          className="koti-link"
           copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')}
           onCopied=${() => setCopied(true)} />
         ${copied && html`<p role="status">${t('homeJourney.copied')}</p>`}
         <div class="koti-journey-links">
-          <button type="button" class="btn-ghost" onClick=${refresh}>${t('homeJourney.checkResult')}</button>
+          <button type="button" class="koti-link" onClick=${refresh}>${t('homeJourney.checkResult')}</button>
           <a class="koti-link" href=${'/v1/profile?tab=' + targets[action]}>${t('homeJourney.open' + action)} →</a>
           ${chat?.enabled && html`<a class="koti-link" href="/v1/chat">${t('homeJourney.localChat')} →</a>`}
         </div>
