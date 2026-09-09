@@ -13,6 +13,10 @@
  *   - Handlers: openEdit/handleSave/handleReset/handleResetAll/handleRestore call the admin service
  *
  * @version-history
+ *   v1.1.0 — 2026-09-09 — GROUP_NAMES covers every seeded group. Five groups added since July
+ *     (playbooks, workflows, proactive, contacts, email) had no row and their headings rendered as
+ *     the raw key ("dashboard.workflows (3)"). check:prompt-groups now holds the map and the
+ *     locale keys against the seeds.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
@@ -27,6 +31,9 @@ import {
 } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 
+// Every group the seeds declare needs a row here, or its heading renders as the raw key
+// ("dashboard.workflows (3)" on the admin page, 2026-09-09). check:prompt-groups holds the two lists
+// against each other.
 const GROUP_NAMES = {
   tiers: 'promptsGroupTiers',
   builders: 'promptsGroupBuilders',
@@ -34,6 +41,11 @@ const GROUP_NAMES = {
   knowledge: 'promptsGroupKnowledge',
   platform: 'promptsGroupPlatform',
   generator: 'promptsGroupGenerator',
+  playbooks: 'promptsGroupPlaybooks',
+  workflows: 'promptsGroupWorkflows',
+  proactive: 'promptsGroupProactive',
+  contacts: 'promptsGroupContacts',
+  email: 'promptsGroupEmail',
 };
 
 export default function PromptsTab({ data }) {

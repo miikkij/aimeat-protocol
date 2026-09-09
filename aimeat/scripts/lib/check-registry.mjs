@@ -6,6 +6,7 @@
  */
 export const FAST_CHECKS = [
     { script: 'check:importmap', label: 'Importmap ↔ imports in sync' },
+    { script: 'check:prompt-groups', label: 'Every prompt group has a translated heading on the admin page' },
     { script: 'check:profile-tabs', label: 'Every profile tab reachable from the menu' },
     { script: 'check:crew-defs', label: 'Shipped crew definitions match the runtime\'s rules' },
     { script: 'check:config-coverage', label: 'Every setting reachable in the admin Config tab' },
