@@ -41,6 +41,7 @@
  * @tokens bottomNav --ak-chrome-bottom
  * @fork bottomNav Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.
  * @version-history
+ *   2026-09-09 - Public apps stay open when auth discards a stale session or logs out.
  *   v0.51.0 — 2026-09-05 — THE SECTION AND THE TWO NAVIGATIONS TAKE WHAT THE APP GIVES THEM:
  *     `parts.actions` puts the app's own right-hand side beside the section's title (and only
  *     then does the head become a row, so a section nobody customised keeps the markup it had),
@@ -406,11 +407,15 @@ export function app(spec) {
       a.mountLoginButton(pill, {
         onLogin: function () { tryBoot(); },
         onLogout: function () {
-          booted = false;
-          root.classList.add('ak-app--gate');
-          status('signin');
+          // Auth also emits logout when it discards a stale stored session. Public apps
+          // remain booted; their onLogout hook can clear any account-specific content.
+          if (requireLogin) {
+            booted = false;
+            root.classList.add('ak-app--gate');
+            status('signin');
+          }
           if (spec.onLogout) spec.onLogout();
-          armPoll();
+          if (requireLogin) armPoll();
         },
       });
     }
