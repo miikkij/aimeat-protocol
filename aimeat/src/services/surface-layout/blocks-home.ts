@@ -28,6 +28,7 @@
  * @usage
  *   import { HOME_BLOCKS } from './blocks-home.js';
  * @version-history
+ *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v1.2.0 — 2026-08-27 — home.chat-door is offered on the onboarding home as well, replacing the
  *     chat as a new account's landing page.
  *   v1.1.0 — 2026-08-27 — home.mcp-connect: the short way into an MCP connection, on the home of
@@ -89,12 +90,12 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
         // it is the one place a person with nothing connected can act. The steps and the chat door
         // side by side keep that without putting anyone in the chat who did not ask for it.
         surfaces: ['home', 'home-onboarding'],
-        presence: { kind: 'capability', capability: 'chat' },
+        presence: { kind: 'always' },
         localeStem: 'home.chatDoor',
         liveDomains: ['chat', 'instances'],
         props: {},
         maxPerSurface: 1,
-        summary: 'Which mind answers when they open the chat here, and the way in.',
+        summary: 'Choose useful work for a connected AI, copy its prompt and see the result. Also works without the built-in chat.',
     },
     {
         id: 'home.fleet',

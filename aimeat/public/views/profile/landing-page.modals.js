@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description Profile edit / change-password / presence modals + presence pill. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/landing-page.js (max-file-lines)
  */
 import { h } from "preact";
-import { useState, useEffect, useCallback, useRef } from "preact/hooks";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "preact/hooks";
 import htm from "htm";
 const html = htm.bind(h);
 import { t } from "/js/i18n.js";
@@ -27,6 +28,12 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
   const [saving, setSaving] = useState(false);
   const [fields, setFields] = useState({ display_name: '', bio: '', avatar: '', locale: 'en', directory_listed: false });
   const [currentEmail, setCurrentEmail] = useState('');
+  const [dirty, setDirty] = useState(false);
+  useLayoutEffect(() => {
+    const closeEmpty = (e) => { if (e.key === 'Escape' && !dirty && !saving) onClose(); };
+    document.addEventListener('keydown', closeEmpty);
+    return () => document.removeEventListener('keydown', closeEmpty);
+  }, [dirty, saving, onClose]);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,7 +58,7 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
     return () => { cancelled = true; };
   }, []);
 
-  const set = (key, val) => setFields(prev => ({ ...prev, [key]: val }));
+  const set = (key, val) => { setDirty(true); setFields(prev => ({ ...prev, [key]: val })); };
 
   const save = async () => {
     setSaving(true);
@@ -74,12 +81,12 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
   };
 
   const onOverlayClick = (e) => {
-    if (e.target === e.currentTarget) onClose();
+    if (e.target === e.currentTarget && !dirty && !saving) onClose();
   };
 
   return html`
     <div class="pf-edit-overlay" onClick=${onOverlayClick}>
-      <div class="pf-edit-modal">
+      <div class="pf-edit-modal" role="dialog" aria-modal="true" aria-label=${t('profile.landing.editModalTitle')}>
         <div class="pf-edit-header">
           <h2 class="pf-edit-title">${t('profile.landing.editModalTitle')}</h2>
           <button class="pf-edit-close" onClick=${onClose} aria-label=${t('profile.landing.editCancel')}>✕</button>
@@ -116,13 +123,14 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
                 onChange=${(e) => set('locale', e.target.value)}>
                 <option value="en">English</option>
                 <option value="fi">Suomi</option>
+                <option value="es">Español</option>
               </select>
               <div class="pf-edit-hint">${t('profile.landing.editLocaleHint') || 'Your preferred language — used for the portal UI; agents can read it from your profile to answer in it.'}</div>
             </label>
             <div class="pf-edit-label">
               ${t('profile.landing.editEmail')}
               <div class="pf-edit-readonly">${currentEmail || t('profile.landing.editEmailNone')}</div>
-              <a href="#" class="pf-edit-link" onClick=${(e) => { e.preventDefault(); onClose(); window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'email' } })); }}>
+              <a href="/v1/profile?tab=email" class="pf-edit-link">
                 ${t('profile.landing.editEmailLink') || 'Change in the Email tab →'}</a>
             </div>
             <label class="pf-edit-check">
@@ -175,6 +183,12 @@ export function ChangePasswordModal({ onClose, onChanged }) {
   // accounts that have never set one (Google sign-in). When false we offer "set a
   // password" with no current-password field, since there's nothing to verify against.
   const [hasPassword, setHasPassword] = useState(null);
+  const dirty = !!(current || newPw || confirm);
+  useLayoutEffect(() => {
+    const closeEmpty = (e) => { if (e.key === 'Escape' && !dirty && !saving) onClose(); };
+    document.addEventListener('keydown', closeEmpty);
+    return () => document.removeEventListener('keydown', closeEmpty);
+  }, [dirty, saving, onClose]);
 
   useEffect(() => {
     let cancelled = false;
@@ -221,7 +235,7 @@ export function ChangePasswordModal({ onClose, onChanged }) {
   };
 
   const onOverlayClick = (e) => {
-    if (e.target === e.currentTarget) onClose();
+    if (e.target === e.currentTarget && !dirty && !saving) onClose();
   };
 
   // OAuth accounts with no password set: "set a password" flow (no current field).
@@ -229,7 +243,8 @@ export function ChangePasswordModal({ onClose, onChanged }) {
 
   return html`
     <div class="pf-edit-overlay" onClick=${onOverlayClick}>
-      <div class="pf-edit-modal">
+      <div class="pf-edit-modal" role="dialog" aria-modal="true"
+        aria-label=${t(setupMode ? 'profile.landing.setPasswordTitle' : 'profile.landing.changePasswordTitle')}>
         <div class="pf-edit-header">
           <h2 class="pf-edit-title">${setupMode
             ? (t('profile.landing.setPasswordTitle') || 'Set a password')

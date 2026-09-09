@@ -1,9 +1,8 @@
 /**
  * @file e2e-remake-home.ts
  * @description E2E for the welcome mat and the home state (aimeat_remake/03-welcome-mat.md +
- *   06-koti-feed-suostumus.md, phases 2–3). The mat is step 1 of the new path and the condition
- *   of having a home at all, so what this suite really tests is a gate: what gets through it, what
- *   does not, and that there is no third option.
+ *   06-koti-feed-suostumus.md, phases 2–3). A live agent and its Hello MCP proof initialize the
+ *   connected home. The personal webpage is optional, and useful notes retain owner isolation.
  *
  *   The six fixtures the phase names, end to end against the running node: clean HTML, HTML in a
  *   fenced code block, HTML buried in chatter, HTML with no <head> metadata, a body fragment with
@@ -11,9 +10,8 @@
  *   naming what was missing.
  *
  *   Failure modes covered:
- *     - no route produces an initialized home without a mat, and none produces one with a mat but
- *       no agent — the two gates the whole remake rests on;
- *     - a refused paste still counts (attempts accumulate) and still leaves the account homeless;
+ *     - a live agent and its connection proof initialize a home without a webpage;
+ *     - a refused paste still counts but never blocks connecting an AI;
  *     - the portfolio accepts an upload from an owner with NO agent (the old 400 NO_AGENT would
  *       have blocked the entire path);
  *     - an agent token cannot paste the mat on the person's behalf.
@@ -21,6 +19,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-remake-home
  * @version-history
+ *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v1.1.0 — 2026-08-10 — Cover the JSON door on PUT /v1/portfolio/upload (happy path read back
  *     through the public endpoint, plus the missing-field refusal). It is the only shape an MCP
  *     agent can send, so without it aimeat_portfolio_publish had no connector half.
@@ -119,7 +118,7 @@ await test('Register owners', async () => {
 await test('A brand-new account is on step 1 with nothing done', async () => {
     const s = await homeState(tokenMat);
     assert(s.initialized === false, 'a new account must not have an initialized home');
-    assert(s.step === 'welcome-mat', `first step is the mat, got ${s.step}`);
+    assert(s.step === 'first-agent', `first step is connecting the AI, got ${s.step}`);
     assert(s.mat.done === false && s.mat.attempts === 0, `mat must be untouched: ${JSON.stringify(s.mat)}`);
     assert(s.agent === null, 'a new account has no agent');
     assert(s.helloMcp === false, 'nothing has proved a connection yet');
@@ -212,8 +211,8 @@ await test('A refused paste leaves the account with no home, and attempts accumu
     const s = await homeState(tokenFail);
     assert(s.mat.done === false, 'no mat exists');
     assert(s.mat.result === 'failed', `the latest outcome is a failure, got ${s.mat.result}`);
-    assert(s.step === 'welcome-mat', 'the person is still on step 1');
-    assert(s.initialized === false, 'THE GATE: no mat, no home');
+    assert(s.step === 'first-agent', 'an optional page failure must not block connecting the AI');
+    assert(s.initialized === false, 'an account without an AI connection is not initialized');
 });
 
 await test('There is no skip: no field, no value, no route grants a home', async () => {
@@ -234,7 +233,7 @@ await test('There is no skip: no field, no value, no route grants a home', async
     assert((await homeState(tokenFail)).initialized === false, 'still homeless');
 });
 
-await test('A mat with an agent but no Hello MCP proof is STILL not an initialized home', async () => {
+await test('An agent without Hello MCP proof does not initialize the home', async () => {
     // The second gate. An agent record alone is not a working connection: the proof is a write
     // that came THROUGH the connection, which is the only thing a person cannot fake by clicking.
     const reg = await json('/v1/agents', auth(tokenAgentOwner, {
@@ -251,11 +250,8 @@ await test('A mat with an agent but no Hello MCP proof is STILL not an initializ
     assert(tok.body.ok === true, `agent token: ${JSON.stringify(tok.body.error)}`);
     agentToken = tok.body.data.token;
 
-    const p = await paste(tokenAgentOwner, page('Cursor'));
-    assert(p.status === 200, `paste ${p.status}: ${JSON.stringify(p.body.error)}`);
-
     const s = await homeState(tokenAgentOwner);
-    assert(s.mat.done === true && s.agent !== null, `setup: mat + agent, got ${JSON.stringify(s)}`);
+    assert(s.mat.done === false && s.agent !== null, `setup: agent without optional page, got ${JSON.stringify(s)}`);
     assert(s.helloMcp === false, 'no proof key has been written');
     assert(s.initialized === false, 'THE SECOND GATE: an agent without a proven connection is not a home');
 });
@@ -268,8 +264,32 @@ await test('...and once the agent writes the proof key through its own session, 
     assert(w.status === 201, `hello_mcp write ${w.status}: ${JSON.stringify(w.body)}`);
     const s = await homeState(tokenAgentOwner);
     assert(s.helloMcp === true, 'the proof key must be visible owner-scope');
-    assert(s.initialized === true, `all three conditions met → initialized, got ${JSON.stringify(s)}`);
+    assert(s.mat.done === false, 'a working AI must unlock the home without a welcome mat');
+    assert(s.initialized === true, `live agent and proof initialize the home, got ${JSON.stringify(s)}`);
     assert(s.step === null, `an initialized home has no next step, got ${s.step}`);
+});
+
+await test('Adding the optional page afterwards preserves the connected home', async () => {
+    const p = await paste(tokenAgentOwner, page('Cursor'));
+    assert(p.status === 200, `optional paste ${p.status}`);
+    const s = await homeState(tokenAgentOwner);
+    assert(s.initialized === true && s.mat.done === true, 'the optional page enriches an already connected home');
+});
+
+await test('The first useful note appears for its owner and stays private to that account', async () => {
+    const value = { title: 'Project preference', text: 'Show the conclusion first, then the evidence.' };
+    const write = await json('/v1/memory', auth(agentToken, {
+        method: 'POST', body: JSON.stringify({ key: 'home.first-note', value, visibility: 'private' }),
+    }));
+    assert(write.status === 201, `first useful note: ${write.status}`);
+    const read = await json('/v1/memory/home.first-note?soft=1', auth(tokenAgentOwner));
+    assert(read.status === 200 && read.body.data.value.text === value.text, 'home must read the actual agent-written note');
+    const other = await json('/v1/memory/home.first-note?soft=1', auth(tokenFail));
+    assert(other.body.data.exists === false, 'another home must not see this private result');
+    const direct = await json(`/v1/memory/${encodeURIComponent(`hmagent#${ownerAgent}@${NODE_ID}`)}/home.first-note`, auth(tokenFail));
+    assert(direct.status === 403, `a direct cross-owner read must be refused: ${direct.status}`);
+    const home = await json('/v1/home/state', auth(agentToken));
+    assert(home.status === 403, `agent scope must not grant the account holder home: ${home.status}`);
 });
 
 console.log('\nPhase 3: who may paste, and the portfolio without an agent');
@@ -398,7 +418,7 @@ await test('Only a stated missing tier reaches branch B', async () => {
     assert(a.body.data.branch === 'B', `no tier → B, got ${JSON.stringify(a.body.data)}`);
     const s = await homeState(t);
     assert(s.branch === 'B' && s.initialized === false, 'branch B is not a home');
-    assert(s.step === 'better-app', `branch B step 2 is getting an app that can, got ${s.step}`);
+    assert(s.step === 'first-agent', `the current path connects an AI independently of the page, got ${s.step}`);
 });
 
 console.log('\nPhase 5: the first agent (branch A, step 2)');
@@ -477,7 +497,7 @@ console.log('\nPhase 6: branch B is a loop back to step 1, not a dead end');
 let tokenB = '';
 const ownerB = `hmbb${stamp}`;
 
-await test('An account that lacks the tier lands on the better-app step', async () => {
+await test('Historical app capability metadata does not replace the connection step', async () => {
     tokenB = await registerOwner(ownerB);
     const p = await paste(tokenB, page('ChatGPT', 'gpt-5'));
     assert(p.status === 200, `paste ${p.status}`);
@@ -486,13 +506,12 @@ await test('An account that lacks the tier lands on the better-app step', async 
 
     const s = await homeState(tokenB);
     assert(s.needsBetterApp === true, `they are blocked on the app: ${JSON.stringify(s.needsBetterApp)}`);
-    assert(s.step === 'better-app', `step 2 is getting an app that can, got ${s.step}`);
+    assert(s.step === 'first-agent', `connect with the current tool guide, got ${s.step}`);
     assert(s.initialized === false, 'THE GATE: branch B is not a home');
 });
 
-await test('FAILURE MODE: an account stuck in B cannot reach an initialized home', async () => {
-    // Even with an agent AND the proof key, the mat came from an app that cannot connect. What
-    // stops them is the capability, and nothing else may substitute for it.
+await test('A verified connection initializes the home despite historical branch B metadata', async () => {
+    // The actual connection supersedes what the optional webpage reported about its authoring app.
     const reg = await json('/v1/agents', auth(tokenB, {
         method: 'POST',
         body: JSON.stringify({ name: 'bagent', owner: ownerB, capabilities: ['actions'], scopes: ['*'], model: 'test-model' }),
@@ -513,10 +532,7 @@ await test('FAILURE MODE: an account stuck in B cannot reach an initialized home
     }));
 
     const s = await homeState(tokenB);
-    // The home DOES initialize here, and that is correct: the three conditions are genuinely met.
-    // What branch B guards is the road TO them — a person whose app cannot connect never gets an
-    // agent to write that key in the first place. This test pins the honest boundary rather than
-    // pretending the gate is somewhere it is not.
+    // The live agent and proof are the boundary; historical branch metadata cannot lock them out.
     assert(s.helloMcp === true, 'setup: the proof key exists');
     assert(s.initialized === true,
         'once an agent has genuinely proven a connection, the home IS finished — B gates the route, not the result');
@@ -530,7 +546,7 @@ await test('Re-pasting a mat from a CAPABLE app clears the block by itself', asy
     await paste(t, page('ChatGPT', 'gpt-5'));
     await json('/v1/home/ai-client', auth(t, { method: 'POST', body: JSON.stringify({ has_paid_plan: false }) }));
     const before = await homeState(t);
-    assert(before.step === 'better-app', `setup: blocked, got ${before.step}`);
+    assert(before.step === 'first-agent', `the optional page must not choose the connection path, got ${before.step}`);
 
     const again = await paste(t, page('Claude Desktop'));
     assert(again.status === 200, `re-paste ${again.status}: ${JSON.stringify(again.body.error)}`);
