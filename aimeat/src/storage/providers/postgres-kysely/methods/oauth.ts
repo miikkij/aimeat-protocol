@@ -4,9 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description OAuth domain for the Postgres+Kysely backend (OAuthClient / OAuthRefreshToken /
  *   OAuthApproval): registered OAuth 2.1 clients, rotating refresh tokens, and remembered consent
- *   approvals, plus the bulk deletes by client, GAII, and owner. Approvals are keyed by the unique
+ *   approvals, plus the bulk delete of refresh tokens by GAII. Approvals are keyed by the unique
  *   (clientId, gaii) pair. Translated 1:1 from the Prisma implementation.
  * @version-history
+ *   v1.1.0 — 2026-09-09 — deleteOAuthClient, listOAuthClients, deleteOAuthRefreshTokensByClient,
+ *     deleteOAuthApproval, deleteOAuthApprovalsByClient, deleteOAuthApprovalsByGaii and
+ *     listOAuthApprovalsByOwner deleted: no caller.
  *   v1.0.0 — 2026-07-15 — Phase 5: OAuth domain on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -50,18 +53,6 @@ export const oauthMethods = {
     return r ? mapClient(r) : null;
   },
 
-  async deleteOAuthClient(this: PostgresKyselyStorage, clientId: string): Promise<boolean> {
-    await this.db.deleteFrom('OAuthRefreshToken').where('clientId', '=', clientId).execute();
-    await this.db.deleteFrom('OAuthApproval').where('clientId', '=', clientId).execute();
-    const r = await this.db.deleteFrom('OAuthClient').where('clientId', '=', clientId).executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0) > 0;
-  },
-
-  async listOAuthClients(this: PostgresKyselyStorage): Promise<OAuthClientRecord[]> {
-    const rows = await this.db.selectFrom('OAuthClient').selectAll().orderBy('createdAt', 'desc').execute();
-    return rows.map(mapClient);
-  },
-
   // ── Refresh tokens ──
   async createOAuthRefreshToken(this: PostgresKyselyStorage, token: OAuthRefreshTokenRecord): Promise<void> {
     await this.db.insertInto('OAuthRefreshToken').values({
@@ -78,11 +69,6 @@ export const oauthMethods = {
   async deleteOAuthRefreshToken(this: PostgresKyselyStorage, tokenHash: string): Promise<boolean> {
     const r = await this.db.deleteFrom('OAuthRefreshToken').where('tokenHash', '=', tokenHash).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0) > 0;
-  },
-
-  async deleteOAuthRefreshTokensByClient(this: PostgresKyselyStorage, clientId: string): Promise<number> {
-    const r = await this.db.deleteFrom('OAuthRefreshToken').where('clientId', '=', clientId).executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0);
   },
 
   async deleteOAuthRefreshTokensByGaii(this: PostgresKyselyStorage, gaii: string): Promise<number> {
@@ -103,25 +89,5 @@ export const oauthMethods = {
   async getOAuthApproval(this: PostgresKyselyStorage, clientId: string, gaii: string): Promise<OAuthApprovalRecord | null> {
     const r = await this.db.selectFrom('OAuthApproval').selectAll().where('clientId', '=', clientId).where('gaii', '=', gaii).executeTakeFirst();
     return r ? mapApproval(r) : null;
-  },
-
-  async deleteOAuthApproval(this: PostgresKyselyStorage, clientId: string, gaii: string): Promise<boolean> {
-    const r = await this.db.deleteFrom('OAuthApproval').where('clientId', '=', clientId).where('gaii', '=', gaii).executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0) > 0;
-  },
-
-  async deleteOAuthApprovalsByClient(this: PostgresKyselyStorage, clientId: string): Promise<number> {
-    const r = await this.db.deleteFrom('OAuthApproval').where('clientId', '=', clientId).executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0);
-  },
-
-  async deleteOAuthApprovalsByGaii(this: PostgresKyselyStorage, gaii: string): Promise<number> {
-    const r = await this.db.deleteFrom('OAuthApproval').where('gaii', '=', gaii).executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0);
-  },
-
-  async listOAuthApprovalsByOwner(this: PostgresKyselyStorage, owner: string): Promise<OAuthApprovalRecord[]> {
-    const rows = await this.db.selectFrom('OAuthApproval').selectAll().where('owner', '=', owner).orderBy('approvedAt', 'desc').execute();
-    return rows.map(mapApproval);
   },
 };

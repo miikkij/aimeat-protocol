@@ -1098,6 +1098,48 @@ await test('61. A STRANGER still cannot read that file (the rule is about one ac
         `another owner must not read it, got ${asStranger.status}`);
 });
 
+// What the file is called when it lands on somebody's disk. The download door names it after the
+// key's last segment, and a key is an address: a direct-message attachment lives at
+// dm/<thread>/<message>/<id>, so pressing download saved `23ea6d2c` — no name, no extension.
+// Reported from production 2026-09-08.
+await test('62. A handle can name the file, and the download says so', async () => {
+    const key = `deep/path/segments/aa11bb22`;
+    await json(`/v1/storage`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key, data: Buffer.from('# the brief').toString('base64'), mime_type: 'text/markdown', visibility: 'private' }),
+    });
+
+    const handle = await json(`/v1/storage/${key.split('/').map(encodeURIComponent).join('/')}?mode=handle&filename=${encodeURIComponent('eve-voice-brief.md')}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(handle.status === 200, `handle: ${handle.status} ${JSON.stringify(handle.body)}`);
+
+    const dl = await rawFetch(handle.body.data.download_url.replace(/^https?:\/\/[^/]+/, ''));
+    assert(dl.status === 200, `download: ${dl.status}`);
+    const cd = dl.headers.get('content-disposition') ?? '';
+    assert(cd.includes('eve-voice-brief.md'), `the name the caller gave must be the saved name, got: ${cd}`);
+    assert(!cd.includes('aa11bb22'), `the key's last segment must not be the saved name, got: ${cd}`);
+});
+
+await test('63. Without a filename the key still names the download, and a hostile one cannot break the header', async () => {
+    const key = `deep/path/segments/aa11bb22`;
+    const plain = await json(`/v1/storage/${key.split('/').map(encodeURIComponent).join('/')}?mode=handle`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const dl = await rawFetch(plain.body.data.download_url.replace(/^https?:\/\/[^/]+/, ''));
+    assert((dl.headers.get('content-disposition') ?? '').includes('aa11bb22'), 'the key remains the fallback');
+
+    // A name is a name, not a path and not a header. Both would be somebody else's bug to find.
+    const nasty = await json(`/v1/storage/${key.split('/').map(encodeURIComponent).join('/')}?mode=handle&filename=${encodeURIComponent('../../etc/passwd\r\nX-Injected: yes')}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const dl2 = await rawFetch(nasty.body.data.download_url.replace(/^https?:\/\/[^/]+/, ''));
+    assert(dl2.status === 200, `download with a hostile name: ${dl2.status}`);
+    assert(dl2.headers.get('x-injected') === null, 'a newline in the name must not become a header');
+    const cd2 = dl2.headers.get('content-disposition') ?? '';
+    assert(!cd2.includes('/'), `path separators must not survive into the name, got: ${cd2}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

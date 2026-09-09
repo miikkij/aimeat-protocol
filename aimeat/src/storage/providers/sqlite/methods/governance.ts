@@ -8,6 +8,7 @@
  *   v1.1.0 — 2026-07-16 — listConsentsForAgents batch primitive.
  *   v1.2.0 — 2026-07-23 — listOrganisms member-scoped queries return ALL matches (no default 20-item page cap).
  *   v1.3.0 — 2026-08-23 — consentFacets(), the node-wide SQL roll-up the compliance report reads (BR-02).
+ *   v1.4.0 — 2026-09-09 — updateCsm deleted: no caller.
  */
 import type {
   ArchiveFilter, SchemaRecord, CsmRecord, MsmRecord,
@@ -161,24 +162,6 @@ export const governanceMethods = {
     if (opts?.serviceType) { sql += ' WHERE serviceType = ?'; params.push(opts.serviceType); }
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
     return rows.map(r => this.deserializeCsm(r));
-  },
-
-  async updateCsm(this: SqliteStorage, name: string, updates: Partial<CsmRecord>): Promise<CsmRecord | null> {
-    const existing = await this.getCsm(name);
-    if (!existing) return null;
-    const updated = { ...existing, ...updates, name: existing.name };
-    this.db.prepare(
-      `UPDATE csms SET definition = ?, jsonSchemaKey = ?, serviceType = ?, registeredBy = ?,
-       registeredAt = ?, updatedAt = ?, semantic = ?, federate = ? WHERE name = ?`
-    ).run(
-      JSON.stringify(updated.definition), updated.jsonSchemaKey,
-      updated.serviceType, updated.registeredBy,
-      updated.registeredAt, updated.updatedAt,
-      updated.semantic ? JSON.stringify(updated.semantic) : null,
-      updated.federate ? 1 : 0,
-      name,
-    );
-    return updated;
   },
 
   async deleteCsm(this: SqliteStorage, name: string): Promise<boolean> {

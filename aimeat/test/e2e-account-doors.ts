@@ -147,30 +147,43 @@ await test('Setup: four owners and one agent', async () => {
 
 // ─── Phase 1 — POST /v1/ghii validators ───
 //
-// POST /v1/ghii is rate-limited to 5 per minute (config.registrationRateLimitMax), and the limiter
-// keys on `req.auth?.sub ?? ip` — optionalAuth() runs app-wide ahead of it, so a call carrying a
-// bearer token gets that principal's own bucket. Every call below therefore rides one of the four
-// setup owners' tokens, four calls to a bucket. The route ignores the header; it exists so nine
-// refusals in a row do not turn into 429s that hide the assertions after them.
+// POST /v1/ghii is rate-limited per IP (config.registrationRateLimitMax; the test runner pins it
+// to 1000 a minute). Until 2026-09-09 the limiter keyed on `req.auth?.sub ?? ip`, so a call
+// carrying any bearer token got that principal's own bucket on the public sign-up door; test 0
+// below asserts the shared bucket, and the calls after it carry no credential, the way a
+// registration does.
 console.log('Phase 1 — POST /v1/ghii validators');
 
-let bucketCalls = 0;
-function registrationBucket(): Record<string, string> {
-    const pool = [A, B, P, D];
-    const owner = pool[Math.floor(bucketCalls / 4)];
-    assert(!!owner, `registration rate-limit buckets exhausted after ${bucketCalls} calls`);
-    bucketCalls++;
-    return auth(owner.token);
-}
 const registerGhii = (body: Record<string, unknown>) =>
-    json('/v1/ghii', { method: 'POST', headers: registrationBucket(), body: JSON.stringify(body) });
+    json('/v1/ghii', { method: 'POST', body: JSON.stringify(body) });
+
+await test('0. The registration limiter counts by IP: a bearer token does not buy a private bucket', async () => {
+    // Two calls from the same address with two different tokens land in ONE bucket, so the second
+    // call's Remaining is one less than the first's. With per-token buckets each would start fresh.
+    const remaining = async (token: string): Promise<number> => {
+        const res = await fetch(`${BASE}/v1/ghii`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', ...auth(token) },
+            body: JSON.stringify({ display_name: 'bucket probe' }),
+        });
+        await res.text();
+        assert(res.status === 400, `a bodyless registration is refused either way: ${res.status}`);
+        const h = res.headers.get('x-ratelimit-remaining');
+        assert(h !== null, 'the limiter stamps X-RateLimit-Remaining');
+        return Number(h);
+    };
+    const first = await remaining(A.token);
+    const second = await remaining(B.token);
+    assert(second === first - 1, `one shared bucket: ${first} then ${second}`);
+    const anon = await fetch(`${BASE}/v1/ghii`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ display_name: 'bucket probe' }) });
+    await anon.text();
+    assert(Number(anon.headers.get('x-ratelimit-remaining')) === second - 1, `and the anonymous call shares it too: ${anon.headers.get('x-ratelimit-remaining')}`);
+});
 
 await test('1. Register with no username is refused', async () => {
     const r = await registerGhii({ display_name: 'No Name' });
-    // FINDING (pinned, not a hole): the handler's own `username is required` guard
-    // (register-login.ts:82-85) cannot be reached. GhiiRegistrationSchema makes username a required
-    // z.string().min(1) and validateBody answers first, so the code on the wire is VALIDATION_ERROR
-    // and never INVALID_INPUT. Asserting today's answer rather than the one the handler intends.
+    // GhiiRegistrationSchema makes username a required z.string().min(1) and validateBody answers
+    // first, so the code on the wire is VALIDATION_ERROR. The handler's own `username is required`
+    // guard behind it could not fire and was removed on 2026-09-09.
     assert(r.status === 400, `expected 400, got ${r.status}`);
     assert(r.body.error?.code === 'VALIDATION_ERROR', `expected VALIDATION_ERROR, got ${r.body.error?.code}`);
 });
@@ -216,9 +229,8 @@ await test('6. A display_name carrying an @ keeps only the part before it', asyn
 
 await test('7. A non-string password is refused, and a weak one answers WEAK_PASSWORD', async () => {
     const notAString = await registerGhii({ username: `acctghii${Date.now().toString(36)}`, display_name: 'X', password: 12345678 });
-    // FINDING (pinned, not a hole): the handler's `Password must be a string` guard
-    // (register-login.ts:121-124) is likewise unreachable — the schema types password as
-    // z.string().max(256).optional(), so a number never reaches the handler.
+    // The schema types password as z.string().max(256).optional(), so a number never reaches the
+    // handler; the `Password must be a string` guard behind it was removed on 2026-09-09.
     assert(notAString.status === 400 && notAString.body.error?.code === 'VALIDATION_ERROR',
         `non-string password: ${notAString.status} ${notAString.body.error?.code}`);
     // The strength gate on the other side of the schema IS reachable, and is the reason the schema
@@ -246,9 +258,8 @@ await test('8. A password account can be created and signed in', async () => {
 });
 
 await test('9. Login with no username, and with no password, is refused', async () => {
-    // FINDING (pinned, not a hole): register-login.ts:347-353 answers INVALID_INPUT for a missing
-    // username or password, but GhiiLoginSchema requires both as z.string().min(1), so validateBody
-    // refuses first and the wire code is VALIDATION_ERROR. Both handler guards are unreachable.
+    // GhiiLoginSchema requires both as z.string().min(1), so validateBody refuses first and the
+    // wire code is VALIDATION_ERROR; the two handler guards behind it were removed on 2026-09-09.
     const noUser = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ password: 'AcctDoor1234' }) });
     assert(noUser.status === 400 && noUser.body.error?.code === 'VALIDATION_ERROR',
         `no username: ${noUser.status} ${noUser.body.error?.code}`);
@@ -432,10 +443,9 @@ await test('23. PATCH scopes refuses a non-array, an empty array and a non-strin
 await test('24. PATCH scopes: an unknown name is 404, and ANOTHER owner\'s agent is 404 too', async () => {
     const unknown = await json(`/v1/agents/nosuchagent/scopes`, { method: 'PATCH', headers: auth(A.token), body: JSON.stringify({ scopes: ['memory:read'] }) });
     assert(unknown.status === 404 && unknown.body.error?.code === 'NOT_FOUND', `unknown name: ${unknown.status} ${unknown.body.error?.code}`);
-    // FINDING (pinned, not a hole): management.ts:347-350 answers 403 ACCESS_DENIED when the agent
-    // found is not the caller's. It cannot fire: the lookup above it is getAgentsByOwner(caller), so
-    // another owner's agent is simply absent and the 404 answers first. The refusal holds either
-    // way; only the code differs from what the route reads as though it returns.
+    // The lookup is getAgentsByOwner(caller), so another owner's agent is simply absent and the
+    // 404 is the refusal. The 403 that used to sit behind it could not fire and was removed on
+    // 2026-09-09, on this door and on federate, delete and cors alike.
     const crossOwner = await json(`/v1/agents/${agentA.name}/scopes`, { method: 'PATCH', headers: auth(B.token), body: JSON.stringify({ scopes: ['memory:read'] }) });
     assert(crossOwner.status === 404, `another owner's agent is refused (as a 404), got ${crossOwner.status}`);
 });
@@ -458,7 +468,7 @@ await test('26. PATCH federate: non-boolean 400, unknown name 404, another owner
     assert(/boolean/i.test(notBool.body.error?.message ?? ''), `message names the boolean rule: ${notBool.body.error?.message}`);
     const unknown = await json('/v1/agents/nosuchagent/federate', { method: 'PATCH', headers: auth(A.token), body: JSON.stringify({ federate: true }) });
     assert(unknown.status === 404 && unknown.body.error?.code === 'NOT_FOUND', `unknown name: ${unknown.status} ${unknown.body.error?.code}`);
-    // Same owner-scoped-lookup shape as test 24: management.ts:396-399 cannot fire.
+    // Same owner-scoped lookup as test 24: the 404 is the refusal.
     const crossOwner = await json(url, { method: 'PATCH', headers: auth(B.token), body: JSON.stringify({ federate: true }) });
     assert(crossOwner.status === 404, `another owner's agent is refused (as a 404), got ${crossOwner.status}`);
     const ok = await json(url, { method: 'PATCH', headers: auth(A.token), body: JSON.stringify({ federate: true }) });
@@ -490,12 +500,10 @@ await test('28. An agent holding agent:delete may not delete ITSELF (403)', asyn
     // The scope gets it through requireRoleOrScope; what refuses it is inside the handler, and the
     // message is how this test knows which of the two refused.
     //
-    // FINDING (pinned, not a hole): the dedicated guard `An agent cannot delete itself`
-    // (management.ts:468-471) is unreachable. `registeredBy` is written once, at creation, and this
-    // agent was created through the owner-authed door, so it holds the OWNER'S NAME — never the
-    // agent's own GAII. The registeredBy check at :461-465 therefore refuses first, with the other
-    // sentence. Self-deletion IS refused; what this asserts is the refusal and that it came from
-    // inside the handler.
+    // `registeredBy` is written once, at creation, and holds the owner's name or the approving
+    // sibling's GAII, never the agent's own, so the registeredBy rule is what refuses a self-delete.
+    // The dedicated `An agent cannot delete itself` guard behind it could not fire and was removed
+    // on 2026-09-09. What this asserts is the refusal and that it came from inside the handler.
     const r = await json(`/v1/agents/${deleter.name}`, { method: 'DELETE', headers: auth(deleter.token) });
     assert(r.status === 403, `an agent deleting itself must be refused, got ${r.status}: ${JSON.stringify(r.body)}`);
     assert(r.body.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${r.body.error?.code}`);
@@ -593,7 +601,7 @@ await test('35. PUT cors writes an explicit list, and null puts the agent back t
 await test('36. PUT cors: unknown name 404, another owner\'s 404', async () => {
     const unknown = await json('/v1/agents/nosuchagent/cors', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ allowed_origins: null }) });
     assert(unknown.status === 404 && unknown.body.error?.code === 'NOT_FOUND', `unknown name: ${unknown.status} ${unknown.body.error?.code}`);
-    // FINDING (pinned, not a hole): management.ts:573-576, same owner-scoped-lookup shape again.
+    // Same owner-scoped lookup as test 24: the 404 is the refusal.
     const cross = await json(`/v1/agents/${agentA.name}/cors`, { method: 'PUT', headers: auth(B.token), body: JSON.stringify({ allowed_origins: null }) });
     assert(cross.status === 404, `another owner's agent is refused (as a 404), got ${cross.status}`);
 });
@@ -607,9 +615,9 @@ await test('37. Register an agent with an unknown mode → 400', async () => {
         body: JSON.stringify({ name: 'modeprobe', owner: A.name, mode: 'sideways' }),
     });
     assert(r.status === 400, `expected 400, got ${r.status}: ${JSON.stringify(r.body.error)}`);
-    // FINDING (pinned, not a hole): registration.ts:169-173 refuses an unknown mode with
-    // INVALID_INPUT and the list of the five that exist, and cannot be reached — AgentRegistrationSchema
-    // types mode as a z.enum of those same five, so validateBody answers VALIDATION_ERROR first.
+    // AgentRegistrationSchema types mode as a z.enum of the five modes, so validateBody answers
+    // VALIDATION_ERROR and names the field; the handler's own refusal behind it could not fire
+    // and was removed on 2026-09-09.
     assert(r.body.error?.code === 'VALIDATION_ERROR', `mode refusal code: ${r.body.error?.code}`);
     assert(JSON.stringify(r.body.error?.details ?? []).includes('mode'), `the refusal names the field: ${JSON.stringify(r.body.error?.details)}`);
 });

@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.38.0 -- 2026-09-09 -- The 28 tranche-2 suites join GUARD_SUITES (68 → 96), each measured
+ *            alone on a fresh database, three identical green runs on both backends.
  *   v1.37.0 -- 2026-09-08 -- Coverage tranche 2: 28 suites for the doors the sweep never drove
  *            (appeals, owner export, setup and verification, account and membership doors, the MCP
  *            surfaces, extensions, memory, prompts, mailbox push, the people directory, genesis
@@ -847,6 +849,41 @@ const GUARD_SUITES = [
     // resolution half is the other half: the node carries the owner's key out through a sandboxed
     // script that must never be able to see it.
     'test/e2e-secrets.ts',                  // the owner's vault: what is stored, who may touch it, and who never sees it
+    // Coverage tranche 2, promoted 2026-09-09 the way the rule says: each alone, on a freshly deleted
+    // database, three consecutive green runs on BOTH backends, per-suite counts identical between
+    // them (168 runs, zero flakes). They are the suites that found 22 defects on their first day,
+    // most of them an identity compared in the wrong alphabet or a guard that could not fire, and
+    // about a third of their assertions are refusals or isolation boundaries. The own-node ones
+    // (mailbox-push 40312-40313, setup-and-verification 40320, genesis-federation 40321,
+    // settlements-sync 40322-40323, publish-upstreams 40317) sit in lane 0 like their siblings.
+    'test/e2e-account-doors.ts',            // the GHII register/login validators and the whole agent lifecycle surface
+    'test/e2e-admin-doors.ts',              // the operator doors: who may open them and what each refuses
+    'test/e2e-admin-doors-2.ts',            // roles grant/revoke with live roles, the last-operator guard, setup/token
+    'test/e2e-ai-provider-stub.ts',         // the AI provider road with a fake upstream: key handling, modality, refusals
+    'test/e2e-appeals.ts',                  // a flag is raised, its owner appeals, the organism admin reviews; every refusal
+    'test/e2e-core-jobs.ts',                // the scheduled jobs an operator can trigger, and who cannot
+    'test/e2e-directory-index.ts',          // the people directory: consent gate, radius and keyword search
+    'test/e2e-extension-doors.ts',          // extension instances, secrets masked, cross-owner 403s and 404s
+    'test/e2e-federated-session.ts',        // a visitor from another node: scope, attestation, push-home signature
+    'test/e2e-federation-settlements-sync.ts', // signed settlements, routing, cross-node templates, the sync services
+    'test/e2e-genesis-federation.ts',       // peering, signed catalogue ingest, cross-genesis reads, subscriptions
+    'test/e2e-iam-generated-extension.ts',  // the generated IAM gate: what the matrix admits and refuses
+    'test/e2e-mailbox-push.ts',             // web push and mail notifications on an own node: endpoints, prune, quiet hours
+    'test/e2e-mcp-core-doors.ts',           // the work lifecycle, memory owner-scope branches, both resource templates
+    'test/e2e-mcp-dm-datapackage.ts',       // the DM tools with their refusal arms, and the data-package pair
+    'test/e2e-mcp-exchange.ts',             // offerings, needs, bids and contracts on the tool surface
+    'test/e2e-mcp-extensions-apps.ts',      // extension and app tools: refusal arms, presigned roads, drafts
+    'test/e2e-mcp-groups-shares.ts',        // sharing groups: who is in, who may read, the refusal codes
+    'test/e2e-mcp-onboarding.ts',           // the onboarding ladder an agent climbs, one confirmation at a time
+    'test/e2e-mcp-packages-tools.ts',       // package tools and the tool catalogue on the MCP surface
+    'test/e2e-memory-doors.ts',             // bulk, export, import, bulk-delete, discover, copy, TTL, CORS, the bin
+    'test/e2e-organism-membership-doors.ts', // members hidden, review, promote/demote, transfer, owners, invitations
+    'test/e2e-owner-export.ts',             // one export, every section, and who may ask for it
+    'test/e2e-package-components.ts',       // msm and memory components: register, fetch, delete, the parse ladder
+    'test/e2e-prompt-arms.ts',              // the prompt doors' arms: surfaces, redirects, text format, tiers
+    'test/e2e-prompt-doors.ts',             // the prompt doors: what is public, what needs a token, what is refused
+    'test/e2e-publish-upstreams.ts',        // the publish recipes against fake upstreams on an own node
+    'test/e2e-setup-and-verification.ts',   // the setup wizard on fresh nodes, and the verification doors
 ];
 
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone

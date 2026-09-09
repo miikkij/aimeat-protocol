@@ -6,6 +6,7 @@
  *   owner refresh-token sessions (rotating hashes, idle+absolute windows), and revocation. Translated
  *   1:1 from the Prisma implementation. Backs POST /v1/auth/token and the owner refresh flow.
  * @version-history
+ *   v1.2.0 — 2026-09-09 — pruneExpiredSessions deleted: no caller.
  *   v1.1.0 — 2026-08-13 — revokeSessionsByGaii, matching the SQLite provider.
  *   v1.0.0 — 2026-07-15 — Phase 5: session domain on Postgres+Kysely.
  */
@@ -92,12 +93,5 @@ export const sessionMethods = {
   async isSessionRevoked(this: PostgresKyselyStorage, sessionId: string): Promise<boolean> {
     const s = await this.db.selectFrom('Session').select('revoked').where('sessionId', '=', sessionId).executeTakeFirst();
     return s ? s.revoked : false;
-  },
-
-  async pruneExpiredSessions(this: PostgresKyselyStorage, nowIso: string): Promise<number> {
-    const now = new Date(nowIso);
-    const r = await this.db.deleteFrom('Session')
-      .where(eb => eb.or([eb('expiresAt', '<', now), eb('absoluteExpiresAt', '<', now)])).executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0);
   },
 };

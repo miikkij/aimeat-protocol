@@ -2,16 +2,13 @@
  * @file agent-webhook.repository.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Repository interfaces for agent telemetry events and webhook delivery logs.
+ * @description Repository interface for agent webhook delivery logs.
  * @version-history
+ *   v1.1.0 -- 2026-09-09 -- AgentTelemetryRepository deleted: appendTelemetry and listTelemetry had
+ *     no caller once the in-process ring in services/telemetry-buffer.ts replaced them.
  *   v1.0.0 -- 2026-05-23 -- Initial creation (Phase A push layer)
  */
-import type { TelemetryEvent, WebhookDeliveryLog } from '../interface.js';
-
-export interface AgentTelemetryRepository {
-  appendTelemetry(event: TelemetryEvent): Promise<void>;
-  listTelemetry(agentGaii: string, opts: { since?: string; type?: string; limit?: number }): Promise<TelemetryEvent[]>;
-}
+import type { WebhookDeliveryLog } from '../interface.js';
 
 export interface AgentWebhookRepository {
   appendDeliveryLog(log: WebhookDeliveryLog): Promise<void>;

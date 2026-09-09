@@ -2,8 +2,10 @@
  * @file src/storage/types/commerce.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Memory, action/work/wallet, boards, disputes, files, marketplace, flags, and escrow record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
+ * @description Memory, action/work/wallet, boards, disputes, files, and flags record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-09 — ListingRecord, PurchaseRecord and EscrowHoldRecord deleted with the
+ *     marketplace and generic-escrow storage methods: no caller. The tables stay.
  *   v1.1.0 — 2026-07-27 — WalletTransaction.initiatorGaii: `gaii` is the payer and can only be a human,
  *     so without a second column the ledger could not say whether a charge came from the person, an
  *     agent, or an app they once connected.
@@ -306,45 +308,6 @@ export interface FlagSummary {
 }
 
 
-// Phase 2.6 — Marketplace (DEPRECATED: listings now live in extension memory via marketplace-behaviors extension)
-/** @deprecated Use marketplace-behaviors extension instead */
-export interface ListingRecord {
-  id: string;
-  ownerName: string;        // Seller's owner name
-  sellerGhii: string;       // Seller's GHII
-  title: string;
-  description: string;
-  category: 'palvelut' | 'tuotteet' | 'data' | 'osaaminen' | 'muu';
-  priceMorsels: number;
-  condition?: 'new' | 'used' | 'digital';
-  availability?: 'immediate' | 'on_request' | 'scheduled';
-  location?: { city?: string; area?: string };
-  tags?: string[];
-  images?: string[];
-  status: 'active' | 'sold' | 'expired' | 'hidden' | 'delisted';
-  memoryKey: string;        // marketplace.{owner}.listing.{id}
-  flagCount: number;
-  createdAt: string;
-  updatedAt: string;
-  semantic?: Record<string, unknown>;
-}
-
-/** @deprecated Use marketplace-behaviors extension instead */
-export interface PurchaseRecord {
-  id: string;
-  listingId: string;
-  buyerOwner: string;
-  sellerOwner: string;
-  priceMorsels: number;
-  transactionFeeMorsels: number;
-  totalCostMorsels: number;
-  status: 'pending_delivery' | 'delivered' | 'disputed' | 'completed' | 'cancelled';
-  rating?: { score: number; comment?: string };
-  trackingCode: string;
-  createdAt: string;
-  completedAt?: string;
-}
-
 // Phase 2.4 — Appeals (Advanced Moderation)
 export interface AppealRecord {
   id: string;
@@ -356,18 +319,4 @@ export interface AppealRecord {
   reviewNote?: string;
   createdAt: string;
   reviewedAt?: string;
-}
-
-// ── Generic Escrow ─────────────────────────────────────────────────
-
-export interface EscrowHoldRecord {
-  holdId: string;
-  fromGaii: string;
-  amount: number;
-  reason: string;
-  status: 'held' | 'released' | 'disputed' | 'refunded';
-  extensionName: string;
-  createdAt: string;
-  releasedAt?: string;
-  releasedTo?: string;
 }

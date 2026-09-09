@@ -9,6 +9,7 @@
  * @usage import type { PackageInstanceRepository } from './package-instance.repository.js';
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 1 storage layer)
+ *   v1.1.0 — 2026-09-09 — listInstancesByPackage deleted: no caller (listInstances filters by package).
  */
 
 import type { PackageInstanceRecord, InstanceFilter } from '../interface.js';
@@ -19,5 +20,4 @@ export interface PackageInstanceRepository {
   listInstances(filter: InstanceFilter): Promise<{ instances: PackageInstanceRecord[]; total: number }>;
   updateInstance(id: string, updates: Partial<PackageInstanceRecord>): Promise<PackageInstanceRecord | null>;
   deleteInstance(id: string): Promise<boolean>;
-  listInstancesByPackage(packageGroupId: string): Promise<{ instances: PackageInstanceRecord[]; total: number }>;
 }

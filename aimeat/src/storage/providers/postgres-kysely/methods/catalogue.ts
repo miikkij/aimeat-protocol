@@ -6,6 +6,7 @@
  *   Content Service Manifest, MSM = MCP Service Manifest; both keyed by unique `name`. Backs the CSM/MSM
  *   registration + the startup template seeding. Translated to match the Prisma provider.
  * @version-history
+ *   v1.1.0 — 2026-09-09 — updateCsm deleted: no caller.
  *   v1.0.0 — 2026-07-15 — Phase 5: CSM/MSM catalogue on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -49,17 +50,6 @@ export const catalogueMethods = {
     let q = this.db.selectFrom('Csm').selectAll();
     if (opts?.serviceType) q = q.where('serviceType', '=', opts.serviceType);
     return (await q.execute()).map(toCsm);
-  },
-  async updateCsm(this: PostgresKyselyStorage, name: string, updates: Partial<CsmRecord>): Promise<CsmRecord | null> {
-    const data: Record<string, unknown> = {};
-    if (updates.definition !== undefined) data.definition = jsonb(updates.definition);
-    if (updates.serviceType !== undefined) data.serviceType = updates.serviceType;
-    if (updates.jsonSchemaKey !== undefined) data.jsonSchemaKey = updates.jsonSchemaKey;
-    if (updates.semantic !== undefined) data.semantic = jsonb(updates.semantic ?? null);
-    if (updates.federate !== undefined) data.federate = updates.federate;
-    data.updatedAt = new Date();
-    const rows = await this.db.updateTable('Csm').set(data as never).where('name', '=', name).returningAll().execute();
-    return rows[0] ? toCsm(rows[0]) : null;
   },
   async deleteCsm(this: PostgresKyselyStorage, name: string): Promise<boolean> {
     const r = await this.db.deleteFrom('Csm').where('name', '=', name).executeTakeFirst();

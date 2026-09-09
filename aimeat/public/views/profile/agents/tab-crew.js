@@ -32,6 +32,7 @@ import { timeAgo } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
 import { CREW_TEMPLATES, buildTemplate } from './crew-templates.js';
+import CrewLlmPicker from './crew-llm-picker.js';
 import { anchorErrors, ErrorLines, IdentitySection, CrewSection, RunSection, ContractSection } from './crew-editor.js';
 
 const html = htm.bind(h);
@@ -61,6 +62,7 @@ export default function TabCrew({ agentName, showToast }) {
   const [busy, setBusy] = useState(null);             // 'validate' | 'publish' | 'draft' | 'restore' | null
   const [tryPrompt, setTryPrompt] = useState('');
   const [tryRun, setTryRun] = useState(null);         // { id, status, result, error }
+  const [menu, setMenu] = useState(null);             // GET /crew/menu — the runtime's own answer
   const { confirm, ConfirmUI } = useConfirm();
   const docRef = useRef(doc);
   docRef.current = doc;
@@ -86,7 +88,18 @@ export default function TabCrew({ agentName, showToast }) {
     setLoading(false);
   }, [base]);
 
+  // WHAT THE RUNTIME OFFERS, and which model is chosen for this agent. Its own call, because it can
+  // be slow (it asks the agent over the tunnel) and the definition must render without waiting for
+  // it; a failure leaves `menu` null and the served tool list takes over.
+  const loadMenu = useCallback(async () => {
+    try {
+      const resp = await apiGet(`${base}/menu`);
+      setMenu(resp?.data ?? null);
+    } catch (err) { swallowed('tab-crew: menu', err); setMenu(null); }
+  }, [base]);
+
   useEffect(() => { load({ keepEdits: false }); }, [load]);
+  useEffect(() => { loadMenu(); }, [loadMenu]);
 
   useEffect(() => {
     const handler = () => load({ keepEdits: true });
@@ -249,6 +262,10 @@ export default function TabCrew({ agentName, showToast }) {
       `}
       ${!online && html`<div class="pf-agd-warning-text pf-agd-crew-offline">${t(`${K}.offlineHint`)}</div>`}
 
+      ${/* Which model this agent thinks with. Above the definition because it is one line and it
+            decides how everything below it will actually be carried out. */''}
+      <${CrewLlmPicker} agentName=${agentName} menu=${menu} showToast=${showToast} onSaved=${loadMenu} />
+
       ${status === 'empty' ? html`
         <div class="pf-agd-crew-templates">
           <div class="pf-agd-section-title">${t(`${K}.templates.title`)}</div>
@@ -301,7 +318,7 @@ export default function TabCrew({ agentName, showToast }) {
           </div>
         ` : html`
           <${IdentitySection} doc=${doc} onChange=${edit} errors=${errors} />
-          <${CrewSection} doc=${doc} onChange=${edit} errors=${errors} />
+          <${CrewSection} doc=${doc} onChange=${edit} errors=${errors} runtimeTools=${menu?.tools} />
           <${RunSection} doc=${doc} onChange=${edit} errors=${errors} />
           <${ContractSection} doc=${doc} onChange=${edit} errors=${errors} />
         `}

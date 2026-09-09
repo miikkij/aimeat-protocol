@@ -2,8 +2,11 @@
  * @file src/storage/providers/sqlite/methods/community.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Membership, Join-request, Approval, Appeal, Marketplace, Push, Issuer, Nonce, Genesis-peer, Reputation, Realtime-room methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
+ * @description Membership, Join-request, Approval, Appeal, Push, Issuer, Nonce, Genesis-peer, Reputation, Realtime-room methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.4.0 — 2026-09-09 — Marketplace listings and purchases, getTrustedIssuer, getTrustedIssuerByUrl,
+ *     deleteTrustedIssuer, getOrganismReputation and listRealtimeRooms deleted: no caller outside
+ *     the storage layer.
  *   v1.3.0 — 2026-08-11 — Push subscriptions are per device: upsert on (ownerName, endpoint),
  *     listPushSubscriptionsByOwner added, delete takes an optional endpoint (audit H-8).
  *   v1.2.0 — 2026-07-16 — Memberships carry invitedWorkspaces (JSON column): workspace grants chosen at invite time.
@@ -12,7 +15,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  */
 import type {
-  OrganismMembershipRecord, JoinRequestRecord, PendingApprovalRecord, AppealRecord, ListingRecord, PurchaseRecord,
+  OrganismMembershipRecord, JoinRequestRecord, PendingApprovalRecord, AppealRecord,
   PushSubscriptionRecord, TrustedIssuerRecord, VerificationNonceRecord, GenesisPeerRecord, OrganismReputationRecord, RealtimeRoomRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
@@ -329,169 +332,6 @@ export const communityMethods = {
   },
 
   // ══════════════════════════════════════════════════════════
-  // ── Marketplace ──
-  // ══════════════════════════════════════════════════════════
-
-  async createListing(this: SqliteStorage, record: ListingRecord): Promise<ListingRecord> {
-    this.db.prepare(
-      `INSERT INTO listings (id, ownerName, sellerGhii, title, description, category, priceMorsels,
-       condition, availability, location, tags, images, status, memoryKey, flagCount, createdAt, updatedAt, semantic)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      record.id, record.ownerName, record.sellerGhii, record.title, record.description,
-      record.category, record.priceMorsels,
-      record.condition ?? null, record.availability ?? null,
-      record.location ? JSON.stringify(record.location) : null,
-      record.tags ? JSON.stringify(record.tags) : null,
-      record.images ? JSON.stringify(record.images) : null,
-      record.status, record.memoryKey, record.flagCount,
-      record.createdAt, record.updatedAt,
-      record.semantic ? JSON.stringify(record.semantic) : null,
-    );
-    return record;
-  },
-
-  async getListing(this: SqliteStorage, id: string): Promise<ListingRecord | null> {
-    const row = this.db.prepare('SELECT * FROM listings WHERE id = ?').get(id) as Record<string, unknown> | undefined;
-    return row ? this.deserializeListing(row) : null;
-  },
-
-  async listListings(this: SqliteStorage, opts?: { category?: string; city?: string; minPrice?: number; maxPrice?: number; status?: string; sellerOwner?: string; page?: number; perPage?: number }): Promise<ListingRecord[]> {
-    const page = opts?.page ?? 1;
-    const perPage = opts?.perPage ?? 20;
-
-    const rows = this.db.prepare('SELECT * FROM listings ORDER BY createdAt DESC').all() as Record<string, unknown>[];
-    let results = rows.map(r => this.deserializeListing(r));
-
-    if (opts?.category) results = results.filter(l => l.category === opts.category);
-    if (opts?.city) results = results.filter(l => l.location?.city?.toLowerCase() === opts.city!.toLowerCase());
-    if (opts?.minPrice !== undefined) results = results.filter(l => l.priceMorsels >= opts.minPrice!);
-    if (opts?.maxPrice !== undefined) results = results.filter(l => l.priceMorsels <= opts.maxPrice!);
-    if (opts?.status) results = results.filter(l => l.status === opts.status);
-    if (opts?.sellerOwner) results = results.filter(l => l.ownerName === opts.sellerOwner);
-
-    const start = (page - 1) * perPage;
-    return results.slice(start, start + perPage);
-  },
-
-  async updateListing(this: SqliteStorage, id: string, updates: Partial<ListingRecord>): Promise<ListingRecord | null> {
-    const existing = await this.getListing(id);
-    if (!existing) return null;
-    const updated = { ...existing, ...updates, id: existing.id };
-    this.db.prepare(
-      `UPDATE listings SET ownerName = ?, sellerGhii = ?, title = ?, description = ?,
-       category = ?, priceMorsels = ?, condition = ?, availability = ?, location = ?,
-       tags = ?, images = ?, status = ?, memoryKey = ?, flagCount = ?,
-       createdAt = ?, updatedAt = ?, semantic = ? WHERE id = ?`
-    ).run(
-      updated.ownerName, updated.sellerGhii, updated.title, updated.description,
-      updated.category, updated.priceMorsels,
-      updated.condition ?? null, updated.availability ?? null,
-      updated.location ? JSON.stringify(updated.location) : null,
-      updated.tags ? JSON.stringify(updated.tags) : null,
-      updated.images ? JSON.stringify(updated.images) : null,
-      updated.status, updated.memoryKey, updated.flagCount,
-      updated.createdAt, updated.updatedAt,
-      updated.semantic ? JSON.stringify(updated.semantic) : null,
-      id,
-    );
-    return updated;
-  },
-
-  async deleteListing(this: SqliteStorage, id: string): Promise<boolean> {
-    const result = this.db.prepare('DELETE FROM listings WHERE id = ?').run(id);
-    return result.changes > 0;
-  },
-
-  async createPurchase(this: SqliteStorage, record: PurchaseRecord): Promise<PurchaseRecord> {
-    this.db.prepare(
-      `INSERT INTO purchases (id, listingId, buyerOwner, sellerOwner, priceMorsels,
-       transactionFeeMorsels, totalCostMorsels, status, rating, trackingCode, createdAt, completedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      record.id, record.listingId, record.buyerOwner, record.sellerOwner,
-      record.priceMorsels, record.transactionFeeMorsels, record.totalCostMorsels,
-      record.status, record.rating ? JSON.stringify(record.rating) : null,
-      record.trackingCode, record.createdAt, record.completedAt ?? null,
-    );
-    return record;
-  },
-
-  async getPurchase(this: SqliteStorage, id: string): Promise<PurchaseRecord | null> {
-    const row = this.db.prepare('SELECT * FROM purchases WHERE id = ?').get(id) as Record<string, unknown> | undefined;
-    return row ? this.deserializePurchase(row) : null;
-  },
-
-  async listPurchasesByBuyer(this: SqliteStorage, buyerOwner: string): Promise<PurchaseRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM purchases WHERE buyerOwner = ? ORDER BY createdAt DESC').all(buyerOwner) as Record<string, unknown>[];
-    return rows.map(r => this.deserializePurchase(r));
-  },
-
-  async listPurchasesBySeller(this: SqliteStorage, sellerOwner: string): Promise<PurchaseRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM purchases WHERE sellerOwner = ? ORDER BY createdAt DESC').all(sellerOwner) as Record<string, unknown>[];
-    return rows.map(r => this.deserializePurchase(r));
-  },
-
-  async updatePurchase(this: SqliteStorage, id: string, updates: Partial<PurchaseRecord>): Promise<PurchaseRecord | null> {
-    const existing = await this.getPurchase(id);
-    if (!existing) return null;
-    const updated = { ...existing, ...updates, id: existing.id };
-    this.db.prepare(
-      `UPDATE purchases SET listingId = ?, buyerOwner = ?, sellerOwner = ?, priceMorsels = ?,
-       transactionFeeMorsels = ?, totalCostMorsels = ?, status = ?, rating = ?,
-       trackingCode = ?, createdAt = ?, completedAt = ? WHERE id = ?`
-    ).run(
-      updated.listingId, updated.buyerOwner, updated.sellerOwner,
-      updated.priceMorsels, updated.transactionFeeMorsels, updated.totalCostMorsels,
-      updated.status, updated.rating ? JSON.stringify(updated.rating) : null,
-      updated.trackingCode, updated.createdAt, updated.completedAt ?? null, id,
-    );
-    return updated;
-  },
-
-  deserializeListing(this: SqliteStorage, row: Record<string, unknown>): ListingRecord {
-    const record: ListingRecord = {
-      id: row.id as string,
-      ownerName: row.ownerName as string,
-      sellerGhii: row.sellerGhii as string,
-      title: row.title as string,
-      description: row.description as string,
-      category: row.category as ListingRecord['category'],
-      priceMorsels: row.priceMorsels as number,
-      status: row.status as ListingRecord['status'],
-      memoryKey: row.memoryKey as string,
-      flagCount: row.flagCount as number,
-      createdAt: row.createdAt as string,
-      updatedAt: row.updatedAt as string,
-    };
-    if (row.condition) record.condition = row.condition as ListingRecord['condition'];
-    if (row.availability) record.availability = row.availability as ListingRecord['availability'];
-    if (row.location) record.location = JSON.parse(row.location as string);
-    if (row.tags) record.tags = JSON.parse(row.tags as string);
-    if (row.images) record.images = JSON.parse(row.images as string);
-    if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
-    return record;
-  },
-
-  deserializePurchase(this: SqliteStorage, row: Record<string, unknown>): PurchaseRecord {
-    const record: PurchaseRecord = {
-      id: row.id as string,
-      listingId: row.listingId as string,
-      buyerOwner: row.buyerOwner as string,
-      sellerOwner: row.sellerOwner as string,
-      priceMorsels: row.priceMorsels as number,
-      transactionFeeMorsels: row.transactionFeeMorsels as number,
-      totalCostMorsels: row.totalCostMorsels as number,
-      status: row.status as PurchaseRecord['status'],
-      trackingCode: row.trackingCode as string,
-      createdAt: row.createdAt as string,
-    };
-    if (row.rating) record.rating = JSON.parse(row.rating as string);
-    if (row.completedAt) record.completedAt = row.completedAt as string;
-    return record;
-  },
-
-  // ══════════════════════════════════════════════════════════
   // ── Push Subscriptions ──
   // ══════════════════════════════════════════════════════════
 
@@ -551,27 +391,12 @@ export const communityMethods = {
     return record;
   },
 
-  async getTrustedIssuer(this: SqliteStorage, id: string): Promise<TrustedIssuerRecord | null> {
-    const row = this.db.prepare('SELECT * FROM trusted_issuers WHERE id = ?').get(id) as Record<string, unknown> | undefined;
-    return row ? this.deserializeTrustedIssuer(row) : null;
-  },
-
-  async getTrustedIssuerByUrl(this: SqliteStorage, url: string): Promise<TrustedIssuerRecord | null> {
-    const row = this.db.prepare('SELECT * FROM trusted_issuers WHERE url = ?').get(url) as Record<string, unknown> | undefined;
-    return row ? this.deserializeTrustedIssuer(row) : null;
-  },
-
   async listTrustedIssuers(this: SqliteStorage, opts?: { type?: string }): Promise<TrustedIssuerRecord[]> {
     let sql = 'SELECT * FROM trusted_issuers';
     const params: unknown[] = [];
     if (opts?.type) { sql += ' WHERE type = ?'; params.push(opts.type); }
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
     return rows.map(r => this.deserializeTrustedIssuer(r));
-  },
-
-  async deleteTrustedIssuer(this: SqliteStorage, id: string): Promise<boolean> {
-    const result = this.db.prepare('DELETE FROM trusted_issuers WHERE id = ?').run(id);
-    return result.changes > 0;
   },
 
   deserializeTrustedIssuer(this: SqliteStorage, row: Record<string, unknown>): TrustedIssuerRecord {
@@ -706,17 +531,6 @@ export const communityMethods = {
     return record;
   },
 
-  async getOrganismReputation(this: SqliteStorage, organismId: string): Promise<OrganismReputationRecord | null> {
-    const row = this.db.prepare('SELECT * FROM organism_reputations WHERE organismId = ?').get(organismId) as Record<string, unknown> | undefined;
-    if (!row) return null;
-    return {
-      organismId: row.organismId as string,
-      score: row.score as number,
-      breakdown: JSON.parse(row.breakdown as string),
-      calculatedAt: row.calculatedAt as string,
-    };
-  },
-
   // ══════════════════════════════════════════════════════════
   // ── Realtime Rooms ──
   // ══════════════════════════════════════════════════════════
@@ -737,15 +551,6 @@ export const communityMethods = {
   async getRealtimeRoom(this: SqliteStorage, id: string): Promise<RealtimeRoomRecord | null> {
     const row = this.db.prepare('SELECT * FROM realtime_rooms WHERE id = ?').get(id) as Record<string, unknown> | undefined;
     return row ? this.deserializeRealtimeRoom(row) : null;
-  },
-
-  async listRealtimeRooms(this: SqliteStorage, filter?: { appType?: string; isPublic?: boolean }): Promise<RealtimeRoomRecord[]> {
-    let sql = 'SELECT * FROM realtime_rooms WHERE 1=1';
-    const params: unknown[] = [];
-    if (filter?.appType) { sql += ' AND appType = ?'; params.push(filter.appType); }
-    if (filter?.isPublic !== undefined) { sql += ' AND isPublic = ?'; params.push(filter.isPublic ? 1 : 0); }
-    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
-    return rows.map(r => this.deserializeRealtimeRoom(r));
   },
 
   async updateRealtimeRoom(this: SqliteStorage, id: string, updates: Partial<RealtimeRoomRecord>): Promise<RealtimeRoomRecord | null> {

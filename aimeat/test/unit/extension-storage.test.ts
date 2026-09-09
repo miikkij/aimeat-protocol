@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import type { ExtensionRecord, EscrowHoldRecord } from '../../src/storage/interface.js';
+import type { ExtensionRecord } from '../../src/storage/interface.js';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -34,19 +34,6 @@ function makeExtension(overrides: Partial<ExtensionRecord> = {}): ExtensionRecor
         },
         installedBy: 'operator',
         installedAt: new Date().toISOString(),
-        ...overrides,
-    };
-}
-
-function makeEscrowHold(overrides: Partial<EscrowHoldRecord> = {}): EscrowHoldRecord {
-    return {
-        holdId: `hold-${Math.random().toString(36).slice(2, 10)}`,
-        fromGaii: 'agent-1@test-node',
-        amount: 100,
-        reason: 'marketplace-escrow',
-        status: 'held',
-        extensionName: 'test-extension',
-        createdAt: new Date().toISOString(),
         ...overrides,
     };
 }
@@ -130,97 +117,5 @@ describe('ExtensionRecord (SqliteStorage)', () => {
     it('returns false when deleting non-existent extension', async () => {
         const result = await storage.deleteExtension('nonexistent');
         expect(result).toBe(false);
-    });
-});
-
-// ── Escrow Hold Tests ───────────────────────────────────────
-
-describe('EscrowHoldRecord (SqliteStorage)', () => {
-    let storage: SqliteStorage;
-
-    beforeEach(() => {
-        storage = new SqliteStorage(':memory:');
-    });
-
-    it('creates and retrieves an escrow hold', async () => {
-        const hold = makeEscrowHold({ holdId: 'hold-1', amount: 250 });
-        const created = await storage.createEscrowHold(hold);
-        expect(created.holdId).toBe('hold-1');
-        expect(created.amount).toBe(250);
-        expect(created.status).toBe('held');
-
-        const retrieved = await storage.getEscrowHold('hold-1');
-        expect(retrieved).not.toBeNull();
-        expect(retrieved!.holdId).toBe('hold-1');
-        expect(retrieved!.fromGaii).toBe('agent-1@test-node');
-        expect(retrieved!.extensionName).toBe('test-extension');
-    });
-
-    it('returns null for non-existent escrow hold', async () => {
-        const result = await storage.getEscrowHold('nonexistent');
-        expect(result).toBeNull();
-    });
-
-    it('lists escrow holds by gaii', async () => {
-        await storage.createEscrowHold(makeEscrowHold({ holdId: 'h1', fromGaii: 'agent-a@node' }));
-        await storage.createEscrowHold(makeEscrowHold({ holdId: 'h2', fromGaii: 'agent-a@node' }));
-        await storage.createEscrowHold(makeEscrowHold({ holdId: 'h3', fromGaii: 'agent-b@node' }));
-
-        const agentA = await storage.listEscrowHolds('agent-a@node');
-        expect(agentA).toHaveLength(2);
-
-        const agentB = await storage.listEscrowHolds('agent-b@node');
-        expect(agentB).toHaveLength(1);
-        expect(agentB[0].holdId).toBe('h3');
-    });
-
-    it('lists escrow holds filtered by status', async () => {
-        await storage.createEscrowHold(makeEscrowHold({ holdId: 'h1', fromGaii: 'agent-a@node', status: 'held' }));
-        await storage.createEscrowHold(makeEscrowHold({ holdId: 'h2', fromGaii: 'agent-a@node', status: 'released' }));
-        await storage.createEscrowHold(makeEscrowHold({ holdId: 'h3', fromGaii: 'agent-a@node', status: 'held' }));
-
-        const held = await storage.listEscrowHolds('agent-a@node', { status: 'held' });
-        expect(held).toHaveLength(2);
-
-        const released = await storage.listEscrowHolds('agent-a@node', { status: 'released' });
-        expect(released).toHaveLength(1);
-        expect(released[0].holdId).toBe('h2');
-    });
-
-    it('releases an escrow hold', async () => {
-        await storage.createEscrowHold(makeEscrowHold({ holdId: 'hold-release' }));
-
-        const released = await storage.releaseEscrowHold('hold-release', 'seller@test-node');
-        expect(released).not.toBeNull();
-        expect(released!.status).toBe('released');
-        expect(released!.releasedTo).toBe('seller@test-node');
-        expect(released!.releasedAt).toBeDefined();
-
-        // Verify persisted
-        const retrieved = await storage.getEscrowHold('hold-release');
-        expect(retrieved!.status).toBe('released');
-    });
-
-    it('returns null when releasing non-existent hold', async () => {
-        const result = await storage.releaseEscrowHold('nonexistent', 'someone@node');
-        expect(result).toBeNull();
-    });
-
-    it('refunds an escrow hold', async () => {
-        await storage.createEscrowHold(makeEscrowHold({ holdId: 'hold-refund' }));
-
-        const refunded = await storage.refundEscrowHold('hold-refund');
-        expect(refunded).not.toBeNull();
-        expect(refunded!.status).toBe('refunded');
-        expect(refunded!.releasedAt).toBeDefined();
-
-        // Verify persisted
-        const retrieved = await storage.getEscrowHold('hold-refund');
-        expect(retrieved!.status).toBe('refunded');
-    });
-
-    it('returns null when refunding non-existent hold', async () => {
-        const result = await storage.refundEscrowHold('nonexistent');
-        expect(result).toBeNull();
     });
 });

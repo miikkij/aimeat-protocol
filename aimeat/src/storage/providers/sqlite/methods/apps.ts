@@ -14,6 +14,7 @@
  *   v1.4.0 — 2026-08-29 — updateAppMeta merges `marks`, replaces or withdraws `authorship` and
  *     writes `authorshipLog` (the owner's chrome switches and the named reviewer).
  *   v1.5.0 — 2026-08-29 — updateAppMeta merges `legal` per kind (mergeLegal).
+ *   v1.6.0 — 2026-09-09 — deleteAppGrant and getConfigValue deleted: no caller.
  */
 import { mergeLegal } from '../../../types/apps.js';
 import type {
@@ -439,11 +440,6 @@ export const appsMethods = {
     return this.getAppGrant(grantId);
   },
 
-  async deleteAppGrant(this: SqliteStorage, grantId: string): Promise<boolean> {
-    const result = this.db.prepare('DELETE FROM app_grants WHERE grantId = ?').run(grantId);
-    return result.changes > 0;
-  },
-
   deserializeAppGrant(this: SqliteStorage, row: Record<string, unknown>): AppGrantRecord {
     return {
       grantId: row.grantId as string,
@@ -740,11 +736,6 @@ export const appsMethods = {
   supportsConfigPersistence(this: SqliteStorage): boolean {
     // In-memory SQLite (:memory:) does not persist across restarts
     return this.db.name !== ':memory:';
-  },
-
-  async getConfigValue(this: SqliteStorage, key: string): Promise<string | null> {
-    const row = this.db.prepare('SELECT value FROM system_settings WHERE key = ?').get(`config:${key}`) as { value: string } | undefined;
-    return row?.value ?? null;
   },
 
   async setConfigValue(this: SqliteStorage, key: string, value: string): Promise<void> {

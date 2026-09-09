@@ -6,6 +6,7 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.27.0 -- 2026-09-09 -- .pf-agd-crew-llm: which model an agent thinks with, on the Crew tab.
  *   v1.26.0 -- 2026-09-08 -- The new-agent panel (.pf-agd-new*): a two-column form that folds to
  *     one on a phone, the attach strip, and the waiting-proposal rows.
  *   v1.25.0 -- 2026-09-06 -- The fleet search field over the board (.pf-agd-fleet-search) and the
@@ -2032,6 +2033,41 @@
   background: var(--bg-dim);
   font-size: 0.78rem;
   color: var(--text-muted);
+}
+
+/* ── Which model an agent thinks with ── */
+.pf .pf-agd-crew-llm {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-dim);
+  padding: 0.75rem 0.9rem;
+  margin: 0.75rem 0;
+}
+.pf .pf-agd-crew-llm-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.5rem 0 0.35rem;
+}
+.pf .pf-agd-crew-llm-row select {
+  /* Wide enough for a model label, and it folds to the panel on a phone rather than pushing it. */
+  flex: 1 1 18rem;
+  min-width: 0;
+  max-width: 28rem;
+}
+.pf .pf-agd-crew-llm-empty {
+  margin-top: 0.5rem;
+}
+/* This panel's ground is --bg-dim, not the card, and the muted tokens were picked against the card:
+   measured 4.39:1 in the light theme where the same class reads 4.63 one box out. Both lines here
+   carry the whole meaning of the panel, so they take the plain text colour. */
+.pf .pf-agd-crew-llm .pf-agd-help-text,
+.pf .pf-agd-crew-llm-current {
+  color: var(--text);
+}
+.pf .pf-agd-crew-llm-current {
+  font-size: 0.85rem;
 }
 
 /* ── The new-agent panel: a name, a shape, and what the owner's agents have proposed ── */

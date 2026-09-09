@@ -11,6 +11,7 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.4.0 — 2026-09-09 — MarketplaceRepository and AgentTelemetryRepository no longer exported: deleted, no caller.
  *   v1.3.0 — 2026-09-06 — SecretRepository exported: the owner's secrets vault.
  *   v1.2.0 — 2026-09-04 — PasskeyRepository exported.
  *   v1.1.0 — 2026-09-03 — DependencyRepository and ComponentVersionRepository exported.
@@ -31,7 +32,6 @@ export type { ConsentRepository } from './consent.repository.js';
 export type { CatalogueRepository } from './catalogue.repository.js';
 export type { ModerationRepository } from './moderation.repository.js';
 export type { OrganismRepository } from './organism.repository.js';
-export type { MarketplaceRepository } from './marketplace.repository.js';
 export type { FederationRepository } from './federation.repository.js';
 export type { NodeRepository } from './node.repository.js';
 export type { SessionRepository } from './session.repository.js';
@@ -61,6 +61,6 @@ export type { SharingGroupRepository } from './sharing-group.repository.js';
 export type { AgentActivityRepository } from './agent-activity.repository.js';
 export type { AgentMessageRepository } from './agent-message.repository.js';
 export type { DirectMessageRepository } from './direct-message.repository.js';
-export type { AgentTelemetryRepository, AgentWebhookRepository } from './agent-webhook.repository.js';
+export type { AgentWebhookRepository } from './agent-webhook.repository.js';
 export type { AgentOnboardingRepository } from './agent-onboarding.repository.js';
 export type { AiProvenanceRepository } from './ai-provenance.repository.js';

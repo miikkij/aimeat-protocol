@@ -40,6 +40,11 @@
  *   setStoredFileHeaders(res, file);       // then Content-Length / Content-Range / Cache-Control
  *   res.end(file.data);
  * @version-history
+ *   v1.1.0 -- 2026-09-08 -- `downloadName`: the name a file is SAVED as, when the caller knows it
+ *     and the key does not. A direct-message attachment is stored at dm/<thread>/<message>/<id>, so
+ *     the key's last segment is an id: pressing download saved `23ea6d2c`, with no extension and no
+ *     trace of the name the sender gave it. Content-Disposition beats an anchor's `download`
+ *     attribute, so this had to be fixed on the response rather than in the page.
  *   v1.0.0 -- 2026-08-11 -- August 2026 audit H-26: extracted from routes/storage-files.ts, which
  *     had seven download responses each setting the uploader's Content-Type and nothing else.
  */
@@ -101,6 +106,24 @@ const CSP_INLINE = "default-src 'none'; img-src 'self' data: blob:; media-src 's
  * The percent-encoding escapes `'()*` on top of encodeURIComponent: they are legal in a URI
  * component and illegal in an RFC 5987 ext-value.
  */
+/**
+ * A caller-supplied save-as name, reduced to something that can only ever be a filename.
+ *
+ * Path separators go (a name is not an address), and so does everything below space, because a
+ * newline in a header value is header injection and `dispositionValue` percent-encodes rather than
+ * refuses. Length is capped well under what any filesystem takes. Empty in, empty out — the caller
+ * falls back to the key.
+ */
+export function safeDownloadName(name: string | undefined | null): string {
+    if (!name) return '';
+    return String(name)
+        .replace(/[\\/]/g, '_')
+        // eslint-disable-next-line no-control-regex -- control characters in a header value are the thing being removed
+        .replace(/[\x00-\x1F\x7F]/g, '')
+        .trim()
+        .slice(0, 200);
+}
+
 function dispositionValue(disposition: 'inline' | 'attachment', filename: string): string {
     if (!filename) return disposition;
     const ascii = filename.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
@@ -123,7 +146,7 @@ function dispositionValue(disposition: 'inline' | 'attachment', filename: string
  */
 export function setStoredFileHeaders(
     res: Response,
-    file: { key: string; mimeType: string; data?: Buffer | Uint8Array | null; utf8Verified?: boolean },
+    file: { key: string; mimeType: string; data?: Buffer | Uint8Array | null; utf8Verified?: boolean; downloadName?: string },
 ): void {
     const inline = isInlineSafeFileType(file.mimeType);
     // A stored verdict WINS over the bytes in hand, and that ordering is the point: a range response
@@ -141,8 +164,13 @@ export function setStoredFileHeaders(
         : verifiedContentType(file.mimeType, file.utf8Verified));
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Security-Policy', inline ? CSP_INLINE : CSP_ATTACHMENT);
-    // The key is an address, so its last segment is the closest thing to a filename we have; a key
-    // with no segments at all still gets a bare disposition rather than a broken header.
-    const filename = String(file.key ?? '').split('/').filter(Boolean).pop() ?? '';
+    // The name the file is SAVED as. A key is an address, and its last segment is only the closest
+    // thing to a filename we have — for a direct-message attachment that segment is the attachment's
+    // id, so a person who pressed download got a file called `23ea6d2c` with no extension. Whoever
+    // knows the real name passes it as `downloadName` (the recipient's inbox does), and the key is
+    // the fallback for everything that does not. A key with no segments still gets a bare
+    // disposition rather than a broken header.
+    const filename = safeDownloadName(file.downloadName)
+        || (String(file.key ?? '').split('/').filter(Boolean).pop() ?? '');
     res.setHeader('Content-Disposition', dispositionValue(inline ? 'inline' : 'attachment', filename));
 }

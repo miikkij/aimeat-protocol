@@ -8,10 +8,12 @@
  *
  * @structure
  *   - CapabilityRepository: create/get/update/delete + list/lookup by owner/source
- *   - stats & logs: incrementCapabilityStats, addCapabilityLog, listCapabilityLogs, prune
- *   - governance: setCapabilityOverride, setCapabilityTrust, add/remove/countCapabilityVouches
+ *   - stats & logs: incrementCapabilityStats, addCapabilityLog, listCapabilityLogs
+ *   - governance: setCapabilityOverride, add/remove/countCapabilityVouches
  *
  * @version-history
+ *   v1.2.0 — 2026-09-09 — deleteCapabilityLogsBefore and setCapabilityTrust deleted: no caller
+ *     outside their own unit test (the vouch rows refresh the trust blob themselves).
  *   v1.1.0 — 2026-08-28 — Vouches become ROWS, not a counter. increment/decrementVouchCount only
  *     rewrote a number in the trust blob: the vouches table sat unread and unwritten since it was
  *     created, so one caller could vouch any number of times, the comment was silently dropped,
@@ -19,7 +21,7 @@
  *     the dedup) and the count is derived from the rows.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import type { CapabilityRecord, CapabilityLogEntry, CapabilityOverride, CapabilityTrust, CapabilityFilter } from '../interface.js';
+import type { CapabilityRecord, CapabilityLogEntry, CapabilityOverride, CapabilityFilter } from '../interface.js';
 
 export interface CapabilityRepository {
   createCapability(record: CapabilityRecord): Promise<CapabilityRecord>;
@@ -42,10 +44,8 @@ export interface CapabilityRepository {
     page?: number;
     perPage?: number;
   }): Promise<{ logs: CapabilityLogEntry[]; total: number }>;
-  deleteCapabilityLogsBefore(before: string): Promise<number>;
 
   setCapabilityOverride(id: string, override: CapabilityOverride | null): Promise<void>;
-  setCapabilityTrust(id: string, trust: Partial<CapabilityTrust>): Promise<void>;
   /** One vouch per voucher: a second add by the same GHII is a no-op and answers false. */
   addCapabilityVouch(capabilityId: string, userGhii: string, comment?: string): Promise<boolean>;
   /** Removes THIS voucher's vouch only; answers false when they had none to remove. */

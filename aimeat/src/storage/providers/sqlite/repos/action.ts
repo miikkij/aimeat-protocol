@@ -10,6 +10,7 @@
  *   - createAction/getAction: insert (with UNIQUE→ACTION_EXISTS) and fetch by provider+id
  *
  * @version-history
+ *   v1.1.0 — 2026-09-09 — deleteActionsByProvider deleted: no caller.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type Database from 'better-sqlite3';
@@ -85,11 +86,6 @@ export function listActions(db: Database.Database, opts?: { search?: string; cat
 export function deleteAction(db: Database.Database, id: string, providerGaii: string): boolean {
   const result = db.prepare('DELETE FROM actions WHERE providerGaii = ? AND id = ?').run(providerGaii, id);
   return result.changes > 0;
-}
-
-export function deleteActionsByProvider(db: Database.Database, gaii: string): number {
-  const result = db.prepare('DELETE FROM actions WHERE providerGaii = ?').run(gaii);
-  return result.changes;
 }
 
 export function listActionsByProvider(db: Database.Database, gaii: string): ActionRecord[] {

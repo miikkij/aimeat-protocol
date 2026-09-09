@@ -304,13 +304,4 @@ describe('spaces are isolated', () => {
     expect((await storage.getWorkspaceRow(ORG, WS, NS, 'same'))?.body).toEqual({ where: 'mail' });
     expect((await storage.getWorkspaceRow(ORG, WS, 'crm.other', 'same'))?.body).toEqual({ where: 'other' });
   });
-
-  it('drops a whole space without touching its neighbour', async () => {
-    await storage.appendWorkspaceRows([
-      mk({ rowId: 'a', namespace: 'crm.mail' }),
-      mk({ rowId: 'b', namespace: 'crm.other', id: 'sur-b2' }),
-    ]);
-    expect(await storage.deleteWorkspaceRowSpace(ORG, WS, 'crm.mail')).toBe(1);
-    expect(await storage.getWorkspaceRow(ORG, WS, 'crm.other', 'b')).not.toBeNull();
-  });
 });

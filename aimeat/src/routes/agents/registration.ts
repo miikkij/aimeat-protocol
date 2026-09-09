@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent registration routes (connectivity-key connect, owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-09-09 — The mode refusal behind the schema's enum is gone; it could not fire.
  *   v1.4.0 — 2026-08-29 — The pending listing carries `requested_scopes`: what the agent asked for,
  *     beside `current_scopes`, which is what it already holds. The request was dropped at authorize
  *     time until now, so the owner was asked to grant access without being shown what was wanted.
@@ -38,7 +39,6 @@ import { emitChange } from '../../services/event-bus.js';
 import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
 import { createOnboardingTestTask } from '../../services/onboarding-test-task.js';
 import { detectPlatform } from '../../services/platform-detector.js';
-import { VALID_MODES } from './constants.js';
 
 export function registerRegistrationRoutes(
   router: Router, config: AimeatConfig, storage: Storage, dirnameAgents: string,
@@ -166,11 +166,8 @@ export function registerRegistrationRoutes(
   router.post('/v1/agents', requireAuth(), requireLocalSession(), requireRole('owner'), validateBody(AgentRegistrationSchema, config.nodeId), async (req, res) => {
     const { name, owner, display_name, description, capabilities, scopes, mode } = req.body ?? {};
 
-    if (mode !== undefined && !VALID_MODES.includes(mode)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-        `mode must be one of: ${VALID_MODES.join(', ')}`));
-      return;
-    }
+    // mode is validated by AgentRegistrationSchema's enum ahead of this handler (validateBody), so
+    // the refusal that used to sit here could not fire.
 
     // Extension hook: pre_agent_registration
     const hookResult = await executeHooks(config, storage, 'pre_agent_registration', { name, owner, display_name });

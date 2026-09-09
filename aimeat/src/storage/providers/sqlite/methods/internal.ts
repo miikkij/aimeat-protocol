@@ -6,14 +6,16 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  *   v1.1.0 — 2026-08-19 — declare deserializeAppSummary (the listing row mapper, payload-free).
+ *   v1.2.0 — 2026-09-09 — deserializeListing, deserializePurchase and deserializeEscrowHold gone with
+ *     the marketplace and generic-escrow methods (no caller).
  */
 import type {
   OwnerRecord, AgentRecord, MemoryRecord, ActionRecord, WorkRecord, WalletTransaction,
   BoardRecord, BoardPostRecord, OtkRecord, DisputeRecord, PeeringRequestRecord,
   GHIIRecord, PersonalNodeRecord, MailboxItemRecord, SchemaRecord, ConsentRecord, CsmRecord,
   MsmRecord, EmailVerificationRecord, FlagRecord, OrganismRecord, OrganismMembershipRecord,
-  JoinRequestRecord, PendingApprovalRecord, AppealRecord, ListingRecord, PurchaseRecord, TrustedIssuerRecord,
-  GenesisPeerRecord, ChatInstanceRecord, RealtimeRoomRecord, ExtensionRecord, EscrowHoldRecord, BoardSubscriptionRecord,
+  JoinRequestRecord, PendingApprovalRecord, AppealRecord, TrustedIssuerRecord,
+  GenesisPeerRecord, ChatInstanceRecord, RealtimeRoomRecord, ExtensionRecord, BoardSubscriptionRecord,
   CortexExtensionRecord, PersonalPushSubscriptionRecord, NotificationPreferences, AppRecord, AppSummaryRecord, AppPurchaseRecord, SubdomainSiteRecord,
   AppGrantRecord, NotificationTemplateRecord, ScheduledJobRecord, ExtensionInstanceRecord, ReplicationQueueEntry, DeviceAuthorizationRecord,
   SystemPromptRecord, SystemPromptVersionRecord, ExecutionLogEntry, PackageRecord, TemplateListingRecord, TemplateReview,
@@ -52,13 +54,10 @@ export interface SqliteInternals {
   deserializeJoinRequest(row: Record<string, unknown>): JoinRequestRecord ;
   deserializePendingApproval(row: Record<string, unknown>): PendingApprovalRecord ;
   deserializeAppeal(row: Record<string, unknown>): AppealRecord ;
-  deserializeListing(row: Record<string, unknown>): ListingRecord ;
-  deserializePurchase(row: Record<string, unknown>): PurchaseRecord ;
   deserializeTrustedIssuer(row: Record<string, unknown>): TrustedIssuerRecord ;
   deserializeGenesisPeer(row: Record<string, unknown>): GenesisPeerRecord ;
   deserializeRealtimeRoom(row: Record<string, unknown>): RealtimeRoomRecord ;
   deserializeExtension(row: Record<string, unknown>): ExtensionRecord ;
-  deserializeEscrowHold(row: Record<string, unknown>): EscrowHoldRecord ;
   deserializeCortexExtension(row: Record<string, unknown>): CortexExtensionRecord ;
   deserializePersonalPushSubscription(row: Record<string, unknown>): PersonalPushSubscriptionRecord ;
   deserializeNotificationPreferences(row: Record<string, unknown>): NotificationPreferences ;

@@ -12,6 +12,8 @@
  * @structure cascadeMethods.cascadeDeleteAgentData(gaii) — every owner-scoped table for one identity
  * @usage Object.assign(SqliteStorage.prototype, cascadeMethods) in providers/sqlite/index.ts
  * @version-history
+ *   v1.2.1 — 2026-09-09 — The tally comment names the function deleteOwner actually calls
+ *     (pseudonymiseWriter); the Storage method it named was deleted for having no caller.
  *   v1.2.0 — 2026-09-06 — secrets joins the cascade. A row there is a live credential to somebody
  *     else's service, held under a username that is released for reuse.
  *   v1.1.0 — 2026-09-04 — Six tables join the cascade: memory_history, owner_agent_defaults,
@@ -34,7 +36,8 @@ export const cascadeMethods = {
     // row would hand the next registrant somebody else's history. Rows where this identity was the
     // WRITER into somebody ELSE'S namespace are deliberately NOT deleted here — they are that
     // owner's record of who touched their data, and removing them would turn their "four hands" into
-    // three. Those are pseudonymised instead, by pseudonymiseTallyWriter, called from deleteOwner.
+    // three. Those are pseudonymised instead, by pseudonymiseWriter (repos/memory-tally.ts), which
+    // deleteOwner calls directly.
     this.db.prepare('DELETE FROM memory_write_tally WHERE ownerGaii = ?').run(gaii);
     this.db.prepare('DELETE FROM memory_family_tally WHERE ownerGaii = ?').run(gaii);
     // The archived prior versions of a trackable key. The live row goes above; without this line the

@@ -13,6 +13,8 @@
  *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
  *
  * @version-history
+ *   Revoke order — 2026-09-09 — The last-operator check runs before the self-revoke check; behind it
+ *     the guard could never fire, because the caller holds the role and so the count was always two.
  *   Join completion — 2026-09-06 — Review items 4.4 and 4.5. The approved-join completion is awaited
  *     inside its own try: the poller is cleared before it, so a failure there used to fall into a
  *     catch that logs "continuing after a suppressed failure" — a sentence about a poll that would
@@ -452,15 +454,18 @@ export function adminMonitoringRouter(
             return;
         }
 
-        // Two doors that would lock the node out of its own administration.
-        if (req.auth!.owner === owner) {
-            res.status(409).json(error(config.nodeId, 'CONFLICT', 'You cannot revoke your own operator role'));
-            return;
-        }
-
+        // Two doors that would lock the node out of its own administration. The last-operator
+        // check goes first: the caller holds the role (requireRole, read live since 2026-09-09),
+        // so when the target is the only operator the target IS the caller, and "last operator"
+        // is the reason that matters. Behind the self-revoke check it could never be reached.
         const operators = (await storage.listOwners()).filter(o => o.roles.includes('operator'));
         if (operators.length <= 1) {
             res.status(409).json(error(config.nodeId, 'CONFLICT', 'The last operator cannot be revoked'));
+            return;
+        }
+
+        if (req.auth!.owner === owner) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', 'You cannot revoke your own operator role'));
             return;
         }
 

@@ -12,9 +12,10 @@
  *   THE CURSOR EXPRESSION IS WRITTEN OUT rather than using a row-value comparison, so it is
  *   character-for-character the condition the SQLite side runs. Two spellings of pagination is how
  *   two backends end up paginating differently, which passes every test on the fast local one.
- * @structure workspaceRowMethods — append / get / list / delete / deleteBefore / trim / stats / usage / deleteSpace
+ * @structure workspaceRowMethods — append / get / list / delete / deleteBefore / trim / stats / usage
  * @usage Object.assign(PostgresKyselyStorage.prototype, workspaceRowMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-09-09 — deleteWorkspaceRowSpace deleted: no caller outside its unit test.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { sql } from 'kysely';
@@ -209,16 +210,5 @@ export const workspaceRowMethods = {
     if (scope.wsId) q = q.where('wsId', '=', scope.wsId);
     const row = await q.executeTakeFirst();
     return { rows: Number(row?.rows ?? 0), bytes: Number(row?.bytes ?? 0) };
-  },
-
-  async deleteWorkspaceRowSpace(
-    this: PostgresKyselyStorage, organismId: string, wsId: string, namespace?: string,
-  ): Promise<number> {
-    let q = this.db.deleteFrom('WorkspaceRow')
-      .where('organismId', '=', organismId)
-      .where('wsId', '=', wsId);
-    if (namespace) q = q.where('namespace', '=', namespace);
-    const res = await q.executeTakeFirst();
-    return Number(res?.numDeletedRows ?? 0);
   },
 };

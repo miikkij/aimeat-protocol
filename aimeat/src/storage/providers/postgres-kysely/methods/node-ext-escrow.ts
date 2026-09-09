@@ -2,12 +2,14 @@
  * @file src/storage/providers/postgres-kysely/methods/node-ext-escrow.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Node-level extension / cortex / escrow domain for the Postgres+Kysely backend:
- *   WASM extensions (Extension), per-owner extension instances (ExtensionInstance), generic escrow
- *   holds (EscrowHold), and manifest-based cortex extensions + their lib files (CortexExtension /
- *   CortexLibFile). Translated 1:1 from the Prisma implementation against the same tables — jsonb
- *   columns go through the shared `jsonb()` param helper; status/visibility unions are DB strings.
+ * @description Node-level extension / cortex domain for the Postgres+Kysely backend:
+ *   WASM extensions (Extension), per-owner extension instances (ExtensionInstance), and
+ *   manifest-based cortex extensions + their lib files (CortexExtension / CortexLibFile).
+ *   Translated 1:1 from the Prisma implementation against the same tables — jsonb columns go
+ *   through the shared `jsonb()` param helper; status/visibility unions are DB strings.
  * @version-history
+ *   v1.3.0 — 2026-09-09 — Generic escrow holds (EscrowHold) deleted: no caller. The file keeps its
+ *     name so its history stays findable.
  *   v1.2.0 — 2026-08-17 — `lean` listings strip scriptContent / manifest / seed-data entries IN SQL
  *     (jsonb projection), so the capability aggregator stops pulling every extension's source and
  *     every cortex manifest through the process on each cron run.
@@ -18,9 +20,9 @@
  */
 import { sql, type Selectable } from 'kysely';
 import type {
-  CortexExtensionRecord, EscrowHoldRecord, ExtensionInstanceRecord, ExtensionRecord,
+  CortexExtensionRecord, ExtensionInstanceRecord, ExtensionRecord,
 } from '../../../interface.js';
-import type { CortexExtension, EscrowHold, Extension, ExtensionInstance } from '../db-types.js';
+import type { CortexExtension, Extension, ExtensionInstance } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb, dbError } from '../helpers.js';
 
@@ -35,13 +37,6 @@ function toExtension(r: Selectable<Extension>): ExtensionRecord {
     limits: r.limits as unknown as ExtensionRecord['limits'], federation: r.federation as unknown as ExtensionRecord['federation'],
     installedBy: r.installedBy, installedAt: iso(r.installedAt), activatedAt: isoOpt(r.activatedAt),
     ...(r.instances ? { instances: r.instances as unknown as ExtensionRecord['instances'] } : {}),
-  };
-}
-function toEscrow(r: Selectable<EscrowHold>): EscrowHoldRecord {
-  return {
-    holdId: r.holdId, fromGaii: r.fromGaii, amount: r.amount, reason: r.reason,
-    status: r.status as EscrowHoldRecord['status'], extensionName: r.extensionName,
-    createdAt: iso(r.createdAt), releasedAt: isoOpt(r.releasedAt), releasedTo: r.releasedTo ?? undefined,
   };
 }
 function toCortex(r: Selectable<CortexExtension>): CortexExtensionRecord {
@@ -122,42 +117,6 @@ export const nodeExtEscrowMethods = {
   async deleteExtension(this: PostgresKyselyStorage, name: string): Promise<boolean> {
     const r = await this.db.deleteFrom('Extension').where('name', '=', name).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0) > 0;
-  },
-
-  // ── Generic Escrow ───────────────────────────────────────────
-  async createEscrowHold(this: PostgresKyselyStorage, record: EscrowHoldRecord): Promise<EscrowHoldRecord> {
-    await this.db.insertInto('EscrowHold').values({
-      holdId: record.holdId, fromGaii: record.fromGaii, amount: record.amount, reason: record.reason,
-      status: record.status, extensionName: record.extensionName, createdAt: new Date(record.createdAt),
-      releasedAt: record.releasedAt ? new Date(record.releasedAt) : null, releasedTo: record.releasedTo ?? null,
-      updatedAt: new Date(),
-    }).execute();
-    return record;
-  },
-  async getEscrowHold(this: PostgresKyselyStorage, holdId: string): Promise<EscrowHoldRecord | null> {
-    const r = await this.db.selectFrom('EscrowHold').selectAll().where('holdId', '=', holdId).executeTakeFirst();
-    return r ? toEscrow(r) : null;
-  },
-  async listEscrowHolds(this: PostgresKyselyStorage, fromGaii: string, opts?: { status?: string }): Promise<EscrowHoldRecord[]> {
-    let q = this.db.selectFrom('EscrowHold').selectAll().where('fromGaii', '=', fromGaii);
-    if (opts?.status) q = q.where('status', '=', opts.status);
-    return (await q.execute()).map(toEscrow);
-  },
-  async releaseEscrowHold(this: PostgresKyselyStorage, holdId: string, toGaii: string): Promise<EscrowHoldRecord | null> {
-    const existing = await this.db.selectFrom('EscrowHold').select('status').where('holdId', '=', holdId).executeTakeFirst();
-    if (!existing || existing.status !== 'held') return null;
-    const rows = await this.db.updateTable('EscrowHold')
-      .set({ status: 'released', releasedTo: toGaii, releasedAt: new Date(), updatedAt: new Date() })
-      .where('holdId', '=', holdId).returningAll().execute();
-    return rows[0] ? toEscrow(rows[0]) : null;
-  },
-  async refundEscrowHold(this: PostgresKyselyStorage, holdId: string): Promise<EscrowHoldRecord | null> {
-    const existing = await this.db.selectFrom('EscrowHold').select('status').where('holdId', '=', holdId).executeTakeFirst();
-    if (!existing || existing.status !== 'held') return null;
-    const rows = await this.db.updateTable('EscrowHold')
-      .set({ status: 'refunded', releasedAt: new Date(), updatedAt: new Date() })
-      .where('holdId', '=', holdId).returningAll().execute();
-    return rows[0] ? toEscrow(rows[0]) : null;
   },
 
   // ── Cortex Extensions (manifest-based) + lib files ───────────

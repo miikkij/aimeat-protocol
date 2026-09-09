@@ -13,8 +13,9 @@
  *   A REPEATED rowId REPLACES. `createdAt` and the surrogate `id` survive the replacement, so a
  *   re-run of a scheduled ingest updates what it already wrote instead of duplicating it, and the
  *   row's history of when it first arrived is not rewritten by the re-run.
- * @structure append / get / list / delete / deleteBefore / trim / stats / usage / deleteSpace
+ * @structure append / get / list / delete / deleteBefore / trim / stats / usage
  * @version-history
+ *   v1.1.0 — 2026-09-09 — deleteWorkspaceRowSpace deleted: no caller outside its unit test.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import type Database from 'better-sqlite3';
@@ -212,13 +213,4 @@ export function workspaceRowUsage(db: Database.Database, scope: WorkspaceRowScop
      FROM workspace_rows WHERE ${clauses.join(' AND ')}`
   ).get(...params) as Row | undefined;
   return { rows: Number(row?.rows ?? 0), bytes: Number(row?.bytes ?? 0) };
-}
-
-export function deleteWorkspaceRowSpace(
-  db: Database.Database, organismId: string, wsId: string, namespace?: string,
-): number {
-  const clauses = ['organismId = ?', 'wsId = ?'];
-  const params: unknown[] = [organismId, wsId];
-  if (namespace) { clauses.push('namespace = ?'); params.push(namespace); }
-  return db.prepare(`DELETE FROM workspace_rows WHERE ${clauses.join(' AND ')}`).run(...params).changes;
 }

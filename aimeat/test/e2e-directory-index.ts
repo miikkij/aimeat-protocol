@@ -32,7 +32,7 @@
  *   - Phase 5 the semantic block each entry carries
  *   - Phase 6 the refusals
  * @usage
- *   cd aimeat && AIMEAT_PORT=40673 AIMEAT_DB_PATH=test/.test-e2e-dir.db \
+ *   cd aimeat && AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-dir.db \
  *     pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-directory-index
  * @version-history
  *   v1.1.0 -- 2026-09-08 -- The `geo` test asserts the fixed indexer instead of pinning the miss,

@@ -3,10 +3,11 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Wallet transaction ledger for the Postgres+Kysely backend (Transaction table) plus the
- *   atomic morsel-BALANCE mutations (debit/credit/creditCapped/transfer) on GHIIRecord.morselBalance —
+ *   atomic morsel-BALANCE mutations (debit/credit/creditCapped) on GHIIRecord.morselBalance —
  *   all balance ops resolve any GAII/GEAI/bare-name to the owner GHII first (agents hold no balance).
  *   Translated 1:1 from the SQLite/Prisma implementations.
  * @version-history
+ *   v1.3.0 — 2026-09-09 — deleteTransactions and transferBalance deleted: no caller.
  *   v1.2.0 — 2026-08-16 — The ledger resolves the principal on both sides, the way every balance op
  *     already did: a row written with an agent GAII is filed under the owner GHII (with initiatorGaii
  *     keeping who acted), and a lookup by an agent GAII resolves too, so the federation replay guard
@@ -86,11 +87,6 @@ export const walletMethods = {
     const rows = await this.db.selectFrom('Transaction').selectAll().orderBy('timestamp', 'desc').limit(Math.min(limit, 10000)).execute();
     return rows.map(mapTx);
   },
-  async deleteTransactions(this: PostgresKyselyStorage, gaii: string): Promise<number> {
-    const r = await this.db.deleteFrom('Transaction').where('gaii', '=', gaii).executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0);
-  },
-
   // ── Atomic morsel-balance mutations (on GHIIRecord.morselBalance) ──
   async debitBalance(this: PostgresKyselyStorage, gaii: string, amount: number): Promise<boolean> {
     // SECURITY: reject negative/non-finite amounts — a negative amount would INVERT the subtraction and
@@ -129,24 +125,6 @@ export const walletMethods = {
       if (actualCredit <= 0) return 0;
       await trx.updateTable('Ghii').set({ morselBalance: sql`COALESCE("morselBalance", 0) + ${actualCredit}` }).where('ghii', '=', ghii).execute();
       return actualCredit;
-    });
-  },
-  async transferBalance(this: PostgresKyselyStorage, fromGaii: string, toGaii: string, amount: number): Promise<boolean> {
-    // SECURITY: reject negative/non-finite amounts (a negative transfer would drain the recipient); 0 is a no-op.
-    if (!Number.isFinite(amount) || amount < 0) return false;
-    const fromGhii = await resolveGhii(this.db, fromGaii);
-    const toGhii = await resolveGhii(this.db, toGaii);
-    if (!fromGhii || !toGhii) return false;
-    if (fromGhii === toGhii) return true; // Same owner — no-op
-    return this.transaction(async () => {
-      const trx = this.db;
-      const debit = await trx.updateTable('Ghii')
-        .set({ morselBalance: sql`COALESCE("morselBalance", 0) - ${amount}` })
-        .where('ghii', '=', fromGhii).where(sql<boolean>`COALESCE("morselBalance", 0) >= ${amount}`)
-        .executeTakeFirst();
-      if (Number(debit.numUpdatedRows ?? 0) === 0) return false;
-      await trx.updateTable('Ghii').set({ morselBalance: sql`COALESCE("morselBalance", 0) + ${amount}` }).where('ghii', '=', toGhii).execute();
-      return true;
     });
   },
 };

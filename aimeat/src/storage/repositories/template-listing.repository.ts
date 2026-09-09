@@ -10,6 +10,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 1 storage layer)
  *   v1.1.0 — 2026-03-20 — add listPendingTemplates method for moderation workflow
+ *   v1.2.0 — 2026-09-09 — deleteReview and deleteDiscussion deleted: no caller.
  */
 
 import type { TemplateListingRecord, TemplateReview, TemplateDiscussion, TemplateFilter } from '../interface.js';
@@ -30,11 +31,9 @@ export interface TemplateListingRepository {
   getReviewsByListing(listingId: string, limit?: number, offset?: number): Promise<{ reviews: TemplateReview[]; total: number }>;
   getReviewByAuthor(listingId: string, authorGhii: string): Promise<TemplateReview | null>;
   updateReview(id: string, updates: Partial<TemplateReview>): Promise<TemplateReview | null>;
-  deleteReview(id: string): Promise<boolean>;
   recalculateRating(listingId: string): Promise<{ rating: number; reviewCount: number }>;
 
   // ── Discussions (separate table) ──
   addDiscussion(discussion: TemplateDiscussion): Promise<TemplateDiscussion>;
   getDiscussionsByListing(listingId: string, limit?: number, offset?: number): Promise<{ discussions: TemplateDiscussion[]; total: number }>;
-  deleteDiscussion(id: string): Promise<boolean>;
 }

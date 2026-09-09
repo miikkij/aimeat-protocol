@@ -19,6 +19,8 @@
  * @usage app.use(ghiiRouter(config, storage, emailService)) from server.ts
  *
  * @version-history
+ *   v1.3.0 — 2026-09-09 — The registration limiter keys by IP only; a bearer token no longer buys
+ *     its own bucket on the public sign-up door.
  *   v1.2.0 — 2026-07-13 — Split route handlers into sibling modules under ./ghii/ (max-file-lines);
  *     pure extraction, registration order + behavior preserved.
  *   v1.1.0 — 2026-07-08 — Added POST /v1/ghii/login/attach-email — legacy/unverified accounts (correct
@@ -42,8 +44,11 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
     const router = Router();
 
     // Shared registration rate limiter — one instance across POST /v1/ghii and
-    // POST /v1/ghii/register-web so both paths share the same counter.
-    const registrationLimit = rateLimit({ max: config.registrationRateLimitMax, windowMs: config.registrationRateLimitWindowMs });
+    // POST /v1/ghii/register-web so both paths share the same counter. Keyed by IP only:
+    // registration takes no credential, and the default key (the bearer's sub when one is
+    // present) handed any token holder a private bucket on the public sign-up door until
+    // 2026-09-09 (e2e-account-doors).
+    const registrationLimit = rateLimit({ max: config.registrationRateLimitMax, windowMs: config.registrationRateLimitWindowMs, keyBy: 'ip' });
 
     registerRegisterLoginRoutes(router, config, storage, emailService, peers, registrationLimit);
     registerAttachEmailRoute(router, config, storage, emailService);

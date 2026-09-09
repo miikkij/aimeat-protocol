@@ -5,9 +5,10 @@
  * @description Storage contract for server-side session tracking. Covers both the
  *   legacy JWT-tracking sessions (created by /v1/auth/token and /v1/auth/refresh)
  *   and owner login sessions that carry a rotating, server-side refresh token.
- * @structure SessionRecord shape; SessionRepository interface (create/list/rotate/revoke/prune).
- * @usage Implemented by each storage provider (SQLite, MongoDB) and composed into the Storage interface.
+ * @structure SessionRecord shape; SessionRepository interface (create/list/rotate/revoke).
+ * @usage Implemented by each storage provider (SQLite, PostgreSQL) and composed into the Storage interface.
  * @version-history
+ * v1.3.0 - 2026-09-09 - pruneExpiredSessions deleted: no caller.
  * v1.2.0 - 2026-08-13 - Add revokeSessionsByGaii: end one principal's sessions without touching its
  *   siblings', which is what deleting an agent needs.
  * v1.1.0 - 2026-06-03 - Add owner refresh-token fields + createOwnerSession,
@@ -88,7 +89,4 @@ export interface SessionRepository {
    */
   revokeSessionsByGaii(gaii: string): Promise<number>;
   isSessionRevoked(sessionId: string): Promise<boolean>;
-
-  /** Delete revoked or fully-expired session rows. Returns the number removed. */
-  pruneExpiredSessions(nowIso: string): Promise<number>;
 }

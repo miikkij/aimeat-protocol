@@ -5,11 +5,13 @@
  * @description Four small agent-support domains for the Postgres+Kysely backend, grouped into one
  *   module: agent directives + owner defaults (AgentDirective / OwnerAgentDefault), agent activity
  *   counters (AgentActivity — an upsert-accumulate on the [agentGaii,date,hour,metric] unique key),
- *   telemetry + webhook delivery logs (TelemetryEvent / WebhookDeliveryLog), and sharing groups
- *   (SharingGroup). Translated 1:1 from the Prisma (Mongo) implementations; the accumulate mirrors
- *   Prisma `{ increment }` and countEntriesReferencingGroup sums Memory + StorageFile rows carrying
- *   the group id — identical to the Prisma count.
+ *   webhook delivery logs (WebhookDeliveryLog), and sharing groups (SharingGroup). Translated 1:1
+ *   from the Prisma (Mongo) implementations; the accumulate mirrors Prisma `{ increment }` and
+ *   countEntriesReferencingGroup sums Memory + StorageFile rows carrying the group id — identical
+ *   to the Prisma count.
  * @version-history
+ *   v1.1.0 — 2026-09-09 — appendTelemetry and listTelemetry deleted: no caller since the in-process
+ *     ring in services/telemetry-buffer.ts replaced them.
  *   v1.0.0 — 2026-07-15 — Phase 5: agent directives/activity/webhook/sharing-group on Postgres+Kysely.
  */
 import { sql, type Selectable } from 'kysely';
@@ -19,7 +21,6 @@ import type {
   GroupShareRecord,
   OwnerAgentDefaults,
   SharingGroupRecord,
-  TelemetryEvent,
   WebhookDeliveryLog,
 } from '../../../interface.js';
 import type {
@@ -28,7 +29,6 @@ import type {
   GroupShare,
   OwnerAgentDefault,
   SharingGroup,
-  TelemetryEvent as TelemetryEventRow,
   WebhookDeliveryLog as WebhookDeliveryLogRow,
 } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -92,19 +92,6 @@ function toGroupShareRecord(r: Selectable<GroupShare>): GroupShareRecord {
   if (r.note) record.note = r.note;
   if (r.expiresAt) record.expiresAt = iso(r.expiresAt);
   return record;
-}
-
-function toTelemetryEvent(r: Selectable<TelemetryEventRow>): TelemetryEvent {
-  const event: TelemetryEvent = {
-    id: r.id,
-    agentGaii: r.agentGaii,
-    type: r.type as TelemetryEvent['type'],
-    data: r.data as Record<string, unknown>,
-    createdAt: iso(r.createdAt),
-  };
-  if (r.sessionId != null) event.sessionId = r.sessionId;
-  if (r.taskId != null) event.taskId = r.taskId;
-  return event;
 }
 
 function toDeliveryLog(r: Selectable<WebhookDeliveryLogRow>): WebhookDeliveryLog {
@@ -227,30 +214,9 @@ export const agentActivityMethods = {
   },
 };
 
-// ── 3. Telemetry + Webhook Delivery Log (TelemetryEvent / WebhookDeliveryLog) ──
+// ── 3. Webhook Delivery Log (WebhookDeliveryLog) ──
 
 export const agentWebhookMethods = {
-  async appendTelemetry(this: PostgresKyselyStorage, event: TelemetryEvent): Promise<void> {
-    await this.db.insertInto('TelemetryEvent').values({
-      id: event.id,
-      agentGaii: event.agentGaii,
-      type: event.type,
-      data: jsonb(event.data),
-      sessionId: event.sessionId ?? null,
-      taskId: event.taskId ?? null,
-      createdAt: new Date(event.createdAt),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any).execute();
-  },
-
-  async listTelemetry(this: PostgresKyselyStorage, agentGaii: string, opts: { since?: string; type?: string; limit?: number }): Promise<TelemetryEvent[]> {
-    let q = this.db.selectFrom('TelemetryEvent').selectAll().where('agentGaii', '=', agentGaii);
-    if (opts.type) q = q.where('type', '=', opts.type);
-    if (opts.since) q = q.where('createdAt', '>', new Date(opts.since));
-    const rows = await q.orderBy('createdAt', 'desc').limit(opts.limit ?? 50).execute();
-    return rows.map(toTelemetryEvent);
-  },
-
   async appendDeliveryLog(this: PostgresKyselyStorage, log: WebhookDeliveryLog): Promise<void> {
     await this.db.insertInto('WebhookDeliveryLog').values({
       id: log.id,

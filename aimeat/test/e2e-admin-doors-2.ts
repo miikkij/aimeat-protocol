@@ -16,6 +16,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts \
  *     --test=e2e-admin-doors-2
  * @version-history
+ *   v1.1.0 — 2026-09-09 — The revoke test asserts live operator roles and the reachable
+ *     last-operator guard instead of pinning the frozen JWT.
  *   v1.0.0 — 2026-09-08 — Written for the coverage work.
  */
 import * as ed from '@noble/ed25519';
@@ -344,20 +346,24 @@ await test('Revoke refuses a name nobody holds, an owner without the role, and y
     assert(me.roles.includes('operator'), 'the refused self-revoke still took the role');
 });
 
-await test('Revoke refuses the last operator on the node', async () => {
-    // TODAY'S BEHAVIOUR, pinned rather than judged. Two operators exist at this point (this suite's
-    // own, and the one promoted by the grant test), so the last-operator guard cannot be reached with
-    // a fresh credential: the caller must itself hold the role, which makes the count at least two.
-    // It IS reachable with the token the revoked second operator still holds — requireRole reads the
-    // roles frozen into the JWT, not the owner record — after that operator is the only one left.
-    await json('/v1/admin/roles/revoke', op({
+await test('A revoked operator\'s token loses the role at once, and the last operator cannot be revoked', async () => {
+    // Until 2026-09-09 requireRole read the roles frozen into the JWT, so the revoked second
+    // operator kept every operator door until its token expired, and the last-operator guard sat
+    // behind the self-revoke check where a live credential could never reach it. Now the role is
+    // read from the owner record on every request that claims it, and the guard goes first.
+    const stale = await json('/v1/admin/owners', {
+        headers: { Authorization: `Bearer ${staleOperatorToken}` },
+    });
+    assert(stale.status === 403, `a revoked operator's token on an operator door: expected 403, got ${stale.status}`);
+
+    // Take the second operator (promoted by the grant test) away, leaving this suite's own.
+    const second = await json('/v1/admin/roles/revoke', op({
         method: 'POST', body: JSON.stringify({ owner: grantName, role: 'operator' }),
     }));
-    const { status, body } = await json('/v1/admin/roles/revoke', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${staleOperatorToken}` },
-        body: JSON.stringify({ owner: operatorName, role: 'operator' }),
-    });
+    assert(second.status === 200, `revoking the second operator: ${second.status}`);
+    const { status, body } = await json('/v1/admin/roles/revoke', op({
+        method: 'POST', body: JSON.stringify({ owner: operatorName, role: 'operator' }),
+    }));
     assert(status === 409, `expected 409, got ${status}: ${JSON.stringify(body)}`);
     assert(String(body.error?.message).includes('last operator'), `the reason must name the case: ${body.error?.message}`);
 

@@ -206,10 +206,14 @@ export async function transcribeAttachment(messageId, attachmentId, opts = {}) {
  *  one's name carries the agent's file, and /v1/storage reads only the caller's own namespace, so
  *  the whole attachment read as missing to the person whose name was on the message. Cross-namespace
  *  reads have one door, /v1/pub, and it lets a person read what their own agents hold. */
-export async function attachmentUrl(localKey, owner) {
-  const path = owner
-    ? `/v1/pub/${enc(owner)}/${localKey.split('/').map(enc).join('/')}?mode=handle`
-    : `/v1/storage/${localKey.split('/').map(enc).join('/')}?mode=handle`;
-  const r = await apiGet(path);
+export async function attachmentUrl(localKey, owner, filename) {
+  // `filename` is the name the file is SAVED as. A received attachment is stored at
+  // dm/<thread>/<message>/<id>, and the node names a download after the key's last segment, so
+  // without this a person pressing ⬇ got a file called `23ea6d2c` with no extension. The anchor's
+  // own `download` attribute cannot fix it: Content-Disposition wins in every browser.
+  const base = owner
+    ? `/v1/pub/${enc(owner)}/${localKey.split('/').map(enc).join('/')}`
+    : `/v1/storage/${localKey.split('/').map(enc).join('/')}`;
+  const r = await apiGet(`${base}?mode=handle${filename ? `&filename=${enc(filename)}` : ''}`);
   return r?.data?.download_url || r?.data?.url || null;
 }

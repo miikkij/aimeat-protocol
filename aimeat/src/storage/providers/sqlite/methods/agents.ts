@@ -6,6 +6,7 @@
  *   row reader. Moved out of methods/owner.ts by pure extraction when that file reached the 800-line
  *   limit; bodies verbatim, bound to SqliteStorage via the prototype merge in sqlite/index.ts.
  * @version-history
+ *   v1.2.0 — 2026-09-09 — getAgentByName and transferBalance deleted: no caller.
  *   v1.1.0 — 2026-09-02 — createAgent/updateAgent/deserializeAgent carry `mcpClient` and `mcpLastSeen`
  *     (which AI tool the agent last spoke from over MCP, and when), matching Postgres migration 0063.
  *   v1.0.0 — 2026-09-02 — Extracted from methods/owner.ts (max-file-lines). The group's own history is
@@ -61,11 +62,6 @@ export const agentMethods = {
 
   async getAgent(this: SqliteStorage, gaii: string): Promise<AgentRecord | null> {
     const row = this.db.prepare('SELECT * FROM agents WHERE gaii = ?').get(gaii) as Record<string, unknown> | undefined;
-    return row ? this.deserializeAgent(row) : null;
-  },
-
-  async getAgentByName(this: SqliteStorage, name: string, _nodeId: string): Promise<AgentRecord | null> {
-    const row = this.db.prepare('SELECT * FROM agents WHERE name = ? LIMIT 1').get(name) as Record<string, unknown> | undefined;
     return row ? this.deserializeAgent(row) : null;
   },
 
@@ -222,26 +218,6 @@ export const agentMethods = {
       if (actualCredit <= 0) return 0;
       this.db.prepare('UPDATE ghiis SET morselBalance = COALESCE(morselBalance, 0) + ? WHERE ghii = ?').run(actualCredit, ghii);
       return actualCredit;
-    });
-    return txn();
-  },
-
-  async transferBalance(this: SqliteStorage, fromGaii: string, toGaii: string, amount: number): Promise<boolean> {
-    // SECURITY: reject negative/non-finite amounts (a negative transfer would drain the recipient); 0 is a no-op.
-    if (!Number.isFinite(amount) || amount < 0) return false;
-    const fromGhii = this.resolveGhii(fromGaii);
-    const toGhii = this.resolveGhii(toGaii);
-    if (!fromGhii || !toGhii) return false;
-    if (fromGhii === toGhii) return true; // Same owner — no-op
-    const txn = this.db.transaction(() => {
-      const debit = this.db.prepare(
-        `UPDATE ghiis SET morselBalance = COALESCE(morselBalance, 0) - ? WHERE ghii = ? AND COALESCE(morselBalance, 0) >= ?`
-      ).run(amount, fromGhii, amount);
-      if (debit.changes === 0) return false;
-      this.db.prepare(
-        `UPDATE ghiis SET morselBalance = COALESCE(morselBalance, 0) + ? WHERE ghii = ?`
-      ).run(amount, toGhii);
-      return true;
     });
     return txn();
   },
