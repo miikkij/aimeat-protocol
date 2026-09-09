@@ -3709,11 +3709,13 @@
             tryBoot();
           },
           onLogout: function() {
-            booted = false;
-            root.classList.add("ak-app--gate");
-            status("signin");
+            if (requireLogin) {
+              booted = false;
+              root.classList.add("ak-app--gate");
+              status("signin");
+            }
             if (spec.onLogout) spec.onLogout();
-            armPoll();
+            if (requireLogin) armPoll();
           }
         });
       }
