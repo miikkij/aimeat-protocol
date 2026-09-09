@@ -4,6 +4,8 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+**Profile and password dialogs use the current theme.** Both share the existing square dialog frame, underlined fields and secondary actions, and ink primary button, whether opened from Home or Settings. Password fields fill their row and the close control stays visible while scrolling.
+
 **Home actions keep the existing visual style.** Task choices, prompt copying and account settings use the home's shared underlined controls and selected-state treatment. Removed the separate boxed-button styling introduced with the new journey.
 
 **Start with your own AI and a useful task.** New accounts can connect their AI before making a personal webpage, which is now optional. Home offers prompts to save a useful note, create an agent, schedule a task or build an app, and shows the note read back from the owner's memory. Home settings now open the existing password and profile forms directly, with a clear link to sign-in security and permissions.

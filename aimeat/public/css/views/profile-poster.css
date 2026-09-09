@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.5.1 — 2026-09-09 — Account dialogs share the poster frame, fields and actions in Home and Settings.
  *   v1.5.0 — 2026-09-06 — The GAII control on an agent row (.pf-agd-gaii) takes the square corner
  *     and the sun on hover, like the board tiles it came from; the fleet search count reads as a
  *     quiet mono figure beside the underline field the shared .input-field already gives it.
@@ -98,27 +99,29 @@
 .pf .empty, .portfolio-not-found { border: 3px dashed var(--text); border-radius: 0; font-weight: var(--font-poster-text-weight); color: var(--text); }
 
 /* ── The loud action is an ink slab; the quiet ones are underlined words ────────────────── */
-.pf .btn-primary, .portfolio-container .btn-primary, .portfolio-viewer-full .btn-primary, .pf-mnav-toggle {
+.pf .btn-primary, .portfolio-container .btn-primary, .portfolio-viewer-full .btn-primary, .pf-mnav-toggle, .pf-account-modal .btn-primary {
   background: var(--text); color: var(--bg);
   border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
   padding: 10px 16px;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em;
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
-.pf .btn-primary:hover, .portfolio-container .btn-primary:hover, .portfolio-viewer-full .btn-primary:hover {
+.pf .btn-primary:hover, .portfolio-container .btn-primary:hover, .portfolio-viewer-full .btn-primary:hover, .pf-account-modal .btn-primary:hover {
   color: var(--sun); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun);
 }
 .pf .btn-primary.success, .pf .btn-primary.copied { background: var(--success-fg); box-shadow: 4px 4px 0 var(--text); }
-.pf .btn-primary:disabled { opacity: 0.45; transform: none; }
+.pf .btn-primary:disabled, .pf-account-modal .btn-primary:disabled { opacity: 0.45; transform: none; }
 .pf .btn-outline, .pf .btn-ghost, .pf .btn-danger, .pf .expand-btn, .pf .pf-back-btn,
-.portfolio-container .btn-outline, .portfolio-container .btn-ghost, .portfolio-viewer-full .btn-ghost, .portfolio-viewer-full .btn-outline {
+.portfolio-container .btn-outline, .portfolio-container .btn-ghost, .portfolio-viewer-full .btn-ghost, .portfolio-viewer-full .btn-outline,
+.pf-account-modal .btn-outline, .pf-account-modal .pf-edit-link, .pf-account-modal .pf-pw-eye {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none;
   padding: 0 0 1px; min-height: 0;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--text); line-height: 1.5;
 }
 .pf .btn-outline:hover, .pf .btn-ghost:hover, .pf .expand-btn:hover, .pf .pf-back-btn:hover,
-.portfolio-container .btn-outline:hover, .portfolio-container .btn-ghost:hover, .portfolio-viewer-full .btn-ghost:hover {
+.portfolio-container .btn-outline:hover, .portfolio-container .btn-ghost:hover, .portfolio-viewer-full .btn-ghost:hover,
+.pf-account-modal .btn-outline:hover, .pf-account-modal .pf-edit-link:hover, .pf-account-modal .pf-pw-eye:hover {
   background: none; color: var(--accent); border-color: var(--accent); box-shadow: none; transform: none;
 }
 .pf .btn-danger { color: var(--accent); border-color: var(--accent); }
@@ -129,17 +132,21 @@
 .pf .card-actions, .pf .form-actions, .pf .pf-agd-form-actions, .portfolio-prompt-actions, .portfolio-paste-actions { gap: 0.6rem 1.6rem; align-items: center; }
 
 /* ── Fields: an underline for one line, an ink box for many ────────────────────────────── */
-.pf .input-field, .portfolio-container .input-field, .pf .input-sm, .pf .pf-agd-tag-add-input {
+.pf .input-field, .portfolio-container .input-field, .pf .input-sm, .pf .pf-agd-tag-add-input,
+.pf-account-modal .pf-edit-input, .pf-account-modal .pf-edit-textarea, .pf-account-modal .pf-edit-select {
   background: transparent; border: 0; border-bottom: 3px solid var(--text); border-radius: 0;
   padding: 8px 0; font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); color: var(--text);
 }
-.pf .input-field:focus, .portfolio-container .input-field:focus { border-color: var(--accent); box-shadow: none; background: transparent; }
-.pf .input-field::placeholder, .portfolio-container .input-field::placeholder { color: var(--text-dim); font-weight: 600; }
+.pf .input-field:focus, .portfolio-container .input-field:focus,
+.pf-account-modal .pf-edit-input:focus, .pf-account-modal .pf-edit-textarea:focus, .pf-account-modal .pf-edit-select:focus { border-color: var(--accent); box-shadow: none; background: transparent; }
+.pf .input-field::placeholder, .portfolio-container .input-field::placeholder,
+.pf-account-modal .pf-edit-input::placeholder, .pf-account-modal .pf-edit-textarea::placeholder { color: var(--text-dim); font-weight: 600; }
 .pf textarea.input-field, .portfolio-container textarea.input-field, .portfolio-paste-area, .portfolio-custom-desc,
-.pf select.input-field, .pf .agent-prompt-box, .pf .access-pat-token, .pf .pj-rec-json, .portfolio-prompt-output, .pf .pf-agd-tag-add-input {
+.pf select.input-field, .pf .agent-prompt-box, .pf .access-pat-token, .pf .pj-rec-json, .portfolio-prompt-output, .pf .pf-agd-tag-add-input,
+.pf-account-modal .pf-edit-textarea, .pf-account-modal .pf-edit-select {
   border: 2px solid var(--text); border-radius: 0; padding: 10px 12px; background: var(--bg-dim);
 }
-.pf select.input-field { background: var(--bg); padding: 8px 10px; }
+.pf select.input-field, .pf-account-modal .pf-edit-select { background: var(--bg); padding: 8px 10px; }
 .pf .pf-select-inline { border: 2px solid var(--text); padding: 6px 10px; }
 .portfolio-paste-area, .portfolio-prompt-output { border-width: 3px; }
 .portfolio-prompt-output { color: var(--text); }
@@ -269,9 +276,25 @@
 .pf .pagination { font-family: var(--font-mono); }
 
 /* ── Dialogs ────────────────────────────────────────────────────────────────────────────── */
-.modal { border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); font-family: var(--font-showroom-body); }
-.modal-header h3 { font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); font-size: 1.4rem; text-transform: uppercase; letter-spacing: var(--font-poster-tracking); }
-.modal-footer { border-top: 3px solid var(--text); padding-top: 1rem; }
+.modal, .pf-account-modal { border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); font-family: var(--font-showroom-body); }
+.modal-header h3, .pf-account-modal .pf-edit-title { font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); font-size: 1.4rem; text-transform: uppercase; letter-spacing: var(--font-poster-tracking); }
+.modal-footer, .pf-account-modal .pf-edit-footer { border-top: 3px solid var(--text); padding-top: 1rem; }
+
+/* These dialogs also open from Home, outside the profile shell. */
+.pf-account-modal { animation: none; background: var(--card-bg); color: var(--text); display: flex; flex-direction: column; overflow: hidden; }
+.pf-account-modal .pf-edit-header, .pf-account-modal .pf-edit-footer { flex: none; }
+.pf-account-modal .pf-edit-body { overflow-y: auto; min-height: 0; }
+.pf-account-modal .pf-edit-close { border: 2px solid var(--text); border-radius: 0; color: var(--text); flex: none; min-width: 44px; min-height: 44px; }
+.pf-account-modal .pf-edit-input { width: 100%; min-width: 0; box-sizing: border-box; }
+.pf-account-modal .pf-pw-eye { right: 0; top: 0; bottom: 3px; transform: none; margin: auto 0; height: fit-content; }
+.pf-account-modal .pf-edit-footer { flex-wrap: wrap; align-items: center; gap: 1rem; }
+.pf-account-modal .pf-edit-link { align-self: flex-start; width: fit-content; text-decoration: none; }
+.pf-account-modal .pf-edit-readonly, .pf-account-modal .pf-avatar-preview, .pf-account-modal .pf-edit-error { border-radius: 0; }
+.pf-account-modal .pf-edit-readonly { background: none; border: 0; border-bottom: 1px solid var(--border); padding-inline: 0; }
+.pf-account-modal .pf-avatar-preview { border: 2px solid var(--text); }
+@media (max-width: 600px) {
+  .pf-account-modal .pf-edit-footer-left { flex-basis: 100%; }
+}
 
 /* ── Words on the sun stay ink in every theme ───────────────────────────────────────────── */
 .pf .pf-side-item--active, .pf .pf-next-card--primary, .pf .pf-next-card:hover, .pf .pf-mcp-badge,

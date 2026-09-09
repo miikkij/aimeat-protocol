@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile edit / change-password / presence modals + presence pill. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-09: Mark both account dialogs for the shared poster form skin in every host view.
  *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/landing-page.js (max-file-lines)
  */
@@ -86,7 +87,7 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
 
   return html`
     <div class="pf-edit-overlay" onClick=${onOverlayClick}>
-      <div class="pf-edit-modal" role="dialog" aria-modal="true" aria-label=${t('profile.landing.editModalTitle')}>
+      <div class="pf-edit-modal pf-account-modal" role="dialog" aria-modal="true" aria-label=${t('profile.landing.editModalTitle')}>
         <div class="pf-edit-header">
           <h2 class="pf-edit-title">${t('profile.landing.editModalTitle')}</h2>
           <button class="pf-edit-close" onClick=${onClose} aria-label=${t('profile.landing.editCancel')}>✕</button>
@@ -243,7 +244,7 @@ export function ChangePasswordModal({ onClose, onChanged }) {
 
   return html`
     <div class="pf-edit-overlay" onClick=${onOverlayClick}>
-      <div class="pf-edit-modal" role="dialog" aria-modal="true"
+      <div class="pf-edit-modal pf-account-modal" role="dialog" aria-modal="true"
         aria-label=${t(setupMode ? 'profile.landing.setPasswordTitle' : 'profile.landing.changePasswordTitle')}>
         <div class="pf-edit-header">
           <h2 class="pf-edit-title">${setupMode
