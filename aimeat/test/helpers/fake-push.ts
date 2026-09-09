@@ -89,8 +89,28 @@ function derLength(n: number): Buffer {
 const tlv = (tag: number, body: Buffer): Buffer => Buffer.concat([Buffer.from([tag]), derLength(body.length), body]);
 const derSeq = (...parts: Buffer[]): Buffer => tlv(0x30, Buffer.concat(parts));
 const derSet = (...parts: Buffer[]): Buffer => tlv(0x31, Buffer.concat(parts));
-/** DER INTEGER is signed, so a high top bit needs a leading zero byte. */
-const derInt = (raw: Buffer): Buffer => tlv(0x02, raw[0] & 0x80 ? Buffer.concat([Buffer.from([0]), raw]) : raw);
+/**
+ * DER INTEGER: signed, and MINIMAL.
+ *
+ * Signed is the half everybody writes: a high top bit needs a leading zero or the value reads as
+ * negative. Minimal is the half that gets forgotten, and DER requires both — a leading zero the
+ * next byte does not need is a malformed integer, and OpenSSL says so as
+ * `asn1 encoding routines::illegal padding` when it parses the certificate.
+ *
+ * It matters here because the serial number is `randomBytes(8)`. About one run in five hundred
+ * drew a first byte of 0x00 followed by one under 0x80, the certificate would not parse, and the
+ * suite died before it had started anything — which is exactly how it looked on the sweep of
+ * 2026-09-09: `error:068000DD:asn1 encoding routines::illegal padding`, 0 of 1, in 0.29s.
+ *
+ * Exported for the unit test, because a bug that shows up once in five hundred certificates is not
+ * one to prove by generating certificates.
+ */
+export const derInt = (raw: Buffer): Buffer => {
+    let at = 0;
+    while (at + 1 < raw.length && raw[at] === 0 && (raw[at + 1] & 0x80) === 0) at += 1;
+    const body = raw.subarray(at);
+    return tlv(0x02, body[0] & 0x80 ? Buffer.concat([Buffer.from([0]), body]) : body);
+};
 const derBool = (v: boolean): Buffer => tlv(0x01, Buffer.from([v ? 0xff : 0x00]));
 const derOctet = (body: Buffer): Buffer => tlv(0x04, body);
 /** DER BIT STRING with no unused bits, which is every case here. */
