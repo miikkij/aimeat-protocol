@@ -48,7 +48,7 @@ const PORT = 40293;
  *  and the strict setting has to be reachable at runtime for the test that turns it on. */
 const DB_PATH = `./test/.relay-claim-${process.pid}.db`;
 const NODE_ID = 'aimeat-test-001-relayrx';
-const BASE = `http://localhost:${PORT}`;
+const BASE = `http://127.0.0.1:${PORT}`;
 
 async function json(path: string, opts: RequestInit = {}) {
     const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
@@ -112,7 +112,7 @@ await test('Setup: a receiving node, an owner, and two peers — one permitted t
     config.port = PORT; config.nodeId = NODE_ID; config.baseUrl = BASE;
     config.devMode = true; config.testMode = true; config.adminPassword = adminPw; config.storageProvider = 'sqlite'; config.sqlitePath = DB_PATH;
     const { app } = await createServer(config);
-    server = await new Promise<Server>(resolve => { const s = app.listen(PORT, () => resolve(s)); });
+    server = await new Promise<Server>(resolve => { const s = app.listen(PORT, '127.0.0.1', () => resolve(s)); });
 
     const reg = await json('/v1/admin/setup/register', {
         method: 'POST', headers: { 'X-Admin-Password': adminPw }, body: JSON.stringify({ name: 'relayowner' }),

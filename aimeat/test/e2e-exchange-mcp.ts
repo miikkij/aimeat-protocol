@@ -34,7 +34,7 @@ import { registerExchangeRunTools } from '../src/mcp/exchange-run.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const PORT = parseInt(process.env.E2E_XMCP_PORT ?? '40408', 10);
-const BASE = `http://localhost:${PORT}`;
+const BASE = `http://127.0.0.1:${PORT}`;
 process.env.AIMEAT_PORT = String(PORT);
 process.env.AIMEAT_DEV_MODE = 'true';
 process.env.AIMEAT_TEST_MODE = 'true';
@@ -43,7 +43,7 @@ const { config } = loadConfig({});
 config.port = PORT;
 const NODE_ID = config.nodeId;
 const { app, storage } = await createServer(config);
-const server = await new Promise<Server>((resolve) => { const s = app.listen(PORT, () => resolve(s)); });
+const server = await new Promise<Server>((resolve) => { const s = app.listen(PORT, '127.0.0.1', () => resolve(s)); });
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
