@@ -34,6 +34,10 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   v1.5.0 — 2026-09-11 — /v1/members joins the registry. It was a served, crawled, linked-to page
+ *     that the registry did not know about, so it described itself with the shell's generic head:
+ *     Bing reported its title as the bare word "AIMEAT" and it appeared in neither sitemap.xml nor
+ *     the markdown mirrors. A public HTML page belongs here; that is the whole entry criterion.
  *   v1.4.0 — 2026-08-28 — /v1/changelog and /v1/how-an-app-builds join the registry; /v1/pricing
  *     left it (the page is gone, the address redirects to the store).
  *   v1.3.0 — 2026-08-16 — buildLlmsHumanPages()/buildLlmsOptionalPages(): the llms.txt index's
@@ -299,6 +303,25 @@ page is the complete one either way.
 
 For a machine reading this: the catalogue is \`GET {{BASE_URL}}/v1/apps\`, and each entry carries the
 address to open, what it stores, and what it declares about the AI inside it.
+`,
+  },
+  {
+    path: '/v1/members',
+    title: 'Members — the people who publish on this AIMEAT node',
+    description: 'Everyone on this node who has published a portfolio: their name, the identifier other people and their agents address them by, and a link to their own page.',
+    changefreq: 'weekly',
+    priority: '0.7',
+    markdown: `The people on this node who have published a portfolio of their own.
+
+Each card carries a name, the AIMEAT identifier that name resolves to, and a link to that person's
+page. Browse them at [{{BASE_URL}}/v1/members]({{BASE_URL}}/v1/members).
+
+A portfolio is published by its owner and by nobody else, so this list is the people who chose to
+appear on it, not everyone who holds an account here. Any account can have one — written by hand,
+or by the owner's own AI from what they have actually done on this node.
+
+For a machine reading this: the list is \`GET {{BASE_URL}}/v1/portfolio/members\`, and one person's
+page is \`{{BASE_URL}}/v1/portfolio/<name>\`.
 `,
   },
   {
