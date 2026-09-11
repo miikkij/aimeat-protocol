@@ -23,8 +23,13 @@ import { sendMarkdown } from '../services/markdown-negotiation.js';
 import { success, error } from '../middleware/envelope.js';
 
 /** The glossary as markdown: one H2 per area, one bolded term per entry. */
-export function buildGlossaryMarkdown(config: AimeatConfig): string {
-  const b = config.baseUrl;
+/**
+ * The glossary's own prose: the standfirst, then every term grouped by area. No frontmatter and no
+ * sitemap, so it can be used as a BODY — by the markdown mirror below, and by the served page,
+ * whose registry entry carries a one-paragraph summary rather than two hundred definitions
+ * (routes/portal-spa.ts). One source for both, so the page and its mirror cannot drift.
+ */
+export function buildGlossaryBody(): string {
   const areas = glossaryByArea().map((area) => {
     const terms = area.terms.map((t) => {
       const head = `### ${t.term}`;
@@ -35,6 +40,16 @@ export function buildGlossaryMarkdown(config: AimeatConfig): string {
     return `## ${area.title}\n\n${terms}`;
   }).join('\n\n');
 
+  return `> The terms this protocol uses, defined precisely. Several of them are near-neighbours of each
+> other — GHII, GAII and GEAI differ by one letter and name three different principals — and
+> guessing wrong writes data under an identity nobody reads back, without anything erroring.
+
+${areas}`;
+}
+
+export function buildGlossaryMarkdown(config: AimeatConfig): string {
+  const b = config.baseUrl;
+
   return `---
 title: Glossary
 description: The AIMEAT vocabulary — identities, data shapes, the usage meter, extensibility, action and federation.
@@ -43,11 +58,7 @@ url: ${b}/v1/glossary
 
 # AIMEAT glossary
 
-> The terms this protocol uses, defined precisely. Several of them are near-neighbours of each
-> other — GHII, GAII and GEAI differ by one letter and name three different principals — and
-> guessing wrong writes data under an identity nobody reads back, without anything erroring.
-
-${areas}
+${buildGlossaryBody()}
 
 ## Sitemap
 

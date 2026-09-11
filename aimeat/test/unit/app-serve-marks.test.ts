@@ -103,3 +103,46 @@ describe('the guarantees the pass owns for all four marks at once', () => {
     expect(applyServeMarks(DOC, {}).toString('utf-8')).toBe(DOC);
   });
 });
+
+/**
+ * The caller-declared document (v1.3.0).
+ *
+ * THE HOLE THIS SECTION IS THE MEMORY OF. `isDocument` was sniffed from a closing `</body>` or
+ * `</html>`. Three published apps on aimeat.io — noste, taivas, laake — open with a comment or a
+ * `<meta charset>` and never close anything, which every browser parses as a document and this
+ * pass declined as a fragment. Measured 2026-09-11: noste served 235 kB with eleven characters of
+ * extractable text, no attribution badge, no AI-disclosure mark and no discovery block, on an
+ * origin Bing had already indexed. The default is still the sniff, because the callers that pass
+ * JSON or SVG cannot vouch for their payload.
+ */
+describe('applyServeMarks: the caller may declare the payload a document', () => {
+  // Exactly the shape of the three: no doctype, no <html>, no closing tag of any kind.
+  const TAGLESS = '<meta charset="utf-8"><title>NOSTE</title><div id="app"></div><script>go()</script>';
+
+  it('declines a tagless document when nobody vouches for it', () => {
+    const out = applyServeMarks(TAGLESS, { badge: true }).toString('utf-8');
+    expect(out).toBe(TAGLESS);
+  });
+
+  it('marks the same bytes when the caller says it is a document', () => {
+    const out = applyServeMarks(TAGLESS, { badge: true, isDocument: true }).toString('utf-8');
+    expect(out).not.toBe(TAGLESS);
+    expect(out.startsWith(TAGLESS)).toBe(true);   // appended, the author's bytes untouched
+    expect(out).toContain('aimeat');
+  });
+
+  // The flag is opt-in, so a caller that cannot vouch for its payload is unaffected by adding it.
+  // (A JSON value that happens to contain the literal `</body>` IS spliced, and always has been —
+  // see the `not-a-document/all-four` golden. That is the sniff's own limit, not this flag's.)
+  it('changes nothing for a caller that does not set it', () => {
+    const json = '{"kind":"not html","value":"plain"}';
+    expect(applyServeMarks(json, { badge: true }).toString('utf-8')).toBe(json);
+  });
+
+  it('leaves a document that closes properly exactly as it was', () => {
+    const closed = '<!doctype html><html><head><title>t</title></head><body><p>hi</p></body></html>';
+    const sniffed = applyServeMarks(closed, { badge: true }).toString('utf-8');
+    const declared = applyServeMarks(closed, { badge: true, isDocument: true }).toString('utf-8');
+    expect(declared).toBe(sniffed);
+  });
+});

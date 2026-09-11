@@ -343,6 +343,9 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
     // (measured on a live app origin: lang, canonical, description, og:*, JSON-LD all absent —
     // authors write apps, not meta tags, and author-declared tags always win).
     let buf = applyServeMarks(relaxed, {
+      // This branch is inside a `text/html` test, so the media type is already settled and the
+      // marks pass does not have to guess from a closing tag the author never had to write.
+      isDocument: true,
       // The owner's switch (services/app-marks.ts); on unless they turned it off.
       badge: appBadgeOn(app.manifest),
       provenance: prov,

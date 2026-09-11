@@ -215,6 +215,34 @@ async function main() {
             assert(body.includes('rel="mcp-server"'), 'and links the MCP server card for a raw-HTML reader');
         });
 
+        // An app is under no obligation to close a tag, and three published on aimeat.io do not:
+        // noste, taivas and laake open with a comment or a `<meta charset>` and stop. The marks
+        // pass used to sniff for `</body>` or `</html>` to decide whether it could touch the
+        // payload at all, so all three were served on their own origins with no badge, no
+        // AI-disclosure mark and no discovery block. Measured 2026-09-11: 235 kB of application
+        // offering eleven characters of text to a crawler that had already indexed the origin.
+        await test('an app that closes no tag is still marked on its own origin', async () => {
+            const taglessFile = 'origin-tagless.html';
+            const taglessHtml = '<meta charset="utf-8"><title>Tagless</title><div id="app"></div>'
+                + '<script>document.getElementById("app").textContent = "drawn by script"</script>';
+            const pub = await json('/v1/apps', {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                    filename: taglessFile, content: b64(taglessHtml), name: 'Tagless',
+                    description: 'A single-file app with no closing tag, which is legal HTML.',
+                    category: 'utility', tags: [],
+                }),
+            });
+            assert(pub.status === 201, `publish status ${pub.status}`);
+
+            const res = await onAppOrigin('/', 'origin-tagless');
+            assert(res.status === 200, `expected 200, got ${res.status}`);
+            assert(res.body.includes('<noscript id="aimeat-agent-discovery">'), 'no discovery block');
+            assert(res.body.includes(`app_id: ${taglessFile}`), 'the discovery block does not name the app');
+            assert(res.body.includes('aimeat-app-badge'), 'no attribution badge');
+            assert(res.body.startsWith(taglessHtml), 'the author\'s own bytes were altered rather than appended to');
+        });
+
         await test('llms.txt on an app origin is THAT app, not the node builder guide', async () => {
             const res = await onAppOrigin('/llms.txt', SUB);
             assert(res.status === 200, `expected 200, got ${res.status}`);
