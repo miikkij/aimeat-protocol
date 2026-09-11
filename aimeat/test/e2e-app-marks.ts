@@ -290,6 +290,46 @@ await test('Unauthenticated PATCH is refused', async () => {
     assert(status === 401, `status ${status}`);
 });
 
+console.log('\nPhase 4: an app that closes no tag is still a document');
+
+// THE HOLE THIS PHASE IS THE MEMORY OF. The marks pass decided whether a payload was a document by
+// looking for a closing `</body>` or `</html>`, and a single-file app is under no obligation to
+// write either. Measured on aimeat.io 2026-09-11: noste, taivas and laake open with a comment or a
+// `<meta charset>` and stop. All three were served with no badge, no AI-disclosure mark and no
+// discovery block — noste is 235 kB of application and offered eleven characters of text to the
+// crawler that had indexed it. The serving routes know the media type before they call, and now
+// say so.
+const TAGLESS = 'tagless-app.html';
+const TAGLESS_HTML = '<meta charset="utf-8"><title>Tagless</title><div id="app"></div>'
+    + '<script>document.getElementById("app").textContent = "drawn by script"</script>';
+
+await test('Owner A publishes an app that closes no tag', async () => {
+    const { status } = await json('/v1/apps', aAuthed({
+        method: 'POST',
+        body: JSON.stringify({
+            filename: TAGLESS, content: b64(TAGLESS_HTML), name: 'Tagless App',
+            description: 'A single-file app with no closing tag, which is legal HTML.',
+            category: 'utility', tags: ['demo'],
+        }),
+    }));
+    assert(status === 201, `publish status ${status}`);
+});
+
+await test('It is served with the marks anyway', async () => {
+    const res = await fetch(`${BASE}/v1/apps/${ownerAName}/${TAGLESS}?mode=inline`);
+    assert(res.status === 200, `inline serve status ${res.status}`);
+    const html = await res.text();
+    assert(html.startsWith(TAGLESS_HTML), 'the author\'s own bytes were altered rather than appended to');
+    assert(html.includes('aimeat-app-badge'), 'no attribution badge');
+    assert(html.includes('aimeat-app-ref'), 'no agent-discovery block');
+    assert(html.length > TAGLESS_HTML.length + 500, `only ${html.length - TAGLESS_HTML.length} bytes added`);
+});
+
+await test('Delete the tagless app', async () => {
+    const { status } = await json(`/v1/apps/${TAGLESS}`, aAuthed({ method: 'DELETE' }));
+    assert(status === 200, `delete status ${status}`);
+});
+
 console.log('\nCleanup');
 await test('Delete the app', async () => {
     const { status } = await json(`/v1/apps/${FILE}`, aAuthed({ method: 'DELETE' }));

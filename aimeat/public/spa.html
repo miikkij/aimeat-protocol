@@ -1090,11 +1090,23 @@
         h2.textContent = stat.textContent;
         stat.replaceWith(h2);
       }
+      // The server-rendered page body (#crawler-body, injected by utils/page-body.ts) is the same
+      // text this view is about to draw properly, put in the document for readers that never run
+      // this script. Once the view has drawn, it is a second copy of the page sitting under the
+      // real one, so it goes. Removed rather than hidden: hidden text on a page is a thing search
+      // engines are entitled to be suspicious of, and there is nothing here to hide.
+      function dropCrawlerBody() {
+        const app = document.getElementById('app');
+        if (!app || !app.firstElementChild) return;   // the view has not drawn yet
+        document.getElementById('crawler-body')?.remove();
+      }
+
       // Views are lazy-imported, so their heading appears well after first paint — a timeout is a
       // guess about how long that takes, and it was wrong. Watch the app subtree instead and act
       // the moment a heading shows up, on the first render and on every route change after it.
-      oneH1();
-      new MutationObserver(oneH1).observe(document.getElementById('app'), { childList: true, subtree: true });
+      function onAppRender() { oneH1(); dropCrawlerBody(); }
+      onAppRender();
+      new MutationObserver(onAppRender).observe(document.getElementById('app'), { childList: true, subtree: true });
 
       // Build i18n object for auth widget from modal.* translations
       function authI18n() {

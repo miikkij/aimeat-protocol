@@ -620,6 +620,9 @@ export function registerReadRoutes(
             // The visible label rides ONLY on the inline (runnable) form. A raw download stays
             // byte-for-byte, which is what keeps the content hash in the record verifiable.
             ? applyServeMarks(app.data, {
+                // `isHtml` is already true on this branch, so the marks pass does not have to
+                // infer it from a closing tag a single-file app is under no obligation to write.
+                isDocument: true,
                 // The owner's switch (services/app-marks.ts); on unless they turned it off.
                 badge: appBadgeOn(app.manifest),
                 provenance: prov,

@@ -108,6 +108,78 @@ function locs(xml: string): string[] {
         }
     });
 
+    // ── The served page body ────────────────────────────────────────────────────────────────
+    // Measured on aimeat.io 2026-09-11: twelve registry pages answered with the same spa.html
+    // shell, whose body holds 203 characters, byte-identical on every one of them. The head had
+    // described each page correctly since July, so everything these tests could have checked was
+    // green while a reader that does not run JavaScript got twelve copies of one empty document.
+    // What is asserted here is therefore the BODY as sent, and that it differs per page.
+
+    /** Registry pages served as real HTML files rather than as the SPA shell. They have their own
+     *  content already (six to twenty thousand characters), and injecting a summary of a page into
+     *  that page would be duplication. /v1/docs is Swagger UI, which is its own application. */
+    const OWN_HTML = new Set(['/v1/connect', '/v1/privacy', '/v1/terms', '/v1/docs']);
+    const shellPages = sitemapPages().filter(p => p.markdown && !OWN_HTML.has(p.path));
+
+    /** The visible text of a document as SENT: no scripts, no styles, no comments, no tags. */
+    function visibleText(html: string): string {
+        const body = html.match(/<body[^>]*>([\s\S]*)<\/body>/)?.[1] ?? '';
+        return body
+            .replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<!--[\s\S]*?-->/g, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    const shellBodies = new Map<string, string>();
+    for (const p of shellPages) shellBodies.set(p.path, (await text(p.path)).body);
+
+    await test('every SPA-shell page carries its own text in the document as sent', async () => {
+        for (const p of shellPages) {
+            const html = shellBodies.get(p.path)!;
+            assert(html.includes('<div id="crawler-body"'), `${p.path}: no server-rendered body`);
+            const seen = visibleText(html);
+            assert(seen.length >= 350, `${p.path}: ${seen.length} chars of visible text, expected 350+`);
+        }
+    });
+
+    await test('no two pages send the same body', async () => {
+        const byText = new Map<string, string>();
+        for (const p of shellPages) {
+            const seen = visibleText(shellBodies.get(p.path)!);
+            const twin = byText.get(seen);
+            assert(!twin, `${p.path} sends the same body as ${twin}`);
+            byText.set(seen, p.path);
+        }
+    });
+
+    await test('the glossary page sends its defined terms, not its one-paragraph summary', async () => {
+        const seen = visibleText(shellBodies.get('/v1/glossary') ?? '');
+        assert(seen.length >= 5000, `${seen.length} chars, expected 5000+ (the built glossary body)`);
+        for (const term of ['GHII', 'GAII', 'Morsel']) {
+            assert(seen.includes(term), `glossary body omits ${term}`);
+        }
+    });
+
+    await test('the injected body is the page, not a page of markdown syntax', async () => {
+        const seen = visibleText(shellBodies.get('/v1/members') ?? '');
+        assert(!/\]\(http/.test(seen), 'unrendered markdown link syntax reached the page');
+        assert(!/^#{1,6}\s/m.test(seen), 'unrendered markdown heading reached the page');
+        const html = shellBodies.get('/v1/members') ?? '';
+        assert(/<div id="crawler-body"[^>]*>[\s\S]*?<h2>/.test(html), 'no heading in the injected body');
+    });
+
+    // Failure mode: the injection is for the empty shell only. A route with no registry entry has
+    // no text to inject, and a registry page served as its own HTML file already has its own.
+    await test('pages that must not get an injected body do not', async () => {
+        for (const path of ['/v1/profile', '/v1/chat', '/v1/connect']) {
+            const html = (await text(path)).body;
+            assert(!html.includes('<div id="crawler-body"'), `${path} got an injected body`);
+        }
+    });
+
     // ── /sitemap.md (phase 03) ──────────────────────────────────────────────────────────────
 
     const smd = await text('/sitemap.md');
