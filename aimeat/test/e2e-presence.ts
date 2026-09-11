@@ -42,7 +42,7 @@ function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 
 const PORT = 40272;
 const NODE_ID = 'aimeat-test-001-presence';
-const BASE = `http://localhost:${PORT}`;
+const BASE = `http://127.0.0.1:${PORT}`;
 const adminPw = randomBytes(16).toString('base64url');
 
 async function json(path: string, opts: RequestInit = {}): Promise<{ status: number; body: any }> {
@@ -71,7 +71,7 @@ async function bootNode(): Promise<Server> {
   config.storageProvider = 'memory';
 
   const { app } = await createServer(config);
-  return new Promise<Server>((resolve) => { const s = app.listen(PORT, () => resolve(s)); });
+  return new Promise<Server>((resolve) => { const s = app.listen(PORT, '127.0.0.1', () => resolve(s)); });
 }
 
 async function setupOwner(name: string): Promise<{ ghii: string; token: string }> {

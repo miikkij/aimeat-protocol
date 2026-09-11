@@ -106,14 +106,14 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     process.env.AIMEAT_TEST_MODE = 'true';
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = nodeId;
-    process.env.AIMEAT_BASE_URL = `http://localhost:${port}`;
+    process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
     process.env.AIMEAT_STORAGE = 'memory';
 
     const { config } = loadConfig({});
     // Override config directly in case loadConfig cached old values
     config.port = port;
     config.nodeId = nodeId;
-    config.baseUrl = `http://localhost:${port}`;
+    config.baseUrl = `http://127.0.0.1:${port}`;
     config.devMode = true;
     config.testMode = true;
     config.adminPassword = adminPw;
@@ -122,7 +122,7 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
 
     const { app, storage } = await createServer(config);
     const server = await new Promise<Server>((resolve) => {
-        const s = app.listen(port, () => resolve(s));
+        const s = app.listen(port, '127.0.0.1', () => resolve(s));
     });
 
     // The node keypair is created by initializeNode(), which service-init fires without awaiting,
@@ -138,8 +138,8 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     return {
         server,
         config,
-        baseUrl: `http://localhost:${port}`,
-        json: makeJson(`http://localhost:${port}`),
+        baseUrl: `http://127.0.0.1:${port}`,
+        json: makeJson(`http://127.0.0.1:${port}`),
         ownerName: '',
         ownerToken: '',
         ownerPrivKey: '',

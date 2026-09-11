@@ -30,7 +30,7 @@ import type { Server } from 'node:http';
 import type { RecordedCall } from './helpers/fake-mail-upstreams.js';
 
 const PORT = parseInt(process.env.E2E_MAIL_PORT ?? '40286', 10);
-const BASE = `http://localhost:${PORT}`;
+const BASE = `http://127.0.0.1:${PORT}`;
 const TMP = mkdtempSync(join(tmpdir(), 'aimeat-mail-e2e-'));
 const TENANT = 'contoso-test-directory';
 
@@ -91,7 +91,7 @@ const { app, storage } = await createServer(config);
 // `ready` and `disconnect` are on the providers rather than on the Storage interface, which is why
 // both are reached through a cast here, exactly as the other in-process suites reach them.
 await (storage as { ready?: Promise<unknown> }).ready;
-const server = await new Promise<Server>((resolve) => { const s = app.listen(PORT, () => resolve(s)); });
+const server = await new Promise<Server>((resolve) => { const s = app.listen(PORT, '127.0.0.1', () => resolve(s)); });
 
 const { up, restore } = installFakeUpstreams();
 const KEY = requireEncryptionKey(config)!;

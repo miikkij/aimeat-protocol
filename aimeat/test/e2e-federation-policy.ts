@@ -43,7 +43,15 @@ interface NodeState { server: Server; baseUrl: string; nodeId: string; adminPw: 
 
 function makeJson(baseUrl: string) {
   return async (path: string, opts: RequestInit = {}) => {
-    const res = await fetch(`${baseUrl}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
+    // `fetch failed` on its own names nothing. undici puts the reason in `cause`, and without it
+    // three nightly sweeps reported this suite with no way to tell a refused connection from a
+    // name that would not resolve.
+    const res = await fetch(`${baseUrl}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } })
+      .catch((err: unknown) => {
+        const cause = (err as { cause?: { code?: string; message?: string } }).cause;
+        throw new Error(`${(err as Error).message} — ${baseUrl}${path}`
+          + `${cause ? ` (${cause.code ?? ''} ${cause.message ?? ''})`.trimEnd() : ''}`);
+      });
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body };
@@ -57,15 +65,19 @@ async function bootNode(port: number, nodeId: string, openJoin: boolean): Promis
   process.env.AIMEAT_TEST_MODE = 'true';
   process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
   process.env.AIMEAT_NODE_ID = nodeId;
-  process.env.AIMEAT_BASE_URL = `http://localhost:${port}`;
+  process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
   process.env.AIMEAT_STORAGE = 'memory';
   const { config } = loadConfig({});
-  config.port = port; config.nodeId = nodeId; config.baseUrl = `http://localhost:${port}`;
+  config.port = port; config.nodeId = nodeId; config.baseUrl = `http://127.0.0.1:${port}`;
   config.devMode = true; config.testMode = true; config.adminPassword = adminPw; config.storageProvider = 'memory';
   config.federationOpenJoin = openJoin;
   const { app } = await createServer(config);
-  const server = await new Promise<Server>((resolve) => { const s = app.listen(port, () => resolve(s)); });
-  return { server, baseUrl: `http://localhost:${port}`, nodeId, adminPw, ownerToken: '', json: makeJson(`http://localhost:${port}`) };
+  // Bound to the loopback ADDRESS, and talked to by the same address. `listen(port)` binds every
+  // interface and the suite then asked for `localhost`, which is a name: it needs resolution and a
+  // choice between ::1 and 127.0.0.1, and on a loaded CI runner that choice is where `fetch failed`
+  // came from — the message this suite printed on three nightly sweeps with nothing else to read.
+  const server = await new Promise<Server>((resolve) => { const s = app.listen(port, '127.0.0.1', () => resolve(s)); });
+  return { server, baseUrl: `http://127.0.0.1:${port}`, nodeId, adminPw, ownerToken: '', json: makeJson(`http://127.0.0.1:${port}`) };
 }
 async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
   const reg = await node.json('/v1/admin/setup/register', { method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ name: ownerName }) });

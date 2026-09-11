@@ -27,7 +27,7 @@ async function test(name: string, fn: () => Promise<void>) {
 }
 function assert(c: boolean, m: string) { if (!c) throw new Error(m); }
 
-const PORT = 40277, NODE_ID = 'aimeat-test-001-nodeinfo', BASE = `http://localhost:${PORT}`;
+const PORT = 40277, NODE_ID = 'aimeat-test-001-nodeinfo', BASE = `http://127.0.0.1:${PORT}`;
 const adminPw = randomBytes(16).toString('base64url');
 async function json(path: string, opts: RequestInit = {}) {
   const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
@@ -47,7 +47,7 @@ await test('Boot node + register operator', async () => {
   const { config } = loadConfig({});
   config.port = PORT; config.nodeId = NODE_ID; config.baseUrl = BASE; config.devMode = true; config.testMode = true; config.adminPassword = adminPw; config.storageProvider = 'memory';
   const { app } = await createServer(config);
-  server = await new Promise<Server>(r => { const s = app.listen(PORT, () => r(s)); });
+  server = await new Promise<Server>(r => { const s = app.listen(PORT, '127.0.0.1', () => r(s)); });
   const opName = `niop${Date.now()}`;
   const reg = await json('/v1/admin/setup/register', { method: 'POST', headers: { 'X-Admin-Password': adminPw }, body: JSON.stringify({ name: opName }) });
   assert(reg.status === 200 && reg.body.ok, `register: ${reg.status} ${JSON.stringify(reg.body)}`);

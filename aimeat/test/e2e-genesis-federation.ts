@@ -45,7 +45,7 @@ import * as ed from '@noble/ed25519';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const PORT = parseInt(process.env.E2E_GENESIS_PORT ?? '40321', 10);
-const BASE = `http://localhost:${PORT}`;
+const BASE = `http://127.0.0.1:${PORT}`;
 const TMP = mkdtempSync(join(tmpdir(), 'aimeat-genesis-e2e-'));
 
 // Every one of these is read by loadConfig below, so they are set BEFORE it is called.
@@ -90,7 +90,7 @@ config.port = PORT;
 const NODE_ID = config.nodeId;
 const { app, storage } = await createNode(config);
 await (storage as { ready?: Promise<unknown> }).ready;
-const server = await new Promise<Server>((resolve) => { const s = app.listen(PORT, () => resolve(s)); });
+const server = await new Promise<Server>((resolve) => { const s = app.listen(PORT, '127.0.0.1', () => resolve(s)); });
 
 // The node is up and its background scheduler was never started. From here the flag is on, which is
 // what createGenesisSyncService below requires; no mounted route reads it.

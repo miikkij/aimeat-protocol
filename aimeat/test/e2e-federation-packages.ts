@@ -63,13 +63,13 @@ async function bootNode(port: number, nodeId: string, packageFederation: boolean
     process.env.AIMEAT_TEST_MODE = 'true';
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = nodeId;
-    process.env.AIMEAT_BASE_URL = `http://localhost:${port}`;
+    process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
     process.env.AIMEAT_STORAGE = 'memory';
 
     const { config } = loadConfig({});
     config.port = port;
     config.nodeId = nodeId;
-    config.baseUrl = `http://localhost:${port}`;
+    config.baseUrl = `http://127.0.0.1:${port}`;
     config.devMode = true;
     config.testMode = true;
     config.adminPassword = adminPw;
@@ -79,10 +79,10 @@ async function bootNode(port: number, nodeId: string, packageFederation: boolean
     config.packageCreateRole = 'owner';
 
     const { app } = await createServer(config);
-    const server = await new Promise<Server>((resolve) => { const s = app.listen(port, () => resolve(s)); });
+    const server = await new Promise<Server>((resolve) => { const s = app.listen(port, '127.0.0.1', () => resolve(s)); });
     return {
-        server, baseUrl: `http://localhost:${port}`, nodeId, adminPw,
-        ownerName: '', ownerToken: '', json: makeJson(`http://localhost:${port}`),
+        server, baseUrl: `http://127.0.0.1:${port}`, nodeId, adminPw,
+        ownerName: '', ownerToken: '', json: makeJson(`http://127.0.0.1:${port}`),
     };
 }
 

@@ -39,14 +39,14 @@ function makeJson(baseUrl: string) {
 async function bootNode(port: number, nodeId: string, opts: { genesisUrl?: string; bookListed?: boolean }): Promise<NodeState> {
   const adminPw = randomBytes(16).toString('base64url');
   process.env.AIMEAT_PORT = String(port); process.env.AIMEAT_DEV_MODE = 'true'; process.env.AIMEAT_TEST_MODE = 'true';
-  process.env.AIMEAT_ADMIN_PASSWORD = adminPw; process.env.AIMEAT_NODE_ID = nodeId; process.env.AIMEAT_BASE_URL = `http://localhost:${port}`; process.env.AIMEAT_STORAGE = 'memory';
+  process.env.AIMEAT_ADMIN_PASSWORD = adminPw; process.env.AIMEAT_NODE_ID = nodeId; process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`; process.env.AIMEAT_STORAGE = 'memory';
   const { config } = loadConfig({});
-  config.port = port; config.nodeId = nodeId; config.baseUrl = `http://localhost:${port}`; config.devMode = true; config.testMode = true; config.adminPassword = adminPw; config.storageProvider = 'memory';
+  config.port = port; config.nodeId = nodeId; config.baseUrl = `http://127.0.0.1:${port}`; config.devMode = true; config.testMode = true; config.adminPassword = adminPw; config.storageProvider = 'memory';
   config.genesisUrl = opts.genesisUrl ?? null;
   config.federationBookListed = opts.bookListed !== false;
   const { app } = await createServer(config);
-  const server = await new Promise<Server>(r => { const s = app.listen(port, () => r(s)); });
-  return { server, baseUrl: `http://localhost:${port}`, nodeId, adminPw, ownerToken: '', json: makeJson(`http://localhost:${port}`) };
+  const server = await new Promise<Server>(r => { const s = app.listen(port, '127.0.0.1', () => r(s)); });
+  return { server, baseUrl: `http://127.0.0.1:${port}`, nodeId, adminPw, ownerToken: '', json: makeJson(`http://127.0.0.1:${port}`) };
 }
 async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
   const reg = await node.json('/v1/admin/setup/register', { method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ name: ownerName }) });
@@ -75,8 +75,8 @@ let G: NodeState, P1: NodeState, P2: NodeState;
 
 await test('Boot G (primary) + P1 (listed leaf) + P2 (opted-out leaf) + operators', async () => {
   G = await bootNode(40278, 'aimeat-test-001-bookg', {});
-  P1 = await bootNode(40279, 'aimeat-test-001-bookp1', { genesisUrl: 'http://localhost:40278' });
-  P2 = await bootNode(40280, 'aimeat-test-001-bookp2', { genesisUrl: 'http://localhost:40278', bookListed: false });
+  P1 = await bootNode(40279, 'aimeat-test-001-bookp1', { genesisUrl: 'http://127.0.0.1:40278' });
+  P2 = await bootNode(40280, 'aimeat-test-001-bookp2', { genesisUrl: 'http://127.0.0.1:40278', bookListed: false });
   await setupOwner(G, `gop${ts}`);
   await setupOwner(P1, `p1op${ts}`);
   await setupOwner(P2, `p2op${ts}`);
@@ -152,8 +152,8 @@ await test('7. a book that is unsigned or tampered is refused, and the mirrored 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, node_id: 'stub', data: { book: served, is_primary: true } }));
   });
-  await new Promise<void>(r => stub.listen(40281, r));
-  const STUB = 'http://localhost:40281';
+  await new Promise<void>(r => stub.listen(40281, '127.0.0.1', r));
+  const STUB = 'http://127.0.0.1:40281';
   const pullFromStub = () => P1.json('/v1/federation/book/pull', {
     method: 'POST', headers: auth(P1.ownerToken), body: JSON.stringify({ source_url: STUB }),
   });
