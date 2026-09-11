@@ -36,6 +36,7 @@
  */
 import type { ChildProcess } from 'node:child_process';
 import { connect } from 'node:net';
+import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
 
 /** How long a spawned node may take to answer. Generous on purpose: see the file header. */
@@ -106,16 +107,42 @@ export async function waitForServer(
     // and the node never printed a line at all (it did not reach its first log). Ask before the
     // process is killed, because after that the port tells you nothing.
     const listening = await portAnswers(base);
+    const cpu = cpuSecondsOf(child.pid);
     const said = bytes === 0
         ? 'the node printed NOTHING, so it never reached its first log line'
         : `the node printed ${bytes} bytes, first at ${firstOutputAt - began}ms`;
+    const burned = cpu === null ? ''
+        : ` It burned ${cpu.toFixed(1)}s of CPU in ${Math.round((Date.now() - began) / 1000)}s of wall clock, so it was `
+            + `${cpu > (Date.now() - began) / 4000 ? 'WORKING (a slow machine, not a stuck one)' : 'WAITING on something, not computing'}.`;
 
     child.kill('SIGKILL');
     throw new Error(
         `${label} did not answer ${base}${path} within ${budgetMs}ms. `
         + `The port ${listening ? 'IS accepting connections, so something is there and not answering HTTP' : 'refuses connections, so nothing ever bound it'}; `
-        + `${said}. `
+        + `${said}.${burned} `
         + `Raise AIMEAT_E2E_BOOT_MS if the machine is slow rather than broken.${tail()}`);
+}
+
+/**
+ * How much CPU the process has actually burned, on Linux, where CI runs.
+ *
+ * This is the question a timeout cannot answer on its own: a node that is COMPUTING for three
+ * minutes (a cold compile, a runner with four lanes fighting for two cores) and a node that is
+ * WAITING for three minutes (a lock, a socket, a file) look identical from outside, and the fix for
+ * one is not the fix for the other. /proc/<pid>/stat fields 14 and 15 are the process's own user
+ * and system time in clock ticks. Returns null anywhere else, which costs the message one clause.
+ */
+function cpuSecondsOf(pid: number | undefined): number | null {
+    if (process.platform !== 'linux' || !pid) return null;
+    try {
+        const stat = readFileSync(`/proc/${pid}/stat`, 'utf-8');
+        // The command name is in parentheses and may contain spaces, so fields are counted after it.
+        const after = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+        const ticks = Number(after[11]) + Number(after[12]);
+        return Number.isFinite(ticks) ? ticks / 100 : null;
+    } catch {
+        return null;
+    }
 }
 
 /** Does anything accept a TCP connection at that address? Half a second, then no. */
