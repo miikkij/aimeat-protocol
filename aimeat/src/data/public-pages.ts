@@ -34,6 +34,12 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   v1.6.0 — 2026-09-11 — Every title long enough to summarise its own page. Eleven of them were
+ *     not: "Help" was four characters, "Privacy" seven, "Glossary" eight, and a search result is
+ *     where a title has to do its whole job with no page around it. Bing had listed seven pages of
+ *     this node for it; these are the rest of the same defect, found by counting rather than by
+ *     waiting for the next report. The titles are `<title>`, `og:title` and the link text in
+ *     sitemap.md and llms.txt; the nav labels are locale strings and are untouched.
  *   v1.5.0 — 2026-09-11 — /v1/members joins the registry. It was a served, crawled, linked-to page
  *     that the registry did not know about, so it described itself with the shell's generic head:
  *     Bing reported its title as the bare word "AIMEAT" and it appeared in neither sitemap.xml nor
@@ -147,7 +153,7 @@ protocol-level flow.
   },
   {
     path: '/v1/business',
-    title: 'AIMEAT for your business',
+    title: 'AIMEAT for your business — one memory your team\'s AIs share',
     description: 'What AIMEAT does for an organisation: consent-governed shared memory, auditable agent access, and coordination across teams and their AI agents.',
     changefreq: 'monthly',
     priority: '0.8',
@@ -164,7 +170,7 @@ See also [How it works]({{BASE_URL}}/v1/how-it-works) and the [glossary]({{BASE_
   },
   {
     path: '/v1/how-it-works',
-    title: 'How AIMEAT works',
+    title: 'How AIMEAT works — identities, memory and consent explained',
     description: 'The protocol in plain terms: identities for humans and their agents, memory with visibility rules, consent, and how nodes federate.',
     changefreq: 'monthly',
     priority: '0.8',
@@ -186,7 +192,7 @@ The vocabulary is in the [glossary]({{BASE_URL}}/v1/glossary); the full technica
   },
   {
     path: '/v1/docs',
-    title: 'API documentation',
+    title: 'API documentation — every AIMEAT endpoint, with its schema',
     description: 'Browsable reference for every AIMEAT endpoint, generated from the OpenAPI contract that governs this node.',
     changefreq: 'weekly',
     priority: '0.8',
@@ -200,7 +206,7 @@ governs it.
   },
   {
     path: '/v1/help',
-    title: 'Help',
+    title: 'Help — how to use this node, and where to ask for more',
     description: 'Getting started with AIMEAT, common questions, and a ready-made prompt you can paste into any AI chat to be walked through the node.',
     changefreq: 'monthly',
     priority: '0.7',
@@ -214,7 +220,7 @@ full manual.
   },
   {
     path: '/v1/connect',
-    title: 'Connect an AI assistant to this node',
+    title: 'Connect an AI assistant to this node, over MCP or a token',
     description: 'Connect Claude, ChatGPT or any MCP-capable assistant to your AIMEAT account, and approve exactly which scopes it may use.',
     changefreq: 'monthly',
     priority: '0.7',
@@ -231,7 +237,7 @@ approve it in your portal and choose its scopes, and it claims a token. Protocol
   },
   {
     path: '/v1/glossary',
-    title: 'Glossary',
+    title: 'Glossary — every term the AIMEAT protocol uses, defined',
     description: 'The AIMEAT vocabulary: GHII, GAII and GEAI identities, morsels, organisms, workspaces, skills, capabilities and the rest, defined precisely.',
     changefreq: 'monthly',
     priority: '0.6',
@@ -250,7 +256,7 @@ The full set with forms, examples and cross-references is at
     // points at the JSON rather than copying entries: a copy here would be stale on the next
     // shipped change, and the file is the record.
     path: '/v1/changelog',
-    title: 'What shipped here',
+    title: 'What shipped here — every change to this AIMEAT node',
     description: 'Every change the people running this node shipped, newest first, by month, with an address per entry. Written as what a person gets, not what the code does.',
     changefreq: 'weekly',
     priority: '0.6',
@@ -267,7 +273,7 @@ change, each with a date, a kind, a title and a body in English and Finnish.
     // exists because the front page folded the generator to one line and a stranger never saw
     // the road: say it, carry the prompt to any AI, bring the file back, it lands on the wall.
     path: '/v1/how-an-app-builds',
-    title: 'How an app gets built here',
+    title: 'How an app gets built here, from one sentence to a live page',
     description: 'From a sentence to an app on the wall in four beats, with any AI chat you already have and no connector: describe it, carry the prompt to your AI, bring the file back, and it is live at its own address.',
     changefreq: 'monthly',
     priority: '0.7',
@@ -289,7 +295,7 @@ same story with the real pieces, and ends with the generator itself, open.
   },
   {
     path: '/v1/app-store',
-    title: 'Applications published here',
+    title: 'Applications published here, openable without an account',
     description: 'The applications people have published on this node: what each one does, who made it, and the address to open it. Anything listed can be opened without an account.',
     changefreq: 'weekly',
     priority: '0.8',
@@ -326,7 +332,7 @@ page is \`{{BASE_URL}}/v1/portfolio/<name>\`.
   },
   {
     path: '/v1/transparency',
-    title: 'How this node marks AI-generated content',
+    title: 'How this node marks AI-generated content, and what it means',
     description: 'What this AIMEAT node records when a model writes something, what a reader sees, what the marking cannot do, and how anyone can check a piece of content without an account.',
     changefreq: 'monthly',
     priority: '0.6',
@@ -368,7 +374,7 @@ Reporting content that should carry a label and does not: \`POST {{BASE_URL}}/v1
   },
   {
     path: '/v1/privacy',
-    title: 'Privacy',
+    title: 'Privacy — what this node stores about you, and for how long',
     description: 'How this AIMEAT node handles personal data: what is stored, who can reach it, how consent is recorded, and how to have it removed.',
     changefreq: 'yearly',
     priority: '0.3',
@@ -381,7 +387,7 @@ the real content rather than this summary.
   },
   {
     path: '/v1/terms',
-    title: 'Terms of use',
+    title: 'Terms of use — the rules for using this AIMEAT node',
     description: 'The terms under which this AIMEAT node is offered, for the humans who hold accounts and the agents acting on their behalf.',
     changefreq: 'yearly',
     priority: '0.3',

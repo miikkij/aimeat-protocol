@@ -39,6 +39,11 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   v1.3.0 — 2026-09-11 — `spec.isDocument`: a caller that has already checked the media type may
+ *     say so, instead of this pass sniffing for a closing tag the author never had to write.
+ *     Three live apps open with a comment or a `<meta charset>` and close nothing, so they were
+ *     served with no badge, no AI-disclosure mark and no discovery block at all. Default is the
+ *     sniff, unchanged, and every golden case leaves the flag unset.
  *   v1.2.1 — 2026-08-31 — The head injection finds `<body …>` with utils/html-inject's findOpenTag
  *     instead of `/<body[^>]*>/i`, which cost quadratic time on a document made of `<body` repeats
  *     (CodeQL js/polynomial-redos 1579/1580). Same insertion point, so the goldens are unchanged.
@@ -102,6 +107,20 @@ export interface ServeMarksSpec {
   discovery?: AppDiscoverySpec;
   /** The `<head>` metadata the app almost certainly has none of. */
   headMeta?: AppHeadSpec;
+  /**
+   * The CALLER states that these bytes are an HTML document, overruling the sniff below.
+   *
+   * The sniff looks for a closing `</body>` or `</html>`, and three published apps on aimeat.io
+   * have neither: noste, taivas and laake open with a comment or a `<meta charset>` and simply
+   * stop, which every browser parses as a document and this pass declined as a fragment. They were
+   * served with no attribution badge, no AI-disclosure mark and no discovery block — 235 kB of
+   * application with eleven characters of text in it, on an origin a search engine had indexed.
+   *
+   * It stays a sniff by default, because the callers that hand this function JSON, SVG or a raw
+   * download cannot all vouch for their payload and a mark spliced into JSON corrupts it. The two
+   * that CAN vouch already tested the media type before calling, and say so here.
+   */
+  isDocument?: boolean;
 }
 
 /**
@@ -115,7 +134,9 @@ export function applyServeMarks(data: Buffer | Uint8Array | string, spec: ServeM
   const text = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
 
   // Only touch real HTML documents; never corrupt JSON/SVG/other inline payloads. Tested ONCE.
-  const isDocument = /<\/body\s*>/i.test(text) || /<\/html\s*>/i.test(text);
+  // A caller that has already checked the media type may say so instead (spec.isDocument): the
+  // sniff reads closing tags, and a single-file app is under no obligation to write any.
+  const isDocument = spec.isDocument ?? (/<\/body\s*>/i.test(text) || /<\/html\s*>/i.test(text));
 
   let out = text;
   if (isDocument) {

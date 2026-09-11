@@ -20,6 +20,10 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.2.0 — 2026-09-11 — serveSpa() puts the registry page's authored body into the shell
+ *     (utils/page-body.ts). The head had described each page correctly since July while the body
+ *     stayed the same 203 characters on all of them, which is what a reader that does not run
+ *     JavaScript actually got: twelve addresses, one near-empty document.
  *   v1.1.0 — 2026-08-29 — The build stamp reaches /css/margin-pattern.css as well as theme.css.
  *   v1.0.0 — 2026-08-25 — Extracted from portal.ts (line ceiling)
  */
@@ -30,6 +34,8 @@ import type { AimeatConfig } from '../config.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { findPublicPage, type PublicPage } from '../data/public-pages.js';
 import { injectPageHead, injectSiteHead } from '../utils/page-head.js';
+import { injectPageBody } from '../utils/page-body.js';
+import { buildGlossaryBody } from './glossary.js';
 
 /**
  * The site-link block handed to the browser, with empty entries dropped so the injected
@@ -139,6 +145,19 @@ export function serveSpa(
   // itself wins over the node-wide fallback just written. Shared with the static info pages.
   const page = builtPage ?? (routePath ? findPublicPage(routePath) : undefined);
   if (page) html = injectPageHead(html, page, config, nonceAttr);
+
+  // The page's own words, in the document as SENT rather than only in the one a browser builds.
+  // The head above says what the page is; without this the body said nothing, identically, on
+  // twelve of the fifteen registry pages. Only for the spa.html shell: /v1/connect, /v1/privacy
+  // and /v1/terms come through here as real HTML pages that already carry their own content.
+  html = injectPageBody(html, page, config, {
+    isShell: spaPath.endsWith('spa.html'),
+    // The glossary is the one page whose real body is generated rather than written into the
+    // registry: two hundred defined terms from src/data/glossary.ts, the same text its .md mirror
+    // serves. Its registry entry is a one-paragraph summary, which would have made the best page
+    // on this node one of the thinnest.
+    markdown: page?.path === '/v1/glossary' ? buildGlossaryBody() : undefined,
+  });
 
   // Make the running AIMEAT version visible from the page itself — a view-source comment plus a
   // queryable meta tag. Lets anyone confirm which version a node runs (esp. across federation peers)
