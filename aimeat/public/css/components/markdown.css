@@ -12,6 +12,9 @@
  *   v1.0.0 — 2026-06-19 — Initial: extracted the per-view duplicates into one global component sheet.
  *   v1.1.0 — 2026-07-02 — Styles for the live memory embed (aimeat-memory fence → MemoryEmbed): .md-mem
  *     container/header/refresh/table/notes.
+ *   v1.2.0 — 2026-09-11 — #crawler-body: the wrapper for the server-rendered page body. It carries
+ *     .md-body for everything inside it, so this sheet stays the one place rendered markdown is
+ *     styled and the block needs a width and a margin of its own and nothing else.
  */
 
 .md-body {
@@ -82,3 +85,11 @@
 .md-body .md-mem-err { color: var(--warning, var(--muted)); }
 .md-body .md-mem-more { color: var(--muted); font-size: 0.78rem; margin-top: 0.3em; }
 .md-body .md-mem-value { font-size: 0.95rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* ── The server-rendered page body (utils/page-body.ts → #crawler-body) ──────────────────────
+   What a reader that does not run JavaScript gets: the page's own text, in the document as
+   sent. It reuses .md-body for its typography and needs only a page's worth of margin, since
+   it lives directly under the app root with no view chrome around it. The SPA removes it the
+   moment a view has drawn (public/spa.html), so on a normal visit it is on screen only for as
+   long as the first render takes. */
+#crawler-body { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.25rem 3rem; }
