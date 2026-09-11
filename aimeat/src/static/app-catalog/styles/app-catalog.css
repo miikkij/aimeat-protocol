@@ -118,6 +118,9 @@
       overlay-wrapper rule (position:fixed/inset:0/z-index/backdrop) and its [hidden] display:none
       counterpart, so it had no modal styling at all — same class of miss as #lineage/#protection in
       v2.9.1. Added #agents-overlay to both selector lists.
+    v2.16.0 — 2026-09-11 — Lengthen the page <title>. "My Apps — AIMEAT" is sixteen characters and
+      says nothing about what the page does; Bing Webmaster Tools reported it among seven pages
+      whose titles are too short to summarise themselves in a result list.
 -->
 <html lang="en">
 <head>
@@ -125,7 +128,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="theme-color" content="#FAFAF8"/>
   <link rel="stylesheet" href="/lib/aimeat-fonts.css"/>
-  <title>My Apps — AIMEAT</title>
+  <title>My Apps — create, publish and manage your apps on AIMEAT</title>
   <style>
     :root {
       color-scheme: light;
