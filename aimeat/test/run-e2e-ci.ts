@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.39.0 -- 2026-09-11 -- Add e2e-admin-discovery-page.ts to ALL_SUITES: the Discovery page's
+ *            doors, the whole-site instant update's plan, and the send refused without a key.
+ *            Not in the guard tier yet; it earns that with three identical green runs.
  *   v1.38.0 -- 2026-09-09 -- The 28 tranche-2 suites join GUARD_SUITES (68 → 96), each measured
  *            alone on a fresh database, three identical green runs on both backends.
  *   v1.37.0 -- 2026-09-08 -- Coverage tranche 2: 28 suites for the doors the sweep never drove
@@ -541,6 +544,9 @@ const ALL_SUITES = [
     'test/e2e-auth-refusals.ts',
     'test/e2e-admin-security-page.ts',
     'test/e2e-admin-cors-page.ts',
+    // The Discovery page's doors: the status with the key check and the notice log, the plan of a
+    // whole-site instant update, and the send refused by name on a node with no key.
+    'test/e2e-admin-discovery-page.ts',
     'test/e2e-living-pulse.ts',
     // Every core scheduled job fired through the operator's trigger door, on a node of its own
     // (40310) with an SMTP sink, short windows and the flags the seeding keys on. Lane 0.

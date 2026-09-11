@@ -2,22 +2,27 @@
  * @file discovery-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin dashboard Discovery tab — whether this node can be found in a search engine,
- *   how it describes itself when it is, and what the operator still has to go and do.
+ * @description Admin Discovery page in the poster face (design canvas "AIMEAT Admin Discovery"):
+ *   whether this node can be found in a search engine, how it describes itself when it is, and
+ *   what the operator still has to go and do.
  *
- *   The question an operator actually has is "am I findable, and what is left". Nothing answered it:
- *   the settings that decide it sat among two hundred others in the Config tab as raw dot-paths, and
- *   the only way to know whether a verification tag was reaching the page was to view source. So the
- *   status here is read from what is BEING SERVED rather than from the configuration, and the steps
- *   are a checked list rather than a paragraph of advice — a step is only green once the thing it
- *   asks for is visible from outside.
+ *   The question an operator actually has is "am I findable, and what is left". The page opens on
+ *   the word (FINDABLE or TURNED AWAY), six rows read from what is BEING SERVED rather than from the
+ *   settings — a verification code that was typed in but never reached the page looks the same as a
+ *   working one until somebody checks — and the numeral strip. Then one row per search engine,
+ *   the instant updates with the whole site in one notice, the identity, the application list, and
+ *   the outside checks beside the paste for the operator's own AI.
  *
  * @structure
- *   DiscoveryTab (default) — status, node identity, the steps, and the per-app list
- *   The app list and the steps live in ./discovery-tab.apps.js and ./discovery-tab.steps.js;
- *   this file holds the shell, the status read and the identity editor.
+ *   DiscoveryTab (default) — load, the front-page tag check, RightNow (01) and the strip, then the
+ *     sections from the sibling files: engines (02), instant (03), identity (04), apps (05), and
+ *     Checks (06) here. The row, the stamp and the base come from discovery-tab.shared.js.
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.0.0 — 2026-09-11 — The poster face: the status word, the metric rows, the strip, six numbered
+ *     sections, and the tag check shared between 01 and 02. The five steps became one row per
+ *     engine (discovery-tab.engines.js) and the instant updates a section of their own
+ *     (discovery-tab.indexnow.js); the identity moved to discovery-tab.identity.js.
  *   v1.0.0 — 2026-08-25 — Initial.
  */
 import { h } from 'preact';
@@ -25,62 +30,143 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner, ErrorBox, Badge, ExpandableHelp, useToast, Toast } from './shared.js';
+import { useViewCSS } from '/components/useViewCSS.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
+import { Spinner, ErrorBox, Badge, useToast, Toast } from './shared.js';
+import { CopyButton } from '/components/CopyButton.js';
+import { getNodeUrl } from '/js/services/auth.js';
 import * as adminService from '/js/services/admin.js';
-import { DiscoverySteps } from './discovery-tab.steps.js';
+import { DiscoveryEngines } from './discovery-tab.engines.js';
+import { DiscoveryInstant } from './discovery-tab.indexnow.js';
+import { DiscoveryIdentity } from './discovery-tab.identity.js';
 import { DiscoveryApps } from './discovery-tab.apps.js';
+import { buildDiscoveryPrompt } from './discovery-tab.prompt.js';
+import { Row, when, baseOf } from './discovery-tab.shared.js';
 
-/** The `seo.*` settings this tab edits, in the order an operator meets them. */
-const IDENTITY_FIELDS = [
-  { path: 'seo.site_name',         key: 'siteName',      type: 'text' },
-  { path: 'seo.site_description',  type: 'textarea',     key: 'siteDescription' },
-  { path: 'seo.og_image',          key: 'ogImage',       type: 'text' },
-  { path: 'seo.organization_name', key: 'orgName',       type: 'text' },
-  { path: 'seo.organization_url',  key: 'orgUrl',        type: 'text' },
-  { path: 'seo.same_as',           key: 'sameAs',        type: 'lines' },
-  { path: 'seo.twitter_site',      key: 'twitterSite',   type: 'text' },
-];
+const S = (key, params) => t('dashboard.seo.' + key, params);
 
-/** One row of the status read-out, with the document it is a fact about. */
-function StatusRow({ label, value, tone, href }) {
-  return html`<div class="adm-seo-row">
-    <span class="adm-seo-row-label">${label}</span>
-    <span class="adm-seo-row-value">
-      ${tone ? html`<${Badge} type=${tone} label=${value} />` : value}
-    </span>
-    ${href ? html`<a class="adm-seo-row-link" href=${href} target="_blank" rel="noopener">${t('dashboard.seo.open')}</a>` : null}
-  </div>`;
+/** The chip for the key file: no key, served, not served, or unchecked. */
+function keyChip(ix) {
+  if (!ix.key_configured) return html`<${Badge} type="muted" label=${S('now.chipNoKey')} />`;
+  if (ix.key_served === true) return html`<${Badge} type="healthy" label=${S('now.chipKeyServed')} />`;
+  if (ix.key_served === false) return html`<${Badge} type="danger" label=${S('now.chipKeyMissing')} />`;
+  return html`<${Badge} type="muted" label=${S('now.chipKeyUnchecked')} />`;
 }
 
-/**
- * What a search result and a shared link would look like right now. Rendered from the SERVED
- * values, so an operator sees the effect of what they typed rather than the text they typed.
- */
-function IdentityPreview({ identity }) {
-  return html`<div class="adm-seo-preview">
-    <div class="adm-seo-preview-serp">
-      <div class="adm-seo-preview-url">${identity.organization_url}</div>
-      <div class="adm-seo-preview-title">${identity.site_name}</div>
-      <div class="adm-seo-preview-desc">${identity.site_description}</div>
-    </div>
-    <div class="adm-seo-preview-card">
-      ${identity.og_image
-        ? html`<img class="adm-seo-preview-img" src=${identity.og_image} alt="" loading="lazy" />`
-        : html`<div class="adm-seo-preview-img adm-seo-preview-img-empty">${t('dashboard.seo.noImage')}</div>`}
-      <div class="adm-seo-preview-card-body">
-        <div class="adm-seo-preview-title">${identity.site_name}</div>
-        <div class="adm-seo-preview-desc">${identity.site_description}</div>
+/** Section 01: the word, its sentence, the log line, the six rows. */
+function RightNow({ status, served, toSection, onToggle, busy }) {
+  const off = status.indexing === 'off';
+  const ix = status.indexnow;
+  const proofs = (served.google ? 1 : 0) + (served.bing ? 1 : 0);
+  const lines = [];
+  if (off) lines.push(S('now.lineOff'));
+  else {
+    lines.push(S('now.lineOn'));
+    if (served.checked && proofs === 0) lines.push(S('now.lineNoProof'));
+    if (ix.key_configured && !ix.everything.last_sent_at) lines.push(S('now.lineNoWhole'));
+  }
+  const keyWord = !ix.key_configured ? S('now.logNoKey')
+    : ix.key_served === true ? S('now.logKeyOk')
+    : ix.key_served === false ? S('now.logKeyNo') : S('now.logKeyUnknown');
+  const log = [
+    'robots.txt',
+    S('now.logPages', { n: status.sitemap.page_count }),
+    S('now.logHosts', { n: status.sitemap.app_host_count }),
+    keyWord,
+    S('now.logRead', { at: new Date().toLocaleTimeString() }),
+  ].join(' · ');
+  const last = ix.last;
+  const lastValue = last
+    ? S('now.instantVal', { n: last.urlCount, at: when(last.at), status: last.status ?? S('instant.noAnswer') })
+    : S('now.instantNever');
+  const openDoor = (href) => html`<a class="og-door og-door--quiet" href=${href} target="_blank" rel="noopener">${S('open')}</a>`;
+  return html`
+    <section class="og-sec og-sec--first" id="adm-disc-01">
+      <div class="og-sec-h"><h2>${S('now.title')}<small>01</small></h2>
+        <div class="og-doors">
+          <button type="button" class="og-door og-door--quiet ${off ? '' : 'og-door--danger'}" disabled=${busy} onClick=${onToggle}>
+            ${off ? S('now.turnOn') : S('now.turnOff')}
+          </button>
+        </div>
       </div>
-    </div>
-  </div>`;
+      <div class="adm-ov-grid">
+        <div>
+          <div class="adm-ov-status ${off ? 'danger' : ''}">${off ? S('now.wordOff') : S('now.wordOn')}</div>
+          <p class="adm-alert-line">${lines.join(' ')}</p>
+          <div class="adm-ov-up">${log}</div>
+        </div>
+        <div>
+          ${Row({ title: S('now.crawl'), why: S('now.crawlWhy'),
+            chip: html`<${Badge} type=${off ? 'danger' : 'healthy'} label=${S('now.chipServed')} />`,
+            value: status.robots.content_signal })}
+          ${Row({ title: S('now.training'), why: S('now.trainingWhy'),
+            chip: html`<${Badge} type=${status.robots.training_crawlers_blocked ? 'watch' : 'info'} label=${status.robots.training_crawlers_blocked ? S('now.chipKeptOut') : S('now.chipLetIn')} />`,
+            value: html`<button type="button" class="og-door og-door--quiet" onClick=${() => toSection('config')}>${S('change')}</button>` })}
+          ${Row({ title: S('now.pages'), why: S('now.pagesWhy'),
+            chip: html`<${Badge} type="healthy" label=${S('now.chipPages', { n: status.sitemap.page_count })} />`,
+            value: html`/sitemap.xml · ${openDoor(status.sitemap.url)}` })}
+          ${Row({ title: S('now.appList'), why: S('now.appListWhy'),
+            chip: html`<${Badge} type=${status.apps.on > 0 ? 'healthy' : 'muted'} label=${S('now.chipOf', { n: status.apps.on, total: status.apps.total })} />`,
+            value: html`/sitemap-index.xml · ${openDoor(status.sitemap.index_url)}` })}
+          ${Row({ title: S('now.proofs'), why: S('now.proofsWhy'),
+            chip: html`<${Badge} type=${proofs === 2 ? 'healthy' : 'watch'} label=${served.checked ? S('now.chipProofs', { n: proofs }) : S('engines.checking')} />`,
+            value: html`Google · Bing · <button type="button" class="og-door og-door--quiet" onClick=${() => toSection('02')}>${S('now.toEngines')}</button>` })}
+          ${Row({ title: S('now.instant'), why: S('now.instantWhy'),
+            chip: keyChip(ix), value: lastValue, last: true })}
+        </div>
+      </div>
+      <${Strip} status=${status} proofs=${proofs} />
+    </section>`;
 }
 
-export default function DiscoveryTab() {
+/** The numeral strip: the pages, the findable applications, the engines that know you, the last notice. */
+function Strip({ status, proofs }) {
+  const last = status.indexnow.last;
+  const scopeWord = (scope) => S('now.scope_' + (scope || 'app'));
+  return html`
+    <div class="og-strip">
+      <div><b>${status.sitemap.page_count}</b><span>${S('now.stripPages')}</span><small>${S('now.stripPagesSub')}</small></div>
+      <div><b>${status.apps.on}</b><span>${S('now.stripApps')}</span><small>${S('now.stripAppsSub', { total: status.apps.total, pending: status.apps.pending })}</small></div>
+      <div><b class=${proofs === 0 ? 'adm-disc-coral' : ''}>${S('now.stripOf', { n: proofs })}</b><span>${S('now.stripEngines')}</span><small>${proofs === 2 ? S('now.stripEnginesBoth') : proofs === 1 ? S('now.stripEnginesOne') : S('now.stripEnginesNone')}</small></div>
+      <div><b>${last ? last.urlCount : 0}</b><span>${S('now.stripLast')}</span><small>${last ? S('now.stripLastSub', { at: when(last.at), what: scopeWord(last.scope) }) : S('now.stripLastNone')}</small></div>
+    </div>`;
+}
+
+/** Section 06: the outside checks, and the paste for the operator's own AI. */
+function Checks({ status }) {
+  const base = baseOf(status);
+  const enc = encodeURIComponent(base);
+  const paste = buildDiscoveryPrompt({ url: getNodeUrl() });
+  const open = (href) => html`<a class="og-door og-door--quiet" href=${href} target="_blank" rel="noopener">${S('open')}</a>`;
+  return html`
+    <section class="og-sec" id="adm-disc-06">
+      <div class="og-sec-h"><h2>${S('checks.title')}<small>06</small></h2>
+        <div class="og-doors"><${CopyButton} text=${paste} label=${S('checks.copyAi')} className="og-door og-door--quiet" /></div></div>
+      <div class="adm-disc-checks">
+        <div>
+          <p class="adm-disc-lead">${S('checks.lead')}</p>
+          ${Row({ title: S('checks.rich'), why: S('checks.richWhy'), chip: null, value: open(`https://search.google.com/test/rich-results?url=${enc}`) })}
+          ${Row({ title: S('checks.schema'), why: S('checks.schemaWhy'), chip: null, value: open(`https://validator.schema.org/#url=${enc}`) })}
+          ${Row({ title: S('checks.speed'), why: S('checks.speedWhy'), chip: null, value: open(`https://pagespeed.web.dev/analysis?url=${enc}`) })}
+          ${Row({ title: S('checks.bingInspect'), why: S('checks.bingInspectWhy'), chip: null, value: open('https://www.bing.com/webmasters/urlinspection'), last: true })}
+        </div>
+        <div class="og-box">
+          <span class="og-box-label">${S('checks.aiLabel')}</span>
+          <div class="adm-disc-paste">${paste}</div>
+        </div>
+      </div>
+    </section>`;
+}
+
+export default function DiscoveryTab({ switchPage }) {
+  useViewCSS('/css/views/admin-discovery.css');
   const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
-  // Only the fields the operator has actually touched, so an unedited field is never resaved.
-  const [edits, setEdits] = useState({});
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState(false);
+  // What the LIVE front page carries, fetched from this node's own root. The config saying a token
+  // is set is not the same claim as the tag reaching a crawler, and the second is the one that
+  // makes Search Console verify.
+  const [served, setServed] = useState({ google: false, bing: false, checked: false });
   const [toast, showError, showSuccess, clearToast] = useToast();
 
   const load = useCallback(async () => {
@@ -94,150 +180,63 @@ export default function DiscoveryTab() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  const checkServed = useCallback(async () => {
+    try {
+      const res = await fetch('/', { headers: { Accept: 'text/html' }, cache: 'no-store' });
+      const body = await res.text();
+      // The whole head, cut at </head> rather than at a byte count: the injected tags are added
+      // just BEFORE the closing tag, at the end of a head that is already twenty-odd kilobytes of
+      // importmap, and a fixed slice once reported a working tag as missing.
+      const close = body.toLowerCase().indexOf('</head>');
+      const head = close >= 0 ? body.slice(0, close) : body;
+      setServed({
+        google: /<meta name="google-site-verification"\s+content="[^"]+"/i.test(head),
+        bing: /<meta name="msvalidate\.01"\s+content="[^"]+"/i.test(head),
+        checked: true,
+      });
+    } catch (err) {
+      // The page not answering is a fact about this browser's request, not about the tag — so the
+      // row stays "not seen" rather than turning into a failure the operator would chase.
+      console.warn('Discovery: could not read the live front page to check the verification tags', err);
+      setServed({ google: false, bing: false, checked: true });
+    }
+  }, []);
 
-  // Every tab showing server data re-reads on the live-update event. This one especially: the app
-  // states below change when an owner flips their own switch, from a surface that is not this page.
-  useEffect(() => {
-    const handler = () => { load(); };
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [load]);
+  useEffect(() => { load(); checkServed(); }, [load, checkServed]);
+  // The app states change when an owner flips their own switch, from a surface that is not this
+  // page; a notice stamps the apps; a saved setting changes what is served.
+  useEffect(() => onLiveUpdate(['apps', 'config', 'features'], () => load()), [load]);
 
-  const setIndexing = useCallback(async (on) => {
-    setSaving(true);
+  const toSection = (n) => {
+    if (n === 'config') { switchPage('config'); return; }
+    document.getElementById('adm-disc-' + n)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const toggleIndexing = useCallback(async () => {
+    if (!status) return;
+    const on = status.indexing === 'off';
+    setBusy(true);
     try {
       await adminService.saveConfig([{ path: 'seo.indexing', value: on ? 'on' : 'off' }]);
-      showSuccess(on ? t('dashboard.seo.indexingOnOk') : t('dashboard.seo.indexingOffOk'));
+      showSuccess(on ? S('now.indexingOnOk') : S('now.indexingOffOk'));
       await load();
     } catch (err) {
       showError(err?.message || String(err));
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
-  }, [load, showSuccess, showError]);
-
-  const saveIdentity = useCallback(async () => {
-    const changes = Object.entries(edits).map(([path, value]) => ({ path, value }));
-    if (changes.length === 0) return;
-    setSaving(true);
-    try {
-      await adminService.saveConfig(changes);
-      setEdits({});
-      showSuccess(t('dashboard.seo.identitySaved'));
-      await load();
-    } catch (err) {
-      showError(err?.message || String(err));
-    } finally {
-      setSaving(false);
-    }
-  }, [edits, load, showSuccess, showError]);
+  }, [status, load, showSuccess, showError]);
 
   if (error) return html`<${ErrorBox} message=${error} />`;
-  if (!status) return html`<${Spinner} text=${t('dashboard.seo.loading')} />`;
+  if (!status) return html`<${Spinner} text=${S('loading')} />`;
 
-  const off = status.indexing === 'off';
-  const current = (field) => {
-    if (edits[field.path] !== undefined) return edits[field.path];
-    const map = {
-      'seo.site_name': status.identity.site_name,
-      'seo.site_description': status.identity.site_description,
-      'seo.og_image': status.identity.og_image,
-      'seo.organization_name': status.identity.organization_name,
-      'seo.organization_url': status.identity.organization_url,
-      'seo.same_as': status.identity.same_as,
-      'seo.twitter_site': status.identity.twitter_site || '',
-    };
-    return map[field.path] ?? '';
-  };
-  const edit = (field, raw) => setEdits(prev => ({
-    ...prev,
-    [field.path]: field.type === 'lines'
-      ? String(raw).split('\n').map(s => s.trim()).filter(Boolean)
-      : raw,
-  }));
-
-  return html`<div class="adm-seo">
+  return html`<div class="adm-disc">
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-
-    <${ExpandableHelp} title=${t('dashboard.seo.helpTitle')}>
-      <p>${t('dashboard.seo.helpBody')}</p>
-    <//>
-
-    <section class="adm-card">
-      <h3>${t('dashboard.seo.statusTitle')}</h3>
-      <p class="adm-muted">${t('dashboard.seo.statusIntro')}</p>
-
-      <div class="adm-seo-master">
-        <div>
-          <strong>${off ? t('dashboard.seo.masterOff') : t('dashboard.seo.masterOn')}</strong>
-          <div class="adm-muted">${off ? t('dashboard.seo.masterOffHint') : t('dashboard.seo.masterOnHint')}</div>
-        </div>
-        <button class=${off ? 'btn-primary' : 'btn-outline'} disabled=${saving}
-                onClick=${() => setIndexing(off)}>
-          ${off ? t('dashboard.seo.turnOn') : t('dashboard.seo.turnOff')}
-        </button>
-      </div>
-
-      <${StatusRow} label=${t('dashboard.seo.rowRobots')}
-                    value=${status.robots.content_signal}
-                    href=${status.robots.url} />
-      <${StatusRow} label=${t('dashboard.seo.rowTraining')}
-                    value=${status.robots.training_crawlers_blocked
-                      ? t('dashboard.seo.trainingBlocked') : t('dashboard.seo.trainingAllowed')}
-                    tone=${status.robots.training_crawlers_blocked ? 'amber' : 'green'} />
-      <${StatusRow} label=${t('dashboard.seo.rowSitemap')}
-                    value=${t('dashboard.seo.pagesCount', { n: status.sitemap.page_count })}
-                    href=${status.sitemap.url} />
-      <${StatusRow} label=${t('dashboard.seo.rowSitemapIndex')}
-                    value=${t('dashboard.seo.hostsCount', {
-                      n: status.sitemap.app_host_count, total: status.apps.total,
-                    })}
-                    href=${status.sitemap.index_url} />
-      <${StatusRow} label=${t('dashboard.seo.rowIndexnow')}
-                    value=${status.indexnow.key_configured
-                      ? (status.indexnow.last_submitted_at
-                        ? t('dashboard.seo.indexnowLast', { at: status.indexnow.last_submitted_at, n: status.indexnow.last_url_count })
-                        : t('dashboard.seo.indexnowNeverSent'))
-                      : t('dashboard.seo.indexnowNoKey')}
-                    tone=${status.indexnow.key_configured ? 'green' : 'amber'} />
-    </section>
-
-    <section class="adm-card">
-      <h3>${t('dashboard.seo.identityTitle')}</h3>
-      <p class="adm-muted">${t('dashboard.seo.identityIntro')}</p>
-
-      ${IDENTITY_FIELDS.map(field => html`
-        <label class="adm-seo-field" key=${field.path}>
-          <span class="adm-seo-field-label">${t(`dashboard.seo.f_${field.key}`)}</span>
-          ${field.type === 'textarea'
-            ? html`<textarea rows="3" value=${current(field)}
-                             onInput=${e => edit(field, e.target.value)} />`
-            : field.type === 'lines'
-              ? html`<textarea rows="3" value=${(current(field) || []).join('\n')}
-                               onInput=${e => edit(field, e.target.value)} />`
-              : html`<input type="text" value=${current(field)}
-                            onInput=${e => edit(field, e.target.value)} />`}
-          <span class="adm-seo-field-hint">${t(`dashboard.seo.h_${field.key}`)}</span>
-        </label>
-      `)}
-
-      <div class="adm-seo-actions">
-        <button class="btn-primary" disabled=${saving || Object.keys(edits).length === 0}
-                onClick=${saveIdentity}>
-          ${t('dashboard.seo.saveIdentity')}
-        </button>
-        ${Object.keys(edits).length > 0
-          ? html`<button class="btn-ghost" onClick=${() => setEdits({})}>${t('dashboard.seo.discard')}</button>`
-          : null}
-      </div>
-
-      <h4>${t('dashboard.seo.previewTitle')}</h4>
-      <p class="adm-muted">${t('dashboard.seo.previewIntro')}</p>
-      <${IdentityPreview} identity=${status.identity} />
-    </section>
-
-    <${DiscoverySteps} status=${status} onChanged=${load} />
+    <${RightNow} status=${status} served=${served} toSection=${toSection} onToggle=${toggleIndexing} busy=${busy} />
+    <${DiscoveryEngines} status=${status} served=${served} onRecheck=${checkServed} onChanged=${load} />
+    <${DiscoveryInstant} status=${status} onChanged=${load} />
+    <${DiscoveryIdentity} status=${status} onChanged=${load} />
     <${DiscoveryApps} status=${status} onChanged=${load} />
+    <${Checks} status=${status} />
   </div>`;
 }

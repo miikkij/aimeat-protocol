@@ -11,6 +11,8 @@
  * @structure appSettingsTools: ConnectCliToolDefinition[]
  * @usage import { appSettingsTools } from './tool-call-defs-apps-settings.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-11 -- aimeat_seo_announce: the whole site to IndexNow (or its plan), on the
+ *     third surface in the same change as the other two.
  *   v1.2.0 -- 2026-09-02 -- aimeat_app_audit forwards `playtest`, so a fleet agent on this door can
  *     have the node open its app in a headless browser. The third surface gets the parameter in the
  *     same change as the other two, which is the whole point of this file existing.
@@ -130,5 +132,20 @@ export const appSettingsTools: ConnectCliToolDefinition[] = [
         description: 'Whether this node can be found in a search engine, and what is still undone about it. Operator-only.',
         input: {},
         handler: ({ client }) => client.get('/v1/admin/seo/status'),
+    },
+    {
+        // → POST /v1/admin/seo/indexnow, or GET /v1/admin/seo/indexnow/plan with plan: true — the
+        //   whole site to IndexNow, one batch per host under that host's own key. Operator-only.
+        name: 'aimeat_seo_announce',
+        description: 'Tell the search engines about the whole site now through IndexNow, or with plan: true list what would be sent. Operator-only.',
+        input: {
+            scope: { type: 'string', description: '"all" (default): the pages and every findable application. "pages": the pages alone.' },
+            plan: { type: 'boolean', description: 'true lists what would be sent, host by host, and sends nothing.' },
+        },
+        handler: ({ client }, input) => {
+            const scope = optionalString(input, 'scope') ?? 'all';
+            if (optionalBoolean(input, 'plan')) return client.get(`/v1/admin/seo/indexnow/plan?scope=${encodeURIComponent(scope)}`);
+            return client.post('/v1/admin/seo/indexnow', { scope });
+        },
     },
 ];

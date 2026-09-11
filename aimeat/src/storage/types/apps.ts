@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema, system-prompt, and package/template record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-09-11 — AppSeo gains `announcedAt`: when IndexNow was last told about the app,
+ *     server-stamped by services/indexnow.ts and never taken from the owner's update door.
  *   v1.9.0 — 2026-08-29 — AppManifest gains `legal`: the app's own legal pages by kind (terms,
  *     privacy, imprint, refunds, accessibility, cookies, support), each markdown, HTML or a URL.
  *   v1.8.0 — 2026-08-29 — AppManifest gains `marks` (the badge and install-chip switches),
@@ -276,6 +278,11 @@ export interface AppSeo {
   image?: string;
   /** Overrides the derived `<html lang>`. Empty reads the app's own `aimeat-locales` meta. */
   lang?: string;
+  /**
+   * When the search engines were last told about this app through IndexNow (services/indexnow.ts).
+   * Server-stamped after an accepted notice; never taken from the owner's update door.
+   */
+  announcedAt?: string;
 }
 
 export interface AppProtection {

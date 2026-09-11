@@ -5,6 +5,8 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   v1.8.0 -- 2026-09-11 -- aimeat_seo_announce over POST /v1/admin/seo/indexnow (plan: true reads
+ *     GET /v1/admin/seo/indexnow/plan): the whole site to the search engines, one batch per host.
  *   v1.7.0 -- 2026-08-29 -- aimeat_app_legal_set over PATCH and GET /v1/apps/me/:filename/legal,
  *     carrying ai_provenance in the body (the route records it); aimeat_app_audit over
  *     GET /v1/apps/me/:filename/audit?limit=N.
@@ -502,4 +504,15 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     annotationsFor('aimeat_seo_status'), async () => {
       return out(await client.get('/v1/admin/seo/status'));
     });
+
+  // → POST /v1/admin/seo/indexnow, or GET /v1/admin/seo/indexnow/plan with plan: true — the whole
+  //   site to IndexNow, one batch per host. Operator-only.
+  mcp.tool('aimeat_seo_announce', descriptionFor('aimeat_seo_announce'), {
+    scope: z.enum(['all', 'pages']).optional().describe('"all" (default): the pages and every findable application. "pages": the pages alone.'),
+    plan: z.boolean().optional().describe('true lists what would be sent, host by host, and sends nothing.'),
+  }, annotationsFor('aimeat_seo_announce'), async (a) => {
+    const scope = a.scope ?? 'all';
+    if (a.plan) return out(await client.get(`/v1/admin/seo/indexnow/plan?scope=${scope}`));
+    return out(await client.post('/v1/admin/seo/indexnow', { scope }));
+  });
 }

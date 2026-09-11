@@ -13,6 +13,7 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   v1.7.0 — 2026-09-11 — getIndexNowPlan and announceIndexNow: the whole site to IndexNow, and its plan.
  *   v1.6.0 — 2026-09-09 — getMarketplaceStats removed: its route was deleted (a table nothing writes).
  *   v1.5.0 — 2026-09-08 — getCorsOverview: the CORS page in one read.
  *   v1.4.0 — 2026-09-05 — getSecurityOverview: the Security page in one read.
@@ -136,6 +137,11 @@ export const blockAppSeo     = (owner, filename, blocked, reason) =>
 // Only meaningful while apps.seo_mode is "review"; answers 409 otherwise.
 export const approveAppSeo   = (owner, filename, approved) =>
   apiPost(`/v1/admin/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/seo-approve`, { approved });
+// What a whole-site instant update would send, host by host, without sending it.
+export const getIndexNowPlan = (scope = 'all') => apiGet(`/v1/admin/seo/indexnow/plan?scope=${encodeURIComponent(scope)}`);
+// The whole site to IndexNow now: the pages, and with "all" every findable application, one batch
+// per host. Answers 409 without a key or with search engines turned away.
+export const announceIndexNow = (scope = 'all') => apiPost('/v1/admin/seo/indexnow', { scope });
 
 // ── Chat Instances ──
 export const getChatInstances = ()      => apiGet('/v1/chat-instances');
