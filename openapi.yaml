@@ -319,6 +319,42 @@ components:
           format: date-time
         key:
           type: string
+    IndexNowRun:
+      type: object
+      description: One instant-update notice to IndexNow, as the node recorded it
+      properties:
+        at: { type: string, format: date-time }
+        urlCount: { type: integer, description: Addresses sent, over every host }
+        hosts: { type: integer, description: Hosts they were grouped into, one POST each under that host's key file }
+        ok: { type: boolean, description: Every host was accepted (200 or 202) }
+        status: { type: integer, nullable: true, description: The first refusal's status when one host was refused, otherwise the accepted status; null when a request never completed }
+        failed: { type: array, items: { type: string }, description: The hosts whose batch was refused or never answered }
+        scope: { type: string, enum: [app, pages, all], description: What the notice covered }
+        by: { type: string, description: Who asked for an explicit notice; absent when a publish fired it }
+    IndexNowPlan:
+      type: object
+      description: What a whole-site notice would send, host by host
+      properties:
+        scope: { type: string, enum: [all, pages] }
+        url_count: { type: integer }
+        host_count: { type: integer }
+        hosts:
+          type: array
+          items:
+            type: object
+            properties:
+              host: { type: string, description: The origin the batch is sent under }
+              url_count: { type: integer }
+        urls: { type: array, items: { type: string } }
+        apps:
+          type: array
+          description: The applications the plan covers
+          items:
+            type: object
+            properties:
+              owner: { type: string }
+              filename: { type: string }
+              subdomain: { type: string, nullable: true }
     AppSeoState:
       type: string
       description: >-
@@ -356,6 +392,11 @@ components:
             an owner who could set this would approve themselves and the mode would enforce nothing.
           readOnly: true
         approvedAt: { type: string, format: date-time, readOnly: true }
+        announcedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          description: When the search engines were last told about this app through IndexNow. Server-stamped after an accepted notice.
         title: { type: string, maxLength: 120, description: Overrides the derived title. Empty uses the app's name. }
         description: { type: string, maxLength: 320, description: Overrides the derived meta description. }
         keywords:
@@ -23477,9 +23518,27 @@ paths:
                             properties:
                               key_configured: { type: boolean }
                               key_url: { type: string, nullable: true }
+                              key_served:
+                                type: boolean
+                                nullable: true
+                                description: Whether the key file answers from outside with the key as its body, fetched by the node just now (cached a few minutes). Null when there is no key or the node could not reach its own address.
+                              key_checked_at: { type: string, nullable: true, format: date-time }
                               auto: { type: boolean }
                               last_submitted_at: { type: string, nullable: true, format: date-time }
                               last_url_count: { type: integer, nullable: true }
+                              last:
+                                $ref: '#/components/schemas/IndexNowRun'
+                              runs:
+                                type: array
+                                description: The newest notices first, at most five
+                                items: { $ref: '#/components/schemas/IndexNowRun' }
+                              everything:
+                                type: object
+                                description: What a whole-site notice would carry right now, and when one last went out
+                                properties:
+                                  url_count: { type: integer }
+                                  host_count: { type: integer }
+                                  last_sent_at: { type: string, nullable: true, format: date-time }
                           apps:
                             type: object
                             description: How many published apps are in each search-visibility state
@@ -23496,6 +23555,92 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+
+  /v1/admin/seo/indexnow/plan:
+    get:
+      operationId: planIndexNowAnnouncement
+      summary: What a whole-site instant update would send, without sending it
+      description: |
+        Operator-only. The addresses a notice to IndexNow would carry: the node's pages, and with
+        `scope=all` every findable application's own address and its apex path as well, grouped by
+        host because each host is sent under its own key file. The same decision the sitemap index
+        makes per application, so the plan and the index never disagree.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: scope
+          schema: { type: string, enum: [all, pages], default: all }
+      responses:
+        '200':
+          description: The plan
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/IndexNowPlan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/admin/seo/indexnow:
+    post:
+      operationId: announceIndexNow
+      summary: Tell the search engines about the whole site now
+      description: |
+        Operator-only. One instant update covering the node's pages and, with `scope: all`, every
+        findable application, sent to IndexNow as one batch per host under that host's own key
+        file. It reaches Bing (and through it Copilot and ChatGPT search), Yandex, Naver, Seznam and
+        Yep; Google does not take part. It is a knock, not an order: each engine decides whether to
+        come and what to keep.
+
+        Explicit, so the automatic switch (`seo.indexnow_auto`) does not apply. Refused with 409
+        when no IndexNow key is configured or when the node turns search engines away
+        (`seo.indexing = off`). Answers 502 when every host was refused; a partial refusal is a 200
+        whose run names the hosts that were.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scope: { type: string, enum: [all, pages], default: all }
+      responses:
+        '200':
+          description: The notice went out
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          scope: { type: string, enum: [all, pages] }
+                          url_count: { type: integer }
+                          host_count: { type: integer }
+                          run: { $ref: '#/components/schemas/IndexNowRun' }
+                          note: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: No key, or search engines are turned away (NO_INDEXNOW_KEY, INDEXING_OFF, NOTHING_TO_SEND)
+        '502':
+          description: Every host was refused (INDEXNOW_REFUSED); the run is in the error details
 
   /v1/admin/apps/{owner}/{filename}/seo-block:
     post:

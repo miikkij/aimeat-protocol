@@ -343,6 +343,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_app_legal_set: { title: 'App Legal Pages', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_app_audit: { title: 'App Audit Log', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_seo_status: { title: 'Search Visibility Status', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    // Open world: it posts to api.indexnow.org. Idempotent: the same notice twice is the same notice.
+    aimeat_seo_announce: { title: 'Instant Update to Search Engines', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     aimeat_image_generate: { title: 'Generate Image', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_ai_job_start: { title: 'Start AI Job', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_ai_job_list: { title: 'List AI Jobs', readOnlyHint: true },

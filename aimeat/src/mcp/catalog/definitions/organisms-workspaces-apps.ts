@@ -738,6 +738,16 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         input: {},
     },
     {
+        name: 'aimeat_seo_announce',
+        description: 'Tell the search engines about the whole site now, through IndexNow: the node\'s pages and, by default, every findable application, sent as one batch per host under that host\'s own key file. It reaches Bing (and through Bing, Copilot and ChatGPT search), Yandex, Naver, Seznam and Yep; Google does not take part, so the sitemap stays the way Google hears. It is a knock, not an order: each engine decides whether to come and what to keep, and a site never verified in Bing Webmaster Tools gets little of Bing\'s time, so read aimeat_seo_status first and get the verification done. With plan: true it lists what would be sent, host by host, and sends nothing. Refuses when no IndexNow key is configured or when the node turns search engines away. Operator-only.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            scope: { type: 'string', description: '"all" (default): the pages and every findable application. "pages": the pages alone.' },
+            plan: { type: 'boolean', description: 'true lists what would be sent, host by host, and sends nothing.' },
+        },
+    },
+    {
         name: 'aimeat_image_generate',
         description: 'Make a picture from a description, on the owner\'s AI key, and store it. Returns a storage key and a URL rather than the image itself, so the bytes never travel through your context. Pass public: true when a model or a web page has to fetch it back by URL; leave it off for anything private. Needs an IMAGE model to be configured (Profile > OpenRouter, or a node default) — it refuses by name rather than handing the request to a chat model, because a chat model answers an image request with prose. Spends the owner\'s daily AI budget and reports what it cost.',
         caller: 'agent',

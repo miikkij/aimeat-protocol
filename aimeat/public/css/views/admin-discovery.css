@@ -1,0 +1,133 @@
+/* ── Admin Discovery page, in the poster face ──
+ * @file admin-discovery.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's Discovery page (design canvas "AIMEAT Admin Discovery"): one row per
+ *   search engine with its proof field and its doors, the instant-update rows and the send-everything
+ *   box, the identity's underline fields beside the two previews, the application list with its
+ *   state chips as filters, and the outside checks beside the paste box. The frame, the sections,
+ *   the metric rows, the numeral strip, the dashed box and the doors come from admin.css and
+ *   organism.css; only what this page adds lives here. Every value is a theme.css token, so the
+ *   page flips with the theme.
+ * @version-history
+ *   v1.0.0 — 2026-09-11 — Initial. Replaces the .adm-seo-* rules that lived in admin.css.
+ */
+
+/* The last row of a section carries no rule under it; the section's own rule is the next one. */
+.adm-disc .adm-mrow--last { border-bottom: 0; }
+/* A row's value is a mono token (a directive, a path, a stamp) with no space to break at. */
+.adm-disc .adm-mrow .adm-mval { overflow-wrap: anywhere; }
+/* A door inside a value column reads at the value's size. */
+.adm-disc .adm-mval .og-door { font-size: .8rem; }
+/* A strip cell's second line wraps rather than truncates: at 1280 the four cells are narrow. */
+.adm-disc .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-disc .og-strip b.adm-disc-coral { color: var(--accent); }
+
+.adm-disc-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 90ch; }
+.adm-disc-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.adm-disc-note { margin: 8px 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-disc-code { display: inline-block; padding: 1px 6px; font-family: var(--font-mono); font-size: .75rem; background: var(--code-bg); color: var(--text); overflow-wrap: anywhere; }
+.adm-disc-mono { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.adm-disc-ok { color: var(--success-fg); }
+.adm-disc-acts { display: flex; gap: 22px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+
+/* 02: one search engine is a row — who and how it hears, the proof field, the chip, the doors. */
+.adm-disc-erow { display: grid; grid-template-columns: 250px minmax(0, 1fr) 150px 250px; gap: 0 22px; align-items: start; padding: 13px 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text); }
+.adm-disc-erow--last { border-bottom: 0; }
+.adm-disc-erow b { font-weight: 700; }
+.adm-disc-erow-how { font-size: .88rem; line-height: 1.5; }
+.adm-disc-erow-acts { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+/* The beat between a row's sentence and the field under it. */
+.adm-disc-gap { height: 10px; }
+
+/* An underline field: the page's one input shape. The mono one holds a code or an address. */
+.adm-disc-fld { display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 4px 2px 5px; max-width: 520px; }
+.adm-disc-fld--wide { max-width: none; }
+.adm-disc-fld:focus-within { border-bottom-color: var(--accent); }
+.adm .adm-disc-fld input[type="text"],
+.adm .adm-disc-fld input[type="search"] { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .9rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-disc-fld input::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm .adm-disc-fld--mono input[type="text"] { font-family: var(--font-mono); font-size: .8rem; font-weight: 500; }
+.adm .adm-disc-fld--mono input::placeholder { font-weight: 500; }
+.adm-disc-fld svg { width: 16px; height: 16px; flex: none; stroke: var(--text); fill: none; stroke-width: 2.5; }
+/* A many-line field is the 2px box. */
+.adm .adm-disc-box-fld { width: 100%; box-sizing: border-box; border: 2px solid var(--text); border-radius: 0; background: var(--bg); padding: 10px 12px; font: inherit; font-size: .9rem; font-weight: 600; line-height: 1.5; color: var(--text); resize: vertical; min-height: 4.6em; outline: none; box-shadow: none; }
+.adm .adm-disc-box-fld:focus { border-color: var(--accent); box-shadow: none; }
+.adm .adm-disc-box-fld--mono { font-family: var(--font-mono); font-size: .8rem; font-weight: 500; }
+
+/* 03: the rows on the left, the dashed coral box on the right. */
+.adm-disc-two { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 0 44px; align-items: start; }
+.adm-disc .og-box { max-width: none; }
+.adm-disc-box-body { font-size: .88rem; line-height: 1.55; }
+.adm-disc-box-acts { display: flex; gap: 22px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+/* The last notices under the box: a mono line each. */
+.adm-disc-runs { margin-top: 18px; }
+.adm-disc-run { display: flex; gap: 14px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); flex-wrap: wrap; }
+.adm-disc-run:last-child { border-bottom: 0; }
+.adm-disc-run b { font-weight: 500; color: var(--text); }
+/* The plan, opened from "See the list first": the hosts, then every address. */
+.adm-disc-plan-hosts { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 12px; }
+.adm-disc-plan-urls { max-height: 40vh; overflow: auto; border: 2px solid var(--text); padding: 8px 10px; font-family: var(--font-mono); font-size: .75rem; line-height: 1.6; color: var(--text); background: var(--bg-surface); }
+.adm-disc-plan-urls div { overflow-wrap: anywhere; }
+
+/* 04: the fields on the left, the two previews on the right. */
+.adm-disc-identity { display: grid; grid-template-columns: minmax(0, 1fr) 460px; gap: 0 44px; align-items: start; }
+.adm-disc-fields { display: flex; flex-direction: column; gap: 18px; }
+.adm-disc-fields .adm-disc-fld { max-width: none; }
+.adm-disc-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; }
+.adm-disc-frame { border: 2px solid var(--text); background: var(--card-bg); padding: 12px 14px; margin-bottom: 18px; }
+.adm-disc-frame--card { padding: 0; }
+.adm-disc-serp-url { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.adm-disc-serp-title { font-weight: 700; font-size: 1.05rem; color: var(--accent); margin: 2px 0; }
+.adm-disc-serp-desc { font-size: .85rem; color: var(--text-dim); line-height: 1.45; }
+.adm-disc-card-img { display: block; width: 100%; max-width: 100%; height: 200px; object-fit: cover; background: var(--text); }
+.adm-disc-card-img--empty { display: flex; align-items: center; justify-content: center; color: var(--bg); font-size: .8rem; }
+.adm-disc-card-body { padding: 12px 14px; }
+.adm-disc-card-title { font-weight: 700; font-size: .95rem; color: var(--text); }
+.adm-disc-card-host { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: 6px; }
+
+/* 05: the mode chips in the header, the tally chips as filters, the search field, the table. */
+.adm-disc-chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.adm-disc-chips-lbl { font-size: .78rem; color: var(--text-dim); margin-right: 6px; }
+.adm-disc-fchip { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 9px; border: 2px solid var(--border); background: none; color: var(--text-dim); cursor: pointer; border-radius: 0; }
+.adm-disc-fchip:hover { border-color: var(--text); color: var(--text); }
+.adm-disc-fchip.on { border-color: var(--text); background: var(--sun); color: var(--on-sun); }
+.adm-disc-fchip:disabled { opacity: .5; cursor: default; }
+.adm-disc-filters { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; flex-wrap: wrap; }
+.adm-disc-sep { width: 1px; height: 22px; background: var(--border); margin: 0 6px; }
+.adm-disc-filters .adm-disc-fld { flex: 1 1 14rem; max-width: none; padding-bottom: 3px; }
+.adm-disc-tbl td.adm-disc-addr, .adm-disc-tbl td.adm-disc-when { font-family: var(--font-mono); font-size: .72rem; white-space: nowrap; }
+.adm-disc-tbl td.adm-disc-addr { white-space: normal; overflow-wrap: anywhere; }
+.adm-disc-tbl td.adm-disc-do { text-align: right; white-space: nowrap; }
+.adm-disc-tbl td b { color: var(--text); font-weight: 700; }
+/* A state chip is one word on one line, even in the narrow column a phone's scrolling table gives it. */
+.adm-disc-tbl .adm-badge { white-space: nowrap; }
+.adm-disc-tbl .adm-disc-why { display: block; font-size: .75rem; color: var(--text-dim); margin-top: 2px; }
+.adm-disc-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; margin-top: 14px; flex-wrap: wrap; }
+.adm-disc-empty { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: .88rem; color: var(--text-dim); }
+
+/* 06: the checks on the left, the paste on the right. */
+.adm-disc-checks { display: grid; grid-template-columns: minmax(0, 1fr) 560px; gap: 0 44px; align-items: start; }
+.adm-disc-paste { white-space: pre-wrap; font-size: .85rem; line-height: 1.55; color: var(--text); }
+
+@media (max-width: 1100px) {
+  .adm-disc .og-strip { flex-wrap: wrap; }
+  .adm-disc .og-strip > div { flex: 1 1 50%; border-right: 0; border-bottom: 1px solid var(--border); }
+  .adm-disc-erow { grid-template-columns: 200px minmax(0, 1fr); gap: 6px 19px; }
+  .adm-disc-erow > :nth-child(3) { grid-column: 2; }
+  .adm-disc-erow .adm-disc-erow-acts { grid-column: 1 / -1; }
+  .adm-disc-two, .adm-disc-identity, .adm-disc-checks { grid-template-columns: 1fr; gap: 18px 0; }
+}
+
+/* A phone: a metric row keeps its name readable and puts the chip and the value under each other on
+   the right; an engine row is a column; the pair of fields stacks. */
+@media (max-width: 768px) {
+  .adm-disc .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; }
+  .adm-disc .adm-mrow > :nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+  .adm-disc .adm-mrow > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .adm-disc .adm-mrow > :nth-child(3) { grid-column: 2; grid-row: 2; max-width: 11rem; white-space: normal; }
+  .adm-disc-erow { grid-template-columns: 1fr; gap: 8px 0; }
+  .adm-disc-erow > :nth-child(3) { grid-column: 1; }
+  .adm-disc-pair { grid-template-columns: 1fr; gap: 18px 0; }
+  .adm-disc-fld, .adm-disc-fields .adm-disc-fld { max-width: none; }
+}

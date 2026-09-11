@@ -27,6 +27,9 @@
  * @structure registerSeoTools(mcp, storage, config, getAgentGaii)
  * @usage import { registerSeoTools } from './seo.js';
  * @version-history
+ *   v1.1.0 — 2026-09-11 — aimeat_seo_announce: the whole site to IndexNow, or its plan. Calls
+ *     planAnnouncement / announceEverything (indexnow-site.ts), the same functions
+ *     POST /v1/admin/seo/indexnow calls.
  *   v1.0.1 — 2026-08-29 — The header's gap note names the marks door that now exists (app-marks.ts).
  *   v1.0.0 — 2026-08-25 — Initial.
  */
@@ -36,8 +39,10 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { buildSeoStatus } from '../routes/admin-seo.js';
+import { buildSeoStatus, announceNote } from '../routes/admin-seo.js';
 import { ownerAppSeo } from '../services/app-seo.js';
+import { planAnnouncement, announceEverything } from '../services/indexnow-site.js';
+import { emitChange } from '../services/event-bus.js';
 import { resolveOperatorName } from '../services/owner-lifecycle.js';
 
 export function registerSeoTools(
@@ -67,6 +72,52 @@ export function registerSeoTools(
       }
       const status = await buildSeoStatus(config, storage);
       return { content: [{ type: 'text' as const, text: JSON.stringify(status, null, 2) }] };
+    },
+  );
+
+  mcp.tool(
+    'aimeat_seo_announce',
+    descriptionFor('aimeat_seo_announce'),
+    {
+      scope: z.enum(['all', 'pages']).optional().describe('"all" (default): the pages and every findable application. "pages": the pages alone.'),
+      plan: z.boolean().optional().describe('true lists what would be sent, host by host, and sends nothing.'),
+    },
+    annotationsFor('aimeat_seo_announce'),
+    async (args: { scope?: 'all' | 'pages'; plan?: boolean }) => {
+      // Operator-gated here for the same reason aimeat_seo_status is: this calls the service the
+      // route calls, not the route, so the route's gate has to be repeated at this door.
+      const operator = await resolveOperatorName(storage, getAgentGaii());
+      if (!operator) {
+        return {
+          content: [{ type: 'text' as const, text: 'Only whoever runs this node can tell the search engines about it.' }],
+          isError: true,
+        };
+      }
+      const scope = args.scope ?? 'all';
+      if (args.plan) {
+        const plan = await planAnnouncement(config, storage, scope);
+        return { content: [{ type: 'text' as const, text: JSON.stringify({
+          scope, url_count: plan.urls.length, host_count: plan.hosts.length, hosts: plan.hosts, urls: plan.urls,
+        }, null, 2) }] };
+      }
+      const out = await announceEverything(config, storage, { scope, by: operator });
+      if (!out.sent) {
+        const why = out.reason === 'no_key'
+          ? 'No IndexNow key is set on this node (AIMEAT_INDEXNOW_KEY); whoever installed it is the one to ask.'
+          : out.reason === 'indexing_off'
+            ? 'Search engines are turned away on this node (seo.indexing is off), so there is nothing to announce.'
+            : 'There is nothing to send: no pages and no findable application.';
+        return { content: [{ type: 'text' as const, text: why }], isError: true };
+      }
+      emitChange('apps');
+      const { run } = out;
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({
+          scope, url_count: run.urlCount, host_count: run.hosts, run,
+          note: announceNote(scope, run.urlCount, run.hosts, run.failed),
+        }, null, 2) }],
+        ...(run.failed.length === run.hosts ? { isError: true } : {}),
+      };
     },
   );
 

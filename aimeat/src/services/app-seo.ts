@@ -36,6 +36,8 @@
  * @usage
  *   if (!appSeoIndexable(app, config)) return disallowRobots();
  * @version-history
+ *   v1.1.1 — 2026-09-11 — The notice goes through announceApp, which sends each host under its own
+ *     key and stamps seo.announcedAt on the app.
  *   v1.1.0 — 2026-08-25 — applyOwnerSeoUpdate() and ownerAppSeo(): the WRITE, in one place, so the
  *     HTTP door and the MCP tool cannot drift on which fields are stripped, whether the update
  *     merges, what the owner is told, or when IndexNow hears about it. The MCP surface reaches
@@ -47,7 +49,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { AppSeo, AppSummaryRecord } from '../storage/types/apps.js';
-import { submitToIndexNow, appSubmitUrls } from './indexnow.js';
+import { announceApp } from './indexnow.js';
 import { resolveAppOwnerScope } from './app-lifecycle.js';
 import { emitChange } from './event-bus.js';
 
@@ -225,8 +227,8 @@ export async function applyOwnerSeoUpdate(
   if (appSeoIndexable(after, config)) {
     const site = (await storage.listSubdomainSites())
       .find(s => s.enabled && s.kind === 'app' && s.target === `${target.ownerName}/${target.filename}`);
-    await submitToIndexNow(config, storage,
-      appSubmitUrls(config, { ownerName: target.ownerName, filename: target.filename }, site?.subdomain));
+    await announceApp(config, storage,
+      { ownerGaii: target.ownerGaii, ownerName: target.ownerName, filename: target.filename }, site?.subdomain);
   }
 
   return { state, note: seoNote(state), seo: after.manifest?.seo ?? {} };

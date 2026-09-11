@@ -39,6 +39,8 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   v1.9.1 — 2026-09-11 — The IndexNow notice goes through announceApp: each host under its own key,
+ *     and the app stamped with when it was last told.
  *   v1.9.0 — 2026-09-05 — The declared register travels to the publish response beside the track,
  *     so an Atelier app is told which genre page it has to stand beside
  *     (wish-atelier-always-excellent, part 4).
@@ -93,7 +95,7 @@ import { lintAppHtmlForMobile } from '../utils/app-mobile-lint.js';
 import { invalidateProtectionCache } from '../utils/app-protect.js';
 import { ensureAppSubdomain } from '../routes/subdomains.js';
 import { appSeoIndexable } from './app-seo.js';
-import { submitToIndexNow, appSubmitUrls } from './indexnow.js';
+import { announceApp } from './indexnow.js';
 import { logger } from '../utils/logger.js';
 import { refreshAppDependencies } from './dependency-map.js';
 
@@ -492,7 +494,7 @@ export async function publishApp(
         ? (await storage.listSubdomainSites())
           .find(s => s.enabled && s.kind === 'app' && s.target === `${ownerName}/${filename}`)
         : undefined;
-      await submitToIndexNow(config, storage, appSubmitUrls(config, { ownerName, filename }, site?.subdomain));
+      await announceApp(config, storage, { ownerGaii: ownerGhii, ownerName, filename }, site?.subdomain);
     }
   }
 
