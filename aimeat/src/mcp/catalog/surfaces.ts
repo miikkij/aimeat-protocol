@@ -293,6 +293,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_admin_statistics',
         // The Usage page in one read: whose money paid for the AI, and the key nothing here meters.
         'aimeat_admin_usage',
+        // The Knowledge page in one read: the whole collection, its shape, and who has already looked.
+        'aimeat_admin_knowledge',
         // Arranging this node's front page and the page its members land on.
         'aimeat_surface_layout_get', 'aimeat_surface_layout_set',
         // The operator's break-glass over an organism whose creator account is unreachable, plus the

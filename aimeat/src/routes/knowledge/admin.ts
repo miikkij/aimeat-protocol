@@ -16,6 +16,15 @@
  *     A package imported by the person's agent stays readable by the person, because both resolve to
  *     one owner. The refusal is the same 404 a missing package gets: whether a package exists is not
  *     something this door should confirm to a stranger.
+ *   v1.3.0 — 2026-09-12 — The list carries `paging` and `facets`, and the gathering moves to
+ *     services/knowledge-overview.ts. The count was always returned and never read: the page showed
+ *     the first twenty of however many there were. The facets are where the data's own two defects
+ *     become visible — one person under two spellings, and a maturity word this node never defined.
+ *   v1.4.0 — 2026-09-12 — The operator's import runs the SAME schema the agent's does; it checked
+ *     the name and the content type and wrote the rest unvalidated, which is how `maturity` outside
+ *     the declared three reached the catalogue. Review and delete search the operator's own
+ *     namespace as well as the agents': the operator could not act on a package they had created,
+ *     because those two lookups read agents alone while the list always read both.
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -25,6 +34,8 @@ import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import type { KnowledgeHelpers } from './helpers.js';
+import { validateManifest } from './manifest-validator.js';
+import { buildKnowledgeOverview, DEFAULT_PER_PAGE } from '../../services/knowledge-overview.js';
 
 export function registerAdminRoutes(
   router: Router,
@@ -34,103 +45,37 @@ export function registerAdminRoutes(
 ): void {
   const { resolve } = helpers;
 
-  /* ── GET /v1/admin/knowledge — List all packages for operator review ── */
+  /* ── GET /v1/admin/knowledge — the operator's list, the SHAPE of the collection, and the count ──
+   *
+   * THE COUNT IS THE POINT. This route has always paginated and always returned `total`; the page
+   * asked for page one, read only `packages`, and showed the first twenty of however many there
+   * were. On a moderation surface that is the one failure it cannot have, so `page` now carries
+   * number, per_page, total and pages together and nothing has to infer them.
+   *
+   * `facets` is the other half: by author, by kind, by how finished, counted over EVERYTHING that
+   * matched rather than over the page. It is where two defects in the data become visible — one
+   * person stored under two spellings, and a maturity word this node does not define.
+   * → services/knowledge-overview.ts
+   */
   router.get('/v1/admin/knowledge', requireAuth(), requireRole('operator'), async (req, res) => {
-    const page = Math.max(1, parseInt(req.query.page as string || '1'));
-    const perPage = Math.min(50, Math.max(1, parseInt(req.query.limit as string || '20')));
-    const filterFlagged = req.query.flagged === 'true';
-    const filterAuthor = req.query.author as string | undefined;
-    const filterType = req.query.content_type as string | undefined;
-
-    const allAgents = await storage.listAgents();
-    const seenKeys = new Set<string>();
-    type AdminManifestRow = {
-      key: string;
-      value: KnowledgeManifest;
-      ownerGaii: string;
-      visibility: string;
-      flagCount: number;
-      createdAt: string;
-      updatedAt: string;
-      isSystem: boolean;
-    };
-    let manifests: AdminManifestRow[] = [];
-
-    // Collect from all agents in ONE IN query (was listMemory per agent).
-    const agentManifests = await storage.listMemoryForOwners(allAgents.map(a => a.gaii), {
-      prefix: 'packages/',
-      tags: ['knowledge-package'],
+    const str = (k: string) => (typeof req.query[k] === 'string' ? req.query[k] as string : undefined);
+    const data = await buildKnowledgeOverview(config, storage, resolve(req), {
+      page: parseInt(str('page') || '1'),
+      perPage: parseInt(str('limit') || String(DEFAULT_PER_PAGE)),
+      flagged: req.query.flagged === 'true',
+      ...(str('author') ? { author: str('author') } : {}),
+      ...(str('author_key') ? { authorKey: str('author_key') } : {}),
+      ...(str('content_type') ? { contentType: str('content_type') } : {}),
+      ...(str('q') ? { q: str('q') } : {}),
     });
-    for (const m of agentManifests) {
-      if (m.key.endsWith('/manifest') && (m.value as { type?: string })?.type === 'knowledge-package' && !seenKeys.has(m.key)) {
-        seenKeys.add(m.key);
-        manifests.push({
-          key: m.key,
-          value: m.value as KnowledgeManifest,
-          ownerGaii: m.ownerGaii,
-          visibility: m.visibility,
-          flagCount: m.flagCount ?? 0,
-          createdAt: m.createdAt,
-          updatedAt: m.updatedAt,
-          isSystem: (m.tags || []).includes('system-knowledge'),
-        });
-      }
-    }
-
-    // Also collect system packages stored under operator GAII
-    const operatorGaii = resolve(req);
-    const operatorManifests = await storage.listMemory(operatorGaii, {
-      prefix: 'packages/',
-      tags: ['knowledge-package'],
-    });
-    for (const m of operatorManifests) {
-      if (m.key.endsWith('/manifest') && (m.value as { type?: string })?.type === 'knowledge-package' && !seenKeys.has(m.key)) {
-        seenKeys.add(m.key);
-        manifests.push({
-          key: m.key,
-          value: m.value as KnowledgeManifest,
-          ownerGaii: m.ownerGaii,
-          visibility: m.visibility,
-          flagCount: m.flagCount ?? 0,
-          createdAt: m.createdAt,
-          updatedAt: m.updatedAt,
-          isSystem: true,
-        });
-      }
-    }
-
-    // Apply filters
-    if (filterFlagged) manifests = manifests.filter(m => m.flagCount > 0);
-    if (filterAuthor) manifests = manifests.filter(m => m.value.author === filterAuthor);
-    if (filterType) manifests = manifests.filter(m => m.value.content_type === filterType);
-
-    // Sort: flagged first, then newest
-    manifests.sort((a, b) => {
-      if (a.flagCount !== b.flagCount) return b.flagCount - a.flagCount;
-      return (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt);
-    });
-
-    const total = manifests.length;
-    const paged = manifests.slice((page - 1) * perPage, page * perPage);
-
+    // The old flat fields stay beside the new ones: this list has other readers, and none of them
+    // should have to learn a new shape to keep working.
+    const paging = data.paging as { number: number; per_page: number; total: number };
     res.json(success(config.nodeId, {
-      packages: paged.map(m => ({
-        key: m.key,
-        package_id: m.key.replace('packages/', '').replace('/manifest', ''),
-        name: m.value.name,
-        author: m.value.author,
-        content_type: m.value.content_type,
-        tags: m.value.tags || [],
-        visibility: m.visibility,
-        flag_count: m.flagCount,
-        maturity: m.value.maturity,
-        entries_count: (m.value.entries || []).length,
-        is_system: m.isSystem || false,
-        created: m.value.created || m.createdAt,
-      })),
-      total,
-      page,
-      per_page: perPage,
+      ...data,
+      total: paging.total,
+      page: paging.number,
+      per_page: paging.per_page,
     }));
   });
 
@@ -188,6 +133,18 @@ export function registerAdminRoutes(
       updated: now,
     };
 
+    // THE SAME SCHEMA THE AGENT'S IMPORT PASSES. This door checked the name and the content type
+    // and then wrote whatever it had assembled, so `maturity` outside draft | review | published
+    // went straight into the catalogue — while the unprivileged door refused it with the field
+    // named. The privileged path being the unvalidated one is the wrong way round: an operator's
+    // mistake lands with the node's own authority behind it.
+    if (!validateManifest(manifest)) {
+      res.status(400).json(error(config.nodeId, 'SCHEMA_VALIDATION',
+        'The description file for this package has something wrong in it. The details below say which part.',
+        undefined, validateManifest.errors));
+      return;
+    }
+
     // Store manifest
     await storage.setMemory({
       key: manifestKey,
@@ -234,9 +191,13 @@ export function registerAdminRoutes(
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
 
-    // Find the package across all agents in ONE IN query (was getMemory per agent).
+    // Across every agent AND the operator's own namespace, in one IN query. It was agents alone,
+    // so a package the operator created through /v1/admin/knowledge/import — which stores it under
+    // the OPERATOR's gaii — could not be found by its own node: the list showed it and this door
+    // answered 404. The list route always read both; these two never did.
     const allAgents = await storage.listAgents();
-    const hit = (await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey }))
+    const searchOwners = [...allAgents.map(a => a.gaii), resolve(req)];
+    const hit = (await storage.listMemoryForOwners(searchOwners, { prefix: manifestKey }))
       .find(r => r.key === manifestKey) ?? null;
     let found = false;
 
@@ -291,9 +252,13 @@ export function registerAdminRoutes(
 
     const manifestKey = `packages/${packageId}/manifest`;
 
-    // Find the package across all agents in ONE IN query (was getMemory per agent).
+    // Across every agent AND the operator's own namespace, in one IN query. It was agents alone,
+    // so a package the operator created through /v1/admin/knowledge/import — which stores it under
+    // the OPERATOR's gaii — could not be found by its own node: the list showed it and this door
+    // answered 404. The list route always read both; these two never did.
     const allAgents = await storage.listAgents();
-    const manifest: MemoryRecord | null = (await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey }))
+    const searchOwners = [...allAgents.map(a => a.gaii), resolve(req)];
+    const manifest: MemoryRecord | null = (await storage.listMemoryForOwners(searchOwners, { prefix: manifestKey }))
       .find(r => r.key === manifestKey) ?? null;
 
     if (!manifest) {

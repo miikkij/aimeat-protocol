@@ -469,6 +469,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_admin_cors_overview: { title: 'Admin: CORS Overview', readOnlyHint: true },
     aimeat_admin_hooks: { title: 'Admin: Hooks', readOnlyHint: true },
     aimeat_admin_statistics: { title: 'Admin: Statistics', readOnlyHint: true },
+    aimeat_admin_knowledge: { title: 'Admin: Knowledge', readOnlyHint: true },
     // Read-only about this node, but `ask_provider` reaches a third party, so it is not closed-world.
     aimeat_admin_usage: { title: 'Admin: Usage', readOnlyHint: true, openWorldHint: true },
     // Not destructive: binding replaces a list the operator can read first and set back.

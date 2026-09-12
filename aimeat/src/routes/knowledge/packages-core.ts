@@ -12,6 +12,10 @@
  *     `original` mints an addressable provenance record (`stampedBy: 'principal'` — the author
  *     declares it, the node did not witness it) and attaches it to the manifest; GET /:id serves it
  *     on `meta.provenance` + the AI-Disclosure headers.
+ *   v1.3.0 — 2026-09-12 — The compiled schema moves to ./manifest-validator.ts so the operator's
+ *     import can use it too, and the refusal's `details` reach the caller: they were being passed
+ *     as error()'s fourth argument, which is httpStatus, so "the details below say which part" has
+ *     carried none since the line was written. The untyped require('ajv') hid it.
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,25 +25,15 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
-import { ManifestSchema } from '../../schemas/knowledge-package.js';
-import { createRequire } from 'node:module';
 import type { KnowledgeHelpers } from './helpers.js';
+import { validateManifest } from './manifest-validator.js';
 import { mintProvenance } from '../../services/ai-provenance.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 
-const require = createRequire(import.meta.url);
-
-const ajvPkg = require('ajv');
-const formatsPkg = require('ajv-formats');
-
-const AjvClass = ajvPkg.default ?? ajvPkg;
-const addFormats = formatsPkg.default ?? formatsPkg;
-
-const ajv = new AjvClass({ allErrors: true });
-addFormats(ajv);
-const validateManifest = ajv.compile(ManifestSchema);
+// The validator is shared with the operator's import, which used to write a manifest nothing
+// checked. → ./manifest-validator.ts
 
 export function registerPackagesCoreRoutes(
   router: Router,
@@ -93,7 +87,13 @@ export function registerPackagesCoreRoutes(
     // Validate manifest structure
     const manifest = pkg as KnowledgeManifest;
     if (!validateManifest(manifest)) {
-      res.status(400).json(error(config.nodeId, 'SCHEMA_VALIDATION', 'The description file for this package has something wrong in it. The details below say which part.', validateManifest.errors));
+      // `details` is the FIFTH argument; the fourth is httpStatus. The AJV errors went into the
+      // status slot for as long as this call has existed, and the untyped require() hid it — so a
+      // message promising "the details below" carried none. Sharing the typed validator is what
+      // surfaced it.
+      res.status(400).json(error(config.nodeId, 'SCHEMA_VALIDATION',
+        'The description file for this package has something wrong in it. The details below say which part.',
+        undefined, validateManifest.errors));
       return;
     }
 
