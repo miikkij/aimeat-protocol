@@ -14,6 +14,9 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.20.0 — 2026-09-12 — ensureAppSubdomain reads a target's mapping whatever its state: an
+ *     address the operator turned off used to make the next open mint a second label for the same
+ *     app, so the switch on the Subdomains page undid itself.
  *   v1.19.0 — 2026-08-29 — The app's legal pages ride into the head-meta pass as <link rel> tags.
  *   v1.18.0 — 2026-08-29 — serveApp reads the owner's badge and install-chip switches and the
  *     named reviewer from the manifest (services/app-marks.ts); the reviewer is also the JSON-LD
@@ -144,8 +147,15 @@ export async function ensureAppSubdomain(storage: Storage, config: AimeatConfig,
   if (!config.appHost) return null;
   const target = `${ownerBare}/${filename}`;
   const sites = await storage.listSubdomainSites();
-  const existing = sites.find(s => s.enabled && s.kind === 'app' && s.target === target);
-  if (existing) return existing.subdomain;
+  // A mapping the operator turned OFF is an answer, not an absence. Matching only enabled rows
+  // meant the next open of that app minted a SECOND label for the same target (`notes-2`), so
+  // "off" was worked around by the node itself within minutes and the operator never saw why.
+  // A disabled mapping now means this app has no address of its own, and the callers fall back
+  // to the shared path form, which serves the same app.
+  const forTarget = sites.filter(s => s.kind === 'app' && s.target === target);
+  const live = forTarget.find(s => s.enabled);
+  if (live) return live.subdomain;
+  if (forTarget.length > 0) return null;
 
   const taken = new Set(sites.map(s => s.subdomain));
   const free = (n: string) => SUBDOMAIN_RE.test(n) && !RESERVED_SUBDOMAINS.has(n) && !taken.has(n);
@@ -160,7 +170,7 @@ export async function ensureAppSubdomain(storage: Storage, config: AimeatConfig,
     await storage.createSubdomainSite({ subdomain: name, kind: 'app', target, enabled: true, createdBy: `${ownerBare}@${config.nodeId}`, createdAt: now, updatedAt: now });
     return name;
   } catch {
-    // Race: a concurrent request created the mapping — re-resolve.
+    // Race: a concurrent request created the mapping — re-resolve, on the same terms as above.
     const after = (await storage.listSubdomainSites()).find(s => s.enabled && s.kind === 'app' && s.target === target);
     return after?.subdomain ?? null;
   }
