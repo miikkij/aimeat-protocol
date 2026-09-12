@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.42.0 -- 2026-09-12 -- Add e2e-admin-usage-page.ts to ALL_SUITES: whose money each figure is,
+ *            and the key this node cannot meter. Not in the guard tier yet.
  *   v1.41.0 -- 2026-09-12 -- Add e2e-admin-stats-page.ts to ALL_SUITES: the twin of e2e-metrics,
  *            asserting that GET /v1/stats counts requests at all. Not in the guard tier yet.
  *   v1.40.0 -- 2026-09-12 -- Add e2e-admin-hooks-page.ts to ALL_SUITES: the Hooks page's read, the
@@ -565,6 +567,9 @@ const ALL_SUITES = [
     // was written and never mounted), that a scope refusal is counted, and that a period reading is
     // a different reading from the node's whole life.
     'test/e2e-admin-stats-page.ts',
+    // The Usage page's read: that every figure says whose money it is, that the chat agent's key is
+    // reported as NOT metered here, and that a half-stated period is refused rather than completed.
+    'test/e2e-admin-usage-page.ts',
     'test/e2e-living-pulse.ts',
     // Every core scheduled job fired through the operator's trigger door, on a node of its own
     // (40310) with an SMTP sink, short windows and the flags the seeding keys on. Lane 0.

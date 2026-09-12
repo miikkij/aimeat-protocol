@@ -132,6 +132,8 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     // The Statistics page's read. Operator-gated in the handler like the rest of this block; there
     // is nothing to narrow, because it is one read of counters the node keeps about itself.
     'aimeat_admin_statistics',
+    // The Usage page's read: what AI costs here and whose money paid. Same gate, same reason.
+    'aimeat_admin_usage',
     // Reading how a page is arranged, and the catalogue of blocks this node can serve. Gated in the
     // handler on the operator, like the admin tools above it, and there is nothing here to narrow:
     // a layout is a list of block names, and the front page's describes a page anyone can look at.
