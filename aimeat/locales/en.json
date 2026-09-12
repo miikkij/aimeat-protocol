@@ -12,6 +12,14 @@
         "bearer": "Bearer token",
         "oauth2": "OAuth"
       },
+      "category": {
+        "data": "data",
+        "utility": "utility",
+        "image": "image",
+        "communication": "communication",
+        "analytics": "analytics",
+        "analysis": "analysis"
+      },
       "now": {
         "title": "Right now",
         "line": "Registering one connects nothing. It publishes a description that an AI can read, and the call is made by whoever read it."
@@ -215,7 +223,7 @@
         "closeWhy": "The names differ by a few letters. That can be a typo and it can be two real things, so read the descriptions before deciding.",
         "batch": "{n} put here by {who} on {day}",
         "batchWhy": "Installed together in one sitting and loaded by nothing since. Usually the parts of one app that is no longer published.",
-        "site": "Shipped with this site: {n}",
+        "site": "{n} that shipped with this site",
         "siteWhy": "This site installed these itself so that anyone building an app can reach for them. Nothing has asked yet, they cost nothing to leave on, and leaving them alone is the right move.",
         "oneWhy": "Installed {when} by {who}. Nothing else here looks like it.",
         "show": "Show them",

@@ -1,7 +1,7 @@
 {
   "admin": {
     "msm": {
-      "intro": "Machine service manifest on kirjoitettu kuvaus ulkopuolisesta palvelusta: mitä se tekee, missä se on, mitä se ottaa ja mitä se antaa takaisin. Tekoäly lukee kuvauksen ja kutsuu palvelua itse. Tämä sivusto säilyttää kuvauksen eikä koskaan tee sitä kutsua.",
+      "intro": "Machine service manifest on kirjoitettu kuvaus ulkopuolisesta palvelusta: mitä se tekee, missä se on, mitä se ottaa ja mitä se antaa takaisin. Tekoäly lukee kuvauksen ja kutsuu palvelua itse. Tämä sivusto säilyttää kuvauksen eikä kutsu palvelua koskaan itse.",
       "writeNew": "Kirjoita uusi",
       "open": "Avaa",
       "deleteIt": "Poista",
@@ -12,18 +12,26 @@
         "bearer": "Bearer-tunnus",
         "oauth2": "OAuth"
       },
+      "category": {
+        "data": "tieto",
+        "utility": "työkalu",
+        "image": "kuva",
+        "communication": "viestintä",
+        "analytics": "mittaus",
+        "analysis": "arvio"
+      },
       "now": {
         "title": "Juuri nyt",
-        "line": "Rekisteröinti ei yhdistä mitään. Se julkaisee kuvauksen, jonka tekoäly voi lukea, ja kutsun tekee se joka luki."
+        "line": "Rekisteröinti ei yhdistä mitään. Se julkaisee kuvauksen, jonka tekoäly voi lukea, ja kutsun tekee se joka sen luki."
       },
       "strip": {
         "registered": "Rekisteröity",
-        "registeredSub": "kuvausta tämän sivuston hallussa",
+        "registeredSub": "kuvausta, jotka tämä sivusto säilyttää",
         "needKey": "Vaatii avaimen",
         "needKeySub": "ja avain on koneella, ei täällä",
         "repeated": "Kuvaa samaa palvelua",
-        "repeatedNone": "mikään kaksi ei kuvaa samaa",
-        "quiet": "Päivää koskematta",
+        "repeatedNone": "mitkään kaksi eivät kuvaa samaa",
+        "quiet": "Päivää ilman muutosta",
         "quietSub": "siitä kun mitään täällä viimeksi muutettiin"
       },
       "col": {
@@ -36,7 +44,7 @@
       "list": {
         "title": "Mitä on rekisteröity",
         "count": "{n} / {total}",
-        "find": "Etsi nimellä, osoitteella, toiminnolla, omistajalla tai sanoilla",
+        "find": "Etsi nimellä, osoitteella, toiminnolla, kirjoittajalla tai kuvauksen sanoilla",
         "noMatch": "Mikään täällä ei vastaa hakuasi.",
         "none": "Mitään ei ole vielä rekisteröity. Alla olevat valmiit mallit ovat nopein tapa aloittaa."
       },
@@ -45,7 +53,7 @@
         "count": "{n} ylimääräistä kopiota",
         "countOne": "Yksi ylimääräinen kopio",
         "countNone": "Ei ylimääräisiä kopioita",
-        "lead": "{n} / {total} kuuluu joukkoon jossa on vähintään yksi toinen. Kaksi manifestia on samassa joukossa kun ne kutsuvat samaa osoitetta tai tarjoavat samannimisen toiminnon, ja se mikä ne yhdisti lukee jokaisella rivillä.",
+        "lead": "{n} / {total} on joukossa jossa on mukana vähintään yksi toinen. Kaksi manifestia päätyy samaan joukkoon kun ne kutsuvat samaa osoitetta tai tarjoavat samannimisen toiminnon, ja se mikä ne yhdisti lukee rivillä.",
         "none": "Mitkään kaksi näistä eivät kuvaa samaa asiaa.",
         "byHost": "{n} jotka kutsuvat osoitetta {host}",
         "byHostWhy": "Jokainen niistä osoittaa samaan paikkaan. Ne on kirjoitettu erikseen, eikä mikään kerro mikä niistä pitäisi lukea.",
@@ -74,14 +82,14 @@
         "write": "Vain omistaja saa kirjoittaa",
         "writeWhy": "Asetetaan muuttujalla AIMEAT_MSM_INSTALL_ROLE, joka on omistaja ellei operaattori ole vaihtanut sitä. Poistaminenkin on omistajan.",
         "travel": "Federointi lähettää sen eteenpäin",
-        "travelWhy": "Matkustamaan merkitty manifesti menee niille sivustoille joiden kanssa tämä on kytköksissä, ja mikä tahansa niistä voidaan myös pakata komponenttipakettiin ja viedä minne vain.",
+        "travelWhy": "Federoitavaksi merkitty manifesti menee tämän sivuston vertaisille, ja mikä tahansa niistä voidaan myös pakata komponenttipakettiin ja viedä minne vain.",
         "boxLabel": "Hyvä tietää",
         "box": "Manifesti on väite jonkun toisen palvelusta. Mikään täällä ei tarkista että osoite vielä vastaa, että toiminnot ovat yhä olemassa, tai että se mitä ne ottavat ja antavat on yhä oikein. Manifesti saa jopa määritellä terveystarkistuksen, eikä sitä aja mikään. Mitään täällä ei ole muutettu {days} päivään."
       },
       "detail": {
         "back": "← Kaikki manifestit",
         "publicBadge": "Julkinen",
-        "federatedBadge": "Matkustaa",
+        "federatedBadge": "Federoitu",
         "meta": "Kirjoitettu {when}, kirjoittaja {who} · {category} · versio {version}",
         "neverEdited": "· ei muokattu sen jälkeen",
         "editedAt": "· viimeksi muokattu {when}",
@@ -112,15 +120,15 @@
         "readableAll": "Kuka tahansa, ilman kirjautumista, osoitteessa",
         "readableWhy": "Avainmuuttujan nimi siivotaan julkisesta vastauksesta. Osoite, toiminnot ja kaikki mitä ne ottavat ovat siinä.",
         "federation": "Federointi",
-        "federateOn": "Merkitty matkustamaan niille sivustoille joiden kanssa tämä on kytköksissä.",
-        "federateOff": "Ei merkitty matkustamaan.",
+        "federateOn": "Merkitty menemään tämän sivuston vertaisille.",
+        "federateOff": "Ei merkitty menemään vertaisille.",
         "descriptionLabel": "Kuvaus jonka tekoäly lukee ensin",
         "saveDescription": "Tallenna kuvaus",
         "editDescription": "Muokkaa kuvausta",
-        "startFederating": "Lähetä kytköksiin",
+        "startFederating": "Lähetä vertaisille",
         "stopFederating": "Pidä täällä",
         "editLabel": "Mitä muokkaaminen voi muuttaa",
-        "editWhat": "Vain kuvauksen ja sen matkustaako se kytköksiin. Osoite, toiminnot ja avain jota se haluaa ovat itse manifesti: niiden muuttamiseksi kirjoita se uudestaan ja rekisteröi uusi."
+        "editWhat": "Vain kuvauksen ja sen, meneekö manifesti vertaisille. Osoite, toiminnot ja avain jota se haluaa ovat itse manifesti: niiden muuttamiseksi kirjoita se uudestaan ja rekisteröi uusi."
       },
       "write": {
         "title": "Kirjoita uusi manifesti",
@@ -132,30 +140,30 @@
         "start": "Aloita tästä",
         "theManifest": "Manifesti",
         "from": "aloitettu mallista {name}",
-        "yamlLabel": "Kirjoitettuna YAML-muodossa",
+        "yamlLabel": "YAML-muodossa",
         "yamlPlaceholder": "version, service, auth, actions. Aloita jostakin yllä olevasta nähdäksesi muodon.",
-        "federate": "Lähetä niille sivustoille joiden kanssa tämä on kytköksissä",
+        "federate": "Lähetä tämän sivuston vertaisille",
         "whenYouSave": "Mitä tallennuksessa tapahtuu",
         "shapeChecked": "Muoto tarkistetaan",
-        "shapeCheckedWhy": "Että se jäsentyy, että kategoria ja todennustapa ovat sanoja jotka tämä sivusto tuntee, ja että jokaisella toiminnolla on tunnus, osoite ja metodi. Kaatuva manifesti torjutaan ja korjattavat rivit kerrotaan.",
+        "shapeCheckedWhy": "Että se jäsentyy, että kategoria ja todennustapa ovat sanoja jotka tämä sivusto tuntee, ja että jokaisella toiminnolla on tunnus, osoite ja metodi. Virheellinen manifesti torjutaan, ja sinulle kerrotaan mitkä rivit pitää korjata.",
         "serviceNot": "Palvelua ei tarkisteta",
         "serviceNotWhy": "Mikään ei kutsu osoitetta, mikään ei etsi avainta, mikään ei aja terveystarkistusta. Viime vuonna sammutetun palvelun manifesti tallentuu aivan yhtä siististi.",
         "goesPublic": "Siitä tulee julkinen samalla sekunnilla",
-        "goesPublicWhy": "Kuka tahansa saa lukea sen ilman kirjautumista. Avainmuuttujan nimi siivotaan vastauksesta, osoite ja toiminnot eivät.",
+        "goesPublicWhy": "Kuka tahansa saa lukea sen ilman kirjautumista. Avainmuuttujan nimi siivotaan vastauksesta. Osoite ja toiminnot jäävät siihen.",
         "save": "Tallenna manifesti",
         "saving": "Tallennetaan..."
       },
       "dialog": {
         "deleteTitle": "Poistetaanko {name}?",
         "deleteWarnLabel": "Tätä ei voi perua",
-        "deleteWarn": "Manifesti lähtee, eikä mikään täällä tuo sitä takaisin. Kaikki sen varaan rakennettu ja jokainen agentti jolle käskettiin lukea se, lakkaa löytämästä sitä.",
+        "deleteWarn": "Manifesti lähtee, eikä mikään täällä tuo sitä takaisin. Kaikki sen varaan rakennettu lakkaa löytämästä sitä, ja niin lakkaa jokainen agentti jolle se annettiin luettavaksi.",
         "deleteTypeLabel": "Kirjoita {name} vahvistukseksi"
       },
       "toast": {
         "noDetail": "{name} ei auennut.",
-        "federating": "{name} matkustaa nyt kytköksiin.",
+        "federating": "{name} menee nyt vertaisille.",
         "notFederating": "{name} pysyy täällä.",
-        "described": "Kohteen {name} kuvaus tallennettiin.",
+        "described": "{name}: kuvaus tallennettiin.",
         "deleted": "{name} on poissa.",
         "written": "Manifesti tallennettiin."
       }
@@ -173,16 +181,16 @@
       "removeForGood": "Poista lopullisesti",
       "now": {
         "title": "Juuri nyt",
-        "line": "{n} asennettu, ja {unused} niistä ei lataa yksikään sovellus.",
-        "lineOff": "{off} on sammutettu, ja {breaking} niistä on yhä jonkin sovelluksen pyytämä."
+        "line": "{n} asennettu. Niistä {unused} on sellaisia, joita ei lataa yksikään sovellus.",
+        "lineOff": "{off} on sammutettu, ja {breaking} niistä on yhä jonkin sovelluksen tarvitsemia."
       },
       "strip": {
         "installed": "Asennettu",
         "installedSub": "kaikki mitä tämä sivusto tarjoilee",
         "carrying": "Sovelluksen käytössä",
         "carryingSub": "vähintään yksi sovellus lataa sen",
-        "unused": "Ei kenenkään lataama",
-        "unusedSub": "yksikään sovellus ei avaa niitä",
+        "unused": "Ei käytössä",
+        "unusedSub": "yksikään sovellus ei lataa niitä",
         "busiest": "Kysytyin",
         "busiestNone": "yksikään sovellus ei lataa vielä mitään"
       },
@@ -203,9 +211,9 @@
         "none": "Yksikään sovellus ei lataa näistä mitään."
       },
       "unused": {
-        "title": "Ei kenenkään lataamat",
+        "title": "Näitä ei lataa mikään",
         "count": "{n} / {total}",
-        "lead": "Yksikään sovellus ei lataa näistä yhtäkään. Ne on ryhmitelty tarkistettavien tosiasioiden mukaan eikä nimen mukaan, jotta poistuneen sovelluksen jäänteet, kahdesti asennettu sama asia ja sivuston oma perusvarustus eivät näytä keskenään samalta.",
+        "lead": "Yksikään sovellus ei lataa näistä yhtäkään. Ne on ryhmitelty sellaisten tosiasioiden mukaan jotka voit itse tarkistaa, eikä nimen mukaan, jotta poistuneen sovelluksen jäänteet, kahdesti asennettu sama asia ja sivuston oma perusvarustus eivät näytä keskenään samalta.",
         "none": "Jokainen täällä oleva cortex on vähintään yhden sovelluksen käytössä."
       },
       "group": {
@@ -213,10 +221,10 @@
         "sameLettersWhy": "Samat kirjaimet ja numerot, eri välimerkeillä kirjoitettuna. Toinen on lähes varmasti toisen uudelleenasennus.",
         "containsWhy": "Toinen nimi on toisen sisällä. Yleensä se tarkoittaa nimenvaihtoa, joka jätti ensimmäisen jäljelle.",
         "closeWhy": "Nimet eroavat parilla kirjaimella. Se voi olla kirjoitusvirhe ja se voi olla kaksi eri asiaa, joten lue kuvaukset ennen päätöstä.",
-        "batch": "{n} kpl, asentanut {who} {day}",
+        "batch": "{n} jotka {who} asensi {day}",
         "batchWhy": "Asennettu yhdellä istumalla, eikä mikään ole ladannut niitä sen jälkeen. Yleensä yhden julkaisemattoman sovelluksen osat.",
-        "site": "Sivuston mukana tulleita: {n}",
-        "siteWhy": "Tämä sivusto asensi nämä itse, jotta kuka tahansa sovelluksen rakentaja voi ottaa ne käyttöön. Kukaan ei ole vielä pyytänyt, päällä olo ei maksa mitään, ja oikea siirto on jättää ne rauhaan.",
+        "site": "{n} jotka tulivat sivuston mukana",
+        "siteWhy": "Tämä sivusto asensi nämä itse, jotta kuka tahansa sovelluksen rakentaja voi ottaa ne käyttöön. Kukaan ei ole vielä pyytänyt, päällä olo ei maksa mitään, ja oikein on jättää ne rauhaan.",
         "oneWhy": "Asennettu {when}, asentaja {who}. Mikään muu täällä ei muistuta sitä.",
         "show": "Näytä ne",
         "close": "Piilota ne",
@@ -227,7 +235,7 @@
         "goes": "Sammutus ottaa osat pois",
         "goesWhy": "Sen muodot, ohjeet, toiminnot, taulut ja sanastot otetaan pois, eikä sen tiedostoja enää tarjoilla. Sen lataava sovellus hajoaa heti kun joku seuraavan kerran avaa sen, eikä siitä varoiteta ketään.",
         "stays": "Tiedostot ja kirjoitettu data jäävät paikoilleen",
-        "staysWhy": "Takaisin päälle kytkeminen palauttaa kaiken entiselleen. Siksi sammutus on turvallinen liike: sen voi perua.",
+        "staysWhy": "Takaisin päälle kytkeminen palauttaa kaiken entiselleen. Siksi sammutus on turvallinen: sen voi perua.",
         "remove": "Lopullista poistoa ei voi perua",
         "removeWhy": "Se poistaa cortexin ja sen tiedostot. Mikään ei tuo niitä takaisin, joten se pyytää kirjoittamaan nimen ensin."
       },
@@ -239,7 +247,7 @@
         "private": "Yksityinen",
         "privateWhy": "Asentaja ja sinä. Ei kukaan muu, ei edes nimeä arvaamalla.",
         "site": "Sivuston mukana tullut",
-        "siteWhy": "Kaikkien luettavissa riippumatta siitä, mikä sana rivillä lukee, koska tämä on sivuston omaa varustusta ja jokaisen sovelluksen on tarkoitus rakentaa sen päälle. Osa näistä on merkitty julkisiksi ja osa yksityisiksi, eikä sillä ole tässä mitään väliä.",
+        "siteWhy": "Kaikkien luettavissa riippumatta siitä, mikä sana rivillä on, koska tämä on sivuston omaa varustusta ja jokaisen sovelluksen on tarkoitus rakentaa sen päälle. Osa näistä on merkitty julkisiksi ja osa yksityisiksi, eikä sillä ole tässä mitään väliä.",
         "boxLabel": "Hyvä tietää",
         "box": "Näet kaikki {n}, koska olet operaattori. Omana itsenään kirjautunut näkee julkiset, sivuston omat ja omansa. Hänen ruudullaan luku on eri, ja niin kuuluukin olla."
       },

@@ -35,7 +35,7 @@ import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
-import { num, Badge, Spinner, ErrorBox, useToast, Toast } from './shared.js';
+import { num, day, Badge, Spinner, ErrorBox, useToast, Toast } from './shared.js';
 import { Modal } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
 import * as cortexService from '/js/services/cortex.js';
@@ -44,9 +44,6 @@ import CortexDetail from './cortex-tab.detail.js';
 
 const html = htm.bind(h);
 const C = (key, params) => t('admin.cortex.' + key, params);
-
-/** A calendar day the way the reader writes one. A group heading needs the day, not the clock. */
-const day = (iso) => (iso ? new Date(iso).toLocaleDateString() : '—');
 
 /** How many apps load this one, which is the number every arrangement on this page turns on. */
 const appsOf = (e) => e?.used_by?.apps ?? 0;
