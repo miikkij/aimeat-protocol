@@ -9,9 +9,11 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
- *   v1.47.0 -- 2026-09-12 -- Add e2e-admin-realtime-page.ts to ALL_SUITES: the overview the Realtime
+ *   v1.48.0 -- 2026-09-12 -- Add e2e-admin-realtime-page.ts to ALL_SUITES: the overview the Realtime
  *            page reads, and the switched-off answer that used to be a 503 the dashboard could not
  *            tell from a quiet node. Not in the guard tier yet.
+ *   v1.47.0 -- 2026-09-12 -- Add e2e-admin-knowledge-page.ts to ALL_SUITES: the count that was
+ *            returned and never read, and the privileged import that wrote past its own schema.
  *   v1.46.0 -- 2026-09-12 -- Add e2e-admin-work-page.ts to ALL_SUITES: the shape of a row in
  *            GET /v1/admin/work, which was only ever asserted on an empty node, and the escrow
  *            inside its cost object. Not in the guard tier yet.
@@ -594,6 +596,9 @@ const ALL_SUITES = [
     // The Cortex extensions page: the dependant count the whole page is arranged by, the pieces one
     // cortex put here, and the promise that a switch-off leaves the files and the written data.
     'test/e2e-admin-cortex-page.ts',
+    // The MSM page: where each manifest points and what it offers, which is what the page groups
+    // by, and the auth variable the operator is shown and the public answer is not.
+    'test/e2e-admin-msm-page.ts',
     // The numbers behind the Statistics page: that requests_total is counted at all (its middleware
     // was written and never mounted), that a scope refusal is counted, and that a period reading is
     // a different reading from the node's whole life.
@@ -604,6 +609,9 @@ const ALL_SUITES = [
     // The Organisation sign-in page's read: that a connection can be complete and still reach
     // nobody, because the node-wide switch is off and both public doors answer 503.
     'test/e2e-admin-sso-page.ts',
+    // The Knowledge page's read: that the count survives the paging, and that the OPERATOR's import
+    // now passes the same schema the agent's always did.
+    'test/e2e-admin-knowledge-page.ts',
     'test/e2e-living-pulse.ts',
     // Every core scheduled job fired through the operator's trigger door, on a node of its own
     // (40310) with an SMTP sink, short windows and the flags the seeding keys on. Lane 0.

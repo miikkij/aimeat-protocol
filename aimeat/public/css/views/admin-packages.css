@@ -1,0 +1,102 @@
+/* ── Admin Packages page, in the poster face ──
+ * @file admin-packages.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's Packages page (design canvas "AIMEAT Admin Packages"): one row per
+ *   package with its description and the parts inside it, the instances, the store listings, the
+ *   review board and the re-seed section. The frame, the sections, the metric rows, the strip and
+ *   the doors come from admin.css and organism.css; only what this page adds is here. Every value
+ *   is a theme.css token, so the page flips with the theme.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial. The page had no rules of its own: four sub-tabs of .adm-card
+ *     tables, and the moderation panels carried hardcoded hex (#818cf8, rgba(79,70,229,…)).
+ */
+
+.adm-pk-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 96ch; }
+.adm-pk-note { margin: 12px 0 0; font-size: .8rem; line-height: 1.55; color: var(--text-dim); max-width: 92ch; }
+.adm-pk-quiet { padding: 10px 0; font-size: .9rem; line-height: 1.55; color: var(--text-dim); max-width: 92ch; }
+.adm-pk .adm-mrow--last { border-bottom: 0; }
+.adm-pk .adm-mrow { grid-template-columns: minmax(0, 1fr) auto minmax(11rem, auto); }
+.adm-pk-code { display: inline-block; font-family: var(--font-mono); font-size: .75rem; background: var(--code-bg); padding: 1px 6px; overflow-wrap: anywhere; }
+.adm-pk-acts { display: flex; gap: 22px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+
+/* 02: one package per row. The parts are the reason a row is two lines tall: a name, an author
+   and a version do not tell an operator whether the package matters, and the parts do. */
+.adm-pk-phead,
+.adm-pk-prow { display: grid; grid-template-columns: minmax(0, 1fr) 148px 108px 84px 92px; gap: 0 18px; align-items: baseline; }
+.adm-pk-phead { padding: 8px 0; border-bottom: 1px solid var(--border); color: var(--text-muted); font-weight: 600; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; }
+.adm-pk-prow { padding: 12px 0; border-bottom: 1px solid var(--border-subtle); font-size: .82rem; color: var(--text-dim); }
+.adm-pk-prow b { display: block; font-size: .95rem; font-weight: 700; color: var(--text); }
+.adm-pk-gid { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); margin-top: 2px; overflow-wrap: anywhere; }
+.adm-pk-desc { display: block; font-size: .82rem; line-height: 1.5; color: var(--text-dim); margin-top: 6px; max-width: 78ch; }
+.adm-pk-parts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.adm-pk-parts span { font-family: var(--font-mono); font-size: .68rem; border: 2px solid var(--border); padding: 1px 7px; color: var(--text-dim); }
+.adm-pk-ver { font-family: var(--font-mono); font-size: .74rem; overflow-wrap: anywhere; }
+.adm-pk-num { font-family: var(--font-mono); font-size: .78rem; text-align: right; }
+.adm-pk-num.is-zero { color: var(--text-muted); }
+
+/* 03 and 04: the compact rows. */
+.adm-pk-ihead,
+.adm-pk-irow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 120px 148px 78px 132px; gap: 0 18px; align-items: baseline; }
+.adm-pk-lhead,
+.adm-pk-lrow { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 100px 82px 84px 108px; gap: 0 18px; align-items: baseline; }
+.adm-pk-ihead,
+.adm-pk-lhead { padding: 8px 0; border-bottom: 1px solid var(--border); color: var(--text-muted); font-weight: 600; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; }
+.adm-pk-irow,
+.adm-pk-lrow { padding: 9px 0; border-bottom: 1px solid var(--border-subtle); font-size: .82rem; color: var(--text-dim); }
+.adm-pk-irow b,
+.adm-pk-lrow b { font-weight: 700; color: var(--text); font-size: .88rem; }
+.adm-pk-mono { font-family: var(--font-mono); font-size: .74rem; overflow-wrap: anywhere; }
+
+/* 05: the review board — the queue, the opened listing, the decisions kept. */
+.adm-pk-qhead,
+.adm-pk-qrow { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 140px 120px 84px; gap: 0 18px; align-items: baseline; }
+.adm-pk-qhead { padding: 8px 0; border-bottom: 1px solid var(--border); color: var(--text-muted); font-weight: 600; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; }
+.adm-pk-qrow { width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--border-subtle); padding: 11px 0; font: inherit; font-size: .82rem; color: var(--text-dim); cursor: pointer; }
+.adm-pk-qrow:hover { background: var(--bg-surface); }
+.adm-pk-qrow.is-open { border-bottom: 2px solid var(--text); }
+.adm-pk-qrow b { font-weight: 700; color: var(--text); font-size: .9rem; }
+.adm-pk-caret { font-family: var(--font-mono); color: var(--text); justify-self: end; }
+.adm-pk-panel { border: 2px solid var(--text); background: var(--card-bg); padding: 16px 18px; margin: 0 0 12px; }
+.adm-pk-kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 32px; margin-bottom: 16px; }
+.adm-pk-kv > div { border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.adm-pk-kv span { display: block; font-size: .64rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 3px; }
+.adm-pk-kv em { font-style: normal; font-family: var(--font-mono); font-size: .78rem; color: var(--text); overflow-wrap: anywhere; }
+.adm-pk-paneldesc { font-size: .88rem; line-height: 1.55; margin: 0 0 16px; max-width: 82ch; }
+.adm-pk-fld { margin-bottom: 14px; max-width: 620px; }
+.adm-pk-fldl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 5px; }
+.adm .adm-pk-fld input[type='text'] { width: 100%; box-sizing: border-box; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; background: none; padding: 3px 2px 5px; font: inherit; font-size: .9rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-pk-fld input[type='text']:focus { border-bottom-color: var(--accent); }
+.adm .adm-pk-fld input::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm-pk-hrow { display: grid; grid-template-columns: minmax(0, 1.3fr) 108px minmax(0, 1fr) 132px; gap: 0 18px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); font-size: .82rem; color: var(--text-dim); }
+.adm-pk-hrow b { font-weight: 700; color: var(--text); font-size: .86rem; }
+.adm-pk-said { margin: 10px 0 0; font-size: .82rem; font-weight: 600; }
+.adm-pk-said.is-ok { color: var(--success-fg); }
+.adm-pk-said.is-bad { color: var(--danger-fg); }
+
+@media (max-width: 1180px) {
+  /* Off the grid the cells flow and wrap, with each one saying what it is. The old page answered
+     the same width with a table in a sideways-scrolling box. */
+  .adm-pk-phead,
+  .adm-pk-ihead,
+  .adm-pk-lhead,
+  .adm-pk-qhead { display: none; }
+  .adm-pk-prow,
+  .adm-pk-irow,
+  .adm-pk-lrow,
+  .adm-pk-qrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 20px; padding: 12px 0; }
+  .adm-pk-prow > span:first-child,
+  .adm-pk-irow > span:first-child,
+  .adm-pk-lrow > span:first-child,
+  .adm-pk-qrow > span:first-child { flex-basis: 100%; }
+  .adm-pk-prow > [data-l]::before,
+  .adm-pk-irow > [data-l]::before,
+  .adm-pk-lrow > [data-l]::before,
+  .adm-pk-qrow > [data-l]::before { content: attr(data-l) ': '; font-family: var(--font-mono); font-size: .68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .3px; }
+  .adm-pk-num { text-align: left; }
+  .adm-pk-caret { display: none; }
+  .adm-pk-kv { grid-template-columns: minmax(0, 1fr); }
+  .adm-pk .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; }
+  .adm-pk .adm-mval { grid-column: 1 / -1; text-align: left; margin-top: 3px; }
+  .adm-pk-hrow { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+}

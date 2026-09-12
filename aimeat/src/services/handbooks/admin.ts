@@ -6,6 +6,9 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — most tools require operator role and
  *   are runtime-gated (a non-operator caller will get "Operator role required").
  * @version-history
+ *   v1.5.0 -- 2026-09-12 -- aimeat_admin_knowledge, with the thing an AI reading it has to say out
+ *     loud: the total, not the page length. The catalogue tool answers a smaller question and
+ *     nothing said so.
  *   v1.4.0 -- 2026-09-12 -- The organisation sign-in order is six steps, and the sixth is a node
  *     setting no tool here can reach. An AI that stops at five reports a finished setup behind a
  *     shut door.
@@ -42,7 +45,15 @@ boards and work items the node HOLDS, and the morsels in circulation) · \`aimea
 (all agents) · \`aimeat_admin_config\` (node config) · \`aimeat_admin_mint\` (mint morsels —
 irreversible ledger credit, daily cap enforced; a financial action, use sparingly).
 
-**Moderation.** \`aimeat_flag_report\` — report content (board post, agent, etc.) for moderation.
+**Moderation.** \`aimeat_admin_knowledge\` (EVERY knowledge package on the node, not just the
+catalogued ones — \`aimeat_knowledge_list\` is the catalogue and is a subset. Lead with
+\`paging.total\`, never with how many rows you got: a page of twenty out of two hundred reported as
+the whole store is the one mistake this surface cannot make. \`facets\` counts the whole match, so
+you can say what the collection IS — one person's bulk import, or six things somebody wrote. Filter
+an author with \`author_key\`, which collapses \`alice\` and \`alice@node-id\` into one person, and
+call a \`maturity\` with \`declared: false\` an undeclared word rather than printing it as ours.
+\`reviews\` and \`last_review\` are how you answer "has anybody looked at this") ·
+\`aimeat_flag_report\` — report content (board post, agent, etc.) for moderation.
 
 **Sharing groups (owner governance).** \`aimeat_group_list\` · \`aimeat_group_get\` ·
 \`aimeat_group_create\` · \`aimeat_group_add_member\` · \`aimeat_group_remove_member\`. Groups back
@@ -87,6 +98,8 @@ the manual offboarding door; a connected directory does the same automatically o
   lead with whose money each figure is rather than with the largest number in the payload.
 - Answer "is anything happening to us": \`aimeat_admin_statistics\` for the period and the week before
   it, then \`aimeat_admin_security_overview\` if the refusals are flat across a weekend.
+- Answer "what knowledge is on this node, and what has nobody looked at": \`aimeat_admin_knowledge\`,
+  leading with the total and the shape rather than with the first page of names.
 - Govern data sharing: create a group, add members, then grant consent for a data-pattern.
 - Classify agents: set mode/tags so other surfaces (e.g. task-runner) behave correctly.
 - Connect an organisation's identity provider end to end, and offboard a person by hand.

@@ -358,6 +358,20 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
         input: {},
     },
     {
+        name: 'aimeat_admin_knowledge',
+        description: 'Operator-only. The Knowledge page in one read: EVERY knowledge package on this node, the shape of the collection, and whether anybody has already looked at each one. NOT the same question as aimeat_knowledge_list, which is the catalogue — what a caller may read — and therefore a subset: this one includes the packages nobody catalogued, which on a moderation surface are the ones that matter. `paging` carries number, per_page, total and pages together, so say the total rather than the page length: a page of twenty out of two hundred read as the whole store is the one mistake this surface cannot make. `facets` counts over EVERYTHING that matched rather than over the page, and a facet does not narrow its own counts, so you can move sideways from one kind to another without clearing a filter first. `facets.authors` collapses a person across the spellings of their name and lists them: this node writes the same person as both `alice` and `alice@node-id`, so filter with author_key rather than typing a name. `facets.maturity[].declared` is false for a word this node does not define (the type declares draft, review and published, and live data carries others) — report such a value as undeclared instead of printing it as if it were ours. Each package carries `reviews` and `last_review`, so "nobody has looked at this yet" is a fact you can state. The same data as GET /v1/admin/knowledge. Returns an operator-role error for non-operators.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            page: { type: 'number', required: false, description: 'Which page of packages, from 1. A page past the end comes back as the last page rather than empty.' },
+            limit: { type: 'number', required: false, description: 'How many packages on the page. 20 by default, 50 at most.' },
+            q: { type: 'string', required: false, description: 'Free text over the name, the author and the tags.' },
+            author_key: { type: 'string', required: false, description: 'One author, collapsed across the spellings of their name. Take the key from facets.authors.' },
+            content_type: { type: 'string', required: false, description: 'One kind of package, as facets.kinds names it.' },
+            flagged: { type: 'boolean', required: false, description: 'Only packages somebody has reported.' },
+        },
+    },
+    {
         name: 'aimeat_admin_usage',
         description: 'Operator-only. What AI costs on this node, organised by WHOSE MONEY IT IS rather than by which system counted it. Give BOTH from and to (ISO dates, inclusive) or neither for the trailing thirty days. `whose_money.house` is the operator\'s own bill — what people spent on the node\'s key because they had not brought their own. `whose_money.own` is other people\'s own provider accounts and costs the operator nothing. `whose_money.ledger` is a THIRD count, off a different table, and is the larger set; report it as such and never add it to the other two. `ceiling_usd` is the free grant times the number of accounts: the most the house key can cost before somebody is refused, and the number an operator acts on. THE IMPORTANT LIMIT: `keys.chat.metered_here` is false, because every chat turn is spent from one key handed to a child process, so no figure here contains any of it — say so whenever you report a total, or the operator will read a bill that is missing its largest item. Pass ask_provider true to have the node ask the provider what its own two keys have actually spent (one outbound call per key, cached a minute); without it `keys.*.spend` is null and unknown is the honest answer. `models.unpriced` explains the calls that carry no cost: most are free or local models that have none, and `estimated_missing_usd` is what the rest would have cost at the priced average. The same data as GET /v1/admin/usage/page. Returns an operator-role error for non-operators.',
         caller: 'operator',

@@ -1,0 +1,125 @@
+/* ── Admin CSM page, in the poster face ──
+ * @file admin-csm.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's CSM page (design canvas "AIMEAT Admin CSM"): the list with what each
+ *   CSM locks and how hard, the empty state that says what a CSM refuses and offers the shipped
+ *   examples, one CSM's fields as a table, and the create view. The sections, the numeral strip and
+ *   the slab come from admin.css and organism.css; only what this page adds lives here, and every
+ *   value is a theme.css token.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial. Replaces the bordered table and the JSON dump.
+ */
+
+.adm-csm-lead { margin: 0; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
+.adm-csm-lead + .adm-csm-lead { margin-top: .9rem; }
+.adm-csm-hero + .adm-csm-lead { margin-top: 1.1rem; }
+.adm-csm-hint { margin: 14px 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.adm-csm .og-strip { margin-top: 0; margin-bottom: 1.6rem; }
+.adm-csm .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-csm-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 13px 2px 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-csm-page { padding-top: .2rem; }
+
+/* ── The headline beside the sentence that explains it ── */
+.adm-csm-top { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 0 48px; align-items: start; }
+.adm-csm-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 9px; }
+.adm-csm-hero { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3.1rem; line-height: 1.02; letter-spacing: var(--font-poster-tracking); color: var(--text); }
+.adm-csm-hero--empty { font-size: 2.8rem; line-height: 1.04; }
+.adm-csm-hero-sub { margin: .7rem 0 0; font-size: .88rem; line-height: 1.6; color: var(--text-dim); }
+
+/* ── One registered CSM: what it is called, where it bites, and how hard ── */
+.adm-csm-rows { border-top: 2px solid var(--text); margin-top: 1.6rem; }
+.adm-csm-hrow, .adm-csm-row { display: grid; grid-template-columns: 220px 150px minmax(0, 1fr) 150px 150px; gap: 0 20px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.adm-csm-hrow { padding: 8px 0; border-bottom: 2px solid var(--text); font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); }
+.adm-csm-row:hover { background: var(--bg-surface); }
+.adm-csm-name { font-weight: 700; font-size: .93rem; color: var(--text); overflow-wrap: anywhere; }
+.adm-csm-name em { display: block; font-style: normal; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--text-dim); margin-top: 3px; }
+.adm-csm-fields { font-size: .84rem; color: var(--text); }
+.adm-csm-fields em { display: block; font-style: normal; font-size: .76rem; color: var(--text-dim); margin-top: 3px; }
+.adm-csm-where { font-family: var(--font-mono); font-size: .76rem; color: var(--text); overflow-wrap: anywhere; }
+.adm-csm-where em { display: block; font-style: normal; font-family: var(--font); font-size: .76rem; color: var(--text-dim); margin-top: 4px; }
+.adm-csm-mode { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+.adm-csm-chip { font-family: var(--font-mono); font-size: .66rem; font-weight: 500; text-transform: uppercase; letter-spacing: .03em; padding: 1px 7px; border: 2px solid var(--border); color: var(--text-dim); white-space: nowrap; }
+.adm-csm-chip.is-strict { border-color: var(--text); color: var(--text); }
+.adm-csm-chip.is-fed { border-color: var(--accent); color: var(--accent); }
+.adm-csm-doors { display: flex; gap: 14px; justify-content: flex-end; align-items: baseline; flex-wrap: wrap; }
+.adm .adm-csm-door { background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; padding: 0 0 1px; font: inherit; font-size: .78rem; font-weight: 700; color: var(--text); cursor: pointer; white-space: nowrap; }
+.adm .adm-csm-door:hover:enabled { color: var(--accent); border-bottom-color: var(--accent); }
+.adm .adm-csm-door.is-quiet { color: var(--text-dim); border-bottom-color: var(--border); }
+
+/* ── Nothing registered: what a CSM refuses, and the shipped examples ── */
+.adm-csm-two { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0 48px; align-items: start; margin-top: 1.4rem; }
+.adm-csm-two--empty { grid-template-columns: minmax(0, 1fr) 430px; gap: 0 52px; }
+.adm-csm-two--create { grid-template-columns: minmax(0, 1fr) 370px; gap: 0 44px; }
+.adm-csm-refusals { border-top: 2px solid var(--text); margin-top: 1.8rem; }
+.adm-csm-ref { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 0 22px; padding: 13px 0; border-bottom: 1px solid var(--border); align-items: baseline; }
+.adm-csm-ref b { font-weight: 700; font-size: .9rem; color: var(--text); }
+.adm-csm-ref span { font-size: .85rem; line-height: 1.55; color: var(--text-dim); }
+.adm-csm-act { display: flex; align-items: center; gap: 22px; margin-top: 28px; flex-wrap: wrap; }
+
+.adm-csm-starts { border: 2px solid var(--text); background: var(--bg-surface); padding: 18px 20px; }
+.adm-csm-starts-l { font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); margin-bottom: 4px; }
+.adm-csm-starts-s { font-size: .82rem; line-height: 1.5; color: var(--text-dim); margin: 0 0 14px; }
+.adm-csm-srow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 14px; padding: 9px 0; border-top: 1px solid var(--border); align-items: baseline; }
+.adm-csm-srow:first-of-type { border-top: 0; }
+.adm-csm-sname { font-weight: 700; font-size: .86rem; color: var(--text); }
+.adm-csm-swhat { grid-column: 1 / -1; font-size: .78rem; line-height: 1.45; color: var(--text-dim); }
+.adm .adm-csm-stake { background: none; border: 0; border-bottom: 2px solid var(--border); border-radius: 0; padding: 0 0 1px; font: inherit; font-size: .76rem; font-weight: 700; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
+.adm .adm-csm-stake:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── One CSM open ── */
+.adm-csm-crumb { font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); margin-bottom: 14px; }
+.adm .adm-csm-crumb button { background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; padding: 0 0 1px; font: inherit; font-size: .74rem; font-weight: 500; color: var(--text); cursor: pointer; }
+.adm .adm-csm-crumb button:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.adm-csm-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1.5rem; border-top: 3px solid var(--text); padding-top: 1.3rem; margin-bottom: .4rem; flex-wrap: wrap; }
+.adm-csm-head h2 { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.9rem; line-height: 1.05; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text); }
+.adm-csm-head h2 i { font-style: normal; font-family: var(--font-mono); font-size: .8rem; font-weight: 400; color: var(--text-dim); margin-left: 12px; text-transform: none; letter-spacing: 0; overflow-wrap: anywhere; }
+.adm-csm-head h2 small { font-family: var(--font-mono); font-size: .8rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--accent); margin-left: .6rem; }
+.adm-csm-applies { margin: .6rem 0 0; font-size: .86rem; line-height: 1.55; color: var(--text-dim); max-width: 92ch; }
+.adm-csm-what { margin: 1rem 0 0; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
+
+/* The fields, as a person reads them: what it is called, what it takes, what it refuses. */
+.adm-csm-fhead { font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); border-bottom: 2px solid var(--text); padding-bottom: 6px; margin-bottom: 2px; }
+.adm-csm-grp { font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); padding: 16px 0 6px; }
+.adm-csm-frow { display: grid; grid-template-columns: 190px 120px minmax(0, 1fr); gap: 0 20px; padding: 9px 0; border-bottom: 1px solid var(--border); align-items: baseline; }
+.adm-csm-fname { font-family: var(--font-mono); font-size: .82rem; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
+.adm-csm-ftype { font-size: .8rem; color: var(--text-dim); }
+.adm-csm-frule { font-size: .82rem; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.adm-csm-frule.is-none { color: var(--text-dim); }
+
+.adm-csm-facts { border-top: 2px solid var(--text); margin: 0; }
+.adm-csm-fact { display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 0 14px; padding: 10px 0; border-bottom: 1px solid var(--border); align-items: baseline; }
+.adm-csm-fact dt { font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); }
+.adm-csm-fact dd { margin: 0; font-size: .84rem; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.adm-csm-fact dd em { display: block; font-style: normal; font-size: .76rem; line-height: 1.45; color: var(--text-dim); margin-top: 3px; }
+.adm-csm-fact dd code { font-family: var(--font-mono); font-size: .78rem; }
+/* The dashed coral box is what this face uses to say a thing out loud. */
+.adm-csm-warn { margin: 16px 0 0; padding: 12px 14px; border: 3px dashed var(--accent); font-size: .82rem; line-height: 1.55; color: var(--text); }
+.adm-csm-warn b { display: block; font-weight: 800; margin-bottom: 4px; }
+.adm-csm-yaml { border: 2px solid var(--text); background: var(--bg-surface); padding: 14px 16px; margin: 1.2rem 0 0; font-family: var(--font-mono); font-size: .76rem; line-height: 1.6; color: var(--text); overflow-x: auto; max-height: 460px; }
+
+/* ── Writing one ── */
+.adm .adm-csm-editor { width: 100%; border: 2px solid var(--text); border-radius: 0; background: var(--bg-surface); color: var(--text); padding: 16px 18px; font-family: var(--font-mono); font-size: .8rem; line-height: 1.75; resize: vertical; outline: none; box-shadow: none; }
+.adm .adm-csm-editor:focus { border-color: var(--accent); }
+.adm .adm-csm-editor::placeholder { color: var(--text-dim); }
+.adm-csm-err { margin-top: 14px; }
+.adm-csm-prompt { border: 2px solid var(--text); background: var(--bg-surface); padding: 16px 18px; margin: 1.2rem 0 0; font-family: var(--font-mono); font-size: .78rem; line-height: 1.6; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 560px; overflow-y: auto; }
+
+@media (max-width: 1100px) {
+  .adm-csm-hrow, .adm-csm-row { grid-template-columns: 190px 130px minmax(0, 1fr) 130px 130px; gap: 0 14px; }
+  .adm-csm-two, .adm-csm-two--empty, .adm-csm-two--create { grid-template-columns: minmax(0, 1fr) 300px; gap: 0 32px; }
+}
+
+@media (max-width: 900px) {
+  .adm-csm-top { grid-template-columns: 1fr; gap: 1.2rem; }
+  .adm-csm-hero, .adm-csm-hero--empty { font-size: 2.2rem; }
+  .adm-csm-hrow { display: none; }
+  .adm-csm-row { grid-template-columns: minmax(0, 1fr); gap: 7px 0; }
+  .adm-csm-mode { flex-direction: row; }
+  .adm-csm-doors { justify-content: flex-start; }
+  .adm-csm-two, .adm-csm-two--empty, .adm-csm-two--create { grid-template-columns: 1fr; gap: 1.8rem 0; }
+  .adm-csm-ref { grid-template-columns: 1fr; gap: 4px 0; }
+  .adm-csm-frow { grid-template-columns: minmax(0, 1fr) auto; gap: 3px 14px; }
+  .adm-csm-frule { grid-column: 1 / -1; }
+  .adm-csm-foot { flex-direction: column; gap: 6px; }
+}

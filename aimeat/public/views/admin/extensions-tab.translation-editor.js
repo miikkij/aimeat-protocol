@@ -1,10 +1,10 @@
 /**
- * @file public/views/admin/services-tab.translation-editor.js
+ * @file public/views/admin/extensions-tab.translation-editor.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Instance translation editor + AI-prompt builder + per-extension key patterns for the admin Services tab. Extracted from services-tab.js to satisfy max-file-lines.
+ * @description Instance translation editor + AI-prompt builder + per-extension key patterns for the admin Extensions tab. Extracted from the tab file to satisfy max-file-lines.
  * @version-history
- *   v1.0.0 — 2026-07-13 — Extracted from services-tab.js (max-file-lines)
+ *   v1.0.0 — 2026-07-13 — Extracted from the tab file (max-file-lines)
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -12,7 +12,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
-import { inputStyle } from './services-tab.config-form.js';
+import { inputStyle } from './extensions-tab.config-form.js';
 
 // ── Translation key patterns by extension ──
 const EXT_TRANSLATION_KEYS = {

@@ -13,6 +13,8 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   v1.10.0 — 2026-09-12 — setBoardVisibility, setBoardFederate and deleteBoard: three board doors
+ *     the routes have always had and no frontend function reached.
  *   v1.9.0 — 2026-09-12 — updateSchedulerJob sends PATCH, the verb its route is registered under;
  *     it sent PUT, so switching a scheduled job on or off answered 404. pruneSchedulerLog added.
  *   v1.8.0 — 2026-09-12 — setHook: binding a hook from the page, which the PUT route has always
@@ -83,6 +85,9 @@ export const getBoardPosts   = (id, limit = 50) => apiGet(`/v1/boards/${encodeUR
 export const createBoard      = (name, visibility, description) => apiPost('/v1/boards', { name, visibility: visibility || 'public', description });
 export const postToBoard     = (id, body, title) => apiPost(`/v1/boards/${encodeURIComponent(id)}/posts`, { body, title: title || 'msg' });
 export const patchBoardMembers = (id, body) => apiPatch(`/v1/boards/${encodeURIComponent(id)}/members`, body);
+export const setBoardVisibility = (id, visibility) => apiPatch(`/v1/boards/${encodeURIComponent(id)}/visibility`, { visibility });
+export const setBoardFederate  = (id, federate)   => apiPatch(`/v1/boards/${encodeURIComponent(id)}/visibility`, { federate });
+export const deleteBoard       = (id)             => apiDelete(`/v1/boards/${encodeURIComponent(id)}`);
 
 // ── Work ──
 export const getAdminWork    = ()       => apiGet('/v1/admin/work');
@@ -212,6 +217,7 @@ export const getCsmBuilderPrompt = ()     => apiGet('/v1/portal/prompts/csm-buil
 
 // ── MSM ──
 export const getMsmIntegrations = ()    => apiGet('/v1/admin/msm');
+export const listMsms           = ()    => apiGet('/v1/admin/msm');
 export const getMsmDetail       = (name) => apiGet(`/v1/admin/msm/${encodeURIComponent(name)}`);
 export const createMsm          = (yaml, federate) => apiPost('/v1/msm', { yaml, federate });
 export const updateMsm          = (name, updates) => apiPut(`/v1/admin/msm/${encodeURIComponent(name)}`, updates);
@@ -360,6 +366,9 @@ export const getAvailableExtensions   = ()              => apiGet('/v1/admin/ext
 export const installBundledExtension  = (name)          => apiPost(`/v1/admin/extensions/available/${encodeURIComponent(name)}/install`);
 export const uninstallExtension       = (name)          => apiDelete(`/v1/extensions/${encodeURIComponent(name)}`);
 export const activateExtension        = (name)          => apiPost(`/v1/extensions/${encodeURIComponent(name)}/activate`);
+// The route has existed since the extension system shipped; nothing in the UI could switch one off,
+// so the only way back from "installed and unwanted" was to uninstall it and lose its stored data.
+export const deactivateExtension      = (name)          => apiPost(`/v1/extensions/${encodeURIComponent(name)}/deactivate`);
 export const getExtensions            = ()              => apiGet('/v1/extensions');
 export const getExtensionInstances    = (name)          => apiGet(`/v1/extensions/${encodeURIComponent(name)}/instances`);
 export const createExtensionInstance  = (name, body)    => apiPost(`/v1/extensions/${encodeURIComponent(name)}/instances`, body);
@@ -393,14 +402,29 @@ export async function fetchSchedulerExecutionLog(params = {}) {
 }
 
 // ── Knowledge Management ──
+/**
+ * The operator's package list, plus `paging` (number, per_page, total, pages) and `facets` — the
+ * shape of the whole collection by author, kind, how finished and who can see it.
+ *
+ * `page` and `limit` were always accepted and never sent, so the page showed the first twenty of
+ * however many there were. `author_key` collapses one person's spellings, which the exact-match
+ * `author` filter cannot: this node writes both `alice@node-id` and `alice` for the same person.
+ */
 export const getKnowledgePackages = (opts = {}) => {
   const params = new URLSearchParams();
   if (opts.flagged) params.set('flagged', 'true');
   if (opts.author) params.set('author', opts.author);
+  if (opts.author_key) params.set('author_key', opts.author_key);
   if (opts.content_type) params.set('content_type', opts.content_type);
+  if (opts.q) params.set('q', opts.q);
   if (opts.page) params.set('page', String(opts.page));
+  if (opts.limit) params.set('limit', String(opts.limit));
   return apiGet(`/v1/admin/knowledge?${params.toString()}`);
 };
+
+/** The moderation trail on one package: who looked, when, why, and what they decided. */
+export const getKnowledgeReviews = (packageId) =>
+  apiGet(`/v1/knowledge/${encodeURIComponent(packageId)}/reviews`);
 export const createSystemKnowledge = (data) =>
   apiPost('/v1/admin/knowledge/import', data);
 export const deleteKnowledgePackage = (packageId) =>

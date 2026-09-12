@@ -665,6 +665,29 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return asText(await client.get(`/v1/stats${qs}`));
   });
 
+  mcp.tool('aimeat_admin_knowledge', descriptionFor('aimeat_admin_knowledge'), {
+    agent_name: agentNameSchema,
+    page: z.number().int().optional().describe('Which page of packages, from 1. A page past the end comes back as the last page rather than empty.'),
+    limit: z.number().int().optional().describe('How many packages on the page. 20 by default, 50 at most.'),
+    q: z.string().optional().describe('Free text over the name, the author and the tags.'),
+    author_key: z.string().optional().describe('One author, collapsed across the spellings of their name. Take the key from facets.authors rather than typing a name.'),
+    content_type: z.string().optional().describe('One kind of package, as facets.kinds names it.'),
+    flagged: z.boolean().optional().describe('Only packages somebody has reported.'),
+  }, annotationsFor('aimeat_admin_knowledge'), async ({ agent_name, page, limit, q, author_key, content_type, flagged }) => {
+    const { client } = pickAgent(registry, agent_name);
+    // Every filter goes on its own: none of them is read as a pair, and each one left behind would
+    // answer about a larger collection than the caller asked about, under the caller's own label.
+    const parts = [
+      ...(page !== undefined ? [`page=${encodeURIComponent(String(page))}`] : []),
+      ...(limit !== undefined ? [`limit=${encodeURIComponent(String(limit))}`] : []),
+      ...(q !== undefined ? [`q=${encodeURIComponent(q)}`] : []),
+      ...(author_key !== undefined ? [`author_key=${encodeURIComponent(author_key)}`] : []),
+      ...(content_type !== undefined ? [`content_type=${encodeURIComponent(content_type)}`] : []),
+      ...(flagged !== undefined ? [`flagged=${flagged ? 'true' : 'false'}`] : []),
+    ];
+    return asText(await client.get(`/v1/admin/knowledge${parts.length ? '?' + parts.join('&') : ''}`));
+  });
+
   mcp.tool('aimeat_admin_hook_set', descriptionFor('aimeat_admin_hook_set'), {
     agent_name: agentNameSchema,
     hook: z.string().describe('The moment to bind, e.g. "pre_owner_registration".'),
