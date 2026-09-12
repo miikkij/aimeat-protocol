@@ -8,11 +8,18 @@
  *   - initSessionAuth / enableAnonymousAuth / isAnonymousMode / getAnonymousCredentials: startup wiring
  *   - optionalAuth / requireAuth / requireAuthOrAnonymous: presence-level gates
  *   - requireRole / requireScope / requireExternalPrincipal / requireLocalSession: authorization gates
- *   - requireOwnerPrincipal: the account-security gate (password, recovery address, 2FA, deletion)
+ *   - the account-security family (isOwnerPrincipal, isThirdPartyPrincipal, requireOwnerPrincipal)
+ *     lives in ./account-security.ts and is re-exported here
  *   - resolvePatToken / maybeSetPatBrowserSession: Personal Access Token handling
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-09-12 — isThirdPartyPrincipal(auth): whose SOFTWARE a principal is, beside isOwnerPrincipal's
+ *     question of whether it may change the account. A read door with a half that suits a person's
+ *     own agents and not a published product needed a question `owner` cannot answer, because all
+ *     of them carry the person's name. GET /v1/ghii/me is the first caller. Adding it took this
+ *     file past 800 lines, so the three account-security functions moved to ./account-security.ts
+ *     as a pure extraction and are re-exported from here.
  *   2026-09-08 — requireScope: a federated session gets no owner bypass; its scope list is enforced.
  *   2026-09-06 — withCurrentScopes() (body in ./effective-scopes.ts): an agent's effective scopes are its token's INTERSECTED with
  *     its record's, resolved per request beside the revocation check and for the same stated reason.
@@ -68,7 +75,7 @@
  */
 import type { Request, Response, NextFunction } from 'express';
 import { verifyJWT, isRevoked, type VerifiedToken } from './jwt.js';
-import { ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE, scopeIsCovered } from '../utils/scope-coverage.js';
+import { OPERATOR_ORGANISM_REPAIR_SCOPE, scopeIsCovered } from '../utils/scope-coverage.js';
 import { setRefreshCookie, readRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import type { AimeatConfig } from '../config.js';
@@ -437,80 +444,10 @@ export function requireRole(role: string) {
   };
 }
 
-/**
- * Require a principal that IS the account holder, rather than something acting on the account
- * holder's behalf. For the doors that decide who can get back INTO the account: the password, the
- * recovery address, the second factor, the identity proof, and deleting or exporting everything.
- *
- * WHY NOT requireRole('owner'). The `owner` role does not say which principal is calling. The agent
- * branch of POST /v1/auth/token used to mint an agent session carrying the human's owner (and
- * operator) roles, and the August 2026 audit removed that in the same run.
- *
- * NO MINT DOES IT ANY MORE, as of 2026-09-06, and the sentence that stood here naming the two
- * unauthenticated mints in routes/ghii/web-verify.ts was out of date: both have issued ['agent']
- * since August. The last one was POST /v1/setup/init, which minted ['agent','owner','operator'] onto
- * a token whose `sub` was an agent GAII; it issues an owner session now.
- *
- * WHICH CHANGES NOTHING ABOUT WHY THIS GATE IS SPELLED OUT. Every one of those was found after it
- * shipped, by somebody reading a mint rather than by a check. The exclusions below hold regardless
- * of who starts copying roles onto whom next, and that is the whole reason not to lean on a role
- * name here.
- *
- * WHY NOT "does the token carry a session id". A Personal Access Token the human minted for their
- * own browser produces owner tokens with NO session id (the PAT branch of POST /v1/auth/refresh),
- * so that test would sign real people out of their own account settings. An owner-level PAT passes
- * here, and that is correct: it is a credential the human created behind requireRole('owner').
- *
- * WHAT IS EXCLUDED. `agent` and `ecosystem` are external principals with their own identity; `app`
- * is a published app holding a scoped grant. All three carry the HUMAN's account name in
- * `req.auth.owner`, which is what every handler under /v1/ghii keys off, so without this gate all
- * three land on the human's record: set a password on an account that has none and then sign in as
- * them, point the recovery address at a mailbox they control and mail themselves a reset code, or
- * arm a second factor with a secret the human never sees.
- *
- * The one way in for an external principal is ACCOUNT_SECURITY_SCOPE, granted per agent by the
- * owner in the agent permission editor. It is tested as the EXACT string: no wildcard carries it
- * (utils/scope-coverage.ts), and no existing agent was grandfathered onto it, so an agent is here
- * only because the owner ticked that one box. An `app` is refused whatever it holds — an app grant
- * is consent to use the account, never consent to take it over — and the word is deliberately
- * absent from APP_GRANTABLE_SCOPES so an app cannot ask for it either.
- */
-/**
- * The test requireOwnerPrincipal() makes, as a value rather than a door.
- *
- * A handler whose OTHER branch is legitimately open cannot take the middleware — POST
- * /v1/invitations/:token/accept is the first of those: the anonymous branch is how a person
- * registers from an emailed link, and it must stay open, while the signed-in branch joins an
- * existing account to an organism and should not be reachable by a machine acting in that person's
- * name. Such a handler asks this instead of restating the test, because the docblock above says what
- * a near-copy costs: three copies of the scope test once lived in this file and none of them knew
- * about the exception the vocabulary module was written to hold.
- */
-export function isOwnerPrincipal(auth: Request['auth'] | undefined): boolean {
-  if (!auth) return false;
-  const roles = auth.roles;
-  const isApp = roles.includes('app');
-  if (roles.includes('owner') && !isApp && !roles.includes('agent') && !roles.includes('ecosystem')) return true;
-  // Exact string, no wildcard. scope-coverage.ts enforces the same rule everywhere a scope is
-  // proposed or approved; this line is that rule at the door itself.
-  return !isApp && (auth.scopes ?? []).includes(ACCOUNT_SECURITY_SCOPE);
-}
-
-export function requireOwnerPrincipal() {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.auth) {
-      deny401(req, res, 'Authentication required');
-      return;
-    }
-    if (isOwnerPrincipal(req.auth)) {
-      next();
-      return;
-    }
-    logger.warn(`[account-security-denied] ${req.auth.sub} on ${req.method} ${req.path}`);
-    deny403(req, res, 'ACCESS_DENIED', 'This changes how the account is signed into, so it is reserved to the account holder. ' +
-      `An agent needs the "${ACCOUNT_SECURITY_SCOPE}" permission, which the owner grants per agent.`);
-  };
-}
+// The account-security family — which PRINCIPAL of an account is calling, whose SOFTWARE it is,
+// and the door that admits only the first — lives in ./account-security.ts, moved there unchanged
+// when this file passed 800 lines. Re-exported so every existing import of it still resolves here.
+export { isOwnerPrincipal, isThirdPartyPrincipal, requireOwnerPrincipal } from './account-security.js';
 
 /**
  * Require the NODE OPERATOR, or something the operator explicitly sent. For the break-glass doors

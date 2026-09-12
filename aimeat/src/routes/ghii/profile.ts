@@ -6,6 +6,15 @@
  *   get/put, GET /v1/ghii/me, GET /v1/ghii/:ghii, PUT /v1/ghii, DELETE /v1/ghii. Extracted from
  *   src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-09-12 — GET /v1/ghii/me splits its response instead of taking a gate, which closes
+ *     the last DEBT line in the route-scope ratchet. The door is open to everything acting in the
+ *     person's name and always was safe across people: it reads the record by req.auth.owner, so
+ *     another human's agent gets that human's row and never this one's. The account-security half
+ *     (recovery address, whether a password exists, verification state, the public key) now renders
+ *     only for the person and their own agents; a hosted app grant or an ecosystem app gets the
+ *     identity half unless it holds ACCOUNT_SECURITY_SCOPE. Ruled by the developer 2026-09-12,
+ *     against the alternative the exemption entry had proposed: requiring the scope of every
+ *     principal would have refused every agent on the node until each owner ticked a box.
  *   v1.3.0 — 2026-09-04 — The read halves catch up with the writes H-7 fenced. GET /v1/ghii/cors is
  *     behind requireOwnerPrincipal() beside its PUT: it names the web origins that already hold
  *     credentialed access to this account, which is the reconnaissance for the attack the PUT was
@@ -27,7 +36,7 @@ import type { Router } from 'express';
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
+import { isOwnerPrincipal, isThirdPartyPrincipal, requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { isValidRegion, isValidTimeZone } from '../../services/display-prefs.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -183,6 +192,22 @@ export function registerProfileRoutes(
 
         // Directory opt-in state (the member "phone book") — owner-controlled memory key.
         const dirKey = await storage.getMemory(ghiiRecord.ghii, `profile.${ghiiRecord.username}.directory_listed`);
+
+        // WHO SEES THE ACCOUNT-SECURITY HALF. The door stays open to everything acting in this
+        // person's name, because every caller needs the identity half to learn who it works for,
+        // and no other person's account is reachable here at all: the record is looked up by
+        // req.auth.owner, so another human's agent reads that human's own row. What is fenced is
+        // the half that is the INPUT to taking an account over — the recovery address, whether a
+        // password exists, how far verification got — which is the reconnaissance the H-5 work
+        // closed the writes against while the read stayed open.
+        //
+        // A person and their own agents see it. Ruled 2026-09-12: an agent acting for someone
+        // should be able to tell them the recovery address is stale or that they never set a
+        // password, and gating that on a per-agent permission would refuse every agent on the node
+        // until each owner went and ticked a box. Software a third party wrote and this person
+        // merely approved does not see it, unless they granted it the account-security word
+        // deliberately — the same word, tested the same way, as the doors that CHANGE the account.
+        const showsAccount = !isThirdPartyPrincipal(req.auth) || isOwnerPrincipal(req.auth);
         res.json(success(config.nodeId, {
             ghii: ghiiRecord.ghii,
             display_name: ghiiRecord.displayName,
@@ -194,18 +219,20 @@ export function registerProfileRoutes(
             // keeps is nobody else's business.
             region: ghiiRecord.region ?? null,
             timezone: ghiiRecord.timezone ?? null,
-            notification_email: ghiiRecord.notificationEmail ?? null,
             directory_listed: dirKey?.value === true,
             verification_level: ghiiRecord.verificationLevel,
-            email_verified_at: ghiiRecord.emailVerifiedAt ?? null,
-            // Whether a password has been set. Accounts created via OAuth (e.g. Google
-            // sign-in) start without one; the portal uses this to offer "set a password"
-            // (no current password required) instead of "change password".
-            has_password: !!ghiiRecord.passwordHash,
-            // The Ed25519 PUBLIC key generated at registration (stored on the owner
-            // record) — the Access tab shows it. The private key is never retrievable;
-            // it was returned once at creation.
-            public_key: (await storage.getOwner(ownerName))?.publicKey ?? null,
+            ...(showsAccount ? {
+                notification_email: ghiiRecord.notificationEmail ?? null,
+                email_verified_at: ghiiRecord.emailVerifiedAt ?? null,
+                // Whether a password has been set. Accounts created via OAuth (e.g. Google
+                // sign-in) start without one; the portal uses this to offer "set a password"
+                // (no current password required) instead of "change password".
+                has_password: !!ghiiRecord.passwordHash,
+                // The Ed25519 PUBLIC key generated at registration (stored on the owner
+                // record) — the Access tab shows it. The private key is never retrievable;
+                // it was returned once at creation.
+                public_key: (await storage.getOwner(ownerName))?.publicKey ?? null,
+            } : {}),
         }));
     });
 

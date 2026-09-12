@@ -43,6 +43,9 @@
  *   v2.0.0 — 2026-08-07 — Becomes the single session source: subscribes to the auth lib's own
  *     post-change events (killing the stale-session race for every consumer at once), dedupes by
  *     signature, and absorbs the lifecycle + jwt/header surface that views were reaching past it for.
+ *   v2.0.1 — 2026-09-12 — getProfile()'s docblock stops promising the email. GET /v1/ghii/me now
+ *     renders its account-security half only for the person and their own agents, so a caller
+ *     running as a published app reads four of those fields as absent rather than null.
  */
 
 /* eslint-disable aimeat/no-direct-auth -- THIS is the module the rule points everything else to;
@@ -265,7 +268,15 @@ export function onAuthChange(callback) {
 
 // ── Profile ─────────────────────────────────────────────────────────────────────────────────────
 
-/** Fetch the current user's own profile (includes private fields like email). */
+/**
+ * Fetch the current user's own profile.
+ *
+ * What comes back depends on WHOSE software is asking. A person's own session or one of their own
+ * agents gets the account-security half too — the recovery address, whether a password is set, the
+ * verification timestamp and the registration public key. A published app holding a grant, and an
+ * ecosystem app, get the identity half without those four unless the person granted them the
+ * account-security permission, so read them as optional and render around their absence.
+ */
 export async function getProfile() {
   const s = getSession();
   if (!s) return null;

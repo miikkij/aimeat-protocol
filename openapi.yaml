@@ -27708,9 +27708,15 @@ paths:
       operationId: ghiiMe
       summary: Get the authenticated owner's own GHII profile
       description: |
-        Returns the caller's own GHII profile, including fields not exposed on the
-        public profile route (notification email, email verification timestamp, and
-        the Ed25519 public key generated at registration).
+        Returns the caller's own GHII profile. The record is always the caller's own: it is
+        looked up by the account name the credential carries, so no principal reaches another
+        person's profile through this route.
+
+        Four fields are the ACCOUNT-SECURITY half and are present only for the person and their
+        own agents: `notification_email`, `email_verified_at`, `has_password` and `public_key`.
+        Software a third party wrote and the account holder merely approved (a hosted app grant,
+        an ecosystem app) receives the identity half without them, unless the account holder
+        granted it the `account:security` permission. Treat all four as optional.
       tags: [GHII]
       security:
         - BearerAuth: []
@@ -27741,21 +27747,32 @@ paths:
                       locale:
                         type: string
                         nullable: true
+                      region:
+                        type: string
+                        nullable: true
+                      timezone:
+                        type: string
+                        nullable: true
+                      directory_listed:
+                        type: boolean
+                        description: Whether the account has opted in to the member directory
+                      verification_level:
+                        type: integer
                       notification_email:
                         type: string
                         nullable: true
-                      verification_level:
-                        type: integer
+                        description: Account-security half. Absent for third-party software without the account:security permission.
                       email_verified_at:
                         type: string
                         nullable: true
+                        description: Account-security half. Absent for third-party software without the account:security permission.
                       has_password:
                         type: boolean
-                        description: Whether a password has been set. False for accounts created via OAuth (e.g. Google sign-in) that have never set one.
+                        description: Whether a password has been set. False for accounts created via OAuth (e.g. Google sign-in) that have never set one. Account-security half. Absent for third-party software without the account:security permission.
                       public_key:
                         type: string
                         nullable: true
-                        description: The owner's Ed25519 public key (base64), generated at registration
+                        description: The owner's Ed25519 public key (base64), generated at registration. Account-security half. Absent for third-party software without the account:security permission.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
