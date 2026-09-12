@@ -10,6 +10,7 @@
  * @structure CRON_PRESETS · CreateForm
  * @usage <${CreateForm} agents=${agents} showToast=${showToast} onCreated=${reload} lockedAgent=${name} />
  * @version-history
+ *   v2.1.0 -- 2026-09-13 -- V2: use the shared ink rule on the form action row.
  *   v2.0.0 — 2026-08-30 — Moved out of scheduler-tab.js and laid out on the poster face; three new
  *     cadences (weekdays, Mondays, the 1st of the month), a time field that rewrites the cron, and
  *     the cadence read back in words. The request body is unchanged.
@@ -157,7 +158,7 @@ export function CreateForm({ agents = [], showToast, onCreated, onCancel = null,
         </label>
       </div>`)}
 
-      <div class="sc-form-actions">
+      <div class="sc-form-actions poster-row--thing">
         <button type="button" class="og-slab" disabled=${saving} onClick=${submit}>${saving ? t('profile.scheduler.saving') : t('profile.scheduler.create')}</button>
         ${onCancel ? html`<button type="button" class="og-door og-door--quiet" onClick=${onCancel}>${t('profile.scheduler.close')}</button>` : null}
       </div>

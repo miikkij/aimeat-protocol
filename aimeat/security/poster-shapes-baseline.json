@@ -1,16 +1,16 @@
 {
   "_note": "Copied design-language declarations, recorded debt rather than approval. This files map may only shrink. After migration, lower the affected counts or remove cleared files. Only an explicit developer decision permits re-seeding with pnpm check:poster-shapes --record.",
   "_measured": {
-    "date": "2026-09-12T23:04:00.000Z",
+    "date": "2026-09-12T23:17:00.000Z",
     "files": 79,
-    "declarations": 758,
+    "declarations": 755,
     "patterns": {
       "headline": 140,
       "sun": 129,
       "box2": 193,
       "frame3": 75,
       "record": 31,
-      "rule": 67,
+      "rule": 64,
       "action": 73,
       "slab": 10,
       "aside": 23,
@@ -328,7 +328,6 @@
     },
     "public/css/views/discover-poster.css": {
       "headline": 3,
-      "rule": 1,
       "action": 2,
       "sun": 1,
       "box2": 1
@@ -378,7 +377,6 @@
     },
     "public/css/views/knowledge-poster.css": {
       "headline": 3,
-      "rule": 1,
       "action": 2,
       "sun": 2,
       "box2": 4
@@ -492,7 +490,6 @@
     },
     "public/css/views/scheduler-poster.css": {
       "headline": 2,
-      "rule": 1,
       "action": 1,
       "sun": 2,
       "box2": 4

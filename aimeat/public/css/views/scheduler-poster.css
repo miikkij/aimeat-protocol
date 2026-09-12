@@ -9,6 +9,7 @@
  *   box and the key/value facts on a schedule's page, and the new-schedule form. NOTE: this file
  *   must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose the form action row's top rule from poster.css.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
@@ -112,7 +113,7 @@
 .sc-when label { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
 .sc-label { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .sc-limits { display: flex; flex-wrap: wrap; gap: .6rem 1.6rem; }
-.sc-form-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 1.4rem; padding-top: 1rem; border-top: 3px solid var(--text); }
+.sc-form-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 1.4rem; padding-top: 1rem; }
 
 @media (max-width: 1100px) {
   .og-sc .og-fold { flex-wrap: wrap; row-gap: .35rem; }
