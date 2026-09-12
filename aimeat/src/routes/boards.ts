@@ -13,6 +13,9 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.8.0 — 2026-09-12 — GET /v1/boards says how many live notices each board carries and when the
+ *     newest was written (storage.boardPostCounts, one grouped query for the listing). A listing is
+ *     asked first which of its boards is alive, and answering it needed one request per board.
  *   v1.7.0 — 2026-09-06 — A REACTION CAN BE TAKEN BACK. DELETE /v1/boards/:b/posts/:p/react
  *     removes the caller's own mark and drops the emoji when nobody is left on it; 404 when there
  *     was nothing to remove, so an undo is never a quiet no-op. Nothing could withdraw a reaction
@@ -134,6 +137,10 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return false;
     });
 
+    // Whether anyone has ever used a board is the first thing a listing is asked, and answering it
+    // per board meant one request each — 57 of them on this installation. One grouped query.
+    const counts = await storage.boardPostCounts(visible.map(b => b.id));
+
     res.json(success(config.nodeId, {
       boards: visible.map(b => ({
         id: b.id,
@@ -144,6 +151,8 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         federate: b.federate ?? false,
         rules: boardRulesBlock(b),
         created_at: b.createdAt,
+        posts: counts[b.id]?.posts ?? 0,
+        ...(counts[b.id]?.lastAt ? { last_post_at: counts[b.id].lastAt } : {}),
         ...(gaii ? { owner_gaii: b.ownerGaii, allowed_gaiis: b.allowedGaiis } : {}),
       })),
       total: visible.length,
