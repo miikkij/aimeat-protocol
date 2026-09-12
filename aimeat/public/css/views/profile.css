@@ -6,6 +6,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.12.0 -- 2026-09-13 -- V2: shared poster classes own the crumb and avatar frame.
  *   v3.11.0 — 2026-09-13 — V1: retire underlying section-title values; shared poster classes own headings.
  *   v3.10.0 — 2026-09-06 — The signed-out wall's rules (.login-prompt, .bg-aurora, .aurora-wave, pfAurora)
  *     removed: the door that replaced it has its own sheet, profile-door.css.
@@ -1657,9 +1658,6 @@
   font-family: inherit; min-height: 44px;
 }
 .pf .pf-back-btn:hover { background: var(--accent-soft, #FFF0EE); border-color: var(--accent, #E8564A); }
-.pf .pf-back-current {
-  font-size: .85rem; font-weight: 600; color: var(--text, #1a1a1a);
-}
 
 /* Inline view — full tab content opened within the landing page */
 .pf .pf-inline-view {
@@ -1685,7 +1683,6 @@
 .pf .pf-lp-card-header { display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
 .pf .pf-lp-avatar {
   width: 88px; height: 88px;
-  background: var(--card); border: 3px solid var(--text);
   overflow: hidden; flex-shrink: 0; cursor: pointer;
 }
 .pf .pf-lp-avatar svg { width: 100%; height: 100%; }
@@ -2238,7 +2235,6 @@
 .pf-content-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
 .pf-back-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); border-radius: var(--radius-sm, 8px); padding: 0.3rem 0.7rem; cursor: pointer; font: inherit; font-size: 0.85rem; }
 .pf-back-btn:hover { background: var(--bg-hover, var(--bg-dim)); }
-.pf-back-current { font-weight: 700; font-size: 1.05rem; color: var(--text); }
 .pf-content-body { min-width: 0; }
 
 .pf-mnav-toggle { display: none; }

@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.7.0 -- 2026-09-13 -- V2: profile markup selects the shared crumb shape.
  *   v1.6.0 — 2026-09-13 — V1: profile markup composes shared page and B1 section headings.
  *   v1.5.1 — 2026-09-09 — Account dialogs share the poster frame, fields and actions in Home and Settings.
  *   v1.5.0 — 2026-09-06 — The GAII control on an agent row (.pf-agd-gaii) takes the square corner
@@ -54,8 +55,6 @@
 .pf-content, .portfolio-container, .portfolio-viewer-full { font-family: var(--font-showroom-body); }
 /* The crumb precedes a page title. Markup selects the shared page or B1 section class. */
 .pf-content-head { border-bottom: 0; padding-bottom: 0; margin-bottom: 0.2rem; }
-.pf .pf-back-current { font-family: var(--font-mono); font-weight: 400; font-size: 0.8rem; letter-spacing: 0; text-transform: none; color: var(--accent); }
-.pf .pf-back-current::after { content: ' /'; }
 .portfolio-container h1 {
   font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
   font-size: 1.9rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;

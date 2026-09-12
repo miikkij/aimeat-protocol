@@ -13,6 +13,7 @@
  * @structure EyeMark · fmtPublished · WALL_FIRST_PAGE · Gallery · StatsPanel
  * @usage import { Gallery, StatsPanel } from './landing-wall.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose the search field with the shared poster frame.
  *   v1.0.0 — 2026-08-26 — Pure extraction from landing.js v5.3.0. No behaviour change.
  */
 import { h } from 'preact';
@@ -109,7 +110,7 @@ export function Gallery() {
     <div class="ld-section">
       <h2 class="ld-h2">${tr('landing.wallTitle', 'Built by people with their AI. Yours goes here too.')}</h2>
       <div class="ld-wall-bar">
-        <input class="ld-wall-search" type="search" value=${q}
+        <input class="ld-wall-search poster-frame" type="search" value=${q}
           onInput=${(e) => setQ(e.target.value)}
           placeholder=${tr('landing.wallSearch', 'Search apps…')}
           aria-label=${tr('landing.wallSearch', 'Search apps')} />
