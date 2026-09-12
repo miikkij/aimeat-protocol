@@ -12,6 +12,10 @@
  * @structure .sf-band · .sf-free · .sf-portal-text · .sf-portal-board · .sf-settings-door
  * @usage Linked from public/spa.html beside the other view stylesheets.
  * @version-history
+ *   v1.3.0 — 2026-09-12 — The band title is an ink slab with a 6px sun stripe, as home.css v3.3.0 draws
+ *     .koti-band-title (design canvas "Osioiden rajat kotisivulla", B1). Found on production after the
+ *     home's own bands had changed: the playbooks band ("Mitä haluaisit perustaa?") is this engine's
+ *     band, and a copy of a shape follows its original by hand until the shapes share one home.
  *   v1.2.0 — 2026-08-30 — A front-page notice shows its category and its poster's name (blocks-portal.js v1.2.0).
  *   v1.1.2 — 2026-08-29 — The band title reads --font-poster-tracking / --font-poster-leading (theme.css) instead
  *     of the -.03em / .95 measured for Archivo Black.
@@ -37,10 +41,16 @@
   line-height: var(--font-poster-leading);
   letter-spacing: var(--font-poster-tracking);
   text-transform: uppercase;
-  color: var(--text);
+  color: var(--bg);
+  background: var(--text);
+  padding: 0.55rem 1rem 0.5rem;
+  border-bottom: 6px solid var(--sun);
   margin: 0 0 1.4rem;
 }
-@media (max-width: 560px) { .sf-band { margin-top: 3rem; } .sf-band-title { font-size: 1.7rem; } }
+@media (max-width: 560px) {
+  .sf-band { margin-top: 3rem; }
+  .sf-band-title { font-size: 1.7rem; padding: 0.45rem 0.8rem 0.4rem; }
+}
 
 /* Inside a band, successive rows keep one rhythm: more air between rows than between the chips
    inside one, so the categories read apart instead of as one lump. */
