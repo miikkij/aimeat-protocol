@@ -12,6 +12,10 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   v1.9.0 -- 2026-09-12 -- aimeat_dm_inbox_as_owner and aimeat_dm_thread_as_owner read the OWNER's
+ *     own mailbox on the new messages:read-as-owner word, through the service the REST doors use.
+ *     "Reply as me" could send in the owner's thread and could not read it: aimeat_dm_thread answered
+ *     0 messages for the very conversation the prompt named, because it reads the agent's own mail.
  *   v1.8.0 -- 2026-09-08 -- aimeat_dm_send_as_owner names the agent that is acting, so the send can
  *     find the files. The tool sends AS the owner while the AGENT uploaded them, and a file lives
  *     under the identity that stored it: the descriptor pointed at storage that never held it, and
@@ -56,6 +60,7 @@ import { sendDirectMessage, mapMessageAttachments } from '../services/message-se
 import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
 import { deleteOwnerMessage } from '../services/direct-message-delete.js';
+import { delegateReaderFor, readOwnerOverview, readOwnerThread } from '../services/owner-mailbox-reads.js';
 import { sendGroupMessage } from '../services/conversation-group.js';
 import { broadcastFromPrincipal } from '../services/message-broadcast.js';
 import type { DeliveryCtx } from '../services/message-delivery.js';
@@ -458,6 +463,98 @@ export function registerDmMessageTools(
             // is the only durable record of which agent did it.
             logger.info('dm deleted as owner (delegated)', { agent: agentGaii, owner: `${parsed.owner}@${config.nodeId}`, messageId: message_id });
             return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, message_id }, null, 2) }] };
+        },
+    );
+
+    // ── aimeat_dm_inbox_as_owner — the OWNER's own mailbox, as the owner ──
+    // Gated by `messages:read-as-owner`, which no wildcard carries. aimeat_dm_inbox reads what was sent
+    // to the AGENT; this reads what the owner holds, which is what "reply as me" needs in order to read
+    // the thread it answers. The SAME service as GET /v1/messages/overview, so the two surfaces show
+    // the same list and leave the same audit line (services/owner-mailbox-reads.ts).
+    mcp.tool(
+        'aimeat_dm_inbox_as_owner',
+        descriptionFor('aimeat_dm_inbox_as_owner'),
+        {
+            limit: z.number().int().positive().max(200).optional().describe('At most this many conversations, newest first (default 30, max 200).'),
+            unread_only: z.boolean().optional().describe('Only conversations with something unread.'),
+        },
+        annotationsFor('aimeat_dm_inbox_as_owner'),
+        async ({ limit, unread_only }) => {
+            const reader = delegateReaderFor(getAgentGaii(), config.nodeId);
+            const data = await readOwnerOverview(storage, reader, { unreadOnly: unread_only ?? false, limit: limit ?? 30 });
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        conversations: data.conversations.map(c => ({
+                            conversation_id: c.conversationId,
+                            with: c.peerGhii,
+                            with_name: data.peerNames[c.peerGhii] || null,
+                            subject: c.subject ?? null,
+                            last_message: c.lastMessage,
+                            last_direction: c.lastDirection,
+                            ...(c.sentByAgent ? { last_sent_by_agent: c.sentByAgent } : {}),
+                            unread: c.unread,
+                            messages: c.messageCount,
+                            updated_at: c.updatedAt,
+                            ...(c.groupAlias ? { group: c.groupAlias, participants: c.participants ?? [] } : {}),
+                            ...(c.broadcastCount ? { broadcast_copies: c.broadcastCount } : {}),
+                        })),
+                        conversations_total: data.conversationsTotal,
+                        requests: data.requests.map(r => ({
+                            from: r.contactId, from_name: data.peerNames[r.contactId] || null,
+                            conversation_id: r.conversationId, preview: r.preview, created_at: r.createdAt,
+                        })),
+                        important_message_ids: data.important,
+                        note: 'Read one conversation with aimeat_dm_thread_as_owner. Reading marks nothing as read.',
+                    }, null, 2),
+                }],
+            };
+        },
+    );
+
+    // ── aimeat_dm_thread_as_owner — one conversation from the OWNER's mailbox, oldest first ──
+    // Same word and same service as the tool above; the REST twin is GET /v1/messages/conversations/:id.
+    mcp.tool(
+        'aimeat_dm_thread_as_owner',
+        descriptionFor('aimeat_dm_thread_as_owner'),
+        {
+            conversation_id: z.string().min(8).max(64).describe("The owner's conversation id (from aimeat_dm_inbox_as_owner or the reply context)."),
+            page: z.number().int().positive().optional().describe('Page number (default 1).'),
+            per_page: z.number().int().positive().max(200).optional().describe('Messages per page (default 50, max 200).'),
+        },
+        annotationsFor('aimeat_dm_thread_as_owner'),
+        async ({ conversation_id, page, per_page }) => {
+            const reader = delegateReaderFor(getAgentGaii(), config.nodeId);
+            const result = await readOwnerThread(storage, reader, conversation_id, { page: page ?? 1, perPage: per_page ?? 50 });
+            if (!result.ok) {
+                return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: result.message, code: result.code }) }] };
+            }
+            const ordered = [...result.messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+            const provFor = await readProvenanceMany(storage, config, ordered.map(m => m.aiProvenanceId));
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        conversation_id,
+                        ...(result.conversation ? { conversation: result.conversation } : {}),
+                        messages: ordered.map(m => ({
+                            id: m.id,
+                            direction: m.direction,
+                            from: m.senderGhii,
+                            to: m.recipientGhii,
+                            subject: m.subject ?? null,
+                            body: m.body,
+                            attachments: m.attachments?.map(a => attachmentView(a, reader.ownerGhii)) ?? [],
+                            interactive: m.interactive ?? null,
+                            read_at: m.readAt ?? null,
+                            created_at: m.createdAt,
+                            ...provFor(m.aiProvenanceId),
+                        })),
+                        total: result.total,
+                    }, null, 2),
+                }],
+            };
         },
     );
 

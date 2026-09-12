@@ -9,9 +9,11 @@
  *   reused (not re-implemented). Single-master: it serves the inbox mount and nothing else — the
  *   individual list endpoints stay for interactive re-fetches (filter/live-update).
  *
- * @structure MessagesInboxService.overview(ownerGhii, ownerName) → { requests, conversations, important, tracked, agents, groups, peerNames }
+ * @structure MessagesInboxService.overview(ownerGhii, ownerName, { inPerson }) → { requests, conversations, important, tracked, agents, groups, peerNames }
  * @usage const inbox = await createMessagesInboxService(storage).overview(ghii, owner);
  * @version-history
+ *   v1.2.0 — 2026-09-12 — `inPerson: false`: the messages part only, for an app or an agent reading in
+ *     the owner's name (services/owner-mailbox-reads.ts).
  *   v1.1.0 — 2026-08-03 — peerNames: resolve every on-screen peer's display name (conversation peers,
  *     their owners, request contacts) in the same read scope, so the inbox mount stops fanning out one
  *     GET /v1/ghii|/v1/agents per peer from the browser (~48 requests on a busy account).
@@ -51,17 +53,27 @@ export class MessagesInboxService {
    * The whole inbox mount for one owner in a single read scope. The six lists load concurrently; the
    * conversation composition (owner + agents' external threads) is reused from MessagingDbService, and
    * the agent fleet it resolves is the same one the `agents` list returns.
+   *
+   * `inPerson: false` is the overview for someone reading IN the owner's name: the messages part only.
+   * The agent fleet, the sharing groups and the tracked-response rules are not messages, so they come
+   * back present and empty rather than read, and the conversation list is the owner's own mailbox.
    */
-  overview(ownerGhii: string, ownerName: string): Promise<InboxOverview> {
+  overview(ownerGhii: string, ownerName: string, opts: { inPerson?: boolean } = {}): Promise<InboxOverview> {
+    const inPerson = opts.inPerson ?? true;
     return runInReadScope(async () => {
+      // Every part is started inside its own async function, so a storage call that throws while this
+      // array is being built rejects ITS promise instead of escaping the array. The difference is not
+      // cosmetic: an escape skips Promise.all, and the parts already started reject with nobody
+      // listening (test/unit/node-mcp-error-flag.test.ts drives a storage whose every method throws).
+      const part = <T>(f: () => Promise<T>): Promise<T> => (async () => f())();
       const [requests, convos, importantRecs, tracked, agents, ownedGroups, memberGroups] = await Promise.all([
-        this.pendingRequests(ownerGhii),
-        this.messaging.ownerConversations(ownerGhii, ownerName),
-        this.storage.listMemory(ownerGhii, { prefix: FLAG_PREFIX }),
-        listTrackedResponses(this.storage, ownerGhii),
-        this.storage.getAgentsByOwner(ownerName).catch(() => [] as AgentRecord[]),
-        this.storage.listSharingGroups(ownerGhii).catch(err => { logger.warn('overview: continuing after a suppressed failure', { error: String(err) }); return []; }),
-        this.storage.listSharingGroupsByMember(ownerGhii).catch(err => { logger.warn('overview: continuing after a suppressed failure', { error: String(err) }); return []; }),
+        part(() => this.pendingRequests(ownerGhii)),
+        part(() => this.messaging.ownerConversations(ownerGhii, ownerName, { agentThreads: inPerson })),
+        part(() => this.storage.listMemory(ownerGhii, { prefix: FLAG_PREFIX })),
+        part(async () => inPerson ? listTrackedResponses(this.storage, ownerGhii) : []),
+        part(async () => inPerson ? this.storage.getAgentsByOwner(ownerName).catch(() => [] as AgentRecord[]) : [] as AgentRecord[]),
+        part(async () => inPerson ? this.storage.listSharingGroups(ownerGhii).catch(err => { logger.warn('overview: continuing after a suppressed failure', { error: String(err) }); return []; }) : []),
+        part(async () => inPerson ? this.storage.listSharingGroupsByMember(ownerGhii).catch(err => { logger.warn('overview: continuing after a suppressed failure', { error: String(err) }); return []; }) : []),
       ]);
 
       // important = the message ids behind the flag keys (key = `message-flag.<id>`), same as the

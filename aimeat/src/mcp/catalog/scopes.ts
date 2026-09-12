@@ -20,6 +20,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.21.0 -- 2026-09-12 -- aimeat_dm_inbox_as_owner and aimeat_dm_thread_as_owner → messages:read-as-owner,
+ *     outside the '*' bundle.
  *   v1.20.0 -- 2026-09-08 -- aimeat_admin_cors_overview and aimeat_admin_cors_set join the
  *     operator-gated list, beside the Security pair.
  *   v1.19.0 -- 2026-09-06 -- The three secrets-vault tools → secrets:manage, the same word the three
@@ -533,6 +535,12 @@ export const TOOL_SCOPES: Record<string, string> = {
     // would hand every agent holding it the power to destroy the owner's correspondence with nobody
     // asked. NOT part of the '*' bundle either (utils/scope-coverage.ts) -- it costs its own tick.
     aimeat_dm_delete_as_owner: 'messages:delete-as-owner',
+    // Reading the owner's own mailbox, as the owner. `messages:read` on an agent is the agent's own
+    // messages (aimeat_dm_inbox below), so this is its own word, and NOT part of the '*' bundle: a
+    // read leaves nothing behind for the owner to see. Same doors as REST (GET /v1/messages/overview
+    // and /conversations/:id) through services/owner-mailbox-reads.ts.
+    aimeat_dm_inbox_as_owner: 'messages:read-as-owner',
+    aimeat_dm_thread_as_owner: 'messages:read-as-owner',
     aimeat_notify: 'notifications:send',
     aimeat_dm_inbox: 'messages:read',
     aimeat_dm_thread: 'messages:read',
