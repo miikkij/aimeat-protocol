@@ -161,9 +161,19 @@ export default function GhiiTab({ data, reload, switchPage }) {
           onClick=${() => setLevel(u, n)}>L${n}</button>`)}
     </span>`;
 
+  // Every GHII on this page ends in the same node id, so the row prints the name before the @ and
+  // keeps the whole thing for the hover and for the stacked view. Sixty-four repetitions of
+  // "@aimeat-finland-001-genesis" is not information, and at 1280 it is what pushed the row's own
+  // columns off the side. A GHII that does NOT end in this node's id is printed in full.
+  const shortId = (u) => (u.ghii.endsWith('@' + nodeId) ? u.username || u.ghii : u.ghii);
+
   const person = (u) => html`
     <div class="adm-gh-row" key=${u.ghii}>
-      <span><b>${nameOf(u)}</b><span class="adm-gh-id">${u.ghii}</span></span>
+      <span>
+        <b>${nameOf(u)}</b>
+        <span class="adm-gh-id" title=${u.ghii}>${shortId(u)}</span>
+        <span class="adm-gh-id adm-gh-id--full">${u.ghii}</span>
+      </span>
       <span data-l=${G('colMail')}>
         ${u.masked_email
     ? html`<span class="adm-gh-mail ${u.email_verified ? '' : 'adm-gh-mail--unconfirmed'}">${u.masked_email}</span>`
@@ -257,7 +267,7 @@ export default function GhiiTab({ data, reload, switchPage }) {
         <div class="adm-gh-head">
           <span>${G('colPerson')}</span><span>${G('colMail')}</span><span>${G('colLevel')}</span>
           <span>${G('colTotp')}</span><span>${G('colSeen')}</span>
-          <span class="adm-gh-made-h">${G('colMade')}</span><span></span>
+          <span>${G('colMade')}</span><span></span>
         </div>
         ${shown.length
     ? shown.map(person)
