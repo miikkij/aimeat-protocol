@@ -154,6 +154,9 @@ __pycache__/
 .venv/
 venv/
 docs/internal/
+# Execution prompts written for one session to work from. Same kind of thing as docs/internal/,
+# under the node rather than the repo root, and spelled with the s the other one does not have.
+aimeat/docs/internals/
 # Local dev-server log (from PowerShell pnpm dev redirect)
 .devlog.txt
 .devlog.err.txt
