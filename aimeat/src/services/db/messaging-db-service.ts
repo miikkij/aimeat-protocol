@@ -10,9 +10,11 @@
  *   `viaAgent`; skip internal own-owner peers) live here, unchanged from the route — this composes the
  *   domain, it doesn't reinvent it (the fan-out→IN rule, mirroring HomeDashboardService).
  *
- * @structure MessagingDbService.ownerConversations(ownerGhii, ownerName) → { conversations } in a read scope
+ * @structure MessagingDbService.ownerConversations(ownerGhii, ownerName, { agentThreads }) → { conversations } in a read scope
  * @usage const { conversations } = await createMessagingDbService(storage).ownerConversations(ghii, owner);
  * @version-history
+ *   v1.4.0 — 2026-09-12 — `agentThreads: false` lists the owner's own mailbox only, for an app or an
+ *     agent reading in the owner's name (services/owner-mailbox-reads.ts).
  *   v1.3.0 — 2026-09-06 — The copies of one broadcast collapse into a single row (foldBroadcasts),
  *     carrying the others nested and the unread count summed. Keyed on the LAST message's
  *     broadcastId, so a thread somebody answered lifts back out with nothing detecting the reply.
@@ -80,13 +82,20 @@ export class MessagingDbService {
    * (tagged `viaAgent`) — in one read scope. The agent fleet is resolved once; the conversations for the
    * owner and all agents are read in ONE batched call (per-agent fan-out killed). Contacts that are
    * pending/blocked are hidden from the owner's own list (same as the single-mailbox view).
+   *
+   * `agentThreads: false` is the list for someone reading IN the owner's name (an app, a delegated
+   * agent): the owner's own mailbox only. The agents' threads are theirs, and a word about the owner's
+   * messages does not reach them. The fleet is still resolved, because recognising the owner's own row
+   * in a group thread one of their agents opened needs the agents' identities, and that names nothing
+   * the owner's own row does not already hold.
    */
-  ownerConversations(ownerGhii: string, ownerName: string): Promise<{ conversations: OwnerConversation[] }> {
+  ownerConversations(ownerGhii: string, ownerName: string, opts: { agentThreads?: boolean } = {}): Promise<{ conversations: OwnerConversation[] }> {
+    const agentThreads = opts.agentThreads ?? true;
     return runInReadScope(async () => {
       const agents = await this.storage.getAgentsByOwner(ownerName).catch(err => { logger.warn('ownerConversations: continuing after a suppressed failure', { error: String(err) }); return []; });
       const [contacts, byOwner] = await Promise.all([
         this.storage.listContacts(ownerGhii),
-        this.batchConversations([ownerGhii, ...agents.map(a => a.gaii)]),
+        this.batchConversations(agentThreads ? [ownerGhii, ...agents.map(a => a.gaii)] : [ownerGhii]),
       ]);
 
       const hidden = new Set(contacts.filter(c => c.state === 'pending' || c.state === 'blocked').map(c => c.contactId));
@@ -96,7 +105,7 @@ export class MessagingDbService {
       // (an agent DM'd a user from its own inbox), tagged `viaAgent`. Internal threads (peer is this same
       // owner — an agent talking to the owner or a sibling agent) are skipped: not "sent to a user".
       const agentConvs: OwnerConversation[] = [];
-      for (const a of agents) {
+      for (const a of agentThreads ? agents : []) {
         for (const c of (byOwner[a.gaii] ?? [])) {
           if (parseGaiiLoose(c.peerGhii).owner === ownerName) continue;
           agentConvs.push({ ...c, viaAgent: a.gaii });

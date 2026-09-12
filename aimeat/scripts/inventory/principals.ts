@@ -26,6 +26,8 @@
  * @structure PRINCIPALS · GUARD_EFFECTS · principalsFor(guards) · scopesFrom(guards)
  * @usage const { principals, unknown } = principalsFor(['requireAuth()', "requireScope('memory:write')"]);
  * @version-history
+ *   v1.1.0 — 2026-09-12 — requireOwnerMailboxRead is an authorization gate: the four owner-mailbox
+ *     reads, for the owner in person, an app on messages:read and an agent on messages:read-as-owner.
  *   v1.0.0 — 2026-09-03 — Initial (wish-invarianttiauditointi, phase 1).
  */
 
@@ -80,6 +82,7 @@ export const AUTHORIZATION_GATES = [
     'requireScope', 'requireAnyScope', 'requireRole', 'requireRoleOrScope', 'requireOperator',
     'requireOwnerPrincipal', 'requireScimConnection', 'requireOperatorPrincipal',
     'requireExternalPrincipal', 'requireOwnerSession', 'workspaceAccess', 'workspaceAccessMiddleware',
+    'requireOwnerMailboxRead',
 ];
 
 /**
@@ -102,6 +105,11 @@ export const GUARD_EFFECTS: Record<string, { admits: Principal[] | null; note?: 
      * because they act for their own. A deliberate superset of requireRole('agent').
      */
     requireExternalPrincipal: { admits: ['owner', 'operator', 'agent', 'ecosystem'] },
+    /**
+     * The four owner-mailbox reads: the owner in person, an app on messages:read, an agent or GEAI on
+     * messages:read-as-owner. Decided in services/owner-mailbox-reads.ts (mailboxReaderOf).
+     */
+    requireOwnerMailboxRead: { admits: ['owner', 'operator', 'app', 'agent', 'ecosystem'], note: 'app on messages:read; agent/GEAI on messages:read-as-owner; federated refused' },
     /** The owner's own browser session on the welcome mat, not a token acting in their name. */
     requireOwnerSession: { admits: ['owner', 'operator'] },
     /**
