@@ -2,44 +2,163 @@
  * @file apps-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin dashboard Applications tab — operator moderation surface for
- *   every published app on the node. Lists all apps (across all owners, including
- *   parked + operator-hidden), with a hide/restore control. Hiding removes the app
- *   from every public surface (catalogue/gallery/search + direct download); the
- *   owner still sees it in their "My Apps" with a "moderated by operator: hidden"
- *   badge but cannot lift it — only an operator can.
- * @structure AppsAdminTab (default) — load all apps, filter, table, hide-reason +
- *   type-to-confirm delete modals.
+ * @description Admin Applications page in the poster face (design canvas "AIMEAT Admin
+ *   Applications", direction A): what is published here, the table of every app, the copy scan, the
+ *   four ways an app can be off the wall, and what this operator has taken down.
+ *
+ *   THE PAGE ANSWERS BEFORE IT LISTS. Seventy-six apps came as one table with no counts at all,
+ *   so "is anything wrong here" could only be answered by reading every row.
+ *
+ *   FOUR STATES LOOKED ALIKE AND MEAN DIFFERENT THINGS: taken down by the operator, parked by the
+ *   owner, behind an access code, kept out of search engines. Only the first is the operator's, and
+ *   only the first is theirs to undo.
+ *
+ *   DELETING MOVED OFF THE ROW. It is the one irreversible thing here and it was a red button on
+ *   every row, the same size as Hide. It lives in the row menu now, still behind the typed
+ *   filename. Taking an app down is the moderation action, and it is undone in one press.
+ * @structure AppsAdminTab (default) · RightNow · FourStates · TakenDown
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
- *   v1.1.0 — 2026-09-05 — The two status badges lose their emoji: no emoji anywhere in the interface.
+ *   v2.0.0 — 2026-09-12 — The poster face: five numbered sections, the facts the node already sent
+ *     and the page ignored (forks, version, access code, search block, publish date, the address
+ *     that opens the app), filters beside the search, the copy scan as a section with the suspected
+ *     copy beside the original, and delete behind the row menu.
+ *   v1.2.0 — 2026-07-07 — Add "Scan for copies" (Phase 4).
+ *   v1.1.0 — 2026-06-25 — Add operator hard-delete (type-to-confirm).
  *   v1.0.0 — 2026-06-24 — Initial: list-all + hide/restore moderation tool.
- *   v1.1.0 — 2026-06-25 — Add operator hard-delete (type-to-confirm) — removes an
- *     app permanently from the node.
- *   v1.2.0 — 2026-07-07 — Add "Scan for copies" (Phase 4): calls GET /v1/admin/apps/similar
- *     and shows unattributed near-duplicates (high similarity, no fork link) + watermark hits.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
 import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, fmtBytes, Spinner, Empty, ErrorBox, useToast, Toast } from './shared.js';
+import { useViewCSS } from '/components/useViewCSS.js';
+import { num, dt, fmtBytes, Badge, Spinner, ErrorBox, useToast, Toast } from './shared.js';
 import { Modal } from '/components/Modal.js';
+import { swallowed } from '/js/swallowed.js';
 import * as adminService from '/js/services/admin.js';
+import { AppRow } from './apps-tab.row.js';
+import { CopyScan } from './apps-tab.scan.js';
+
+const html = htm.bind(h);
+const A = (key, params) => t('admin.apps.' + key, params);
+
+/** The columns that can be sorted, and how each one reads a row. */
+const SORTS = {
+  published: (a) => -new Date(a.created_at || 0).getTime(),
+  opened: (a) => -(a.downloads || 0),
+  size: (a) => -(a.size || 0),
+  forks: (a) => -(a.forks || 0),
+  name: (a) => String(a.manifest?.name || a.filename).toLowerCase(),
+  owner: (a) => String(a.owner || '').toLowerCase(),
+};
+
+/** Section 01: the word, the sentence, and the five rows behind it. */
+function RightNow({ facts, number, onFilter }) {
+  const word = facts.down > 0 ? A('now.wordModerated', { n: num(facts.down) }) : A('now.wordQuiet');
+  const line = facts.down > 0
+    ? A('now.lineModerated', { n: num(facts.all), owners: num(facts.owners), down: num(facts.down) })
+    : A('now.lineQuiet', { n: num(facts.all), owners: num(facts.owners) });
+  const row = (title, why, chip, value, last) => html`
+    <div class=${'adm-mrow' + (last ? ' adm-mrow--last' : '')}>
+      <span><b>${title}</b><span class="adm-why">${why}</span></span>
+      <span>${chip}</span>
+      <span class="adm-mval">${value}</span>
+    </div>`;
+  return html`
+    <section class="og-sec og-sec--first" id="adm-ap-now">
+      <div class="og-sec-h"><h2>${A('now.title')}<small>${number}</small></h2>
+        <div class="og-doors">
+          <a class="og-door og-door--quiet" href="/v1/app-store" target="_blank" rel="noopener">${A('now.openWall')}</a>
+        </div></div>
+      <div class="adm-ov-grid">
+        <div>
+          <div class="adm-ov-status">${word}</div>
+          <p class="adm-alert-line">${line}</p>
+          <div class="adm-ov-up">${A('now.stored', { size: fmtBytes(facts.bytes) })}<br />${facts.newest}</div>
+        </div>
+        <div>
+          ${row(A('now.downRow'), A('now.downWhy'),
+            facts.down > 0
+              ? html`<${Badge} type="critical" label=${num(facts.down)} />`
+              : html`<${Badge} type="healthy" label=${A('now.none')} />`,
+            A('now.operatorOnly'))}
+          ${row(A('now.parkedRow'), A('now.parkedWhy'),
+            html`<${Badge} type="muted" label=${num(facts.parked)} />`, A('now.ownersOwn'))}
+          ${row(A('now.codeRow'), A('now.codeWhy'),
+            html`<${Badge} type=${facts.coded > 0 ? 'info' : 'muted'} label=${num(facts.coded)} />`,
+            A('now.accessCode'))}
+          ${row(A('now.seoRow'), A('now.seoWhy'),
+            html`<${Badge} type=${facts.seoBlocked > 0 ? 'watch' : 'muted'} label=${A('now.byYou', { n: num(facts.seoBlocked) })} />`,
+            A('now.ofN', { n: num(facts.notIndexed) }))}
+          ${row(A('now.neverRow'), A('now.neverWhy'),
+            html`<${Badge} type="muted" label=${num(facts.never)} />`, A('now.zeroOpens'), true)}
+        </div>
+      </div>
+      <div class="og-strip">
+        <div><b>${num(facts.all)}</b><span>${A('strip.apps')}</span><small>${A('strip.appsSub')}</small></div>
+        <button type="button" onClick=${() => onFilter('down')}>
+          <b class="adm-ap-coral">${num(facts.down)}</b><span>${A('strip.down')}</span><small>${A('strip.downSub')}</small></button>
+        <button type="button" onClick=${() => onFilter('parked')}>
+          <b>${num(facts.parked)}</b><span>${A('strip.parked')}</span><small>${A('strip.parkedSub')}</small></button>
+        <div><b>${fmtBytes(facts.bytes)}</b><span>${A('strip.stored')}</span><small>${A('strip.storedSub', { size: fmtBytes(facts.largest) })}</small></div>
+      </div>
+    </section>`;
+}
+
+/** Section 04: the four states, and the one action that cannot be undone. */
+function FourStates({ facts, number }) {
+  const step = (n, key, value, last) => html`
+    <div class=${'adm-ap-step' + (last ? ' adm-ap-step--last' : '')}>
+      <span class="adm-ap-stepn">${n}</span>
+      <span><b>${A('states.' + key)}</b><span class="adm-why">${A('states.' + key + 'Why')}</span></span>
+      <span class="adm-mval">${value}</span>
+    </div>`;
+  return html`
+    <section class="og-sec" id="adm-ap-states">
+      <div class="og-sec-h"><h2>${A('states.title')}<small>${number}</small></h2></div>
+      <p class="adm-ap-lead">${A('states.lead')}</p>
+      ${step(1, 'down', A('states.count', { n: num(facts.down) }))}
+      ${step(2, 'parked', A('states.count', { n: num(facts.parked) }))}
+      ${step(3, 'code', A('states.count', { n: num(facts.coded) }))}
+      ${step(4, 'seo', A('states.count', { n: num(facts.notIndexed) }), true)}
+      <div class="og-box" style="margin-top: 16px">
+        <span class="og-box-label">${A('states.dangerLabel')}</span>
+        ${A('states.danger')}
+      </div>
+    </section>`;
+}
+
+/** Section 05: what this operator has taken down, with the reason they gave. */
+function TakenDown({ apps, number }) {
+  const down = apps.filter(a => a.operator_hidden);
+  return html`
+    <section class="og-sec" id="adm-ap-log">
+      <div class="og-sec-h"><h2>${A('log.title')}<small>${number}</small></h2></div>
+      ${down.length === 0
+        ? html`<p class="adm-ap-note">${A('log.none')}</p>`
+        : down.map((a, i) => html`
+          <div class=${'adm-mrow' + (i === down.length - 1 ? ' adm-mrow--last' : '')} key=${a.filename}>
+            <span>
+              <b>${escHtml(a.manifest?.name || a.filename)}</b>
+              <span class="adm-why">${a.operator_hide_reason ? `"${escHtml(a.operator_hide_reason)}"` : A('log.noReason')}</span>
+            </span>
+            <span><${Badge} type="critical" label=${A('chip.down')} /></span>
+            <span class="adm-mval">${dt(a.operator_hidden_at)} · ${escHtml(a.operator_hidden_by || '-')}</span>
+          </div>`)}
+    </section>`;
+}
 
 export default function AppsAdminTab() {
+  useViewCSS('/css/views/admin-apps.css');
   const [apps, setApps] = useState(null);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
-  const [hiddenOnly, setHiddenOnly] = useState(false);
-  // { owner, filename, name, reason } while the hide-reason modal is open
+  const [filter, setFilter] = useState('all');
+  const [sort, setSort] = useState('published');
   const [hiding, setHiding] = useState(null);
-  // { owner, filename, name, typed } while the type-to-confirm delete modal is open
   const [deleting, setDeleting] = useState(null);
   const [busy, setBusy] = useState(false);
-  // Unattributed-copy scan (Phase 4): { suspiciousPairs, watermarkHits, scanned, note }
   const [scanResult, setScanResult] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [msg, showError, showSuccess, clearMsg] = useToast();
@@ -56,50 +175,74 @@ export default function AppsAdminTab() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
   useEffect(() => {
     const handler = () => { load(); };
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [load]);
 
-  const filtered = useMemo(() => {
-    if (!apps) return [];
-    const q = query.trim().toLowerCase();
-    return apps.filter(a => {
-      if (hiddenOnly && !a.operator_hidden) return false;
+  // ── what the page counts, from the list the node already sends ──
+  const facts = useMemo(() => {
+    const list = apps || [];
+    const when = (a) => new Date(a.created_at || 0).getTime();
+    const newest = list.slice().sort((a, b) => when(b) - when(a))[0];
+    return {
+      all: list.length,
+      owners: new Set(list.map(a => a.owner)).size,
+      down: list.filter(a => a.operator_hidden).length,
+      parked: list.filter(a => a.parked).length,
+      coded: list.filter(a => a.protected).length,
+      seoBlocked: list.filter(a => a.operator_seo_blocked).length,
+      notIndexed: list.filter(a => a.operator_seo_blocked || a.seo_state === 'off' || a.seo_state === 'blocked').length,
+      never: list.filter(a => !a.operator_hidden && !a.parked && (a.downloads || 0) === 0).length,
+      bytes: list.reduce((n, a) => n + (a.size || 0), 0),
+      largest: list.reduce((n, a) => Math.max(n, a.size || 0), 0),
+      newest: newest
+        ? A('now.newest', { when: dt(newest.created_at), who: escHtml(newest.owner) })
+        : A('now.noApps'),
+    };
+  }, [apps]);
+
+  const shown = useMemo(() => {
+    const list = (apps || []).filter(a => {
+      if (filter === 'down' && !a.operator_hidden) return false;
+      if (filter === 'parked' && !a.parked) return false;
+      if (filter === 'coded' && !a.protected) return false;
+      if (filter === 'never' && (a.operator_hidden || a.parked || (a.downloads || 0) > 0)) return false;
+      const q = query.trim().toLowerCase();
       if (!q) return true;
       return (a.filename || '').toLowerCase().includes(q)
         || (a.owner || '').toLowerCase().includes(q)
         || (a.manifest?.name || '').toLowerCase().includes(q);
     });
-  }, [apps, query, hiddenOnly]);
+    const key = SORTS[sort] || SORTS.published;
+    return list.slice().sort((a, b) => {
+      const av = key(a); const bv = key(b);
+      return typeof av === 'string' ? av.localeCompare(bv) : av - bv;
+    });
+  }, [apps, query, filter, sort]);
 
-  const hiddenCount = useMemo(() => (apps || []).filter(a => a.operator_hidden).length, [apps]);
-
+  // ── the three writes ──
   const doHide = useCallback(async () => {
     if (!hiding) return;
     setBusy(true);
     try {
       await adminService.moderateApp(hiding.owner, hiding.filename, true, hiding.reason?.trim() || undefined);
-      showSuccess(t('admin.apps.hiddenOk'));
+      showSuccess(A('tookDown', { name: hiding.name }));
       setHiding(null);
       await load();
-    } catch (err) {
-      showError(err?.message || String(err));
-    } finally {
-      setBusy(false);
-    }
+    } catch (err) { swallowed('apps-tab: hide', err); showError(err?.message || String(err)); }
+    finally { setBusy(false); }
   }, [hiding, load, showSuccess, showError]);
 
   const doRestore = useCallback(async (app) => {
+    setBusy(true);
     try {
       await adminService.moderateApp(app.owner, app.filename, false);
-      showSuccess(t('admin.apps.restoredOk'));
+      showSuccess(A('putBackDone', { name: app.manifest?.name || app.filename }));
       await load();
-    } catch (err) {
-      showError(err?.message || String(err));
-    }
+    } catch (err) { swallowed('apps-tab: restore', err); showError(err?.message || String(err)); }
+    finally { setBusy(false); }
   }, [load, showSuccess, showError]);
 
   const doDelete = useCallback(async () => {
@@ -107,141 +250,135 @@ export default function AppsAdminTab() {
     setBusy(true);
     try {
       await adminService.deleteAppAdmin(deleting.owner, deleting.filename);
-      showSuccess(t('admin.apps.deletedOk'));
+      showSuccess(A('deletedDone', { name: deleting.name }));
       setDeleting(null);
       await load();
-    } catch (err) {
-      showError(err?.message || String(err));
-    } finally {
-      setBusy(false);
-    }
+    } catch (err) { swallowed('apps-tab: delete', err); showError(err?.message || String(err)); }
+    finally { setBusy(false); }
   }, [deleting, load, showSuccess, showError]);
+
+  /**
+   * The narrow one: a blocked app stays published, listed and usable, and only stops being
+   * findable in a search engine. The same door lifts it again, which is why this is one toggle
+   * rather than the approve route (that one answers 409 unless the site reviews every app).
+   */
+  const doSeo = useCallback(async (app) => {
+    setBusy(true);
+    try {
+      await adminService.blockAppSeo(app.owner, app.filename, !app.operator_seo_blocked);
+      showSuccess(app.operator_seo_blocked ? A('seoAllowed') : A('seoBlocked'));
+      await load();
+    } catch (err) { swallowed('apps-tab: seo', err); showError(err?.message || String(err)); }
+    finally { setBusy(false); }
+  }, [load, showSuccess, showError]);
 
   const runCopyScan = useCallback(async () => {
     setScanning(true);
     try {
       const resp = await adminService.scanAppCopies();
       setScanResult(resp?.data || null);
-    } catch (err) {
-      showError(err?.message || String(err));
-    } finally {
-      setScanning(false);
-    }
+    } catch (err) { swallowed('apps-tab: scan', err); showError(err?.message || String(err)); }
+    finally { setScanning(false); }
   }, [showError]);
 
+  if (apps === null) {
+    return html`
+      ${msg && html`<${Toast} type=${msg.type} text=${msg.text} onDismiss=${clearMsg} />`}
+      <${Spinner} text=${t('dashboard.loading')} />`;
+  }
+
+  let counter = 0;
+  const n = () => String(++counter).padStart(2, '0');
+  const col = (key, label, right) => html`
+    <th class=${right ? 'r' : ''}>
+      <button type="button" class=${sort === key ? 'adm-ap-sorted' : ''} onClick=${() => setSort(key)}>${label}</button>
+    </th>`;
+
   return html`
-    ${msg && html`<${Toast} type=${msg.type} text=${msg.text} onDismiss=${clearMsg} />`}
-    <p class="adm-text-sm adm-text-dim adm-mb-md">${t('admin.apps.desc')}</p>
-
-    <div class="adm-card">
-      <div class="adm-flex-between adm-mb-md">
-        <h2>${t('admin.apps.title')} ${hiddenCount > 0 ? html`<span class="badge badge-warn">${hiddenCount} ${t('admin.apps.hiddenChip')}</span>` : ''}</h2>
-        <div class="adm-flex adm-apps-filters">
-          <input class="adm-input" placeholder=${t('admin.apps.searchPlaceholder')}
-            value=${query} onInput=${e => setQuery(e.target.value)} />
-          <label class="adm-text-sm adm-apps-toggle">
-            <input type="checkbox" checked=${hiddenOnly} onChange=${e => setHiddenOnly(e.target.checked)} />
-            ${t('admin.apps.hiddenOnly')}
-          </label>
-          <button class="adm-btn-sm adm-btn-info" onClick=${runCopyScan} disabled=${scanning}>
-            ${scanning ? t('admin.apps.scanning') : t('admin.apps.scanCopies')}
-          </button>
-        </div>
-      </div>
-
-      ${scanResult && html`
-        <div class="adm-card adm-mb-md">
-          <div class="adm-flex-between adm-mb-sm">
-            <b>${t('admin.apps.copyScanTitle')}</b>
-            <button class="adm-btn-sm adm-btn-ghost" onClick=${() => setScanResult(null)}>${t('common.close')}</button>
-          </div>
-          <div class="adm-text-sm adm-text-dim adm-mb-sm">${escHtml(scanResult.note || '')} (${scanResult.scanned} ${t('admin.apps.scanned')})</div>
-          ${scanResult.watermarkHits?.length ? html`
-            <div class="adm-text-sm"><b>${t('admin.apps.wmHits')}</b></div>
-            <ul>${scanResult.watermarkHits.map(w => html`<li class="adm-text-sm mono">${escHtml(w.inApp)} ⬅ ${escHtml(w.watermarkOf)} · ${escHtml(w.viewer)} · ${dt(w.servedAt)}</li>`)}</ul>` : ''}
-          ${scanResult.suspiciousPairs?.length ? html`
-            <div class="adm-text-sm"><b>${t('admin.apps.similarPairs')}</b></div>
-            <ul>${scanResult.suspiciousPairs.map(p => html`<li class="adm-text-sm mono">${escHtml(p.a)} ~ ${escHtml(p.b)} · ${Math.round(p.similarity * 100)}%</li>`)}</ul>` : ''}
-          ${(!scanResult.watermarkHits?.length && !scanResult.suspiciousPairs?.length) ? html`<div class="adm-text-sm adm-text-dim">${t('admin.apps.nothingFlagged')}</div>` : ''}
-        </div>` }
-
+    <div class="adm-ap">
+      ${msg && html`<${Toast} type=${msg.type} text=${msg.text} onDismiss=${clearMsg} />`}
+      <p class="adm-ap-intro">${A('intro')}</p>
       ${error && html`<${ErrorBox} message=${error} />`}
-      ${apps === null ? html`<${Spinner} />`
-        : filtered.length === 0 ? html`<${Empty} text=${t('admin.apps.empty')} />`
-        : html`
-        <div class="scrollable">
-          <table>
-            <thead><tr>
-              <th>${t('admin.apps.colApp')}</th>
-              <th>${t('admin.apps.colOwner')}</th>
-              <th>${t('admin.apps.colSize')}</th>
-              <th>${t('admin.apps.colDownloads')}</th>
-              <th>${t('admin.apps.colStatus')}</th>
-              <th></th>
-            </tr></thead>
+
+      <${RightNow} facts=${facts} number=${n()} onFilter=${(key) => { setFilter(key); setQuery(''); }} />
+
+      <section class="og-sec" id="adm-ap-find">
+        <div class="og-sec-h"><h2>${A('find.title')}<small>${n()}</small></h2>
+          <div class="og-doors"><span class="adm-ap-note">${A('find.count', { n: num(shown.length), total: num(facts.all) })}</span></div></div>
+
+        <div class="adm-ap-tools">
+          <span class="adm-ap-find">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>
+            <input type="text" value=${query} placeholder=${A('searchPh')} onInput=${e => setQuery(e.target.value)} />
+          </span>
+          ${[['all', facts.all], ['down', facts.down], ['parked', facts.parked], ['coded', facts.coded], ['never', facts.never]]
+            .map(([key, count]) => html`
+              <button type="button" key=${key} class=${'adm-ap-filter' + (filter === key ? ' on' : '')}
+                onClick=${() => setFilter(key)}>${A('filter.' + key, { n: num(count) })}</button>`)}
+        </div>
+
+        <div class="adm-ap-scroll">
+          <table class="adm-ap-tbl">
+            <thead>
+              <tr>
+                ${col('name', A('col.app'))}
+                ${col('owner', A('col.owner'))}
+                ${col('size', A('col.size'), true)}
+                ${col('opened', A('col.opened'), true)}
+                ${col('forks', A('col.forks'), true)}
+                ${col('published', A('col.published'), true)}
+                <th class="r"></th>
+              </tr>
+            </thead>
             <tbody>
-              ${filtered.map(a => html`
-                <tr class=${a.operator_hidden ? 'adm-apps-row-hidden' : ''}>
-                  <td>
-                    <div>${escHtml(a.manifest?.name || a.filename)}</div>
-                    <div class="adm-text-sm adm-text-dim mono">${escHtml(a.filename)}</div>
-                  </td>
-                  <td class="mono">${escHtml(a.owner)}</td>
-                  <td>${fmtBytes(a.size || 0)}</td>
-                  <td>${a.downloads || 0}</td>
-                  <td>
-                    ${a.operator_hidden
-                      ? html`<span class="badge badge-danger">${t('admin.apps.statusHidden')}</span>
-                          ${a.operator_hide_reason ? html`<div class="adm-text-sm adm-text-dim">${escHtml(a.operator_hide_reason)}</div>` : ''}
-                          ${a.operator_hidden_by ? html`<div class="adm-text-sm adm-text-dim">${t('admin.apps.byAt', { by: a.operator_hidden_by, at: dt(a.operator_hidden_at) })}</div>` : ''}`
-                      : a.parked
-                        ? html`<span class="badge badge-dim">${t('admin.apps.statusParked')}</span>`
-                        : html`<span class="badge badge-success">${t('admin.apps.statusLive')}</span>`}
-                  </td>
-                  <td>
-                    <div class="adm-flex adm-apps-rowactions">
-                      ${a.operator_hidden
-                        ? html`<button class="adm-btn-sm adm-btn-success" onClick=${() => doRestore(a)}>${t('admin.apps.restore')}</button>`
-                        : html`<button class="adm-btn-sm adm-btn-danger" onClick=${() => setHiding({ owner: a.owner, filename: a.filename, name: a.manifest?.name || a.filename, reason: '' })}>${t('admin.apps.hide')}</button>`}
-                      <button class="adm-btn-sm adm-btn-danger-solid" onClick=${() => setDeleting({ owner: a.owner, filename: a.filename, name: a.manifest?.name || a.filename, typed: '' })}>${t('admin.apps.delete')}</button>
-                    </div>
-                  </td>
-                </tr>
-              `)}
+              ${shown.map(a => html`
+                <${AppRow} key=${a.owner + '/' + a.filename} app=${a} busy=${busy}
+                  onHide=${(app) => setHiding({ owner: app.owner, filename: app.filename, name: app.manifest?.name || app.filename, reason: '' })}
+                  onRestore=${doRestore}
+                  onDelete=${(app) => setDeleting({ owner: app.owner, filename: app.filename, name: app.manifest?.name || app.filename, typed: '' })}
+                  onSeo=${doSeo} />`)}
             </tbody>
           </table>
         </div>
-      `}
-    </div>
+        ${shown.length === 0 && html`<p class="adm-ap-note" style="margin-top: 12px">${A('noMatch')}</p>`}
+      </section>
 
-    <${Modal} open=${!!hiding} onClose=${() => setHiding(null)} title=${t('admin.apps.hideTitle')}>
-      ${hiding && html`
-        <p>${t('admin.apps.hideConfirm')} <strong>${escHtml(hiding.name)}</strong> (<span class="mono">${escHtml(hiding.owner)}</span>)?</p>
-        <p class="adm-text-sm adm-text-dim">${t('admin.apps.hideExplain')}</p>
-        <label class="adm-text-sm adm-mb-half">${t('admin.apps.reasonLabel')}</label>
-        <input class="adm-input adm-input-full" value=${hiding.reason}
-          placeholder=${t('admin.apps.reasonPlaceholder')}
-          onInput=${e => setHiding({ ...hiding, reason: e.target.value })} />
-        <div class="adm-flex adm-mt-md adm-apps-modal-actions">
-          <button class="btn-ghost" onClick=${() => setHiding(null)}>${t('common.cancel')}</button>
-          <button class="btn-danger-solid" disabled=${busy} onClick=${doHide}>${t('admin.apps.hide')}</button>
-        </div>
-      `}
-    <//>
+      <${CopyScan} result=${scanResult} apps=${apps} scanning=${scanning} onScan=${runCopyScan} number=${n()} />
+      <${FourStates} facts=${facts} number=${n()} />
+      <${TakenDown} apps=${apps} number=${n()} />
 
-    <${Modal} open=${!!deleting} onClose=${() => setDeleting(null)} title=${t('admin.apps.deleteTitle')}>
-      ${deleting && html`
-        <p>${t('admin.apps.deleteConfirm')} <strong>${escHtml(deleting.name)}</strong> (<span class="mono">${escHtml(deleting.owner)}</span>)?</p>
-        <p class="adm-text-sm adm-text-error">${t('admin.apps.deleteWarn')}</p>
-        <label class="adm-text-sm adm-mb-half">${t('admin.apps.deleteTypeLabel', { filename: deleting.filename })}</label>
-        <input class="adm-input adm-input-full mono" value=${deleting.typed}
-          placeholder=${deleting.filename}
-          onInput=${e => setDeleting({ ...deleting, typed: e.target.value })} />
-        <div class="adm-flex adm-mt-md adm-apps-modal-actions">
-          <button class="btn-ghost" onClick=${() => setDeleting(null)}>${t('common.cancel')}</button>
-          <button class="btn-danger-solid" disabled=${busy || deleting.typed !== deleting.filename} onClick=${doDelete}>${t('admin.apps.delete')}</button>
-        </div>
-      `}
-    <//>
-  `;
+      <${Modal} open=${!!hiding} onClose=${() => setHiding(null)} title=${A('hideTitle')}>
+        ${hiding && html`
+          <p>${A('hideAsk', { name: escHtml(hiding.name), owner: escHtml(hiding.owner) })}</p>
+          <p class="adm-ap-note">${A('hideExplain')}</p>
+          <label class="adm-ap-field">
+            <span>${A('reasonLabel')}</span>
+            <input class="adm-input" type="text" value=${hiding.reason} placeholder=${A('reasonPh')}
+              onInput=${e => setHiding({ ...hiding, reason: e.target.value })} />
+          </label>
+          <div class="adm-ap-dialog-acts">
+            <button type="button" class="adm-btn" disabled=${busy} onClick=${doHide}>${A('takeDown')}</button>
+            <button type="button" class="og-door og-door--quiet" onClick=${() => setHiding(null)}>${t('common.cancel')}</button>
+          </div>`}
+      <//>
+
+      <${Modal} open=${!!deleting} onClose=${() => setDeleting(null)} title=${A('deleteTitle')}>
+        ${deleting && html`
+          <p>${A('deleteAsk', { name: escHtml(deleting.name), owner: escHtml(deleting.owner) })}</p>
+          <div class="og-box">
+            <span class="og-box-label">${A('deleteWarnLabel')}</span>
+            ${A('deleteWarn')}
+          </div>
+          <label class="adm-ap-field">
+            <span>${A('deleteTypeLabel', { filename: deleting.filename })}</span>
+            <input class="adm-input mono" type="text" value=${deleting.typed} placeholder=${deleting.filename}
+              onInput=${e => setDeleting({ ...deleting, typed: e.target.value })} />
+          </label>
+          <div class="adm-ap-dialog-acts">
+            <button type="button" class="og-door og-door--quiet og-door--danger"
+              disabled=${busy || deleting.typed !== deleting.filename} onClick=${doDelete}>${A('deleteForGood')}</button>
+            <button type="button" class="og-door og-door--quiet" onClick=${() => setDeleting(null)}>${t('common.cancel')}</button>
+          </div>`}
+      <//>
+    </div>`;
 }

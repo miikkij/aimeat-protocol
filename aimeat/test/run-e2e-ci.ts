@@ -576,6 +576,9 @@ const ALL_SUITES = [
     // (edit, take the current version, and the number rises while the text goes back), and what a
     // group take does besides replacing text.
     'test/e2e-admin-prompts-page.ts',
+    // The Applications page: the four states a listing must separate, taking an app off the wall
+    // and back with the reason kept, the narrow search-engine block beside it, and the refusals.
+    'test/e2e-admin-apps-page.ts',
     // The numbers behind the Statistics page: that requests_total is counted at all (its middleware
     // was written and never mounted), that a scope refusal is counted, and that a period reading is
     // a different reading from the node's whole life.
