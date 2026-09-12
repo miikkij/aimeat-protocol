@@ -29,7 +29,7 @@
 .adm-us .adm-mrow .adm-mval { overflow-wrap: anywhere; }
 .adm-us .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
 .adm-us .og-strip b.adm-us-coral { color: var(--accent); }
-.adm-us .og-strip b.adm-us-dim { color: var(--text-muted); }
+.adm-us .og-strip b.adm-us-dim { color: var(--text-dim); }
 .adm-us .og-box { max-width: none; }
 
 .adm-us-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 90ch; }
@@ -49,7 +49,7 @@
 /* 02: one model is a row — what it is, what it cost, and a bar whose length is the whole encoding. */
 .adm-us-brow { display: grid; grid-template-columns: minmax(0, 1fr) 110px 96px 96px 230px; gap: 0 22px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: .88rem; color: var(--text); }
 .adm-us-brow--last { border-bottom: 0; }
-.adm-us-brow--head { border-bottom: 2px solid var(--text); padding-bottom: 6px; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; color: var(--text-muted); font-weight: 600; }
+.adm-us-brow--head { border-bottom: 2px solid var(--text); padding-bottom: 6px; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; color: var(--text-dim); font-weight: 600; }
 .adm-us-brow b { font-weight: 700; }
 .adm-us-mono { font-family: var(--font-mono); font-size: .8rem; color: var(--text); overflow-wrap: anywhere; }
 .adm-us-num { font-family: var(--font-mono); font-size: .8rem; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-dim); white-space: nowrap; }
@@ -57,8 +57,8 @@
 .adm-us-bar { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .adm-us-bar-fill { display: block; height: 12px; border-radius: 2px; background: var(--text); min-width: 2px; }
 /* The folded tail is many models, not one, so it does not wear the ink the named rows do. */
-.adm-us-bar-fill--tail { background: var(--text-muted); }
-.adm-us-bar > span { font-family: var(--font-mono); font-size: .7rem; color: var(--text-muted); white-space: nowrap; }
+.adm-us-bar-fill--tail { background: var(--text-dim); }
+.adm-us-bar > span { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); white-space: nowrap; }
 
 /* 03: one chart, two series, its own axis. */
 .adm-us-chart { border: 2px solid var(--text); background: var(--card-bg); padding: 16px 18px 12px; }
@@ -69,7 +69,7 @@
 .adm-us-key { width: 10px; height: 10px; border-radius: 2px; display: block; }
 .adm-us-key--house { background: var(--us-house); }
 .adm-us-key--own { background: var(--us-own); }
-.adm-us-yhint { font-family: var(--font-mono); font-size: .66rem; color: var(--text-muted); }
+.adm-us-yhint { font-family: var(--font-mono); font-size: .66rem; color: var(--text-dim); }
 .adm-us-yhint--on { color: var(--text); }
 .adm-us-plot { display: flex; align-items: flex-end; gap: 4px; height: 160px; margin-top: 14px; padding-bottom: 2px; border-bottom: 1px solid var(--border); }
 .adm-us-day { flex: 1 1 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; min-width: 0; }
@@ -79,12 +79,12 @@
 .adm-us-bar-house { background: var(--us-house); }
 .adm-us-bar-own { background: var(--us-own); }
 .adm-us-xaxis { display: flex; gap: 4px; margin-top: 6px; }
-.adm-us-xaxis span { flex: 1 1 0; text-align: center; font-family: var(--font-mono); font-size: .62rem; color: var(--text-muted); min-width: 0; overflow: hidden; }
+.adm-us-xaxis span { flex: 1 1 0; text-align: center; font-family: var(--font-mono); font-size: .62rem; color: var(--text-dim); min-width: 0; overflow: hidden; }
 
 /* 03, 04: the numbers behind a chart, and the people. */
 .adm-us-scroll { overflow-x: auto; }
 .adm-us-tbl { width: 100%; border-collapse: collapse; font-size: .81rem; }
-.adm-us-tbl th { text-align: left; color: var(--text-muted); font-weight: 600; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); white-space: nowrap; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; }
+.adm-us-tbl th { text-align: left; color: var(--text-dim); font-weight: 600; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); white-space: nowrap; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; }
 .adm-us-tbl td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--border-subtle); color: var(--text-dim); vertical-align: top; }
 .adm-us-tbl td b { color: var(--text); font-weight: 700; }
 .adm-us-tbl th.num, .adm-us-tbl td.num { text-align: right; }

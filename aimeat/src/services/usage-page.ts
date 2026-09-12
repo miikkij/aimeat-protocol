@@ -184,7 +184,19 @@ export async function buildUsagePage(
       readKeySpend(config, config.gooseProviderApiKey, 'chat'),
     ]);
     (keys.house as Record<string, unknown>).spend = house;
-    (keys.chat as Record<string, unknown>).spend = chat;
+    // THE CHAT AGENT CAN BE RUNNING ON A KEY THIS NODE DOES NOT HOLD. `enabled` follows the goose
+    // binary being configured, while the key is a separate setting; when it is unset the child
+    // process takes whatever is in its own environment. "No key is set for this" is then true of
+    // the node and false of the situation, and beside a row that names a live model it reads as a
+    // contradiction. Say the harder, accurate thing instead.
+    (keys.chat as Record<string, unknown>).spend =
+      !chat.ok && !config.gooseProviderApiKey && (config.gooseBin || '').trim()
+        ? {
+          ok: false,
+          which: 'chat',
+          reason: 'The chat agent is running on a key this node does not hold, so there is nothing to ask about. Its spend is on whichever provider account that key belongs to.',
+        }
+        : chat;
   }
 
   return {
