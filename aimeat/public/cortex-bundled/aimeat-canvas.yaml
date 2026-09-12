@@ -10,7 +10,11 @@ metadata:
     domain: creative
 
 spec:
-  version: "1.0.0"
+  # 1.0.1 — the code review fixes of 2026-03-05 (fdc11bd0e) reach an installed node. They landed
+  # AFTER the bump to 1.0.0 on the same day and nothing moved this line afterwards, so redo of a
+  # clear, the disabled-tool guard and the createdAt stamp have been sitting in the repository
+  # unshipped ever since: the seeder skips a pack whose stored version matches the bundled one.
+  version: "1.0.1"
   license: MIT
   components:
     - type: schema

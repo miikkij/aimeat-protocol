@@ -14,12 +14,14 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 
 export const c = (key, vars) => t('profile.boards.cover.' + key, vars);
-export const loc = () => (getLocale() === 'fi' ? 'fi-FI' : getLocale() === 'es' ? 'es-CO' : 'en-GB');
-export const day = (iso) => (iso ? new Date(iso).toLocaleDateString(loc()) : '');
+// The loc() helper here derived the FORMAT from the LANGUAGE. /js/format.js reads the
+// reader's own, from their profile, falling back to their browser.
+export const day = (iso) => (iso ? fmtDate(iso) : '');
 export const rel = (iso) => { if (!iso) return ''; const d = new Date(iso); return Date.now() - d.getTime() > 30 * 864e5 ? day(iso) : formatRelativeTime(iso); };
 
 export const visWord = (v) => c('vis.' + (v || 'private')) || v;

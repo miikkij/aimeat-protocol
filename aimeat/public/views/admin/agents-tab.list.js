@@ -19,7 +19,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
 import { trustKind, trustText, isAwake } from './agents-tab.derive.js';
 import AgentRecord, { seenWords } from './agents-tab.record.js';
 
@@ -50,7 +50,7 @@ function trustCell(agent) {
   const kind = trustKind(agent.trust_score);
   if (kind === 'unknown') return html`<span class="adm-ag-tr adm-ag-tr--none">${A('trustUnknown')}</span>`;
   const cls = kind === 'low' ? 'adm-ag-tr--low' : kind === 'registered' ? 'adm-ag-tr--none' : '';
-  return html`<span class="adm-ag-tr ${cls}">${trustText(agent.trust_score, getLocale())}</span>`;
+  return html`<span class="adm-ag-tr ${cls}">${trustText(agent.trust_score)}</span>`;
 }
 
 /** The scopes column: the first two words, then how many more there are. */

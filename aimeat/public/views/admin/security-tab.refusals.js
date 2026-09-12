@@ -15,6 +15,7 @@ import { h } from 'preact';
 import { useState, useMemo } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
+import { time as fmtTime, dateTime as fmtDateTime } from '/js/format.js';
 import { num } from './shared.js';
 import { downloadBlob } from '/js/utils.js';
 import { getAuthRefusals } from '/js/services/admin.js';
@@ -43,7 +44,7 @@ export function ipText(ip) {
 export function whenText(ts, now = Date.now()) {
   const d = new Date(ts);
   if (Number.isNaN(d.getTime())) return ts || '';
-  return now - d.getTime() < WINDOW_MS ? d.toLocaleTimeString() : d.toLocaleString();
+  return now - d.getTime() < WINDOW_MS ? fmtTime(d) : fmtDateTime(d);
 }
 
 function matches(r, { window, status, q }, now) {

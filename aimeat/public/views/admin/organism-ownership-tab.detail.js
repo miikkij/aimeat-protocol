@@ -20,11 +20,12 @@ import { useState, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { dt } from './shared.js';
 import { candidates } from './organism-ownership-tab.model.js';
 
 const O = (key, params) => t('admin.orgOwnership.' + key, params);
-const day = (iso) => (iso ? new Date(iso).toLocaleDateString() : '—');
+const day = (iso) => (iso ? fmtDate(iso) : '—');
 
 /** How many names the picker shows before it asks for more typing. */
 const PICK = 6;

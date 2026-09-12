@@ -3,15 +3,18 @@ kind: Extension
 metadata:
   name: aimeat-i18n
   namespace: aimeat
-  description: "Localization helper — load translations (inline or from the user's own memory), translate with flat-key-first t() + {var} interpolation, switch locale with persistence, and a LanguageSwitcher UI."
+  description: "Localization in two independent halves. AIMEAT.i18n is the WORDS: translations (inline or from the user's own memory), flat-key-first t() with {var} interpolation, locale switching, a LanguageSwitcher. AIMEAT.fmt is HOW THINGS ARE WRITTEN: dates, times, numbers, money and morsels in the reader's own format and clock, read from their profile. Language, regional format and time zone are three separate settings and a person may mix them — never derive one from another."
   author: AIMEAT
-  tags: [i18n, localization, translation, locale, multilanguage, components]
+  tags: [i18n, localization, translation, locale, multilanguage, components, format, dates, timezone, currency, numbers]
   labels:
     domain: i18n
   visibility: public
 
 spec:
-  version: "1.1.0"
+  # 1.2.0 — AIMEAT.fmt. The version is what makes an ALREADY-INSTALLED cortex refresh: the seeder
+  # skips one whose stored version matches the bundled manifest, so shipping new library code
+  # without moving this line leaves every existing node serving the old file forever.
+  version: "1.2.0"
   license: MIT
   components:
     - type: prompt
@@ -42,9 +45,38 @@ spec:
         Static markup:
           <span data-i18n="greeting"></span>  then  AIMEAT.i18n.apply()          // fills textContent of every [data-i18n]
 
+        ── AIMEAT.fmt — HOW THINGS ARE WRITTEN, which is a different question ──
+
+        The language decides WORDS. It does not decide whether a date is 9/12/2026 or 12.9.2026,
+        and it does not decide which clock a time is read in. Those come from the person's PROFILE
+        and are two more settings they set independently, the way an operating system separates
+        display language, regional format and time zone. Finnish words with an American date format
+        and a Tokyo clock is a legitimate combination; obey all three. NEVER derive one from another
+        — the node's own pages had twenty copies of a helper that did, and they disagreed.
+
+        Setup (once, at boot, right after i18n.init):
+          await AIMEAT.fmt.useProfile();     // reads the signed-in person's settings from this node
+          // or, when your app already holds them:
+          AIMEAT.fmt.use({ region: 'fi-FI', timezone: 'Europe/Helsinki' });
+          // Called neither way, every formatter follows the reader's browser, which is the old
+          // behaviour and a perfectly good default.
+
+        Format:
+          AIMEAT.fmt.date(iso)          AIMEAT.fmt.time(iso)        AIMEAT.fmt.dateTime(iso)
+          AIMEAT.fmt.relative(iso)      // "3 days ago"
+          AIMEAT.fmt.number(1234567.89) // "1 234 567,89" in fi-FI
+          AIMEAT.fmt.money(12.5, 'EUR') // "12,50 €"
+          AIMEAT.fmt.zoneLabel(iso)     // "EET" — null while the reader follows their browser
+          Each takes the same options bag as toLocaleString: fmt.date(iso, { day: 'numeric', month: 'long' }).
+
+        MORSELS ARE NOT MONEY, and fmt.money REFUSES them — it throws on MORSEL/MORSELS/MRSL.
+        A morsel paces what agents may push into the store; it accrues on its own and it buys
+        nothing. Use AIMEAT.fmt.morsels(n, word) — it never attaches a currency symbol.
+
         Notes:
           - Translations are USER data — load them via AIMEAT.data (keyBase), NOT from an ext: namespace.
           - t() always returns a string (falls back to the key) so the UI never shows blanks.
+          - The two halves share a file and nothing else. Changing the language never moves the format.
         Load via: <script src="{{node_url}}/v1/cortex/aimeat-i18n/libs/aimeat-i18n.js"></script>
       variables:
         - "{{node_url}}"
@@ -52,8 +84,11 @@ spec:
     - type: lib
       name: aimeat-i18n
       filename: aimeat-i18n.js
-      exports: [init, t, setLocale, getLocale, locales, available, LanguageSwitcher, apply]
+      exports: [init, t, setLocale, getLocale, locales, available, LanguageSwitcher, apply,
+                use, useProfile, region, timezone, number, date, time, dateTime, relative,
+                money, morsels, resolvedTimeZone, zoneLabel]
       api_surface: |
+        ── AIMEAT.i18n — the words ──
         AIMEAT.i18n.init({ keyBase?, locales, default?, fallback?, translations? }) → Promise<locale>  (inline translations OR memory-backed via keyBase)
         AIMEAT.i18n.t(key, vars?) → string  (flat key → nested dot-path → fallback locale → key; {var} interpolation)
         AIMEAT.i18n.setLocale(locale) → Promise<locale>  (persists choice; emits window 'aimeat-i18n-changed')
@@ -62,3 +97,15 @@ spec:
         AIMEAT.i18n.available() → boolean
         AIMEAT.i18n.LanguageSwitcher({ target?, onChange?, labels?, className? }) → { el, destroy() }
         AIMEAT.i18n.apply(root?) → void  (translates every [data-i18n] element's textContent, or [data-i18n-attr])
+
+        ── AIMEAT.fmt — how things are written. Driven by the PROFILE, never by the language. ──
+        AIMEAT.fmt.useProfile() → Promise<{region, timezone}>  (reads the signed-in person's settings from this node)
+        AIMEAT.fmt.use({ region?, timezone? }) → {region, timezone}  (when your app already holds them; null in either = follow the browser)
+        AIMEAT.fmt.region() → string|null      AIMEAT.fmt.timezone() → string|null
+        AIMEAT.fmt.date(v, opts?) → string     AIMEAT.fmt.time(v, opts?) → string     AIMEAT.fmt.dateTime(v, opts?) → string
+        AIMEAT.fmt.relative(v) → string        ("3 days ago"; words follow the format tag, not the UI language)
+        AIMEAT.fmt.number(n, opts?) → string
+        AIMEAT.fmt.money(n, currency, opts?) → string  (THROWS on MORSEL/MORSELS/MRSL — a morsel is a pacer, not a currency)
+        AIMEAT.fmt.morsels(n, word?) → string  (a count; never a currency symbol)
+        AIMEAT.fmt.resolvedTimeZone() → string (the zone in force, always a real IANA name)
+        AIMEAT.fmt.zoneLabel(v?) → string|null ("EET"; null while the reader follows their browser, because naming the clock they already read teaches nothing)

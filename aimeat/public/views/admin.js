@@ -26,7 +26,8 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { time as fmtTime } from '/js/format.js';
 import { escHtml } from '/js/utils.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { getSession, onAuthChange } from '/js/services/auth.js';
@@ -449,7 +450,7 @@ export default function Admin({ navigate, locale }) {
             <button class="adm-refresh" onClick=${loadAll} disabled=${loading}>
               ${loading ? t('dashboard.loading') : t('dashboard.refresh')}
             </button>
-            ${lastUpdate && html`<span class="adm-time">${new Date(lastUpdate).toLocaleTimeString(getLocale())}</span>`}
+            ${lastUpdate && html`<span class="adm-time">${fmtTime(lastUpdate)}</span>`}
           </div>
         </div>
 

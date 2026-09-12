@@ -35,6 +35,7 @@ import { useState, useEffect, useMemo, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { num, Row, Badge, Empty, Spinner, ErrorBox, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
@@ -44,7 +45,7 @@ import OrganismDetail from './organism-ownership-tab.detail.js';
 
 const O = (key, params) => t('admin.orgOwnership.' + key, params);
 const DLG = 'adm-oo-dlg';
-const day = (iso) => (iso ? new Date(iso).toLocaleDateString() : '—');
+const day = (iso) => (iso ? fmtDate(iso) : '—');
 
 /** The five chips, keyed by the filter ids FILTERS orders and counts() counts. */
 const FILTER_LABEL = { all: 'fAll', stuck: 'fStuck', single: 'fSingle', archived: 'fArchived' };

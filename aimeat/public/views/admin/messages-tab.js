@@ -17,6 +17,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { escHtml } from '/js/utils.js';
 import { StatsGrid } from './shared.js';
 import * as api from '/js/services/admin.js';
@@ -31,7 +32,7 @@ function relTime(iso) {
     if (s < 60) return `${s}s`;
     if (s < 3600) return `${Math.floor(s / 60)}m`;
     if (s < 86400) return `${Math.floor(s / 3600)}h`;
-    return new Date(iso).toLocaleDateString();
+    return fmtDate(iso);
   } catch (err) { swallowed('messages-tab: relTime', err); return ''; }
 }
 

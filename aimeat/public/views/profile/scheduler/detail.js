@@ -18,6 +18,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { Section, Fold } from '/views/profile/organisms/poster-parts.js';
 import { formatUntil, scheduleIo, describeDispatch } from '../schedule-item.js';
@@ -83,8 +84,8 @@ export function renderDetail(ctx, s) {
       <div>${s.enabled === false
         ? html`<b>·</b><span>${c('stripNextRun')}</span><small>${t('profile.scheduler.paused')}</small>`
         : html`<b>${formatUntil(s.nextRunAt)}</b><span>${c('stripNextRun')}</span><small>${s.nextRunAt ? `${dayLabel(new Date(s.nextRunAt), loc())} ${hhmm(new Date(s.nextRunAt))}` : ''}</small>`}</div>
-      <div><b>${s.runCount ?? 0}</b><span>${c('stripRuns')}</span><small>${s.createdAt ? c('sinceDate', { d: new Date(s.createdAt).toLocaleDateString(loc()) }) : ''}</small></div>
-      <div><b class="og-strip-coral">${s.createdByAgent ? (s.agentName || t('profile.scheduler.byAgent')) : c('byYou')}</b><span>${c('stripCreator')}</span><small>${s.createdAt ? new Date(s.createdAt).toLocaleDateString(loc()) : ''}</small></div>
+      <div><b>${s.runCount ?? 0}</b><span>${c('stripRuns')}</span><small>${s.createdAt ? c('sinceDate', { d: fmtDate(s.createdAt) }) : ''}</small></div>
+      <div><b class="og-strip-coral">${s.createdByAgent ? (s.agentName || t('profile.scheduler.byAgent')) : c('byYou')}</b><span>${c('stripCreator')}</span><small>${s.createdAt ? fmtDate(s.createdAt) : ''}</small></div>
     </div>`;
 
   const rail = html`

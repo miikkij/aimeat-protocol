@@ -23,7 +23,8 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { date as fmtDate, num as fmtNum } from '/js/format.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { Markdown } from '/components/Markdown.js';
 import { detectImage, ImageView } from '/components/ImageDeliverable.js';
@@ -42,9 +43,8 @@ export const SYSTEM_SPACES = new Set(['notif', 'ai-usage', 'commerce', 'agents',
 const STALE_DAYS = 90;
 const TABLE_ROWS = 12;   // a table shows this many key spaces before asking for the rest
 const c = (key, fb) => tr('profile.memory.cover.' + key, fb);
-const loc = () => (getLocale() === 'fi' ? 'fi-FI' : getLocale() === 'es' ? 'es-CO' : 'en-GB');
-const num = (n) => Number(n || 0).toLocaleString(loc());
-const day = (iso) => new Date(iso).toLocaleDateString(loc());
+const num = (n) => fmtNum(Number(n || 0));
+const day = (iso) => fmtDate(iso);
 const agentOf = (gaii) => { const s = String(gaii || ''); return s.includes('#') ? s.split('#')[0] : ''; };
 const isStale = (m) => { const at = m.updated_at || m.created_at; return !!at && (Date.now() - new Date(at).getTime()) > STALE_DAYS * 864e5; };
 const byUpdated = (a, b) => +new Date(b.updated_at || b.created_at || 0) - +new Date(a.updated_at || a.created_at || 0);

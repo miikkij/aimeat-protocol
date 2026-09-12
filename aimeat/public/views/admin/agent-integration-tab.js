@@ -41,6 +41,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { num, dt, Spinner } from './shared.js';
 import * as api from '/js/services/admin-agent-integration.js';
@@ -56,7 +57,7 @@ function share(n, total) {
 
 /** The day a row is dated by. The hour matters on a stuck run, so it keeps its full stamp. */
 function day(iso) {
-  try { return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); }
+  try { return fmtDate(iso, { day: 'numeric', month: 'short', year: 'numeric' }); }
   catch (err) { swallowed('agent-integration: day', err); return ''; }
 }
 

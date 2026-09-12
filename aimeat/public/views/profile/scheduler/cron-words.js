@@ -11,10 +11,12 @@
  * @version-history
  *   v1.0.0 — 2026-08-30 — Initial, for the scheduler in the poster face.
  */
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 
 const w = (key, vars) => t('profile.scheduler.words.' + key, vars);
-const loc = () => (getLocale() === 'fi' ? 'fi-FI' : getLocale() === 'es' ? 'es-CO' : 'en-GB');
+// The loc() helper here derived the FORMAT from the LANGUAGE; /js/format.js reads the
+// reader's own setting instead.
 const two = (n) => String(n).padStart(2, '0');
 const step = (f) => { const m = /^\*\/(\d+)$/.exec(f); return m ? Number(m[1]) : null; };
 const list = (f) => (/^\d+(,\d+)*$/.test(f) ? f.split(',').map(Number) : null);
@@ -23,7 +25,7 @@ const list = (f) => (/^\d+(,\d+)*$/.test(f) ? f.split(',').map(Number) : null);
 function weekdayName(d) {
   const sunday = new Date(2024, 0, 7); // a Sunday
   const date = new Date(sunday); date.setDate(sunday.getDate() + (d % 7));
-  return date.toLocaleDateString(loc(), { weekday: 'short' });
+  return fmtDate(date, { weekday: 'short' });
 }
 function dowLabel(f) {
   const range = /^(\d)-(\d)$/.exec(f);
@@ -32,7 +34,7 @@ function dowLabel(f) {
   return days.map(weekdayName).join(', ');
 }
 function dateLabel(d, m) {
-  return new Date(2024, m - 1, d).toLocaleDateString(loc(), { day: 'numeric', month: 'short' });
+  return fmtDate(new Date(2024, m - 1, d), { day: 'numeric', month: 'short' });
 }
 
 /** @param {string} cron @returns {string} the cadence in words, or the cron itself when it has no plain reading */

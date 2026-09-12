@@ -13,14 +13,16 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 
 export const c = (key, vars) => t('profile.offers.cover.' + key, vars);
-export const loc = () => (getLocale() === 'fi' ? 'fi-FI' : getLocale() === 'es' ? 'es-CO' : 'en-GB');
+// The loc() helper here derived the FORMAT from the LANGUAGE. /js/format.js reads the
+// reader's own, from their profile, falling back to their browser.
 const two = (n) => String(n).padStart(2, '0');
 export const hhmm = (d) => `${two(d.getHours())}:${two(d.getMinutes())}`;
-export const dayLabel = (d) => d.toLocaleDateString(loc(), { weekday: 'short', day: 'numeric', month: 'numeric' });
+export const dayLabel = (d) => fmtDate(d, { weekday: 'short', day: 'numeric', month: 'numeric' });
 /** "01:18" over "la 29.8." for a table's first column. */
 export const when = (iso) => { const d = new Date(iso); return html`${hhmm(d)}<small>${dayLabel(d)}</small>`; };
 

@@ -13,6 +13,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 import { t, tOr } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { num, dt, fmtBytes } from './shared.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { getNodeUrl } from '/js/services/auth.js';
@@ -40,7 +41,7 @@ export function IncidentsSection({ ov, onResolve, onDelete, onPayload }) {
       <div class="og-sec-h"><h2>${S('incidents.title')}<small>03</small></h2></div>
       <p class="adm-sec-lead">${S('incidents.lead')}</p>
       ${items.length === 0 ? html`<div class="adm-sec-empty adm-sec-empty--last">${S('incidents.none')}</div>` : null}
-      ${items.length > 0 && open === 0 ? html`<div class="adm-sec-empty">${lastResolved ? S('incidents.noneOpen', { date: new Date(lastResolved).toLocaleDateString() }) : S('incidents.noneOpenPlain')}</div>` : null}
+      ${items.length > 0 && open === 0 ? html`<div class="adm-sec-empty">${lastResolved ? S('incidents.noneOpen', { date: fmtDate(lastResolved) }) : S('incidents.noneOpenPlain')}</div>` : null}
       ${items.map((i, idx) => html`
         <div class="adm-sec-irow ${idx === items.length - 1 ? 'adm-sec-irow--last' : ''}" key=${i.id}>
           <span><span class="adm-badge ${i.status === 'open' ? 'adm-badge--danger' : 'adm-badge--success'}">${S('incidents.status.' + (i.status === 'open' ? 'open' : 'resolved'))}</span></span>
@@ -60,7 +61,7 @@ export function AccountsSection({ ov, switchPage }) {
   const a = ov.accounts;
   const deactivated = a.deactivated.length;
   const list = a.deactivated
-    .map(d => `${d.name} (${d.since ? new Date(d.since).toLocaleDateString() : '?'}${d.by ? ', ' + d.by : ''})`)
+    .map(d => `${d.name} (${d.since ? fmtDate(d.since) : '?'}${d.by ? ', ' + d.by : ''})`)
     .join(', ');
   return html`
     <section class="og-sec" id="adm-sec-04">

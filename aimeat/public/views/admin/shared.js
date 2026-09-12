@@ -35,7 +35,7 @@ import { DataTable as GenericDataTable } from '/components/DataTable.js';
 // Display formatters now live in the shared /js/format.js. Import them into local
 // scope (StatCard etc. call num() directly) AND re-export so the existing admin
 // importers (`import { num, dt, fmtUp, fmtBytes } from './shared.js'`) keep working.
-import { num, dt, day, fmtUp, fmtBytes } from '/js/format.js';
+import { num, dt, day, fmtUp, fmtBytes, date as fmtDate } from '/js/format.js';
 export { num, dt, day, fmtUp, fmtBytes };
 
 /**
@@ -50,7 +50,7 @@ export function shortDate(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   const thisYear = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleDateString(undefined, thisYear
+  return fmtDate(d, thisYear
     ? { day: 'numeric', month: 'short' }
     : { day: 'numeric', month: 'short', year: 'numeric' });
 }

@@ -18,7 +18,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
 import { kindOf, freshness, isAwake, daysSince, trustText } from './agents-tab.derive.js';
 import { shortDate } from './shared.js';
 
@@ -70,14 +70,14 @@ function Trust({ agent, detail, loading }) {
   return html`
     <div class="adm-ag-trust">
       <span class="adm-ag-trust-h">${A('trustHead')}</span>
-      <div class="adm-ag-trust-n">${trustText(tr.score, getLocale())}<span>${A('trustOf100')}</span></div>
+      <div class="adm-ag-trust-n">${trustText(tr.score)}<span>${A('trustOf100')}</span></div>
       <div class="adm-ag-trow">${A('trustDeliveries')}<span>${tr.total_deliveries ?? 0}</span></div>
       <div class="adm-ag-trow">${A('trustSuccess')}<span>${tr.total_deliveries
     ? (tr.success_rate * 100).toFixed(0) + '%'
     : A('trustNoWork')}</span></div>
       <div class="adm-ag-trow">${A('trustRatings')}<span>+${tr.positive_ratings ?? 0} / -${tr.negative_ratings ?? 0}</span></div>
       <div class="adm-ag-trow">${A('trustAge')}<span>${A('trustDays', { n: tr.age_days ?? 0 })}</span></div>
-      <p>${moved ? A('trustMoved', { before: trustText(before, getLocale()) }) : A('trustSame')} ${A('trustCap')}</p>
+      <p>${moved ? A('trustMoved', { before: trustText(before) }) : A('trustSame')} ${A('trustCap')}</p>
     </div>`;
 }
 
