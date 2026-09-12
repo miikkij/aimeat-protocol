@@ -6,6 +6,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.11.0 — 2026-09-13 — V1: retire underlying section-title values; shared poster classes own headings.
  *   v3.10.0 — 2026-09-06 — The signed-out wall's rules (.login-prompt, .bg-aurora, .aurora-wave, pfAurora)
  *     removed: the door that replaced it has its own sheet, profile-door.css.
  *   v3.9.0 — 2026-09-06 — The organism row's counts, date and door get fixed tracks (.pj-org-stats
@@ -242,7 +243,6 @@
 .pf-hero-inner .tab,.pf .tab{padding:.45rem .9rem;cursor:pointer;color:var(--text-dim,#6B7280);font-weight:500;font-size:.8rem;border:1px solid var(--border,#E5E7EB);border-radius:999px;transition:all .15s;background:var(--bg-card);white-space:nowrap}
 .pf-hero-inner .tab:hover,.pf .tab:hover{color:var(--text,#1A1A2E);border-color:var(--text-muted);background:var(--bg-surface)}
 .pf-hero-inner .tab.active,.pf .tab.active{color:#fff;background:var(--accent,#E8564A);border-color:var(--accent,#E8564A);font-weight:600}
-.pf .section-title{font-size:1.15rem;font-weight:700;margin-bottom:.4rem;color:var(--accent,#E8564A)}
 .pf .section-desc{color:var(--text-dim,#6B7280);font-size:.85rem;margin-bottom:1.25rem;line-height:1.5;max-width:700px}
 .pf .card{background:var(--bg-card);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem;margin-bottom:.75rem;transition:border-color .2s}
 .pf .card:hover{border-color:var(--accent,#E8564A)}
@@ -1058,9 +1058,6 @@
 .pf .mb-half          { margin-bottom: .5rem; }
 .pf .p-1              { padding: 1rem; }
 
-/* ── Section header with top spacing ── */
-.pf .section-title.section-title-spaced { margin-top: 1.5rem; }
-
 /* ── Card sub-heading (replaces inline h3 accent styles) ── */
 .pf .card-h3 {
   color: var(--accent, #E8564A);
@@ -1552,7 +1549,7 @@
 .pf .cs-create-body  { padding: .75rem 1rem .5rem; }
 .pf .cs-create-desc  { margin: 0 0 .5rem; font-size: .85rem; color: var(--muted, #6B7280); }
 .pf .cs-create-hint  { margin: 0; font-size: .75rem; color: var(--muted, #6B7280); font-style: italic; }
-.pf .cs-section-sub  { font-size: .9rem; margin-top: 1rem; }
+.pf .cs-section-sub  { margin-top: 1rem; }
 
 /* ── Federation tab ── */
 .pf .fed-status-text { font-size: .8rem; }
@@ -1677,7 +1674,7 @@
 }
 .pf .pf-inline-view-body { padding: 24px 28px; }
 /* Give tab content inside inline views more breathing room */
-.pf .pf-inline-view-body .section-title { margin-top: .5rem; }
+.pf .pf-inline-view-body .poster-section-title { margin-top: .5rem; }
 .pf .pf-inline-view-body .card { border-radius: 14px; }
 
 /* Container */

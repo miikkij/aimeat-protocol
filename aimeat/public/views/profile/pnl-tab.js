@@ -9,6 +9,7 @@
  *   No forecasts: only the truth of the bookings. Live: re-fetches on the
  *   aimeat-live-update event when the finance domain ticks.
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-08-07 — AccountantAccess: grant and revoke read access to your books.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 7: initial P&L tab.
  */
@@ -44,7 +45,7 @@ function sourceLabel(source) {
 function LineTable({ titleKey, lines, totalMinor }) {
   return html`
     <div class="card pf-pnl-block">
-      <h3 class="section-title">${t(titleKey)}</h3>
+      <h3 class="poster-section-title">${t(titleKey)}</h3>
       ${lines.length === 0 && html`<p class="pf-pnl-empty">${t('profile.pnl.empty')}</p>`}
       ${lines.length > 0 && html`
         <table class="pf-pnl-table">
@@ -116,7 +117,7 @@ function AccountantAccess({ showToast }) {
 
   return html`
     <div class="card pf-pnl-block">
-      <h3 class="section-title">${t('profile.pnl.accountantTitle')}</h3>
+      <h3 class="poster-section-title">${t('profile.pnl.accountantTitle')}</h3>
       <p class="section-desc">${t('profile.pnl.accountantDesc')}</p>
 
       ${accountants.length === 0
@@ -183,7 +184,7 @@ export function PnlTab({ showToast }) {
 
   return html`
     <div class="pf-pnl">
-      <h2 class="section-title">${t('profile.pnl.title')}</h2>
+      <h2 class="poster-page-title">${t('profile.pnl.title')}</h2>
       <p class="section-desc">${t('profile.pnl.desc')}</p>
 
       <div class="pf-pnl-controls">

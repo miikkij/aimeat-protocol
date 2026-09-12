@@ -6,6 +6,7 @@
  *   Displays inbox (received) and sent work items with accept/decline/deliver actions
  *   and a rating modal for completed deliveries.
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.3.0 — 2026-07-16 — Mount folds inbox + sent into GET /v1/work/overview (getWorkOverview); individual reads kept as fallback.
  *   v1.0.0 — 2026-03-16 — Initial work tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes; i18n for action labels
@@ -189,7 +190,7 @@ export default function WorkTab({ session, showToast, onStats }) {
   }
 
   return html`
-    <div class="section-title">${t('profile.work.title')}</div>
+    <div class="poster-page-title">${t('profile.work.title')}</div>
     <div class="section-desc">${t('profile.work.desc')}</div>
     <div class="sub-tabs">
       <button class="sub-tab ${workSubTab === 'inbox' ? 'active' : ''}" onClick=${() => setWorkSubTab('inbox')}>${t('profile.work.inbox')}</button>

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab for publishing/managing services and browsing the catalogue.
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS classes; i18n for unit options and detail labels
  */
 import { h } from 'preact';
@@ -254,7 +255,7 @@ export default function ServicesTab({ session, showToast, onStats }) {
     }`;
 
   return html`
-    <div class="section-title">${t('profile.services.title')}</div>
+    <div class="poster-page-title">${t('profile.services.title')}</div>
     <div class="section-desc">${t('profile.services.desc')}</div>
     <div class="sub-tabs">
       <button class="sub-tab ${svcSubTab === 'mine' ? 'active' : ''}" onClick=${() => setSvcSubTab('mine')}>${t('profile.services.mine')}</button>
