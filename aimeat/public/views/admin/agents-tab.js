@@ -33,14 +33,13 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
-import { num, Empty, Badge, Row } from './shared.js';
+import { num, Empty, Badge, Row, shortDate } from './shared.js';
 import { getAgentDetail } from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
 import {
   countAgents, inFilter, matches, sortAgents, byOwner, trustText,
 } from './agents-tab.derive.js';
 import AgentsList, { PAGE } from './agents-tab.list.js';
-import { shortDate } from './agents-tab.record.js';
 
 const A = (key, params) => t('dashboard.agentsTab.' + key, params);
 

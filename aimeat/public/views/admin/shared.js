@@ -39,6 +39,23 @@ import { num, dt, fmtUp, fmtBytes } from '/js/format.js';
 export { num, dt, fmtUp, fmtBytes };
 
 /**
+ * "16 Mar", or "16 Mar 2025" once it is not this year.
+ *
+ * For a date column in a table: `dt()` writes the whole stamp ("3/16/2026, 10:25:19 AM"), which is
+ * four times the width such a column has and says nothing a reader of a list needs at that
+ * precision. The locale is the reader's own, the same reading `dt()` uses.
+ */
+export function shortDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const thisYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString(undefined, thisYear
+    ? { day: 'numeric', month: 'short' }
+    : { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/**
  * "2026-09-08 16:51" from an ISO stamp, as a machine reading; '' for none.
  *
  * Not `dt()`, which renders a date the way the reader's locale writes one. A stamp in a row of

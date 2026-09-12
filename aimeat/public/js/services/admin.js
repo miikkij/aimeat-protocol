@@ -360,6 +360,9 @@ export const getAvailableExtensions   = ()              => apiGet('/v1/admin/ext
 export const installBundledExtension  = (name)          => apiPost(`/v1/admin/extensions/available/${encodeURIComponent(name)}/install`);
 export const uninstallExtension       = (name)          => apiDelete(`/v1/extensions/${encodeURIComponent(name)}`);
 export const activateExtension        = (name)          => apiPost(`/v1/extensions/${encodeURIComponent(name)}/activate`);
+// The route has existed since the extension system shipped; nothing in the UI could switch one off,
+// so the only way back from "installed and unwanted" was to uninstall it and lose its stored data.
+export const deactivateExtension      = (name)          => apiPost(`/v1/extensions/${encodeURIComponent(name)}/deactivate`);
 export const getExtensions            = ()              => apiGet('/v1/extensions');
 export const getExtensionInstances    = (name)          => apiGet(`/v1/extensions/${encodeURIComponent(name)}/instances`);
 export const createExtensionInstance  = (name, body)    => apiPost(`/v1/extensions/${encodeURIComponent(name)}/instances`, body);
