@@ -13,6 +13,10 @@
  *   - versions + restore: append version records, prune to 50
  *
  * @version-history
+ *   v1.1.0 — 2026-09-12 — Every row carries `source_kind` and `differs_from_default`, read from
+ *     prompt-ownership.ts (the rule the seeder follows), because the page cannot work either out
+ *     and the version number answers neither. The group reset also reports what else it did:
+ *     `switchedOn` and `localesDropped`, both of which used to be discovered afterwards.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -23,9 +27,25 @@ import { success, error } from '../middleware/envelope.js';
 import { stableStringify } from '../utils/stable-json.js';
 import { PROMPT_SEEDS } from '../services/prompt-defaults.js';
 import { seedSystemPrompts } from '../services/prompt-seeder.js';
+import { promptSourceKind, promptDiffersFromDefault } from '../services/prompt-ownership.js';
+import type { SystemPromptRecord } from '../storage/interface.js';
 
 export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  /**
+   * The two facts the page cannot work out for itself, on every row it is handed.
+   *
+   * `source_kind` is what an update does to this prompt, and `differs_from_default` is whether the
+   * stored text is the operator's own. The version number answers NEITHER: taking the current
+   * version raises it too, so an untouched prompt can read v3. Both come from the same module the
+   * seeder reads, so the page and the boot cannot disagree about who owns a prompt.
+   */
+  const withOwnership = (p: SystemPromptRecord) => ({
+    ...p,
+    source_kind: promptSourceKind(p.id, p.group),
+    differs_from_default: promptDiffersFromDefault(p),
+  });
 
   // POST /v1/admin/prompts/reset-group/:group — reset all prompts in a group to factory defaults
   router.post('/v1/admin/prompts/reset-group/:group', requireAuth(), requireRole('operator'), async (req, res) => {
@@ -38,8 +58,16 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
     const now = new Date().toISOString();
     const owner = req.auth!.owner;
     let resetCount = 0;
+    // Two things this does besides replacing the text, and the page says both out loud before it
+    // runs: a prompt the operator had switched off comes back on, and the language overrides go
+    // with the English. Counted here so the answer can name them rather than leave them to be
+    // discovered.
+    let switchedOn = 0;
+    let localesDropped = 0;
     for (const seed of seeds) {
       const existing = await storage.getSystemPrompt(seed.id);
+      if (existing && existing.active === false) switchedOn++;
+      if (existing && Object.values(existing.locales ?? {}).some(v => typeof v === 'string' && v.length > 0)) localesDropped++;
       const newVersion = existing ? existing.version + 1 : 1;
       await storage.upsertSystemPrompt({
         id: seed.id, group: seed.group, name: seed.name, description: seed.description,
@@ -53,7 +81,9 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
       resetCount++;
     }
     const prompts = await storage.listSystemPrompts({ group });
-    res.json(success(config.nodeId, { prompts, resetCount, group }));
+    res.json(success(config.nodeId, {
+      prompts: prompts.map(withOwnership), resetCount, group, switchedOn, localesDropped,
+    }));
   });
 
   // POST /v1/admin/prompts/reset-all — reset ALL prompts to factory defaults, clear version histories
@@ -61,14 +91,14 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
     await storage.deleteAllSystemPrompts();
     await seedSystemPrompts(storage);
     const prompts = await storage.listSystemPrompts();
-    res.json(success(config.nodeId, { prompts, resetCount: prompts.length }));
+    res.json(success(config.nodeId, { prompts: prompts.map(withOwnership), resetCount: prompts.length }));
   });
 
   // GET /v1/admin/prompts — list all prompts
   router.get('/v1/admin/prompts', requireAuth(), requireRole('operator'), async (req, res) => {
     const group = req.query.group as string | undefined;
     const prompts = await storage.listSystemPrompts(group ? { group } : undefined);
-    res.json(success(config.nodeId, { prompts }));
+    res.json(success(config.nodeId, { prompts: prompts.map(withOwnership) }));
   });
 
   // GET /v1/admin/prompts/:id — get single prompt
@@ -76,7 +106,7 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
     const id = req.params.id as string;
     const prompt = await storage.getSystemPrompt(id);
     if (!prompt) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not found'));
-    res.json(success(config.nodeId, { prompt }));
+    res.json(success(config.nodeId, { prompt: withOwnership(prompt) }));
   });
 
   // PATCH /v1/admin/prompts/:id — update prompt
@@ -142,7 +172,7 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
       await storage.pruneSystemPromptVersions(id, 50);
     }
 
-    res.json(success(config.nodeId, { prompt: updated }));
+    res.json(success(config.nodeId, { prompt: withOwnership(updated) }));
   });
 
   // POST /v1/admin/prompts/:id/reset — reset to factory default
@@ -177,7 +207,7 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
     });
     await storage.pruneSystemPromptVersions(id, 50);
 
-    res.json(success(config.nodeId, { prompt: updated }));
+    res.json(success(config.nodeId, { prompt: withOwnership(updated) }));
   });
 
   // GET /v1/admin/prompts/:id/versions — version history
@@ -231,7 +261,7 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
     });
     await storage.pruneSystemPromptVersions(id, 50);
 
-    res.json(success(config.nodeId, { prompt: updated }));
+    res.json(success(config.nodeId, { prompt: withOwnership(updated) }));
   });
 
   return router;
