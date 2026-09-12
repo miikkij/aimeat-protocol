@@ -1,0 +1,125 @@
+/* ── Admin Email page, in the poster face ──
+ * @file admin-email.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's email page (design canvas "AIMEAT Admin Email"): the SMTP rows, the
+ *   test send and its reply from the server, the table of what the node sends automatically, the
+ *   group send with its recipient count, and the template editor. The sections, the metric rows,
+ *   the numeral strip, the doors, the slab and the dashed box come from admin.css and
+ *   organism.css; only what this page adds lives here. Every value is a theme.css token.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial.
+ */
+
+.adm-em-lead { margin: 0 0 16px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
+.adm-em-note { margin: 12px 0 0; font-size: .78rem; line-height: 1.55; color: var(--text-dim); max-width: 92ch; }
+.adm-em .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-em .og-box { max-width: 80ch; }
+/* A From address or an environment line has nowhere to break; it breaks anywhere rather than
+   pushing the row's own name out of its column. */
+.adm-em .adm-mrow .adm-mval { overflow-wrap: anywhere; }
+
+/* ── Two columns: the form on the left, what it will do on the right ───────────────────────── */
+.adm-em-two { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0 44px; align-items: start; }
+.adm-em-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 7px; }
+.adm-em-lbl + .adm-em-lbl, .adm-em-fld + .adm-em-lbl, .adm-em-pick + .adm-em-lbl { margin-top: 18px; }
+.adm-em-fld { display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 2px 2px 4px; }
+.adm-em-fld input, .adm-em-fld textarea {
+  width: 100%; box-sizing: border-box; background: transparent; border: 0; padding: .35rem 0;
+  font-family: var(--font); font-size: .95rem; font-weight: 600; color: var(--text); outline: none; resize: vertical;
+}
+.adm-em-fld input::placeholder, .adm-em-fld textarea::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm-em-fld:focus-within { border-bottom-color: var(--accent); }
+.adm-em-pick { display: inline-flex; flex-wrap: wrap; border: 2px solid var(--text); }
+.adm-em-pick button {
+  background: transparent; border: 0; border-right: 2px solid var(--text); border-radius: 0;
+  padding: .45rem .9rem; cursor: pointer; font-family: var(--font); font-size: .8rem; font-weight: 700; color: var(--text-dim);
+}
+.adm-em-pick button:last-child { border-right: 0; }
+.adm-em-pick button:hover { color: var(--text); }
+.adm-em-pick button.on { background: var(--sun); color: var(--on-sun); }
+.adm-em-act { display: flex; align-items: center; gap: 18px; margin-top: 20px; flex-wrap: wrap; }
+.adm-em-act p { margin: 0; font-size: .8rem; line-height: 1.5; color: var(--text-dim); max-width: 34ch; }
+.adm-em-said { font-size: .84rem; font-weight: 600; }
+.adm-em-said.is-ok { color: var(--success-fg); }
+.adm-em-said.is-bad { color: var(--accent); }
+
+/* ── The box on the right: the server's reply, or who a group send reaches ─────────────────── */
+.adm-em-box { border: 2px solid var(--text); background: var(--bg-surface); padding: 12px 14px; }
+.adm-em-box-t { display: flex; justify-content: space-between; gap: 12px; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); border-bottom: 1px solid var(--border); padding-bottom: 7px; margin-bottom: 9px; }
+.adm-em-box-row { display: flex; justify-content: space-between; gap: 12px; min-width: 0; font-size: .84rem; font-weight: 700; padding: .3rem 0; }
+.adm-em-box-row span { font-family: var(--font-mono); font-size: .76rem; font-weight: 400; color: var(--text-dim); text-align: right; overflow-wrap: anywhere; }
+.adm-em-hint { margin: .55rem 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+
+/* ── What the node sends automatically ─────────────────────────────────────────────────────── */
+.adm-em-row { display: grid; grid-template-columns: minmax(0, 1fr) 300px 150px 92px; gap: 0 18px; align-items: baseline; padding: .58rem 0; border-bottom: 1px solid var(--border); }
+.adm-em-row--head { padding: 0 0 .35rem; border-bottom: 0; font-size: .64rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.adm-em-row--last { border-bottom: 0; }
+.adm-em-nm { font-size: .93rem; font-weight: 800; }
+.adm-em-when { font-size: .82rem; line-height: 1.45; color: var(--text-dim); }
+.adm-em-code { font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); }
+.adm-em-code--fixed { color: var(--accent); }
+.adm-em-count { font-family: var(--font-mono); font-size: .82rem; text-align: right; }
+.adm-em-count--none { color: var(--text-dim); }
+
+/* The environment block on the not-configured page: a sample to copy, so it is the ink-framed box
+   the design language gives a command rather than the dashed aside. */
+.adm-em-envbox { border: 2px solid var(--text); background: var(--bg-surface); max-width: 80ch; }
+.adm-em-envbox-t { border-bottom: 2px solid var(--text); padding: 6px 14px; font-family: var(--font-mono); font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+.adm-em-env { margin: 0; padding: 14px 16px; font-family: var(--font-mono); font-size: .78rem; line-height: 1.9; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* ── Templates ─────────────────────────────────────────────────────────────────────────────── */
+/* The language picker is three doors, and the open one carries the sun the way a selected chip
+   does elsewhere in this face. */
+.adm-em .og-door--on { background: var(--sun); color: var(--on-sun); border-bottom-color: var(--text); padding: 1px 8px; }
+.adm-em-fold {
+  display: flex; align-items: center; gap: 1rem; width: 100%; background: none; border: 0;
+  border-bottom: 1px solid var(--border); padding: .8rem 0; cursor: pointer; text-align: left;
+  font-family: var(--font); font-size: 1rem; font-weight: 700; color: var(--text);
+}
+.adm-em-fold:hover b { color: var(--accent); }
+.adm-em-fold i { font-family: var(--font-mono); font-size: .74rem; font-style: normal; color: var(--accent); flex: 0 0 6rem; }
+.adm-em-fold b { font-weight: 700; }
+.adm-em-fold em { margin-left: auto; font-family: var(--font-mono); font-size: .74rem; font-style: normal; font-weight: 400; color: var(--text-dim); }
+.adm-em-fold-arrow { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); margin-left: .8rem; }
+.adm-em-fold.is-open { border-bottom: 3px solid var(--text); }
+.adm-em-fold.is-open i, .adm-em-fold.is-open .adm-em-fold-arrow { color: var(--accent); }
+.adm-em-open { border: 3px solid var(--text); border-top: 0; background: var(--card-bg); box-shadow: 8px 8px 0 var(--sun); padding: 18px 20px 20px; margin-bottom: 22px; }
+.adm-em-params { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.adm-em-params code { font-family: var(--font-mono); font-size: .72rem; padding: 2px 7px; border: 2px solid var(--text); }
+.adm-em-params span { font-size: .8rem; line-height: 1.5; color: var(--text-dim); max-width: 74ch; }
+.adm-em-views { display: flex; flex-wrap: wrap; margin: 18px 0 0; border-bottom: 3px solid var(--text); }
+.adm-em-views button {
+  background: transparent; border: 2px solid transparent; border-bottom: 0; border-radius: 0;
+  padding: .5rem 1.1rem; cursor: pointer; font-family: var(--font); font-size: .82rem; font-weight: 700; color: var(--text-dim);
+}
+.adm-em-views button.on { background: var(--sun); color: var(--on-sun); border-color: var(--text); }
+.adm-em-views .adm-em-views-r { margin-left: auto; align-self: center; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); padding-right: 2px; }
+.adm-em-stage { border: 2px solid var(--text); border-top: 0; background: var(--bg-surface); padding: 22px; display: flex; justify-content: center; }
+.adm-em-stage iframe { width: 600px; max-width: 100%; height: 420px; border: 1px solid var(--border); background: #FFFFFF; }
+.adm-em-stage textarea {
+  width: 100%; height: 420px; box-sizing: border-box; background: var(--card-bg); border: 2px solid var(--text);
+  padding: .7rem .8rem; font-family: var(--font-mono); font-size: .76rem; line-height: 1.6; color: var(--text); outline: none; resize: vertical;
+}
+.adm-em-stage textarea:focus { border-color: var(--accent); }
+.adm-em-tacts { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-top: 18px; padding-top: 16px; border-top: 3px solid var(--text); }
+
+@media (max-width: 1100px) {
+  .adm-em-two { grid-template-columns: 1fr; gap: 24px 0; }
+  .adm-em-row { grid-template-columns: minmax(0, 1fr) 150px 92px; }
+  .adm-em-row > .adm-em-when { grid-column: 1 / -1; grid-row: 2; margin-top: 4px; }
+  .adm-em-row--head > .adm-em-when { display: none; }
+}
+@media (max-width: 760px) {
+  .adm-em .og-strip { display: grid; grid-template-columns: 1fr 1fr; }
+  .adm-em .og-strip > div { padding: .8rem 0; }
+  .adm-em .og-strip > :nth-child(odd) { border-right: 1px solid var(--border); padding-right: .9rem; }
+  .adm-em .og-strip > :nth-child(even) { border-right: 0; padding-left: .9rem; }
+  .adm-em .og-strip > :nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+  .adm-em .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; }
+  .adm-em .adm-mrow .adm-mval { grid-column: 1 / -1; text-align: left; margin-top: 4px; }
+  .adm-em-row { grid-template-columns: minmax(0, 1fr) 92px; }
+  .adm-em-row > .adm-em-code { grid-column: 1; grid-row: 3; margin-top: 4px; }
+  .adm-em-open { padding: 16px 14px 18px; box-shadow: 6px 6px 0 var(--sun); }
+  .adm-em-stage { padding: 12px; }
+}

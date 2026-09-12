@@ -1,462 +1,216 @@
 /**
- * @file email-tab.js
+ * @file public/views/admin/email-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin dashboard Email tab — SMTP config view, test-send, group
- *   broadcast, and per-locale email template editor with AI-prompt generation.
- * @structure EmailTab (default), TemplateEditor, buildAiPrompt
- * @usage Mounted by the admin dashboard tab router.
+ * @description Admin Email page in the poster face (design canvas "AIMEAT Admin Email"). Five
+ *   numbered sections in the order an operator asks: what the SMTP settings are and what each one
+ *   does, a test message that reports what the server answered, what the node sends automatically
+ *   and how much of it has gone out, a message to a group with the recipient count on the button,
+ *   and the templates.
+ *
+ *   The words are the ordinary ones: SMTP, port, STARTTLS, certificate, From address, placeholder.
+ *   Each row says what the setting does and what changing it costs.
+ *
+ * @structure
+ *   - EmailTab({ data, locale }) — the sections, or the not-configured page when there is no host
+ *   - RightNow: section 01, the settings and the numeral strip
+ *   - Automatic: section 03, the six messages the node sends by itself plus the group send
+ *   - NotConfigured: the whole page when no SMTP host is set: what stops working, and what to set
+ *   - Sections 02 and 04 are in email-tab.send.js, section 05 in email-tab.templates.js
+ *
  * @version-history
- *   v1.2.0 — 2026-09-05 — The four yes/no cells say ✓ and ✗ instead of two emoji: no emoji anywhere in the interface.
- *   v1.1.0 — 2026-06-02 — Admin design unification: raw textareas → adm-textarea
- *     adm-input-full; inline button color styles → adm-btn-success/adm-btn-danger.
+ *   v2.0.0 — 2026-09-12 — The poster face. The page now shows the setting that decides whether a
+ *     new account must confirm its address (the status route has always returned it and no screen
+ *     showed it), all six messages the node sends rather than three, how many people a group send
+ *     would reach before it is pressed, and how many messages have actually gone out. The test-send
+ *     menu no longer offers "Match suggestion", which is not a message type this node has.
+ *   v1.2.0 — 2026-09-05 — The four yes/no cells say ✓ and ✗ instead of two emoji.
+ *   v1.1.0 — 2026-06-02 — Admin design unification.
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { LOCALES } from '/js/utils.js';
-import { EconRow, Empty, ExpandableHelp } from './shared.js';
-import { useConfirm } from '/components/Modal.js';
-import { CopyButton } from '/components/CopyButton.js';
-import { sendTestEmail, getEmailTemplates, sendGroupEmail, saveEmailTemplate, resetEmailTemplate, seedEmailTemplates, resetAllEmailTemplates, saveConfig } from '/js/services/admin.js';
-import { swallowed } from '/js/swallowed.js';
+import { useViewCSS } from '/components/useViewCSS.js';
+import { num, Empty, Badge, Row } from './shared.js';
+import { TestSend, GroupSend } from './email-tab.send.js';
+import Templates from './email-tab.templates.js';
 
-const TEMPLATE_IDS = ['notification', 'verification', 'magic_link', 'match_suggestion'];
-const TEMPLATE_LABELS = {
-  verification: 'dashboard.emailTplVerification',
-  magic_link: 'dashboard.emailTplMagicLink',
-  notification: 'dashboard.emailTplNotification',
-  match_suggestion: 'dashboard.emailTplMatchSuggestion',
-};
-const USED_IN_LABELS = {
-  ghii: 'dashboard.emailUsedInGhii',
-  system: 'dashboard.emailUsedInSystem',
-  matching: 'dashboard.emailUsedInMatching',
-};
+const E = (key, params) => t('admin.email.' + key, params);
 
-/* ── AI Prompt builder ── */
-function buildAiPrompt(tpl, locale) {
-  const langName = locale === 'fi' ? 'Finnish (suomi)' : 'English';
-  const paramList = (tpl.params || []).map(p =>
-    `  ${p} — ${(tpl.paramDescriptions || {})[p] || 'system parameter'}`
-  ).join('\n');
+/** The messages the node sends without anyone pressing anything, in the order they are met. */
+const AUTOMATIC = [
+  { id: 'verification', counter: 'verification', template: 'verification' },
+  { id: 'magic_link', counter: 'magic_link', template: 'magic_link' },
+  { id: 'notification', counter: 'notification', template: 'notification' },
+  { id: 'invitation', counter: 'invitation', template: null },
+  { id: 'key_invitation', counter: 'key_invitation', template: null },
+  { id: 'key_credentials', counter: 'key_credentials', template: null },
+];
 
-  return `I need you to create a beautiful, professional HTML email template for the AIMEAT Protocol.
-
-Template type: ${t(TEMPLATE_LABELS[tpl.id] || tpl.id)}
-Purpose: ${t(USED_IN_LABELS[tpl.usedIn] || tpl.usedIn)}
-Language: ${langName} — ALL user-facing text in the template must be written in ${langName}.
-
-IMPORTANT — Parameter tags that MUST be preserved exactly as-is in the output:
-${paramList}
-
-These tags are replaced by the system with real data when the email is sent. You must include them in the appropriate places in both HTML and plain text versions. Do NOT translate or modify these tags.
-
-Requirements:
-- Modern, clean design with good typography
-- Mobile-responsive (max-width container, fluid layout)
-- Inline CSS only (email clients don't support external stylesheets)
-- Professional color scheme (consider using indigo/purple #4f46e5 as accent)
-- AIMEAT branding in header
-- Clear visual hierarchy
-- Footer with "Sent by AIMEAT Protocol" and unsubscribe note (in ${langName})
-- Both HTML version and plain text fallback version
-- All text content must be in ${langName}
-
-Here is the current default template for reference:
----HTML---
-${tpl.defaultHtml || tpl.preview || ''}
----TEXT---
-${tpl.defaultText || tpl.text || ''}
----END---
-
-Please provide:
-1. The complete HTML email template (in ${langName})
-2. The plain text version (in ${langName})
-
-Make it visually stunning while keeping parameter tags intact.`;
+/** "notifications@aimeat.io" out of "AIMEAT <notifications@aimeat.io>", and its domain. */
+function fromParts(fromHeader) {
+  const raw = String(fromHeader || '');
+  const inAngles = raw.match(/<([^>]+)>/);
+  const address = (inAngles ? inAngles[1] : raw).trim();
+  const at = address.lastIndexOf('@');
+  return { address, domain: at > 0 ? address.slice(at + 1) : '' };
 }
 
-/* ── Single Template Editor ── */
-function TemplateEditor({ tpl, locale, onSave, onReset }) {
-  const [view, setView] = useState('preview'); // preview | html | text
-  const [editHtml, setEditHtml] = useState(tpl.preview || '');
-  const [editText, setEditText] = useState(tpl.text || '');
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState(null);
-  const { confirm, ConfirmUI } = useConfirm();
-
-  // Sync when tpl data or locale changes
-  useEffect(() => {
-    setEditHtml(tpl.preview || '');
-    setEditText(tpl.text || '');
-    setMsg(null);
-  }, [tpl.id, tpl.preview, tpl.text, locale]);
-
-  async function doSave() {
-    setSaving(true);
-    setMsg(null);
-    try {
-      await onSave(tpl.id, locale, editHtml, editText);
-      setMsg({ ok: true, text: t('dashboard.emailTplSaved') });
-    } catch (e) {
-      setMsg({ ok: false, text: e.message });
-    }
-    setSaving(false);
-  }
-
-  async function doReset() {
-    confirm(t('dashboard.emailTplResetConfirm'), async () => {
-      setSaving(true);
-      setMsg(null);
-      try {
-        await onReset(tpl.id, locale);
-        setEditHtml(tpl.defaultHtml || '');
-        setEditText(tpl.defaultText || '');
-        setMsg({ ok: true, text: t('dashboard.emailTplResetDone') });
-      } catch (e) {
-        setMsg({ ok: false, text: e.message });
-      }
-      setSaving(false);
-    }, { danger: true });
-  }
-
-  const hasChanges = editHtml !== (tpl.preview || '') || editText !== (tpl.text || '');
-
-  const tabStyle = (active) => `
-    padding:6px 14px;font-size:.78rem;border:none;border-radius:4px 4px 0 0;cursor:pointer;
-    background:${active ? 'rgba(79,70,229,0.15)' : 'transparent'};
-    color:${active ? '#818cf8' : 'var(--text-dim)'};
-    font-weight:${active ? '600' : '400'};
-    border-bottom:2px solid ${active ? '#818cf8' : 'transparent'};
-  `;
+/** Section 01: every setting, what it does, and the numeral strip under it. */
+function RightNow({ email }) {
+  const from = fromParts(email.smtp_from);
+  const host = String(email.smtp_host || '');
+  const sent = email.sent || {};
+  const rec = email.recipients || {};
+  // The From domain matters on its own: the receiving side checks SPF and DKIM against it, and
+  // those records live in DNS. Same domain family as the server is the ordinary case.
+  const sameFamily = !!from.domain && (host === from.domain || host.endsWith('.' + from.domain));
+  const secure = email.smtp_secure === true;
 
   return html`
-    <div style="border-top:1px solid var(--glass-border);padding:12px 0 0">
-      <!-- Parameters reference -->
-      ${tpl.params && tpl.params.length > 0 && html`
-        <div style="margin-bottom:10px;padding:8px 10px;border-radius:6px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15)">
-          <div style="font-size:.72rem;font-weight:600;color:#f59e0b;margin-bottom:4px">${t('dashboard.emailTplParams')}</div>
-          <div style="font-size:.72rem;color:var(--text-dim);margin-bottom:6px">${t('dashboard.emailTplParamsExplain')}</div>
-          <div class="adm-flex-wrap" style="gap:6px">
-            ${tpl.params.map(p => html`
-              <span style="font-size:.72rem;background:rgba(0,0,0,0.2);color:#f59e0b;padding:2px 8px;border-radius:4px;font-family:monospace"
-                title=${(tpl.paramDescriptions || {})[p] || ''}>${p}</span>
-            `)}
-          </div>
+    <section class="og-sec og-sec--first">
+      <div class="og-sec-h">
+        <h2>${E('now.title')}<small>01</small></h2>
+      </div>
+      <div class="adm-ov-grid">
+        <div>
+          <div class="adm-ov-status">${E('now.word')}</div>
+          <p class="adm-alert-line">${E('now.line', { host })}</p>
+          <div class="adm-ov-up">${E('now.log', {
+    host, port: email.smtp_port, mode: secure ? 'TLS' : 'STARTTLS', from: from.address,
+  })}</div>
         </div>
-      `}
-
-      <!-- Sub-tabs -->
-      <div style="display:flex;gap:2px;border-bottom:1px solid var(--glass-border)">
-        <button style=${tabStyle(view === 'preview')} onClick=${() => setView('preview')}>${t('dashboard.emailTplPreview')}</button>
-        <button style=${tabStyle(view === 'html')} onClick=${() => setView('html')}>${t('dashboard.emailTplEditHtml')}</button>
-        <button style=${tabStyle(view === 'text')} onClick=${() => setView('text')}>${t('dashboard.emailTplEditText')}</button>
+        <div>
+          <${Row} title=${E('now.server')} why=${E('now.serverWhy')}
+            chip=${html`<${Badge} type="healthy" label=${E('now.configured')} />`}
+            value=${host + ':' + email.smtp_port} />
+          <${Row} title=${E('now.transport')} why=${E('now.transportWhy')}
+            chip=${html`<${Badge} type="healthy" label=${secure ? 'TLS' : 'STARTTLS'} />`}
+            value=${secure ? E('now.tlsValue') : E('now.starttlsValue')} />
+          <${Row} title=${E('now.certificate')} why=${E('now.certificateWhy')}
+            chip=${html`<${Badge} type=${email.smtp_reject_unauthorized ? 'healthy' : 'warning'}
+              label=${email.smtp_reject_unauthorized ? E('now.on') : E('now.off')} />`}
+            value=${email.smtp_reject_unauthorized ? E('now.certOnValue') : E('now.certOffValue')} />
+          <${Row} title=${E('now.from')} why=${E('now.fromWhy')} value=${email.smtp_from} />
+          <${Row} title=${E('now.fromDomain')} why=${sameFamily ? E('now.fromDomainWhy') : E('now.fromDomainOtherWhy', { host })}
+            chip=${html`<${Badge} type=${sameFamily ? 'healthy' : 'muted'} label=${sameFamily ? E('now.sameDomain') : E('now.otherDomain')} />`}
+            value=${from.domain} />
+          <${Row} title=${E('now.credentials')} why=${E('now.credentialsWhy')}
+            chip=${html`<${Badge} type=${email.smtp_user_configured && email.smtp_pass_configured ? 'healthy' : 'warning'}
+              label=${email.smtp_user_configured && email.smtp_pass_configured ? E('now.bothSet') : E('now.missing')} />`}
+            value="AIMEAT_SMTP_USER / _PASS" />
+          <${Row} title=${E('now.verification')} why=${E('now.verificationWhy')} last=${true}
+            chip=${html`<${Badge} type=${email.confirmation_required ? 'healthy' : 'muted'}
+              label=${email.confirmation_required ? E('now.required') : E('now.notRequired')} />`}
+            value="AIMEAT_EMAIL_CONFIRMATION_REQUIRED" />
+        </div>
       </div>
-
-      <!-- Content area -->
-      ${view === 'preview' && html`
-        <iframe
-          srcdoc=${editHtml}
-          style="width:100%;height:420px;border:1px solid var(--glass-border);border-top:none;border-radius:0 0 6px 6px;background:#f4f4f7"
-          sandbox="allow-same-origin allow-scripts"
-        />
-      `}
-      ${view === 'html' && html`
-        <textarea
-          class="adm-textarea adm-input-full"
-          value=${editHtml}
-          onInput=${e => setEditHtml(e.target.value)}
-          style="height:420px;font-size:12px;border-top:none;border-radius:0 0 6px 6px"
-          spellcheck="false"
-        />
-      `}
-      ${view === 'text' && html`
-        <textarea
-          class="adm-textarea adm-input-full"
-          value=${editText}
-          onInput=${e => setEditText(e.target.value)}
-          style="height:300px;font-size:13px;border-top:none;border-radius:0 0 6px 6px"
-          spellcheck="false"
-        />
-      `}
-
-      <!-- Action buttons -->
-      <div class="adm-flex-center" style="flex-wrap:wrap;margin-top:10px">
-        <button class="adm-btn-action adm-text-sm" onClick=${doSave} disabled=${saving || !hasChanges}>
-          ${saving ? '...' : t('dashboard.emailTplSave')}</button>
-        <${CopyButton} text=${buildAiPrompt(tpl, locale)} className="adm-btn-action adm-text-sm"
-          label=${t('dashboard.emailTplAiPrompt')} copiedLabel=${t('dashboard.emailTplAiPrompt')}
-          onCopied=${() => setMsg({ ok: true, text: t('dashboard.emailTplAiPromptCopied') })} />
-        ${tpl.isCustom && html`
-          <button class="adm-btn-action adm-btn-danger adm-text-sm" onClick=${doReset} disabled=${saving}>${t('dashboard.emailTplReset')}</button>
-        `}
-        ${msg && html`<span class="adm-text-sm" style="color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
+      <div class="og-strip">
+        <div><b>${sent.counted ? num(sent.total ?? 0) : '—'}</b><span>${E('strip.sent')}</span>
+          <small>${sent.counted ? E('strip.sentSub') : E('strip.notCounted')}</small></div>
+        <div><b>${sent.counted ? num(sent.last_7_days ?? 0) : '—'}</b><span>${E('strip.week')}</span>
+          <small>${E('strip.weekSub')}</small></div>
+        <div><b class=${sent.failed ? 'og-coral-num' : ''}>${sent.counted ? num(sent.failed ?? 0) : '—'}</b><span>${E('strip.failed')}</span>
+          <small>${E('strip.failedSub')}</small></div>
+        <div><b>${num(rec.with_address ?? 0)}</b><span>${E('strip.reach')}</span>
+          <small>${E('strip.reachSub', { total: num(rec.accounts ?? 0) })}</small></div>
       </div>
-      <${ConfirmUI} />
-    </div>
-  `;
+    </section>`;
 }
 
-/* ── Main Tab ── */
-export default function EmailTab({ data, reload, locale }) {
+/** Section 03: what leaves the node without anyone pressing anything, and how much has. */
+function Automatic({ email }) {
+  const sent = email.sent || {};
+  const byType = sent.by_type || {};
+  const count = key => (sent.counted ? (byType[key] ?? 0) : null);
+  const cell = n => n === null
+    ? html`<div class="adm-em-count adm-em-count--none">—</div>`
+    : html`<div class="adm-em-count ${n ? '' : 'adm-em-count--none'}">${num(n)}</div>`;
+
+  return html`
+    <section class="og-sec">
+      <div class="og-sec-h"><h2>${E('auto.title')}<small>03</small></h2></div>
+      <p class="adm-em-lead">${E('auto.lead')}</p>
+      <div class="adm-em-row adm-em-row--head">
+        <div>${E('auto.colMessage')}</div><div class="adm-em-when">${E('auto.colWhen')}</div>
+        <div>${E('auto.colTemplate')}</div><div class="adm-em-count">${E('auto.colSent')}</div>
+      </div>
+      ${AUTOMATIC.map(m => html`
+        <div class="adm-em-row">
+          <div class="adm-em-nm">${E('kind.' + m.id)}</div>
+          <div class="adm-em-when">${E('auto.when.' + m.id)}</div>
+          <div class="adm-em-code ${m.template ? '' : 'adm-em-code--fixed'}">${m.template || E('auto.hardCoded')}</div>
+          ${cell(count(m.counter))}
+        </div>`)}
+      <div class="adm-em-row adm-em-row--last">
+        <div class="adm-em-nm">${E('kind.group_send')}</div>
+        <div class="adm-em-when">${E('auto.when.group_send')}</div>
+        <div class="adm-em-code adm-em-code--fixed">${E('auto.hardCoded')}</div>
+        ${cell(count('group_send'))}
+      </div>
+      <p class="adm-em-note">${E('auto.note')}</p>
+    </section>`;
+}
+
+/** The whole page when no SMTP host is set: what stops working, and what to set. */
+function NotConfigured() {
+  return html`
+    <div class="og adm-em">
+      <section class="og-sec og-sec--first">
+        <div class="og-sec-h"><h2>${E('now.title')}<small>01</small></h2></div>
+        <div class="adm-ov-grid">
+          <div>
+            <div class="adm-ov-status danger">${E('off.word')}</div>
+            <p class="adm-alert-line">${E('off.line')}</p>
+            <div class="adm-ov-up">${E('off.log')}</div>
+          </div>
+          <div>
+            <${Row} title=${E('kind.verification')} why=${E('off.verificationWhy')}
+              chip=${html`<${Badge} type="warning" label=${E('off.notSent')} />`} value=${E('off.atSignUp')} />
+            <${Row} title=${E('kind.magic_link')} why=${E('off.magicWhy')}
+              chip=${html`<${Badge} type="warning" label=${E('off.notSent')} />`} value=${E('off.atSignIn')} />
+            <${Row} title=${E('kind.notification')} why=${E('off.notificationWhy')}
+              chip=${html`<${Badge} type="warning" label=${E('off.notSent')} />`} value=${E('off.inAppOnly')} />
+            <${Row} title=${E('off.invites')} why=${E('off.invitesWhy')} last=${true}
+              chip=${html`<${Badge} type="muted" label=${E('off.linkOnly')} />`} value=${E('off.noEmail')} />
+          </div>
+        </div>
+      </section>
+
+      <section class="og-sec">
+        <div class="og-sec-h"><h2>${E('off.setTitle')}<small>02</small></h2></div>
+        <p class="adm-em-lead">${E('off.setLead')}</p>
+        <div class="adm-em-envbox">
+          <div class="adm-em-envbox-t">${E('off.envLabel')}</div>
+          <pre class="adm-em-env">${[
+    'AIMEAT_SMTP_HOST=mail.example.com',
+    'AIMEAT_SMTP_PORT=587',
+    'AIMEAT_SMTP_USER=notifications@example.com',
+    'AIMEAT_SMTP_PASS=…',
+    'AIMEAT_SMTP_FROM=Example <notifications@example.com>',
+    'AIMEAT_SMTP_SECURE=false',
+    'AIMEAT_SMTP_REJECT_UNAUTHORIZED=true',
+  ].join('\n')}</pre>
+        </div>
+        <p class="adm-em-note">${E('off.setNote')}</p>
+        <p class="adm-em-note">${E('off.dnsNote')}</p>
+      </section>
+    </div>`;
+}
+
+export default function EmailTab({ data, locale }) {
+  useViewCSS('/css/views/admin-email.css');
   const email = data.email;
-  const [to, setTo] = useState('');
-  const [testTpl, setTestTpl] = useState('notification');
-  const [sending, setSending] = useState(false);
-  const [result, setResult] = useState(null);
-  const [tplLocale, setTplLocale] = useState(locale || 'en');
-  const [templates, setTemplates] = useState(null);
-  const [tplLoading, setTplLoading] = useState(false);
-  const [expanded, setExpanded] = useState({});
-  const [seeded, setSeeded] = useState(false);
-  const [seedMsg, setSeedMsg] = useState(null);
-  const [cfgSaving, setCfgSaving] = useState(false);
-  const { confirm, ConfirmUI } = useConfirm();
-
-  // Group send state
-  const [grpGroup, setGrpGroup] = useState('operators');
-  const [grpSubject, setGrpSubject] = useState('');
-  const [grpBody, setGrpBody] = useState('');
-  const [grpSending, setGrpSending] = useState(false);
-  const [grpResult, setGrpResult] = useState(null);
-
-  useEffect(() => {
-    if (email && email.enabled) loadTemplates(tplLocale);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Reload templates when the locale or enabled-state changes; email is the whole config object (new identity per parent render) so email?.enabled is the stable signal; keying on `email` would refetch every render.
-  }, [tplLocale, email?.enabled]);
-
-  async function loadTemplates(loc) {
-    setTplLoading(true);
-    try {
-      const r = await getEmailTemplates(loc);
-      setTemplates(r.data.templates || []);
-      setSeeded(!!r.data.seeded);
-    } catch (err) {
-      swallowed('email-tab: loadTemplates', err);
-      setTemplates(null);
-    }
-    setTplLoading(false);
-  }
-
-  async function toggleSmtpConfig(dotPath, newValue) {
-    setCfgSaving(true);
-    try {
-      await saveConfig([{ path: dotPath, value: newValue }]);
-      reload();
-    } catch (err) { swallowed('email-tab: toggleSmtpConfig', err); }
-    setCfgSaving(false);
-  }
-
   if (!email) return html`<${Empty} text=${t('dashboard.emailNotAvailable')} />`;
-
-  if (!email.enabled) {
-    return html`
-      <p class="adm-text-dim adm-text-base adm-mb-md">${t('dashboard.emailDisabledExplain')}</p>
-      <${ExpandableHelp} title=${t('dashboard.emailSmtpHelp')}>
-        <p>${t('dashboard.emailSmtpHelpDetail')}</p>
-      </${ExpandableHelp}>
-    `;
-  }
-
-  async function doSend() {
-    if (!to) return;
-    setSending(true);
-    setResult(null);
-    try {
-      const r = await sendTestEmail(to, testTpl, tplLocale);
-      if (r.data?.sent) {
-        setResult({ ok: true, msg: t('dashboard.emailSent') });
-      } else {
-        setResult({ ok: false, msg: t('dashboard.emailSendFailed') });
-      }
-    } catch (e) {
-      setResult({ ok: false, msg: e.message });
-    }
-    setSending(false);
-  }
-
-  async function doGroupSend() {
-    if (!grpSubject || !grpBody) return;
-    setGrpSending(true);
-    setGrpResult(null);
-    try {
-      const r = await sendGroupEmail(grpGroup, grpSubject, grpBody);
-      setGrpResult({ ok: true, msg: t('dashboard.emailGroupSent').replace('{sent}', r.data.sent).replace('{total}', r.data.total) });
-    } catch (e) {
-      setGrpResult({ ok: false, msg: e.message });
-    }
-    setGrpSending(false);
-  }
-
-  function toggle(id) {
-    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
-  }
-
-  async function handleSaveTemplate(id, loc, htmlContent, textContent) {
-    await saveEmailTemplate(id, loc, htmlContent, textContent);
-    await loadTemplates(loc);
-  }
-
-  async function handleResetTemplate(id, loc) {
-    await resetEmailTemplate(id, loc);
-    await loadTemplates(loc);
-  }
-
-  async function doSeedDefaults() {
-    setSeedMsg(null);
-    try {
-      const r = await seedEmailTemplates();
-      setSeedMsg({ ok: true, text: t('dashboard.emailTplSeeded').replace('{count}', r.data.count) });
-      await loadTemplates(tplLocale);
-    } catch (e) {
-      setSeedMsg({ ok: false, text: e.message });
-    }
-  }
-
-  async function doResetAll() {
-    confirm(t('dashboard.emailTplResetAllConfirm'), async () => {
-      setSeedMsg(null);
-      try {
-        const r = await resetAllEmailTemplates();
-        setSeedMsg({ ok: true, text: t('dashboard.emailTplResetAllDone').replace('{count}', r.data.count) });
-        await loadTemplates(tplLocale);
-      } catch (e) {
-        setSeedMsg({ ok: false, text: e.message });
-      }
-    }, { danger: true });
-  }
+  if (!email.enabled) return html`<${NotConfigured} />`;
 
   return html`
-    <p class="adm-text-dim adm-text-base adm-mb-md">${t('dashboard.emailExplain')}</p>
-
-    <!-- SMTP Configuration -->
-    <div class="adm-card">
-      <h4 class="adm-mb-md" style="margin:0">${t('dashboard.smtpConfig')}</h4>
-      <${EconRow} label=${t('dashboard.host')} value=${email.smtp_host || '\u2014'} />
-      <${EconRow} label=${t('dashboard.port')} value=${email.smtp_port || '\u2014'} />
-      <div class="adm-hrow">
-        <span class="adm-hmetric">${t('dashboard.secure')}</span>
-        <span><label style="cursor:pointer"><input type="checkbox" checked=${email.smtp_secure} disabled=${cfgSaving}
-          onChange=${ev => toggleSmtpConfig('email.smtp_secure', ev.target.checked)} /> ${email.smtp_secure ? '\u2713' : '\u2717'}</label></span>
-      </div>
-      <div class="adm-hrow">
-        <span class="adm-hmetric">${t('dashboard.rejectUnauthorized')}</span>
-        <span><label style="cursor:pointer"><input type="checkbox" checked=${email.smtp_reject_unauthorized} disabled=${cfgSaving}
-          onChange=${ev => toggleSmtpConfig('email.smtp_reject_unauthorized', ev.target.checked)} /> ${email.smtp_reject_unauthorized ? '\u2713' : '\u2717'}
-          <span style="font-size:.72rem;color:var(--text-dim);margin-left:6px">${t('dashboard.rejectUnauthorizedHelp')}</span></label></span>
-      </div>
-      <${EconRow} label=${t('dashboard.from')} value=${email.smtp_from || '\u2014'} />
-      <${EconRow} label=${t('dashboard.emailUserConfigured')} value=${email.smtp_user_configured ? '\u2713' : '\u2717'} />
-      <${EconRow} label=${t('dashboard.emailPassConfigured')} value=${email.smtp_pass_configured ? '\u2713' : '\u2717'} />
-    </div>
-
-    <!-- Test Email -->
-    <div class="adm-card adm-mt-md">
-      <h4 class="adm-mb-md" style="margin:0">${t('dashboard.testEmail')}</h4>
-      <div class="adm-flex-center" style="flex-wrap:wrap">
-        <input type="email" class="adm-input" value=${to}
-          onInput=${e => setTo(e.target.value)}
-          placeholder=${t('dashboard.emailPlaceholder')}
-          style="flex:1;min-width:200px" />
-        <select class="adm-input" value=${testTpl} onChange=${e => setTestTpl(e.target.value)}
-          style="width:auto;min-width:140px">
-          ${TEMPLATE_IDS.map(id => html`
-            <option value=${id}>${t(TEMPLATE_LABELS[id])}</option>
-          `)}
-        </select>
-        <button class="adm-btn" onClick=${doSend} disabled=${sending || !to}>
-          ${sending ? '...' : t('dashboard.send')}
-        </button>
-      </div>
-      ${result && html`<div class="adm-mt-sm adm-text-base" style="color:${result.ok ? '#22c55e' : '#ef4444'}">${result.msg}</div>`}
-    </div>
-
-    <!-- Send to Group -->
-    <div class="adm-card adm-mt-md">
-      <h4 class="adm-mb-md" style="margin:0">${t('dashboard.emailGroupTitle')}</h4>
-      <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.emailGroupExplain')}</p>
-      <div class="adm-flex-wrap adm-mb-sm">
-        <select class="adm-input" value=${grpGroup} onChange=${e => setGrpGroup(e.target.value)}
-          style="width:auto;min-width:140px">
-          <option value="operators">${t('dashboard.emailGroupOperators')}</option>
-          <option value="all">${t('dashboard.emailGroupAll')}</option>
-        </select>
-      </div>
-      <input type="text" class="adm-input adm-input-full adm-mb-sm" value=${grpSubject}
-        onInput=${e => setGrpSubject(e.target.value)}
-        placeholder=${t('dashboard.emailGroupSubject')} />
-      <textarea class="adm-textarea adm-input-full" value=${grpBody}
-        onInput=${e => setGrpBody(e.target.value)}
-        placeholder=${t('dashboard.emailGroupBody')}
-        rows="4" />
-      <div class="adm-mt-sm">
-        <button class="adm-btn" onClick=${doGroupSend} disabled=${grpSending || !grpSubject || !grpBody}>
-          ${grpSending ? '...' : t('dashboard.emailGroupSend')}
-        </button>
-      </div>
-      ${grpResult && html`<div class="adm-mt-sm adm-text-base" style="color:${grpResult.ok ? '#22c55e' : '#ef4444'}">${grpResult.msg}</div>`}
-    </div>
-
-    <!-- Email Templates -->
-    <div class="adm-card adm-mt-md">
-      <div class="adm-flex-between adm-mb-md">
-        <h4 style="margin:0">${t('dashboard.emailTemplatesTitle')}</h4>
-        <div style="display:flex;gap:4px">
-          ${LOCALES.map(l => html`
-            <button class=${tplLocale === l ? 'adm-btn' : 'adm-btn-action'} style="padding:4px 10px;font-size:.75rem"
-              onClick=${() => setTplLocale(l)}>${l.toUpperCase()}</button>
-          `)}
-        </div>
-      </div>
-      <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.emailTemplatesExplain')}</p>
-
-      <!-- Seed / Reset All buttons -->
-      <div class="adm-flex-center" style="flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;border-radius:6px;background:rgba(255,255,255,0.02);border:1px solid var(--glass-border)">
-        ${!seeded && html`
-          <button class="adm-btn-action adm-btn-success adm-text-sm"
-            onClick=${doSeedDefaults}>${t('dashboard.emailTplSeedDefaults')}</button>
-          <span style="font-size:.78rem" class="adm-text-dim">${t('dashboard.emailTplSeedExplain')}</span>
-        `}
-        ${seeded && html`
-          <button class="adm-btn-action adm-btn-danger adm-text-sm"
-            onClick=${doResetAll}>${t('dashboard.emailTplResetAll')}</button>
-          <button class="adm-btn-action adm-text-sm"
-            onClick=${doSeedDefaults}>${t('dashboard.emailTplReseed')}</button>
-          <span style="font-size:.78rem" class="adm-text-dim">${t('dashboard.emailTplSeededStatus')}</span>
-        `}
-        ${seedMsg && html`<span class="adm-text-sm" style="color:${seedMsg.ok ? '#22c55e' : '#ef4444'}">${seedMsg.text}</span>`}
-      </div>
-
-      ${tplLoading ? html`<p class="adm-text-dim adm-text-base">...</p>` : null}
-
-      ${templates && templates.map(tpl => html`
-        <div style="border:1px solid ${expanded[tpl.id] ? '#818cf8' : 'var(--glass-border)'};border-radius:8px;margin-bottom:10px;overflow:hidden;transition:border-color .2s ease">
-          <div class="adm-flex-between" style="padding:10px 14px;cursor:pointer;background:${expanded[tpl.id] ? 'rgba(79,70,229,0.04)' : 'rgba(255,255,255,.03)'}"
-            onClick=${() => toggle(tpl.id)}>
-            <span class="adm-flex-center">
-              <strong>${t(TEMPLATE_LABELS[tpl.id] || tpl.id)}</strong>
-              <span class="adm-text-dim" style="font-size:.72rem">${t(USED_IN_LABELS[tpl.usedIn] || tpl.usedIn)}</span>
-              ${tpl.isCustom && html`<span style="font-size:.65rem;background:rgba(79,70,229,0.15);color:#818cf8;padding:1px 6px;border-radius:3px;font-weight:600">${t('dashboard.emailTplCustomBadge')}</span>`}
-            </span>
-            <span class="adm-text-dim" style="font-size:.75rem">${expanded[tpl.id] ? '\u25B2' : '\u25BC'}</span>
-          </div>
-          ${expanded[tpl.id] && html`
-            <div style="padding:0 14px 14px">
-              <${TemplateEditor}
-                key=${`${tpl.id}-${tplLocale}`}
-                tpl=${tpl}
-                locale=${tplLocale}
-                onSave=${handleSaveTemplate}
-                onReset=${handleResetTemplate}
-              />
-            </div>
-          `}
-        </div>
-      `)}
-    </div>
-    <${ConfirmUI} />
-  `;
+    <div class="og adm-em">
+      <${RightNow} email=${email} />
+      <${TestSend} locale=${locale || 'en'} />
+      <${Automatic} email=${email} />
+      <${GroupSend} recipients=${email.recipients} />
+      <${Templates} locale=${locale || 'en'} />
+    </div>`;
 }

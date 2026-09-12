@@ -300,6 +300,49 @@ await test('GET /v1/admin/email/status \u2192 200, has enabled field', async () 
     assert(typeof body.data?.confirmation_required === 'boolean', 'has confirmation_required');
 });
 
+await test('GET /v1/admin/email/status → says how many people a group send would reach', async () => {
+    // The Email page prints this count on the Send button, BEFORE anything is sent. It used to be
+    // computable only by sending: the group route counted its own recipients and returned the
+    // number afterwards. Both now come from services/email-recipients.ts.
+    const { status, body } = await json('/v1/admin/email/status', authed());
+    assert(status === 200, `status ${status}`);
+    const r = body.data?.recipients;
+    assert(r && typeof r === 'object', 'has a recipients block');
+    for (const key of ['accounts', 'with_address', 'operators', 'operators_with_address']) {
+        assert(typeof r[key] === 'number', `recipients.${key} is a number`);
+        assert(r[key] >= 0, `recipients.${key} is not negative`);
+    }
+    assert(r.with_address <= r.accounts, 'nobody can be reachable without an account');
+    assert(r.operators_with_address <= r.operators, 'a reachable operator is an operator');
+    assert(r.operators_with_address <= r.with_address, 'a reachable operator is reachable');
+});
+
+await test('GET /v1/admin/email/status → says what has been sent, or that nothing counts it', async () => {
+    const { status, body } = await json('/v1/admin/email/status', authed());
+    assert(status === 200, `status ${status}`);
+    const s = body.data?.sent;
+    assert(s && typeof s === 'object', 'has a sent block');
+    assert(typeof s.counted === 'boolean', 'sent.counted says whether the counter runs at all');
+    for (const key of ['total', 'failed', 'retried', 'last_7_days']) {
+        assert(typeof s[key] === 'number' && s[key] >= 0, `sent.${key} is a number and not negative`);
+    }
+    assert(s.by_type && typeof s.by_type === 'object', 'sent.by_type is an object, empty when nothing has been sent');
+    // A type absent from by_type has never been sent; a type present must carry a number.
+    for (const [type, n] of Object.entries(s.by_type)) {
+        assert(typeof n === 'number', `sent.by_type.${type} is a number`);
+    }
+});
+
+await test('POST /v1/admin/email/send-group → refuses a group that is not one of the two', async () => {
+    const { status, body } = await json('/v1/admin/email/send-group', authed({
+        method: 'POST',
+        body: JSON.stringify({ group: 'everyone-ever', subject: 'x', body: 'y' }),
+    }));
+    // The refusal must come before anything is read or sent, and it must name the two words.
+    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+    assert(/operators/.test(body?.error?.message || ''), 'the refusal says which groups exist');
+});
+
 await test('POST /v1/admin/email/test → sends, or says the node has no SMTP', async () => {
     // This needs a mail server, and the runner deliberately does not configure one: sending real
     // mail from a test suite is not something a run should do by accident. The status endpoint
@@ -366,6 +409,22 @@ await test('GET /v1/admin/push \u2192 200, has enabled field', async () => {
     assert(typeof body.data?.vapid_configured === 'boolean', 'has vapid_configured');
     assert(typeof body.data?.total_subscriptions === 'number', 'has total_subscriptions');
     assert(Array.isArray(body.data?.subscriptions), 'has subscriptions array');
+});
+
+// The Push page draws its trigger list from this field. Without it the page falls back to showing
+// four event types as though all four were live, which is what it did before and is wrong on any
+// node running the default of two.
+await test('GET /v1/admin/push → carries the trigger list the page reads', async () => {
+    const { body } = await json('/v1/admin/push', authed());
+    const types = body.data?.push_notify_types;
+    assert(Array.isArray(types), `push_notify_types is ${typeof types}`);
+    assert(types.length > 0, 'push_notify_types is empty, so the page would say nothing sends');
+    assert(types.every((x: unknown) => typeof x === 'string' && x.length > 0), `not all strings: ${JSON.stringify(types)}`);
+    assert('vapid_public_key' in body.data, 'vapid_public_key is absent, so the page cannot tell one deployed key pair from another');
+    // The switch and the effective state are separate fields on purpose: with the switch on and no
+    // keys, `enabled` is false, and a page with only that field tells the operator their config
+    // says false when it says true.
+    assert(typeof body.data?.push_enabled === 'boolean', `push_enabled is ${typeof body.data?.push_enabled}`);
 });
 
 // ─── CSM ───

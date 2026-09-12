@@ -39,6 +39,21 @@ AI slop; the same rule applies there).
 
 **Speak human.** A term from the system's own vocabulary carries its meaning in the same sentence, or it does not appear. "agentAutonomy is L3 and meta.decisions is alwaysGate" tells the reader nothing; "the agent may write on its own, but decisions and gaps wait for your approval" says the same thing and can be acted on. This applies hardest when reporting to the developer: an identifier, a config key or a status enum is evidence, and the sentence still has to work without it. The same goes for a number: say what it means, not only what it is.
 
+**An operator surface is written for an administrator, in the industry's own words** (Jouni,
+2026-09-12, on the Email page). Two rules, and they pull against each other on purpose:
+
+- **The term is the ordinary one.** SMTP, port, STARTTLS, TLS, certificate, From address,
+  placeholder, spam, bounce. Never a softened invention: "Encryption" where the field is transport
+  security, "address confirmation at sign-up" where the industry says email verification. A reader
+  arrives knowing these words and searches with them; renaming them costs them the page.
+- **Under each one, a line saying what it does and what changing it costs.** "Turning it off stops
+  all validation: expiry, hostname and chain" is the sentence; "keeps your mail safe" is not.
+
+What this forbids is the literary register, not the explanation: no metaphor, no paired negatives
+for rhythm, no closing flourish, no sentence that sounds good and says nothing. The test is whether
+an administrator has to read a sentence twice. Everything in "The tells" still applies; this says
+where the line falls on a page whose reader is technical.
+
 **The self-edit pass**, once the draft exists: read it once for the three patterns above, once for
 adverbs, and once asking of each sentence whether deleting it would lose information. Most
 first-draft closing paragraphs lose nothing.
