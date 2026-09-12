@@ -20,6 +20,7 @@
 import { el, clear, resolve, reducedMotion } from './dom.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
+import { time } from '../_core/format.js';
 
 const CAP_DEFAULT = 400;
 const TONES = ['ok', 'warn', 'err', 'plain'];
@@ -28,7 +29,7 @@ function stamp(ts) {
   if (ts == null) return '';
   const d = ts instanceof Date ? ts : new Date(ts);
   if (isNaN(d.getTime())) return String(ts);
-  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return time(d, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 /**

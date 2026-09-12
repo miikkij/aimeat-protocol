@@ -232,10 +232,15 @@
       if (typeof n !== 'number') return String(n == null ? '' : n);
       if (format === 'usd') return '$' + n.toFixed(n < 1 ? 4 : 2);
       if (format === 'eur') return n.toFixed(2) + ' EUR';
-      var s = Math.abs(n) >= 1000
-        ? Math.round(n).toLocaleString(locale === 'fi' ? 'fi-FI' : 'en-GB')
-        : (Math.round(n * 100) / 100);
-      return String(s);
+      // A thousands separator belongs to how the reader WRITES numbers, which is a setting of its
+      // own. This took the app's LANGUAGE instead, so a Finnish-speaking reader who prefers an
+      // English format got 12 345 where every other number on the page said 12,345.
+      // AIMEAT.fmt (aimeat-i18n 1.2.0) answers from their profile; an app that has not installed
+      // that pack falls back to the browser, which is what a reader has always had here.
+      if (Math.abs(n) < 1000) return String(Math.round(n * 100) / 100);
+      var fmt = (typeof AIMEAT !== 'undefined') && AIMEAT.fmt;
+      if (fmt && typeof fmt.num === 'function') return fmt.num(Math.round(n));
+      try { return Math.round(n).toLocaleString(); } catch (e) { return String(Math.round(n)); }
     }
 
     /**
@@ -571,7 +576,7 @@
     autoColumns: autoColumns,
     agg: agg,
     num: num,
-    VERSION: '1.1.0',
+    VERSION: '1.1.1',
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);

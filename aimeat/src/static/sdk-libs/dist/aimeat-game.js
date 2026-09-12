@@ -1175,6 +1175,23 @@
     };
   }
 
+  // src/static/sdk-libs/_core/format.js
+  function fmt() {
+    const ns = typeof window !== "undefined" ? window.AIMEAT : null;
+    return ns && ns.fmt ? ns.fmt : null;
+  }
+  function date(v, opts) {
+    const f = fmt();
+    if (f && typeof f.date === "function") return f.date(v, opts);
+    const d = new Date(v);
+    if (!Number.isFinite(d.getTime())) return String(v == null ? "" : v);
+    try {
+      return d.toLocaleDateString(void 0, opts);
+    } catch {
+      return String(v);
+    }
+  }
+
   // src/static/sdk-libs/game/markers.js
   function badge(spec) {
     const state = {
@@ -1193,7 +1210,7 @@
       if (!state.earned) return t("notEarned");
       if (state.earnedAt == null) return t("earned");
       const d = state.earnedAt instanceof Date ? state.earnedAt : new Date(state.earnedAt);
-      const shown = Number.isNaN(d.getTime()) ? String(state.earnedAt) : d.toLocaleDateString(i18n.lang());
+      const shown = Number.isNaN(d.getTime()) ? String(state.earnedAt) : date(d);
       return t("earnedOn", { when: shown });
     }
     function render() {

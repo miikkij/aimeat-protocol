@@ -45,6 +45,7 @@
  */
 import { isError, isQuantity, asText, trimNumber } from './formula-eval.js';
 import { unitLabel } from './units.js';
+import { num } from '../_core/format.js';
 
 /** The named ways a value is written out. A bare number is that many decimals. */
 export const FORMATS = ['unit', 'plain', 'int', 'percent', 'upper', 'lower', 'text', '<digits>'];
@@ -125,24 +126,28 @@ export function formatError(spec) {
 function needsIntl(f) { return f.group === true || f.locale != null || f.style === 'currency'; }
 
 /**
- * The BCP-47 tag Intl is actually given. "auto" is the record saying "whatever the page reads",
- * which is the ONE thing about a format that follows the language; a written-out tag is a
- * decision the record made and the page does not get to overrule it.
- * @param {Format} f @param {string} [lang]
+ * The BCP-47 tag Intl is actually given, for a record that NAMED one. A written-out tag is a
+ * decision the record made and nothing overrules it: a price list quoted in de-DE stays de-DE.
+ *
+ * `auto` is not handled here any more. It used to mean "whatever the page READS", which made the
+ * one setting that is not about words follow the language; it means "whatever the reader WRITES"
+ * now, and _core/format.js answers that from their profile. So `auto` returns undefined here and
+ * the caller takes the shared formatter instead.
+ * @param {Format} f
  * @returns {string|undefined}
  */
-function localeOf(f, lang) {
-  if (f.locale === 'auto') return lang ? String(lang) : undefined;
-  return f.locale || undefined;
+function localeOf(f) {
+  return f.locale && f.locale !== 'auto' ? String(f.locale) : undefined;
 }
 
 /**
  * One number, written the way the spec asks. Never the unit: that is placed by formatParts, so a
  * display with its own unit element (the formula's answer, a control's readout) can keep it.
- * @param {number} n @param {any} spec @param {string} [lang]  the language, for `locale: "auto"`
+ * @param {number} n @param {any} spec @param {string} [_lang] kept for the printers' shared shape;
+ *   the format no longer follows the language, so nothing here reads it
  * @returns {string}
  */
-export function formatNumber(n, spec, lang) {
+export function formatNumber(n, spec, _lang) {
   const f = parseFormat(spec) || {};
   if (!Number.isFinite(n)) return String(n);
   const scaled = f.style === 'percent' ? n * 100 : n;
@@ -154,8 +159,14 @@ export function formatNumber(n, spec, lang) {
     if (f.decimals != null) { opts.minimumFractionDigits = f.decimals; opts.maximumFractionDigits = f.decimals; }
     else if (f.maxDecimals != null) { opts.minimumFractionDigits = 0; opts.maximumFractionDigits = f.maxDecimals; }
     if (f.style === 'currency') { opts.style = 'currency'; opts.currency = f.currency; }
+    const named = localeOf(f);
     try {
-      body = new Intl.NumberFormat(localeOf(f, lang), opts).format(scaled);
+      // A record that NAMED a locale gets it; that is a decision the record made about its own
+      // numbers, and this is the one place in the SDK allowed to honour it. Everything else — the
+      // `auto` case and the plain one — goes through the shared formatter, which reads the person's
+      // own regional setting rather than the page's language.
+      // eslint-disable-next-line aimeat/no-raw-locale-format -- the record names the locale
+      body = named ? new Intl.NumberFormat(named, opts).format(scaled) : num(scaled, opts);
     } catch {
       body = trimNumber(scaled);
     }

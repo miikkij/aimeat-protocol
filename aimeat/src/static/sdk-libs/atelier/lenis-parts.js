@@ -36,6 +36,7 @@
  */
 import { el, clear, resolve, reducedMotion, attention, uid } from './dom.js';
 import { NODE_URL } from '../_core/config.js';
+import { num, money as fmtMoney, date, time } from '../_core/format.js';
 import { emptyState } from './state.js';
 import { form } from './form.js';
 import { stagger } from './motion.js';
@@ -151,7 +152,7 @@ function dayLabelOf(at) {
   const back = new Date(now.getTime() - 86400000);
   if (key === dayKeyOf(back)) return 'Yesterday';
   if (typeof Intl === 'object' && Intl.DateTimeFormat) {
-    return new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' }).format(d);
+    return date(d, { weekday: 'short', day: 'numeric', month: 'short' });
   }
   return d.toDateString();
 }
@@ -161,7 +162,7 @@ function timeLabelOf(at) {
   const d = dateOf(at);
   if (!d) return '';
   if (typeof Intl === 'object' && Intl.DateTimeFormat) {
-    return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(d);
+    return time(d, { hour: '2-digit', minute: '2-digit' });
   }
   return d.toTimeString().slice(0, 5);
 }
@@ -355,12 +356,13 @@ function money(value, currency) {
   if (typeof Intl === 'object' && Intl.NumberFormat) {
     if (/^[A-Za-z]{3}$/.test(cur)) {
       try {
-        return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur.toUpperCase() }).format(v);
+        return fmtMoney(v, cur, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       } catch {
-        // An unknown code: fall through and show the number with the code beside it.
+        // An unknown code, or a morsel, which money() refuses on purpose: fall through and show the
+        // number with the word beside it, which is the right shape for a morsel anyway.
       }
     }
-    return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) + ' ' + cur;
+    return num(v, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + cur;
   }
   return v.toFixed(2) + ' ' + cur;
 }

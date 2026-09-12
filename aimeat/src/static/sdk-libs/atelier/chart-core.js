@@ -11,6 +11,8 @@
  *     Näyteikkuna canvas board is the acceptance bar).
  */
 
+import { num } from '../_core/format.js';
+
 export const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** SVG element helper — el() writes HTML; charts need the SVG namespace. */
@@ -32,8 +34,8 @@ export function tickStep(span) {
 }
 
 export function fmtTick(v) {
-  if (Math.abs(v) >= 1000) return (v / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 }) + 'k';
-  return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (Math.abs(v) >= 1000) return num(v / 1000, { maximumFractionDigits: 1 }) + 'k';
+  return num(v, { maximumFractionDigits: 2 });
 }
 
 /**
