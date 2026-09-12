@@ -12,6 +12,10 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   v1.3.0 — 2026-09-13 — Forwarding a work request to a remote node goes through safeFetch. The
+ *     validateOutboundUrl() above it reads the first hop only, so a node that passed it could 302
+ *     the call to loopback; safeFetch re-validates every hop. The pre-check stays, because it is
+ *     what turns a bad address into a 400 the caller can act on rather than a 502.
  *   v1.2.0 — 2026-08-11 — the two Tier 0.5 doors are gone: GET /v1/work/:tc/accept?otk= and
  *     GET /v1/work/:tc/reject?otk=. RFC v4.0 deprecates one-time keys, and these two were a third
  *     implementation of accept and reject that wrote the status straight to storage: no work→task
@@ -39,7 +43,7 @@ import { executeHooks } from '../services/hooks.js';
 import { WorkRequestSchema, WorkBatchSchema, WorkDeliverySchema, WorkRatingSchema, validateBody } from '../models/schemas.js';
 import { resolveGaii } from '../services/federation.js';
 import type { PeerInfo } from '../services/federation.js';
-import { validateOutboundUrl } from '../utils/url-validator.js';
+import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
 import { acceptWork, deliverWork, fireWebhook } from '../services/work-lifecycle.js';
 
@@ -139,7 +143,12 @@ export async function createWorkItem(
         logger.warn(`Blocked outbound work request to ${resolved.nodeUrl}: ${remoteUrlCheck.reason}`);
         return { error: `Remote node URL blocked: ${remoteUrlCheck.reason}`, status: 400, code: 'INVALID_URL' };
       }
-      const resp = await fetch(`${resolved.nodeUrl}/v1/work/request`, {
+      // safeFetch, not fetch, even though the URL was just validated: the check above reads the
+      // FIRST hop only, and a host that passes it can answer 302 to loopback or to a metadata
+      // address. safeFetch re-runs the same validation on every hop and throws `Fetch blocked: …`,
+      // which the catch below turns into the same REMOTE_UNREACHABLE the network errors give. The
+      // pre-check stays because it is what produces the specific 400 a caller can act on.
+      const resp = await safeFetch(`${resolved.nodeUrl}/v1/work/request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
