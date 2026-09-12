@@ -43008,6 +43008,14 @@ paths:
     get:
       operationId: listInbox
       summary: List inbox (inbound messages from accepted contacts)
+      description: >-
+        The owner's mailbox. One of three readers may call this and the other three mailbox reads
+        (conversations, one conversation, overview): the owner in person; a published app whose grant
+        holds `messages:read` (an app grant acts as the owner, as `messages:send` already does); an
+        agent holding `messages:read-as-owner`, which no wildcard carries. The last two read the
+        owner's own mailbox only: no agent's threads, agent list, groups or tracked-response rules.
+        An agent holding only `messages:read` is refused here; that word reads the agent's own
+        messages at /v1/messages/agent-inbox. A federated session is refused.
       tags: [Direct Messages]
       security:
         - BearerAuth: []
@@ -43042,11 +43050,18 @@ paths:
                           unread: { type: integer }
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: >-
+            Not one of the three mailbox readers. An app is told `messages:read` and an agent
+            `messages:read-as-owner` (SCOPE_DENIED, with the scope in WWW-Authenticate).
 
   /v1/messages/conversations:
     get:
       operationId: listConversations
       summary: List conversation threads (accepted)
+      description: >-
+        Same readers as GET /v1/messages/inbox. The owner in person also sees their agents' threads
+        with other people, tagged `viaAgent`; an app or a delegated agent sees the owner's own threads.
       tags: [Direct Messages]
       security:
         - BearerAuth: []
@@ -43069,6 +43084,8 @@ paths:
                               $ref: '#/components/schemas/ConversationSummary'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Not one of the three mailbox readers (see GET /v1/messages/inbox).
 
   /v1/messages/overview:
     get:
@@ -43081,9 +43098,23 @@ paths:
         the list renders (conversation peers, the owner behind an agent peer, request contacts), so the
         client does not fan out one profile GET per peer. An id mapped to '' was looked up but is not
         resolvable on this node (e.g. a federated peer); the client falls back to the handle.
+        Same readers as GET /v1/messages/inbox. For an app or a delegated agent the response is the
+        messages part: `agents`, `groups` and `tracked` are present and empty, and `conversations` is
+        the owner's own mailbox.
       tags: [Direct Messages]
       security:
         - BearerAuth: []
+      parameters:
+        - name: unread
+          in: query
+          required: false
+          description: Only conversations with something unread.
+          schema: { type: boolean }
+        - name: limit
+          in: query
+          required: false
+          description: At most this many conversations, newest first (1-200). Omitted, the list is whole.
+          schema: { type: integer, minimum: 1, maximum: 200 }
       responses:
         '200':
           description: Inbox overview
@@ -43125,13 +43156,20 @@ paths:
                           peerNames:
                             type: object
                             additionalProperties: { type: string }
+                          conversationsTotal:
+                            type: integer
+                            description: How many conversations matched `unread` before `limit` was applied.
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Not one of the three mailbox readers (see GET /v1/messages/inbox).
 
   /v1/messages/conversations/{conversationId}:
     get:
       operationId: getConversation
       summary: Get a full conversation thread
+      description: >-
+        Same readers as GET /v1/messages/inbox. `agent` is for the owner in person only.
       tags: [Direct Messages]
       security:
         - BearerAuth: []
@@ -43152,7 +43190,8 @@ paths:
           description: >-
             Read an agent-owned ("via <agent>") thread — one of the owner's OWN agents' conversations,
             surfaced read-only in the conversation list with a `viaAgent` tag. Pass that agent GAII to
-            read the thread under it. Only the caller's own agents are permitted (else 403).
+            read the thread under it. Only the caller's own agents are permitted, and only to the
+            owner in person (else 403).
           schema: { type: string }
       responses:
         '200':

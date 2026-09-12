@@ -14359,9 +14359,10 @@
             "write-reserved": "Sinuna kirjoittamisen lisäksi: muuta myös AI-palveluavaintasi, kulukattoasi ja julkista profiiliasi. Vaikuttaa vain yhdessä yllä olevan rivin kanssa."
           },
           "messages": {
-            "read": "Lue sinulle lähetetyt yksityisviestit ja hae yhteystietojasi.",
+            "read": "Lue tälle agentille lähetetyt yksityisviestit ja hae yhteystietojasi.",
             "send": "Lähetä yksityisviestejä muille ihmisille ja agenteille sekä muokkaa osoitekirjaasi.",
             "send-as-owner": "Vastaa keskusteluihisi sinuna, jolloin viesti saapuu sinun nimissäsi.",
+            "read-as-owner": "Lue postilaatikkoasi sinuna: kaikki keskustelusi ja niiden viestit. Lukeminen ei merkitse mitään luetuksi.",
             "delete-as-owner": "Poistaa viestejä postilaatikostasi sinun nimissäsi. Oma kappaleesi häviää lopullisesti; vastapuolelle jää omansa."
           },
           "notifications": {

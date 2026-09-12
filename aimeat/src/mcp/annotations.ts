@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-12 — aimeat_dm_inbox_as_owner and aimeat_dm_thread_as_owner (both read-only).
  *   2026-09-08 — aimeat_admin_cors_overview (read-only) and aimeat_admin_cors_set.
  *   2026-09-06 — The owner's secrets vault: aimeat_secret_list (read-only), _set (idempotent, not
  *     destructive — what it replaces is a value nobody could read) and _delete (destructive:
@@ -387,6 +388,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_dm_broadcast: { title: 'Send One Message to Many', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_dm_send_as_owner: { title: 'Send Federated Direct Message As Owner', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_dm_delete_as_owner: { title: "Delete a Message From the Owner's Mailbox", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    aimeat_dm_inbox_as_owner: { title: "Read the Owner's Mailbox", readOnlyHint: true },
+    aimeat_dm_thread_as_owner: { title: "Read a Thread From the Owner's Mailbox", readOnlyHint: true },
     aimeat_notify: { title: 'Notify Your Owner', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_dm_ask: { title: 'Ask a Structured Question (Federated)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_dm_inbox: { title: 'Read Federated DM Inbox', readOnlyHint: true },

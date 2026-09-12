@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 -- 2026-09-12 -- aimeat_dm_inbox_as_owner / aimeat_dm_thread_as_owner on the CLI dispatch,
+ *     over GET /v1/messages/overview and /conversations/:id (messages:read-as-owner).
  *   v1.8.0 -- 2026-09-08 -- aimeat_agent_propose, and the sixteen v2 agent-plane tools move to
  *     tool-call-defs-agent-v2.ts unchanged, because adding one pushed this file past 800 lines.
  *   v1.7.0 -- 2026-09-06 -- aimeat_agent_mode_set declares its two parameters required, which is
@@ -25,7 +27,7 @@
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { agentCrewCliTools } from './tool-call-defs-agent-crew.js';
 import { agentV2CliTools } from './tool-call-defs-agent-v2.js';
-import { query, optionalString, requiredString, optionalArray, optionalRecord, optionalNumber, taskTodoPayload } from './tool-call-helpers.js';
+import { query, optionalString, requiredString, optionalArray, optionalRecord, optionalNumber, optionalBoolean, taskTodoPayload } from './tool-call-helpers.js';
 
 export const agentTools: ConnectCliToolDefinition[] = [
     {
@@ -398,6 +400,28 @@ export const agentTools: ConnectCliToolDefinition[] = [
             message_id: { type: 'string', required: true, description: 'Id of the message to remove (from aimeat_dm_inbox or aimeat_dm_thread).' },
         },
         handler: ({ client }, input) => client.delete(`/v1/messages/${encodeURIComponent(requiredString(input, 'message_id'))}`),
+    },
+    {
+        name: 'aimeat_dm_inbox_as_owner',
+        description: "Read the OWNER's own mailbox, as the owner: conversations newest first with unread counts, the waiting contact requests and display names. Reading marks nothing as read. Requires the messages:read-as-owner scope.",
+        input: {
+            limit: { type: 'number', description: 'At most this many conversations, newest first (default 30, max 200).' },
+            unread_only: { type: 'boolean', description: 'Only conversations with something unread.' },
+        },
+        handler: ({ client }, input) => client.get(`/v1/messages/overview${query({
+            limit: optionalNumber(input, 'limit') ?? 30,
+            unread: optionalBoolean(input, 'unread_only') === true ? 'true' : undefined,
+        })}`),
+    },
+    {
+        name: 'aimeat_dm_thread_as_owner',
+        description: "Read one conversation from the OWNER's own mailbox, as the owner. Reading marks nothing as read. Requires the messages:read-as-owner scope.",
+        input: {
+            conversation_id: { type: 'string', required: true, description: "The owner's conversation id (from aimeat_dm_inbox_as_owner)." },
+            page: { type: 'number', description: 'Page number (default 1).' },
+            per_page: { type: 'number', description: 'Messages per page (default 50, max 200).' },
+        },
+        handler: ({ client }, input) => client.get(`/v1/messages/conversations/${encodeURIComponent(requiredString(input, 'conversation_id'))}${query({ page: optionalNumber(input, 'page'), per_page: optionalNumber(input, 'per_page') })}`),
     },
     {
         name: 'aimeat_dm_thread',
