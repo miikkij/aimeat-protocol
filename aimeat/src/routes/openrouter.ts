@@ -14,6 +14,12 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.13.0 — 2026-09-13 — The operator's AI provider allowlist reaches both doors here. The model
+ *     picker (GET /v1/openrouter/models) sends the decrypted key in an Authorization header just as
+ *     a completion does, and it was the one path that never asked assertProviderAllowed, so on a
+ *     node with an allowlist the key still went to a host outside it. PUT /v1/openrouter/settings
+ *     now refuses such an address on the way IN as well, instead of storing a setting the node
+ *     would decline to use. Both are no-ops on a node with no allowlist, which is the default.
  *   v1.12.0 — 2026-09-09 — `reasoning` persists beside temperature/top_p/max_tokens: OpenRouter's
  *     reasoning parameter, sent to the provider as given on every completion that does not set its
  *     own; null clears it. Only the four documented fields are stored. Beside it, `autoRetry` and
@@ -75,7 +81,7 @@ import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { listModels, DEFAULT_BASE_URLS, type ProviderType, type ModelModality } from '../services/openrouter.js';
-import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
+import { completeForOwner, AiCompletionError, assertProviderAllowed } from '../services/ai-completion.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 
 /**
@@ -229,6 +235,18 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         if (urlError) {
           return res.status(400).json(error(config.nodeId, 'INVALID_BODY', urlError));
         }
+        // REFUSE BEFORE YOU WRITE. validateProviderUrl above reads the SHAPE of the address —
+        // localhost over http, anything else over https — and never the operator's host list, so
+        // an address this node will refuse to send a key to could be saved as though it had been
+        // accepted. The person then had a setting that looked applied and a model picker that
+        // failed later, somewhere else, with a different message. Empty allowlist is the default
+        // and passes everything, so on a node that has not configured one nothing changes here.
+        try {
+          assertProviderAllowed(config, effectiveBaseUrl);
+        } catch (e) {
+          const err = e as AiCompletionError;
+          return res.status(err.status ?? 403).json(error(config.nodeId, err.code ?? 'PROVIDER_NOT_ALLOWED', err.message));
+        }
       }
 
       // API key: required for openrouter, optional for lmstudio/custom
@@ -363,6 +381,20 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
       const provider = (prefs.provider as ProviderType) || 'openrouter';
       const baseUrl = (prefs.baseUrl as string) || DEFAULT_BASE_URLS[provider];
+
+      // The operator's provider allowlist bounds WHERE a decrypted key may be sent, and listing
+      // models sends one: the key goes out in the Authorization header exactly as it does on a
+      // completion. Every completion, image and transcription path asks this question through
+      // prepareAiCall; this door did not, so on a node with an allowlist the key still reached a
+      // host outside it here, and the completion that followed then failed 403. Asked before the
+      // cache is read as well as before the key is decrypted, so an entry cached while a host was
+      // allowed is not served after the operator removes it.
+      try {
+        assertProviderAllowed(config, baseUrl);
+      } catch (e) {
+        const err = e as AiCompletionError;
+        return res.status(err.status ?? 403).json(error(config.nodeId, err.code ?? 'PROVIDER_NOT_ALLOWED', err.message));
+      }
 
       // Which slice of the catalogue. This is NOT a client-side filter dressed up as a parameter:
       // OpenRouter's default catalogue contains no transcription or speech models at all (measured
