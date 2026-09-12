@@ -24,6 +24,10 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   v1.2.0 — 2026-09-12 — "Dates, times and numbers: never from the language". The app-side half of
+ *     the ruling that language, regional format and time zone are three settings; AIMEAT.fmt is
+ *     what an app calls, and the moment-versus-calendar-date distinction is stated because getting
+ *     it wrong produces a wrong DAY rather than a wrong format.
  *   v1.1.0 — 2026-09-06 — The extension section says a key is named as `{{secret:NAME}}` and
  *     filled from the person's vault, and what the app tells the person instead of drawing a field.
  *   v1.0.0 — 2026-08-25 — Extracted from builtin-skills.ts (max-file-lines) and merged with the
@@ -222,6 +226,39 @@ naming it, with nothing sent). What the app owes the person is the NAME and wher
 Access page, section 04 Secrets, or their own AI (\`aimeat_secret_set { name, value }\`, behind
 the \`secrets:manage\` scope the owner ticks per agent; \`aimeat_secret_list\` shows names and
 who used them, never a value). Show a missing key by its name in the UI; never draw a field for it.
+
+## Dates, times and numbers: never from the language
+
+The pill that switches an app's language decides which WORDS a person reads. It does not decide
+whether a date is 9/12/2026 or 12.9.2026, and it does not decide which clock they are looking at.
+Those are two more settings of their own, and people mix all three: Finnish words with an American
+date format is a real preference, and so is English words with a Helsinki clock.
+
+Install \`aimeat-i18n\` and write everything through \`AIMEAT.fmt\`, which reads the signed-in
+person's own settings from their profile:
+
+\`\`\`javascript
+await AIMEAT.fmt.useProfile();            // once, after sign-in; signed out, the browser answers
+AIMEAT.fmt.num(1234)                      // their grouping
+AIMEAT.fmt.date(iso)                      // their date format
+AIMEAT.fmt.time(iso, { hour: '2-digit', minute: '2-digit' })   // their clock
+AIMEAT.fmt.dateTime(iso)
+AIMEAT.fmt.money(12.5, 'EUR')
+AIMEAT.fmt.morsels(625)                   // never a currency symbol
+\`\`\`
+
+Three things that are easy to get wrong:
+
+- **A moment is not a calendar date.** A message arrived at an instant and belongs on the reader's
+  clock. A heat-map square, a month rail or "the day this was counted into" is a day on a calendar:
+  re-read it in someone's zone and it labels itself the day before for anyone west of the node, so
+  a heading disagrees with the rows under it.
+- **\`money()\` refuses morsels, on purpose.** A morsel is a pacer, not a currency: it paces what
+  agents may push into a person's store, it accrues while they are idle, and it buys nothing. The
+  two are numbers of the same size on the same screens. \`morsels()\` is the one that formats them.
+- **Never write \`toLocaleString()\` with a tag you derived from the language.** That is the defect
+  this exists to prevent, and on the platform itself it had thirty copies that disagreed with each
+  other about what English meant.
 
 ## Do / Don't
 
