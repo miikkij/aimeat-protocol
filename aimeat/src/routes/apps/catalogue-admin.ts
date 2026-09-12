@@ -6,6 +6,9 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-09-12 — GET /v1/admin/apps carries `screenshot_url`, the way the public listing
+ *     already did. The operator's moderation page could not show the app it was about to take
+ *     down, and the copy scan could not put a suspected copy beside the original it matched.
  *   v1.10.0 — 2026-09-05 — GET /v1/apps reads `own`. aimeat_app_list published the parameter on all
  *     three surfaces and this route never read it, so "list my apps" answered with the whole
  *     catalogue and reported success. Refused without a session rather than ignored.
@@ -294,6 +297,14 @@ export function registerCatalogueAdminRoutes(
         const refs = apps.map(a => ({ ownerGaii: a.ownerGaii, filename: a.filename }));
         const downloadsByApp = await storage.getAppDownloadsForApps(refs);
         const forksByApp = await storage.countAppForksForApps(refs);
+        // The picture, in one query for every owner at once, the way the public catalogue reads it.
+        // An operator deciding whether to take an app down was choosing by filename: this page had
+        // no way to look at the thing it moderates, and the copy scan could not put a suspected
+        // copy beside the original.
+        const screenshotKeys = new Set<string>();
+        for (const [gaii, files] of Object.entries(await storage.listStorageFilesForOwners([...new Set(apps.map(a => a.ownerGaii))]))) {
+            for (const f of files) if (f.key.startsWith('apps/screenshots/')) screenshotKeys.add(`${gaii} ${f.key}`);
+        }
 
         const result = apps.map((app) => {
             const metricKey = `${app.ownerGaii} ${app.filename}`;
@@ -325,6 +336,9 @@ export function registerCatalogueAdminRoutes(
                 downloads,
                 forks,
                 download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
+                screenshot_url: screenshotKeys.has(`${app.ownerGaii} apps/screenshots/${app.filename}`)
+                    ? `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}/screenshot`
+                    : null,
                 created_at: app.createdAt,
             };
         });

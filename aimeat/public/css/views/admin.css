@@ -8,6 +8,10 @@
  *   selected item, group labels wear the sun, the node id sits on top in mono. Content surfaces
  *   map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   v2.6.0 — 2026-09-12 — A numeral strip whose cells are filters wraps on a narrow screen like one
+ *     whose cells are not. organism.css halves `.og-strip > div` under 1100px and a button is not a
+ *     div, so the Applications and Cortex strips kept four columns at 1036px with three cells at
+ *     about 100px and their labels on three lines. Found by driving the browser, not by a gate.
  *   v2.5.0 — 2026-09-11 — The Discovery tab's rules (.adm-seo-*) leave for views/admin-discovery.css
  *     (the page took the poster face); .adm-table-scroll stays, it is the shell's.
  *   v2.4.0 — 2026-09-05 — The Compliance tab's screen rules (.adm-cmp-*) leave for
@@ -467,6 +471,13 @@
 .adm .og-strip > button + button { padding-left: 1.1rem; }
 .adm .og-strip > button:last-child { border-right: 0; }
 .adm .og-strip > button:hover span { text-decoration: underline; text-decoration-thickness: 2px; }
+/* organism.css narrows `.og-strip > div` to half-width rows under 1100px, and a button is not a
+   div: a strip whose cells are filters kept four columns on a narrow screen, so three of them
+   measured 89, 107 and 106 px with their labels wrapping to three lines. Found by driving the
+   browser at 1036px; both this page and Applications had it. */
+@media (max-width: 1100px) {
+  .adm .og-strip > button { flex-basis: 50%; border-right: 0; }
+}
 .adm-alert-line { margin: .6rem 0 0; font-size: .9rem; font-weight: 600; color: var(--text); }
 
 /* The grant form and other poster fields */

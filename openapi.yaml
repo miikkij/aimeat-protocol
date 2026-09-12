@@ -50307,6 +50307,33 @@ paths:
                           confirmation_required: { type: boolean }
                           smtp_user_configured: { type: boolean }
                           smtp_pass_configured: { type: boolean }
+                          recipients:
+                            type: object
+                            description: |
+                              How many people a group send would reach, counted the same way the
+                              send itself counts them. A person is reachable only through the
+                              notification address on their GHII record.
+                            properties:
+                              accounts: { type: integer }
+                              with_address: { type: integer }
+                              operators: { type: integer }
+                              operators_with_address: { type: integer }
+                          sent:
+                            type: object
+                            description: |
+                              What the node has sent, from the counters the email service writes.
+                              The messages themselves are not stored. `by_type` carries only the
+                              types that have ever been sent; `counted` is false when the stats
+                              collector is not running, which is not the same as nothing sent.
+                            properties:
+                              total: { type: integer }
+                              failed: { type: integer }
+                              retried: { type: integer }
+                              last_7_days: { type: integer }
+                              counted: { type: boolean }
+                              by_type:
+                                type: object
+                                additionalProperties: { type: integer }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -50620,8 +50647,14 @@ paths:
                       data:
                         type: object
                         properties:
-                          enabled: { type: boolean }
+                          enabled: { type: boolean, description: 'Effective state: the switch AND the keys AND the web-push module.' }
+                          push_enabled: { type: boolean, description: 'The AIMEAT_PUSH_ENABLED switch on its own, so a page can tell a switched-off service from a keyless one.' }
                           vapid_configured: { type: boolean }
+                          vapid_public_key: { type: string, nullable: true, description: 'The public half of the VAPID pair, already public (served at /v1/push/vapid-key). Null when unset.' }
+                          push_notify_types:
+                            description: 'The mailbox event types that actually trigger a push, from AIMEAT_PUSH_NOTIFY_TYPES.'
+                            type: array
+                            items: { type: string }
                           locales:
                             type: array
                             items: { type: string }
