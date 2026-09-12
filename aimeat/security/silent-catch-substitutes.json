@@ -1,13 +1,17 @@
 {
   "note": "How many substitute-answering catch handlers each file is allowed to hold. A catch that returns a value saying nothing failed hands the caller a confident wrong answer; the rule's own header carries the case that found the shape. Seeded 2026-09-13 from the state of that day and NOT REVIEWED: an entry here is a question, not a clearance. Keyed by file and count because a catch handler has no stable name and a line number stops covering the code it was written for as soon as anything above it moves. Fixing one lowers its count; the gate names the gain so it can be locked in. Re-seeding forgives the lot.",
   "files": {
+    "src/services/display-prefs.ts": {
+      "count": 1,
+      "reason": "READ 2026-09-13 and right. It is the INNER of two nested catches: the outer one already logged which stored preference would not format, and this one answers a region AND zone that were both refused with the ISO timestamp, which is the true instant written plainly. The failure is already on the record and the value is not a guess. [triaged 2026-09-13]"
+    },
     "public/views/admin.js": {
       "count": 8,
       "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
     },
     "public/js/format.js": {
-      "count": 6,
-      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+      "count": 7,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED for six of the seven. The seventh arrived with the i18n work the same day and WAS read: the currency formatter falls back to the plain number followed by the code, so an unsupported currency renders as \"12.34 XYZ\" and the reader sees both the amount and that something was not formatted. A browser formatter refusing a code is not a failure to hide. [one read 2026-09-13]"
     },
     "public/js/services/organisms.js": {
       "count": 6,
