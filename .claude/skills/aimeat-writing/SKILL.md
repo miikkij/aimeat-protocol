@@ -65,6 +65,24 @@ translated, Jouni sees it immediately, and it costs a correction round every tim
 minutes on the first pass is cheaper than the iteration it saves. This is a standing instruction, not
 a preference.
 
+### Termit
+
+Termi on joko kohdekielen vakiintunut sana tai englanninkielinen sellaisenaan. Kolmatta muotoa ei
+keksitä. Kielikello nimeää kolme toimivaa lainan muotoa: vakiintunut sitaattilaina (deadline,
+online), mukautettu laina puhekielessä (biisi, frendi) ja käännöslaina joka on jo asettunut kieleen
+(palvelin, kotisivu). Asiatekstiin taivutettu englanninkielinen termi ei ole mikään näistä.
+
+Kun et tiedä kumpi, pidä englanti. Se on rehellisempää kuin arvaus ja se on mitä ala tekee.
+
+Tarkistus on sama kuin muullakin kohdekielellä: hae termi lainausmerkeissä ja katso käyttääkö sitä
+luonnollinen kohdekielinen teksti. **Tämä koskee myös keskustelua, commit-viestejä ja nodelle
+kirjoitettuja tietueita**, ei vain julkaistavaa käyttöliittymätekstiä, koska niissä ei aja mikään
+portti — kirjoittaja on ainoa tarkistus.
+
+Mitattu 12.9.2026: "sviitti" (test suite) ja "kalkkaus" (calque) kirjoitettiin molemmat
+tarkistamatta, ja molemmat päätyivät julkaistuihin tietueisiin asti. Oikeat muodot: testijoukko tai
+testisarja, ja käännöslaina.
+
 **Kaksikielinen sisältö kirjoitetaan kahdesti, ei käännetä kertaakaan** (opittu 23.8.2026, kun
 PITCH-esityksen suomi paljastui sanasta sanaan siirretyksi englanniksi). Fi- ja en-versio syntyvät
 samoista faktoista erillisinä sävellyksinä: englannin retoriikka ("two built-in flaws, and neither is
