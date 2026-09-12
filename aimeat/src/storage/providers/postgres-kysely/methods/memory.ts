@@ -291,6 +291,22 @@ export const memoryMethods = {
     return rows.map(rowToRecord);
   },
 
+  /** The whole bin, across every owner — the operator's read. Names `deletedAt` itself rather than
+   *  going through the archive filter, which hides the bin on every branch and must keep doing so. */
+  async listAllDeletedMemory(this: PostgresKyselyStorage, opts?: { prefix?: string; ownerPrefix?: string; limit?: number; offset?: number }): Promise<{ items: MemoryRecord[]; total: number }> {
+    const base = () => {
+      let q = this.db.selectFrom('Memory').where('deletedAt', 'is not', null);
+      if (opts?.ownerPrefix) q = q.where('ownerGaii', 'like', opts.ownerPrefix + '%');
+      if (opts?.prefix) q = q.where('key', 'like', opts.prefix + '%');
+      return q;
+    };
+    const counted = await base().select(({ fn }) => fn.countAll<string>().as('n')).executeTakeFirst();
+    let q = base().selectAll().orderBy('deletedAt', 'desc');
+    if (opts?.limit) q = q.limit(opts.limit).offset(opts.offset ?? 0);
+    const rows = await q.execute();
+    return { items: rows.map(rowToRecord), total: Number(counted?.n ?? 0) };
+  },
+
   /** The sweeper's hand: the one call in the memory path that destroys anything. */
   async purgeDeletedMemory(this: PostgresKyselyStorage, cutoffIso: string): Promise<number> {
     const r = await this.db.deleteFrom('Memory')

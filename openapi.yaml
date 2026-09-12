@@ -54431,8 +54431,9 @@ paths:
         name who a `group` or `workspace` record is readable by, and `allowed_origins` is the
         per-key origin list when the record carries one.
 
-        With `bin=1` the response is that owner's deleted records instead, each with the moment it
-        stops being restorable. The bin is read one owner at a time, so `owner` is required with it.
+        With `bin=1` the response is the deleted records instead, across every owner, each with the
+        moment it stops being restorable. `owner` and `prefix` narrow it but are not required: the
+        question after a delete is where a record went, not whose it was.
       security:
         - BearerAuth: []
       parameters:
@@ -54443,7 +54444,7 @@ paths:
         - name: owner
           in: query
           schema: { type: string }
-          description: Filter by owner GAII prefix. Required when bin=1.
+          description: Filter by owner GAII prefix.
         - name: visibility
           in: query
           schema: { type: string, enum: [private, owner, group, workspace, members, public] }
@@ -54455,7 +54456,9 @@ paths:
         - name: bin
           in: query
           schema: { type: string, enum: ['1', 'true'] }
-          description: Return this owner's deleted records instead of their live ones.
+          description: |
+            Return deleted records instead of live ones, across every owner unless `owner` narrows
+            it. Deleted records are hidden from every other read on this node.
         - name: oldest
           in: query
           schema: { type: string, enum: ['1'] }

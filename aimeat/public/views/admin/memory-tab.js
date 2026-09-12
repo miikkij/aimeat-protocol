@@ -153,7 +153,12 @@ export default function MemoryTab() {
     try {
       let r;
       if (bin) {
-        r = await getAdminMemory({ bin: true, owner: owner.trim() });
+        // No owner needed: the bin reads across every owner, because the question after a delete is
+        // "where did it go", not "whose was it". The owner and prefix fields still narrow it.
+        r = await getAdminMemory({
+          bin: true, owner: owner.trim() || undefined, prefix: prefix.trim() || undefined,
+          limit: PAGE, offset: off,
+        });
       } else if (q.trim()) {
         r = await searchAdminMemory({
           q: q.trim(), owner: owner.trim() || undefined, prefix: prefix.trim() || undefined,
@@ -364,13 +369,13 @@ export default function MemoryTab() {
 
         ${loading && rows.length === 0 && html`<${Empty} text=${S('loading')} />`}
         ${!loading && rows.length === 0 && html`
-          <${Empty} text=${bin && !owner.trim() ? S('binNeedsOwner') : searching ? S('noMatches') : S('noRecords')} />`}
+          <${Empty} text=${bin ? S('binEmpty') : searching ? S('noMatches') : S('noRecords')} />`}
 
         ${rows.map(r => html`
           <${Row} key=${r.owner_gaii + ' ' + r.key} r=${r} binView=${bin}
             onOpen=${openRecord} onRestore=${putBack} />`)}
 
-        ${!searching && !bin && pages > 1 && html`
+        ${!searching && pages > 1 && html`
           <div class="adm-mem-foot">
             <span>${S('showing', { from: offset + 1, to: Math.min(offset + PAGE, total), total })}</span>
             <div class="adm-mem-pager">
