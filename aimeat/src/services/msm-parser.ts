@@ -9,9 +9,13 @@
  *   - MSM types: MsmDefinition, MsmAction, MsmFieldDef, MsmCategory, MsmAuthType (+ valid-value lists)
  *   - parseMsm(yaml): converts snake_case YAML into a normalized MsmDefinition
  *   - validateMsm(def): returns an array of human-readable validation error strings
+ *   - msmHosts()/msmActionIds(): what a manifest would call, and what it offers
  *   - internal helpers: parseFieldDef/parseFieldMap/parseAction
  *
  * @version-history
+ *   v1.1.0 — 2026-09-12 — msmHosts() and msmActionIds(), for the operator page that arranges the
+ *     manifests by where they point. The listing had carried a name and a count and nothing about
+ *     the address, so five manifests for one RSS feed read as five integrations.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { parse as parseYaml } from 'yaml';
@@ -81,6 +85,60 @@ export interface MsmDefinition {
     intervalSeconds?: number;
     expectedStatus?: number;
   };
+}
+
+// ── What a manifest would call ─────────────────────────────────────────────────────────────────
+
+/**
+ * The scheme and authority of an address, without asking the URL parser: an action's address may be
+ * a template ("https://host/x?q={input.q}", or the whole address as "{input.url}"), and `new URL()`
+ * throws on the second. A miss is the right answer there rather than an exception to swallow.
+ */
+const AUTHORITY_RE = /^[a-z][a-z0-9+.-]*:\/\/([^/?#]+)/i;
+
+/**
+ * The hosts a manifest's actions would call, in the order they first appear.
+ *
+ * The operator's page is arranged by this: five manifests on aimeat.io describe the same RSS
+ * address under five names, and nothing on the page said so because the listing never carried
+ * where anything points. An address templated end to end names no host and is left out.
+ */
+export function msmHosts(def: unknown): string[] {
+  const out: string[] = [];
+  for (const action of actionsOf(def)) {
+    const endpoint = action.endpoint;
+    const url = endpoint && typeof endpoint === 'object'
+      ? (endpoint as Record<string, unknown>).url
+      : undefined;
+    if (typeof url !== 'string') continue;
+    const m = AUTHORITY_RE.exec(url);
+    if (!m) continue;
+    // An authority may carry credentials and a port; the host is what is between them.
+    const host = m[1].split('@').pop()!.split(':')[0].toLowerCase();
+    if (host && !out.includes(host)) out.push(host);
+  }
+  return out;
+}
+
+/** The ids of the actions a manifest declares, which is the other thing two of them can share. */
+export function msmActionIds(def: unknown): string[] {
+  const out: string[] = [];
+  for (const action of actionsOf(def)) {
+    const id = action.id;
+    if (typeof id === 'string' && id && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
+/**
+ * A manifest's actions, whether it arrived as a parsed MsmDefinition or as the JSON storage keeps.
+ * Storage types the definition as a plain record, so neither caller can promise the shape.
+ */
+function actionsOf(def: unknown): Array<Record<string, unknown>> {
+  if (!def || typeof def !== 'object') return [];
+  const actions = (def as Record<string, unknown>).actions;
+  if (!Array.isArray(actions)) return [];
+  return actions.filter((a): a is Record<string, unknown> => !!a && typeof a === 'object');
 }
 
 // ── Helpers (not exported) ──

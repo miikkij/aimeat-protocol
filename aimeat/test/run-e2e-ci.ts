@@ -590,6 +590,9 @@ const ALL_SUITES = [
     // The Cortex extensions page: the dependant count the whole page is arranged by, the pieces one
     // cortex put here, and the promise that a switch-off leaves the files and the written data.
     'test/e2e-admin-cortex-page.ts',
+    // The MSM page: where each manifest points and what it offers, which is what the page groups
+    // by, and the auth variable the operator is shown and the public answer is not.
+    'test/e2e-admin-msm-page.ts',
     // The numbers behind the Statistics page: that requests_total is counted at all (its middleware
     // was written and never mounted), that a scope refusal is counted, and that a period reading is
     // a different reading from the node's whole life.
