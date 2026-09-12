@@ -21,6 +21,7 @@
  *   import { AgentConsent } from '/components/AgentConsent.js';
  *   html`<${AgentConsent} requests=${pending} onApprove=${fn} onDeny=${fn} />`
  * @version-history
+ *   2026-09-13 — V1: the profile approval heading composes the shared B1 section class.
  *   v1.0.0 — 2026-08-07 — Extracted from views/profile/agents-tab.js so the home and the profile
  *     render the same panel (remake phase 4, E7).
  *   v1.1.0 — 2026-08-07 — The 'step' variant says "your home" instead of the settings tab's "your
@@ -181,7 +182,7 @@ export function AgentConsent({ requests, onApprove, onDeny, busyCode = null, var
   const step = variant === 'step';
   return html`
     <div class=${step ? 'agc agc-step' : 'agent-cta mb-1 agc'}>
-      <div class="section-title">
+      <div class=${step ? 'section-title' : 'poster-section-title'}>
         ${step ? tr('agentConsent.stepTitle', 'Your agent is at the door')
                : t('profile.agents.pendingRequests.title')}
       </div>

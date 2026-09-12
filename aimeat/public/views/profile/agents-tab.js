@@ -6,6 +6,7 @@
  *   expandable agent cards with Two-Zone Header + 8-tab interface,
  *   device auth flow, scope management modal.
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v3.12.0 -- 2026-09-08 -- The new-agent panel below the basic-agents one: an agent of the
  *     person's own, the proposals their agents have made, and the attach control for any agent that
  *     has no key. The proposal routes had shipped six days earlier with no surface at all.
@@ -492,7 +493,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
   return html`
     <div class="pf-agd-header-row">
-      <div class="section-title">${t('profile.agents.title')}${agents.length > 0 ? html` <span class="pf-agd-count-badge">(${agents.length})</span>` : ''}</div>
+      <div class="poster-page-title">${t('profile.agents.title')}${agents.length > 0 ? html` <span class="pf-agd-count-badge">(${agents.length})</span>` : ''}</div>
       <button class="${connectExpanded ? 'btn-outline' : 'btn-primary'} btn-sm" onClick=${() => setConnectExpanded(!connectExpanded)}>
         ${connectExpanded ? t('profile.agents.detail.zone2.cancel') : `+ ${t('profile.agents.connect')}`}
       </button>

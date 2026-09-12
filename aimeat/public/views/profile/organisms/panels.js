@@ -9,6 +9,7 @@
  * @structure OrgSearch, IncomingInvitations, BoardPreview
  * @usage import { OrgSearch, IncomingInvitations, BoardPreview } from '/views/profile/organisms/panels.js';
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  *   v1.1.0 — 2026-06-22 — OrgSearch: instant (debounced) indexed search, results grouped by workspace,
  *     and clicking a hit deep-links to the exact record/document (via the workspace openDoc handoff).
@@ -115,7 +116,7 @@ export function IncomingInvitations({ showToast, onChanged }) {
   if (!invites.length) return null;
   return html`
     <div class="card">
-      <div class="section-title">${t('organisms.youAreInvited') || 'You’re invited'}</div>
+      <div class="poster-section-title">${t('organisms.youAreInvited') || 'You’re invited'}</div>
       ${invites.map(({ membership, organism }) => html`
         <div class="pj-access-row" key=${organism.id}>
           <span><b>${(organism.name)}</b>${membership.invitedBy ? html` <span class="pj-mini">— ${(t('organisms.invitedByLabel') || 'invited by {who}').replace('{who}', (membership.invitedBy))}</span>` : null}</span>

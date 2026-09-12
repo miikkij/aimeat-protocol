@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.6.0 — 2026-09-13 — V1: profile markup composes shared page and B1 section headings.
  *   v1.5.1 — 2026-09-09 — Account dialogs share the poster frame, fields and actions in Home and Settings.
  *   v1.5.0 — 2026-09-06 — The GAII control on an agent row (.pf-agd-gaii) takes the square corner
  *     and the sun on hover, like the board tiles it came from; the fleet search count reads as a
@@ -51,25 +52,17 @@
 
 /* ── Faces and the tab head ─────────────────────────────────────────────────────────────── */
 .pf-content, .portfolio-container, .portfolio-viewer-full { font-family: var(--font-showroom-body); }
-/* The tab head is the crumb ("Agents /", small mono in coral) and the tab's own first title is the
-   page title in the Black face, as the canvas draws it: crumb above, headline under it, no rule
-   between. Every later .section-title is a section headline in the regular cut. */
+/* The crumb precedes a page title. Markup selects the shared page or B1 section class. */
 .pf-content-head { border-bottom: 0; padding-bottom: 0; margin-bottom: 0.2rem; }
 .pf .pf-back-current { font-family: var(--font-mono); font-weight: 400; font-size: 0.8rem; letter-spacing: 0; text-transform: none; color: var(--accent); }
 .pf .pf-back-current::after { content: ' /'; }
-.pf .pf-content-body > .section-title:first-child, .pf .pf-content-body > *:first-child > .section-title:first-child,
-.pf .pf-content-body > *:first-child > *:first-child > .section-title:first-child,
-.pf .pf-content-body > *:first-child > h2:not([class]):first-child, .pf .pf-content-body > *:first-child > *:first-child > h2:not([class]):first-child {
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 2.8rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); margin-bottom: 0.6rem;
-}
-.pf .section-title, .portfolio-container h1 {
+.portfolio-container h1 {
   font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
   font-size: 1.9rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
   color: var(--text); margin-bottom: 0.5rem;
 }
 .portfolio-container h1 { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3.4rem; letter-spacing: var(--font-poster-tracking); }
-.pf .section-title.section-title-spaced { margin-top: 2.6rem; }
+.pf .poster-section-title.section-title-spaced { margin-top: 2.6rem; }
 .pf .section-desc, .portfolio-subtitle-text { font-weight: 600; color: var(--text-dim); font-size: 0.92rem; }
 .pf .card-h3, .pf .card-title, .pf .pf-agd-section-label, .pf .pf-agd-section-title, .pf .pj-section-title,
 .pf .form-row label, .pf .detail-label, .pf .tx-detail-label, .pf .pj-field > span, .pf .pj-rec-field-label,
@@ -516,8 +509,7 @@
 .pf .pf-agd-basic-item { border-bottom: 1px solid var(--border); padding: 0.7rem 0; }
 
 @media (max-width: 700px) {
-  .pf .pf-content-body > .section-title:first-child, .pf .pf-content-body > *:first-child > .section-title:first-child,
-  .pf .pf-content-body > *:first-child > *:first-child > .section-title:first-child { font-size: 2rem; }
+  .pf { --poster-page-size: 2rem; }
   .portfolio-container h1 { font-size: 2.2rem; }
   .portfolio-flow { grid-template-columns: 1fr; }
   .portfolio-viewer-bar { padding: 0 0.8rem; gap: 0.8rem; }

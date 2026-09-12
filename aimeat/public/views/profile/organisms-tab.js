@@ -19,6 +19,7 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v2.7.0 — 2026-09-06 — The counts and the date always render, empty cell and all, because the
  *     row's trailing block is now a fixed grid and a missing cell would slide the rest into the
  *     wrong track. The door gets a cell of its own so Open on one row and Join on the next cannot
@@ -525,7 +526,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   for (const hh of (gHits || [])) { if (!hh.organismId) continue; (gGroups[hh.organismId] = gGroups[hh.organismId] || []).push(hh); }
 
   return html`
-    <div class="section-title">${t('organisms.title') || 'Organisms'}</div>
+    <div class="poster-page-title">${t('organisms.title') || 'Organisms'}</div>
     <div class="section-desc">${t('organisms.desc') || 'Organisms are groups — communities, teams, clubs, or projects. Create one or join existing ones to share knowledge, coordinate work, and build together.'}</div>
 
     <!-- Create form (opened from the topbar button) -->
@@ -625,7 +626,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     <!-- My Organisms -->
     <input type="file" accept=".zip,application/zip" ref=${orgFileRef} class="pj-hidden-input" onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImportOrg(f); }} />
     <div class="pj-ws-topbar">
-      <div class="section-title">${t('organisms.myOrganisms') || 'My Organisms'}</div>
+      <div class="poster-section-title">${t('organisms.myOrganisms') || 'My Organisms'}</div>
       <div class="pj-org-topbar-actions">
         ${myOrganisms.length > 1 ? html`
           <select class="input-field input-sm pj-org-sort" title=${t('organisms.sortTitle') || 'Sort'} value=${sortMode}
@@ -665,7 +666,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
     <!-- Discover -->
     ${publicOrganisms.length > 0 && html`
-      <div class="section-title section-title-spaced">${t('organisms.discover') || 'Discover'}</div>
+      <div class="poster-section-title section-title-spaced">${t('organisms.discover') || 'Discover'}</div>
       <div class="pj-org-list">${publicOrganisms.map(org => renderOrgRow(org, false))}</div>
     `}
     `}

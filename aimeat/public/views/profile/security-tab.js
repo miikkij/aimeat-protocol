@@ -5,6 +5,7 @@
  * @description Profile tab for CORS origin management (GHII + per-agent): which web addresses may
  *   reach the account's API. Operator-only in the menu (the Infrastructure group).
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.6.0 — 2026-09-05 — Two-step sign-in, the passkeys and the sessions moved to the Access page,
  *     which every member can open; this tab sits in the operator-only group, so a member could not
  *     switch two-step on from anywhere. What stays here is the one thing that belongs to an
@@ -115,7 +116,7 @@ export default function SecurityTab({ session, showToast }) {
   const effectiveOrigins = ghii.effective || [];
 
   return html`
-    <div class="section-title">${t('profile.security.title')}</div>
+    <div class="poster-page-title">${t('profile.security.title')}</div>
     <div class="section-desc">${t('profile.security.desc')}</div>
 
     ${securityData.managedBy && html`

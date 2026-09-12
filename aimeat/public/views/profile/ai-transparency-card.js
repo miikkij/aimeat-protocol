@@ -23,6 +23,7 @@
  *   import { AiTransparencyCard } from './ai-transparency-card.js';
  *   html`<${AiTransparencyCard} />`
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-08-01 — i18n namespace renamed `aiTransparency.*` → `aiTransparencyMine.*`
  *     (TARGET-058 Phase 10b). It sat one character away from `transparency.*`, the PUBLIC page's
  *     namespace, with `title` and `loading` meaning different things in each — a pair an
@@ -92,7 +93,7 @@ export function AiTransparencyCard() {
     <div class="pf-card pf-aitr">
       <button type="button" class="pf-aitr-head" onClick=${() => setCollapsed(c => !c)}
               aria-expanded=${!collapsed}>
-        <span class="section-title">${t('aiTransparencyMine.title')}</span>
+        <span class="poster-section-title">${t('aiTransparencyMine.title')}</span>
         <span class="pf-aitr-chevron">${collapsed ? '+' : '−'}</span>
       </button>
       <p class="section-desc">${t('aiTransparencyMine.desc')}</p>

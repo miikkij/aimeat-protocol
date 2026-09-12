@@ -11,6 +11,7 @@
  * @structure LivingTab (default export) — templates list/editor + deploy + instances list/viewer
  * @usage html`<${LivingTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-07-16 — Mount folds templates + instances + organisms into GET /v1/living-docs
  *     (getLivingOverview); individual reads (two full memory scans) kept as fallback.
  *   v1.0.0 — 2026-06-21 — Phase 0: template management + deploy + manual derive + render.
@@ -270,7 +271,7 @@ export default function LivingTab({ session, showToast }) {
 
   const renderEditor = () => html`
     <div class="pf-ld-editor">
-      <div class="section-title pf-nb-section">${editing.id && templates?.some(x => x.id === editing.id) ? t('profile.living.editTemplate') : t('profile.living.newTemplate')}</div>
+      <div class="poster-section-title pf-nb-section">${editing.id && templates?.some(x => x.id === editing.id) ? t('profile.living.editTemplate') : t('profile.living.newTemplate')}</div>
       <label class="pf-nb-suggest-label">${t('profile.living.fieldTitle')}</label>
       <input class="input-field" value=${editing.title} onInput=${e => patchEditing({ title: e.target.value })} />
       <label class="pf-nb-suggest-label">${t('profile.living.fieldDescription')}</label>
@@ -322,7 +323,7 @@ export default function LivingTab({ session, showToast }) {
 
   const renderDeploy = () => html`
     <div class="pf-ld-editor">
-      <div class="section-title pf-nb-section">${t('profile.living.deployTitle').replace('{title}', deploying.template.title)}</div>
+      <div class="poster-section-title pf-nb-section">${t('profile.living.deployTitle').replace('{title}', deploying.template.title)}</div>
       ${orgs.length === 0
         ? html`<div class="empty">${t('profile.living.noOrgs')}</div>`
         : html`
@@ -351,7 +352,7 @@ export default function LivingTab({ session, showToast }) {
     return html`
       <div class="pf-ld-editor">
         <div class="pf-ld-opened-head">
-          <div class="section-title">${escHtml(opened.config.title)}</div>
+          <div class="poster-section-title">${escHtml(opened.config.title)}</div>
           <div class="pf-ld-card-btns">
             <button class="btn-primary btn-sm" disabled=${pulsing} onClick=${handlePulse}>${pulsing ? t('profile.living.pulsing') : `↻ ${t('profile.living.pulseNow')}`}</button>
             <button class="btn-outline btn-sm" onClick=${togglePause}>${st.paused ? t('profile.living.resume') : t('profile.living.pause')}</button>
@@ -442,7 +443,7 @@ export default function LivingTab({ session, showToast }) {
 
   return html`
     ${ConfirmUI}
-    <div class="section-title">${t('profile.living.title')}</div>
+    <div class="poster-page-title">${t('profile.living.title')}</div>
     <div class="section-desc">${t('profile.living.desc')}</div>
 
     ${opened ? renderOpened() : html`
@@ -450,7 +451,7 @@ export default function LivingTab({ session, showToast }) {
       ${editing && renderEditor()}
 
       ${!editing && !deploying && html`
-        <div class="section-title pf-nb-section">${t('profile.living.templatesTitle')}</div>
+        <div class="poster-section-title pf-nb-section">${t('profile.living.templatesTitle')}</div>
         <div class="section-desc">${t('profile.living.templatesDesc')}</div>
         <div class="pf-ld-author">
           <textarea class="input-field" rows="2" placeholder=${t('profile.living.authorPh')}
@@ -480,7 +481,7 @@ export default function LivingTab({ session, showToast }) {
                   </div>`)}
               </div>`}
 
-        <div class="section-title pf-nb-section">${t('profile.living.instancesTitle')}</div>
+        <div class="poster-section-title pf-nb-section">${t('profile.living.instancesTitle')}</div>
         <div class="section-desc">${t('profile.living.instancesDesc')}</div>
         ${instances === null
           ? html`<${Spinner} text=${t('profile.living.loading')} />`
