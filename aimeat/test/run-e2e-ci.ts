@@ -213,6 +213,10 @@ const ALL_SUITES = [
     // knowledge admin. e2e-admin-features keeps the refusals and reads.
     'test/e2e-admin-doors.ts',
     'test/e2e-admin-doors-2.ts',
+    // The operator's memory doors — the listing, the cross-owner content search, one record, and
+    // the bin. This surface had no test at all until 2026-09-12, and it is the one an operator
+    // deletes anybody's data through.
+    'test/e2e-admin-memory-page.ts',
     'test/e2e-agent-activity.ts',
     'test/e2e-agent-capabilities.ts',
     'test/e2e-anonymous.ts',

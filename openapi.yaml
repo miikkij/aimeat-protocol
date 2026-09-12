@@ -232,6 +232,48 @@ components:
       description: One-time key for Tier 0.5 operations
 
   schemas:
+    AdminMemoryRow:
+      type: object
+      description: >-
+        One memory record as the operator's surfaces read it: metadata and the audience, never the
+        value. `visibility` is the setting; `group_id`, `workspace_ref` and `allowed_origins` are who
+        it actually admits. A null `ai_provenance_id` means nobody recorded how the value was
+        produced, which is not the same as a person having written it.
+      properties:
+        key: { type: string }
+        owner_gaii: { type: string }
+        visibility:
+          type: string
+          enum: [private, owner, group, workspace, members, public]
+        group_id:
+          type: string
+          nullable: true
+          description: The sharing group a `group` record admits.
+        workspace_ref:
+          type: string
+          nullable: true
+          description: Space-separated "<organismId>/<workspaceId>" bindings a `workspace` record admits.
+        allowed_origins:
+          type: array
+          nullable: true
+          items: { type: string }
+          description: Per-key web origin list, on top of the visibility.
+        ai_provenance_id:
+          type: string
+          nullable: true
+          description: How the value was produced. Null means unstated.
+        tags:
+          type: array
+          items: { type: string }
+        version: { type: integer }
+        byte_size:
+          type: integer
+          description: Size of the value, from the stored per-row count.
+        ttl_hours: { type: integer, nullable: true }
+        flag_count: { type: integer }
+        archived: { type: boolean }
+        created_at: { type: string }
+        updated_at: { type: string }
     CrewDefDoc:
       type: object
       description: >-
@@ -54356,10 +54398,22 @@ paths:
     get:
       operationId: getAdminMemory
       tags: [Memory, Admin]
-      summary: List all memory records
+      summary: List memory records across all owners
       description: |
-        Operator only. Lists memory records across all owners with pagination and optional
-        filtering by key prefix, owner prefix, and visibility.
+        Operator only. Lists memory records across every owner, filtered by key prefix, owner GAII
+        prefix, visibility and archive state.
+
+        Records only, never values: a value may be up to 1024 kB and a page holds up to 200 rows, so
+        the listing projects metadata and the stored `byte_size`. Fetch a value with
+        `GET /v1/admin/memory/{owner}/{key}`, or search inside values with
+        `GET /v1/admin/memory/search`.
+
+        Each row carries the audience as well as the visibility word: `group_id` and `workspace_ref`
+        name who a `group` or `workspace` record is readable by, and `allowed_origins` is the
+        per-key origin list when the record carries one.
+
+        With `bin=1` the response is that owner's deleted records instead, each with the moment it
+        stops being restorable. The bin is read one owner at a time, so `owner` is required with it.
       security:
         - BearerAuth: []
       parameters:
@@ -54370,10 +54424,29 @@ paths:
         - name: owner
           in: query
           schema: { type: string }
-          description: Filter by owner GAII prefix
+          description: Filter by owner GAII prefix. Required when bin=1.
         - name: visibility
           in: query
-          schema: { type: string }
+          schema: { type: string, enum: [private, owner, group, workspace, members, public] }
+        - name: archived
+          in: query
+          schema: { type: string, enum: [exclude, include, only], default: exclude }
+          description: |
+            Archived records are excluded by default, as everywhere else. `only` is the archive view.
+        - name: bin
+          in: query
+          schema: { type: string, enum: ['1', 'true'] }
+          description: Return this owner's deleted records instead of their live ones.
+        - name: oldest
+          in: query
+          schema: { type: string, enum: ['1'] }
+          description: Order by key instead of most recently written first.
+        - name: counts
+          in: query
+          schema: { type: string, enum: ['1', 'true'] }
+          description: |
+            Also return the audience breakdown for this same filter, counted across every matching
+            record rather than tallied from the page returned.
         - name: limit
           in: query
           schema: { type: integer, default: 50, minimum: 1, maximum: 200 }
@@ -54382,7 +54455,7 @@ paths:
           schema: { type: integer, default: 0 }
       responses:
         '200':
-          description: Memory record page
+          description: Memory record page, or the owner's bin when bin=1
           content:
             application/json:
               schema:
@@ -54396,30 +54469,166 @@ paths:
                           items:
                             type: array
                             items:
-                              type: object
-                              properties:
-                                key: { type: string }
-                                owner_gaii: { type: string }
-                                value: {}
-                                visibility: { type: string }
-                                tags:
-                                  type: array
-                                  items: { type: string }
-                                version: { type: integer }
-                                created_at: { type: string }
-                                updated_at: { type: string }
-                                flag_count: { type: integer }
+                              $ref: '#/components/schemas/AdminMemoryRow'
                           total: { type: integer }
                           limit: { type: integer }
                           offset: { type: integer }
+                          counts:
+                            type: object
+                            description: |
+                              Present with counts=1. One entry per visibility plus `archived`,
+                              counted across every record matching the same filter.
+                            additionalProperties: { type: integer }
+                          max_keys_per_principal:
+                            type: integer
+                            description: The per-principal key ceiling this node runs.
+                          grace_days:
+                            type: integer
+                            description: How long a deleted record can be taken back.
+                          bin:
+                            type: boolean
+                            description: Present and true when this is the bin view.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/admin/memory/search:
+    get:
+      operationId: searchAdminMemory
+      tags: [Memory, Admin]
+      summary: Search inside memory values, across every owner
+      description: |
+        Operator only. Indexed full-text search over what is written inside memory records, ranked
+        best first, across every owner unless `owner` narrows it.
+
+        Each hit carries an `excerpt` cut from the matched value, so a result says why it is a
+        result. The excerpt is null when the term does not appear as a literal run of characters,
+        which is ordinary: the index stems and tokenises, so a record containing "operators" ranks
+        for "operator" with nothing exact to point at.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+          description: What to search for.
+        - name: owner
+          in: query
+          schema: { type: string }
+          description: Restrict to one owner GAII. Omit to search every owner.
+        - name: prefix
+          in: query
+          schema: { type: string }
+        - name: visibility
+          in: query
+          schema: { type: string, enum: [private, owner, group, workspace, members, public] }
+        - name: max_flags
+          in: query
+          schema: { type: integer }
+          description: Drop records whose moderation flag count exceeds this.
+        - name: archived
+          in: query
+          schema: { type: string, enum: [exclude, include, only], default: exclude }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, minimum: 1, maximum: 200 }
+      responses:
+        '200':
+          description: Ranked hits
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          query: { type: string }
+                          items:
+                            type: array
+                            items:
+                              allOf:
+                                - $ref: '#/components/schemas/AdminMemoryRow'
+                                - type: object
+                                  properties:
+                                    score: { type: number }
+                                    excerpt:
+                                      nullable: true
+                                      type: object
+                                      properties:
+                                        before: { type: string }
+                                        hit: { type: string }
+                                        after: { type: string }
+                          limit: { type: integer }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /v1/admin/memory/{owner}/{key}:
+    get:
+      operationId: getAdminMemoryRecord
+      tags: [Memory, Admin]
+      summary: One memory record, whole
+      description: |
+        Operator only. The record as it is stored: its value, every field on the row, and the kept
+        earlier versions when the key is trackable. This is the only admin memory read that loads a
+        value, which is why it takes one key rather than a page of them.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema: { type: string }
+          description: Owner GAII
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+          description: The memory key. Keys may contain slashes, so percent-encode it.
+      responses:
+        '200':
+          description: The record
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/AdminMemoryRow'
+                          - type: object
+                            properties:
+                              value: {}
+                              trackable: { type: boolean }
+                              archived_at: { type: string, nullable: true }
+                              archived_by: { type: string, nullable: true }
+                              archived_root: { type: string, nullable: true }
+                              history:
+                                type: array
+                                description: Kept earlier versions, newest first. Empty unless trackable.
+                                items:
+                                  type: object
+                                  properties:
+                                    version: { type: integer }
+                                    recorded_at: { type: string }
+                                    actor: { type: string, nullable: true }
+                                    event: { type: string, nullable: true }
+                                    byte_size: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
     delete:
       operationId: deleteAdminMemory
       tags: [Memory, Admin]
-      summary: Delete any memory key
-      description: Operator only. Deletes a memory record for any owner GAII and key.
+      summary: Put any memory record in the bin
+      description: |
+        Operator only. The record leaves every read at once and can be taken back whole until the
+        grace window closes, after which the sweeper removes it for good. The operator is recorded
+        on the record as the one who deleted it.
       security:
         - BearerAuth: []
       parameters:
@@ -54434,7 +54643,7 @@ paths:
           schema: { type: string }
       responses:
         '200':
-          description: Memory key deleted
+          description: In the bin
           content:
             application/json:
               schema:
@@ -54446,6 +54655,50 @@ paths:
                         type: object
                         properties:
                           deleted: { type: boolean }
+                          owner_gaii: { type: string }
+                          key: { type: string }
+                          restorable_until:
+                            type: string
+                            nullable: true
+                            description: When it stops being takeable back. Null when the node keeps no window.
+                          grace_days: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/admin/memory/{owner}/{key}/restore:
+    post:
+      operationId: restoreAdminMemory
+      tags: [Memory, Admin]
+      summary: Take a memory record back out of the bin
+      description: |
+        Operator only. Restores a deleted record whole. Refused once the grace window has closed and
+        the sweeper has been past, which is the honest answer to "can I have it back".
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema: { type: string }
+          description: Owner GAII
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          restored: { type: boolean }
                           owner_gaii: { type: string }
                           key: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }

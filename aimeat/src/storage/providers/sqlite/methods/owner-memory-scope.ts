@@ -6,6 +6,11 @@
  *   single-query cross-identity list/meta variants. Split out of owner.ts to keep every method-group
  *   file <=800 lines; bound to SqliteStorage via prototype merge (same as the other method groups).
  * @version-history
+ *   v1.2.0 - 2026-09-12 - The projection carries the audience and the provenance: groupId,
+ *     workspaceRef, allowedOrigins, aiProvenanceId and archived. `visibility` alone says "group"
+ *     without saying WHICH group, so a listing built on this could name the word and not the
+ *     audience. All five are already on the row and none is a value, so the projection is still
+ *     value-free. (Admin memory page.)
  *   v1.1.0 - 2026-08-17 - listAllMemoryMeta (cross-owner META projection) + shared rowToMeta helper.
  *   v1.0.0 - 2026-07-15 - Extracted from owner.ts (max-file-lines) during the owner-scope query perf pass.
  */
@@ -13,6 +18,10 @@ import type { MemoryRecord, ArchiveFilter } from '../../../interface.js';
 import type { MemoryMetaRow } from '../../../repositories/memory.repository.js';
 import type { SqliteStorage } from '../index.js';
 import { archivedSql } from '../repos/memory.js';
+
+/** The projected columns, in one place so the three reads below cannot drift apart on what META means. */
+const META_COLS = 'key, ownerGaii, visibility, groupId, workspaceRef, allowedOrigins, aiProvenanceId, '
+  + 'archived, tags, version, flagCount, byteSize, ttlHours, createdAt, updatedAt';
 
 /** Shared row→meta mapping for the projections below (tags parsed, defaults applied). */
 function rowToMeta(row: Record<string, unknown>): MemoryMetaRow {
@@ -27,6 +36,11 @@ function rowToMeta(row: Record<string, unknown>): MemoryMetaRow {
     ttlHours: (row.ttlHours as number | null) ?? null,
     createdAt: row.createdAt as string,
     updatedAt: row.updatedAt as string,
+    groupId: (row.groupId as string | null) ?? null,
+    workspaceRef: (row.workspaceRef as string | null) ?? null,
+    allowedOrigins: row.allowedOrigins ? JSON.parse(row.allowedOrigins as string) as string[] : null,
+    aiProvenanceId: (row.aiProvenanceId as string | null) ?? null,
+    archived: !!row.archived,
   };
 }
 
@@ -35,7 +49,7 @@ export const ownerMemoryScopeMethods = {
     // META projection: select metadata + byteSize, NEVER the `value` column (the whole point — a
     // keyspace of thousands of keys lists without loading/serialising any value). ttlHours + createdAt
     // are read only to prune lazily-expired rows, then dropped from the result.
-    let sql = 'SELECT key, ownerGaii, visibility, tags, version, flagCount, byteSize, ttlHours, createdAt, updatedAt FROM memory WHERE ownerGaii = ?';
+    let sql = `SELECT ${META_COLS} FROM memory WHERE ownerGaii = ?`;
     const params: unknown[] = [ownerGaii];
     if (opts?.prefix) { sql += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
     if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
@@ -83,7 +97,7 @@ export const ownerMemoryScopeMethods = {
   async listMemoryMetaForOwners(this: SqliteStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryMetaRow[]> {
     if (ownerGaiis.length === 0) return [];
     const ph = ownerGaiis.map(() => '?').join(',');
-    let sql = `SELECT key, ownerGaii, visibility, tags, version, flagCount, byteSize, ttlHours, createdAt, updatedAt FROM memory WHERE ownerGaii IN (${ph})`;
+    let sql = `SELECT ${META_COLS} FROM memory WHERE ownerGaii IN (${ph})`;
     const params: unknown[] = [...ownerGaiis];
     if (opts?.prefix) { sql += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
     if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
@@ -122,7 +136,7 @@ export const ownerMemoryScopeMethods = {
     // Postgres backend's: key unless the caller asked for recency, and no implicit ceiling.
     const offset = opts?.offset ?? 0;
     const orderSql = opts?.newestFirst ? ' ORDER BY updatedAt DESC' : ' ORDER BY key';
-    const cols = 'SELECT key, ownerGaii, visibility, tags, version, flagCount, byteSize, ttlHours, createdAt, updatedAt FROM memory';
+    const cols = `SELECT ${META_COLS} FROM memory`;
     const rows = (opts?.limit
       ? this.db.prepare(cols + whereStr + orderSql + ' LIMIT ? OFFSET ?').all(...params, opts.limit, offset)
       : this.db.prepare(cols + whereStr + orderSql).all(...params)
