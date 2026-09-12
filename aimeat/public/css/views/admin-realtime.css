@@ -1,0 +1,209 @@
+/* ── Admin Realtime page, in the poster face ──
+ * @file admin-realtime.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's Realtime page (design canvas "AIMEAT Admin Realtime"): the rooms as
+ *   poster rows with the people in them drawn as pips, the opened room with its peers and documents,
+ *   the six counters since the restart, and the empty states that say WHICH empty this is. The
+ *   frame, the sections, the metric rows, the numeral strip, the dashed box and the doors come from
+ *   admin.css and organism.css; only what this page adds lives here. Every value is a theme.css
+ *   token, so the page flips with the theme.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial (the Realtime page in the poster face).
+ */
+
+/* A quiet page is quiet in the status word too: nothing is wrong, so nothing is coral. */
+.adm-rt .adm-ov-status.quiet { color: var(--text-dim); }
+.adm-rt .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-rt .adm-mrow--last { border-bottom: 0; }
+.adm-rt-note { margin: 8px 0 0; font-size: .8rem; line-height: 1.5; color: var(--text-dim); max-width: 70ch; }
+
+/* ── The address and the switch: two facts an operator can go and check ───────────────────── */
+.adm-rt-kv { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 0 20px; margin: 0; }
+.adm-rt-kv dt { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding: 7px 0; }
+.adm-rt-kv dd { margin: 0; padding: 7px 0; font-size: .9rem; font-weight: 600; color: var(--text); min-width: 0; }
+.adm-rt-kv dd code { font-family: var(--font-mono); font-size: .78rem; font-weight: 400; background: var(--bg-surface); padding: 1px 6px; overflow-wrap: anywhere; }
+.adm-rt-kv dd em { display: block; font-style: normal; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); margin-top: 3px; }
+.adm-rt-offbox { margin-top: 16px; }
+
+/* ── 02: the rooms ────────────────────────────────────────────────────────────────────────── */
+.adm-rt-row {
+  display: grid;
+  grid-template-columns: 2.2rem minmax(0, 1fr) 15rem 6rem 6rem 5.5rem;
+  gap: 0 16px;
+  align-items: center;
+  padding: 8px 7px;
+  margin: 0 -7px;
+  border-bottom: 1px solid var(--border);
+  min-height: 44px;
+  box-sizing: border-box;
+}
+.adm-rt-row--head { border-bottom: 0; padding-bottom: 5px; min-height: 0; }
+.adm-rt-row--head div { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.adm-rt-row--head .adm-rt-n { text-align: right; }
+.adm-rt-row:hover { background: var(--card-bg); }
+/* The room whose panel is open below keeps the sun edge, so the panel is never orphaned. */
+.adm-rt-row.is-open { background: var(--card-bg); box-shadow: inset 3px 0 0 var(--sun); }
+
+.adm-rt-n {
+  font-family: var(--font-poster);
+  font-weight: var(--font-poster-weight, 400);
+  font-size: 1.35rem;
+  line-height: var(--font-poster-leading, 1);
+  text-align: right;
+  color: var(--text);
+}
+.adm-rt-nm { min-width: 0; }
+.adm-rt-open {
+  display: block; max-width: 100%; background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: .97rem; font-weight: 800; color: var(--text); text-align: left;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.adm-rt-open:hover { text-decoration: underline; text-decoration-thickness: 2px; }
+.adm-rt-nm em { display: block; font-style: normal; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.adm-rt-who { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-width: 0; }
+.adm-rt-pip { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: .68rem; color: var(--text); border: 2px solid var(--border); padding: 0 6px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-rt-pip i { width: 6px; height: 6px; background: var(--success-fg); flex: none; }
+.adm-rt-pip--more { color: var(--text-dim); }
+.adm-rt-nobody { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.adm-rt-docs { font-family: var(--font-mono); font-size: .74rem; color: var(--text); }
+.adm-rt-docs em { font-style: normal; color: var(--text-dim); }
+.adm-rt-when { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+.adm-rt-acts { display: flex; justify-content: flex-end; }
+/* The one action on the row, and it is felt by somebody else immediately: it wears the accent. */
+.adm-rt-act {
+  background: none; border: 0; border-bottom: 2px solid var(--accent); padding: 2px 0 1px; cursor: pointer;
+  font-family: inherit; font-weight: 800; font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; color: var(--accent);
+}
+.adm-rt-act:hover { background: var(--accent); color: var(--bg); }
+
+/* ── One room, opened ─────────────────────────────────────────────────────────────────────── */
+.adm-rt-panel { border: 3px solid var(--text); background: var(--card-bg); box-shadow: 8px 8px 0 var(--sun); padding: 18px 22px 20px; margin: 18px 0 6px; max-width: 820px; }
+.adm-rt-phead { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.adm-rt-crumb { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-bottom: 4px; }
+.adm-rt-phead h3 {
+  margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400);
+  font-size: 1.5rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em);
+  text-transform: uppercase; color: var(--text); overflow-wrap: anywhere;
+}
+.adm-rt-phead h3 small { font-family: var(--font-mono); font-size: .7rem; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-dim); margin-left: 10px; }
+.adm-rt-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.adm-rt-chip { font-family: var(--font-mono); font-weight: 500; font-size: .68rem; line-height: 1.6; padding: 1px 7px; border: 2px solid var(--border); color: var(--text-dim); }
+.adm-rt-chip--live { border-color: var(--success-fg); color: var(--success-fg); }
+.adm-rt-x {
+  flex: none; width: 26px; height: 26px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--text); background: none; padding: 0; cursor: pointer; color: var(--text);
+}
+.adm-rt-x:hover { background: var(--text); color: var(--bg); }
+
+.adm-rt-psec { border-top: 3px solid var(--text); padding: 12px 0 2px; margin-top: 16px; }
+.adm-rt-sub { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .9rem; letter-spacing: .05em; text-transform: uppercase; color: var(--text); margin-bottom: 8px; }
+.adm-rt-prow { display: grid; grid-template-columns: minmax(0, 1fr) 10rem 6rem; gap: 0 14px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); min-height: 38px; }
+.adm-rt-prow--head { border-bottom: 0; padding-bottom: 3px; min-height: 0; }
+.adm-rt-prow--head div { font-size: .62rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.adm-rt-person { display: inline-flex; align-items: center; gap: 7px; font-size: .92rem; font-weight: 800; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.adm-rt-person i { width: 6px; height: 6px; background: var(--success-fg); flex: none; }
+.adm-rt-id { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.adm-rt-slab {
+  margin-top: 10px; border: 0; background: var(--accent); color: #FFFFFF; box-shadow: 4px 4px 0 var(--text);
+  padding: 10px 16px; cursor: pointer; font-family: inherit; font-weight: 600; font-size: .8rem;
+  letter-spacing: .04em; text-transform: uppercase; transition: transform .1s, box-shadow .1s;
+}
+.adm-rt-slab:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--text); }
+
+/* ── 03: what has moved since the restart ─────────────────────────────────────────────────── */
+.adm-rt-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 44px; }
+.adm-rt-cnt { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.adm-rt-cnt span { font-size: .88rem; font-weight: 600; color: var(--text); }
+.adm-rt-cnt b { font-family: var(--font-mono); font-size: .88rem; font-weight: 500; color: var(--text); }
+/* A refused message is the one figure here that asks for a look when it is not zero. */
+.adm-rt-cnt b.is-bad { color: var(--accent); }
+.adm-rt-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 22px; margin-top: 20px; }
+.adm-rt-two .og-box p { margin: 0 0 8px; }
+.adm-rt-two .og-box p:last-child { margin-bottom: 0; }
+.adm-rt-rule { font-weight: 700; color: var(--text); }
+
+/* ── The read that failed: nothing was measured, so nothing is printed as a zero ───────────── */
+.adm-rt-empty { border: 3px solid var(--text); background: var(--card-bg); padding: 18px 22px; max-width: 640px; margin-top: 8px; }
+.adm-rt-empty h3 {
+  margin: 0 0 5px; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400);
+  font-size: 1.2rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em);
+  text-transform: uppercase; color: var(--text);
+}
+.adm-rt-empty p { margin: 0 0 12px; font-size: .9rem; line-height: 1.55; color: var(--text-dim); }
+
+/* ── The close question, in the poster face ───────────────────────────────────────────────── */
+.modal.adm-rt-dlg {
+  background: var(--card-bg); border: 3px solid var(--text); border-radius: 0;
+  box-shadow: 12px 12px 0 var(--sun); padding: 20px 24px 22px; max-width: 560px;
+}
+.modal.adm-rt-dlg .modal-header { margin-bottom: 6px; align-items: flex-start; }
+.modal.adm-rt-dlg .modal-header h3 {
+  margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400);
+  font-size: 1.35rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em);
+  text-transform: uppercase; color: var(--text);
+}
+.modal.adm-rt-dlg .modal-close {
+  flex: none; width: 26px; height: 26px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--text); border-radius: 0; padding: 0; opacity: 1; font-size: .8rem; color: var(--text);
+}
+.modal.adm-rt-dlg .modal-close:hover { background: var(--text); color: var(--bg); }
+.modal.adm-rt-dlg .modal-confirm-message { color: var(--text); margin: 0; }
+.modal.adm-rt-dlg .modal-footer { align-items: center; gap: 22px; padding-top: 18px; }
+.modal.adm-rt-dlg .modal-footer .btn-danger-solid {
+  background: var(--accent); color: #FFFFFF; border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--text);
+  padding: 11px 16px; font-family: inherit; font-weight: 600; font-size: .8rem; letter-spacing: .04em; text-transform: uppercase;
+  transition: transform .1s, box-shadow .1s;
+}
+.modal.adm-rt-dlg .modal-footer .btn-danger-solid:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--text); }
+.modal.adm-rt-dlg .modal-footer .btn-ghost {
+  background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; padding: 0 0 1px;
+  font-family: inherit; font-weight: 800; font-size: .8rem; color: var(--text);
+}
+.modal.adm-rt-dlg .modal-footer .btn-ghost:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.adm-rt-ask { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.adm-rt-ask-note { font-size: .85rem; color: var(--text-dim); }
+.adm-rt-ask-rows { display: flex; flex-direction: column; border: 2px solid var(--text); padding: 8px 12px; }
+.adm-rt-ask-row { display: flex; justify-content: space-between; gap: 18px; font-family: var(--font-mono); font-size: .75rem; line-height: 1.9; color: var(--text); }
+.adm-rt-ask-row em { font-style: normal; color: var(--text-dim); text-align: right; }
+
+@media (max-width: 1100px) {
+  .adm-rt-row { grid-template-columns: 2.2rem minmax(0, 1fr) 4.5rem 5.5rem 5rem; gap: 0 12px; }
+  .adm-rt-who { grid-column: 2 / -1; padding-top: 4px; }
+  .adm-rt-row--head div:nth-child(3) { display: none; }
+  .adm-rt-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 32px; }
+}
+
+@media (max-width: 700px) {
+  /* Six cells do not fold into three columns by themselves: auto-placement scatters them and the
+     room name ends up in a 4rem slot. Each one is named, and the row becomes three lines: the room
+     with its documents, the people in it, and when it was last heard beside the close door. */
+  .adm-rt-row {
+    grid-template-columns: 2rem minmax(0, 1fr) auto;
+    grid-template-areas:
+      "n nm docs"
+      "n who who"
+      "n when act";
+    gap: 4px 10px;
+    padding: 10px 7px;
+  }
+  .adm-rt-row--head { display: none; }
+  .adm-rt-n { grid-area: n; align-self: start; }
+  .adm-rt-nm { grid-area: nm; }
+  .adm-rt-who { grid-area: who; padding-top: 0; }
+  .adm-rt-docs { grid-area: docs; text-align: right; }
+  .adm-rt-when { grid-area: when; }
+  .adm-rt-acts { grid-area: act; }
+  .adm-rt-counts { grid-template-columns: minmax(0, 1fr); }
+  .adm-rt-kv { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .adm-rt-kv dt { padding-bottom: 0; }
+  .adm-rt-kv dd { padding-top: 3px; }
+  .adm-rt-prow { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; }
+  .adm-rt-prow--head { display: none; }
+  .adm-rt-prow .adm-rt-id { grid-column: 1 / -1; }
+  .adm-rt-panel { padding: 14px 16px 16px; box-shadow: 5px 5px 0 var(--sun); }
+  /* A metric row gives its sentence the whole width; the value follows on its own line. */
+  .adm-rt .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; }
+  .adm-rt .adm-mrow .adm-mval { grid-column: 1 / -1; text-align: left; margin-top: 4px; }
+}
