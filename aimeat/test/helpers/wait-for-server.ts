@@ -31,6 +31,13 @@
  *   const child = spawn('node', [...], { stdio: ['ignore', 'pipe', 'pipe'] });
  *   return waitForServer(child, BASE);
  * @version-history
+ *   v1.1.0 — 2026-09-12 — The CPU reading gives the SHARE OF ONE CORE instead of a verdict. The
+ *     verdict was wrong in the case that happens: a spawned node burned 7.8s of CPU in 180s on the
+ *     Postgres guard tier and was called "WAITING on something, not computing", when 7.8s is about
+ *     what a boot of this node costs and the four lanes beside it were restarting theirs in 9.7s
+ *     each. It was doing the work at four per cent of a core, on a two-core runner carrying four
+ *     lanes and a fifth node. The threshold that produced the word (a quarter of a core) was never
+ *     measured against a loaded runner, and it sent a reader looking for a lock that was not there.
  *   v1.0.0 — 2026-09-09 — Initial. The stderr tail and the exit check already existed, correct, in
  *     e2e-ai-provider-stub.ts and nowhere else; this is that code with a budget, in one place.
  */
@@ -111,9 +118,19 @@ export async function waitForServer(
     const said = bytes === 0
         ? 'the node printed NOTHING, so it never reached its first log line'
         : `the node printed ${bytes} bytes, first at ${firstOutputAt - began}ms`;
-    const burned = cpu === null ? ''
-        : ` It burned ${cpu.toFixed(1)}s of CPU in ${Math.round((Date.now() - began) / 1000)}s of wall clock, so it was `
-            + `${cpu > (Date.now() - began) / 4000 ? 'WORKING (a slow machine, not a stuck one)' : 'WAITING on something, not computing'}.`;
+    // The share of one core, and not a verdict. The verdict this used to print was wrong in the
+    // case that actually happens: on 2026-09-12 a spawned node burned 7.8s of CPU in 180s and was
+    // called WAITING, while 7.8s is about what a boot of this node costs and the lanes beside it
+    // were restarting theirs in 9.7s. It was doing the work at four per cent of a core, on a runner
+    // with four lanes and a fifth node on two cores. A reader given the share can tell the three
+    // apart; a reader given a word has to trust a threshold nobody measured.
+    const wallMs = Date.now() - began;
+    const share = cpu === null ? null : (cpu * 1000) / wallMs;
+    const burned = cpu === null || share === null ? ''
+        : ` It burned ${cpu.toFixed(1)}s of CPU in ${Math.round(wallMs / 1000)}s of wall clock, which is `
+            + `${(share * 100).toFixed(0)}% of one core. Near zero means it is waiting on something; a small `
+            + `share means it is doing the work and not getting the processor, which is a machine running `
+            + `more nodes than it has cores rather than a stuck one.`;
 
     child.kill('SIGKILL');
     throw new Error(
