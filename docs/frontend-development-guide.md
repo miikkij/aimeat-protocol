@@ -508,6 +508,53 @@ These patterns MUST NOT appear in any `public/` JS or CSS file:
 | `rgba(255,255,255` or hardcoded hex in CSS | Won't flip for dark theme | Use tokens that invert: `var(--bg-surface)`, `var(--card-bg-alt)`, `var(--border)` |
 | Raw `<h3>` for section titles | Inconsistent styling | Use `<div class="section-title">` |
 | Hardcoded colors in JS | Theme-unaware | Use CSS variables via classes |
+| `toLocaleDateString` / `toLocaleTimeString` / `toLocaleString` | Follows the browser, or the page's language, instead of the reader's own setting | Import from `/js/format.js` — see below |
+
+---
+
+## Dates, times and numbers
+
+**A format is never derived from a language.** The pill at the top of the page decides which WORDS a
+person reads. It does not decide whether a date is 9/12/2026 or 12.9.2026, and it does not decide
+which clock they are looking at. Those are two more settings of their own, and a person mixes all
+three freely, the way an operating system has let them for thirty years: Finnish words with an
+American date format is a real preference, and so is English words with a Helsinki clock.
+
+`aimeat/no-raw-locale-format` refuses the raw calls, so this is checked rather than remembered. It
+exists because the library was already there and thirty call sites wrote their own anyway, and the
+copies disagreed with each other about what English meant.
+
+```javascript
+import { num, date, time, dateTime, calendar, relative, money, morsels } from '/js/format.js';
+
+num(1234)                                  // 1 234   — the reader's own grouping
+date(iso)                                  // their date format
+time(iso, { hour: '2-digit', minute: '2-digit' })   // their clock
+dateTime(iso)                              // both
+relative(iso)                              // "3 days ago", in their format
+money(12.5, 'EUR')                         // 12,50 €
+morsels(625)                               // 625 morsels — never a currency symbol
+```
+
+**A moment and a calendar date are different things, and the difference is a wrong number rather
+than a wrong format.** A message arrived at an instant, and the reader should see it on their own
+clock. A heat-map square, a month rail and the day a usage row was counted into are days on a
+calendar: re-read them in the reader's zone and they label themselves the day before for anyone west
+of the node, so a heading ends up disagreeing with the rows under it. `calendar()` pins those, and
+`dayKey()` / `sameDay()` answer "is this today" in the reader's zone rather than the browser's.
+
+Three things follow from this that are easy to get wrong:
+
+- **`money()` refuses morsels, on purpose.** A morsel is a pacer, not a currency: it paces what
+  agents may push into a person's store, it accrues while they are idle, and it buys nothing. The
+  two are numbers of the same size sitting on the same pages, so a formatter that took both would
+  print `625 €` over a balance. `morsels()` is the one that formats them.
+- **Absent means follow the browser.** A person who never opened the settings sees exactly what they
+  always saw. Nobody is migrated into a preference they did not express.
+- **The same rule reaches apps and the server.** In an app: `AIMEAT.fmt` (cortex `aimeat-i18n`) and
+  `_core/format.js` inside a served SDK library. On the server: `displayPrefsFor()` the person the
+  message is FOR, then `formatForPerson()` — the recipient is the key, because an email written by
+  an hourly sweep has no request, no browser and no cookie to ask.
 
 ---
 
