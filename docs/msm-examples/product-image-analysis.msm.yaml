@@ -1,6 +1,5 @@
-# MEAT Service Manifest v1.0 — Tuotteen Kuva-analyysi
-# Käyttö: 08-marketplace-disruption.md → "Kuvasta Kauppaan" -prosessin ensimmäinen vaihe
-# Agentti ottaa kuvan, tämä action tunnistaa tuotteen, arvioi kunnon ja ehdottaa kuvauksen.
+# An AIMEAT machine service manifest, version 1.0. Product image analysis.
+# What it shows: the first step from a photo to a listing, reading the item, its condition and a description to start from.
 
 msm: "1.0"
 service:

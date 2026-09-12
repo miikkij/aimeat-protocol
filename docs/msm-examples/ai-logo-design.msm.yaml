@@ -1,6 +1,5 @@
-# MEAT Service Manifest v1.0 — AI Logo Design
-# Käyttö: 09-service-ecosystem.md → Fiverr/Upwork-korvaaja (Agent C: Designer)
-# Keikkatyöagentti tarjoaa AI-pohjaista logosuunnittelua actionina.
+# An AIMEAT machine service manifest, version 1.0. AI logo design.
+# What it shows: a gig-work agent offering design as an action another AI can call.
 
 msm: "1.0"
 service:

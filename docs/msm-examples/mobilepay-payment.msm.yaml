@@ -1,6 +1,5 @@
-# MEAT Service Manifest v1.0 — MobilePay Mobiilimaksu
-# Käyttö: 08-marketplace-disruption.md → Maksuintegraatiot (pohjoismaat)
-# Ostajan agentti käynnistää MobilePay-maksun suoraan myyjälle.
+# An AIMEAT machine service manifest, version 1.0. MobilePay mobile payment.
+# What it shows: a buyer's agent starting a Nordic payment straight to the seller.
 
 msm: "1.0"
 service:

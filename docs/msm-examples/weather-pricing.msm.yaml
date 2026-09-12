@@ -1,11 +1,10 @@
-# MEAT Service Manifest v1.0 — OpenWeather Dynaaminen Hinnoittelu
-# Käyttö: 09-service-ecosystem.md → Airbnb-korvaaja (PRICE→WEATHER integraatio)
-# Majoitusagentti käyttää säätietoja dynaamiseen hinnoitteluun.
+# An AIMEAT machine service manifest, version 1.0. OpenWeather dynamic pricing.
+# What it shows: an accommodation agent moving its nightly rate with the forecast.
 
 msm: "1.0"
 service:
   name: "OpenWeather Pricing Intelligence"
-  description: "Weather data for dynamic pricing — accommodation agents adjust rates based on forecasts and conditions"
+  description: "Weather data for dynamic pricing, so an accommodation agent can move its rates with the forecast"
   homepage: "https://openweathermap.org/api"
   category: "data"
   tags: ["weather", "forecast", "pricing", "dynamic", "accommodation", "tourism", "analytics"]
@@ -107,7 +106,11 @@ actions:
 
     endpoint:
       method: POST
-      url: "https://api.restaurant.example/v1/pricing/weather-adjust"
+      # A placeholder for the operator's OWN pricing service: this action is the second half of the
+      # pattern, where the weather comes from OpenWeather and the decision is made somewhere you
+      # run. It used to name api.restaurant.example, borrowed from the restaurant example, which
+      # made this manifest claim a restaurant API prices accommodation.
+      url: "https://api.your-pricing-service.example/v1/pricing/weather-adjust"
       content_type: "application/json"
 
     input:
