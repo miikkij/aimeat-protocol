@@ -8,6 +8,8 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.14.0 -- 2026-09-12 -- aimeat_admin_hooks and aimeat_admin_hook_set, thin over
+ *     GET /v1/admin/hooks and the PUT the Hooks page uses to bind a moment.
  *   v1.13.0 -- 2026-09-08 -- aimeat_admin_cors_overview and aimeat_admin_cors_set, thin over
  *     GET /v1/admin/cors/overview and the two PUT cors routes the CORS page uses.
  *   v1.12.0 -- 2026-09-05 -- aimeat_admin_security_overview and aimeat_admin_incident_resolve, thin
@@ -615,6 +617,22 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_admin_cors_overview'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.get('/v1/admin/cors/overview'));
+  });
+
+  mcp.tool('aimeat_admin_hooks', descriptionFor('aimeat_admin_hooks'), {
+    agent_name: agentNameSchema,
+  }, annotationsFor('aimeat_admin_hooks'), async ({ agent_name }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.get('/v1/admin/hooks'));
+  });
+
+  mcp.tool('aimeat_admin_hook_set', descriptionFor('aimeat_admin_hook_set'), {
+    agent_name: agentNameSchema,
+    hook: z.string().describe('The moment to bind, e.g. "pre_owner_registration".'),
+    actions: z.array(z.string()).describe('The action references to call, in order. An empty list clears the moment.'),
+  }, annotationsFor('aimeat_admin_hook_set'), async ({ agent_name, hook, actions }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.put(`/v1/admin/hooks/${encodeURIComponent(hook)}`, { actions }));
   });
 
   mcp.tool('aimeat_admin_cors_set', descriptionFor('aimeat_admin_cors_set'), {

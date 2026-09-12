@@ -8,6 +8,9 @@
  *   self-contained design system (adm-* scoped); these are intentionally separate
  *   from the main /components primitives.
  * @version-history
+ *   v1.4.0 — 2026-09-12 — Row and when(): the metric row and the machine-readable stamp every
+ *     operator page in the poster face uses, moved here from the Discovery page's own file when the
+ *     Hooks page needed the same two.
  *   v1.3.0 — 2026-09-09 — Badge translates its type word when dashboard.badge<Type> exists
  *     (healthy, critical, watch, warning, info, pending, idle) and prints the type as before when
  *     it does not. "HEALTHY" was the one English word on the Finnish admin Prompts page.
@@ -34,6 +37,35 @@ import { DataTable as GenericDataTable } from '/components/DataTable.js';
 // importers (`import { num, dt, fmtUp, fmtBytes } from './shared.js'`) keep working.
 import { num, dt, fmtUp, fmtBytes } from '/js/format.js';
 export { num, dt, fmtUp, fmtBytes };
+
+/**
+ * "2026-09-08 16:51" from an ISO stamp, as a machine reading; '' for none.
+ *
+ * Not `dt()`, which renders a date the way the reader's locale writes one. A stamp in a row of
+ * operational facts is read beside a status code and a duration, and those are all machine
+ * readings: sorting them by eye needs one shape whatever language the page is in.
+ */
+export function when(iso) {
+  if (!iso) return '';
+  return String(iso).slice(0, 16).replace('T', ' ');
+}
+
+/**
+ * One metric row in the poster face: the name and why it matters, a chip, and the value.
+ *
+ * The shape every operator page in this face uses under its status word (Overview, CORS, Discovery,
+ * Hooks). Here rather than in one page's own file because the second copy of it was already being
+ * written when this moved.
+ * @param {{ title: any, why: any, chip?: any, value: any, last?: boolean }} props
+ */
+export function Row({ title, why, chip, value, last }) {
+  return html`
+    <div class="adm-mrow ${last ? 'adm-mrow--last' : ''}">
+      <span><b>${title}</b><span class="adm-why">${why}</span></span>
+      <span>${chip}</span>
+      <span class="adm-mval">${value}</span>
+    </div>`;
+}
 
 /**
  * Render a badge. `type` picks the tone class (adm-badge-${type}); the visible

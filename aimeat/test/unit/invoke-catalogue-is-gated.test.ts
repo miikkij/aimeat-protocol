@@ -62,7 +62,10 @@ describe('the invoke catalogue is a gated surface', () => {
         // down here so that growing it is a visible act rather than a silent one.
         // 26 since 2026-09-08: aimeat_admin_cors_set, gated in its handler on the operator role like
         // the other admin writes (scopes.ts says why no scope word narrows an operator).
-        expect(exempt.length).toBeLessThanOrEqual(26);
+        // 27 since 2026-09-12: aimeat_admin_hook_set, the same decision. It binds a lifecycle moment
+        // to an address, which only whoever runs the node may do, and the handler resolves the
+        // operator before it writes; there is no narrower word to name it with.
+        expect(exempt.length).toBeLessThanOrEqual(27);
         expect(mutating.length).toBeGreaterThan(100);
     });
 });

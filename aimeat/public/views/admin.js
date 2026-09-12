@@ -252,9 +252,11 @@ export default function Admin({ navigate, locale }) {
       };
 
       // Phase 2: extras
+      // The hooks are not read here any more: the Hooks tab makes its own one read (it needs the
+      // whole page, not the bound lists), and nothing else on the shell used them.
       const extras = await Promise.allSettled([
         api.getMaintenance(), api.getAdminWork(), api.getFederation(),
-        api.getHooks(), api.getChatInstances(), api.getRealtime(),
+        api.getChatInstances(), api.getRealtime(),
         api.getFederationPeers(),
       ]);
       if (!mountRef.current) return;
@@ -262,10 +264,9 @@ export default function Admin({ navigate, locale }) {
       d.maintenance    = extras[0].status === 'fulfilled' ? extras[0].value.data : null;
       d.workItems      = extras[1].status === 'fulfilled' ? (extras[1].value.data.work || []) : [];
       d.federation     = extras[2].status === 'fulfilled' ? (extras[2].value.data.peers || []) : [];
-      d.hooks          = extras[3].status === 'fulfilled' ? (extras[3].value.data.extension_hooks || {}) : {};
-      d.chatInstances  = extras[4].status === 'fulfilled' ? (extras[4].value.data.chat_instances || []) : [];
-      d.realtime       = extras[5].status === 'fulfilled' ? extras[5].value.data : null;
-      d.livePeers      = extras[6].status === 'fulfilled' ? (extras[6].value.data?.peers || []) : [];
+      d.chatInstances  = extras[3].status === 'fulfilled' ? (extras[3].value.data.chat_instances || []) : [];
+      d.realtime       = extras[4].status === 'fulfilled' ? extras[4].value.data : null;
+      d.livePeers      = extras[5].status === 'fulfilled' ? (extras[5].value.data?.peers || []) : [];
 
       // Phase 3: features
       const features = await Promise.allSettled([

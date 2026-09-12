@@ -23,10 +23,9 @@ import { useState, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Badge, useToast, Toast } from './shared.js';
+import { Badge, useToast, Toast, Row, when } from './shared.js';
 import { Modal } from '/components/Modal.js';
 import * as adminService from '/js/services/admin.js';
-import { Row, when } from './discovery-tab.shared.js';
 import { swallowed } from '/js/swallowed.js';
 
 const S = (key, params) => t('dashboard.seo.' + key, params);

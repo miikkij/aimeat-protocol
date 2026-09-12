@@ -1,0 +1,98 @@
+/* ── Admin Hooks page, in the poster face ──
+ * @file admin-hooks.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's Hooks page (design canvas "AIMEAT Admin Hooks"): one row per moment
+ *   with its gate chip and what is bound to it, the bind form with the contract the webhook has to
+ *   answer, and the table of calls the node has made. The frame, the sections, the metric rows, the
+ *   numeral strip, the dashed box and the doors come from admin.css and organism.css; only what this
+ *   page adds lives here. Every value is a theme.css token, so the page flips with the theme.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial. Replaces the classic-shell card the tab used.
+ */
+
+/* The last row of a section carries no rule under it; the section's own rule is the next one. */
+.adm-hook .adm-mrow--last { border-bottom: 0; }
+.adm-hook .adm-mrow .adm-mval { overflow-wrap: anywhere; }
+.adm-hook .adm-mval .og-door { font-size: .8rem; }
+.adm-hook .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-hook .og-strip b.adm-hook-coral { color: var(--accent); }
+
+.adm-hook-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 90ch; }
+.adm-hook-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.adm-hook-note { margin: 10px 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-hook-code { display: inline-block; padding: 1px 6px; font-family: var(--font-mono); font-size: .75rem; background: var(--code-bg); color: var(--text); overflow-wrap: anywhere; }
+.adm-hook-mono { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.adm-hook-acts { display: flex; gap: 22px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+.adm-hook-empty { padding: 26px; text-align: center; color: var(--text-dim); font-size: .9rem; border: 2px dashed var(--border); background: var(--bg); }
+
+/* A gate's chip is the loud one: this row decides whether the thing happens. */
+.adm-hook-gate { display: inline-block; padding: 1px 7px; font-family: var(--font-mono); font-size: .66rem; font-weight: 500; text-transform: uppercase; line-height: 1.6; white-space: nowrap; background: var(--accent); color: #FFFFFF; }
+
+/* 02: one moment is a row — the name, what it guards, its gate word, what is bound, the doors. */
+.adm-hook-row { display: grid; grid-template-columns: 250px minmax(0, 1fr) 120px minmax(0, 1fr) 170px; gap: 0 20px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text); }
+.adm-hook-row--last { border-bottom: 0; }
+.adm-hook-row b { font-weight: 700; }
+.adm-hook-name { font-family: var(--font-mono); font-size: .8rem; color: var(--text); overflow-wrap: anywhere; }
+.adm-hook-group { margin: 20px 0 2px; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .95rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+.adm-hook-group:first-of-type { margin-top: 4px; }
+.adm-hook-rowacts { display: flex; gap: 14px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.adm-hook-bound { display: flex; flex-direction: column; gap: 4px; }
+.adm-hook-bound-a { font-family: var(--font-mono); font-size: .74rem; color: var(--text); overflow-wrap: anywhere; }
+.adm-hook-bound-a i { font-style: normal; color: var(--text-dim); }
+
+/* 03: the form on the left, the contract on the right. */
+.adm-hook-two { display: grid; grid-template-columns: 460px minmax(0, 1fr); gap: 0 44px; align-items: start; }
+/* A grid item's min-width is auto, so the contract block (white-space: pre) would set the track to
+   its longest line and push the whole page sideways on a phone. Its own overflow-x is what scrolls. */
+.adm-hook-two > *, .adm-hook-ai > * { min-width: 0; }
+.adm-hook-form { display: flex; flex-direction: column; gap: 18px; }
+.adm-hook-fld { display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 4px 2px 5px; }
+.adm-hook-fld:focus-within { border-bottom-color: var(--accent); }
+.adm .adm-hook-fld select,
+.adm .adm-hook-fld input[type="text"] { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .9rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-hook-fld input::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm .adm-hook-fld--mono input[type="text"] { font-family: var(--font-mono); font-size: .8rem; font-weight: 500; }
+.adm-hook-fld svg { width: 16px; height: 16px; flex: none; stroke: var(--text); fill: none; stroke-width: 2.5; }
+.adm-hook-picked { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.adm-hook-chip { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 9px; border: 2px solid var(--text); background: none; color: var(--text); }
+.adm-hook-chip button { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--accent); line-height: 1; }
+.adm-hook-frame { border: 2px solid var(--text); background: var(--bg-surface); padding: 12px 14px; }
+.adm-hook-pre { font-family: var(--font-mono); font-size: .75rem; line-height: 1.6; color: var(--text); white-space: pre; overflow-x: auto; margin: 0; }
+.adm-hook .og-box { max-width: none; }
+.adm-hook-box-body { font-size: .88rem; line-height: 1.55; }
+
+/* 04: the calls, and the filters over them. */
+.adm-hook-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.adm-hook-fchip { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 9px; border: 2px solid var(--border); background: none; color: var(--text-dim); cursor: pointer; border-radius: 0; }
+.adm-hook-fchip:hover { border-color: var(--text); color: var(--text); }
+.adm-hook-fchip.on { border-color: var(--text); background: var(--sun); color: var(--on-sun); }
+.adm-hook-tbl td.adm-hook-when, .adm-hook-tbl td.adm-hook-num { font-family: var(--font-mono); font-size: .74rem; white-space: nowrap; }
+.adm-hook-tbl td.adm-hook-what { font-family: var(--font-mono); font-size: .72rem; overflow-wrap: anywhere; }
+.adm-hook-tbl td b { color: var(--text); font-weight: 700; }
+.adm-hook-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; margin-top: 14px; flex-wrap: wrap; }
+
+/* 05: the checks on the left, the paste on the right. */
+.adm-hook-ai { display: grid; grid-template-columns: minmax(0, 1fr) 560px; gap: 0 44px; align-items: start; }
+.adm-hook-paste { white-space: pre-wrap; font-size: .85rem; line-height: 1.55; color: var(--text); }
+
+@media (max-width: 1100px) {
+  .adm-hook .og-strip { flex-wrap: wrap; }
+  .adm-hook .og-strip > div { flex: 1 1 50%; border-right: 0; border-bottom: 1px solid var(--border); }
+  .adm-hook-row { grid-template-columns: 200px minmax(0, 1fr); gap: 6px 19px; }
+  .adm-hook-row > :nth-child(3) { grid-column: 2; }
+  .adm-hook-row .adm-hook-rowacts { grid-column: 1 / -1; justify-content: flex-start; }
+  .adm-hook-two, .adm-hook-ai { grid-template-columns: 1fr; gap: 18px 0; }
+}
+
+/* A phone: a metric row keeps its name readable and puts the chip and the value under each other on
+   the right; a moment is a column. */
+@media (max-width: 768px) {
+  .adm-hook .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; }
+  .adm-hook .adm-mrow > :nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+  .adm-hook .adm-mrow > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .adm-hook .adm-mrow > :nth-child(3) { grid-column: 2; grid-row: 2; max-width: 11rem; white-space: normal; }
+  .adm-hook-row { grid-template-columns: 1fr; gap: 8px 0; }
+  .adm-hook-row > :nth-child(3) { grid-column: 1; }
+  .adm-hook-two { grid-template-columns: 1fr; }
+}

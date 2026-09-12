@@ -28,11 +28,10 @@ import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner, Badge, useToast, Toast } from './shared.js';
+import { Spinner, Badge, useToast, Toast, when } from './shared.js';
 import { Modal } from '/components/Modal.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import * as adminService from '/js/services/admin.js';
-import { when } from './discovery-tab.shared.js';
 import { swallowed } from '/js/swallowed.js';
 
 const S = (key, params) => t('dashboard.seo.' + key, params);

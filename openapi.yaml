@@ -319,6 +319,54 @@ components:
           format: date-time
         key:
           type: string
+    HookRow:
+      type: object
+      description: One of the eleven moments, and what is bound to it
+      properties:
+        name: { type: string, description: 'The moment, e.g. pre_owner_registration' }
+        kind:
+          type: string
+          enum: [gate, notify]
+          description: A gate decides whether the thing happens; a notify hook is told once it has
+        guards:
+          type: string
+          enum: [accounts, work, social]
+          description: Which part of the node the moment belongs to
+        actions:
+          type: array
+          items:
+            type: object
+            properties:
+              ref: { type: string, description: The reference as the operator wrote it }
+              name: { type: string, nullable: true }
+              published: { type: boolean, description: Whether an action with this reference exists here }
+              has_address: { type: boolean, description: A published action without one is bound and does nothing }
+              host: { type: string, nullable: true, description: The address's host, never the whole address }
+        last:
+          allOf:
+            - $ref: '#/components/schemas/HookRun'
+          nullable: true
+          description: The newest recorded call for this moment
+        failing:
+          type: boolean
+          description: A gate with something bound whose newest call did not get through
+    HookRun:
+      type: object
+      description: One call a hook made, as the node recorded it
+      properties:
+        at: { type: string, format: date-time }
+        hook: { type: string }
+        actionRef: { type: string }
+        actionName: { type: string }
+        answer:
+          type: string
+          enum: [ok, refused, no_answer, no_address, missing]
+          description: ok = let through; refused = the address said no; no_answer = a timeout or an error; no_address = the bound action carries none; missing = it is no longer published
+        status: { type: integer, nullable: true }
+        ms: { type: integer, description: How long the call took }
+        allowed: { type: boolean, description: Whether this call let the thing through. A notify hook is always true - it cannot stop anything }
+        subject: { type: string, description: What the thing was, in a few words, so a refusal names who was turned away }
+        reason: { type: string, description: The reason the address gave, when it gave one }
     IndexNowRun:
       type: object
       description: One instant-update notice to IndexNow, as the node recorded it
@@ -22452,18 +22500,99 @@ paths:
   /v1/admin/hooks:
     get:
       operationId: listHooks
-      summary: List extension hooks
+      summary: The Hooks page in one read
+      description: |
+        Operator-only. The eleven moments in this node's life where it can call out to somebody's
+        own code, and everything needed to judge them: which four DECIDE whether the thing happens
+        (a `pre_` hook can refuse a registration, a work request, a board post or a new federation
+        peer) and which seven are only told afterwards, what is bound to each and whether that
+        action is still published and still carries an address, which actions could be bound, and
+        every call the node has made.
+
+        It reports what is TRUE rather than what is configured, wherever the two can differ: a bound
+        action that was deleted reads as not published, and one without a `webhookUrl` reads as
+        carrying no address, because both look identical to a working binding from inside the
+        config.
       tags: [Admin]
       security:
         - BearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/AimeatSuccess'
+          description: The page's one read
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          extension_hooks:
+                            type: object
+                            description: What is bound to each moment, as it always was
+                            additionalProperties: { type: array, items: { type: string } }
+                          hooks:
+                            type: array
+                            items: { $ref: '#/components/schemas/HookRow' }
+                          failing:
+                            type: array
+                            description: Gates whose newest call did not get through; each is refusing everything it guards
+                            items: { type: string }
+                          bindable_actions:
+                            type: array
+                            description: The actions published here, which is what a binding names
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                ref: { type: string, description: The reference to write into a binding }
+                                name: { type: string }
+                                provider: { type: string }
+                                has_address: { type: boolean }
+                                host: { type: string, nullable: true }
+                          runs:
+                            type: array
+                            description: Every recorded call, newest first
+                            items: { $ref: '#/components/schemas/HookRun' }
+                          summary:
+                            type: object
+                            properties:
+                              total: { type: integer }
+                              gates: { type: integer }
+                              bound: { type: integer }
+                              bound_gates: { type: integer }
+                              actions_available: { type: integer }
+                              actions_with_address: { type: integer }
+                              calls_24h: { type: integer }
+                              refused_24h: { type: integer }
+                              median_ms: { type: integer, nullable: true }
+                              slowest_ms: { type: integer, nullable: true }
+                              runs_kept: { type: integer }
+                              timeout_ms: { type: integer, description: How long one address gets to answer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /v1/admin/hooks/{hookName}:
     put:
       operationId: setHook
-      summary: Set hook action URLs
+      summary: Bind actions to one moment
+      description: |
+        Operator-only. The actions are called in the order given, each after the last has answered.
+        A gate (any hook whose name starts with `pre_`) WAITS for them and refuses the thing when one
+        answers no, returns a non-2xx, or does not answer within ten seconds, so binding an address
+        that is not reachable stops everything that moment guards. The other seven are told
+        afterwards and stop nothing.
+
+        An action reference is a published action's id, or its id with its provider (`id#provider`).
+        A reference that is not published here is accepted and named back in `unknown` rather than
+        refused: binding before publishing is a legitimate order of work, and a silent acceptance is
+        how a binding that calls nothing ends up looking exactly like one that works.
+
+        An empty list clears the moment, the same as DELETE.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -22487,7 +22616,32 @@ paths:
                     type: string
       responses:
         '200':
-          $ref: '#/components/responses/AimeatSuccess'
+          description: What is bound now
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          hook: { type: string }
+                          actions: { type: array, items: { type: string } }
+                          cleared: { type: boolean }
+                          unknown:
+                            type: array
+                            description: References accepted but not published on this node, so they would do nothing
+                            items: { type: string }
+                          note: { type: string, description: What this binding now means, in the operator's terms }
+                          updated: { type: boolean }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
     delete:
       operationId: clearHook
