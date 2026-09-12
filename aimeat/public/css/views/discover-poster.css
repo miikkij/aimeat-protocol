@@ -8,6 +8,7 @@
  *   map of kinds, the rows of entries with the query words marked, the place cards and the result
  *   groups. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose the search row's top rule from poster.css.
  *   v1.0.1 — 2026-08-30 — The loading mark: a blinking coral square before the counting line.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
@@ -27,7 +28,7 @@
 .og-dv .dv-chip--btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── The search desk ────────────────────────────────────────────────────────────────────────── */
-.dv-desk { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .8rem 1.6rem; align-items: end; margin-top: 1.4rem; padding: 1.1rem 0; border-top: 3px solid var(--text); border-bottom: 3px solid var(--text); }
+.dv-desk { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .8rem 1.6rem; align-items: end; margin-top: 1.4rem; padding: 1.1rem 0; border-bottom: 3px solid var(--text); }
 .dv-field { width: 100%; min-width: 0; box-sizing: border-box; border: 0; border-bottom: 3px solid var(--text); background: transparent; padding: .5rem 0; font: inherit; font-size: 1.35rem; color: var(--text); }
 .dv-field:focus { outline: none; border-bottom-color: var(--accent); }
 .dv-field::placeholder { color: var(--text-dim); }

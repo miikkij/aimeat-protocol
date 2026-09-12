@@ -10,6 +10,7 @@
  *   origin in the rail. Reads the public endpoints; the Art. 50(4) label stays under the headline.
  * @structure PublicKnowledgeViewer · BrowseView · DetailView · entryToMarkdown · buildFullMarkdown
  * @version-history
+ *   v2.1.0 -- 2026-09-13 -- V2: use the shared ink rule on the public search row.
  *   v2.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Tietopankin sivu", direction A):
  *     the card grid becomes a list with a sentence per package, the centred card becomes a reading
  *     room with the entries open. Dates in the reader's locale; every word through t().
@@ -194,7 +195,7 @@ function BrowseView({ onSelect }) {
         <a class="og-door og-door--quiet" href="/v1/help#knowledge">${c('pubWhat')}</a>
       </div></div>
     </div>
-    <div class="kp-desk">
+    <div class="kp-desk poster-row--thing">
       <input type="search" class="kp-field" value=${search} placeholder=${c('pubSearch')} onInput=${(e) => onSearch(e.target.value)} />
       <div class="og-choice">
         <button type="button" class=${`og-choice-btn ${contentType === '' ? 'on' : ''}`} onClick=${() => setContentType('')}>${c('pubAll')}</button>
