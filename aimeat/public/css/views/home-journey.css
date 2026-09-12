@@ -4,13 +4,21 @@
  * SPDX-License-Identifier: MIT
  * @description Useful work and account settings on the home, in the poster face.
  * @version-history
+ *   v1.1.0 — 2026-09-12 — The section starts with the band title's ink slab (home.css), so the rule
+ *     above it goes; the area the chosen task governs (hint, connection line, prompt, links) sits in
+ *     .koti-journey-panel with a 4px sun bar down its left edge, the selection's own colour carried
+ *     from the chosen tab to the last line it governs. The optional webpage, the mat address and the
+ *     counts stay outside it (design canvas "Osioiden rajat kotisivulla", B1).
  *   v1.0.1 — 2026-09-09 — Remove bespoke button styling; home.css supplies the existing controls.
  *   v1.0.0 — 2026-09-09 — Connection, prompts, real saved note and basic account controls.
  */
-.koti-journey { border-top: 3px solid var(--text); padding-top: 1.4rem; margin-block: 1.5rem; min-width: 0; }
+.koti-journey { margin-block: 1.5rem; min-width: 0; }
 .koti-journey p { line-height: 1.6; }
 .koti-journey-choices, .koti-journey-status, .koti-journey-links { display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; margin-block: 1rem; }
+.koti-journey-choices { margin-block: 1rem .6rem; }
 .koti-journey-choices button { min-height: 44px; }
+/* The sun bar starts under the chosen tab and ends with the last line the choice governs. */
+.koti-journey-panel { border-left: 4px solid var(--sun); padding-left: 1.25rem; margin-block: 0 1.5rem; min-width: 0; }
 .koti-journey-status { justify-content: space-between; border-block: 1px solid var(--border); padding-block: 1rem; }
 .koti-journey-connect { border: 2px solid var(--text); padding: 1rem; margin-block: 1rem; min-width: 0; }
 .koti-journey-connect .ast-tools { flex-wrap: wrap; }
@@ -25,6 +33,7 @@
 @media (max-width: 600px) {
   .koti-journey .koti-link, .koti-account-settings .koti-link { white-space: normal; text-align: left; }
   .koti-journey-connect { padding: .75rem; }
+  .koti-journey-panel { padding-left: .9rem; }
   .koti-journey .koti-prompt-head { flex-wrap: wrap; gap: .75rem; }
   .koti-journey-links { align-items: flex-start; flex-direction: column; }
 }
