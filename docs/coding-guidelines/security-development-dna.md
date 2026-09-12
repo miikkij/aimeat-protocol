@@ -189,6 +189,36 @@ grants something (an agent's scopes, an agent's key, an ecosystem app's access).
 principal guard is one list, `AUTHORIZATION_GATES` in `scripts/inventory/principals.ts` — this script
 and `check:route-scopes` used to carry one each and they disagreed about four names.
 
+#### 11c. On a FEDERATED session the name is somebody else's account
+
+Everything above reads the name as "this human, or something acting for them". There is one principal
+where that is false, and it is the worst case of the invariant: a session signed in from ANOTHER node
+carries `owner` = the local part of an account that lives elsewhere. On this node that string names a
+DIFFERENT PERSON — whichever local account happens to share it.
+
+Measured on 2026-09-13 (`test/e2e-federated-namesake.ts`): a visitor signed in as `alice@their-node`
+read local `alice`'s PRIVATE memory, wrote into her namespace, and `GET /v1/ghii/me` answered with her
+profile, its account-security half included. A peer's operator can create any account name on their
+own node, so this was impersonation of any local account BY NAME, from any peer whose federated
+sign-in an operator had switched on. `requireRole('owner')` admitted it, because the mint hands a
+federated session `roles:['owner']`.
+
+The root was `resolveIdentity` composing `${auth.owner}@${nodeId}`: correct for a local owner, and for
+a visitor it stamps THIS node's suffix onto a name that belongs to another node's account. A federated
+session now resolves to its HOME GHII (`${owner}@${homeNode}`), which is what RFC v4.0 Core §31 means
+by a visitor acting "under their own identity" and what `routes/memory/federation.ts` had always used.
+
+Fixing the resolver is half of it, for the reason 11a gives: **a door that SCOPES by the bare name
+never calls the resolver at all.** Four such doors were reachable by a visitor and each is now closed
+to one — the memory owner-scope fan-outs (including `?owner_scope=true` and `?agent=`), `GET
+/v1/ghii/me`, the board member door and the two work reads.
+
+*Check:* when a handler reads `req.auth!.owner`, ask what it means for a visitor from another node.
+If the answer is "the local account with that name", the door needs `!req.auth!.federated` beside the
+owner-session test, or the resolved identity instead of the name. `requireScope` has excluded
+federated sessions from the owner bypass since 2026-09-08 for the same reason; the name-keyed doors
+are the same question one level down.
+
 ### 12. A role is granted, never inherited at mint time
 `POST /v1/auth/token` read the owner record and copied the owner's `owner` and `operator` roles onto
 the AGENT's JWT, so every agent of an operator was an operator. The consequence was not the role test
