@@ -1,0 +1,524 @@
+{
+  "_note": "Copied design-language declarations, recorded debt rather than approval. This files map may only shrink. After migration, lower the affected counts or remove cleared files. Only an explicit developer decision permits re-seeding with pnpm check:poster-shapes --record.",
+  "_measured": {
+    "date": "2026-09-12T21:11:41.459Z",
+    "files": 79,
+    "declarations": 766,
+    "patterns": {
+      "headline": 141,
+      "sun": 130,
+      "box2": 193,
+      "frame3": 79,
+      "record": 32,
+      "rule": 67,
+      "action": 73,
+      "slab": 10,
+      "aside": 24,
+      "dialog": 5,
+      "label": 12
+    }
+  },
+  "files": {
+    "public/css/views/access-poster.css": {
+      "headline": 2,
+      "sun": 2,
+      "box2": 2,
+      "frame3": 4,
+      "record": 3
+    },
+    "public/css/views/admin-agent-integration.css": {
+      "headline": 1,
+      "sun": 2
+    },
+    "public/css/views/admin-agents.css": {
+      "headline": 3,
+      "rule": 1,
+      "action": 1,
+      "sun": 1,
+      "box2": 3,
+      "frame3": 1,
+      "record": 1
+    },
+    "public/css/views/admin-apps.css": {
+      "headline": 2,
+      "action": 1,
+      "box2": 2,
+      "slab": 1
+    },
+    "public/css/views/admin-boards.css": {
+      "headline": 2,
+      "rule": 1,
+      "action": 3,
+      "sun": 2,
+      "box2": 2,
+      "aside": 1
+    },
+    "public/css/views/admin-compliance.css": {
+      "headline": 1,
+      "action": 2,
+      "sun": 1,
+      "box2": 2
+    },
+    "public/css/views/admin-cors.css": {
+      "headline": 1,
+      "action": 1,
+      "box2": 1
+    },
+    "public/css/views/admin-cortex.css": {
+      "headline": 4,
+      "action": 1
+    },
+    "public/css/views/admin-csm.css": {
+      "headline": 2,
+      "rule": 1,
+      "box2": 4,
+      "aside": 1
+    },
+    "public/css/views/admin-database.css": {
+      "headline": 2,
+      "action": 1,
+      "sun": 1,
+      "box2": 2
+    },
+    "public/css/views/admin-discovery.css": {
+      "action": 1,
+      "sun": 1,
+      "box2": 3
+    },
+    "public/css/views/admin-email.css": {
+      "rule": 1,
+      "action": 3,
+      "sun": 3,
+      "box2": 6,
+      "frame3": 1,
+      "record": 1
+    },
+    "public/css/views/admin-extensions.css": {
+      "headline": 1,
+      "rule": 1,
+      "action": 1,
+      "sun": 1,
+      "box2": 3,
+      "frame3": 1,
+      "record": 1
+    },
+    "public/css/views/admin-federation.css": {
+      "action": 1,
+      "sun": 2
+    },
+    "public/css/views/admin-ghii.css": {
+      "action": 1,
+      "sun": 2
+    },
+    "public/css/views/admin-hooks.css": {
+      "headline": 1,
+      "action": 1,
+      "sun": 1,
+      "box2": 2
+    },
+    "public/css/views/admin-knowledge.css": {
+      "headline": 1,
+      "action": 2,
+      "sun": 2,
+      "box2": 1,
+      "aside": 1
+    },
+    "public/css/views/admin-maintenance.css": {
+      "headline": 1,
+      "action": 1,
+      "box2": 2,
+      "aside": 1
+    },
+    "public/css/views/admin-memory.css": {
+      "headline": 6,
+      "rule": 4,
+      "action": 3,
+      "sun": 2,
+      "box2": 1,
+      "aside": 1
+    },
+    "public/css/views/admin-metrics-poster.css": {
+      "headline": 2,
+      "action": 1,
+      "sun": 2,
+      "box2": 2
+    },
+    "public/css/views/admin-msm.css": {
+      "headline": 4,
+      "action": 1,
+      "box2": 1
+    },
+    "public/css/views/admin-organism-ownership.css": {
+      "headline": 3,
+      "action": 1,
+      "sun": 2,
+      "box2": 3,
+      "frame3": 1,
+      "aside": 1,
+      "slab": 1,
+      "dialog": 1
+    },
+    "public/css/views/admin-owners.css": {
+      "headline": 2,
+      "action": 1,
+      "sun": 2,
+      "box2": 2,
+      "frame3": 1,
+      "slab": 1,
+      "dialog": 1
+    },
+    "public/css/views/admin-packages.css": {
+      "action": 1,
+      "box2": 1
+    },
+    "public/css/views/admin-portal.css": {
+      "headline": 2,
+      "action": 1,
+      "sun": 1,
+      "box2": 4,
+      "aside": 1
+    },
+    "public/css/views/admin-prompts.css": {
+      "headline": 3,
+      "action": 2,
+      "sun": 1,
+      "box2": 2
+    },
+    "public/css/views/admin-push.css": {
+      "action": 1,
+      "sun": 1,
+      "box2": 3
+    },
+    "public/css/views/admin-realtime.css": {
+      "headline": 5,
+      "rule": 1,
+      "box2": 3,
+      "frame3": 3,
+      "record": 1,
+      "dialog": 1
+    },
+    "public/css/views/admin-scheduler.css": {
+      "headline": 1,
+      "action": 1,
+      "sun": 2,
+      "box2": 1
+    },
+    "public/css/views/admin-security.css": {
+      "action": 1,
+      "sun": 1
+    },
+    "public/css/views/admin-skills.css": {
+      "headline": 3,
+      "rule": 1,
+      "action": 1,
+      "sun": 2,
+      "box2": 4,
+      "aside": 1
+    },
+    "public/css/views/admin-sso.css": {
+      "headline": 2,
+      "rule": 1,
+      "action": 1,
+      "aside": 1
+    },
+    "public/css/views/admin-stats.css": {
+      "headline": 1,
+      "sun": 1,
+      "box2": 1
+    },
+    "public/css/views/admin-subdomains.css": {
+      "headline": 1,
+      "rule": 1,
+      "action": 3,
+      "sun": 2,
+      "box2": 3
+    },
+    "public/css/views/admin-usage.css": {
+      "sun": 1,
+      "box2": 1
+    },
+    "public/css/views/admin-work.css": {
+      "headline": 2,
+      "action": 1,
+      "sun": 1,
+      "frame3": 1
+    },
+    "public/css/views/admin.css": {
+      "headline": 5,
+      "rule": 3,
+      "action": 1,
+      "sun": 1,
+      "aside": 1
+    },
+    "public/css/views/agents-detail.css": {
+      "sun": 1
+    },
+    "public/css/views/ai-poster.css": {
+      "sun": 3,
+      "box2": 3,
+      "frame3": 1,
+      "record": 1
+    },
+    "public/css/views/appdev-poster.css": {
+      "sun": 1,
+      "box2": 1,
+      "aside": 1
+    },
+    "public/css/views/apps-poster.css": {
+      "headline": 2,
+      "box2": 2,
+      "aside": 1
+    },
+    "public/css/views/boards-poster.css": {
+      "rule": 1
+    },
+    "public/css/views/build-story.css": {
+      "rule": 1,
+      "sun": 2,
+      "box2": 3,
+      "frame3": 8,
+      "record": 4,
+      "slab": 1,
+      "dialog": 1
+    },
+    "public/css/views/calibrator-poster.css": {
+      "headline": 4,
+      "sun": 2,
+      "box2": 5,
+      "frame3": 1,
+      "record": 2
+    },
+    "public/css/views/capabilities-poster.css": {
+      "sun": 1,
+      "box2": 2,
+      "frame3": 2,
+      "record": 1
+    },
+    "public/css/views/changelog.css": {
+      "rule": 1,
+      "action": 1,
+      "sun": 1,
+      "box2": 2,
+      "frame3": 2
+    },
+    "public/css/views/chat.css": {
+      "headline": 4,
+      "rule": 2,
+      "action": 4,
+      "sun": 5,
+      "box2": 6,
+      "slab": 2
+    },
+    "public/css/views/companies-poster.css": {
+      "headline": 1,
+      "sun": 1,
+      "box2": 2,
+      "label": 4
+    },
+    "public/css/views/contacts-poster.css": {
+      "headline": 1,
+      "box2": 2
+    },
+    "public/css/views/data-wallet-poster.css": {
+      "headline": 1,
+      "sun": 2,
+      "box2": 1,
+      "frame3": 3,
+      "record": 2
+    },
+    "public/css/views/discover-poster.css": {
+      "headline": 3,
+      "rule": 1,
+      "action": 2,
+      "sun": 1,
+      "box2": 1
+    },
+    "public/css/views/email-poster.css": {
+      "headline": 1,
+      "box2": 1
+    },
+    "public/css/views/extensions-poster.css": {
+      "sun": 1,
+      "box2": 2,
+      "frame3": 1,
+      "record": 1
+    },
+    "public/css/views/fleet.css": {
+      "headline": 3,
+      "rule": 1,
+      "sun": 1,
+      "box2": 1,
+      "aside": 1
+    },
+    "public/css/views/help.css": {
+      "rule": 1,
+      "sun": 2,
+      "frame3": 2
+    },
+    "public/css/views/home-journey.css": {
+      "box2": 2
+    },
+    "public/css/views/home.css": {
+      "headline": 11,
+      "rule": 6,
+      "action": 2,
+      "sun": 8,
+      "box2": 7,
+      "frame3": 2,
+      "record": 3,
+      "slab": 1,
+      "label": 3
+    },
+    "public/css/views/inbox-poster.css": {
+      "headline": 1,
+      "rule": 3,
+      "action": 1,
+      "sun": 3,
+      "box2": 3
+    },
+    "public/css/views/knowledge-poster.css": {
+      "headline": 3,
+      "rule": 1,
+      "action": 2,
+      "sun": 2,
+      "box2": 4
+    },
+    "public/css/views/landing-showroom.css": {
+      "rule": 1,
+      "action": 1,
+      "sun": 3,
+      "box2": 1,
+      "frame3": 5,
+      "record": 1,
+      "aside": 2
+    },
+    "public/css/views/landing.css": {
+      "rule": 2,
+      "action": 3,
+      "sun": 2,
+      "box2": 1,
+      "frame3": 7,
+      "aside": 3
+    },
+    "public/css/views/libraries-poster.css": {
+      "sun": 1,
+      "box2": 1,
+      "frame3": 2,
+      "record": 1
+    },
+    "public/css/views/mcp-poster.css": {
+      "headline": 4,
+      "action": 1,
+      "sun": 2,
+      "box2": 7,
+      "aside": 2,
+      "label": 1
+    },
+    "public/css/views/members.css": {
+      "box2": 1,
+      "frame3": 2,
+      "aside": 1
+    },
+    "public/css/views/memory.css": {
+      "rule": 1,
+      "box2": 2,
+      "frame3": 1
+    },
+    "public/css/views/notifications-poster.css": {
+      "headline": 1,
+      "sun": 1,
+      "box2": 4
+    },
+    "public/css/views/offers-poster.css": {
+      "headline": 5,
+      "action": 1,
+      "box2": 5
+    },
+    "public/css/views/organism.css": {
+      "headline": 10,
+      "rule": 5,
+      "action": 2,
+      "sun": 5,
+      "box2": 3,
+      "frame3": 1,
+      "record": 1,
+      "aside": 1,
+      "slab": 2
+    },
+    "public/css/views/packages-poster.css": {
+      "sun": 2,
+      "box2": 1,
+      "frame3": 2,
+      "record": 1
+    },
+    "public/css/views/portal-dev.css": {
+      "rule": 1,
+      "action": 1,
+      "sun": 6,
+      "box2": 14,
+      "frame3": 6,
+      "aside": 1
+    },
+    "public/css/views/portfolio-poster.css": {
+      "sun": 1,
+      "box2": 2,
+      "frame3": 2,
+      "record": 1
+    },
+    "public/css/views/profile-door.css": {
+      "rule": 1,
+      "box2": 2,
+      "frame3": 1,
+      "aside": 1
+    },
+    "public/css/views/profile-poster.css": {
+      "headline": 6,
+      "rule": 13,
+      "action": 7,
+      "sun": 12,
+      "box2": 16,
+      "frame3": 7,
+      "record": 3,
+      "slab": 1,
+      "dialog": 1,
+      "label": 3
+    },
+    "public/css/views/profile.css": {
+      "headline": 7,
+      "rule": 8,
+      "action": 2,
+      "sun": 7,
+      "box2": 5,
+      "frame3": 1,
+      "label": 1
+    },
+    "public/css/views/scheduler-poster.css": {
+      "headline": 2,
+      "rule": 1,
+      "action": 1,
+      "sun": 2,
+      "box2": 4
+    },
+    "public/css/views/skills-poster.css": {
+      "sun": 2,
+      "box2": 1,
+      "frame3": 2,
+      "record": 1
+    },
+    "public/css/views/surface.css": {
+      "headline": 1
+    },
+    "public/css/views/wallet-poster.css": {
+      "headline": 4,
+      "sun": 2,
+      "box2": 4,
+      "frame3": 2,
+      "record": 2
+    },
+    "public/css/views/workflows-poster.css": {
+      "sun": 2,
+      "box2": 2,
+      "frame3": 3
+    }
+  }
+}
