@@ -43,6 +43,9 @@ export function runDateIn(timezone: string | undefined): string {
   const utc = () => new Date().toISOString().slice(0, 10);
   if (!timezone) return utc();
   try {
+    // Intl as a CALENDAR, not a formatter: this is the KEY a run is filed under, and `en-CA` is
+    // simply the tag that writes a plain ISO day. No person reads this string.
+    // eslint-disable-next-line aimeat/no-raw-locale-format -- a day key, not a display
     return new Intl.DateTimeFormat('en-CA', {
       timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
     }).format(new Date());
