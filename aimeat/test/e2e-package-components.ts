@@ -404,6 +404,87 @@ await test('E5. GET /v1/templates carries a total, and every listing it returns 
     assert(wrong.length === 0, `the gallery returned listings that are not listed: ${JSON.stringify(wrong)}`);
 });
 
+// ── Part E3: suspending a listing, and the way back ──────────────────────────
+console.log('\nPart E3 — suspend and relist');
+
+// Suspending used to be one-way and invisible: the gallery route pinned status to 'listed', so a
+// suspended listing was returned by no door at all, and approve takes only pending_review, so
+// nothing set it back. The operator who suspended something by mistake had no way to see it again,
+// and its owner had to publish a new listing, losing the reviews and the install count with it.
+let suspendedListingId = '';
+
+await test('E6. A listing can be created, and the gallery returns it', async () => {
+    const pkg = await createPackage(A.token, `relist-kit-${Date.now()}`, [
+        { id: 'seed', type: 'memory', label: 'Seed', content: MEMORY_ENTRIES('pkgcomp.relist'), dependencies: [] },
+    ], 'public');
+    const r = await json('/v1/templates', {
+        method: 'POST', headers: authH(A.token),
+        body: JSON.stringify({ packageGroupId: pkg.groupId, title: 'Relist kit', description: 'For the suspend round trip', category: 'utility' }),
+    });
+    assert(r.status === 201, `create listing → ${r.status}: ${JSON.stringify(r.body.error ?? r.body)}`);
+    suspendedListingId = r.body.data.listing.id;
+    const gallery = await json('/v1/templates?limit=100');
+    const found = (gallery.body.data?.listings ?? gallery.body.data?.templates ?? []).some((x: { id: string }) => x.id === suspendedListingId);
+    assert(found, 'the new listing is not in the gallery');
+});
+
+await test('E7. REFUSAL: a caller with no credential cannot ask for anything but listed (403)', async () => {
+    const r = await json('/v1/templates?status=suspended');
+    assert(r.status === 403, `expected 403, got ${r.status}`);
+    // The public gallery itself is unchanged: no parameter, no credential, still answers.
+    const open = await json('/v1/templates?limit=1');
+    assert(open.status === 200, `the plain gallery answered ${open.status}`);
+});
+
+await test('E8. REFUSAL: a non-operator owner cannot ask for suspended listings (403)', async () => {
+    const r = await json('/v1/templates?status=suspended', { headers: authH(B.token) });
+    assert(r.status === 403, `expected 403, got ${r.status}`);
+});
+
+await test('E9. A status the listing life has no room for is refused (400)', async () => {
+    const r = await json('/v1/templates?status=whatever', { headers: authH(A.token) });
+    assert(r.status === 400, `expected 400, got ${r.status}`);
+});
+
+await test('E10. Suspending takes it out of the gallery and the operator can still find it', async () => {
+    const s = await json(`/v1/templates/${suspendedListingId}/suspend`, {
+        method: 'POST', headers: authH(A.token), body: JSON.stringify({ reason: 'round trip' }),
+    });
+    assert(s.status === 200, `suspend → ${s.status}: ${JSON.stringify(s.body.error ?? s.body)}`);
+
+    const gallery = await json('/v1/templates?limit=100');
+    const stillPublic = (gallery.body.data?.listings ?? gallery.body.data?.templates ?? []).some((x: { id: string }) => x.id === suspendedListingId);
+    assert(!stillPublic, 'a suspended listing is still in the public gallery');
+
+    const asOperator = await json('/v1/templates?status=suspended&limit=100', { headers: authH(A.token) });
+    assert(asOperator.status === 200, `operator read → ${asOperator.status}`);
+    const rows = asOperator.body.data?.listings ?? asOperator.body.data?.templates ?? [];
+    assert(rows.some((x: { id: string }) => x.id === suspendedListingId), 'the operator cannot see the listing they just suspended');
+});
+
+await test('E11. REFUSAL: relist needs a credential (401) and the operator role (403)', async () => {
+    const anon = await json(`/v1/templates/${suspendedListingId}/relist`, { method: 'POST' });
+    assert(anon.status === 401, `expected 401, got ${anon.status}`);
+    const notOp = await json(`/v1/templates/${suspendedListingId}/relist`, { method: 'POST', headers: authH(B.token) });
+    assert(notOp.status === 403, `expected 403, got ${notOp.status}`);
+});
+
+await test('E12. Relisting puts it back, and relisting again is refused', async () => {
+    const r = await json(`/v1/templates/${suspendedListingId}/relist`, {
+        method: 'POST', headers: authH(A.token), body: JSON.stringify({ comment: 'back' }),
+    });
+    assert(r.status === 200, `relist → ${r.status}: ${JSON.stringify(r.body.error ?? r.body)}`);
+    assert(r.body.data?.listing?.status === 'listed', `status after relist: ${r.body.data?.listing?.status}`);
+
+    const gallery = await json('/v1/templates?limit=100');
+    const back = (gallery.body.data?.listings ?? gallery.body.data?.templates ?? []).some((x: { id: string }) => x.id === suspendedListingId);
+    assert(back, 'the relisted listing is not back in the gallery');
+
+    // Only from suspended: a listed one has nowhere to come back from.
+    const again = await json(`/v1/templates/${suspendedListingId}/relist`, { method: 'POST', headers: authH(A.token) });
+    assert(again.status === 400, `expected 400 on a listed listing, got ${again.status}`);
+});
+
 // ── Part F: refusals ─────────────────────────────────────────────────────────
 console.log('\nPart F — refusals');
 

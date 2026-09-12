@@ -39179,9 +39179,19 @@ paths:
         - name: offset
           in: query
           schema: { type: integer, default: 0 }
+        - name: status
+          in: query
+          description: >-
+            Which listings to return. Absent or `listed` is the gallery and needs no credential;
+            any other value is operator-only and answered 403 otherwise.
+          schema: { type: string, enum: [listed, pending_review, rejected, suspended] }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: status is not one of the four a listing can have
+        '403':
+          description: a non-operator asked for listings that are not listed
 
   /v1/templates/{id}:
     get:
@@ -39548,6 +39558,42 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Template not found
+
+  /v1/templates/{id}/relist:
+    post:
+      operationId: relistTemplate
+      summary: Put a suspended listing back
+      description: >-
+        Return a suspended listing to the gallery. Operator only, and only from `suspended`:
+        approve takes pending_review, so without this a suspended listing had no way back and its
+        owner had to publish a new one, losing its reviews and install count.
+      tags: [Templates]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment: { type: string, description: Kept with the decision }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: the listing is not suspended
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

@@ -16,10 +16,16 @@
  *   - POST /v1/templates/:id/discussion — add discussion message
  *   - GET /v1/templates/:id/discussions — list discussions
  *   - PATCH /v1/templates/:id/featured — toggle featured
+ *   - POST /v1/templates/:id/relist — put a suspended listing back (operator)
  * @usage
  *   import { templatesRouter } from '../routes/templates.js';
  *   app.use(templatesRouter(config, storage));
  * @version-history
+ *   v1.5.0 — 2026-09-12 — Suspending stops being one-way. GET /v1/templates takes a `status`
+ *     parameter, refused with 403 for anything but `listed` unless the caller is an operator, so a
+ *     suspended or rejected listing can be seen at all; and POST /v1/templates/:id/relist puts a
+ *     suspended one back. Before this a suspended listing was invisible at every door and its
+ *     owner had to publish a new listing, losing the reviews and the install count with it.
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 5)
  *   v1.1.0 — 2026-03-15 — GHII resolution via identity system
  *   v1.2.0 — 2026-03-15 — enforce templateReviewsEnabled/templateDiscussionsEnabled config; remove (config as any) cast
@@ -40,6 +46,10 @@ import { emitChange } from '../services/event-bus.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 
 const VALID_SORTS = ['rating', 'installs', 'newest'] as const;
+
+/** A listing's life: pending_review, then listed or rejected, and a listed one can be suspended. */
+const VALID_STATUSES = ['listed', 'pending_review', 'rejected', 'suspended'] as const;
+type ListingStatus = typeof VALID_STATUSES[number];
 
 export function templatesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -132,6 +142,22 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
       const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 20, 1), 100);
       const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
 
+      // The gallery is the listed ones and nothing else, which is why this was pinned. An operator
+      // needs the other three: a suspended listing used to be invisible from every door, so the
+      // page that suspended it could not show it again or say what had become of it. Asking for a
+      // status other than `listed` is refused for anyone who is not an operator, rather than
+      // silently narrowed — a read that answers a different question than it was asked is how a
+      // caller ends up trusting a set it never requested.
+      const statusParam = req.query.status as string | undefined;
+      if (statusParam !== undefined && !VALID_STATUSES.includes(statusParam as ListingStatus)) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `status must be one of ${VALID_STATUSES.join(', ')}`));
+        return;
+      }
+      if (statusParam !== undefined && statusParam !== 'listed' && !req.auth?.roles?.includes('operator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only an operator can list templates that are not listed'));
+        return;
+      }
+
       const result = await storage.listTemplateListings({
         category,
         tags,
@@ -140,7 +166,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
         search,
         limit,
         offset,
-        status: 'listed',
+        status: (statusParam as ListingStatus | undefined) ?? 'listed',
       });
 
       res.json(success(config.nodeId, { templates: result.listings, total: result.total }));
@@ -292,6 +318,44 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
 
       const updated = await storage.updateTemplateListing(id, {
         status: 'suspended',
+        reviewedBy,
+        reviewedAt: now,
+        reviewComment: comment ?? undefined,
+        updatedAt: now,
+      });
+
+      emitChange('templates');
+      res.json(success(config.nodeId, { listing: updated }));
+    } catch (err) {
+      res.status(500).json(error(config.nodeId, 'INTERNAL', (err as Error).message));
+    }
+  });
+
+  // ── POST /v1/templates/:id/relist — Put a suspended listing back (operator) ──
+  //
+  // Suspending was one-way: nothing set a listing back to `listed`, and `approve` takes only
+  // pending_review, so an operator who suspended something by mistake had no way back and the
+  // listing's owner had to publish a new one, losing its reviews and its install count with it.
+  router.post('/v1/templates/:id/relist', requireAuth(), requireRole('operator'), async (req, res) => {
+    const id = req.params.id as string;
+
+    try {
+      const listing = await storage.getTemplateListing(id);
+      if (!listing) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Template listing not found'));
+        return;
+      }
+      if (listing.status !== 'suspended') {
+        res.status(400).json(error(config.nodeId, 'INVALID_STATUS', `Cannot relist a listing with status "${listing.status}". Only suspended templates can be put back.`));
+        return;
+      }
+
+      const reviewedBy = await resolveGhii(storage, req.auth!.owner, req.auth!.sub);
+      const now = new Date().toISOString();
+      const { comment } = req.body ?? {};
+
+      const updated = await storage.updateTemplateListing(id, {
+        status: 'listed',
         reviewedBy,
         reviewedAt: now,
         reviewComment: comment ?? undefined,
