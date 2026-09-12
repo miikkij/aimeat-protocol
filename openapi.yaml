@@ -54463,7 +54463,7 @@ paths:
                               type: object
                               properties:
                                 name: { type: string }
-                                display_name: { type: string }
+                                display_name: { type: string, nullable: true }
                                 roles:
                                   type: array
                                   items: { type: string }
@@ -54476,6 +54476,18 @@ paths:
                                       display_name: { type: string }
                                       trust_score: { type: number }
                                 created_at: { type: string }
+                                disabled_at:
+                                  type: string
+                                  nullable: true
+                                  description: When the account was deactivated; null while it is in use.
+                                disabled_by:
+                                  type: string
+                                  nullable: true
+                                  description: The operator who deactivated it.
+                                managed_by:
+                                  type: string
+                                  nullable: true
+                                  description: The organisation connection whose directory owns this account's lifecycle.
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /v1/admin/realtime:

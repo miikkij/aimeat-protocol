@@ -1,0 +1,197 @@
+/* ── Admin Owners page, in the poster face ──
+ * @file admin-owners.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's Owners page (design canvas "AIMEAT Admin Owners"): the list of
+ *   owners as poster rows with the numeral down the left, the chips at the far end of the name
+ *   cell, the doors that appear on the row under the pointer, the find field with its five filter
+ *   chips, and the body of the question each act asks first. The frame, the sections, the metric
+ *   rows, the numeral strip, the dashed box and the doors come from admin.css and organism.css;
+ *   only what this page adds lives here. Every value is a theme.css token, so the page flips with
+ *   the theme.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial (the Owners page in the poster face).
+ */
+
+/* admin.css gives a strip cell its left padding with `div + div` and `button + button`; this
+   strip reads div, div, button, div, so the two seams between the kinds are said here. */
+.adm-own .og-strip > div + button, .adm-own .og-strip > button + div { padding-left: 1.1rem; }
+/* A strip cell's second line wraps rather than truncates: on a phone the four cells are narrow
+   and organism.css would cut "22 joined in the last 7 days" to an ellipsis. */
+.adm-own .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+
+/* ── 02: the list ─────────────────────────────────────────────────────────────────────────── */
+/* One row is its own grid, not a cell in a table grid: the hover ground, the sun edge and the
+   quieted deactivated row are states of the whole row, and a flat grid would need them on every
+   cell. The columns are stated once here and once in the head. */
+.adm-own-tr {
+  display: grid;
+  grid-template-columns: 2.4rem minmax(0, 1fr) 4.5rem 7rem 13rem;
+  gap: 0 18px;
+  align-items: center;
+  padding: 8px 7px;
+  margin: 0 -7px;
+  border-bottom: 1px solid var(--border);
+  min-height: 44px;
+  box-sizing: border-box;
+}
+.adm-own-tr--head { border-bottom: 0; padding-bottom: 5px; min-height: 0; }
+.adm-own-tr--head div {
+  font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent);
+}
+.adm-own-tr--head .adm-own-n, .adm-own-tr--head .adm-own-ag { font-family: inherit; font-size: .66rem; color: var(--accent); }
+
+.adm-own-n {
+  font-family: var(--font-poster);
+  font-weight: var(--font-poster-weight, 400);
+  font-size: 1.35rem;
+  line-height: var(--font-poster-leading, 1);
+  text-align: right;
+  color: var(--text);
+}
+.adm-own-nm { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* The name is the way into the row: pressing it pins the doors open, which is the same gesture a
+   phone has and a pointer's hover does not. */
+.adm-own-name {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: .97rem; font-weight: 800; color: var(--text); text-align: left;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.adm-own-name:hover { color: var(--accent); }
+.adm-own-sub { font-size: .85rem; font-weight: 600; color: var(--text-dim); white-space: nowrap; }
+/* The chips go to the far end of the name cell, so they stand in one line down the whole table. */
+.adm-own-marks { margin-left: auto; flex: none; display: flex; align-items: center; gap: 6px; }
+.adm-own-chip {
+  font-family: var(--font-mono); font-weight: 500; font-size: .66rem; line-height: 1.6;
+  padding: 1px 6px; border: 2px solid var(--border); color: var(--text-dim); white-space: nowrap;
+}
+.adm-own-chip--op { border-color: var(--accent); color: var(--accent); }
+.adm-own-chip--you { background: var(--sun); border-color: var(--on-sun); color: var(--on-sun); }
+
+.adm-own-ag { font-family: var(--font-mono); font-size: .82rem; font-weight: 500; color: var(--text); text-align: right; }
+/* Nothing has ever connected in this name: the figure stays on the page as a hairline, so the
+   accounts that do carry agents are the ones the eye finds. */
+.adm-own-ag.is-zero { color: var(--border); }
+.adm-own-day { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); white-space: nowrap; }
+
+/* The doors belong to one row at a time. Not `visibility: hidden`, which takes them out of the tab
+   order: at opacity 0 they are still reachable by keyboard, and :focus-within brings them back. */
+.adm-own-acts { display: flex; gap: 14px; justify-content: flex-end; opacity: 0; pointer-events: none; transition: opacity .1s; }
+.adm-own-tr:hover .adm-own-acts,
+.adm-own-tr:focus-within .adm-own-acts,
+.adm-own-tr.is-open .adm-own-acts { opacity: 1; pointer-events: auto; }
+.adm-own-act {
+  background: none; border: 0; border-bottom: 2px solid var(--text); padding: 2px 0 1px; cursor: pointer;
+  font-family: inherit; font-weight: 800; font-size: .72rem; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text); white-space: nowrap;
+}
+.adm-own-act:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.adm-own-act--hot { color: var(--accent); border-bottom-color: var(--accent); }
+.adm-own-act--hot:hover { color: var(--text); border-bottom-color: var(--text); }
+/* A row with no doors says why rather than leaving the column blank. */
+.adm-own-held { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); text-align: right; }
+
+.adm-own-tr:hover, .adm-own-tr.is-open { background: var(--card-bg); box-shadow: inset 3px 0 0 var(--sun); }
+.adm-own-tr:hover .adm-own-name, .adm-own-tr.is-open .adm-own-name { color: var(--accent); }
+.adm-own-tr.is-off .adm-own-name { color: var(--text-dim); }
+
+/* The find field and the five filter chips. */
+.adm-own-find { display: flex; align-items: flex-end; gap: 32px; margin-bottom: 16px; flex-wrap: wrap; }
+.adm-own-fld { flex: 0 1 420px; min-width: 220px; }
+.adm-own-lbl { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 5px; }
+.adm-own-input {
+  width: 100%; box-sizing: border-box; background: transparent; border: 0; border-bottom: 3px solid var(--text);
+  padding: 6px 0; font-family: inherit; font-size: 1rem; font-weight: 600; color: var(--text); outline: none;
+}
+.adm-own-input::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm-own-input:focus { border-bottom-color: var(--accent); }
+.adm-own-chips { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 6px; }
+.adm-own-fchip {
+  background: none; border: 2px solid var(--border); padding: 2px 8px; cursor: pointer;
+  font-family: var(--font-mono); font-weight: 500; font-size: .68rem; line-height: 1.6; color: var(--text-dim);
+}
+.adm-own-fchip:hover { border-color: var(--text); color: var(--text); }
+.adm-own-fchip.on { background: var(--sun); border-color: var(--on-sun); color: var(--on-sun); }
+
+.adm-own-more { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; padding-top: 14px; }
+.adm-own-more span { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
+
+/* ── 03: the two acts ─────────────────────────────────────────────────────────────────────── */
+.adm-own-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 22px; }
+.adm-own-two .og-box p { margin: 0 0 8px; }
+.adm-own-two .og-box p:last-child { margin-bottom: 0; }
+.adm-own-rule { font-weight: 700; color: var(--text); }
+
+/* ── The question each act asks first, in the poster face ─────────────────────────────────── */
+/* Scoped to this page's dialogs by the className useConfirm forwards, so no other dialog in the
+   app changes shape. Ink frame, sun shadow, no radius; the confirm is the slab and the cancel is
+   an underlined word, as the design language has it. */
+.modal.adm-own-dlg {
+  background: var(--card-bg); border: 3px solid var(--text); border-radius: 0;
+  box-shadow: 12px 12px 0 var(--sun); padding: 20px 24px 22px; max-width: 560px;
+}
+.modal.adm-own-dlg .modal-header { margin-bottom: 6px; align-items: flex-start; }
+.modal.adm-own-dlg .modal-header h3 {
+  margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400);
+  font-size: 1.35rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em);
+  text-transform: uppercase; color: var(--text);
+}
+/* The corner people look at first: a 26px ink square, not a grey glyph. */
+.modal.adm-own-dlg .modal-close {
+  flex: none; width: 26px; height: 26px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--text); border-radius: 0; padding: 0; opacity: 1; font-size: .8rem; color: var(--text);
+}
+.modal.adm-own-dlg .modal-close:hover { background: var(--text); color: var(--bg); }
+.modal.adm-own-dlg .modal-confirm-message { color: var(--text); margin: 0; }
+.modal.adm-own-dlg .modal-footer { align-items: center; gap: 22px; padding-top: 18px; }
+.modal.adm-own-dlg .modal-footer .btn-primary,
+.modal.adm-own-dlg .modal-footer .btn-danger-solid {
+  background: var(--text); color: var(--bg); border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
+  padding: 11px 16px; font-family: inherit; font-weight: 600; font-size: .8rem; letter-spacing: .04em; text-transform: uppercase;
+  transition: transform .1s, box-shadow .1s;
+}
+.modal.adm-own-dlg .modal-footer .btn-danger-solid { background: var(--accent); color: #FFFFFF; box-shadow: 4px 4px 0 var(--text); }
+.modal.adm-own-dlg .modal-footer .btn-primary:hover,
+.modal.adm-own-dlg .modal-footer .btn-danger-solid:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); }
+.modal.adm-own-dlg .modal-footer .btn-danger-solid:hover { box-shadow: 2px 2px 0 var(--text); }
+.modal.adm-own-dlg .modal-footer .btn-ghost {
+  background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; padding: 0 0 1px;
+  font-family: inherit; font-weight: 800; font-size: .8rem; color: var(--text);
+}
+.modal.adm-own-dlg .modal-footer .btn-ghost:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── The body of the question each act asks first ─────────────────────────────────────────── */
+.adm-own-ask { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.adm-own-ask-who { font-family: var(--font-mono); font-size: .8rem; color: var(--accent); }
+.adm-own-ask-note { font-size: .85rem; color: var(--text-dim); }
+.adm-own-ask-rows { display: flex; flex-direction: column; border: 2px solid var(--text); padding: 8px 12px; }
+.adm-own-ask-row { display: flex; justify-content: space-between; gap: 18px; font-family: var(--font-mono); font-size: .75rem; line-height: 1.9; color: var(--text); }
+.adm-own-ask-row em { font-style: normal; color: var(--text-dim); }
+
+@media (max-width: 1100px) {
+  /* organism.css folds the strip into two rows by giving `> div` a 50 % basis; the cell that is a
+     button is not a div, so without this it stays on `flex: 1 1 0` and its label wraps under the
+     figure while the three divs beside it do not. */
+  .adm-own .og-strip > button { flex: 1 1 50%; border-right: 0; }
+  .adm-own-tr { grid-template-columns: 2.4rem minmax(0, 1fr) 4rem 6rem; gap: 0 14px; }
+  .adm-own-day { font-size: .72rem; }
+  /* The doors leave the row and stand under it, where a tap reaches them. */
+  .adm-own-acts, .adm-own-held { grid-column: 2 / -1; justify-content: flex-start; text-align: left; }
+  .adm-own-acts { display: none; }
+  .adm-own-tr.is-open .adm-own-acts { display: flex; opacity: 1; pointer-events: auto; padding-top: 6px; }
+  .adm-own-tr--head div:last-child { display: none; }
+}
+
+@media (max-width: 700px) {
+  .adm-own-tr { grid-template-columns: 2rem minmax(0, 1fr) 3.5rem; }
+  .adm-own-nm { flex-wrap: wrap; gap: 6px; }
+  .adm-own-day { grid-column: 2 / -1; }
+  /* The date moved under the name, so its column heading has nothing to head. */
+  .adm-own-tr--head div:nth-child(4) { display: none; }
+  .adm-own-find { gap: 18px; }
+  .adm-own-fld { flex-basis: 100%; }
+  /* An operator row gives its sentence the whole width; the value follows on its own line
+     instead of being squeezed into the 10rem column admin.css reserves for it. */
+  .adm-own .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; }
+  .adm-own .adm-mrow .adm-mval { grid-column: 1 / -1; text-align: left; margin-top: 4px; }
+}

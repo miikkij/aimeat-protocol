@@ -11,6 +11,9 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   v1.6.0 — 2026-09-12 — GET /v1/admin/owners answers display_name as null rather than dropping
+ *     the key: a row for an owner with no display name was a different shape from every other row,
+ *     and openapi.yaml now states the three lifecycle fields the answer has carried since v1.3.0.
  *   v1.5.0 — 2026-09-08 — setup/register judges the password before it creates the owner; a weak
  *     one used to leave a half-made account behind.
  *   v1.4.0 — 2026-09-04 — DELETE /v1/admin/owners/:name/totp: the operator reset for two-step
@@ -539,7 +542,10 @@ export function adminRouter(
         const agentsByOwner = await storage.getAgentsByOwners(owners.map(o => o.name));
         const result = owners.map(o => ({
             name: o.name,
-            display_name: o.displayName,
+            // `?? null` like disabled_at and managed_by below: without it the key vanishes from the
+            // row whenever an owner has no display name, so a reader gets a different shape per
+            // row and cannot tell "no display name" from "this node does not serve the field".
+            display_name: o.displayName ?? null,
             roles: o.roles,
             agents: (agentsByOwner[o.name] ?? []).map(a => ({ gaii: a.gaii, display_name: a.displayName, trust_score: a.trustScore })),
             created_at: o.createdAt,
