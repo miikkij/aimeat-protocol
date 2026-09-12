@@ -245,6 +245,21 @@ export function registerRegistrationRoutes(
     // Extension hook: post_agent_registration (fire-and-forget)
     fireHook(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner });
 
+    // The platform the User-Agent names belongs to the agent from the moment it exists. The
+    // connect path above writes it before it answers; this one wrote it AFTER, in the onboarding
+    // block below, so a caller that registered and read the agent straight back could find the
+    // field still empty. It did, on the slower backend: e2e-account-doors 41 went red on
+    // postgres-kysely and green on sqlite, which is the shape of a write racing its own response
+    // rather than a flake.
+    const regDetected = detectPlatform(req.headers['user-agent'] as string | undefined);
+    if (regDetected) {
+      await storage.updateAgent(agent.gaii, {
+        platform: regDetected.id,
+        platformVersion: regDetected.version,
+        platformDetectedBy: regDetected.detectedBy,
+      });
+    }
+
     // SECURITY: Prevent caching of response containing private key
     res.set('Cache-Control', 'no-store');
     res.set('Pragma', 'no-cache');
@@ -295,17 +310,13 @@ export function registerRegistrationRoutes(
     regOnboardingSteps[0].validationMethod = 'automatic';
     regOnboardingSteps[0].details = { createdAt: now };
 
-    const regDetected = detectPlatform(req.headers['user-agent'] as string | undefined);
+    // The agent's own platform fields were written before the response above; here the same
+    // detection only marks the onboarding step, which nothing reads back in the same breath.
     if (regDetected) {
       regOnboardingSteps[1].status = 'passed';
       regOnboardingSteps[1].validatedAt = now;
       regOnboardingSteps[1].validationMethod = 'automatic';
       regOnboardingSteps[1].details = { platform: regDetected.id, version: regDetected.version };
-      await storage.updateAgent(gaii, {
-        platform: regDetected.id,
-        platformVersion: regDetected.version,
-        platformDetectedBy: regDetected.detectedBy,
-      });
     }
 
     // Same reason as the connect path above: a required accept_test_task step with no task to
