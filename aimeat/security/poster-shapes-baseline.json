@@ -1,14 +1,14 @@
 {
   "_note": "Copied design-language declarations, recorded debt rather than approval. This files map may only shrink. After migration, lower the affected counts or remove cleared files. Only an explicit developer decision permits re-seeding with pnpm check:poster-shapes --record.",
   "_measured": {
-    "date": "2026-09-12T23:17:00.000Z",
+    "date": "2026-09-12T23:24:00.000Z",
     "files": 79,
-    "declarations": 755,
+    "declarations": 750,
     "patterns": {
       "headline": 140,
       "sun": 129,
       "box2": 193,
-      "frame3": 75,
+      "frame3": 70,
       "record": 31,
       "rule": 64,
       "action": 73,
@@ -323,7 +323,7 @@
       "headline": 1,
       "sun": 2,
       "box2": 1,
-      "frame3": 3,
+      "frame3": 1,
       "record": 2
     },
     "public/css/views/discover-poster.css": {
@@ -459,7 +459,7 @@
     "public/css/views/portfolio-poster.css": {
       "sun": 1,
       "box2": 2,
-      "frame3": 2,
+      "frame3": 1,
       "record": 1
     },
     "public/css/views/profile-door.css": {
@@ -497,7 +497,7 @@
     "public/css/views/skills-poster.css": {
       "sun": 2,
       "box2": 1,
-      "frame3": 2,
+      "frame3": 1,
       "record": 1
     },
     "public/css/views/surface.css": {
@@ -507,7 +507,7 @@
       "headline": 4,
       "sun": 2,
       "box2": 4,
-      "frame3": 2,
+      "frame3": 1,
       "record": 2
     },
     "public/css/views/workflows-poster.css": {

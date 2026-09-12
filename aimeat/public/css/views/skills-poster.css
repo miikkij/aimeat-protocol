@@ -10,6 +10,7 @@
  *   with the editor, and the AI rule box.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose the agent rule with the shared ink frame.
  *   v1.0.0 — 2026-09-03 — Initial (replaces the .pf-skl-* rules in profile.css).
  */
 
@@ -93,7 +94,7 @@
 .sk-editor-doors .og-door { font-size: .72rem; }
 
 /* ── The rule an AI gets ───────────────────────────────────────────────────────────────────── */
-.sk-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; border: 3px solid var(--text); background: var(--card-bg); }
+.sk-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; }
 .sk-rule .og-label { display: block; margin-bottom: .3rem; }
 .sk-rule .sk-para { margin-bottom: .6rem; }
 .sk-kv--wide code { display: inline-block; margin-top: .3rem; font-family: var(--font-mono); font-size: .74rem; background: var(--bg-dim); padding: .1rem .35rem; }
