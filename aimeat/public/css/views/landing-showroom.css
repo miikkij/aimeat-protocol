@@ -13,6 +13,7 @@
  *   The blocks the showroom restyled but did not replace (the wish box, the app wall, the counters,
  *   the change log) keep their rules in landing.css.
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- V2: the safety band and room frames compose shared shapes.
  *   v1.2.0 -- 2026-09-13 -- V2: shared classes own the showroom doors, slabs and coral asides.
  *   v1.1.1 — 2026-08-29 — The headline's offset shadow is the sun, not coral: coral behind ink at that
  *     size read as a blur, and the sun ties the title to the sticker above it.
@@ -130,7 +131,7 @@
 @media (max-width: 600px) { .ld-sh-tiers { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* ── The safety list ───────────────────────────────────────────────────────────────────────── */
-.ld-sh-trust { display: flex; flex-direction: column; gap: 1.6rem; padding: 3.5rem 3rem; background: var(--text); color: var(--bg); }
+.ld-sh-trust { display: flex; flex-direction: column; gap: 1.6rem; }
 .ld-sh-trust-title { margin: 0; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: clamp(1.3rem, 2.4vw, 1.9rem); line-height: 1.15; color: var(--sun); text-align: center; }
 .ld-sh-trust-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.1rem; }
 .ld-sh-trust-item {
@@ -144,13 +145,11 @@
 .ld-sh-trust-line a { color: var(--sun); font-weight: 700; text-decoration: none; }
 .ld-sh-trust-line a:hover { text-decoration: underline; }
 @media (max-width: 980px) { .ld-sh-trust-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 600px) { .ld-sh-trust { padding: 2rem 1.25rem; } .ld-sh-trust-grid { grid-template-columns: 1fr; } .ld-sh-trust-title { text-align: left; } }
+@media (max-width: 600px) { .ld-sh-trust-grid { grid-template-columns: 1fr; } .ld-sh-trust-title { text-align: left; } }
 
 /* ── The two rooms ─────────────────────────────────────────────────────────────────────────── */
 .ld-sh-rooms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2.5rem; padding: 3.5rem 0; }
-.ld-sh-room { display: flex; flex-direction: column; gap: .9rem; padding: 1.75rem; background: var(--card-bg); border: 3px solid var(--text); }
-.ld-sh-room--sun { box-shadow: 8px 8px 0 var(--sun); }
-.ld-sh-room--coral { box-shadow: 8px 8px 0 var(--accent); }
+.ld-sh-room { display: flex; flex-direction: column; gap: .9rem; }
 .ld-sh-room-img { display: block; width: 100%; height: auto; aspect-ratio: 5 / 2; object-fit: cover; object-position: center 35%; border: 2px solid var(--text); }
 @media (max-width: 900px) { .ld-sh-rooms { grid-template-columns: 1fr; gap: 1.75rem; padding: 2.5rem 0; } }
 
