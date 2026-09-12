@@ -5,6 +5,8 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.5.0 — 2026-09-13 — aimeat_dm_archive_as_owner and aimeat_dm_organize_as_owner: archiving the
+ *     owner's conversations and the rules for their Messages list, on messages:organize-as-owner.
  *   v1.4.0 — 2026-09-12 — aimeat_dm_inbox_as_owner and aimeat_dm_thread_as_owner: reading the owner's
  *     own mailbox as the owner, on the new messages:read-as-owner word.
  *   v1.3.0 — 2026-09-01 — The five Agent v2 task tools (V5), in MCP's task shape.
@@ -344,6 +346,30 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
             conversation_id: { type: 'string', required: true, description: "The owner's conversation id." },
             page: { type: 'number', description: 'Page number (default 1).' },
             per_page: { type: 'number', description: 'Messages per page (default 50, max 200).' },
+        },
+    },
+    {
+        name: 'aimeat_dm_archive_as_owner',
+        description: "Archive conversations in the OWNER's Messages list, as the owner, or bring them back with restore: true. Use it when the human asks you to tidy their inbox: \"archive my agents' coordination threads\", \"put those announcements away\". Nothing is deleted. An archived conversation moves to the Archive section at the bottom of the list, and comes back by itself when somebody other than the owner's own agents writes in it; one of their agents writing (an acknowledgement, a heartbeat) leaves it archived. Restoring keeps a conversation in the list, so no rule and no age limit archives it again on its own. Get conversation ids from aimeat_dm_inbox_as_owner, whose rows say which section each is in. The list is always your OWN owner's (derived server-side). Tell the human what you archived. Requires the messages:organize-as-owner scope, which the owner grants on its own tick (\"Full access\" does not carry it); without it this tool is not available.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            conversation_ids: { type: 'array', required: true, description: 'Conversation ids to archive or restore (1-500), from aimeat_dm_inbox_as_owner.' },
+            restore: { type: 'boolean', description: 'true brings the conversations back to the list instead of archiving them.' },
+        },
+    },
+    {
+        name: 'aimeat_dm_organize_as_owner',
+        description: "Read or change how the OWNER's Messages list is organised, as the owner. Called with nothing, it returns the current settings and rules. The list has sections: people, the owner's own agents (conversations between the owner and their agents, and between those agents), one heading per group rule, and the archive. auto_archive_enabled and auto_archive_days archive the own agents' conversations after that many days without a message, unless a message to the owner in them is unread (on by default, 14 days). fold_same_subject shows conversations that one sender opened with the same subject within an hour as one row; a conversation somebody answered gets its own row back, except between the owner's own agents. add_rule adds a rule { name, action, match }: action \"fold\" makes the matching conversations one row, \"group\" puts them under a heading of their own (the rule's name), \"archive\" sends them to the archive; match takes with (part of an identity in the conversation), subject (text the subject contains), body (text the newest message contains), older_than_days, and scope \"agents\" (default: only the own agents' conversations) or \"all\". The first enabled rule that matches decides. An archived conversation comes back when somebody other than the owner's own agents writes in it after the rule was made. Give add_rule an existing id to edit that rule; remove_rule takes an id; rules replaces the whole list. Say what you changed in words the human uses. The list is always your OWN owner's. Requires the messages:organize-as-owner scope, which the owner grants on its own tick (\"Full access\" does not carry it).",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            auto_archive_enabled: { type: 'boolean', description: "Archive the own agents' conversations by age." },
+            auto_archive_days: { type: 'number', description: 'Days without a message before that happens (1-365).' },
+            fold_same_subject: { type: 'boolean', description: 'One row for conversations one sender opened with the same subject within an hour.' },
+            add_rule: { type: 'object', description: 'A rule { id?, name, enabled?, action: "fold" | "group" | "archive", match: { with?, subject?, body?, scope?: "agents" | "all", older_than_days? } }.' },
+            remove_rule: { type: 'string', description: 'Id of a rule to remove.' },
+            rules: { type: 'array', description: 'Replace every rule with this list (same shape as add_rule).' },
         },
     },
     {

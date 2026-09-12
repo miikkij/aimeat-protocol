@@ -2,12 +2,14 @@
  * @file public/views/profile/inbox-tab/panels.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Pure (hook-free) render panels for the profile Inbox tab: ListPanel (conversation/request
- *   list + grouped person rows), ThreadPanel (the open thread pane — head, bubbles, awaiting-draft
+ * @description Pure (hook-free) render panels for the profile Inbox tab: ThreadPanel (the open thread pane — head, bubbles, awaiting-draft
  *   bubbles, command bar/fill, composer), TrackedPanel (the Tracked Responses dashboard) and ResultsPanel
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v2.1.0 — 2026-09-13 — ListPanel moved to ./list-panel.js, where the list gained its sections,
+ *     closable groups, archive and selection. ThreadPanel's "…" menu carries an archive or restore
+ *     item for the open conversation (`archiveItem`).
  *   v2.0.0 — 2026-08-29 — The poster face: the thread head keeps Listen and Reply-with-AI as doors and
  *     puts Notebook, link previews, show-all and the schedule behind "…"; each bubble names its writer
  *     (the `who` prop); the row marks and subject lines lost their emoji.
@@ -47,108 +49,7 @@ import { getSession } from '/js/services/auth.js';
 import { KebabMenu } from '../shared.js';
 import { Avatar, MessageBubble, Composer, CommandBar, CommandFill, SchedulePanel, PollBuilder } from './components.js';
 import { ThreadReadAloud } from './read-aloud.js';
-import { peerName, ownerKeyOf, isAgentPeer, ownerDisplayName, subThreadLabel, groupConversations, dayKey, dayLabel, trackStateLabel, tallyPoll, quoteSnippet, stampShort, stampFull } from './helpers.js';
-
-export function ListPanel({ requests, conversations, activeConv, peerDisplay, accept, block, openConversation, openFolds = {}, toggleFold }) {
-  /** One conversation row. `nested` = inside a person group (labelled by the agent/thread, indented). */
-  const convRow = (c, nested, labelPeer) => {
-    const active = activeConv?.conversationId === c.conversationId ? ' inbox-conv--active' : '';
-    const sub = subThreadLabel(c.peerGhii);
-    // An agent-owned conversation the owner aggregates (a DM the agent sent from its own inbox) — labelled
-    // "via <agent>" and read-only. The `viaAgent` tag comes from the conversation list aggregation.
-    const via = c.viaAgent ? (subThreadLabel(c.viaAgent) || peerName(c.viaAgent)) : null;
-    // The last turn in a thread of MINE that one of my agents spoke. Different from `via`: this thread is
-    // still mine to answer, only the newest message is not my own words. The preview said "You:" over it.
-    const byAgent = c.sentByAgent ? (subThreadLabel(c.sentByAgent) || peerName(c.sentByAgent)) : null;
-    // Nested: a subject thread shows its topic; otherwise the agent name / "Direct". Flat: the person.
-    // Inside an opened broadcast the topic is the same on every row and the only thing that tells the
-    // copies apart is WHO each one went to, so there the label is the person (labelPeer).
-    const label = labelPeer
-      ? peerDisplay(c.peerGhii)
-      : via
-        ? (nested ? `${t('inbox.viaAgent')} ${via}` : peerDisplay(c.peerGhii))
-        : (nested ? (c.subject || (sub ? peerDisplay(c.peerGhii) : t('inbox.directThread'))) : peerDisplay(c.peerGhii));
-    // A nested row's mark is a word, not an emoji: an agent thread, a subject thread, or the direct one.
-    const icon = (via || sub) ? t('inbox.cover.markAgent') || 'ag' : (c.subject ? '#' : '·');
-    return html`
-      <button class=${`inbox-conv${active}${nested ? ' inbox-conv--nested' : ''}`} key=${c.conversationId} onClick=${() => openConversation(c)}>
-        ${nested ? html`<span class="inbox-conv-subico">${icon}</span>` : html`<${Avatar} seed=${c.peerGhii} size=${40} />`}
-        <div class="inbox-conv-main">
-          <div class="inbox-conv-line1">
-            <span class="inbox-name">${escHtml(label)} ${(!c.groupAlias && (!nested || c.peerGhii?.includes('#'))) ? html`<${PresenceDot} ghii=${c.peerGhii} />` : ''}</span>
-            ${!nested && via ? html`<span class="inbox-via-chip">${t('inbox.viaAgent')} ${escHtml(via)}</span>` : ''}
-            ${c.broadcastCount ? html`<span class="inbox-via-chip">${t('inbox.broadcastRecipients', { count: String(c.broadcastCount) })}</span>` : ''}
-            <span class="inbox-conv-time" title=${c.updatedAt ? stampFull(c.updatedAt) : ''}>${c.updatedAt ? stampShort(c.updatedAt) : ''}</span>
-          </div>
-          <div class="inbox-conv-line2">
-            ${(!nested && c.subject) ? html`<span class="inbox-conv-subject">${escHtml(c.subject)}</span>` : ''}
-            <span class="inbox-conv-preview">${byAgent ? `${t('inbox.viaAgent')} ${byAgent}: ` : (c.lastDirection === 'outbound' ? `${t('inbox.youPrefix')} ` : '')}${escHtml(c.lastMessage || '')}</span>
-            ${c.unread > 0 ? html`<span class="inbox-conv-badge">${c.unread}</span>` : null}
-          </div>
-        </div>
-      </button>`;
-  };
-
-  /**
-   * One announcement sent to many is many 1:1 threads, and the server hands them down as ONE row with
-   * the rest under `folded`. Collapsed by default: a person who wants the individual threads asks for
-   * them, and a person who does not gets their list back. The row itself still opens the newest copy,
-   * so the announcement is one click away whether or not anyone expands it.
-   */
-  const foldRow = (c, nested) => {
-    const open = !!openFolds[c.broadcastId];
-    return html`
-      <div class="inbox-conv-fold" key=${c.broadcastId}>
-        ${convRow(c, nested)}
-        <button class="inbox-fold-toggle" aria-expanded=${open ? 'true' : 'false'}
-          onClick=${() => toggleFold?.(c.broadcastId)}>
-          ${open ? `↩ ${t('inbox.broadcastHide')}` : `→ ${t('inbox.broadcastShowAll', { count: String(c.folded.length) })}`}
-        </button>
-        ${open ? c.folded.map(f => convRow(f, true, true)) : null}
-      </div>`;
-  };
-  /** A folded row renders with its disclosure; everything else is one thread and renders as one row. */
-  const anyRow = (c, nested) => (c.broadcastCount && c.folded?.length ? foldRow(c, nested) : convRow(c, nested));
-
-  return html`
-    <div class="inbox-list">
-      ${requests.length > 0 ? html`
-        <div class="inbox-list-section">${t('inbox.requests')} <span class="inbox-count">${requests.length}</span></div>
-        ${requests.map(r => html`
-          <div class="inbox-request" key=${r.contactId}>
-            <div class="inbox-request-top">
-              <${Avatar} seed=${r.contactId} size=${36} />
-              <div class="inbox-request-id">
-                <div class="inbox-name">${escHtml(peerDisplay(r.contactId))} <${PresenceDot} ghii=${r.contactId} /></div>
-                <div class="inbox-sub">${escHtml(r.contactId)}</div>
-              </div>
-            </div>
-            <div class="inbox-request-preview">${escHtml(r.preview || '')}</div>
-            <div class="inbox-request-actions">
-              <button class="btn-success btn-sm" onClick=${() => accept(r.contactId)}>${t('inbox.accept')}</button>
-              <button class="btn-outline btn-sm" onClick=${() => block(r.contactId)}>${t('inbox.block')}</button>
-            </div>
-          </div>`)}` : null}
-
-      <div class="inbox-list-section">${t('inbox.conversations')}</div>
-      ${conversations.length === 0 ? html`<div class="inbox-empty-sm">${t('inbox.noConversations')}</div>` : null}
-      ${groupConversations(conversations).map(g => {
-        // A person with a single human-only thread (no agents) renders flat, as before.
-        if (g.convs.length === 1 && !isAgentPeer(g.convs[0].peerGhii)) return anyRow(g.convs[0], false);
-        // Otherwise: a group header for the person + a nested row per thread (human + each agent).
-        const unread = g.convs.reduce((n, c) => n + (c.unread || 0), 0);
-        return html`
-          <div class="inbox-conv-group" key=${g.ownerKey}>
-            <div class="inbox-conv-group-head">
-              <${Avatar} seed=${g.ownerKey} size=${28} />
-              <span class="inbox-name">${escHtml(peerDisplay(g.ownerKey))} <${PresenceDot} ghii=${g.ownerKey} /></span>
-              ${unread > 0 ? html`<span class="inbox-conv-badge">${unread}</span>` : null}
-            </div>
-            ${g.convs.map(c => anyRow(c, true))}
-          </div>`;
-      })}
-    </div>`;
-}
+import { peerName, ownerKeyOf, isAgentPeer, ownerDisplayName, subThreadLabel, dayKey, dayLabel, trackStateLabel, tallyPoll, quoteSnippet, stampShort, stampFull } from './helpers.js';
 
 export function ThreadPanel({
   activeConv, thread, urlMap, important, trackedByMsg, awaitingForConv, awaitingDrafts,
@@ -156,7 +57,7 @@ export function ThreadPanel({
   peerDisplay, showToast, toggleImportant, onTrackMsg, onParkMsg, onDeleteMsg, openMessageAi, submitInteractiveAnswers,
   setMdViewer, openConversationAi, openConversationNotebook, insertCommand, setCmdFill, cancelTracked, openRecord, startSuggestedReply, doSend,
   replyQuote, setReplyQuote, onQuoteReply, composerFocus, showLinkPreviews, toggleLinkPreviews,
-  threadAll, toggleThreadAll, onTranscribe, canTranscribe, voiceMaxSeconds,
+  threadAll, toggleThreadAll, onTranscribe, canTranscribe, voiceMaxSeconds, archiveItem,
 }) {
   let lastDay = '';
   // Reply-to quotes: resolve a message's `replyToId` to the original within the loaded page (a parent
@@ -208,6 +109,7 @@ export function ThreadPanel({
           { label: showLinkPreviews ? t('inbox.linkPreview.hideAll') : t('inbox.linkPreview.showAll'), onClick: toggleLinkPreviews },
           (thread.length >= 50) ? { label: threadAll ? t('inbox.thread.showRecent') : t('inbox.thread.showAll'), onClick: toggleThreadAll } : null,
           (peerIsMyAgent && !viaAgentName) ? { label: t('inbox.schedTitle'), onClick: () => setSchedOpen(o => !o) } : null,
+          archiveItem || null,
         ]} />
       </div>
       <div class="inbox-msgs" ref=${msgsRef}>

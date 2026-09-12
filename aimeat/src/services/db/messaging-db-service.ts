@@ -13,6 +13,10 @@
  * @structure MessagingDbService.ownerConversations(ownerGhii, ownerName, { agentThreads }) → { conversations } in a read scope
  * @usage const { conversations } = await createMessagingDbService(storage).ownerConversations(ghii, owner);
  * @version-history
+ *   v1.5.0 — 2026-09-13 — The list is organised with the owner's own record before it is returned:
+ *     each row carries its section (people, own agents, a rule's heading, archive), why it is
+ *     archived, and the folds inside each section (services/inbox-organize/). foldBroadcasts moved
+ *     there unchanged, because a broadcast now folds inside its section rather than across the list.
  *   v1.4.0 — 2026-09-12 — `agentThreads: false` lists the owner's own mailbox only, for an app or an
  *     agent reading in the owner's name (services/owner-mailbox-reads.ts).
  *   v1.3.0 — 2026-09-06 — The copies of one broadcast collapse into a single row (foldBroadcasts),
@@ -34,6 +38,8 @@ import type { ConversationSummary } from '../../storage/repositories/direct-mess
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { parseGaiiLoose } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
+import { organizeConversations, type InboxSection, type RowArchive, type RowFold } from '../inbox-organize/organize.js';
+import { readInboxOrganize } from '../inbox-organize/record.js';
 
 /**
  * A conversations-list row, optionally tagged with the owning agent when it is an agent's own thread,
@@ -72,6 +78,13 @@ export type OwnerConversation = ConversationSummary & {
    * twenty INBOUND copies landed in their single mailbox, which that view does not serve at all.
    */
   folded?: OwnerConversation[];
+  /** Where the Messages list puts this row, and why (services/inbox-organize/organize.ts). */
+  section?: InboxSection;
+  archived?: RowArchive;
+  /** The heading a group rule names, when `section` is 'group'. */
+  group?: string;
+  /** Present on a row that stands for several threads with one opener and subject, or one fold rule. */
+  fold?: RowFold;
 };
 
 export class MessagingDbService {
@@ -112,7 +125,10 @@ export class MessagingDbService {
         }
       }
       const named = await this.nameGroupThreads(ownerGhii, [...own, ...agentConvs], agents.map(a => a.gaii));
-      return { conversations: foldBroadcasts(named) };
+      // Sections, archive, rules and folds: what the owner decided about their own list. The same
+      // answer for the page and for anyone reading in the owner's name.
+      const organize = await readInboxOrganize(this.storage, ownerGhii);
+      return { conversations: organizeConversations(named, organize, ownerGhii) };
     });
   }
 
@@ -196,56 +212,6 @@ export class MessagingDbService {
     }));
     return out;
   }
-}
-
-/**
- * Collapse the copies of one broadcast into a single row.
- *
- * One announcement to twenty recipients is twenty separate 1:1 threads, and that is deliberate: each
- * recipient answers privately, and the answer belongs to them. What it is not is twenty rows in one
- * list within the same minute, which is what a real inbox looked like on 2026-09-06 — a list of 149
- * conversations whose three unread ones were buried under the repetition.
- *
- * THE RULE IS THE LAST MESSAGE'S BROADCAST ID, and everything follows from that one choice. A copy
- * nobody has answered still ends on the announcement, so it folds. The moment someone REPLIES their
- * thread's newest message is the reply, which carries no broadcastId, and their row lifts out on its
- * own with nothing having to detect a reply. An answer cannot be folded away.
- *
- * A row is grouped by the broadcast AND by whose mailbox it came from: `viaAgent` rows are an agent's
- * outbound copies read from outside, and the owner's own rows are what arrived. Folding those two
- * together would put "what my agent sent" and "what I received" under one heading, which is two
- * different facts.
- *
- * A group of one is left alone: there is nothing to fold, and a lone copy that renders as a broadcast
- * would be a worse row than the thread it actually is.
- */
-export function foldBroadcasts(rows: OwnerConversation[]): OwnerConversation[] {
-  const groups = new Map<string, OwnerConversation[]>();
-  const singles: OwnerConversation[] = [];
-  for (const row of rows) {
-    if (!row.broadcastId) { singles.push(row); continue; }
-    const key = `${row.broadcastId} ${row.viaAgent ?? ''}`;
-    const bucket = groups.get(key);
-    if (bucket) bucket.push(row);
-    else groups.set(key, [row]);
-  }
-
-  const out = [...singles];
-  for (const copies of groups.values()) {
-    if (copies.length === 1) { out.push(copies[0]); continue; }
-    copies.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    const [head, ...rest] = copies;
-    out.push({
-      ...head,
-      // The badge is what the person is owed: unread in a folded row means unread ANYWHERE under it,
-      // or opening the newest copy would clear a count that belonged to nineteen other threads.
-      unread: copies.reduce((n, c) => n + c.unread, 0),
-      broadcastCount: copies.length,
-      folded: rest,
-    });
-  }
-  out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  return out;
 }
 
 /** Assemble the messaging conversations composite over the given storage. */

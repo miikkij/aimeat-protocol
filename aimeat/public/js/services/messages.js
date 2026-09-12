@@ -7,9 +7,12 @@
  *   block), plus small storage helpers used to upload and resolve message attachments.
  * @structure send / listInbox / listConversations / getConversation / markConversationRead /
  *   markRead / deleteMessage / listRequests / acceptRequest / blockContact / listContacts /
- *   uploadAttachment / attachmentUrl / transcribeAttachment
+ *   uploadAttachment / attachmentUrl / transcribeAttachment / getOrganize / updateOrganize /
+ *   archiveConversations
  * @usage import * as messages from '/js/services/messages.js';
  * @version-history
+ *   v1.5.0 -- 2026-09-13 -- getOrganize / updateOrganize / archiveConversations: the owner's archive
+ *     and the rules for their Messages list (/v1/messages/organize).
  *   v1.4.0 -- 2026-08-01 -- Voice messages: uploadAttachment carries a recording's measured
  *     `duration_seconds` into the descriptor (so a thread can show "0:14" before fetching the audio),
  *     and transcribeAttachment() turns one voice attachment into text on the caller's own copy.
@@ -103,6 +106,25 @@ export async function markRead(id) {
 
 export async function deleteMessage(id) {
   return api(`/v1/messages/${enc(id)}`, { method: 'DELETE' });
+}
+
+/** How the owner's list is organised: { auto_archive, fold_same_subject, rules, archived_count, kept_count }. */
+export async function getOrganize() {
+  const r = await apiGet('/v1/messages/organize');
+  return r?.data || null;
+}
+
+/** Change the settings or rules. `patch` is the PUT body: auto_archive, fold_same_subject, rules, add_rule, remove_rule. */
+export async function updateOrganize(patch) {
+  return api('/v1/messages/organize', { method: 'PUT', body: JSON.stringify(patch) });
+}
+
+/** Archive conversations, or bring them back with restore=true. Nothing is deleted either way. */
+export async function archiveConversations(conversationIds, restore = false) {
+  return api('/v1/messages/organize/archive', {
+    method: 'POST',
+    body: JSON.stringify({ conversation_ids: conversationIds, ...(restore ? { restore: true } : {}) }),
+  });
 }
 
 export async function listRequests() {

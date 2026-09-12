@@ -22,6 +22,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-13 — aimeat_dm_archive_as_owner and aimeat_dm_organize_as_owner on the agent surface.
  *   2026-09-12 — aimeat_dm_inbox_as_owner and aimeat_dm_thread_as_owner on the agent surface.
  *   2026-09-08 — aimeat_admin_cors_overview and aimeat_admin_cors_set on the operator surface,
  *     beside the Security pair.
@@ -171,6 +172,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_message_inbox', 'aimeat_message_send', 'aimeat_message_history',
         'aimeat_dm_send', 'aimeat_dm_send_as_owner', 'aimeat_dm_ask', 'aimeat_dm_inbox', 'aimeat_dm_thread', 'aimeat_notify',
         'aimeat_dm_inbox_as_owner', 'aimeat_dm_thread_as_owner',
+        'aimeat_dm_archive_as_owner', 'aimeat_dm_organize_as_owner',
         // A turn between two principals of ONE account, beside the owner thread and the federated
         // DM above it rather than instead of either. Agent surface only: the service surface carries
         // no messaging at all, and the primitives surface reaches these through aimeat_invoke.

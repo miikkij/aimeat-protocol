@@ -12,6 +12,8 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   v1.10.0 -- 2026-09-13 -- aimeat_dm_inbox_as_owner rows say where the owner's list shows them
+ *     (section, heading, archived and why, how many threads a folded row stands for). Additive.
  *   v1.9.0 -- 2026-09-12 -- aimeat_dm_inbox_as_owner and aimeat_dm_thread_as_owner read the OWNER's
  *     own mailbox on the new messages:read-as-owner word, through the service the REST doors use.
  *     "Reply as me" could send in the owner's thread and could not read it: aimeat_dm_thread answered
@@ -499,6 +501,11 @@ export function registerDmMessageTools(
                             updated_at: c.updatedAt,
                             ...(c.groupAlias ? { group: c.groupAlias, participants: c.participants ?? [] } : {}),
                             ...(c.broadcastCount ? { broadcast_copies: c.broadcastCount } : {}),
+                            // Where the owner's list shows it: people, own_agents, a rule's heading, or the archive.
+                            ...(c.section ? { section: c.section === 'agents' ? 'own_agents' : c.section } : {}),
+                            ...(c.group ? { heading: c.group } : {}),
+                            ...(c.archived ? { archived: { reason: c.archived.reason, since: c.archived.since, ...(c.archived.rule ? { rule: c.archived.rule } : {}) } } : {}),
+                            ...(c.fold ? { stands_for: c.fold.count, folded_by: c.fold.kind, fold_label: c.fold.label } : {}),
                         })),
                         conversations_total: data.conversationsTotal,
                         requests: data.requests.map(r => ({

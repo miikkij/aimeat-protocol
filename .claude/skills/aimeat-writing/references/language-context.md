@@ -81,6 +81,9 @@ everywhere at once, and say so in the Changes section.
 | a machine credential | what a program presents to prove it may connect | token | token | token |
 | a machine identifier | a name for a thing, never for a person | identifier / ID | tunniste | identificador / ID |
 | a person's login name | the public half of a sign-in | username | käyttäjätunnus | nombre de usuario |
+| one thread in Messages | everything said between the same parties under one subject | conversation | keskustelu | conversación |
+| where a person puts conversations away | nothing is deleted; a conversation comes back when someone other than their own agents writes | archive / archive (verb) | arkisto / arkistoida | archivo / archivar |
+| a rule for the Messages list | folds, groups or archives the conversations it matches; the first one that fits decides | rule | sääntö | regla |
 
 ## Never translated, in any language
 
@@ -201,3 +204,7 @@ service, the directory, the token, the identifier and the username: the test nam
   decision-ymparisto-ja-palvelin-ovat-oikeat-sanat-toiselle-aimeatille-.
 - **2026-09-12, same day** — five concept rows, the heading rule and the placeholder rule added,
   each one named by the A/B test above rather than thought up.
+- **2026-09-13** — conversation, archive and rule, with the Messages list's sections and archive.
+  *Keskustelu* and *conversación* are what the Messages page already shipped; *arkistoitu* and
+  *archivar* were already the words on other pages (organisms, packages, the calibrator), and
+  *sääntö* is what the Libraries and Capabilities pages call a rule.

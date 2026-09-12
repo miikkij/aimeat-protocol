@@ -14,6 +14,11 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.2.0 -- 2026-09-13 -- The list is in sections the server places (people, own agents, a rule's
+ *     heading, the archive), each closable, with archive and restore on a row, a group and a
+ *     selection (./inbox-tab/list-panel.js, ./inbox-tab/use-organize.js), and a "List rules" page
+ *     under the same crumb (./inbox-tab/organize-page.js). The conversations figure leaves the archive
+ *     out and a chip counts it. doBroadcast moved to ./inbox-tab/broadcast-send.js unchanged.
  *   v2.1.0 -- 2026-09-06 -- The copies of one broadcast are ONE row with the rest behind a disclosure
  *     (openFolds/toggleFold, collapsed by default). The conversations figure still counts THREADS,
  *     not rows: folding shortens the list, it does not give a person fewer conversations.
@@ -155,10 +160,14 @@ import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
 import { peerLabel } from '/js/services/messages-ai-prompts.js';
-import { ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure, openTrackedRecord, buildContactOptions, normalizePollQuestions, mergeThreadPage } from './inbox-tab/helpers.js';
+import { ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure, openTrackedRecord, buildContactOptions, mergeThreadPage } from './inbox-tab/helpers.js';
 import { Composer, MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
 import { buildConversationReplyProps, buildMessageReplyProps, buildConversationNotebookProps } from './inbox-tab/ai-actions.js';
-import { ListPanel, ThreadPanel, TrackedPanel, ResultsPanel, renderBroadcastForm } from './inbox-tab/panels.js';
+import { ThreadPanel, TrackedPanel, ResultsPanel, renderBroadcastForm } from './inbox-tab/panels.js';
+import { ListPanel } from './inbox-tab/list-panel.js';
+import { OrganizePage } from './inbox-tab/organize-page.js';
+import { useInboxOrganize } from './inbox-tab/use-organize.js';
+import { broadcastSend } from './inbox-tab/broadcast-send.js';
 import { useThreadAutoScroll, useMobileComposerKeyboard, useLinkPreviewToggle, useAttachmentUrlRefresh, useRecentBroadcasts } from './inbox-tab/use-thread-ux.js';
 import { useVoiceMessages } from './inbox-tab/use-voice.js';
 import { ContactPicker } from '/components/ContactPicker.js';
@@ -237,6 +246,8 @@ export default function InboxTab({ showToast }) {
     setImportant(new Set(impIds));
     setTrackedList(trs.filter(tr => tr.state !== 'cancelled' && !dismissedRef.current.has(tr.id)));
   }, []);
+  // Sections closed, selection, archive and the "List rules" page (./inbox-tab/use-organize.js).
+  const org = useInboxOrganize({ showToast, loadLists, pageOpen: mode === 'organize' });
 
   // Inbox mount: ONE composite call (GET /v1/messages/overview) seeds all six sections — requests +
   // conversations + important flags + tracked responses + the owner's agents + share groups — instead of
@@ -485,7 +496,11 @@ export default function InboxTab({ showToast }) {
   // Resolve names for every peer currently on screen (conversation peers + their owners + requests + open thread).
   useEffect(() => {
     const ids = [];
-    for (const c of conversations) { if (c.peerGhii) { ids.push(c.peerGhii); ids.push(ownerKeyOf(c.peerGhii)); } }
+    // A folded row is filed under who opened it, and each copy under it is named by who it went to.
+    for (const c of conversations) for (const r of [c, ...(c.folded || [])]) {
+      if (r.peerGhii) { ids.push(r.peerGhii); ids.push(ownerKeyOf(r.peerGhii)); }
+      if (c.fold) { ids.push(r.openedBy); ids.push(r.openedTo); }
+    }
     for (const r of requests) if (r.contactId) ids.push(r.contactId);
     if (activeConv?.peerGhii) { ids.push(activeConv.peerGhii); ids.push(ownerKeyOf(activeConv.peerGhii)); }
     resolvePeerNames(ids);
@@ -513,48 +528,11 @@ export default function InboxTab({ showToast }) {
   const removeBcRecipient = (id) => setBcRecipients(bcRecipients.filter(r => r !== id));
 
   // Send one message to many: explicit recipients and/or a Share Group audience. doBroadcast is the
-  // Composer's onSend for the broadcast panel.
-  const doBroadcast = async (_recipient, text, files, reset) => {
-    if (sending) return;
-    const body = (text || '').trim();
-    if (bcRecipients.length === 0 && !bcGroupId && !bcAudience) { showToast?.(t('inbox.bcNoRecipients'), true); return; }
-
-    let interactive;
-    if (bcType === 'poll') {
-      const questions = normalizePollQuestions(bcQuestions);
-      if (!questions.length) { showToast?.(t('inbox.pollNeedQuestion'), true); return; }
-      interactive = { role: 'questions', v: 1, questions };
-    } else if (!body && files.length === 0) { return; }
-
-    setSending(true);
-    try {
-      const attachments = [];
-      for (let i = 0; i < files.length; i++) {
-        const desc = await messages.uploadAttachment(files[i]);
-        attachments.push({ ...desc, inline: false, id: `at${i}` });
-      }
-      const resp = await messages.sendBroadcast({
-        to: bcRecipients, groupId: bcGroupId || undefined, audience: bcAudience || undefined,
-        mode: bcType === 'poll' ? 'broadcast' : bcMode,   // a poll must be repliable (recipients answer)
-        body, attachments, interactive,
-      });
-      if (resp?.ok === false) { showToast?.(resp?.error?.message || t('inbox.failed'), true); }
-      else {
-        reset?.();
-        const id = resp?.data?.broadcast_id;
-        const titleSrc = (bcType === 'poll' ? (interactive.questions[0]?.prompt || '') : body) || '';
-        if (id) trackBroadcast({
-          id, type: bcType,
-          title: titleSrc.slice(0, 60) || t('inbox.broadcast'),
-          createdAt: new Date().toISOString(),
-        });
-        showToast?.(`${t('inbox.bcSent')} (${resp?.data?.sent ?? 0})`);
-        loadLists();
-        if (id) openResults(id); else setMode('idle');
-      }
-    } catch (err) { swallowed('inbox-tab', err); showToast?.(sendFailure(err), true); }
-    setSending(false);
-  };
+  // Composer's onSend for the broadcast panel (./inbox-tab/broadcast-send.js).
+  const doBroadcast = broadcastSend({
+    sending, setSending, bcRecipients, bcGroupId, bcAudience, bcType, bcQuestions, bcMode,
+    showToast, trackBroadcast, loadLists, openResults, setMode,
+  });
 
   // Open the conversation for a tracked response, then (for awaiting-approval) seed the suggested reply.
   const openTracked = async (tr) => {
@@ -673,13 +651,18 @@ export default function InboxTab({ showToast }) {
   // one title row, then the two panes filling the screen. Broadcast, tracked responses and results
   // are PAGES under the same crumb rather than contents swapped into the right pane, so the left
   // list never lies about what the right side shows.
-  const unreadTotal = conversations.reduce((n, c) => n + (c.unread || 0), 0);
   // Threads, not rows. Folding twenty copies of one announcement into a single row makes the LIST
   // shorter; it does not make the person have fewer conversations, and a figure that fell by nineteen
-  // because the display improved would be answering a question nobody asked.
-  const convTotal = conversations.reduce((n, c) => n + 1 + (c.folded?.length || 0), 0);
-  const isPage = mode === 'tracked' || mode === 'results' || mode === 'broadcast';
-  const pageTitle = mode === 'broadcast' ? t('inbox.broadcastTitle') : mode === 'results' ? t('inbox.resultsTitle') : t('inbox.trackedTitle');
+  // because the display improved would be answering a question nobody asked. What the owner put in
+  // the archive is counted apart, because that one they did decide to stop seeing.
+  const threads = (rows) => rows.reduce((n, c) => n + 1 + (c.folded?.length || 0), 0);
+  const listed = conversations.filter(c => c.section !== 'archive');
+  const unreadTotal = listed.reduce((n, c) => n + (c.unread || 0), 0);
+  const convTotal = threads(listed);
+  const archivedTotal = threads(conversations) - convTotal;
+  const openOrganize = () => { setMode('organize'); setActiveConv(null); };
+  const isPage = mode === 'tracked' || mode === 'results' || mode === 'broadcast' || mode === 'organize';
+  const pageTitle = mode === 'broadcast' ? t('inbox.broadcastTitle') : mode === 'results' ? t('inbox.resultsTitle') : mode === 'organize' ? t('inbox.org.pageTitle') : t('inbox.trackedTitle');
   const goIdle = () => { setMode('idle'); setActiveConv(null); setReplyQuote(null); };
   const broadcastForm = mode !== 'broadcast' ? null : renderBroadcastForm({
     bcType, setBcType, bcMode, setBcMode, bcQuestions, setBcQuestions, bcRecipients, removeBcRecipient, bcInput, setBcInput,
@@ -699,6 +682,7 @@ export default function InboxTab({ showToast }) {
             <span>${(t('inbox.cover.figConvs') || '{n} conversations').replace('{n}', String(convTotal))}</span>
             ${unreadTotal ? html`<span class="og-chip og-chip--sun">${(t('inbox.cover.figUnread') || '{n} unread').replace('{n}', String(unreadTotal))}</span>` : null}
             ${requests.length ? html`<span class="og-chip">${(t('inbox.cover.figRequests') || '{n} requests').replace('{n}', String(requests.length))}</span>` : null}
+            ${archivedTotal ? html`<span class="og-chip">${t('inbox.org.figArchived', { n: String(archivedTotal) })}</span>` : null}
           </small>` : null}</h1>
         </div>
         ${!isPage ? html`<div class="og-mast-actions"><div class="og-doors og-ib-actions">
@@ -706,6 +690,7 @@ export default function InboxTab({ showToast }) {
           <button type="button" class="og-door" onClick=${startBroadcast}>${t('inbox.broadcast')}</button>
           <button type="button" class=${`og-door${awaitingCount ? '' : ' og-door--quiet'}`} onClick=${() => { setMode('tracked'); setActiveConv(null); }} title=${awaitingCount ? t('inbox.trackReady') : ''}>${t('inbox.trackedTitle')}${activeTracked.length ? ` ${activeTracked.length}` : ''}</button>
           ${recentBroadcasts.length ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => { setMode('results'); setResultsId(null); setActiveConv(null); }}>${t('inbox.results')}</button>` : null}
+          <button type="button" class="og-door og-door--quiet" onClick=${openOrganize}>${t('inbox.org.door')}</button>
         </div></div>` : null}
       </div>
       <datalist id="inbox-contact-suggest">
@@ -720,6 +705,7 @@ export default function InboxTab({ showToast }) {
               results=${results} openResults=${openResults} setResultsId=${setResultsId} setResults=${setResults} />` : null}
             ${mode === 'tracked' ? html`<${TrackedPanel} activeTracked=${activeTracked} doneCount=${doneCount}
               openRecord=${openRecord} openTracked=${openTracked} cancelTracked=${cancelTracked} />` : null}
+            ${mode === 'organize' ? html`<${OrganizePage} org=${org} showToast=${showToast} />` : null}
           </div>
           <nav class="og-rail" aria-label=${t('inbox.title')}>
             <span class="og-rail-label">${t('inbox.title')}</span>
@@ -728,13 +714,14 @@ export default function InboxTab({ showToast }) {
             <button type="button" class=${`og-rail-link ${mode === 'broadcast' ? 'on' : ''}`} onClick=${startBroadcast}><i>·</i>${t('inbox.broadcast')}<em>→</em></button>
             <button type="button" class=${`og-rail-link ${mode === 'tracked' ? 'on' : ''}`} onClick=${() => { setMode('tracked'); setActiveConv(null); }}><i>·</i>${t('inbox.trackedTitle')}<em>${activeTracked.length || '→'}</em></button>
             ${recentBroadcasts.length ? html`<button type="button" class=${`og-rail-link ${mode === 'results' ? 'on' : ''}`} onClick=${() => { setMode('results'); setResultsId(null); setActiveConv(null); }}><i>·</i>${t('inbox.results')}<em>${recentBroadcasts.length}</em></button>` : null}
+            <button type="button" class=${`og-rail-link ${mode === 'organize' ? 'on' : ''}`} onClick=${openOrganize}><i>·</i>${t('inbox.org.door')}<em>→</em></button>
           </nav>
         </div>` : html`
       <div class=${`inbox-body${mode !== 'idle' ? ' inbox-body--panel' : ''}`}>
         <button class="inbox-back" onClick=${goIdle}>← ${t('inbox.back')}</button>
         <${ListPanel} requests=${requests} conversations=${conversations} activeConv=${activeConv}
           peerDisplay=${peerDisplay} accept=${accept} block=${block} openConversation=${openConversation}
-          openFolds=${openFolds} toggleFold=${toggleFold} />
+          openFolds=${openFolds} toggleFold=${toggleFold} org=${org} />
 
         ${mode === 'compose' ? html`
           <div class="inbox-panel">
@@ -758,7 +745,7 @@ export default function InboxTab({ showToast }) {
           onTrackMsg=${onTrackMsg} onParkMsg=${onParkMsg} onDeleteMsg=${onDeleteMsg} openMessageAi=${openMessageAi} submitInteractiveAnswers=${submitInteractiveAnswers}
           setMdViewer=${setMdViewer} openConversationAi=${openConversationAi} openConversationNotebook=${openConversationNotebook} insertCommand=${insertCommand} setCmdFill=${setCmdFill}
           cancelTracked=${cancelTracked} openRecord=${openRecord} startSuggestedReply=${startSuggestedReply} doSend=${doSend} showLinkPreviews=${showLinkPreviews} toggleLinkPreviews=${toggleLinkPreviews}
-          threadAll=${threadAll} toggleThreadAll=${toggleThreadAll}
+          threadAll=${threadAll} toggleThreadAll=${toggleThreadAll} archiveItem=${org.menuItemFor(activeConv, conversations)}
           onTranscribe=${transcribeVoice} canTranscribe=${canTranscribe} voiceMaxSeconds=${voiceMaxSeconds} />` : null}
 
         ${mode === 'idle' ? html`

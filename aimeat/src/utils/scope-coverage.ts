@@ -30,6 +30,8 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.7.0 — 2026-09-13 — messages:organize-as-owner joins the own-tick family: archiving the owner's
+ *     conversations and writing the rules for their Messages list, as the owner.
  *   v1.6.0 — 2026-09-12 — messages:read-as-owner joins the own-tick family: an agent reading the
  *     owner's own mailbox, as the owner.
  *   v1.5.0 — 2026-09-06 — SECRETS_MANAGE_SCOPE, the owner's credential vault. Outside the wildcard
@@ -215,6 +217,11 @@ const OWN_TICK_SCOPES = [
     // reason as the word above. (An APP needs none of this: an app grant already acts as the owner,
     // and `messages:read` is its word for the same mailbox — services/owner-mailbox-reads.ts.)
     'messages:read-as-owner',
+    // Organise the OWNER's Messages list, as the owner: archive and restore conversations, and write
+    // the rules that fold, group or archive them. Nothing is destroyed, but archiving is how a message
+    // stops being seen, so an agent able to do it on "Full access" could put away the one message
+    // about itself. Its own tick; not grandfathered, because the capability did not exist before.
+    'messages:organize-as-owner',
 ] as const;
 
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [
