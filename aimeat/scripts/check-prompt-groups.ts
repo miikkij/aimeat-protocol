@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Every prompt group the seeds declare has a heading on the admin Prompts page, and
  *   that heading has a translation. The page names a group through a hand-kept map
- *   (GROUP_NAMES in public/views/admin/prompts-tab.js) and t('dashboard.<key>'); a group missing
+ *   (GROUP_NAMES in public/views/admin/prompts-tab.list.js) and t('dashboard.<key>'); a group missing
  *   from the map renders its raw key as the heading, and nothing errors. Measured 2026-09-09:
  *   five groups added since July (playbooks, workflows, proactive, contacts, email) read
  *   "dashboard.workflows (3)" on the page for weeks before a person noticed.
@@ -14,6 +14,8 @@
  *   - the dashboard object of locales/en.json (fi and es follow en through check:locales)
  * @usage  pnpm check:prompt-groups   (exits non-zero when a group has no heading or no translation)
  * @version-history
+ *   v1.1.0 — 2026-09-12 — GROUP_NAMES moved with the page's list pane to prompts-tab.list.js; the
+ *     gate reads it there. The map and the rule are unchanged.
  *   v1.0.0 — 2026-09-09 — Initial.
  */
 import { readFileSync, readdirSync } from 'node:fs';
@@ -34,10 +36,12 @@ function seededGroups(): Set<string> {
   return groups;
 }
 
+const GROUP_NAMES_FILE = 'public/views/admin/prompts-tab.list.js';
+
 function mappedGroups(): Map<string, string> {
-  const src = readFileSync(join(root, 'public/views/admin/prompts-tab.js'), 'utf8');
+  const src = readFileSync(join(root, GROUP_NAMES_FILE), 'utf8');
   const block = /const GROUP_NAMES = \{([\s\S]*?)\};/.exec(src);
-  if (!block) throw new Error('GROUP_NAMES not found in public/views/admin/prompts-tab.js');
+  if (!block) throw new Error(`GROUP_NAMES not found in ${GROUP_NAMES_FILE}`);
   const map = new Map<string, string>();
   for (const m of block[1].matchAll(/(\w+):\s*'([^']+)'/g)) map.set(m[1], m[2]);
   return map;

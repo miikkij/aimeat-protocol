@@ -557,6 +557,10 @@ const ALL_SUITES = [
     // The Portal page's reads: the facts its first section states, the parts with the words under
     // their names, the save that makes the page the operator's own, and every refusal for a member.
     'test/e2e-admin-portal-page.ts',
+    // The System Prompts page: who owns a prompt, the round trip a version number cannot describe
+    // (edit, take the current version, and the number rises while the text goes back), and what a
+    // group take does besides replacing text.
+    'test/e2e-admin-prompts-page.ts',
     // The numbers behind the Statistics page: that requests_total is counted at all (its middleware
     // was written and never mounted), that a scope refusal is counted, and that a period reading is
     // a different reading from the node's whole life.
