@@ -9,6 +9,7 @@
  *   vertical variant renders on mobile. No protocol terms in body copy.
  * @usage routed at /v1/how-it-works by spa.html
  * @version-history
+ *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v2.1.0 — 2026-08-29 — The showroom face (design canvas "AIMEAT Index Pages"): the diagram's boxes
  *     are square with a 3px ink frame and a solid offset shadow (coral on the hot ones), the human
  *     at the gate a dashed frame, the arrows 3px ink; the CTA row is one hot slab and two doors.
@@ -193,10 +194,10 @@ export default function HowItWorks({ navigate }) {
 
       <div class="ld-ctarow">
         ${hasSite('learn')
-          ? html`<a class="ld-sh-btn ld-sh-btn--hot" href=${siteLink('learn')} target="_blank" rel="noopener">${tr('hiw.ctaLearn', 'Learn it hands-on, free →')}</a>`
-          : html`<a class="ld-sh-btn ld-sh-btn--hot" href="/v1/portal" onClick=${(e) => { e.preventDefault(); navigate('/v1/portal'); }}>${tr('hiw.ctaTry', 'Try it free →')}</a>`}
-        ${storeHref() ? html`<a class="ld-sh-door" href=${storeHref()} target="_blank" rel="noopener">${tr('hiw.ctaPricing', 'See pricing →')}</a>` : ''}
-        <a class="ld-sh-door" href="/v1/business" onClick=${(e) => { e.preventDefault(); navigate('/v1/business'); }}>${tr('hiw.ctaBusiness', 'For your business →')}</a>
+          ? html`<a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href=${siteLink('learn')} target="_blank" rel="noopener">${tr('hiw.ctaLearn', 'Learn it hands-on, free →')}</a>`
+          : html`<a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href="/v1/portal" onClick=${(e) => { e.preventDefault(); navigate('/v1/portal'); }}>${tr('hiw.ctaTry', 'Try it free →')}</a>`}
+        ${storeHref() ? html`<a class="ld-sh-door showroom-door" href=${storeHref()} target="_blank" rel="noopener">${tr('hiw.ctaPricing', 'See pricing →')}</a>` : ''}
+        <a class="ld-sh-door showroom-door" href="/v1/business" onClick=${(e) => { e.preventDefault(); navigate('/v1/business'); }}>${tr('hiw.ctaBusiness', 'For your business →')}</a>
       </div>
     </div>
   `;

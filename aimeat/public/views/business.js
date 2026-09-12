@@ -14,6 +14,7 @@
  *   explained on first use.
  * @usage routed at /v1/business by spa.html
  * @version-history
+ *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v2.2.0 — 2026-08-29 — The showroom face (design canvas "AIMEAT Index Pages"): the demo button
  *     sits in the hero, the ownership section is the ink band and the money section the sun band
  *     (.ld-band--ink / .ld-band--sun), and the closing row is one hot slab and two doors.
@@ -105,7 +106,7 @@ export default function Business({ navigate }) {
         <div class="ld-bhero-text">
           <h1 class="ld-h1">${tr('biz.heroTitle', 'A digital employee that never sleeps')}</h1>
           <p class="ld-hero-sub">${tr('biz.heroSub', 'Scheduled agents fetch, write, report and ship while you do something else. Every step traceable, and what they produce is yours.')}</p>
-          ${CONTACT ? html`<a class="ld-sh-btn ld-sh-btn--hot" href=${CONTACT}>${tr('biz.ctaDemo', 'Book a demo →')}</a>` : ''}
+          ${CONTACT ? html`<a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href=${CONTACT}>${tr('biz.ctaDemo', 'Book a demo →')}</a>` : ''}
         </div>
       </section>
 
@@ -235,9 +236,9 @@ export default function Business({ navigate }) {
         <div class="ld-stats-line">${tr('biz.allLive', 'Everything above runs in production right now. No proof is a mockup.')}</div>
         <div class="ld-ctarow">
           ${hasSite('assessment') ? html`
-            <a class="ld-sh-btn ld-sh-btn--hot" href=${siteLink('assessment')} target="_blank" rel="noopener">${tr('biz.ctaAssessment', 'Free: where is your AI right now? →')}</a>` : ''}
-          ${CONTACT ? html`<a class=${hasSite('assessment') ? 'ld-sh-door' : 'ld-sh-btn ld-sh-btn--hot'} href=${CONTACT}>${tr('biz.ctaDemo', 'Book a demo →')}</a>` : ''}
-          ${storeHref() ? html`<a class="ld-sh-door" href=${storeHref()} target="_blank" rel="noopener">${tr('biz.ctaPricing', 'See pricing →')}</a>` : ''}
+            <a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href=${siteLink('assessment')} target="_blank" rel="noopener">${tr('biz.ctaAssessment', 'Free: where is your AI right now? →')}</a>` : ''}
+          ${CONTACT ? html`<a class=${hasSite('assessment') ? 'ld-sh-door showroom-door' : 'ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot'} href=${CONTACT}>${tr('biz.ctaDemo', 'Book a demo →')}</a>` : ''}
+          ${storeHref() ? html`<a class="ld-sh-door showroom-door" href=${storeHref()} target="_blank" rel="noopener">${tr('biz.ctaPricing', 'See pricing →')}</a>` : ''}
         </div>
       </div>
 
