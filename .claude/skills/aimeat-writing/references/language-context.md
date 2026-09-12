@@ -59,8 +59,9 @@ everywhere at once, and say so in the Changes section.
 | The thing | In one sentence | en | fi | es |
 |---|---|---|---|---|
 | the person's own system | the running AIMEAT their account lives in | your own AIMEAT | oma AIMEAT | tu propio AIMEAT |
-| someone else's system | another AIMEAT they can sign into or read from | environment / remote environment | ympäristö / etäympäristö | entorno / entorno remoto |
-| the machine | the host, when the sentence is really about hardware or reachability | server | palvelin | servidor |
+| someone else's system | another AIMEAT they can sign into and whose memory they browse | environment / remote environment | ympäristö / etäympäristö | entorno / entorno remoto |
+| the machine | the host, when the sentence is really about the machine: what holds a credential, what has an address, what is reachable | server | palvelin | servidor |
+| whoever pays for the shared AI key | the operator of this installation, on an operator surface | this server / the server's key | palvelin / palvelimen avain | este servidor / la clave del servidor |
 | stored knowledge | what the person and their agents wrote here | memory | muisti | memoria |
 | one stored thing | a single record under one key | entry | merkintä | entrada |
 | the AI acting for them | scoped, named, revocable, acts in their name | agent | agentti | agente |
@@ -101,6 +102,20 @@ mean the machine. On an operator surface the word stays, because an administrato
 it: the admin pages, federation administration, the start wizard, the CLI.
 
 **Node.js keeps its name**, and a `{placeholder}` is not prose. The gate knows both.
+
+**The house / talo / la casa, for whoever pays.** No gate catches this one; it is a ruling
+(2026-09-13), and the developer's words for it were *there is no house*. The metaphor carried
+nothing in any of the three languages. Finnish has the idiom *talon piikkiin* but derives no noun
+from it, so *talon saldo* returns no hits at all; in Spanish *la casa* is the bank in a casino, and
+a Bogotá reader took a line about AI credit for an offer of free chips. Both cold readers refused
+it separately, with searches.
+
+Say what the thing is instead. On an operator surface that is **this server** or **the server's
+key**, which is what the configuration page already glossed it as. On a person's surface it is
+**this server**, or **here**, or no actor at all when the sentence stands without one.
+
+Three uses are not the metaphor and stay: a picture caption where a house is a house, an *auction
+house*, and *house style* (`talon tyyli`), which is its own idiom about whose style it is.
 
 ## Register
 
@@ -177,8 +192,12 @@ service, the directory, the token, the identifier and the username: the test nam
 - **2026-09-12** — written, after a pass over the Memory and Access screens in which cold readers
   in Finnish and Spanish, working separately, rejected the same two words on evidence. The table's
   decided column records what those screens already shipped rather than proposing anything new.
-  Two questions are open and are the developer's: whether *environment / ympäristö / entorno* is
-  the right word for someone else's system, given that both readers read it as a deployment stage,
-  and whether *the house* carries its meaning in *tekoälysaldo* and *saldo de IA*.
+  Two questions were left open for the developer, and both are now answered below.
+- **2026-09-13** — both settled, and the answers went opposite ways. *Environment* and *server* are
+  BOTH right and both stay, each in its own sense: an environment is one you sign into and browse,
+  a server is the machine when the sentence is about the machine. The readers who wanted one word
+  for both were reading a distinction the product actually makes. *The house* goes entirely, from
+  the twenty-five internal keys that carried it. Ruled by the developer, recorded on the board as
+  decision-ymparisto-ja-palvelin-ovat-oikeat-sanat-toiselle-aimeatille-.
 - **2026-09-12, same day** — five concept rows, the heading rule and the placeholder rule added,
   each one named by the A/B test above rather than thought up.
