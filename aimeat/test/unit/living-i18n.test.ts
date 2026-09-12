@@ -3,7 +3,8 @@
  * @description A LIVING RECORD THAT CARRIES ITS OWN WORDS. Four things are proved here, and the
  *   fourth is the one that matters: the resolution order (the page, then the record's own default,
  *   then the map's first key), the refusals a malformed language map earns by name, that a format
- *   is per record rather than per language with `locale: "auto"` as the single door out, and that
+ *   is per record rather than per language — with `locale: "auto"` deferring to the READER's own
+ *   regional setting rather than to the page's words — and that
  *   CHANGING THE LANGUAGE CHANGES ONLY THE WORDS — the number a person moved is still where they
  *   left it, the machine is still in the state it reached, and the dependency graph is the same
  *   graph it was.
@@ -13,6 +14,10 @@
  *   throw away everything the person had done, which is the failure this is written to catch.
  * @usage cd aimeat && pnpm vitest run test/unit/living-i18n.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-12 — `locale: "auto"` no longer follows the page's LANGUAGE. It means the
+ *     reader's own regional format, which is a setting of its own, so the case that used to prove
+ *     "English moves the decimal point" now proves that it does not. The record that names a tag
+ *     outright is unchanged: that was the record deciding, and nothing overrules it.
  *   v1.0.0 — 2026-09-06 — Initial (the living document, stage 4).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -232,12 +237,14 @@ describe('a format is per record, not per language', () => {
     expect(formatNumber(15.75, 1, 'fi')).toBe('15.8');
   });
 
-  it('follows the language for the separators when the format says locale: "auto"', () => {
-    const fi = formatNumber(1234.5, { decimals: 1, group: true, locale: 'auto' }, 'fi');
-    const en = formatNumber(1234.5, { decimals: 1, group: true, locale: 'auto' }, 'en');
-    expect(fi).toContain(',5');
-    expect(en).toContain('.5');
-    expect(fi).not.toBe(en);
+  it('writes locale: "auto" the READER\'s way, and the language no longer moves it', () => {
+    // THIS TEST ASSERTED THE OPPOSITE UNTIL 2026-09-12, and the behaviour it asserted was the
+    // defect: `auto` meant "whatever language the page is READING", so switching to English moved
+    // a person's decimal comma. Language, regional format and time zone are three settings, and a
+    // reader whose words are English and whose format is Finnish keeps the comma.
+    // → decision "Kieli, esitysmuoto ja aikavyöhyke ovat kolme erillistä asetusta"
+    const asAuto = { decimals: 1, group: true, locale: 'auto' };
+    expect(formatNumber(1234.5, asAuto, 'fi')).toBe(formatNumber(1234.5, asAuto, 'en'));
   });
 
   it('leaves a written-out locale alone: that was the record deciding, not the page', () => {
