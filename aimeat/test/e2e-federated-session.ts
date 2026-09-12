@@ -41,6 +41,11 @@
  *   500, the verified:false pin, per-peer scopes) · 9 cleanup.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-session
  * @version-history
+ *   v1.1.0 — 2026-09-13 — A visitor's records are keyed by their HOME GHII, so the dead-peer session
+ *     and the live-peer session are two identities rather than one shared local namespace. The
+ *     push-home assertion in the unreachable-home test changes from the proxy error to 404: that
+ *     door now answers "not yours" before it dials. Pin 2 below is also gone — a federated session
+ *     no longer resolves to the local account that shares its name (utils/gaii.ts).
  *   v1.0.0 — 2026-09-08 — Written for the federated half of src/routes/memory/federation.ts and the
  *     federated branch of src/routes/ghii/register-login.ts, neither of which had ever executed.
  */
@@ -664,13 +669,22 @@ async function run() {
         assert(String(pull.body.error?.message).startsWith('Failed to reach'),
             `the network catch, not the url guard: ${pull.body.error?.message}`);
 
+        // push-home never reaches the socket for THIS session, and the reason is the point: the
+        // record was pulled by the visitor whose home is `homeNodeId`, and this session's home is
+        // `deadNodeId`. Two home nodes are two accounts even when the local part of the name is the
+        // same, so the key is not this identity's to push. It answers 404 before it dials.
+        //
+        // Until 2026-09-13 both sessions resolved to `visitor@<this node>` and shared one namespace,
+        // so this door found the other visitor's record and failed on the dead socket instead. That
+        // shared bucket was the defect (utils/gaii.ts resolveIdentity, test/e2e-federated-namesake.ts);
+        // the proxy path for push-home is covered by Phase 5, where the record IS the pusher's.
         const push = await json('/v1/memory/push-home', {
             method: 'POST',
             headers: { Authorization: `Bearer ${deadFedToken}` },
             body: JSON.stringify({ key: PULL_KEY }),
         });
-        assert(push.status === 502, `push ${push.status}: ${JSON.stringify(push.body)}`);
-        assert(push.body.error?.code === 'FEDERATION_PROXY_ERROR', `push code: ${push.body.error?.code}`);
+        assert(push.status === 404, `push ${push.status}: ${JSON.stringify(push.body)}`);
+        assert(push.body.error?.code === 'NOT_FOUND', `push code: ${push.body.error?.code}`);
 
         const list = await json('/v1/memory/list-home', {
             method: 'POST',

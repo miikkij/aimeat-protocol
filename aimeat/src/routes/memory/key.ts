@@ -78,7 +78,9 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     if (agentParam && agentParam !== gaii) {
       const targetAgent = await storage.getAgent(agentParam);
-      if (!targetAgent || targetAgent.owner !== req.auth!.owner) {
+      // `targetAgent.owner !== req.auth!.owner` compares NAMES, and a federated visitor's name is
+      // the local part of an account on another node: it matches the local namesake's agents.
+      if (!targetAgent || targetAgent.owner !== req.auth!.owner || req.auth!.federated) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only read memory of your own agents'));
         return;
       }
@@ -107,7 +109,12 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // whose only granted area was `service.peeker.*` read a `private` owner key by passing the
     // flag, and `openrouter.*` sits in the same namespace.
     const isEcosystem = req.auth!.roles.includes('ecosystem');
-    const ownerScopeRead = (isOwnerSession || req.query.owner_scope === 'true') && !agentParam && !isEcosystem;
+    // NOT a federated session, whatever its role says. The owner-scope is resolved from the bare
+    // owner NAME, and a visitor signed in from another node carries the local part of THEIR name:
+    // the fan-out would read the local account that happens to share it. Their own records are
+    // keyed by their home GHII (utils/gaii.ts resolveIdentity), which the plain read below uses.
+    const ownerScopeRead = (isOwnerSession || req.query.owner_scope === 'true')
+      && !agentParam && !isEcosystem && !req.auth!.federated;
     let record = ownerScopeRead
       ? await memoryDb.getOwnerScope(req.auth!.owner, key)
       : await storage.getMemory(gaii, key);

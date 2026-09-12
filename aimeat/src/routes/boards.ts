@@ -253,7 +253,11 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
     // Authorization: only owner session (GHII, not agent). Operator owner sessions can manage any board.
     // Agent sessions are always rejected — even operator agents must use their owner session.
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    // A federated session is rejected with them: the ownership test below compares owner NAMES, and
+    // a visitor from another node carries the local part of THEIR name, which matches the local
+    // account that shares it. Their boards are on their home node.
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
+      && !req.auth!.federated;
     const isOperatorOwner = isOwnerSession && req.auth!.roles.includes('operator');
     if (!isOwnerSession) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner (owner session) or operator can manage members'));
