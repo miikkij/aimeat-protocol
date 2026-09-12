@@ -60,6 +60,7 @@ import { CopyButton } from '/components/CopyButton.js';
 import { McpQuickConnect } from '/components/McpInstall.js';
 import { agentState } from './state-detector.js';
 import { swallowed } from '/js/swallowed.js';
+import { date as fmtDate } from '/js/format.js';
 import {
   getOnboarding, startOnboarding, getIntegrationOverview,
   getWebhookConfig, testWebhook, updateWebhook,
@@ -563,7 +564,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
         `}
         <div class="pf-agd-info-row">
           <span class="pf-agd-info-label">${t('profile.agents.created')}</span>
-          <span class="pf-agd-info-value">${agent.created_at ? new Date(agent.created_at).toLocaleDateString() : '--'}</span>
+          <span class="pf-agd-info-value">${agent.created_at ? fmtDate(agent.created_at) : '--'}</span>
         </div>
         ${agent.roles && agent.roles.length > 0 && html`
           <div class="pf-agd-info-row">

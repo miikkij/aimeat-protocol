@@ -41,6 +41,7 @@ import { getAgentCommands } from '/js/services/agent-integration.js';
 import { Markdown } from '/components/Markdown.js';
 import { AiLabel } from '/components/ai-label.js';
 import { swallowed } from '/js/swallowed.js';
+import { time as fmtTime } from '/js/format.js';
 
 const html = htm.bind(h);
 
@@ -302,7 +303,7 @@ export default function TabMessages({ agent, agentName, showToast }) {
                       recordUrl=${msg.ai_provenance?.record_url} variant="inline" />
         </div>
         <div class="pf-agd-msg-meta ${msg.direction === 'inbound' ? 'pf-agd-msg-meta-right' : ''}">
-          ${msg.createdAt ? html`<span class="pf-agd-msg-time">${new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> ${timeAgo(msg.createdAt)}` : ''}
+          ${msg.createdAt ? html`<span class="pf-agd-msg-time">${fmtTime(msg.createdAt, { hour: '2-digit', minute: '2-digit' })}</span> ${timeAgo(msg.createdAt)}` : ''}
         </div>
         ${prompt && html`
           <div class="agd-msg-prompt">

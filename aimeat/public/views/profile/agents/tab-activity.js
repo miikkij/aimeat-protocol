@@ -31,6 +31,7 @@ import { getDirectives } from '/js/services/agent-directives.js';
 import { getWebhookConfig, getTelemetry } from '/js/services/agent-integration.js';
 import { getLedgerUsage } from '/js/services/ledger.js';
 import { swallowed } from '/js/swallowed.js';
+import { num, time as fmtTime } from '/js/format.js';
 
 const html = htm.bind(h);
 
@@ -198,7 +199,7 @@ export default function TabActivity({ agent, agentName }) {
             <div class="stat-card-label">${t('profile.agents.activity.tasksCompleted')}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-card-value">${ledgerTokens != null ? ledgerTokens.toLocaleString() : (telemetryConnected ? (stats.tokensUsed30d ?? 0) : '—')}</div>
+            <div class="stat-card-value">${ledgerTokens != null ? num(ledgerTokens) : (telemetryConnected ? (stats.tokensUsed30d ?? 0) : '—')}</div>
             <div class="stat-card-label">${t('profile.agents.activity.tokensUsed')}${telemetryConnected ? '' : ` (${t('profile.agents.detail.activity.notReported') || 'not reported'})`}</div>
           </div>
           <div class="stat-card">
@@ -216,7 +217,7 @@ export default function TabActivity({ agent, agentName }) {
             ${governance.budget ? html`
               <div class="pf-agd-governance-item">
                 <span class="pf-agd-governance-label">${t('profile.agents.detail.activity.governance.tokenBudget')}</span>
-                <span class="pf-agd-governance-value">${(governance.tokensUsedToday || 0).toLocaleString()} / ${(governance.budget.max_tokens_per_day || '---').toLocaleString()}${governance.budget.max_tokens_per_day ? ` (${Math.round((governance.tokensUsedToday || 0) / governance.budget.max_tokens_per_day * 100)}%)` : ''}</span>
+                <span class="pf-agd-governance-value">${num(governance.tokensUsedToday || 0)} / ${num(governance.budget.max_tokens_per_day || '---')}${governance.budget.max_tokens_per_day ? ` (${Math.round((governance.tokensUsedToday || 0) / governance.budget.max_tokens_per_day * 100)}%)` : ''}</span>
               </div>
             ` : ''}
             <div class="pf-agd-governance-item">
@@ -280,7 +281,7 @@ export default function TabActivity({ agent, agentName }) {
           return html`
             <div key=${ev.id || i} class="pf-agd-log-entry pf-agd-log-entry--two-line">
               <div class="pf-agd-log-entry-primary">
-                <span class="pf-agd-log-time">${ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
+                <span class="pf-agd-log-time">${ev.timestamp ? fmtTime(ev.timestamp, { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
                 <span class="pf-agd-event-badge ${badgeClass}">${t(FILTERS.find(f => f.id === cat)?.key || '') || cat}</span>
                 <span class="pf-agd-log-type">${ev.type || ev.event || '-'}</span>
               </div>

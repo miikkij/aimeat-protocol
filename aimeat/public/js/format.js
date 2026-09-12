@@ -32,6 +32,16 @@
  *   money(12.5, 'EUR')           → "12,50 €"
  *   morsels(625)                 → "625 morsels" — never a currency symbol
  * @version-history
+ *   v2.3.0 — 2026-09-12 — calendar(): a DATE rather than a moment, pinned so no zone can slide it.
+ *     A heat-map square, a month rail and a usage day are days on a calendar, not instants, and
+ *     re-reading them in the reader's clock had them label themselves as the day before.
+ *   v2.2.0 — 2026-09-12 — dayKey() and sameDay(): which calendar day an instant falls on IN THE
+ *     READER'S ZONE. Four surfaces asked `toDateString()`, which answers for the BROWSER's zone, so
+ *     a reader on another clock could see a row's time under a day heading it did not belong to.
+ *   v2.1.0 — 2026-09-12 — A caller that names a `timeZone` keeps it. Without this a calendar-day
+ *     bucket (a usage row keyed by the UTC day) was re-read in the reader's own zone and could show
+ *     the previous day to anyone west of the node, which is a wrong number rather than a wrong
+ *     format. A moment still passes no zone and still gets the reader's.
  *   v2.0.0 — 2026-09-12 — Every formatter follows the reader's own region and time zone, from the
  *     profile, falling back to the browser. Adds date/time/dateTime/relative/money/morsels/compare,
  *     which is what the twenty hand-rolled language-to-format helpers were each doing their own way.
@@ -45,14 +55,23 @@
  *     fmtBytes to a shared module; admin/shared.js now re-exports from here.
  */
 import { getRegion, getTimeZone } from '/js/display-prefs.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** The tag to format with: the reader's own, or undefined, which IS the browser default. */
 function tag() {
   return getRegion() || undefined;
 }
 
-/** Merge the reader's clock into a format option bag. No zone stored: the browser's own applies. */
+/**
+ * Merge the reader's clock into a format option bag. No zone stored: the browser's own applies.
+ *
+ * A CALLER THAT NAMES A ZONE WINS, and the case that needs it is a calendar day rather than a
+ * moment: a usage row bucketed by the UTC day means the same day to everybody, and re-reading it
+ * in the reader's own zone slides it backwards for anyone west of the node. Such a caller passes
+ * `timeZone: 'UTC'` and means it. Everything that is a real instant passes no zone and gets theirs.
+ */
 function withZone(opts) {
+  if (opts && opts.timeZone) return opts;
   const tz = getTimeZone();
   return tz ? { ...opts, timeZone: tz } : opts;
 }
@@ -90,6 +109,58 @@ export function dateTime(s, opts) {
   const d = new Date(s);
   if (!Number.isFinite(d.getTime())) return String(s);
   try { return d.toLocaleString(tag(), withZone(opts)); } catch { return String(s); }
+}
+
+/**
+ * A CALENDAR DATE — a square on a grid, a day a usage row was counted into, a birthday — rather
+ * than a moment. Written in the reader's own format, and pinned so that no zone can move it.
+ *
+ * `date()` is for an instant and rightly re-reads it in the reader's clock. Do that to a calendar
+ * square and it slides: a cell built as local midnight, redrawn in a zone two hours west, labels
+ * itself the previous day, and a month rail can then start a month early. Pass a `YYYY-MM-DD`
+ * string or a Date whose LOCAL year-month-day is the day you mean.
+ */
+export function calendar(value, opts) {
+  if (!value) return '—';
+  let y, m, d;
+  if (value instanceof Date) {
+    if (!Number.isFinite(value.getTime())) return String(value);
+    [y, m, d] = [value.getFullYear(), value.getMonth(), value.getDate()];
+  } else {
+    const parts = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value));
+    if (!parts) return String(value);
+    [y, m, d] = [Number(parts[1]), Number(parts[2]) - 1, Number(parts[3])];
+  }
+  // Noon UTC, formatted in UTC: the day is then the day, whatever the reader's clock says.
+  const at = new Date(Date.UTC(y, m, d, 12));
+  try { return at.toLocaleDateString(tag(), { ...opts, timeZone: 'UTC' }); } catch { return String(value); }
+}
+
+/**
+ * The calendar day an instant falls on IN THE READER'S ZONE, as a sortable `YYYY-MM-DD` key.
+ *
+ * For "is this today", "is this yesterday" and for grouping a list under day headings. The obvious
+ * way — `new Date(s).toDateString()` — asks the BROWSER's zone, so a reader who set a different one
+ * saw a row stamped with a clock under a heading a day away from it, on the same screen. This is a
+ * key rather than a display, so the tag is fixed: `en-CA` is the one that writes a plain ISO day.
+ */
+export function dayKey(s) {
+  const d = new Date(s);
+  if (!Number.isFinite(d.getTime())) return '';
+  try {
+    return d.toLocaleDateString('en-CA', withZone(undefined));
+  } catch (err) {
+    // A stored zone the runtime refuses. Say so once and answer with the browser's own day, which
+    // is what every caller here did before there was a setting at all.
+    swallowed('format: dayKey fell back to the browser day', err);
+    return d.toLocaleDateString('en-CA');
+  }
+}
+
+/** Whether two instants fall on the same calendar day in the reader's own zone. */
+export function sameDay(a, b) {
+  const ka = dayKey(a);
+  return !!ka && ka === dayKey(b);
 }
 
 /** The name this module has always had for a date-and-time. Kept, because 161 places call it. */

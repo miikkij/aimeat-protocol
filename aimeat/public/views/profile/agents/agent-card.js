@@ -112,6 +112,7 @@ import TabQuality from './tab-quality.js';
 import TabServices from './tab-services.js';
 import TabCrew from './tab-crew.js';
 import { swallowed } from '/js/swallowed.js';
+import { num } from '/js/format.js';
 
 const html = htm.bind(h);
 
@@ -473,7 +474,7 @@ function renderCollapsedStats(state, agent, onboarding) {
         const { done, active: act } = agent.taskStats;
         if (done || act) parts.push(`${t('profile.agents.detail.today')}: ${done || 0} ${t('profile.agents.detail.done')}${act ? `, ${act} ${t('profile.agents.detail.active')}` : ''}`);
       }
-      if (agent.tokensUsedToday != null) parts.push(`${t('profile.agents.detail.tokensToday')}: ${agent.tokensUsedToday.toLocaleString()}`);
+      if (agent.tokensUsedToday != null) parts.push(`${t('profile.agents.detail.tokensToday')}: ${num(agent.tokensUsedToday)}`);
       return html`${parts.join(' · ')}`;
     }
   }
@@ -539,7 +540,7 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
             <span>${zoneDelivery}</span>
             ${agent.last_seen ? html`<span>${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}</span>` : ''}
             ${stats && (stats.done || stats.active) ? html`<span>${t('profile.agents.detail.today')}: ${stats.done || 0} ${t('profile.agents.detail.done')}${stats.active ? `, ${stats.active} ${t('profile.agents.detail.active')}` : ''}</span>` : ''}
-            ${agent.tokensUsedToday != null ? html`<span>${t('profile.agents.detail.tokensToday')}: ${agent.tokensUsedToday.toLocaleString()}</span>` : ''}
+            ${agent.tokensUsedToday != null ? html`<span>${t('profile.agents.detail.tokensToday')}: ${num(agent.tokensUsedToday)}</span>` : ''}
           </div>
         </div>
       `;
