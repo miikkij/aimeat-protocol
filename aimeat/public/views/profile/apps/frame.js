@@ -17,11 +17,13 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 
 export const a = (key, vars) => t('appspage.' + key, vars);
-export const locale = () => (getLocale() === 'fi' ? 'fi-FI' : getLocale() === 'es' ? 'es-CO' : 'en-GB');
-export const day = (iso) => (iso ? new Date(iso).toLocaleDateString(locale()) : '');
+// The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
+// /js/format.js reads the reader's own, from their profile, falling back to their browser.
+export const day = (iso) => (iso ? fmtDate(iso) : '');
 export const rel = (iso) => { if (!iso) return ''; const d = new Date(iso); return Date.now() - d.getTime() > 30 * 864e5 ? day(iso) : formatRelativeTime(iso); };
 export const kb = (bytes) => Math.round((bytes || 0) / 1024);
 export const nameOf = (app) => app?.manifest?.name || String(app?.filename || '').replace(/\.html?$/i, '');

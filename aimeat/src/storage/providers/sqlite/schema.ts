@@ -264,6 +264,11 @@ export function initializeSchema(db: Database.Database): void {
   // (small), and lookups use json_extract; google still uses the indexed googleSub mirror.
   // Added AFTER the ALTERs above for the same upgrade-safety reason as googleSub.
   safeAddColumn('ghiis', 'externalIdentities', 'TEXT');
+  // How this person's dates and numbers are written, and which clock they read. Separate from
+  // `locale`, which is the LANGUAGE and also picks the language of their email. Null means follow
+  // the reader's browser, so an upgraded database behaves exactly as it did.
+  safeAddColumn('ghiis', 'region', 'TEXT');
+  safeAddColumn('ghiis', 'timezone', 'TEXT');
 
   // One-email-per-account-per-node invariant — a partial UNIQUE index makes a duplicate emailHash
   // impossible at the DB (email-or-handle connect + the email→owner resolver rely on this). The dedupe

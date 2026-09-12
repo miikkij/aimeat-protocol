@@ -128,16 +128,17 @@ export const identityNodesMethods = {
   async createGHII(this: SqliteStorage, record: GHIIRecord): Promise<GHIIRecord> {
     try {
       this.db.prepare(
-        `INSERT INTO ghiis (ghii, username, nodeId, displayName, bio, avatar, locale, passwordHash,
+        `INSERT INTO ghiis (ghii, username, nodeId, displayName, bio, avatar, locale, region, timezone, passwordHash,
          verificationLevel, ownerName, createdAt, updatedAt, totpSecret, totpEnabled, totpBackupCodes,
          totpLastUsedAt, totpLastUsedCode, totpFailedAttempts, totpLockedUntil, semantic, emailHash,
          emailVerifiedAt, verificationMethod, magicLinkEnabled, notificationEmail, lastLoginAt,
          loginCount, verifiedAttributes, verificationIssuer, verificationCredentialHash, ftnVerified,
          googleSub, externalIdentities, trustScore, morselBalance, allowedOrigins)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.ghii, record.username, record.nodeId, record.displayName,
         record.bio ?? null, record.avatar ?? null, record.locale ?? null,
+        record.region ?? null, record.timezone ?? null,
         record.passwordHash ?? null, record.verificationLevel, record.ownerName,
         record.createdAt, record.updatedAt,
         record.totpSecret ?? null, record.totpEnabled ? 1 : 0,
@@ -201,7 +202,7 @@ export const identityNodesMethods = {
     if (!existing) return null;
     const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() };
     this.db.prepare(
-      `UPDATE ghiis SET username = ?, nodeId = ?, displayName = ?, bio = ?, avatar = ?, locale = ?,
+      `UPDATE ghiis SET username = ?, nodeId = ?, displayName = ?, bio = ?, avatar = ?, locale = ?, region = ?, timezone = ?,
        passwordHash = ?, verificationLevel = ?, ownerName = ?, createdAt = ?, updatedAt = ?,
        totpSecret = ?, totpEnabled = ?, totpBackupCodes = ?, totpLastUsedAt = ?,
        totpLastUsedCode = ?, totpFailedAttempts = ?, totpLockedUntil = ?,
@@ -214,6 +215,7 @@ export const identityNodesMethods = {
     ).run(
       updated.username, updated.nodeId, updated.displayName,
       updated.bio ?? null, updated.avatar ?? null, updated.locale ?? null,
+      updated.region ?? null, updated.timezone ?? null,
       updated.passwordHash ?? null, updated.verificationLevel, updated.ownerName,
       updated.createdAt, updated.updatedAt,
       updated.totpSecret ?? null, updated.totpEnabled ? 1 : 0,
@@ -275,6 +277,8 @@ export const identityNodesMethods = {
     if (row.bio) record.bio = row.bio as string;
     if (row.avatar) record.avatar = row.avatar as string;
     if (row.locale) record.locale = row.locale as string;
+    if (row.region) record.region = row.region as string;
+    if (row.timezone) record.timezone = row.timezone as string;
     if (row.passwordHash) record.passwordHash = row.passwordHash as string;
     if (row.totpSecret) record.totpSecret = row.totpSecret as string;
     if (row.totpBackupCodes) record.totpBackupCodes = JSON.parse(row.totpBackupCodes as string);

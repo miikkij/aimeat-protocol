@@ -78,7 +78,8 @@ function toAgentRecord(r: Selectable<Agent>): AgentRecord {
 function toGHIIRecord(r: Selectable<Ghii>): GHIIRecord {
   return {
     username: r.username, nodeId: r.nodeId, ghii: r.ghii, displayName: r.displayName, bio: r.bio ?? undefined, avatar: r.avatar ?? undefined,
-    locale: r.locale ?? undefined, passwordHash: r.passwordHash ?? undefined, verificationLevel: r.verificationLevel as GHIIRecord['verificationLevel'],
+    locale: r.locale ?? undefined, region: r.region ?? undefined, timezone: r.timezone ?? undefined,
+    passwordHash: r.passwordHash ?? undefined, verificationLevel: r.verificationLevel as GHIIRecord['verificationLevel'],
     ownerName: r.ownerName, createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt),
     totpSecret: r.totpSecret ?? undefined, totpEnabled: r.totpEnabled ?? false, totpBackupCodes: arr(r.totpBackupCodes),
     totpLastUsedAt: r.totpLastUsedAt ?? undefined, totpLastUsedCode: r.totpLastUsedCode ?? undefined,
@@ -228,7 +229,8 @@ export const identityMethods = {
     try {
       const [row] = await this.db.insertInto('Ghii').values({
         username: r.username, nodeId: r.nodeId, ghii: r.ghii, displayName: r.displayName, bio: r.bio ?? null, avatar: r.avatar ?? null,
-        locale: r.locale ?? null, passwordHash: r.passwordHash ?? null, verificationLevel: r.verificationLevel, ownerName: r.ownerName,
+        locale: r.locale ?? null, region: r.region ?? null, timezone: r.timezone ?? null,
+        passwordHash: r.passwordHash ?? null, verificationLevel: r.verificationLevel, ownerName: r.ownerName,
         totpSecret: r.totpSecret ?? null, totpEnabled: r.totpEnabled ?? false, totpBackupCodes: r.totpBackupCodes ?? [],
         totpLastUsedAt: r.totpLastUsedAt ?? null, totpLastUsedCode: r.totpLastUsedCode ?? null, totpFailedAttempts: r.totpFailedAttempts ?? 0,
         totpLockedUntil: r.totpLockedUntil ?? null, emailHash: r.emailHash ?? null, emailVerifiedAt: r.emailVerifiedAt ?? null,

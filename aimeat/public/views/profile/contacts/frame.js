@@ -15,13 +15,15 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { date as fmtDate, compare as fmtCompare } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { PresenceDot } from '/components/PresenceDot.js';
 
 export const c = (key, vars) => t('contacts.cover.' + key, vars);
-export const locale = () => (getLocale() === 'fi' ? 'fi-FI' : getLocale() === 'es' ? 'es-CO' : 'en-GB');
-export const day = (iso) => (iso ? new Date(iso).toLocaleDateString(locale()) : '');
+// The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
+// /js/format.js reads the reader's own, from their profile, falling back to their browser.
+export const day = (iso) => (iso ? fmtDate(iso) : '');
 export const rel = (iso) => { if (!iso) return ''; const d = new Date(iso); return Date.now() - d.getTime() > 30 * 864e5 ? day(iso) : formatRelativeTime(iso); };
 
 /** The parts of an id: `claude#jevgeni@node` → { agent: 'claude', owner: 'jevgeni', node }. */
@@ -52,7 +54,7 @@ export function sortPeople(rows) {
   return [...rows].sort((a, b) => {
     const ta = a.last_message_at || '', tb = b.last_message_at || '';
     if (ta !== tb) return tb.localeCompare(ta);
-    return nameOf(a).localeCompare(nameOf(b), locale());
+    return fmtCompare(nameOf(a), nameOf(b));
   });
 }
 

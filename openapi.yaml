@@ -52617,6 +52617,12 @@ paths:
       description: |
         Updates the caller's GHII profile. `directory_listed` toggles the member directory
         opt-in (stored as an owner-controlled memory key) and is a valid standalone update.
+
+        THREE INDEPENDENT DISPLAY SETTINGS, and a caller must not derive one from another.
+        `locale` is the LANGUAGE — which words this person reads, and the language their email is
+        sent in. `region` is how a date and a number are WRITTEN. `timezone` is which clock. A
+        person is free to mix all three. An empty string clears either of the last two back to
+        "follow the reader's browser", which is how they read when nothing is stored.
       security:
         - BearerAuth: []
       requestBody:
@@ -52629,7 +52635,20 @@ paths:
                 display_name: { type: string }
                 bio: { type: string }
                 avatar: { type: string }
-                locale: { type: string }
+                locale:
+                  type: string
+                  description: The LANGUAGE. Also the language this person's email is sent in.
+                region:
+                  type: string
+                  description: >-
+                    How dates and numbers are written, as a BCP-47 tag (fi-FI, en-GB). Empty
+                    clears it. A tag nothing can format with is refused with INVALID_INPUT.
+                timezone:
+                  type: string
+                  description: >-
+                    Which clock, as an IANA zone (Europe/Helsinki). Empty clears it. An offset
+                    such as GMT+2 is refused with INVALID_INPUT, because an offset cannot know
+                    about summer time.
                 notification_email: { type: string }
                 directory_listed: { type: boolean }
       responses:

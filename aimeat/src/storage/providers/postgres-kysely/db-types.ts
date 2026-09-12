@@ -1417,7 +1417,9 @@ export interface Ghii {
   passwordFailedAttempts: Generated<number>;
   passwordHash: string | null;
   passwordLockedUntil: string | null;
+  region: string | null;
   semantic: Json | null;
+  timezone: string | null;
   totpBackupCodes: string[] | null;
   totpEnabled: Generated<boolean>;
   totpFailedAttempts: Generated<number>;

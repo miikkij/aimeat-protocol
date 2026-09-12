@@ -277,7 +277,12 @@ export function applySchemaTables1(db: Database.Database): void {
       displayName                TEXT NOT NULL,
       bio                        TEXT,
       avatar                     TEXT,
+      -- Three independent settings, not one: locale is the LANGUAGE (and picks the language of
+      -- this person's email), region is how dates and numbers are written, timezone is which
+      -- clock they read. Null in either of the last two means follow the reader's browser.
       locale                     TEXT,
+      region                     TEXT,
+      timezone                   TEXT,
       passwordHash               TEXT,
       verificationLevel          INTEGER NOT NULL DEFAULT 0,
       ownerName                  TEXT NOT NULL,

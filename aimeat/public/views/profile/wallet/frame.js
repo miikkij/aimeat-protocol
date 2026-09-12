@@ -15,14 +15,17 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { date as fmtDate, time as fmtTime, money as fmtMoney } from '/js/format.js';
 
 export const x = (key, vars) => t('walpage.' + key, vars);
 
 /** Row kinds that are the pace or a gift, not something earned from somebody. */
 export const GRANTED = new Set(['allowance', 'daily_allowance', 'welcome_bonus', 'mint']);
 
-const localeTag = () => (getLocale() === 'fi' ? 'fi-FI' : getLocale() === 'es' ? 'es-ES' : 'en-GB');
+// The six copies of localeTag() that used to live here derived the FORMAT from the LANGUAGE, and
+// they had already drifted: five gave English en-GB while the money path special-cased en-US. The
+// format is the reader's own now, from their profile, falling back to their browser. /js/format.js
 
 /** Money micro-units (6 decimals) in the reader's format: "1,37 €"; a share with no currency is morsels. */
 export function money(micros, currency) {
@@ -30,7 +33,7 @@ export function money(micros, currency) {
   if (!currency) return morsels(Number(micros) || 0);
   const digits = v !== 0 && Math.abs(v) < 0.01 ? 4 : 2;
   try {
-    return new Intl.NumberFormat(getLocale() === 'en' ? 'en-US' : localeTag(), { style: 'currency', currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
+    return fmtMoney(v, currency);
   } catch {
     // An unknown currency code prints as a plain number, which is the answer.
     return `${v.toFixed(digits)} ${currency}`;
@@ -45,15 +48,11 @@ export const signed = (n) => `${Number(n) > 0 ? '+' : Number(n) < 0 ? '−' : ''
 
 export function dateWord(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(localeTag(), { day: 'numeric', month: 'numeric', year: 'numeric' });
+  return fmtDate(iso, { day: 'numeric', month: 'numeric', year: 'numeric' });
 }
 export function timeWord(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString(localeTag(), { hour: '2-digit', minute: '2-digit' });
+  return fmtTime(iso, { hour: '2-digit', minute: '2-digit' });
 }
 
 /** "exchange-composer#jounidude@node" → "exchange-composer (jounidude)"; "alice@node" → "alice". */

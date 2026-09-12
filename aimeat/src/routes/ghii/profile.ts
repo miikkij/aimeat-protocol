@@ -29,6 +29,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { isValidRegion, isValidTimeZone } from '../../services/display-prefs.js';
 import { emitChange } from '../../services/event-bus.js';
 
 export function registerProfileRoutes(
@@ -188,6 +189,11 @@ export function registerProfileRoutes(
             bio: ghiiRecord.bio,
             avatar: ghiiRecord.avatar,
             locale: ghiiRecord.locale,
+            // Personal display preferences: only on the OWN-profile read and the write below. The
+            // public reads of somebody else deliberately leave them out — which clock a person
+            // keeps is nobody else's business.
+            region: ghiiRecord.region ?? null,
+            timezone: ghiiRecord.timezone ?? null,
             notification_email: ghiiRecord.notificationEmail ?? null,
             directory_listed: dirKey?.value === true,
             verification_level: ghiiRecord.verificationLevel,
@@ -244,12 +250,32 @@ export function registerProfileRoutes(
             return;
         }
 
-        const { display_name, bio, avatar, locale, notification_email, directory_listed } = req.body ?? {};
+        const { display_name, bio, avatar, locale, region, timezone, notification_email, directory_listed } = req.body ?? {};
         const updates: Record<string, unknown> = {};
         if (typeof display_name === 'string') updates.displayName = display_name;
         if (typeof bio === 'string') updates.bio = bio;
         if (typeof avatar === 'string') updates.avatar = avatar;
         if (typeof locale === 'string') updates.locale = locale;
+
+        // HOW THIS PERSON WRITES A DATE, AND WHICH CLOCK THEY READ — separate from `locale` above,
+        // which is the LANGUAGE and also decides the language of their email. An empty string is
+        // how a person says "go back to following my browser", and it is stored as null so the
+        // absent case and the cleared case are one state rather than two.
+        for (const [key, value, ok] of [
+            ['region', region, isValidRegion],
+            ['timezone', timezone, isValidTimeZone],
+        ] as const) {
+            if (value === undefined) continue;
+            if (value === null || value === '') { updates[key] = null; continue; }
+            if (!ok(value)) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+                    key === 'region'
+                        ? 'That is not a language tag this node can format with. Use something like fi-FI, en-GB or sv-SE.'
+                        : 'That is not a time zone this node knows. Use an IANA name like Europe/Helsinki; an offset such as GMT+2 is refused because it cannot know about summer time.'));
+                return;
+            }
+            updates[key] = value;
+        }
         // SECURITY (audit H-5): the recovery address is not ordinary profile data. The unauthenticated
         // password-reset flow mails its code to notificationEmail and gates only on emailVerifiedAt,
         // a mark left from the PREVIOUS address, so repointing it here used to be a complete
@@ -307,6 +333,8 @@ export function registerProfileRoutes(
             bio: updated.bio,
             avatar: updated.avatar,
             locale: updated.locale,
+            region: updated.region ?? null,
+            timezone: updated.timezone ?? null,
             verification_level: updated.verificationLevel,
             ...(togglingDirectory ? { directory_listed } : {}),
             updated_at: updated.updatedAt,

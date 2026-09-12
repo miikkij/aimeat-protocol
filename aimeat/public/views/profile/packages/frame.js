@@ -16,7 +16,8 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 
 export const x = (key, vars) => t('pkpage.' + key, vars);
 
@@ -70,9 +71,7 @@ export function joinOffers(available, templates, remote) {
 
 export function dateWord(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(getLocale() === 'fi' ? 'fi-FI' : getLocale() === 'es' ? 'es-ES' : 'en-GB', { day: 'numeric', month: 'numeric', year: 'numeric' });
+  return fmtDate(iso, { day: 'numeric', month: 'numeric', year: 'numeric' });
 }
 /** A package version is `v2026-06-12-0136`; the day is what a person reads. */
 export function versionDate(v) {

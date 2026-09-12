@@ -15,7 +15,8 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { date as fmtDate, money as fmtMoney } from '/js/format.js';
 import {
   chatPriceLabel, audioPriceLabel, contextLabel, acceptsImages, answersInText, producesImages, priceVaries, isFree,
 } from '/views/profile/openrouter/pricing.js';
@@ -72,15 +73,12 @@ export const modelTraits = (model) => ({
   free: isFree(model), varies: priceVaries(model), images: acceptsImages(model),
 });
 
-const localeTag = () => (getLocale() === 'fi' ? 'fi-FI' : getLocale() === 'es' ? 'es-ES' : 'en-GB');
+// The six copies of localeTag() that used to live here derived the FORMAT from the LANGUAGE, and
+// they had already drifted: five gave English en-GB while the money path special-cased en-US. The
+// format is the reader's own now, from their profile, falling back to their browser. /js/format.js
 
 /** "$0.71" in the page's own locale; small figures keep enough decimals to mean something. */
-export function money(n) {
-  const v = Number(n) || 0;
-  const digits = v === 0 ? 2 : v < 0.01 ? 4 : v < 1 ? 3 : 2;
-  // en-US rather than en-GB for the currency: the latter prints "US$", which no one reads as a price.
-  return new Intl.NumberFormat(getLocale() === 'en' ? 'en-US' : localeTag(), { style: 'currency', currency: 'USD', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
-}
+export const money = (n) => fmtMoney(Number(n) || 0, 'USD');
 
 /** 73306 → "73.3k", 2310965 → "2.3M". */
 export function compact(n) {
@@ -92,9 +90,8 @@ export function compact(n) {
 
 export function dateWord(iso) {
   if (!iso) return '';
-  const d = new Date(iso.length === 10 ? iso + 'T12:00:00Z' : iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(localeTag(), { day: 'numeric', month: 'numeric' });
+  // A bare YYYY-MM-DD becomes midday UTC, so a reader either side of it still reads the same day.
+  return fmtDate(iso.length === 10 ? iso + 'T12:00:00Z' : iso, { day: 'numeric', month: 'numeric' });
 }
 
 /**

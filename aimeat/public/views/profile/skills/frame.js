@@ -16,7 +16,8 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { date as fmtDate, num as fmtNum } from '/js/format.js';
 
 export const x = (key, vars) => t('skpage.' + key, vars);
 
@@ -47,13 +48,16 @@ export function whoOf(s, ctx) {
 export const visibilityWord = (v) => (v === 'public' ? x('vis.public') : v === 'members' ? x('vis.members') : v === 'workspace' ? x('vis.workspace') : x('vis.owner'));
 export function sizeWord(files) {
   const bytes = (files || []).reduce((a, f) => a + (f.size || 0), 0);
-  return bytes >= 1024 ? x('kb', { n: (bytes / 1024).toFixed(bytes >= 10240 ? 0 : 1).replace('.', ',') }) : x('bytes', { n: bytes });
+  // The decimal mark was a hardcoded comma, so an English page read "public · 3,9 kB" — a Finnish
+  // number beside an American date. It is the reader's own mark now, like every other number here.
+  const digits = bytes >= 10240 ? 0 : 1;
+  return bytes >= 1024
+    ? x('kb', { n: fmtNum(Number((bytes / 1024).toFixed(digits))) })
+    : x('bytes', { n: fmtNum(bytes) });
 }
 export function dateWord(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(getLocale() === 'fi' ? 'fi-FI' : getLocale() === 'es' ? 'es-ES' : 'en-GB', { day: 'numeric', month: 'numeric', year: 'numeric' });
+  return fmtDate(iso, { day: 'numeric', month: 'numeric', year: 'numeric' });
 }
 export const daysAgo = (iso) => (Date.now() - new Date(iso || 0).getTime()) / 86400000;
 
