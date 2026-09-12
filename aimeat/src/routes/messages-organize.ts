@@ -29,7 +29,7 @@ import { success, error } from '../middleware/envelope.js';
 import { InboxArchiveSchema, InboxOrganizePatchSchema } from '../models/inbox-organize-schemas.js';
 import { ownerMailbox } from '../services/direct-message-delete.js';
 import {
-  MESSAGES_ORGANIZE_AS_OWNER_SCOPE, archiveConversations, organizeView, readInboxOrganize, updateInboxOrganize,
+  MESSAGES_ORGANIZE_AS_OWNER_SCOPE, archiveConversations, organizeView, readInboxOrganizeStrict, updateInboxOrganize,
 } from '../services/inbox-organize/record.js';
 import { logger } from '../utils/logger.js';
 
@@ -47,7 +47,7 @@ export function messagesOrganizeRouter(config: AimeatConfig, storage: Storage): 
 
   /* ── GET /v1/messages/organize ── */
   router.get('/v1/messages/organize', ...gate, async (req, res) => {
-    const rec = await readInboxOrganize(storage, ownerMailbox(req.auth!, config.nodeId));
+    const rec = await readInboxOrganizeStrict(storage, ownerMailbox(req.auth!, config.nodeId));
     res.json(success(config.nodeId, organizeView(rec), [
       { description: 'Change the settings or rules', method: 'PUT', url: '/v1/messages/organize' },
       { description: 'Archive or restore conversations', method: 'POST', url: '/v1/messages/organize/archive' },

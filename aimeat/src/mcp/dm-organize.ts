@@ -23,7 +23,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { ownerMailbox } from '../services/direct-message-delete.js';
 import { CONVERSATION_ID, InboxOrganizePatchSchema, InboxRuleInputSchema } from '../models/inbox-organize-schemas.js';
-import { archiveConversations, organizeView, readInboxOrganize, updateInboxOrganize } from '../services/inbox-organize/record.js';
+import { archiveConversations, organizeView, readInboxOrganizeStrict, updateInboxOrganize } from '../services/inbox-organize/record.js';
 import { logger } from '../utils/logger.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
@@ -86,7 +86,7 @@ export function registerDmOrganizeTools(
             });
             if (!patch.success) return refusal(patch.error.issues.map(i => `${i.path.map(String).join('.')}: ${i.message}`).join('; '), 'INVALID_INPUT');
             if (Object.keys(patch.data).length === 0) {
-                return text({ ...organizeView(await readInboxOrganize(storage, mailbox())), note: 'Nothing changed: these are the current settings and rules.' });
+                return text({ ...organizeView(await readInboxOrganizeStrict(storage, mailbox())), note: 'Nothing changed: these are the current settings and rules.' });
             }
             const result = await updateInboxOrganize(storage, mailbox(), patch.data);
             if (!result.ok) return refusal(result.message, result.code);

@@ -17,8 +17,8 @@
  *   that could write it through the memory API could archive the message warning the owner about that
  *   very app, and the word that is meant to govern this (`messages:organize-as-owner`) would be a
  *   door beside an open wall.
- * @structure INBOX_ORGANIZE_KEY · types · defaultOrganize · normalizeOrganize · readInboxOrganize ·
- *   archiveConversations · updateInboxOrganize · organizeView
+ * @structure INBOX_ORGANIZE_KEY · types · defaultOrganize · normalizeOrganize · readInboxOrganizeStrict ·
+ *   readInboxOrganize · archiveConversations · updateInboxOrganize · organizeView
  * @usage const rec = await readInboxOrganize(storage, ghii); await archiveConversations(storage, ghii, ids, false);
  * @version-history
  *   v1.0.0 -- 2026-09-13 -- Initial, with the Messages list's sections, rules and archive.
@@ -124,10 +124,21 @@ export function normalizeOrganize(raw: unknown): InboxOrganize {
   };
 }
 
+/**
+ * The record as it is, and a storage failure THROWN. Every write reads through this: a write that
+ * read the forgiving defaults below after a failed read would save them over the owner's archive and
+ * rules. The settings door and the settings tool read through it too, so a caller asking what the
+ * settings are is told the read failed instead of being handed defaults as the answer.
+ */
+export async function readInboxOrganizeStrict(storage: Storage, ownerGhii: string): Promise<InboxOrganize> {
+  const rec = await storage.getMemory(ownerGhii, INBOX_ORGANIZE_KEY);
+  return rec ? normalizeOrganize(rec.value) : defaultOrganize();
+}
+
+/** For composing the list: a failed read shows every conversation unorganised rather than none. */
 export async function readInboxOrganize(storage: Storage, ownerGhii: string): Promise<InboxOrganize> {
   try {
-    const rec = await storage.getMemory(ownerGhii, INBOX_ORGANIZE_KEY);
-    return rec ? normalizeOrganize(rec.value) : defaultOrganize();
+    return await readInboxOrganizeStrict(storage, ownerGhii);
   } catch (err) {
     // A read failure shows the whole list rather than hiding any of it: nothing archived, no rules.
     logger.warn('inbox-organize: reading the record failed, showing the list unorganised', { error: String(err) });
@@ -172,7 +183,7 @@ export function archiveConversations(
   storage: Storage, ownerGhii: string, conversationIds: string[], restore: boolean,
 ): Promise<{ changed: number; organize: InboxOrganize }> {
   return serialized(ownerGhii, async () => {
-    const rec = await readInboxOrganize(storage, ownerGhii);
+    const rec = await readInboxOrganizeStrict(storage, ownerGhii);
     const at = new Date().toISOString();
     const ids = [...new Set(conversationIds)];
     for (const id of ids) {
@@ -209,7 +220,7 @@ function ruleFromInput(input: InboxRuleInput, existing: InboxRule | undefined, a
 /** Change the settings and the rules. `rules` replaces the list; `add_rule` and `remove_rule` edit it. */
 export function updateInboxOrganize(storage: Storage, ownerGhii: string, patch: InboxOrganizePatch): Promise<OrganizeUpdate> {
   return serialized(ownerGhii, async () => {
-    const rec = await readInboxOrganize(storage, ownerGhii);
+    const rec = await readInboxOrganizeStrict(storage, ownerGhii);
     const at = new Date().toISOString();
     if (patch.auto_archive) {
       rec.autoArchive = {

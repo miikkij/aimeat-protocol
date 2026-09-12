@@ -240,6 +240,19 @@ describe('the record', () => {
         expect(await storage.getMemory(OWNER, INBOX_ORGANIZE_KEY)).not.toBeNull();
     });
 
+    it('never writes the defaults over the owner\'s record when reading it failed', async () => {
+        let writes = 0;
+        const broken = {
+            getMemory: async () => { throw new Error('storage refused: getMemory'); },
+            setMemory: async (r: unknown) => { writes++; return r; },
+        } as unknown as Storage;
+        await expect(archiveConversations(broken, OWNER, ['conv-e-0000'], false)).rejects.toThrow('getMemory');
+        await expect(updateInboxOrganize(broken, OWNER, { fold_same_subject: false })).rejects.toThrow('getMemory');
+        expect(writes).toBe(0);
+        // The list itself still shows, unorganised.
+        expect((await readInboxOrganize(broken, OWNER)).autoArchive.enabled).toBe(false);
+    });
+
     it('serialises two quick writes so neither overwrites the other', async () => {
         const storage = memoryStorage();
         await Promise.all([
