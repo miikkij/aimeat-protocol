@@ -42,6 +42,11 @@ const MAX_DAYS = 60;
  *
  * `fail` names the counter that counts the failures of this one, when there is one. It is shown
  * beside the number rather than as a row of its own: "1 296 checked, 2 failed" is one fact.
+ *
+ * `lead: false` bars a counter from section 01's headline without hiding it anywhere else. The
+ * headline names the largest counter, on the assumption that the largest number is the thing worth
+ * knowing; that assumption breaks for a counter which counts a superset of the others, because it
+ * wins every time and says nothing.
  */
 export const COUNTERS = [
   { key: 'auth_failures_total', name: 'refused', role: 'critical' },
@@ -50,7 +55,13 @@ export const COUNTERS = [
   { key: 'login_tarpit_blocked_total', name: 'signinBlocked', role: 'critical' },
   { key: 'login_tarpit_delayed_total', name: 'signinDelayed', role: 'plain' },
   { key: 'login_tarpit_shed_total', name: 'signinShed', role: 'plain' },
-  { key: 'requests_total', name: 'requests', role: 'plain' },
+  // `lead: false` keeps it out of section 01's headline. It counts EVERY request, so it is a
+  // superset of every other counter here and would win the ranking on any node that serves more
+  // requests than it refuses — which is all of them. A denominator is not a finding, and the
+  // headline exists to name the finding. It keeps its row, its chip and its sparkline.
+  // Caught in browser verification on 2026-09-12, the day mounting its middleware made it the
+  // largest number on the page for the first time.
+  { key: 'requests_total', name: 'requests', role: 'plain', lead: false },
   { key: 'memory_reads', name: 'memRead', role: 'reads' },
   { key: 'memory_writes', name: 'memWrite', role: 'writes' },
   { key: 'memory_discover', name: 'memFind', role: 'plain' },

@@ -68,7 +68,11 @@
 .adm-st-bar--writes { background: var(--st-writes); }
 .adm-st-bar--critical { background: var(--st-critical); }
 .adm-st-bar--plain { background: var(--text-dim); }
-.adm-st-spark { display: flex; align-items: flex-end; gap: 2px; height: 34px; }
+/* Thin marks, and the cap is what makes them thin: seven bars across a 210px column would be 28px
+   each, which reads as a block chart rather than a sparkline. Right-aligned so the newest day sits
+   against the edge of the column whatever the day count is. */
+.adm-st-spark { display: flex; align-items: flex-end; justify-content: flex-end; gap: 2px; height: 34px; }
+.adm-st-spark .adm-st-bar { max-width: 10px; }
 
 /* 03: two charts, each owning its axis. */
 .adm-st-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; }
