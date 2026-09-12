@@ -15,9 +15,15 @@
  *   - main(): lint, group findings, print the table; `--strict` exits 1 when anything is found
  * @usage
  *   cd aimeat && pnpm exec tsx scripts/check-silent-catch.ts
- *   cd aimeat && pnpm exec tsx scripts/check-silent-catch.ts --strict   # CI-style gate
+ *   cd aimeat && pnpm exec tsx scripts/check-silent-catch.ts --strict   # check:fast, CI, the hook
  *   cd aimeat && pnpm exec tsx scripts/check-silent-catch.ts --area src/storage --list
+ *   cd aimeat && pnpm exec tsx scripts/check-silent-catch.ts --seed     # rewrite the substitute baseline
  * @version-history
+ *   v1.2.0 — 2026-09-13 — The rule's fourth shape (a catch answering with a substitute value) is
+ *     turned ON here and nowhere else, counted in its own column, and ratcheted per file against
+ *     security/silent-catch-substitutes.json with `--seed` to write it. This script also joins
+ *     FAST_CHECKS: the whole-tree pass had run nowhere at all, so the hook's staged view was the
+ *     only thing calling it and the fourth shape would have had no keeper.
  *   v1.1.0 — 2026-09-05 — `--staged`: lint only the files about to be committed. The hook's
  *     whole-tree pass was a second full ESLint run, 35 s of every commit, for a rule a new file
  *     can only break in itself. CI keeps the whole-tree pass.
@@ -25,7 +31,9 @@
  */
 import { ESLint } from 'eslint';
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 // The parser comes from the installed `typescript-eslint` meta-package (as eslint.config.js does)
 // rather than a new direct dependency on @typescript-eslint/parser.
 import tseslint from 'typescript-eslint';
@@ -62,9 +70,36 @@ const AREAS: { label: string; match: (p: string) => boolean }[] = [
 const GATED_AREAS = ['src/', 'public/'];
 const UNGATED = ['src/static/'];
 
+/**
+ * The substitute baseline, and why it is keyed by FILE and a COUNT rather than by site.
+ *
+ * The other three shapes are at zero in the gated areas and eslint keeps them there. The fourth
+ * arrived on 2026-09-13 over code written before it existed: 87 handlers in the two directories the
+ * rule is already an error in. Turning it on in eslint.config.js would have refused every session's
+ * every commit until all 87 were read, so it is on HERE and measured against this file.
+ *
+ * A catch handler has no stable name, and the sibling ratchets say plainly why a line number is not
+ * one either: "an entry keyed by line stops covering the code it was written for as soon as anything
+ * above it moves". So the unit is the file and the claim is a ceiling. A new substitute raises a
+ * file's count and the gate refuses it; fixing one lowers the count and the gate says so, which is
+ * the direction this is supposed to move in.
+ */
+const BASELINE = join(resolve(dirname(fileURLToPath(import.meta.url)), '..'), 'security', 'silent-catch-substitutes.json');
+
+interface Baseline {
+  note: string;
+  /** file → how many substitute handlers it is allowed to hold, and why nobody has fixed them. */
+  files: Record<string, { count: number; reason: string }>;
+}
+
+const SEED_REASON = 'SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value '
+  + 'that says nothing failed, and whether that substitute is the right answer or a confident wrong '
+  + 'one is a question nobody has read yet. Kept so the gate can refuse a NEW one.';
+
 const args = process.argv.slice(2);
 const strict = args.includes('--strict');
 const list = args.includes('--list');
+const seed = args.includes('--seed');
 const staged = args.includes('--staged');
 const areaFilter = args.includes('--area') ? args[args.indexOf('--area') + 1] : undefined;
 
@@ -92,7 +127,7 @@ async function main(): Promise<void> {
         files: ['**/*.js'],
         plugins: { aimeat: aimeatPlugin },
         languageOptions: { ecmaVersion: 2022, sourceType: 'module' },
-        rules: { [RULE]: 'error' },
+        rules: { [RULE]: ['error', { substitutes: true }] },
       },
       {
         // .ts needs the TypeScript parser. Without it every backend file is a fatal parse error and
@@ -101,7 +136,7 @@ async function main(): Promise<void> {
         files: ['**/*.ts'],
         plugins: { aimeat: aimeatPlugin },
         languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: 'module' },
-        rules: { [RULE]: 'error' },
+        rules: { [RULE]: ['error', { substitutes: true }] },
       },
       {
         // Vendored/minified/generated bundles are not ours to clean.
@@ -154,21 +189,29 @@ async function main(): Promise<void> {
     if (hits.length) byArea.set(area.label, hits);
   }
 
-  const kinds = ['emptyCatch', 'returnsAbsence', 'discardsError'] as const;
   const kindLabel: Record<string, string> = {
     emptyCatch: 'empty', returnsAbsence: 'returns-absence', discardsError: 'discards',
+    substitutesValue: 'substitute',
   };
 
+  const COLUMNS = [
+    { key: 'emptyCatch', head: 'empty', width: 8 },
+    { key: 'returnsAbsence', head: 'absence', width: 9 },
+    { key: 'discardsError', head: 'discards', width: 10 },
+    { key: 'substitutesValue', head: 'substitute', width: 12 },
+  ] as const;
+  const RULE_WIDTH = 28 + 7 + COLUMNS.reduce((n, c) => n + c.width, 0);
+
   console.log(`\n  Silent-exception backlog — rule ${RULE}\n`);
-  console.log(`  ${'Area'.padEnd(28)}${'total'.padStart(7)}${'empty'.padStart(8)}${'absence'.padStart(9)}${'discards'.padStart(10)}`);
-  console.log(`  ${'-'.repeat(62)}`);
+  console.log(`  ${'Area'.padEnd(28)}${'total'.padStart(7)}${COLUMNS.map(c => c.head.padStart(c.width)).join('')}`);
+  console.log(`  ${'-'.repeat(RULE_WIDTH)}`);
   for (const [label, hits] of byArea) {
-    const c = (k: string) => String(hits.filter(h => h.messageId === k).length).padStart(k === 'emptyCatch' ? 8 : k === 'returnsAbsence' ? 9 : 10);
-    console.log(`  ${label.padEnd(28)}${String(hits.length).padStart(7)}${c('emptyCatch')}${c('returnsAbsence')}${c('discardsError')}`);
+    const cells = COLUMNS.map(c => String(hits.filter(h => h.messageId === c.key).length).padStart(c.width)).join('');
+    console.log(`  ${label.padEnd(28)}${String(hits.length).padStart(7)}${cells}`);
   }
-  console.log(`  ${'-'.repeat(62)}`);
+  console.log(`  ${'-'.repeat(RULE_WIDTH)}`);
   const tot = (k: string) => selected.filter(h => h.messageId === k).length;
-  console.log(`  ${'TOTAL'.padEnd(28)}${String(selected.length).padStart(7)}${String(tot('emptyCatch')).padStart(8)}${String(tot('returnsAbsence')).padStart(9)}${String(tot('discardsError')).padStart(10)}\n`);
+  console.log(`  ${'TOTAL'.padEnd(28)}${String(selected.length).padStart(7)}${COLUMNS.map(c => String(tot(c.key)).padStart(c.width)).join('')}\n`);
 
   if (list) {
     for (const f of selected.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)) {
@@ -177,21 +220,82 @@ async function main(): Promise<void> {
     console.log('');
   }
 
-  for (const k of kinds) void k;
+  const isGated = (f: Finding): boolean =>
+    GATED_AREAS.some(a => f.file.startsWith(a)) && !UNGATED.some(a => f.file.startsWith(a));
+  const perFile = (rows: Finding[]): Map<string, number> => {
+    const m = new Map<string, number>();
+    for (const r of rows) m.set(r.file, (m.get(r.file) ?? 0) + 1);
+    return new Map([...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
+  };
+
+  if (seed) {
+    // Seeding forgives the whole backlog, so it is a decision to be asked about rather than
+    // maintenance — the same rule the security/*.json ratchets carry.
+    const counts = perFile(selected.filter(f => isGated(f) && f.messageId === 'substitutesValue'));
+    const file: Baseline = {
+      note: 'How many substitute-answering catch handlers each file is allowed to hold. A catch that '
+        + 'returns a value saying nothing failed hands the caller a confident wrong answer; the rule\'s '
+        + 'own header carries the case that found the shape. Seeded 2026-09-13 from the state of that '
+        + 'day and NOT REVIEWED: an entry here is a question, not a clearance. Keyed by file and count '
+        + 'because a catch handler has no stable name and a line number stops covering the code it was '
+        + 'written for as soon as anything above it moves. Fixing one lowers its count; the gate names '
+        + 'the gain so it can be locked in. Re-seeding forgives the lot.',
+      files: Object.fromEntries([...counts].map(([f, count]) => [f, { count, reason: SEED_REASON }])),
+    };
+    writeFileSync(BASELINE, JSON.stringify(file, null, 2) + '\n', 'utf-8');
+    console.log(`  seeded ${counts.size} file(s), ${[...counts.values()].reduce((a, b) => a + b, 0)} handler(s) → ${BASELINE}\n`);
+    return;
+  }
 
   if (strict) {
-    const gated = selected.filter(f =>
-      GATED_AREAS.some(a => f.file.startsWith(a)) && !UNGATED.some(a => f.file.startsWith(a)));
-    if (gated.length > 0) {
-      console.error(`  ✗ ${gated.length} silent handler(s) in an area that is supposed to be at zero:\n`);
-      for (const f of gated.slice(0, 20)) console.error(`      ${f.file}:${f.line}`);
+    const gated = selected.filter(isGated);
+    // The three original shapes are at zero here and eslint keeps them there. A finding is a break.
+    const mustBeZero = gated.filter(f => f.messageId !== 'substitutesValue');
+    if (mustBeZero.length > 0) {
+      console.error(`  ✗ ${mustBeZero.length} silent handler(s) in an area that is supposed to be at zero:\n`);
+      for (const f of mustBeZero.slice(0, 20)) console.error(`      ${f.file}:${f.line}`);
       console.error('\n  Log it, surface it, or add an eslint-disable WITH a reason.\n');
       process.exit(1);
     }
+
+    // The fourth shape is a ratchet: a file may not hold more than the baseline says.
+    const base: Baseline = existsSync(BASELINE)
+      ? JSON.parse(readFileSync(BASELINE, 'utf-8')) as Baseline
+      : { note: '', files: {} };
+    const now = perFile(gated.filter(f => f.messageId === 'substitutesValue'));
+    const over: string[] = [];
+    const under: string[] = [];
+    for (const [f, count] of now) {
+      const allowed = base.files[f]?.count ?? 0;
+      if (count > allowed) over.push(`${f}: ${count} now, ${allowed} allowed`);
+    }
+    // Only the whole-tree pass may say a file improved. In `--staged` mode every file the commit
+    // does not touch was never linted, so it would read as zero and the gate would claim 80 gains.
+    if (!staged) {
+      for (const [f, entry] of Object.entries(base.files)) {
+        const count = now.get(f) ?? 0;
+        if (count < entry.count) under.push(`${f}: ${count} now, ${entry.count} listed`);
+      }
+    }
+    if (over.length > 0) {
+      console.error(`  ✗ ${over.length} file(s) answer a caught error with MORE substitute values than before:\n`);
+      for (const line of over) console.error(`      ${line}`);
+      console.error('\n  A catch that returns a value saying nothing failed hands the caller a confident');
+      console.error('  wrong answer. Return something that carries the failure, let it propagate, log it,');
+      console.error('  or add an eslint-disable WITH a reason.\n');
+      process.exit(1);
+    }
+    if (under.length > 0) {
+      console.log(`  ✓ ${under.length} file(s) hold fewer substitutes than listed. Lower the count in`);
+      console.log(`    security/silent-catch-substitutes.json to lock the gain in:\n`);
+      for (const line of under) console.log(`      ${line}`);
+      console.log('');
+    }
+    const listed = [...now.values()].reduce((a, b) => a + b, 0);
     const backlog = selected.length - gated.length;
-    console.log(backlog > 0
-      ? `  ✓ gated areas clean; ${backlog} still open in ${UNGATED.join(', ')} (reported, not gated)\n`
-      : '  ✓ no silent handlers anywhere\n');
+    console.log(`  ✓ gated areas: the three cleaned shapes are at zero, and ${listed} listed substitute(s) held steady`);
+    if (backlog > 0) console.log(`    ${backlog} still open in ${UNGATED.join(', ')} (reported, not gated)`);
+    console.log('');
     return;
   }
   if (selected.length === 0) console.log('  ✓ no silent handlers\n');

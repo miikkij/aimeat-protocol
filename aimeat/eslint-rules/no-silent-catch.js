@@ -15,23 +15,44 @@
  *   What is ACCEPTABLE, and why the rule is not simply "log or throw": a handler that puts the error
  *   into an HTTP response, rejects a promise, returns a typed failure carrying the message, or shows
  *   it in the UI has surfaced it. Flagging those would force disables everywhere and the rule would
- *   stop meaning anything. So the rule reports exactly three shapes:
+ *   stop meaning anything. So the rule reports exactly four shapes:
  *
- *     1. emptyCatch     — the body is empty or only comments.
- *     2. returnsAbsence — the body only returns null/false/undefined/0/''/[]/{}, so a failure becomes
- *                         indistinguishable from "not found". This is the storage-layer bug class.
- *     3. discardsError  — the body never mentions the caught error, never throws, never logs and
- *                         never surfaces it.
+ *     1. emptyCatch       — the body is empty or only comments.
+ *     2. returnsAbsence   — the body only returns null/false/undefined/0/''/[]/{}, so a failure
+ *                           becomes indistinguishable from "not found". The storage-layer bug class.
+ *     3. discardsError    — the body never mentions the caught error, never throws, never logs and
+ *                           never surfaces it.
+ *     4. substitutesValue — the body answers with a value that is not an absence literal and says
+ *                           nothing failed, so the caller gets a confident wrong answer.
+ *
+ *   WHY THE FOURTH WAS ADDED, three months after the others (2026-09-13). It is not a new idea but
+ *   a hole inside the third: shape 2 recognises only absence LITERALS, and shape 3 asks for
+ *   `!hasOtherReturn`, so ANY other return silenced it. `catch { return fallback }` therefore passed
+ *   all three. It was found when `resolveGhii` was measured to have answered a database fault with
+ *   the caller's bare account name, which on an owner session is the one value a stored record must
+ *   never carry, inside `src/utils/` where this rule had been an error the whole time. The
+ *   distinguishing question is NOT whether the handler returns something, which is often right, but
+ *   whether the returned value SAYS something failed: `{ valid: false, reason: 'Invalid URL' }` does,
+ *   `[creatorGhii]` does not. carriesFailure() is that test, and it is what keeps the rule from
+ *   flagging the validator idiom (`new URL(x)` or `JSON.parse(x)` inside a function whose job is to
+ *   decide whether the input is usable), which is most of this shape's population.
+ *
+ *   KNOWN LIMIT, deliberately left: a bare `return;` in a catch sets hasOtherReturn and carries no
+ *   substitute, so no shape reports it. Widening that is its own measurement and its own decision.
  *
  *   Deliberate swallowing stays possible: log it (one line, and it becomes measurable in
  *   production), or carry an `eslint-disable-next-line aimeat/no-silent-catch -- <reason>`.
  * @structure
  *   - noSilentCatch: the rule module
  *   - walk(): minimal AST walker over a handler body (no dependency on a traversal lib)
+ *   - carriesFailure(): does a returned expression say that something failed?
  * @usage
  *   'aimeat/no-silent-catch': 'error'
  *   'aimeat/no-silent-catch': ['error', { logNames: ['audit'] }]   // extra log-ish callee names
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Fourth shape, substitutesValue: a catch that answers with a value saying
+ *     nothing failed. Closes the hole the other three left, found through resolveGhii's bare-name
+ *     fallback. carriesFailure() keeps the validator idiom out of it.
  *   v1.0.0 — 2026-07-26 — Initial implementation (roadmap: silent-exception cleanup).
  */
 
@@ -61,6 +82,16 @@ const SURFACE_NAMES = new Set([
  */
 const RE_SURFACE_SETTER = /^set(Err|Error|Failed|Failure|Broken|Unavailable)/;
 
+/**
+ * A returned object SAYS something failed when it carries one of these keys. `{ valid: false,
+ * reason: 'Invalid URL format' }` is a refusal travelling back to the caller, which is the whole
+ * legitimate reason a catch returns a value instead of throwing.
+ */
+const FAILURE_KEYS = new Set(['error', 'errors', 'reason', 'message', 'code', 'detail', 'details', 'problem']);
+
+/** The same, said the other way: a flag that is FALSE is a refusal. `{ ok: true }` is not. */
+const FALSIFIABLE_KEYS = new Set(['ok', 'valid', 'success', 'applied', 'allowed', 'authorized', 'authorised', 'verified']);
+
 const isBlock = (n) => n && n.type === 'BlockStatement';
 
 /**
@@ -88,6 +119,28 @@ function walk(root, visit) {
   }
 }
 
+/**
+ * Does this returned expression say that something failed? Anywhere inside it: a key from
+ * FAILURE_KEYS, or a FALSIFIABLE_KEYS flag set to false or to a negation. Read on the whole
+ * expression rather than its top level, because a refusal is often nested one deep
+ * (`{ status: 400, body: { code: 'X' } }`).
+ */
+function carriesFailure(argument) {
+  let found = false;
+  walk(argument, (node) => {
+    if (node.type !== 'Property' || !node.key) return;
+    const name = node.key.name ?? node.key.value;
+    if (typeof name !== 'string') return;
+    if (FAILURE_KEYS.has(name)) { found = true; return; }
+    if (!FALSIFIABLE_KEYS.has(name) || !node.value) return;
+    const v = node.value;
+    const isFalse = (v.type === 'Literal' && v.value === false)
+      || (v.type === 'UnaryExpression' && v.operator === '!');
+    if (isFalse) found = true;
+  });
+  return found;
+}
+
 /** @type {import('eslint').Rule.RuleModule} */
 export const noSilentCatch = {
   meta: {
@@ -100,6 +153,13 @@ export const noSilentCatch = {
         type: 'object',
         properties: {
           logNames: { type: 'array', items: { type: 'string' } },
+          // Shape 4 is OFF by default, and that is a measurement rather than timidity: turning it on
+          // in eslint.config.js today reports 87 sites across the two directories this rule is
+          // already an error in, so every session's pre-commit would refuse every commit until all
+          // 87 were triaged. It is on in scripts/check-silent-catch.ts, which counts them against a
+          // seeded baseline and refuses only a NEW one. When the backlog reaches zero this becomes
+          // one line in the config.
+          substitutes: { type: 'boolean' },
         },
         additionalProperties: false,
       },
@@ -114,12 +174,18 @@ export const noSilentCatch = {
       discardsError:
         'The caught error is never logged, rethrown or surfaced, so this failure is invisible in '
         + 'production. Log it, or add eslint-disable-next-line aimeat/no-silent-catch -- <reason>.',
+      substitutesValue:
+        'This catch answers the failure with {{value}}, a value that does not say anything failed, '
+        + 'so the caller receives a confident wrong answer rather than an error. Return a value that '
+        + 'carries the failure (ok: false, a reason, a code), let the error propagate, log it, or add '
+        + 'eslint-disable-next-line aimeat/no-silent-catch -- <why this substitute is the right answer>.',
     },
   },
 
   create(context) {
     const options = context.options[0] || {};
     const logNames = new Set([...DEFAULT_LOG_NAMES, ...(options.logNames || [])]);
+    const reportSubstitutes = options.substitutes === true;
     const sourceCode = context.sourceCode ?? context.getSourceCode();
 
     /** Classify a handler body. `paramName` is the caught binding, when it has one. */
@@ -132,6 +198,10 @@ export const noSilentCatch = {
       const absenceReturns = [];
       let hasOtherReturn = false;
       let hasAwait = false;
+      /** Returns of a non-absence value that says nothing failed. */
+      const substituteReturns = [];
+      /** At least one return DOES say it failed, so the handler surfaces through its return value. */
+      let hasFailureReturn = false;
 
       if (isBlock(body)) statementCount = body.body.length;
 
@@ -160,8 +230,10 @@ export const noSilentCatch = {
           case 'ReturnStatement': {
             if (!node.argument) { hasOtherReturn = true; break; }
             const text = sourceCode.getText(node.argument).trim();
-            if (ABSENCE_LITERALS.has(text) || text === '[]' || text === '{}') absenceReturns.push({ node, text });
-            else hasOtherReturn = true;
+            if (ABSENCE_LITERALS.has(text) || text === '[]' || text === '{}') { absenceReturns.push({ node, text }); break; }
+            hasOtherReturn = true;
+            if (carriesFailure(node.argument)) hasFailureReturn = true;
+            else substituteReturns.push({ node, text });
             break;
           }
           default:
@@ -177,10 +249,15 @@ export const noSilentCatch = {
           absenceReturns.push({ node: body, text });
         } else if (!hasThrow && !hasLog) {
           hasOtherReturn = true;
+          if (carriesFailure(body)) hasFailureReturn = true;
+          else substituteReturns.push({ node: body, text });
         }
       }
 
-      return { hasThrow, hasLog, hasSurface, usesParam, statementCount, absenceReturns, hasOtherReturn, hasAwait };
+      return {
+        hasThrow, hasLog, hasSurface, usesParam, statementCount, absenceReturns, hasOtherReturn,
+        hasAwait, substituteReturns, hasFailureReturn,
+      };
     }
 
     /** Report on a handler body, or stay quiet when the error was handled. */
@@ -205,6 +282,24 @@ export const noSilentCatch = {
       // Does something, but never touches the error and never tells anyone.
       if (!f.usesParam && !f.hasOtherReturn && !f.hasAwait) {
         context.report({ node, messageId: 'discardsError' });
+        return;
+      }
+      // Answers with a SUBSTITUTE. This is the hole the three shapes above left, and it is the one
+      // that costs most: shape 2 sees only absence LITERALS, and any other return silences shape 3,
+      // so `catch { return fallback }` passed every one of them. resolveGhii answered a database
+      // fault with the caller's bare account name for six months inside a directory this rule has
+      // been an error in the whole time (2026-09-12). A return that says it failed is still fine,
+      // which is what carriesFailure() is for; an await is left alone here as it is in shape 3,
+      // because a handler that awaits is doing cleanup rather than answering.
+      // `!usesParam` belongs here for the same reason it belongs in shape 3: a handler that mentions
+      // the caught error has looked at it, and `return e.message` IS the failure travelling back.
+      // Leaving it out took src/mcp from 2 findings to 37, every one of them correct code.
+      if (reportSubstitutes && !f.usesParam && !f.hasFailureReturn && f.substituteReturns.length > 0 && !f.hasAwait) {
+        context.report({
+          node: f.substituteReturns[0].node,
+          messageId: 'substitutesValue',
+          data: { value: f.substituteReturns[0].text.slice(0, 40) },
+        });
       }
     }
 

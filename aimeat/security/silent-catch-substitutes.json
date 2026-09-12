@@ -1,0 +1,245 @@
+{
+  "note": "How many substitute-answering catch handlers each file is allowed to hold. A catch that returns a value saying nothing failed hands the caller a confident wrong answer; the rule's own header carries the case that found the shape. Seeded 2026-09-13 from the state of that day and NOT REVIEWED: an entry here is a question, not a clearance. Keyed by file and count because a catch handler has no stable name and a line number stops covering the code it was written for as soon as anything above it moves. Fixing one lowers its count; the gate names the gain so it can be locked in. Re-seeding forgives the lot.",
+  "files": {
+    "public/views/admin.js": {
+      "count": 8,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/js/format.js": {
+      "count": 6,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/js/services/organisms.js": {
+      "count": 6,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/discovery/sources/memory-source.ts": {
+      "count": 3,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/admin/memory-tab.record.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/admin/overview-tab.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/admin/skills-tab.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/landing-page.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/organisms/workspace.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/components/LinkPreview.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/js/services/chat.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/js/services/memory.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/js/services/messages.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/js/services/notebook-plan.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/js/utils.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/admin/boards-tab.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/admin/capabilities-tab.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/admin/extensions-tab.add.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/admin/extensions-tab.record.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/admin/memory-tab.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/doc-solo.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/landing-activity.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/members.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/portal-classic.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/agents-tab.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/agents/tab-helpers.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/agents/task-item.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/inbox-tab/use-thread-ux.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/living-tab.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/memory-tab.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/offers-tab.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/offers/map-page.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/organisms/agents.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/organisms/mindmap.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/organisms/panels.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/organisms/timeline-panel.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/services-tab.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "public/views/profile/wallet/frame.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/cli/connect/api-client.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/config-types-account-security.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/config.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/routes/openrouter.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/routes/push.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/a2a-foreign.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/capability-record.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/connections/read.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/contacts.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/db/messages-inbox-db-service.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/doc-images.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/ecosystem-automation.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/extension-notify.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/file-text/xml.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/marketplace-fee.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/protected-resource.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/relay-claim.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/surface-layout/validate.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/workflow/engine-steps.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/services/workflow/engine-util.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/utils/app-obfuscate.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/utils/app-protect.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    }
+  }
+}

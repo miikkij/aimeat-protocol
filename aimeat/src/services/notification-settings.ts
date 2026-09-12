@@ -15,6 +15,9 @@
  *   groupOfType · senderKey · sourceOf · prefsFor · quietState · localMinutes
  * @usage const s = await readNotificationSettings(storage, ghii); const p = prefsFor(s, source, type);
  * @version-history
+ *   v1.0.1 — 2026-09-13 — localMinutes says out loud when a timezone is unknown, the way validTz()
+ *     twelve lines above it already did. Silently, an unknown zone put a person's quiet hours in
+ *     UTC and woke them up. Found by no-silent-catch's fourth shape.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Ilmoitusten sivu", direction A).
  */
 import type { Storage } from '../storage/interface.js';
@@ -199,7 +202,12 @@ export function localMinutes(now: Date, tz: string): number {
     const h = Number(parts.find(p => p.type === 'hour')?.value ?? 0);
     const m = Number(parts.find(p => p.type === 'minute')?.value ?? 0);
     return h * 60 + m;
-  } catch { return now.getUTCHours() * 60 + now.getUTCMinutes(); }
+  } catch (err) {
+    // Same treatment validTz() above already gives the same failure: UTC is the fallback, and it is
+    // said out loud. Silently, this put a person's quiet hours in the wrong zone and woke them up.
+    logger.warn('notification-settings: unknown timezone, using UTC for quiet hours', { tz, error: String(err) });
+    return now.getUTCHours() * 60 + now.getUTCMinutes();
+  }
 }
 const toMin = (hhmm: string): number => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
