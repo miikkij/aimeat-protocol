@@ -1,5 +1,222 @@
 {
   "admin": {
+    "portal": {
+      "intro": "Etusivusi: se mitä ihmiset näkevät osoitteessa {url} ennen kirjautumista. Valitse mitä osia sivulla on ja missä järjestyksessä, kirjoita omaa tekstiä väliin, tai pyydä tekoälyäsi tekemään se puolestasi.",
+      "save": "Tallenna järjestys",
+      "saving": "Tallennetaan…",
+      "saved": "Tallennettu. Kävijät näkevät tämän nyt.",
+      "unsaved": "{n} tallentamatonta muutosta",
+      "unsavedOne": "1 tallentamaton muutos",
+      "unsavedNote": "Kävijät eivät näe mitään tästä ennen kuin tallennat.",
+      "nothingUnsaved": "Mikään ei odota tallennusta.",
+      "seeWhat": "Katso mitä tallentuu",
+      "hideWhat": "Piilota lista",
+      "undo": "Kumoa ne",
+      "undoAsk": "Heitetäänkö tallentamattomat muutokset pois ja luetaan sivu uudelleen?",
+      "resetAsk": "Korvataanko tämä sillä järjestyksellä, joka sivuston mukana tulee?",
+      "resetDone": "Aloitettu oletusjärjestyksestä. Tallenna, niin se jää voimaan.",
+      "revertAsk": "Unohdetaanko oma järjestyksesi ja palataan oletukseen? Kävijät näkevät tämän jälkeen oletussivun.",
+      "revertDone": "Takaisin oletusjärjestykseen.",
+      "now": {
+        "title": "Mitä kävijä näkee nyt",
+        "openPage": "Avaa sivu",
+        "clearCache": "Näytä muutokseni kävijöille heti",
+        "cacheCleared": "Valmis. Seuraava kävijä saa nykyisen sivun.",
+        "wordDefault": "Oletus",
+        "wordYours": "Omasi",
+        "wordHtml": "Oma HTML",
+        "lineDefault": "Kävijä näkee oletusetusivun. Siinä on {n} osaa, joista {hidden} on piilotettu.",
+        "lineDefaultNone": "Kävijä näkee oletusetusivun. Kaikki {n} osaa näkyvät.",
+        "lineDefaultOne": "Kävijä näkee oletusetusivun. Siinä on {n} osaa, joista yksi on piilotettu.",
+        "lineYours": "Kävijä näkee sivun, jonka järjestit itse. Siinä on {n} osaa, joista {hidden} on piilotettu.",
+        "lineYoursNone": "Kävijä näkee sivun, jonka järjestit itse. Kaikki {n} osaa näkyvät.",
+        "lineYoursOne": "Kävijä näkee sivun, jonka järjestit itse. Siinä on {n} osaa, joista yksi on piilotettu.",
+        "lineHtml": "Kävijä saa lataamasi HTML-sivun. Alla olevia osia ei näytetä lainkaan.",
+        "lineHtmlNone": "Kävijä saa lataamasi HTML-sivun. Alla olevia {n} osaa ei näytetä lainkaan.",
+        "lineHtmlOne": "Kävijä saa lataamasi HTML-sivun. Alla olevia osia ei näytetä lainkaan.",
+        "lastChange": "viimeisin muutos {when}, tekijä {who}",
+        "noChange": "täällä ei ole vielä muutettu mitään",
+        "pageRow": "Etusivu",
+        "pageWhy": "Se mitä kävijä näkee tässä osoitteessa kirjautumatta.",
+        "layoutRow": "Oma järjestyksesi",
+        "layoutWhyYours": "Tallennettu. Alla olevat osat ovat sinun järjestyksessäsi.",
+        "layoutWhyDefault": "Et ole tallentanut omaa. Siirrä tai piilota osa alta, niin sivusta tulee sinun.",
+        "htmlRow": "Oma HTML-sivusi",
+        "htmlWhyNo": "Ei ladattu. HTML-sivu korvaa koko etusivun, jokaisen osan.",
+        "htmlWhyYes": "Ladattu, ja kävijä saa sen. Alla olevat osat pysyvät listalla mutta eivät näy.",
+        "menuRow": "Linkit ylävalikossa",
+        "menuWhy": "Sivun yläpuolinen valikko sellaisena kuin kirjautumaton kävijä sen näkee.",
+        "textsRow": "Tallentamasi tekstit",
+        "textsWhy": "Lyhyitä tekstejä, jotka olet kirjoittanut. Sivun osat ja oma HTML voivat näyttää ne.",
+        "partsValue": "{n} osaa",
+        "menuValue": "{n} linkkiä",
+        "badgeDefault": "Oletus",
+        "badgeYours": "Omasi",
+        "badgeHtml": "Oma HTML",
+        "badgeSaved": "Tallennettu",
+        "badgeNotSaved": "Ei tallennettu",
+        "badgeNone": "Ei mitään",
+        "badgeHidden": "{n} piilossa",
+        "badgeAllShown": "Kaikki näkyvissä",
+        "badgeTexts": "{n} tallennettu"
+      },
+      "strip": {
+        "parts": "Osaa",
+        "partsSub": "tällä sivulla juuri nyt",
+        "hidden": "Piilossa",
+        "hiddenSub": "listalla, mutta ei näytetä",
+        "texts": "Tekstiä",
+        "textsSub": "kirjoitettu ja tallennettu",
+        "delay": "Viive",
+        "delaySub": "ennen kuin muutos näkyy kävijälle"
+      },
+      "surface": {
+        "portal": "Etusivu",
+        "home": "Jäsenen koti",
+        "home-onboarding": "Koti käyttöönoton aikana",
+        "portalNote": "Jokainen joka avaa sivuston, kirjautuneena tai ei. Tämä on ainoa sivu, jonka voi korvata omalla HTML:llä.",
+        "homeNote": "Se mitä ihminen näkee kirjautumisen jälkeen, kun käyttöönotto on tehty. Vain osat: ei omaa HTML:ää eikä omaa valikkoa.",
+        "home-onboardingNote": "Sama sivu ensimmäisinä päivinä, kun oma tunnus on vielä täyttymässä. Järjestetään erikseen, jotta alkuopastuksen voi ottaa pois koskematta valmiiseen kotisivuun."
+      },
+      "parts": {
+        "title": "Mistä sivu koostuu",
+        "startDefault": "Aloita oletusjärjestyksestä",
+        "backDefault": "Takaisin oletusjärjestykseen",
+        "leftOut": "Jätettiin pois kun sivu luettiin",
+        "none": "Täällä ei ole vielä mitään. Lisää osa alta tai aloita oletusjärjestyksestä.",
+        "unknown": "Tätä osaa ei ole enää täällä.",
+        "moveUp": "Siirrä ylemmäs",
+        "moveDown": "Siirrä alemmas",
+        "settings": "Asetukset",
+        "write": "Kirjoita",
+        "close": "Sulje",
+        "hide": "Piilota",
+        "show": "Näytä",
+        "remove": "Poista",
+        "chipHidden": "Piilotit tämän",
+        "chipYours": "Kirjoittamasi",
+        "chipLength": "{n} merkkiä",
+        "yourWords": "Oma tekstisi",
+        "yourWordsPh": "Kirjoita se tähän. Markdown toimii: #-merkillä alkava rivi on otsikko ja **näin** on lihavointi.",
+        "addPh": "Lisää osa: kirjoita ja etsi",
+        "addNone": "Mikään osa ei vastaa tuota.",
+        "addFull": "Jo listalla niin monta kertaa kuin tämä sivu sallii ({n}).",
+        "addQuick": "Käytetyimmät:"
+      },
+      "preview": {
+        "title": "Näin kävijä näkee sen",
+        "wide": "Leveä näyttö",
+        "phone": "Puhelin",
+        "fold": "Taita pois",
+        "unfold": "Näytä",
+        "open": "Avaa sivu uudessa välilehdessä",
+        "noteSaved": "Tämä on sivu sellaisena kuin se on. Se on tallennettu versio, eli juuri se minkä kävijä saa.",
+        "noteNumbers": "Osan numero tässä on sama kuin sen numero listassa.",
+        "noteUnsaved": "Tämä on tallennettu sivu. {n} tallentamatonta muutostasi eivät vielä ole siinä; tallenna, niin kehys päivittyy.",
+        "memberOnly": "Tämä sivu on kirjautumisen takana, joten kehykseen ei ole mitään rehellistä laitettavaa. Avaa oma kotisi toisessa välilehdessä."
+      },
+      "rank": {
+        "title": "Minkä version kävijä saa",
+        "lead": "Kolme asiaa voi ratkaista mitä kävijä saa. Hän saa listan ensimmäisen, joka on olemassa, eikä kahta muuta käytetä lainkaan.",
+        "html": "Oma HTML-sivusi",
+        "htmlWhy": "Jos lataat sellaisen, kävijä saa sen etusivun sijaan. Yllä olevat osat pysyvät listalla mutta lakkaavat näkymästä.",
+        "layout": "Oma järjestyksesi",
+        "layoutWhy": "Yllä olevat osat sinun järjestyksessäsi, omat tekstisi niiden välissä.",
+        "default": "Oletusetusivu",
+        "defaultWhy": "Se mikä sivuston mukana tulee. Se muuttuu kun ohjelmisto päivitetään, mikä on yleensä juuri mitä halutaan.",
+        "inUse": "käytössä",
+        "notUsed": "ei käytössä nyt",
+        "htmlNone": "ei ladattu",
+        "layoutNone": "ei tallennettu",
+        "parts": "Sivulla on {n} osaa kummassakin tapauksessa: HTML-sivu ei poista niitä, se vain estää niiden näyttämisen."
+      },
+      "menu": {
+        "title": "Linkit ylävalikossa",
+        "lead": "Sivun yläpuolinen valikko sellaisena kuin kirjautumaton kävijä sen näkee. Kirjautuneen ihmisen linkit tulevat hänen tunnuksestaan eikä niitä aseteta täällä. Tällä valikolla on oma tallennuspainike.",
+        "save": "Tallenna valikko",
+        "saved": "Valikko on tallennettu.",
+        "shown": "Näkyy",
+        "hidden": "Piilossa",
+        "howItWorksWhy": "Sivu joka kertoo mistä tässä on kyse.",
+        "learnWhy": "Näkyy vain jos oppimissivusto on asetettu Asetuksissa.",
+        "businessWhy": "Yritykselle kirjoitettu sivu.",
+        "helpWhy": "Ohjeet, jotka näkyvät myös kirjautuneelle."
+      },
+      "html": {
+        "title": "Oma HTML-sivusi",
+        "state": "Juuri nyt",
+        "stateNone": "HTML-sivua ei ole ladattu, joten kävijä saa yllä olevat osat.",
+        "stateYours": "HTML-sivu on ladattu, ja kävijä saa sen.",
+        "badgeYours": "Käytössä",
+        "badgeNone": "Ei mitään",
+        "write": "Kirjoita sellainen",
+        "loadCurrent": "Aloita nykyisestä sivusta",
+        "loadAsk": "Korvataanko editorin sisältö sillä sivulla, joka on nyt käytössä?",
+        "loaded": "Käytössä oleva sivu on editorissa. Mitään ei tallennu ennen kuin painat Tallenna.",
+        "warnLabel": "Lue tämä ennen kuin lataat",
+        "warn": "HTML-sivu korvaa koko etusivun. Yllä olevat osat pysyvät listalla mutta lakkaavat näkymästä, ja niin käy myös kaikelle mitä niissä muutat. Jos poistat HTML-sivun myöhemmin, etusivu palaa täsmälleen sellaisena kuin se nyt on.",
+        "editorPh": "Liitä tai kirjoita etusivusi HTML tähän.",
+        "save": "Tallenna HTML-sivu",
+        "saved": "Tallennettu. Kävijä saa nyt tämän sivun.",
+        "download": "Lataa se",
+        "delete": "Poista se",
+        "deleteAsk": "Poistetaanko oma HTML-sivusi? Kävijä palaa yllä oleviin osiin.",
+        "deleted": "Poistettu. Kävijä saa taas yllä olevat osat.",
+        "looksLikeJson": "Tuo näyttää tekoälyn vastaukselta, ei HTML:ltä. Liitä se siihen kohtaan, joka ottaa sen vastaan."
+      },
+      "texts": {
+        "title": "Tallentamasi tekstit",
+        "lead": "Lyhyitä tekstejä, jotka kirjoitat kerran ja otat käyttöön nimellä. Jokainen tallentuu heti kun painat Lisää.",
+        "none": "Et ole vielä tallentanut yhtään.",
+        "keyLabel": "Nimi",
+        "valueLabel": "Teksti",
+        "valuePh": "Mitä siinä lukee",
+        "add": "Lisää",
+        "delete": "Poista",
+        "deleteAsk": "Poistetaanko teksti {key}?",
+        "saved": "Tallennettu.",
+        "deleteDone": "Poistettu.",
+        "saveNote": "Teksti tallentuu omana asiana heti. Se ei odota sivun yläreunan painiketta.",
+        "fromSettings": "asetettu Asetuksissa",
+        "tagsLead": "Oma HTML-sivusi näyttää näistä yhden, kun kirjoitat sen nimen kaksinkertaisiin aaltosulkeisiin. Myös jotkin sivun osat käyttävät niitä.",
+        "tagMemory": "tallentamasi teksti; mikä tahansa portal/-alkuinen nimi käy",
+        "tagKv": "lyhyt arvo, joka asetetaan Asetuksissa",
+        "tagConfig": "jotain mitä sivusto tietää itsestään",
+        "tagStorage": "millä tietokannalla sivusto toimii",
+        "tagBoard": "yhden taulun uusimmat viestit"
+      },
+      "ai": {
+        "title": "Anna tekoälysi tehdä tämä",
+        "lead": "Jos tekoälysi on yhteydessä tähän sivustoon, kerro sille mitä haluat muuttaa ja se tekee sen, etkä tarvitse tätä sivua. Jos yhteyttä ei ole, kopioi teksti omaan tekoälykeskusteluusi ja liitä vastaus takaisin tähän. Näet mitä se haluaa muuttaa ennen kuin mitään tapahtuu.",
+        "copyLayout": "Kopioi teksti tästä sivusta",
+        "copySite": "Kopioi teksti koko sivustosta",
+        "copied": "Kopioitu. Liitä se omaan tekoälykeskusteluusi.",
+        "pastePh": "Liitä tähän se mitä tekoälysi antoi.",
+        "apply": "Ota käyttöön",
+        "applyNote": "Mitään ei oteta käyttöön ennen kuin painat tätä.",
+        "invalid": "Tätä sivu ei osaa lukea. Liitä koko vastaus, jonka tekoälysi antoi, aaltosulkeesta alkaen.",
+        "applied": "Otettu käyttöön. Sivu näyttää nyt tämän.",
+        "appliedBundle": "Otettu käyttöön: {template} HTML-sivu, {memory} tekstiä, {kv} arvoa."
+      },
+      "log": {
+        "title": "Mikä muuttui",
+        "none": "Täällä ei ole vielä muutettu mitään.",
+        "versions": "Sivun aiemmat versiot",
+        "versionsLead": "Jokainen tallennus säilyy. Palauta yksi, niin siitä tulee nykyinen järjestys.",
+        "versionsNone": "Tätä sivua ei ole vielä tallennettu, joten mihinkään ei ole palattavaa.",
+        "restore": "Palauta tämä",
+        "restoreAsk": "Palautetaanko tämä aiempi versio?",
+        "restoreDone": "Palautettu."
+      },
+      "lb": {
+        "title": "Tämä sivusto peilaa toista",
+        "lead": "Etusivu kopioidaan osoitteesta {origin}, joten täällä tehdyt muutokset korvautuvat seuraavassa kopioinnissa. Muuta sivua siellä.",
+        "sync": "Kopioi nyt",
+        "lastSync": "kopioitu viimeksi {when}",
+        "never": "ei vielä kopioitu",
+        "synced": "Kopioitu: {template} HTML-sivu, {memory} tekstiä."
+      }
+    },
     "database": {
       "title": "Tietokanta",
       "loading": "Ladataan tallennustilan tilastoja…",
@@ -15907,10 +16124,12 @@
     "blocks": {
       "common": {
         "band": {
-          "label": "Ryhmä otsikolla"
+          "label": "Ryhmä otsikolla",
+          "summary": "Palkki sivun poikki, joka kokoaa muita osia yhden otsikon alle."
         },
         "freeform": {
-          "label": "Oma teksti"
+          "label": "Oma teksti",
+          "summary": "Itse kirjoittamasi teksti. Se näkyy ylä- ja alapuolellaan olevien osien välissä."
         }
       },
       "home": {
@@ -15959,67 +16178,88 @@
       },
       "portal": {
         "welcome-door": {
-          "label": "Etuovi"
+          "label": "Etuovi",
+          "summary": "Mikä tämä paikka on yhdellä lauseella, ja mistä pääsee sisään."
         },
         "pitch": {
-          "label": "Mikä tämä paikka on, yhdellä rivillä"
+          "label": "Mikä tämä paikka on, yhdellä rivillä",
+          "summary": "Yksi rivi siitä mikä tämä sivusto on, kaiken sen yläpuolella mikä pyytää kävijää tekemään jotain."
         },
         "wish": {
-          "label": "Kerro mitä tarvitset"
+          "label": "Kerro mitä tarvitset",
+          "summary": "Yksi kenttä, johon kävijä kirjoittaa mitä tarvitsee, ja päätyy keskusteluun joka alkaa siitä."
         },
         "build-invite": {
-          "label": "Rakenna sovellus"
+          "label": "Rakenna sovellus",
+          "summary": "Kuvaile haluamasi sovellus ja saat kehotteen, jonka voi liittää mihin tahansa tekoälykeskusteluun."
         },
         "connect-invite": {
-          "label": "Yhdistä oma tekoälysi"
+          "label": "Yhdistä oma tekoälysi",
+          "summary": "Kävijä yhdistää jo käyttämänsä tekoälyn ja hoitaa kaiken tämän siitä keskustelusta."
         },
         "changelog": {
-          "label": "Mitä on julkaistu"
+          "label": "Viimeisimmät muutokset",
+          "summary": "Sivuston muutoslokin uusimmat merkinnät yhdelle riville taitettuna."
         },
         "gallery": {
-          "label": "Julkaistujen sovellusten seinä"
+          "label": "Appilista",
+          "summary": "Jokainen täällä julkaistu sovellus, hakukentän ja järjestyksen kanssa."
         },
         "totals": {
-          "label": "Paljonko täällä on"
+          "label": "Sivuston luvut",
+          "summary": "Montako sovellusta, tilaa ja agenttia tällä sivustolla on."
         },
         "hero": {
-          "label": "Omistaja vai vuokralainen"
+          "label": "Omista vai vuokraa",
+          "summary": "Kysyy haluaako kävijä omistaa tämän vai vuokrata sen, ja tarjoaa kolme tapaa vastata."
         },
         "agent-prompt": {
-          "label": "Rakenna agentti"
+          "label": "Rakenna agentti",
+          "summary": "Kehote, jonka kävijä voi kopioida ja rakentaa omat agenttinsa omalle koneelleen."
         },
         "ask-ai": {
-          "label": "Kysy omalta tekoälyltäsi"
+          "label": "Kysy omalta tekoälyltäsi",
+          "summary": "Kehote, joka kysyy kävijän omalta tekoälyltä mikä tämä on ja onko tämä häntä varten."
         },
         "stats": {
-          "label": "Mitä täällä tehtiin tänään"
+          "label": "Mitä täällä tehtiin tänään",
+          "summary": "Mitä sivustolla tehtiin tänään, ja rivi joka tarjoaa samaa kävijälle."
         },
         "transparency": {
-          "label": "Miten tekoälysisältö merkitään"
+          "label": "Miten tekoälysisältö merkitään",
+          "summary": "Yksi rivi siitä miten sivusto merkitsee mallin kirjoittaman tekstin, ja linkki sivulle joka kertoo sen kunnolla."
         },
         "text": {
-          "label": "Tallentamasi teksti"
+          "label": "Tallentamasi teksti",
+          "summary": "Tallentamasi teksti, joka näytetään tässä nimellä haettuna."
         },
         "board": {
-          "label": "Taulun uusimmat viestit"
+          "label": "Taulun uusimmat viestit",
+          "summary": "Yhden taulun uusimmat viestit, tiedotteille jotka kävijän on syytä nähdä."
         },
         "showroom-hero": {
-          "label": "Näyttelytilan avaus: väite ja toivelaatikko"
+          "label": "Otsikko ja toivelaatikko",
+          "summary": "Iso otsikko sivun ylälaidassa, laatikko johon kävijä kirjoittaa toiveensa, ja kolme pienempää linkkiä sen alla: hanki oma, yhdistä tekoälysi, anna tekoälysi rekisteröidä sinut."
         },
         "wall-intro": {
-          "label": "Mitä appiseinä on"
+          "label": "Johdanto appilistaan",
+          "summary": "Muutama rivi appilistan yläpuolella siitä mitä sovellukset ovat: kokonaisia järjestelmiä tunnissa keskustelemalla, joista useat tuottavat rahaa."
         },
         "store": {
-          "label": "Vie oma kotiin: kauppa"
+          "label": "Kaupan linkki ja hinnat",
+          "summary": "Linkki kauppaan hinnastoineen, luettuna kaupasta itsestään, ja kolme syytä ostaa. Näkyy vain jos sivustolle on asetettu kauppa."
         },
         "trust": {
-          "label": "Turvallinen on lista"
+          "label": "Turvallisuus ja yksityisyys",
+          "summary": "Mitä sivusto lupaa: jokainen toiminto allekirjoitetaan, tekoälysisältö merkitään, suostumuksen voi perua, GDPR-pyynnöt ovat painikkeita, ja linkki siihen miten tekoälysisältö merkitään."
         },
         "rooms": {
-          "label": "Hautomo ja klubitalo"
+          "label": "Adoptoitavat agentit ja oma tila",
+          "summary": "Kaksi korttia: agentit jotka kävijä voi ottaa käyttöön hautomosta, ja tila jonka vain hän näkee."
         },
         "close": {
-          "label": "Viimeinen sana"
+          "label": "Loppusanat",
+          "summary": "Loppusanat: tätä saa kokeilla ilmaiseksi, ja tästä pääsee takaisin ylös toivelaatikkoon ja, jos kauppa on, kauppaan."
         }
       }
     }

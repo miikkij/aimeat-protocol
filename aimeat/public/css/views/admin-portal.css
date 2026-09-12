@@ -1,0 +1,143 @@
+/* ── Admin Portal page, in the poster face ──
+ * @file admin-portal.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's Portal page (design canvas "AIMEAT Admin Portal"): the pinned row
+ *   that keeps unsaved work and the one dark button in sight, the three page tabs, the parts of the
+ *   page beside a preview that carries the same numbers, the picker that narrows as you type, the
+ *   precedence ladder, the saved texts and the paste box. The frame, the sections, the metric rows,
+ *   the numeral strip and the badges come from admin.css and organism.css; only what this page adds
+ *   lives here. Every value is a theme.css token, so the page flips with the theme.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial.
+ */
+
+.adm-pt-intro { margin: 0 0 .8rem; font-size: .88rem; line-height: 1.55; color: var(--text-dim); max-width: 76ch; }
+.adm-pt-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
+.adm-pt-note { margin: 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-pt-empty { padding: 10px 0; font-size: .88rem; color: var(--text-dim); }
+.adm-pt .adm-mrow--last { border-bottom: 0; }
+.adm-pt .adm-mrow .adm-mval { overflow-wrap: anywhere; }
+.adm-pt .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+
+/* The unsaved work and the page's one dark button stay under the topbar wherever you scroll.
+   62px is the topbar's own height, the same offset the Config tab's pinned row uses. */
+.adm-pt-pin {
+  position: sticky; top: 62px; z-index: 39;
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  margin: 0 0 16px; padding: 8px 12px;
+  background: var(--bg-surface); border-left: 3px solid var(--accent);
+}
+.adm-pt-pin-count { font-size: .85rem; font-weight: 700; color: var(--accent); }
+.adm-pt-pin-note { font-size: .78rem; color: var(--text-dim); }
+.adm-pt-pin-list { margin: 0 0 16px; padding: 10px 14px; border: 3px dashed var(--accent); background: var(--glass-bg); }
+.adm-pt-pin-list ul { margin: 0; padding-left: 18px; font-size: .82rem; max-height: 30vh; overflow-y: auto; }
+.adm-pt-pin-list li { margin: 2px 0; color: var(--text); }
+
+/* Which page you are changing. The selected tab sits on the sun with ink words, like every other
+   selected thing on this side of the product. */
+.adm-pt-tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+.adm-pt-tab {
+  padding: 7px 14px; border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+  background: none; font-family: inherit; font-size: .85rem; font-weight: 700;
+  color: var(--text-dim); cursor: pointer;
+}
+.adm-pt-tab:hover { color: var(--text); }
+.adm-pt-tab.on { background: var(--sun); color: var(--on-sun); font-weight: 800; border-bottom-color: var(--text); }
+.adm-pt-tabnote { margin: .5rem 0 1rem; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+
+/* The parts on the left, the page on the right. Below 1400 the preview cannot stand beside the
+   list, so it goes above it: at 1280 the two columns leave the actions no room to sit on one line. */
+.adm-pt-bench { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 0 34px; align-items: start; }
+.adm-pt-bench > .adm-pt-side { position: sticky; top: 118px; }
+
+/* One part: its number, the two move arrows, what it is, and what you can do to it. */
+.adm-pt-row { display: grid; grid-template-columns: 22px 30px minmax(0, 1fr) auto; gap: 0 12px; align-items: start; padding: .6rem 0; border-bottom: 1px solid var(--border); }
+.adm-pt-row--hidden { opacity: .55; }
+.adm-pt-row--last { border-bottom: 0; }
+.adm-pt-num { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin-top: 1px; font-family: var(--font-mono); font-size: .72rem; color: var(--bg); background: var(--text); }
+.adm-pt-num--off { background: var(--border); color: var(--text-muted); }
+.adm-pt-move { display: flex; flex-direction: column; gap: 1px; padding-top: 1px; }
+.adm-pt-move button { padding: 0; border: 0; background: none; line-height: 0; color: var(--text); cursor: pointer; }
+.adm-pt-move button:disabled { color: var(--border); cursor: default; }
+.adm-pt-move svg, .adm-pt-fld svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: square; }
+.adm-pt-name { display: block; font-size: .9rem; font-weight: 700; line-height: 1.3; color: var(--text); }
+.adm-pt-chips { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.adm-pt-acts { display: flex; gap: 12px; align-items: center; padding-top: 2px; flex-wrap: wrap; justify-content: flex-end; }
+.adm-pt-editor { grid-column: 3 / -1; margin-top: 10px; padding: 12px 14px; border: 2px solid var(--text); background: var(--bg-surface); }
+.adm-pt-editor .adm-elabel { display: block; font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
+
+/* The one input shape on this page: a 3px ink underline that turns coral when you are in it. */
+.adm-pt-fld { display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 5px 2px 6px; margin-top: 16px; }
+.adm-pt-fld:focus-within { border-bottom-color: var(--accent); }
+.adm .adm-pt-fld input[type="text"] { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .9rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-pt-fld input[type="text"]::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm-pt-pick { position: relative; }
+.adm-pt-pick-list { position: absolute; left: 0; right: 0; top: 100%; z-index: 20; margin-top: 2px; max-height: 300px; overflow-y: auto; background: var(--card-bg); border: 2px solid var(--text); }
+.adm-pt-pick-list button { display: block; width: 100%; padding: 7px 10px; border: 0; border-radius: 0; background: none; font: inherit; font-size: .85rem; color: var(--text); text-align: left; cursor: pointer; }
+.adm-pt-pick-list button:hover { background: var(--bg-surface); }
+.adm-pt-pick-list button:disabled { color: var(--text-dim); cursor: default; }
+.adm-pt-pick-list b { font-weight: 700; }
+.adm-pt-pick-list small { display: block; font-size: .75rem; color: var(--text-dim); line-height: 1.4; }
+.adm-pt-pick-none { padding: 7px 10px; font-size: .85rem; color: var(--text-dim); }
+.adm-pt-quick { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; font-size: .78rem; color: var(--text-dim); }
+.adm-pt-chip { padding: 3px 9px; border: 2px solid var(--border); border-radius: 0; background: none; font-family: var(--font-mono); font-size: .72rem; font-weight: 500; color: var(--text-dim); cursor: pointer; }
+.adm-pt-chip:hover { border-color: var(--text); color: var(--text); }
+.adm-pt-listfoot { display: flex; align-items: center; gap: 18px; margin-top: 20px; flex-wrap: wrap; }
+
+/* What a visitor sees. The frame is white in both themes because the page inside it is. */
+.adm-pt-pv { border: 2px solid var(--text); background: var(--card-bg); }
+.adm-pt-pvh { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-bottom: 2px solid var(--text); flex-wrap: wrap; }
+.adm-pt-pvl { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+.adm-pt-pvtools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.adm-pt-frame { display: block; width: 100%; height: 520px; border: 0; background: #FFFFFF; }
+.adm-pt-frame--phone { width: 390px; max-width: 100%; margin: 0 auto; height: 620px; }
+.adm-pt-pvnote { margin: 10px 0 0; font-size: .75rem; line-height: 1.5; color: var(--text-dim); }
+
+/* Which version a visitor gets: a coral numeral, what it is, and whether it exists. */
+.adm-pt-step { display: grid; grid-template-columns: 44px minmax(0, 1fr) minmax(200px, auto); gap: 0 19px; align-items: baseline; padding: .7rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text); }
+.adm-pt-step--last { border-bottom: 0; }
+.adm-pt-step b { font-weight: 700; }
+.adm-pt-stepn { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.5rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); color: var(--accent); }
+
+/* The saved texts, and what a template may name. */
+.adm-pt-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 44px; align-items: start; }
+.adm-pt-krow { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: .45rem 0; border-bottom: 1px solid var(--border-subtle); font-size: .82rem; }
+.adm-pt-krow--last { border-bottom: 0; }
+.adm-pt-kk { font-family: var(--font-mono); font-size: .76rem; color: var(--text); overflow-wrap: anywhere; }
+.adm-pt-kv { flex: 1 1 auto; min-width: 0; font-size: .8rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-pt-tag { display: inline-block; padding: 1px 6px; font-family: var(--font-mono); font-size: .74rem; background: var(--code-bg); color: var(--text); }
+.adm-pt-add { display: grid; grid-template-columns: 260px minmax(0, 1fr) auto; gap: 0 18px; align-items: end; margin-top: 16px; }
+
+/* The paste for an operator whose AI cannot reach this node. */
+.adm-pt .og-box { max-width: 960px; }
+.adm-pt-paste { white-space: pre-wrap; font-size: .85rem; line-height: 1.55; color: var(--text); max-height: 220px; overflow-y: auto; }
+.adm .adm-pt-textarea { width: 100%; box-sizing: border-box; border: 2px solid var(--text); border-radius: 0; background: var(--bg-input); color: var(--text); font-family: var(--font-mono); font-size: .8rem; line-height: 1.5; padding: 10px 12px; }
+
+@media (max-width: 1400px) {
+  .adm-pt-bench { grid-template-columns: 1fr; gap: 18px 0; }
+  /* The page goes above the list rather than beside it, and stops following the scroll. */
+  .adm-pt-bench > .adm-pt-side { position: static; order: -1; }
+  .adm-pt-frame { height: 420px; }
+}
+
+@media (max-width: 860px) {
+  .adm-pt-two { grid-template-columns: 1fr; gap: 18px 0; }
+  .adm-pt-add { grid-template-columns: 1fr; gap: 12px 0; }
+  .adm-pt-step { grid-template-columns: 36px minmax(0, 1fr); gap: 4px 12px; }
+  .adm-pt-step > .adm-mval { grid-column: 2; text-align: left; }
+}
+
+/* A phone: the row's name keeps the width and the actions drop onto their own line, and a metric
+   row puts its chip and its value under each other on the right. */
+@media (max-width: 768px) {
+  .adm-pt-row { grid-template-columns: 22px 30px minmax(0, 1fr); gap: 4px 10px; }
+  .adm-pt-acts { grid-column: 3 / -1; justify-content: flex-start; margin-top: 4px; }
+  .adm-pt-editor { grid-column: 1 / -1; }
+  .adm-pt .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; }
+  .adm-pt .adm-mrow > :nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+  .adm-pt .adm-mrow > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .adm-pt .adm-mrow > :nth-child(3) { grid-column: 2; grid-row: 2; max-width: 11rem; white-space: normal; }
+  .adm-pt-frame { height: 360px; }
+  .adm-pt-frame--phone { height: 480px; }
+}

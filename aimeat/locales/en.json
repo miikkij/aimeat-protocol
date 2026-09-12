@@ -1,5 +1,222 @@
 {
   "admin": {
+    "portal": {
+      "intro": "Your front page: what people see at {url} before they sign in. Choose which parts it shows and in what order, add your own text, or ask your AI to do it for you.",
+      "save": "Save the layout",
+      "saving": "Saving…",
+      "saved": "Saved. Visitors see this now.",
+      "unsaved": "{n} unsaved changes",
+      "unsavedOne": "1 unsaved change",
+      "unsavedNote": "Visitors see none of this until you save.",
+      "nothingUnsaved": "Nothing is waiting to be saved.",
+      "seeWhat": "See what will be saved",
+      "hideWhat": "Hide the list",
+      "undo": "Undo them",
+      "undoAsk": "Throw away your unsaved changes and read the page again?",
+      "resetAsk": "Replace what is here with the layout this site ships with?",
+      "resetDone": "Started from the default layout. Save it to keep it.",
+      "revertAsk": "Forget your layout and go back to the default one? Visitors see the default page after this.",
+      "revertDone": "Back to the default layout.",
+      "now": {
+        "title": "What visitors see now",
+        "openPage": "Open the page",
+        "clearCache": "Show my changes to visitors now",
+        "cacheCleared": "Done. The next visitor gets the current page.",
+        "wordDefault": "Default",
+        "wordYours": "Yours",
+        "wordHtml": "Your HTML",
+        "lineDefault": "Visitors see the default front page. It has {n} parts, and {hidden} of them are hidden.",
+        "lineDefaultNone": "Visitors see the default front page. All {n} of its parts are shown.",
+        "lineDefaultOne": "Visitors see the default front page. It has {n} parts, and one of them is hidden.",
+        "lineYours": "Visitors see the page you arranged. It has {n} parts, and {hidden} of them are hidden.",
+        "lineYoursNone": "Visitors see the page you arranged. All {n} of its parts are shown.",
+        "lineYoursOne": "Visitors see the page you arranged. It has {n} parts, and one of them is hidden.",
+        "lineHtml": "Visitors get the HTML page you uploaded. The parts below are not being shown at all.",
+        "lineHtmlNone": "Visitors get the HTML page you uploaded. The {n} parts below are not being shown at all.",
+        "lineHtmlOne": "Visitors get the HTML page you uploaded. The parts below are not being shown at all.",
+        "lastChange": "last change {when} by {who}",
+        "noChange": "nothing has been changed here yet",
+        "pageRow": "The front page",
+        "pageWhy": "What a visitor sees at this address when they are not signed in.",
+        "layoutRow": "Your own layout",
+        "layoutWhyYours": "Saved. The parts below are in your order.",
+        "layoutWhyDefault": "You have not saved one. Move or hide a part below and the page becomes yours.",
+        "htmlRow": "Your own HTML page",
+        "htmlWhyNo": "None uploaded. An HTML page replaces this front page, every part of it.",
+        "htmlWhyYes": "Uploaded, and this is what visitors get. The parts below stay here and are not shown.",
+        "menuRow": "Links in the top menu",
+        "menuWhy": "The menu above the page, as a visitor who is not signed in sees it.",
+        "textsRow": "Your saved texts",
+        "textsWhy": "Short texts you have written. Parts of the page and your own HTML can show them.",
+        "partsValue": "{n} parts",
+        "menuValue": "{n} links",
+        "badgeDefault": "Default",
+        "badgeYours": "Yours",
+        "badgeHtml": "Your HTML",
+        "badgeSaved": "Saved",
+        "badgeNotSaved": "Not saved",
+        "badgeNone": "None",
+        "badgeHidden": "{n} hidden",
+        "badgeAllShown": "All shown",
+        "badgeTexts": "{n} saved"
+      },
+      "strip": {
+        "parts": "Parts",
+        "partsSub": "on this page right now",
+        "hidden": "Hidden",
+        "hiddenSub": "kept in the list, not shown",
+        "texts": "Texts",
+        "textsSub": "you have written and saved",
+        "delay": "Delay",
+        "delaySub": "before a change reaches visitors"
+      },
+      "surface": {
+        "portal": "Front page",
+        "home": "Member home",
+        "home-onboarding": "Home while setting up",
+        "portalNote": "Everyone who opens the site, signed in or not. This is the only page you can replace with your own HTML.",
+        "homeNote": "What a person sees after signing in, once they are set up. Parts only: no HTML of its own, and no menu of its own.",
+        "home-onboardingNote": "The same page during someone's first days, while their account is still filling up. Arranged separately, so first-day guidance can be switched off without touching the finished home page."
+      },
+      "parts": {
+        "title": "What the page is made of",
+        "startDefault": "Start from the default layout",
+        "backDefault": "Back to the default layout",
+        "leftOut": "Left out when the page was read",
+        "none": "Nothing here yet. Add a part below, or start from the default layout.",
+        "unknown": "This part does not exist here any more.",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "settings": "Settings",
+        "write": "Write",
+        "close": "Close",
+        "hide": "Hide",
+        "show": "Show",
+        "remove": "Remove",
+        "chipHidden": "You hid this",
+        "chipYours": "Written by you",
+        "chipLength": "{n} characters",
+        "yourWords": "Your own text",
+        "yourWordsPh": "Write it here. Markdown works: a line starting with # is a heading, and **like this** is bold.",
+        "addPh": "Add a part: type to search",
+        "addNone": "No part matches that.",
+        "addFull": "Already here as many times as this page allows ({n}).",
+        "addQuick": "Most used:"
+      },
+      "preview": {
+        "title": "As a visitor sees it",
+        "wide": "Wide screen",
+        "phone": "Phone",
+        "fold": "Fold away",
+        "unfold": "Show it",
+        "open": "Open the page in a new tab",
+        "noteSaved": "This is the page as it stands. It is the saved version, which is what visitors get.",
+        "noteNumbers": "The number on a part here is its number in the list.",
+        "noteUnsaved": "This is the saved page. Your {n} unsaved changes are not in it yet; save and it updates.",
+        "memberOnly": "This page is behind a sign-in, so there is nothing honest to put in a frame here. Open your own home in another tab to look at it."
+      },
+      "rank": {
+        "title": "Which version visitors get",
+        "lead": "Three things can decide what a visitor gets. They get the first one on this list that exists, and the other two are not used at all.",
+        "html": "Your own HTML page",
+        "htmlWhy": "If you upload one, visitors get it instead of the front page. The parts above stay in the list and stop being shown.",
+        "layout": "Your own layout",
+        "layoutWhy": "The parts above, in your order, with your own text between them.",
+        "default": "The default front page",
+        "defaultWhy": "What this site ships with. It changes when the software is updated, which is usually what you want.",
+        "inUse": "in use",
+        "notUsed": "not used now",
+        "htmlNone": "none uploaded",
+        "layoutNone": "not saved yet",
+        "parts": "The page has {n} parts either way: an HTML page does not delete them, it stops them being shown."
+      },
+      "menu": {
+        "title": "Links in the top menu",
+        "lead": "The menu above the page, as a visitor who is not signed in sees it. A signed-in person's links come from their account and are not set here. This menu has its own save button.",
+        "save": "Save the menu",
+        "saved": "The menu is saved.",
+        "shown": "Shown",
+        "hidden": "Hidden",
+        "howItWorksWhy": "The page that explains what this is.",
+        "learnWhy": "Only appears when a learning site is set in Config.",
+        "businessWhy": "The page written for a company looking at this.",
+        "helpWhy": "Help, which a signed-in person sees too."
+      },
+      "html": {
+        "title": "Your own HTML page",
+        "state": "Right now",
+        "stateNone": "No HTML page uploaded, so the parts above are what visitors get.",
+        "stateYours": "An HTML page is uploaded, and it is what visitors get.",
+        "badgeYours": "In use",
+        "badgeNone": "None",
+        "write": "Write one",
+        "loadCurrent": "Start from the current page",
+        "loadAsk": "Replace what is in the editor with the page that is live now?",
+        "loaded": "The live page is in the editor. Nothing is saved until you press Save.",
+        "warnLabel": "Read this before you upload one",
+        "warn": "An HTML page replaces the whole front page. The parts above stay in the list and stop being shown, and so does anything you change in them. If you delete the HTML page later, the front page comes back exactly as it is now.",
+        "editorPh": "Paste or write the HTML of your front page here.",
+        "save": "Save the HTML page",
+        "saved": "Saved. Visitors get this page now.",
+        "download": "Download it",
+        "delete": "Delete it",
+        "deleteAsk": "Delete your HTML page? Visitors go back to the parts above.",
+        "deleted": "Deleted. Visitors get the parts above again.",
+        "looksLikeJson": "That looks like the answer from an AI, not HTML. Paste it in the section that takes it instead."
+      },
+      "texts": {
+        "title": "Texts you have saved",
+        "lead": "Short texts you write once and use by name. Each one is saved the moment you press Add.",
+        "none": "You have not saved any yet.",
+        "keyLabel": "Name",
+        "valueLabel": "Text",
+        "valuePh": "What it says",
+        "add": "Add it",
+        "delete": "Delete",
+        "deleteAsk": "Delete the text {key}?",
+        "saved": "Saved.",
+        "deleteDone": "Deleted.",
+        "saveNote": "A text is saved on its own, right away. It does not wait for the button at the top of the page.",
+        "fromSettings": "set in Config",
+        "tagsLead": "Your own HTML page shows one of these by writing its name in double curly brackets. Some parts of the page use them too.",
+        "tagMemory": "a text you saved; any name starting with portal/ works",
+        "tagKv": "a short value set in Config",
+        "tagConfig": "something this site knows about itself",
+        "tagStorage": "which database this site runs on",
+        "tagBoard": "the newest posts from one board"
+      },
+      "ai": {
+        "title": "Let your AI do this",
+        "lead": "If your AI is connected to this site, tell it what you want changed and it does it, and you never need this page. If it is not connected, copy the text into your own AI chat and paste the answer back here. You see what it wants to change before anything happens.",
+        "copyLayout": "Copy the text about this page",
+        "copySite": "Copy the text about the whole site",
+        "copied": "Copied. Paste it into your own AI chat.",
+        "pastePh": "Paste what your AI gave back here.",
+        "apply": "Apply it",
+        "applyNote": "Nothing is applied until you press this.",
+        "invalid": "That is not something this page can read. It should be the whole answer your AI gave, starting with a curly bracket.",
+        "applied": "Applied. The page shows this now.",
+        "appliedBundle": "Applied: {template} HTML page, {memory} texts, {kv} values."
+      },
+      "log": {
+        "title": "What changed",
+        "none": "Nothing has been changed here yet.",
+        "versions": "Earlier versions of this page",
+        "versionsLead": "Every save is kept. Put one back and it becomes the current layout.",
+        "versionsNone": "This page has not been saved yet, so there is nothing to go back to.",
+        "restore": "Put this one back",
+        "restoreAsk": "Put this earlier version back?",
+        "restoreDone": "Put back."
+      },
+      "lb": {
+        "title": "This site mirrors another one",
+        "lead": "The front page is copied from {origin}, so changes made here are replaced at the next copy. Change the page over there instead.",
+        "sync": "Copy it now",
+        "lastSync": "last copied {when}",
+        "never": "not copied yet",
+        "synced": "Copied: {template} HTML page, {memory} texts."
+      }
+    },
     "database": {
       "title": "Database",
       "loading": "Loading storage stats…",
@@ -15926,119 +16143,156 @@
     "blocks": {
       "common": {
         "band": {
-          "label": "Group with a heading"
+          "label": "Group with a heading",
+          "summary": "A band across the page that holds other parts under one heading."
         },
         "freeform": {
-          "label": "Your own text"
+          "label": "Your own text",
+          "summary": "A piece of text you write yourself. It appears between the parts above and below it."
         }
       },
       "home": {
         "nameplate": {
-          "label": "Name and picture"
+          "label": "Name and picture",
+          "summary": "Who the person is: their picture, their name, and the way into their settings."
         },
         "mcp-connect": {
-          "label": "Connect an AI, when none is"
+          "label": "Connect an AI, when none is",
+          "summary": "The one-click links and config files that attach an AI to this account. Absent once one is connected."
         },
         "mat": {
-          "label": "Link to their own webpage"
+          "label": "Link to their own webpage",
+          "summary": "One line linking the web page their AI made for them. Absent until they have one."
         },
         "mailbox": {
-          "label": "Unread mail"
+          "label": "Unread mail",
+          "summary": "Whether anything unread is waiting, and how much."
         },
         "chat-door": {
-          "label": "Way into the chat"
+          "label": "Way into the chat",
+          "summary": "Choose useful work for a connected AI, copy its prompt and see the result. Also works without the built-in chat."
         },
         "fleet": {
-          "label": "How their agents are doing"
+          "label": "How their agents are doing",
+          "summary": "How many of their agents are home and whether any of them is in trouble."
         },
         "things": {
-          "label": "What they have made"
+          "label": "What they have made",
+          "summary": "What they have made: counts, the spaces they share, their knowledge packages, their apps."
         },
         "playbooks": {
-          "label": "Things they could set up"
+          "label": "Things they could set up",
+          "summary": "Named outcomes they can set up, each with its steps and the prompt that walks it."
         },
         "achievements": {
-          "label": "What they have tried"
+          "label": "What they have tried",
+          "summary": "What they have tried here so far, as a strip of small marks."
         },
         "feed": {
-          "label": "What has happened"
+          "label": "What has happened",
+          "summary": "What has happened on this account lately, newest first."
         },
         "open-items": {
-          "label": "Unfinished business"
+          "label": "Unfinished business",
+          "summary": "What they meant to do here and have not finished."
         },
         "install-cta": {
-          "label": "Install as an app"
+          "label": "Install as an app",
+          "summary": "An offer to install this as an app on their device. Only ever shown when the browser offers it."
         },
         "trust": {
-          "label": "AI labelling and data ownership"
+          "label": "AI labelling and data ownership",
+          "summary": "How this site labels what a model wrote, and who owns the data. Removing it removes that statement."
         },
         "steps": {
-          "label": "Setup path for someone new"
+          "label": "Setup path for someone new",
+          "summary": "The setup path a new person walks before the account does anything. Its own order is not arrangeable."
         }
       },
       "portal": {
         "welcome-door": {
-          "label": "Front door"
+          "label": "Front door",
+          "summary": "What this place is in one sentence, and the ways in."
         },
         "pitch": {
-          "label": "What this place is, in one line"
+          "label": "What this place is, in one line",
+          "summary": "One line saying what this site is, above everything that asks the visitor to do something."
         },
         "wish": {
-          "label": "Say what you need"
+          "label": "Say what you need",
+          "summary": "One field where a visitor says what they need, and lands in a chat that starts on it."
         },
         "build-invite": {
-          "label": "Build an app"
+          "label": "Build an app",
+          "summary": "Describe an app you want and get a prompt to paste into any AI chat."
         },
         "connect-invite": {
-          "label": "Connect your own AI"
+          "label": "Connect your own AI",
+          "summary": "Connect the AI a visitor already uses, and run all of this from that chat."
         },
         "changelog": {
-          "label": "What shipped lately"
+          "label": "Latest changes",
+          "summary": "The newest entries from this site's change log, folded to one line."
         },
         "gallery": {
-          "label": "Wall of published apps"
+          "label": "The app list",
+          "summary": "Every app people have published here, with a search box and a sort order."
         },
         "totals": {
-          "label": "How much is here"
+          "label": "Numbers about this site",
+          "summary": "How many apps, spaces and agents this site has."
         },
         "hero": {
-          "label": "Owner or tenant"
+          "label": "Own it or rent it",
+          "summary": "Asks whether the visitor wants to own this or rent it, and offers three ways to answer."
         },
         "agent-prompt": {
-          "label": "Build an agent"
+          "label": "Build an agent",
+          "summary": "A prompt a visitor can copy to build their own agents on their own machine."
         },
         "ask-ai": {
-          "label": "Ask your own AI about this"
+          "label": "Ask your own AI about this",
+          "summary": "A prompt that asks their own AI what this is and whether it is for them."
         },
         "stats": {
-          "label": "What this place did today"
+          "label": "What this place did today",
+          "summary": "What this site did today, and the line offering the same to the visitor."
         },
         "transparency": {
-          "label": "How AI content is marked"
+          "label": "How AI content is marked",
+          "summary": "One line on how this site marks what a model wrote, and a link to the page that states it properly."
         },
         "text": {
-          "label": "A passage you keep as a record"
+          "label": "A text you saved",
+          "summary": "A text you saved, shown here by name."
         },
         "board": {
-          "label": "Latest posts from a board"
+          "label": "Latest posts from a board",
+          "summary": "The latest posts from one board, for announcements a visitor should see."
         },
         "showroom-hero": {
-          "label": "Showroom hero: the claim and the wish box"
+          "label": "Headline and wish box",
+          "summary": "The big headline at the top, the box a visitor types a wish into, and three smaller links under it: get your own, connect your AI, let your AI register you."
         },
         "wall-intro": {
-          "label": "What the wall of apps is"
+          "label": "Introduction to the app list",
+          "summary": "A few lines above the app list saying what the apps are: whole systems built in an hour by chatting, several of which earn money."
         },
         "store": {
-          "label": "Take one home: the store"
+          "label": "Shop link and prices",
+          "summary": "A link to the shop with its price list, read from the shop itself, and three reasons to buy. Shown only when this site has a shop set up."
         },
         "trust": {
-          "label": "Safe is a list"
+          "label": "Security and privacy",
+          "summary": "What this site promises: every action signed, AI content labelled, consent you can withdraw, GDPR requests as buttons, and a link to how AI content is marked."
         },
         "rooms": {
-          "label": "The incubator and the clubhouse"
+          "label": "Agents to adopt, and a private space",
+          "summary": "Two cards: agents a visitor can take into use from the incubator, and a space only they can see."
         },
         "close": {
-          "label": "The last word"
+          "label": "Closing words",
+          "summary": "The closing words: this is free to try, with the way back up to the wish box and, when there is one, the shop."
         }
       }
     }

@@ -14998,16 +14998,16 @@
           "label": "Conecta tu propia IA"
         },
         "changelog": {
-          "label": "Lo que se ha publicado"
+          "label": "Últimos cambios"
         },
         "gallery": {
-          "label": "Muro de aplicaciones publicadas"
+          "label": "La lista de apps"
         },
         "totals": {
-          "label": "Cuánto hay aquí"
+          "label": "Cifras de este sitio"
         },
         "hero": {
-          "label": "Propietario o inquilino"
+          "label": "Poseer o alquilar"
         },
         "agent-prompt": {
           "label": "Crear un agente"
@@ -15022,28 +15022,28 @@
           "label": "Cómo se marca el contenido de IA"
         },
         "text": {
-          "label": "Un texto que guardas"
+          "label": "Un texto que guardaste"
         },
         "board": {
           "label": "Últimas publicaciones de un tablón"
         },
         "showroom-hero": {
-          "label": "Apertura de la sala: la promesa y la caja de deseos"
+          "label": "Titular y caja de deseos"
         },
         "wall-intro": {
-          "label": "Qué es el muro de apps"
+          "label": "Introducción a la lista de apps"
         },
         "store": {
-          "label": "Llévate uno a casa: la tienda"
+          "label": "Enlace a la tienda y precios"
         },
         "trust": {
-          "label": "Seguro es una lista"
+          "label": "Seguridad y privacidad"
         },
         "rooms": {
-          "label": "La incubadora y la casa club"
+          "label": "Agentes para adoptar y un espacio propio"
         },
         "close": {
-          "label": "La última palabra"
+          "label": "Palabras finales"
         }
       }
     }
