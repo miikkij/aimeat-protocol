@@ -8,8 +8,7 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
  */
-import { t } from '/js/i18n.js';
-import { date as fmtDate } from '/js/format.js';
+import { ago } from '/js/format.js';
 
 /* Visibility is edited via an explicit select inside the EXPANDED detail (and in the
    edit modal) — the old per-row click-to-cycle pill meant one stray click in the list
@@ -23,19 +22,15 @@ export function formatBytes(n) {
   return (n / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
+/**
+ * How long ago, until it is long enough ago that a date reads better.
+ *
+ * A month is the decision this tab makes; the words are not. They used to come from four `{n}`-style
+ * keys, which survive Finnish only because `pv` and `t` do not inflect, cannot produce "eilen", and
+ * would be quietly wrong in any language whose noun changes with the number. CLDR holds those rules.
+ */
 export function formatRelativeTime(isoStr) {
-  if (!isoStr) return '';
-  const d = new Date(isoStr);
-  const now = Date.now();
-  const diff = now - d.getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return t('profile.memory.timeJustNow');
-  if (mins < 60) return t('profile.memory.timeMinsAgo').replace('{n}', mins);
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return t('profile.memory.timeHoursAgo').replace('{n}', hrs);
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return t('profile.memory.timeDaysAgo').replace('{n}', days);
-  return fmtDate(d);
+  return ago(isoStr, { horizonDays: 30 });
 }
 
 /* ── Key grouping helpers: keys are already hierarchical (agents.*, organism.<uuid>.*,

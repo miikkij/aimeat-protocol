@@ -29,7 +29,9 @@
     },
     "types": []
   },
-  "include": ["public/**/*.js", "public/**/*.d.ts"],
+  // types/ holds the ambient declarations both this program and tsconfig.sdk.json need — today
+  // Intl.DurationFormat, which is ES2025 and beyond this config's `lib`.
+  "include": ["public/**/*.js", "public/**/*.d.ts", "types/**/*.d.ts"],
   "exclude": [
     "node_modules",
     "public/lib/**",

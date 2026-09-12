@@ -32,20 +32,20 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { ago } from '/js/format.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-/** A short, human "when". Exact timestamps are for logs; a feed answers "recently or not". */
+/**
+ * A short, human "when". Exact timestamps are for logs; a feed answers "recently or not".
+ *
+ * The phrase never gives way to a date here — a feed row three months old still reads better as
+ * "3 months ago" than as a date nobody is looking for — so the horizon is Infinity. The words used
+ * to come from a `{n} min ago` key family and are CLDR's now, which is what lets a language whose
+ * noun changes with the number come out right without anybody writing four more keys for it.
+ */
 function when(iso) {
-  const ms = Date.now() - Date.parse(iso);
-  if (!Number.isFinite(ms)) return '';
-  const min = Math.floor(ms / 60000);
-  if (min < 1) return tr('home.feed.justNow', 'just now');
-  if (min < 60) return tr('home.feed.minutesAgo', '{n} min ago').replace('{n}', String(min));
-  const hrs = Math.floor(min / 60);
-  if (hrs < 24) return tr('home.feed.hoursAgo', '{n} h ago').replace('{n}', String(hrs));
-  const days = Math.floor(hrs / 24);
-  return tr('home.feed.daysAgo', '{n} d ago').replace('{n}', String(days));
+  return ago(iso, { horizonDays: Infinity });
 }
 
 /**

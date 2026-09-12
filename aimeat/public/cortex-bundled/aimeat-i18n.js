@@ -266,6 +266,58 @@
     return fmtNumber(n) + ' ' + (word || t('morsels') || 'morsels');
   }
 
+  /** The units a span is broken into, biggest first, with how many milliseconds each holds. */
+  var SPAN_UNITS = [['days', 86400000], ['hours', 3600000], ['minutes', 60000], ['seconds', 1000]];
+
+  /**
+   * A LENGTH OF TIME — "1pv 23t 26min" — in the reader's own language and their own shorthand.
+   *
+   * A different question from relative(), which says how long AGO. This is a span: an uptime, a
+   * countdown, how long a job took.
+   *
+   * DO NOT REACH FOR A TRANSLATION KEY HERE. `{n} pv` survives Finnish only because `pv` does not
+   * inflect; one `{n}` cannot carry a language whose noun changes with the number (Polish `1 dzień`
+   * but `2 dni`, Russian `1 день`, `2 дня`, `5 дней`), and no key can produce "eilen". CLDR holds
+   * every one of those rules and Intl reads them.
+   *
+   * @param {number} ms how long, in milliseconds; a negative span is read as its length
+   * @param {Object} [opts] `max` is how many units may appear (default 3). Everything else goes to
+   *   Intl.DurationFormat, so `{ style: 'long' }` spells the units out.
+   */
+  function fmtDuration(ms, opts) {
+    var n = Math.abs(Number(ms));
+    if (!isFinite(n)) return '—';
+    var o = opts || {};
+    var max = typeof o.max === 'number' ? o.max : 3;
+    var parts = {}, left = Math.round(n / 1000) * 1000, used = 0;
+    for (var i = 0; i < SPAN_UNITS.length; i++) {
+      var unit = SPAN_UNITS[i][0], size = SPAN_UNITS[i][1];
+      var v = Math.floor(left / size);
+      // Empty units are skipped until the first non-empty one, so two days and six minutes still
+      // says minutes rather than stopping at the hours.
+      if (v > 0 || used > 0) {
+        if (v > 0) { parts[unit] = v; used++; }
+        if (used >= max) break;
+      }
+      left -= v * size;
+    }
+    // An empty string in the middle of a sentence reads as broken rather than as "no time at all",
+    // and a zero is dropped by default, so this case asks for it out loud.
+    var zero = used === 0;
+    if (zero) parts.seconds = 0;
+    var bag = { style: 'narrow' };
+    if (zero) bag.secondsDisplay = 'always';
+    for (var k in o) if (k !== 'max') bag[k] = o[k];
+    try {
+      return new Intl.DurationFormat(fmtTag(), bag).format(parts);
+    } catch (e) {
+      // Intl.DurationFormat is Baseline since March 2025; an older browser lands here.
+      var out = [];
+      for (var u in parts) out.push(parts[u] + u.charAt(0));
+      return out.join(' ');
+    }
+  }
+
   /** The zone actually in force, always a real IANA name. */
   function resolvedTimeZone() {
     if (fmtState.timezone) return fmtState.timezone;
@@ -293,7 +345,12 @@
     use: use, useProfile: useProfile,
     region: function () { return fmtState.region; },
     timezone: function () { return fmtState.timezone; },
-    number: fmtNumber, date: fmtDate, time: fmtTime, dateTime: fmtDateTime,
+    // `num` and `number` are the same function under two names. `num` is what /js/format.js and the
+    // served SDK libraries call it, and three of them were calling `AIMEAT.fmt.num` against a
+    // surface that only had `number` — a guarded call, so nothing threw and the person's setting
+    // was simply ignored. Both names stay: an app written against `number` keeps working.
+    num: fmtNumber, number: fmtNumber,
+    date: fmtDate, time: fmtTime, dateTime: fmtDateTime, duration: fmtDuration,
     relative: fmtRelative, money: fmtMoney, morsels: fmtMorsels,
     resolvedTimeZone: resolvedTimeZone, zoneLabel: zoneLabel,
   };

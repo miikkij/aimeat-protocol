@@ -18,15 +18,11 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner } from './shared.js';
 import { getNodeStats } from '/js/services/stats.js';
-import { num, dateTime as fmtDateTime } from '/js/format.js';
+import { num, dateTime as fmtDateTime, duration } from '/js/format.js';
 
+/** How long the node has been up, in the reader's own words rather than in English letters. */
 function fmtUptime(s) {
-  const d = Math.floor(s / 86400);
-  const hr = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  if (d > 0) return d + 'd ' + hr + 'h ' + m + 'm';
-  if (hr > 0) return hr + 'h ' + m + 'm';
-  return m + 'm';
+  return duration(Number(s) * 1000);
 }
 
 function fmtBytes(b) {

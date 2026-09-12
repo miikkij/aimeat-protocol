@@ -6,8 +6,7 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/landing-page.js (max-file-lines)
  */
-import { t } from "/js/i18n.js";
-import { date as fmtDate, time as fmtTime, dateTime as fmtDateTime, sameDay } from '/js/format.js';
+import { date as fmtDate, time as fmtTime, dateTime as fmtDateTime, sameDay, ago } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
 
 /* ───── Small time helpers (reuse the organisms rel-time keys) ───── */
@@ -15,16 +14,12 @@ import { swallowed } from '/js/swallowed.js';
 export function fmtDateLocal(s) {
   return fmtDate(s);
 }
+/**
+ * Relative time for a Home card. This was a byte-for-byte copy of the organisms list's helper,
+ * down to the same keys and the same week-long horizon, kept in step by hand. One of them is it now.
+ */
 export function relTime(s) {
-  const ts = new Date(s).getTime();
-  if (!Number.isFinite(ts)) return '';
-  const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
-  if (mins < 60) return (t('organisms.relMin') || '{n} min ago').replace('{n}', String(mins));
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return (t('organisms.relHours') || '{n} h ago').replace('{n}', String(hours));
-  const days = Math.round(hours / 24);
-  if (days <= 7) return (t('organisms.relDays') || '{n} d ago').replace('{n}', String(days));
-  return fmtDateLocal(s);
+  return ago(s, { horizonDays: 7 });
 }
 export function fmtClock(s) {
   const d = new Date(s);

@@ -27,6 +27,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
+import { duration } from '/js/format.js';
 import { setScheduleEnabled, triggerSchedule, deleteSchedule } from '/js/services/schedules.js';
 import { ScheduleEditForm } from './scheduler/edit-form.js';
 
@@ -40,23 +41,19 @@ const KIND_LABEL = {
   extension: 'profile.scheduler.kind.extension', core: 'profile.scheduler.kind.core',
 };
 
-/** Human "time until" for a future ISO timestamp (e.g. "20h 48min", "45min 30s"). */
+/**
+ * Human "time until" for a future ISO timestamp — "20t 48min", "45min 30s" — in the reader's words.
+ *
+ * `max: 2` keeps the old shape: the two biggest units and no more, so a countdown three days out
+ * does not also spell its minutes. Under an hour that is minutes and seconds, which is what the
+ * hand-built version special-cased and what falling out of the unit list gives for free.
+ */
 export function formatUntil(iso) {
   if (!iso) return '—';
   const ms = new Date(iso).getTime() - Date.now();
   if (Number.isNaN(ms)) return '—';
   if (ms <= 0) return t('profile.scheduler.soon');
-  const s = Math.floor(ms / 1000);
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  const parts = [];
-  if (d) parts.push(d + 'd');
-  if (h) parts.push(h + 'h');
-  if (m) parts.push(m + 'min');
-  if (!d && !h) parts.push(sec + 's'); // seconds only when under an hour
-  return parts.join(' ') || '0s';
+  return duration(ms, { max: 2 });
 }
 
 /**

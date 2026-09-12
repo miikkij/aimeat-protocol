@@ -188,6 +188,88 @@ export function minutesOfDay(s) {
   }
 }
 
+/**
+ * The units a span is broken into, biggest first, with how many milliseconds each one holds.
+ * @type {Array<[keyof Intl.DurationInput, number]>}
+ */
+const SPAN_UNITS = [
+  ['days', 86400000], ['hours', 3600000], ['minutes', 60000], ['seconds', 1000],
+];
+
+/**
+ * A LENGTH OF TIME — "1pv 23t 26min" — in the reader's own language and their own shorthand.
+ *
+ * Not the same question as `relative()`, which says how long AGO something was. This is a span:
+ * an uptime, a countdown, how long a job took.
+ *
+ * WHY NOT A TRANSLATION KEY. Four surfaces built this by hand out of `'d'`, `'h'` and `'min'`, so a
+ * fully Finnish page read `1d 23h 26min`. The obvious repair is a key like `{n} pv`, and it is a
+ * trap: it survives Finnish only because `pv` does not inflect, and one `{n}` cannot carry a
+ * language whose noun changes with the number — Polish writes `1 dzień` but `2 dni` and `5 dni`,
+ * Russian `1 день`, `2 дня`, `5 дней`. CLDR holds every one of those rules already. Asking the
+ * platform is both shorter and correct in languages nobody here speaks.
+ *
+ * @param {number} ms how long, in milliseconds. A negative span is read as its length.
+ * @param {Intl.DurationFormatOptions & { max?: number }} [opts]
+ *   `max` is how many units may appear, biggest first (default 3, which is what the screens show).
+ *   Everything else goes to Intl.DurationFormat, so `{ style: 'long' }` spells the units out and
+ *   `{ style: 'narrow', days: 'long' }` spells only the days.
+ */
+export function duration(ms, opts) {
+  const n = Math.abs(Number(ms));
+  if (!Number.isFinite(n)) return '—';
+  const { max = 3, ...rest } = opts || {};
+  const parts = {};
+  let left = Math.round(n / 1000) * 1000;
+  let used = 0;
+  for (const [unit, size] of SPAN_UNITS) {
+    const v = Math.floor(left / size);
+    // An empty unit is skipped, not printed as a zero — but only until the first non-empty one,
+    // so a span of two days and six minutes still says minutes rather than stopping at the hours.
+    if (v > 0 || used > 0) {
+      if (v > 0) { parts[unit] = v; used++; }
+      if (used >= max) break;
+    }
+    left -= v * size;
+  }
+  // Under a second, or all of it rounded away: say the smallest thing rather than nothing, because
+  // an empty string in the middle of a sentence reads as broken rather than as "no time at all".
+  // A zero is dropped by default, so this case has to ask for it out loud.
+  const zero = used === 0;
+  if (zero) parts.seconds = 0;
+  try {
+    return new Intl.DurationFormat(tag(), {
+      style: 'narrow', ...(zero ? { secondsDisplay: 'always' } : {}), ...rest,
+    }).format(parts);
+  } catch (err) {
+    // Intl.DurationFormat is Baseline since March 2025; a browser older than that lands here.
+    swallowed('format: duration fell back to bare numbers', err);
+    return Object.entries(parts).map(([u, v]) => `${v}${u[0]}`).join(' ');
+  }
+}
+
+/**
+ * How long ago — until it is long enough ago that the date itself reads better.
+ *
+ * Four surfaces held their own copy of this, two of them byte-identical, each with a `{n} min ago`
+ * key family behind it and its own idea of where the horizon sits. The HORIZON is a real product
+ * decision and stays a parameter; the words are not, and they were the defect: `{n} pv sitten`
+ * survives Finnish only because `pv` does not inflect, cannot produce "eilen", and would be quietly
+ * wrong in any language whose noun changes with the number.
+ *
+ * @param {string|number|Date} s
+ * @param {{ horizonDays?: number }} [opts] past this many days, the date replaces the phrase;
+ *   `Infinity` never stops counting, which is what a feed wants.
+ */
+export function ago(s, opts) {
+  if (!s) return '';
+  const d = new Date(s);
+  if (!Number.isFinite(d.getTime())) return '';
+  const horizon = opts && typeof opts.horizonDays === 'number' ? opts.horizonDays : 30;
+  const days = (Date.now() - d.getTime()) / 86400000;
+  return days >= horizon ? date(d) : relative(d);
+}
+
 /** The name this module has always had for a date-and-time. Kept, because 161 places call it. */
 export const dt = dateTime;
 

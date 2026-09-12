@@ -20,10 +20,15 @@
  *   remembered is a rule that decays; this one is checked.
  *
  *   HOW TO SATISFY IT.
- *     a page or component  import { num, date, time, dateTime, calendar } from '/js/format.js'
- *     an app               AIMEAT.fmt.num / .date / .time / .dateTime  (cortex aimeat-i18n)
+ *     a page or component  import { num, date, time, dateTime, calendar, duration } from '/js/format.js'
+ *     an app               AIMEAT.fmt.num / .date / .time / .dateTime / .duration  (cortex aimeat-i18n)
  *     the server           displayPrefsFor(storage, the person the message is FOR),
  *                          then formatForPerson(prefs, iso, opts)
+ *
+ *   A LENGTH OF TIME IS THE SAME RULE. `d + 'd ' + h + 'h '` is not an Intl call and this rule
+ *   cannot see it, but it is the same defect wearing plain string concatenation: four surfaces did
+ *   it and a fully Finnish page read `1d 23h 26min`. `duration()` asks CLDR, which knows that
+ *   Polish writes `1 dzień` but `2 dni`, and that no `{n}` key can say `eilen`.
  *
  *   AND THE ONE DISTINCTION THAT IS NOT ABOUT FORMAT. A moment gets the reader's clock; a CALENDAR
  *   DATE — a heat-map square, a month rail, the day a usage row was counted into — must not, or it
@@ -62,7 +67,7 @@ const ALLOWED = [
 ];
 
 const METHODS = new Set(['toLocaleDateString', 'toLocaleTimeString', 'toLocaleString']);
-const INTL_CTORS = new Set(['DateTimeFormat', 'NumberFormat', 'RelativeTimeFormat']);
+const INTL_CTORS = new Set(['DateTimeFormat', 'NumberFormat', 'RelativeTimeFormat', 'DurationFormat']);
 
 export const noRawLocaleFormat = {
   meta: {

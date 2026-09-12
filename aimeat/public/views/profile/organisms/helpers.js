@@ -13,27 +13,23 @@
  *     denial reason) in the toast instead of a bare "Export failed".
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  */
-import { t } from '/js/i18n.js';
-import { date as fmtDate } from '/js/format.js';
+import { date as fmtDate, ago } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
 import { authHeaders } from '/js/services/auth.js';
 
 /** Date-only, in the reader's own format and clock. → /js/format.js */
 export { fmtDate };
 
-/** Relative time for list metadata ("2 h ago" / "2 h sitten"); falls back to a locale date past 7 days.
+/**
+ * Relative time for list metadata, falling back to the date itself past a week.
+ *
+ * The week is the decision this list makes; the words are not. They came from a `{n} min ago` key
+ * family, which survives Finnish only because `min`, `h` and `d` do not inflect, cannot produce
+ * "eilen", and is quietly wrong in any language whose noun changes with the number.
  * @param {string} s ISO date string
  * @returns {string} */
 export function relTime(s) {
-  const ts = new Date(s).getTime();
-  if (!Number.isFinite(ts)) return '';
-  const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
-  if (mins < 60) return (t('organisms.relMin') || '{n} min ago').replace('{n}', String(mins));
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return (t('organisms.relHours') || '{n} h ago').replace('{n}', String(hours));
-  const days = Math.round(hours / 24);
-  if (days <= 7) return (t('organisms.relDays') || '{n} d ago').replace('{n}', String(days));
-  return fmtDate(s);
+  return ago(s, { horizonDays: 7 });
 }
 
 /** Two-letter monogram for the list/home avatar (initials of the first two words, else first two chars).
