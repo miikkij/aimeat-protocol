@@ -7,8 +7,8 @@
  *   row saying whom it serves: the app it is bound to, the agents holding its ref, or nobody in
  *   particular. This file is the state and the handlers (open a skill, copy its ref, download the
  *   zip, change visibility in place, attach to or detach from an agent, edit, remove, publish);
- *   the render is skills/page.js and skills/rows.js. splitSkillMd is re-exported for the admin
- *   Skills tab and the workspace skills panel, which import it from here.
+ *   the render is skills/page.js and skills/rows.js. splitSkillMd is re-exported for the workspace
+ *   skills panel, which imports it from here.
  * @structure SkillsTab() — state (library, apps, orgs, details, filters, editor, picker) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'skills'
  * @version-history
