@@ -7604,7 +7604,7 @@
       "statusPackages": "{n} pakettia",
       "statusPackagesOne": "yksi paketti",
       "lineNone": "Täällä ei ole vielä julkaistu mitään. Osion 06 esimerkkipaketit antavat jotain katsottavaa.",
-      "lineSome": "{published} on julkaistu ja {listed} on kauppalistaus. Niistä {installed} on asennettu täällä ainakin kerran.",
+      "lineSome": "{published} julkaistu, {listed} kauppalistauksella, {installed} asennettu täällä ainakin kerran.",
       "oldest": "vanhin julkaistu {when}",
       "rowPublished": "Julkaistu",
       "rowPublishedWhy": "Nämä löytyvät selaamalla. Luonnos näkyy vain julkaisijalleen, ja arkistoitu versio on yhä asennettavissa niille, jotka ovat sen jo ottaneet.",
