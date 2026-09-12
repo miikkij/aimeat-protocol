@@ -22,8 +22,8 @@
  * @usage
  *   import { deny401, deny403 } from './deny.js';
  * @version-history
- *   v1.0.0 — 2026-08-23 — Pure extraction from middleware.ts (BR-02 pushed it past 800 lines).
  *   v1.1.0 — 2026-09-12 — denyScope403 counts: scope_denials_total had never been written.
+ *   v1.0.0 — 2026-08-23 — Pure extraction from middleware.ts (BR-02 pushed it past 800 lines).
  */
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
