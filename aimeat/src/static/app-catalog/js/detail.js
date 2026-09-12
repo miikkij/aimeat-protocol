@@ -8,6 +8,7 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-09-13 — Opening an app clears the rail's pinned section (resetDetailRail).
  *   2026-09-12 — The sections sit beside an "On this page" rail (detail-rail.js): one numbered link
  *     per section, kept in view while the page scrolls.
  *   2026-08-29 — The "Legal pages" and "Audit log" sections (legal.js) after Marks, own published apps only.
@@ -75,7 +76,7 @@ import { legalSectionInner, auditSectionInner, legalOnOpen, legalChipHtml } from
 import { appManifestAgents } from './app-agents.js';
 import { isFavorite } from './favorites.js';
 import { saveWorkingCopy, loadCheckpoints, getCheckpoints, readCheckpoint, deleteCheckpoint, discardWorkingCopy, getDraft } from './workcopy.js';
-import { detailRailPage, renderDetailRail } from './detail-rail.js';
+import { detailRailPage, renderDetailRail, resetDetailRail } from './detail-rail.js';
 
 // Injected once at bootstrap by main.js. Functions are main-local; the get* return main's LIVE
 // state (so reads + in-place mutations propagate across the reassignments main does each render).
@@ -229,6 +230,7 @@ function openDetailView(appId) {
   detailCheckpointsHtml = null;
   detailCheckpointBusy = false;
   detailEpoch++;
+  resetDetailRail();
   var app = detailGetApp();
   if (!app) return;
   // A working copy saved in an EARLIER session shows up in the server listing as has_draft.
