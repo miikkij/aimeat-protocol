@@ -468,6 +468,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_admin_incident_resolve: { title: 'Admin: Resolve Security Incident', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     aimeat_admin_cors_overview: { title: 'Admin: CORS Overview', readOnlyHint: true },
     aimeat_admin_hooks: { title: 'Admin: Hooks', readOnlyHint: true },
+    aimeat_admin_statistics: { title: 'Admin: Statistics', readOnlyHint: true },
     // Not destructive: binding replaces a list the operator can read first and set back.
     aimeat_admin_hook_set: { title: 'Admin: Bind a Hook', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     // Replacing a list is not destructive (the previous one was a setting, not data), and setting

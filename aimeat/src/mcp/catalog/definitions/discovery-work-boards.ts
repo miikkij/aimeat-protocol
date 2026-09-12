@@ -358,6 +358,16 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
         input: {},
     },
     {
+        name: 'aimeat_admin_statistics',
+        description: 'Operator-only. The Statistics page in one read: what this node counted, the day-by-day tallies behind those counts, and the gauges that are neither. Give BOTH from and to (ISO dates, inclusive) for a period, or neither for the node\'s whole life. THREE KINDS OF NUMBER share the payload and only one moves with the period. Counters (requests_total, memory_reads, memory_writes, auth_failures_total, rate_limit_hits_total, scope_denials_total, schema_validations, email_sent, push_sent …) are summed over the period when you give one, and are lifetime totals when you do not. Gauges (uptime_seconds, active_owners, active_agents, tunnel, mailbox, gauges.*) are read at the moment of the call, are not summable, and a period does not touch them: never compare one across periods. `daily` carries one entry per day that had activity, so a missing day is a day with none rather than a gap in the data. READ IT TWICE to say anything useful — once for the period and once without — because a counter reading 0 for a period may have a large lifetime total, while one reading 0 both ways has never been written at all, and those are different facts. auth_failures_total is usually the largest number on a node reachable from the public internet, and a rate that stays flat across a weekend is a script working through credentials rather than people. The same data as GET /v1/stats. Returns an operator-role error for non-operators.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            from: { type: 'string', required: false, description: 'First day of the period, inclusive, as YYYY-MM-DD. Give `to` as well or neither is used.' },
+            to: { type: 'string', required: false, description: 'Last day of the period, inclusive, as YYYY-MM-DD. Give `from` as well or neither is used.' },
+        },
+    },
+    {
         name: 'aimeat_admin_hooks',
         description: 'Operator-only. The Hooks page in one read: the eleven moments in this node\'s life where it can call out to somebody\'s own code, which four of them DECIDE whether the thing happens (a pre_ hook can refuse a registration, a work request, a board post or a new federation peer) and which seven are only told afterwards, what is bound to each and whether that action is still published and still carries an address, which actions could be bound, and every call the node has made with what came back. Read this before advising anyone about hooks: a bound gate whose address stops answering refuses everything it guards, and `failing` names any gate in that state. The same data as GET /v1/admin/hooks. Returns an operator-role error for non-operators.',
         caller: 'operator',

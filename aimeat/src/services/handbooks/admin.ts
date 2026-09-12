@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — most tools require operator role and
  *   are runtime-gated (a non-operator caller will get "Operator role required").
  * @version-history
+ *   v1.2.0 -- 2026-09-12 -- aimeat_admin_statistics, and the correction that goes with it:
+ *     aimeat_admin_stats was described here as "health/metrics" and carries neither.
  *   v1.1.0 -- 2026-08-24 -- Organisation sign-in (BR-04): the SSO-connection tools, the setup
  *     order that works, and the manual account disable/enable pair.
  *   v1.0.0 -- 2026-05-30 -- Initial admin-surface handbook
@@ -20,7 +22,11 @@ operator they return "Operator role required". Use deliberately.
 
 ## Your tools
 
-**Node administration (operator).** \`aimeat_admin_stats\` (health/metrics) · \`aimeat_admin_agents\`
+**Node administration (operator).** \`aimeat_admin_statistics\` (what the node COUNTED: requests,
+memory, refusals, the day-by-day tallies, and the live gauges — give both \`from\` and \`to\` for a
+period, neither for the node's whole life, and read it both ways to tell a quiet period from a
+counter nothing writes) · \`aimeat_admin_stats\` (a different question: how many agents, actions,
+boards and work items the node HOLDS, and the morsels in circulation) · \`aimeat_admin_agents\`
 (all agents) · \`aimeat_admin_config\` (node config) · \`aimeat_admin_mint\` (mint morsels —
 irreversible ledger credit, daily cap enforced; a financial action, use sparingly).
 
@@ -60,7 +66,9 @@ person back in without resurrecting the old credentials. Never works on your own
 the manual offboarding door; a connected directory does the same automatically over SCIM.
 
 ## Typical uses
-- Audit the node: \`aimeat_admin_stats\` / \`aimeat_admin_agents\` / \`aimeat_admin_config\`.
+- Audit the node: \`aimeat_admin_statistics\` / \`aimeat_admin_stats\` / \`aimeat_admin_agents\` / \`aimeat_admin_config\`.
+- Answer "is anything happening to us": \`aimeat_admin_statistics\` for the period and the week before
+  it, then \`aimeat_admin_security_overview\` if the refusals are flat across a weekend.
 - Govern data sharing: create a group, add members, then grant consent for a data-pattern.
 - Classify agents: set mode/tags so other surfaces (e.g. task-runner) behave correctly.
 - Connect an organisation's identity provider end to end, and offboard a person by hand.

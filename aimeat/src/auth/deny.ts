@@ -23,6 +23,7 @@
  *   import { deny401, deny403 } from './deny.js';
  * @version-history
  *   v1.0.0 — 2026-08-23 — Pure extraction from middleware.ts (BR-02 pushed it past 800 lines).
+ *   v1.1.0 — 2026-09-12 — denyScope403 counts: scope_denials_total had never been written.
  */
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -123,6 +124,12 @@ export function deny403(req: Request, res: Response, code: string, message: stri
  * WHAT THIS DOES NOT DO, said plainly rather than implied: granting the scope is still a separate
  * act by the owner, in Profile → Agents. This half tells the client precisely what to ask for; the
  * half that lets it ask for one word and be granted one word is not built.
+ *
+ * THE COUNTER IS HERE for the reason deny401's is: this is the one place every scope refusal
+ * passes through, and counting at the call sites is how `auth_failures_total` came to read low.
+ * `scope_denials_total` was declared in the snapshot, in the Prometheus registry and on the
+ * Security page, and no line in the codebase had ever written it — so the operator reading "0
+ * scope denials" was reading an unwired counter, not a quiet fence. Found 2026-09-12.
  */
 export function denyScope403(
   req: Request,
@@ -131,6 +138,10 @@ export function denyScope403(
   message: string,
   resourceMetadataUrl?: string,
 ): void {
+  const stats = getStats();
+  if (stats) stats.increment('scope_denials_total');
+  const prom = getPromMetrics();
+  if (prom) prom.scopeDenialsTotal.inc();
   recordAuthFailure(auditContext(req), { status: 403, code: 'SCOPE_DENIED', reason: message });
   // Quoted and space-separated, which is the scope syntax RFC 6749 §3.3 defines and what a client
   // splits on. A comma-separated list here would parse as one scope with commas in it.

@@ -1,0 +1,133 @@
+/* ── Admin Statistics page, in the poster face ──
+ * @file admin-stats.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's Statistics page (design canvas "AIMEAT Admin Statistics"): the period
+ *   chips in section 01's header, one row per counter with its sparkline, the two day charts, and
+ *   the delivery table. The frame, the sections, the metric rows, the numeral strip, the dashed box
+ *   and the doors come from admin.css and organism.css; only what this page adds lives here.
+ *
+ *   THREE COLOURS HERE ARE NOT TOKENS, and that is deliberate. A series colour is data: `read` has
+ *   to stay the same colour when the theme flips, or the same bar means two different things in
+ *   light and dark. The two series values are slots 1 and 2 of the validated categorical palette
+ *   (worst colour-blind separation 24.7, normal vision 33.6, both modes passing against both
+ *   surfaces), and the refusal bar wears the reserved critical red because a refusal is a status
+ *   and never a series. Everything else on this page is a theme.css token and flips.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial. Replaces the classic-shell cards and the four Chart.js canvases.
+ */
+
+.adm-st {
+  /* The series palette. Fixed, for the reason in the header. */
+  --st-reads: #2a78d6;
+  --st-writes: #eb6834;
+  --st-critical: #d03b3b;
+}
+
+.adm-st .adm-mrow--last { border-bottom: 0; }
+.adm-st .adm-mrow .adm-mval { overflow-wrap: anywhere; }
+.adm-st .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-st .og-strip b.adm-st-coral { color: var(--accent); }
+.adm-st .og-box { max-width: none; }
+
+.adm-st-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 90ch; }
+.adm-st-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.adm-st-note { margin: 10px 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-st-acts { display: flex; gap: 22px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+.adm-st-empty { padding: 26px; text-align: center; color: var(--text-dim); font-size: .9rem; border: 2px dashed var(--border); background: var(--bg); }
+.adm-st-aside { font-family: var(--font-mono); font-size: .7rem; line-height: 1.4; color: var(--text-dim); }
+.adm-st-bad { color: var(--danger-fg); font-weight: 700; }
+
+/* 01: the period control, in the section header where it governs only what is under it. */
+.adm-st-period { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.adm-st-period-l { font-size: .78rem; color: var(--text-dim); margin-right: 4px; }
+.adm-st-fchip { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 9px; border: 2px solid var(--border); background: none; color: var(--text-dim); cursor: pointer; border-radius: 0; }
+.adm-st-fchip:hover { border-color: var(--text); color: var(--text); }
+.adm-st-fchip.on { border-color: var(--text); background: var(--sun); color: var(--on-sun); }
+.adm-st-fchip:disabled { opacity: .5; cursor: default; }
+.adm-st-dates { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.adm .adm-st-dates input[type="date"] { border: 0; border-bottom: 2px solid var(--text); border-radius: 0; background: none; padding: 2px 0; font-family: var(--font-mono); font-size: .74rem; color: var(--text); box-shadow: none; }
+.adm .adm-st-dates input[type="date"]:focus { outline: none; border-bottom-color: var(--accent); }
+.adm-st-dash { color: var(--text-dim); }
+
+/* 02: one counter is a row — what it counts, whether it is per day, the number, its seven days. */
+.adm-st-crow { display: grid; grid-template-columns: minmax(0, 1fr) 120px 150px 210px; gap: 0 22px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text); }
+.adm-st-crow--last { border-bottom: 0; }
+.adm-st-crow b { font-weight: 700; }
+.adm-st-crow .adm-why { overflow-wrap: anywhere; }
+.adm-st-num { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.5rem; line-height: 1; letter-spacing: var(--font-poster-tracking, .01em); text-align: right; color: var(--text); }
+.adm-st-num--none { color: var(--text-muted); }
+.adm-st-chip { display: inline-block; padding: 1px 7px; font-family: var(--font-mono); font-size: .66rem; font-weight: 500; text-transform: uppercase; line-height: 1.6; white-space: nowrap; }
+.adm-st-chip--ok { background: var(--success-bg); color: var(--success-fg); }
+.adm-st-chip--bad { background: var(--danger-bg); color: var(--danger-fg); }
+.adm-st-chip--muted { background: var(--bg-surface); color: var(--text-dim); }
+
+/* A bar: thin, a rounded data-end, anchored to the baseline, 2px of surface between neighbours. */
+.adm-st-bar { display: block; flex: 1 1 0; min-width: 0; border-radius: 2px 2px 0 0; }
+.adm-st-bar--reads { background: var(--st-reads); }
+.adm-st-bar--writes { background: var(--st-writes); }
+.adm-st-bar--critical { background: var(--st-critical); }
+.adm-st-bar--plain { background: var(--text-dim); }
+.adm-st-spark { display: flex; align-items: flex-end; gap: 2px; height: 34px; }
+
+/* 03: two charts, each owning its axis. */
+.adm-st-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; }
+.adm-st-charts > * { min-width: 0; }
+.adm-st-chart { border: 2px solid var(--text); background: var(--card-bg); padding: 16px 18px 12px; }
+.adm-st-chart-h { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 4px; flex-wrap: wrap; }
+.adm-st-chart-t { font-weight: 700; font-size: .95rem; }
+.adm-st-legend { display: flex; gap: 16px; align-items: center; font-size: .78rem; color: var(--text-dim); }
+.adm-st-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.adm-st-key { width: 10px; height: 10px; border-radius: 2px; display: block; }
+.adm-st-key--reads { background: var(--st-reads); }
+.adm-st-key--writes { background: var(--st-writes); }
+.adm-st-key--critical { background: var(--st-critical); }
+.adm-st-key--plain { background: var(--text-dim); }
+.adm-st-yhint { font-family: var(--font-mono); font-size: .66rem; color: var(--text-muted); }
+.adm-st-yhint--on { color: var(--text); }
+.adm-st-plot { display: flex; align-items: flex-end; gap: 6px; height: 150px; margin-top: 14px; padding-bottom: 2px; border-bottom: 1px solid var(--border); }
+.adm-st-day { flex: 1 1 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; min-width: 0; }
+.adm-st-day:hover { background: var(--bg-surface); }
+.adm-st-pair { display: flex; align-items: flex-end; gap: 2px; width: 100%; height: 100%; }
+.adm-st-xaxis { display: flex; gap: 6px; margin-top: 6px; }
+.adm-st-xaxis span { flex: 1 1 0; text-align: center; font-family: var(--font-mono); font-size: .64rem; color: var(--text-muted); min-width: 0; overflow: hidden; }
+
+/* 03 and 05: the numbers behind a chart, and the delivery table. */
+.adm-st-scroll { overflow-x: auto; }
+.adm-st-tbl { width: 100%; border-collapse: collapse; font-size: .81rem; }
+.adm-st-tbl th { text-align: left; color: var(--text-muted); font-weight: 600; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); white-space: nowrap; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; }
+.adm-st-tbl td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--border-subtle); color: var(--text-dim); vertical-align: top; }
+.adm-st-tbl td b { color: var(--text); font-weight: 700; }
+.adm-st-tbl th.num, .adm-st-tbl td.num { text-align: right; }
+.adm-st-tbl td.num { font-family: var(--font-mono); font-size: .76rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* 04: the gauges, in two columns. 06: the checks on the left, the paste on the right. */
+.adm-st-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 44px; }
+.adm-st-ai { display: grid; grid-template-columns: minmax(0, 1fr) 560px; gap: 0 44px; align-items: start; }
+.adm-st-two > *, .adm-st-ai > * { min-width: 0; }
+.adm-st-paste { white-space: pre-wrap; font-size: .85rem; line-height: 1.55; color: var(--text); }
+
+@media (max-width: 1100px) {
+  .adm-st .og-strip { flex-wrap: wrap; }
+  .adm-st .og-strip > div { flex: 1 1 50%; border-right: 0; border-bottom: 1px solid var(--border); }
+  .adm-st-charts, .adm-st-two, .adm-st-ai { grid-template-columns: 1fr; gap: 18px 0; }
+  .adm-st-crow { grid-template-columns: minmax(0, 1fr) 110px 120px; gap: 6px 18px; }
+  .adm-st-crow > :nth-child(4) { grid-column: 1 / -1; }
+}
+
+/* A phone: a metric row keeps its name readable and stacks the chip over the value; a counter row
+   puts its sparkline on a line of its own, where it is still the only thing that needs the width. */
+@media (max-width: 768px) {
+  .adm-st .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; }
+  .adm-st .adm-mrow > :nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+  .adm-st .adm-mrow > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .adm-st .adm-mrow > :nth-child(3) { grid-column: 2; grid-row: 2; max-width: 11rem; white-space: normal; }
+  .adm-st-crow { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; }
+  .adm-st-crow > :nth-child(2) { justify-self: end; }
+  .adm-st-crow > :nth-child(3) { grid-column: 2; grid-row: 1; text-align: right; }
+  .adm-st-crow > :nth-child(2) { grid-column: 2; grid-row: 2; }
+  .adm-st-crow > :nth-child(4) { grid-column: 1 / -1; grid-row: 3; }
+  .adm-st-plot { height: 120px; gap: 3px; }
+  .adm-st-xaxis { gap: 3px; }
+  .adm-st-xaxis span:nth-child(even) { visibility: hidden; }
+}

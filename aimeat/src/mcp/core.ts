@@ -11,6 +11,9 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.22.0 — 2026-09-12 — registerAdminStatisticsTools: the counters, their day tallies and the
+ *     live gauges, which no MCP tool could read. aimeat_admin_stats answers a different question
+ *     (agents, actions, boards, morsels) and keeps it.
  *   v1.21.0 — 2026-09-12 — registerAdminHooksTools: the Hooks page in one read and the bind write,
  *     through the same service the HTTP doors call. Hooks had no MCP door at all.
  *   v1.20.0 — 2026-09-08 — registerAdminCorsTools: the CORS page in one read and the one write it
@@ -118,6 +121,7 @@ import { registerAdminSsoTools } from './admin-sso.js';
 import { registerAdminSecurityTools } from './admin-security.js';
 import { registerAdminCorsTools } from './admin-cors.js';
 import { registerAdminHooksTools } from './admin-hooks.js';
+import { registerAdminStatisticsTools } from './admin-statistics.js';
 import { registerCoreStorageTools } from './core-storage.js';
 import { registerCoreDataPackageTools } from './core-datapackage.js';
 import { logger } from '../utils/logger.js';
@@ -746,4 +750,6 @@ export function registerCoreTools(
     registerAdminCorsTools(mcp, storage, config, getAgentGaii);
     // The Hooks page in one read, and the write that binds a moment to an address.
     registerAdminHooksTools(mcp, storage, config, getAgentGaii);
+    // The Statistics page in one read: the counters, their day tallies, and the live gauges.
+    registerAdminStatisticsTools(mcp, storage, config, getAgentGaii);
 }

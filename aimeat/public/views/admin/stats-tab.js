@@ -2,485 +2,282 @@
  * @file stats-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin dashboard Statistics tab with time range selector, notification
- *   delivery sections (email, push, mailbox), and per-day Chart.js charts.
- *   Manages its own data fetching so the period can be changed without reloading
- *   the entire dashboard.
+ * @description Admin Statistics page in the poster face (design canvas "AIMEAT Admin Statistics"):
+ *   what this node counted over a period you pick, what is true at this second, and which counters
+ *   have nothing behind them.
+ *
+ *   THE PAGE OPENS ON THE BIGGEST NUMBER, and on a node reachable from the public internet that is
+ *   usually the count of people and machines refused at the door. The old page did not show that
+ *   counter at all above the fold, while giving a quarter of its top row to a consent counter that
+ *   had reached 2 in the node's life. What an operator opens Statistics for is "is anything
+ *   happening to us", and the answer was four screens down.
+ *
+ *   ONE READ, TWO SHAPES. The period read is the ranged call; the node's whole life comes from the
+ *   un-ranged snapshot the dashboard shell already made. Holding both is what lets a row tell the
+ *   difference between a counter at zero for this week and a counter nothing has ever written —
+ *   which the old page could not do, and which is why `requests_total` read 0 for two months
+ *   without anyone being able to see that its middleware had never been mounted.
  * @structure
- *   - getDateRange(period)   -- converts preset key to { from, to } date strings
- *   - successRate / rateColor -- helpers for delivery percentage display
- *   - sumByPrefix            -- sums daily history keys matching a prefix
- *   - TimeRange              -- period preset buttons + custom date inputs
- *   - BreakdownTable         -- generic type-breakdown table (email / push)
- *   - StatsTab (default)     -- main tab component
- *   - renderAllCharts        -- loads Chart.js and draws all canvases
+ *   - Period — the chips and the two dates, in section 01's header, governing only what is under it
+ *   - RightNow (01) — the word, the five rows, the strip
+ *   - AskAi (06) — what an agent can do with these, and the paste
+ *   - StatsTab (default) — the reads, and the six sections
+ * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
- *   v1.0.0 -- 2026-05-01 -- Initial stats tab with basic cards and Chart.js charts
- *   v2.0.0 -- 2026-05-21 -- Major rewrite: time range selector, email / push /
- *     mailbox notification sections, per-day charts, self-managed data fetching
- *   v2.0.1 -- 2026-05-21 -- i18n chart labels, chart cleanup on unmount, live
- *     badges on gauge cards, section header CSS classes, breakdown table th fix
+ *   v3.0.0 — 2026-09-12 — The poster face and six numbered sections. Counted-over-a-period and
+ *     live-at-this-second are now separate sections, a counter with nothing behind it says so
+ *     instead of drawing a zero, the empty weekly and monthly charts are gone, and the two charts
+ *     that remain each own their axis and are drawn without Chart.js.
  *   v2.0.2 -- 2026-05-21 -- Replace inline styles with CSS classes, i18n weekday
  *     labels, use periodCustom/periodFrom/periodTo i18n keys on date inputs
+ *   v2.0.1 -- 2026-05-21 -- i18n chart labels, chart cleanup on unmount, live
+ *     badges on gauge cards, section header CSS classes, breakdown table th fix
+ *   v2.0.0 -- 2026-05-21 -- Major rewrite: time range selector, email / push /
+ *     mailbox notification sections, per-day charts, self-managed data fetching
+ *   v1.0.0 -- 2026-05-01 -- Initial stats tab with basic cards and Chart.js charts
  */
 import { h } from 'preact';
-import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num, fmtUp, fmtBytes, StatCard, EconRow } from './shared.js';
+import { useViewCSS } from '/components/useViewCSS.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
+import { num, fmtUp, Badge, Row, Spinner, ErrorBox } from './shared.js';
+import { CopyButton } from '/components/CopyButton.js';
+import { getNodeUrl } from '/js/services/auth.js';
 import * as api from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
+import { rangeFor, daysInRange, counterRows } from './stats-tab.data.js';
+import { WhatMoved, TheDays } from './stats-tab.days.js';
+import { LiveNow, DidItArrive } from './stats-tab.live.js';
+import { buildStatsPrompt } from './stats-tab.prompt.js';
 
-/* ── Helpers ── */
+const S = (key, params) => t('admin.stats.' + key, params);
 
-/** Compute { from, to } date strings from a period preset key. */
-function getDateRange(period) {
-  const today = new Date();
-  const fmt = d => d.toISOString().split('T')[0];
-  const to = fmt(today);
-  switch (period) {
-    case 'today': return { from: to, to };
-    case 'week': {
-      const mon = new Date(today);
-      mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
-      return { from: fmt(mon), to };
-    }
-    case '7d': {
-      const d = new Date(today); d.setDate(d.getDate() - 6);
-      return { from: fmt(d), to };
-    }
-    case '30d': {
-      const d = new Date(today); d.setDate(d.getDate() - 29);
-      return { from: fmt(d), to };
-    }
-    default: return null; // 'all' = no params
-  }
-}
+const PRESETS = ['today', '7d', '30d', 'all'];
 
-function successRate(sent, failed) {
-  if (!sent && !failed) return null;
-  return ((sent / (sent + failed)) * 100).toFixed(1);
-}
-
-function rateTone(rate) {
-  if (rate === null) return '';
-  const n = parseFloat(rate);
-  if (n >= 95) return 'green';
-  if (n >= 80) return 'amber';
-  return 'red';
-}
-
-/** Sum all values in a day-object whose key starts with `prefix`. */
-function sumByPrefix(dayData, prefix) {
-  let total = 0;
-  for (const [key, val] of Object.entries(dayData || {})) {
-    if (key.startsWith(prefix)) total += val;
-  }
-  return total;
-}
-
-/* ── Sub-components ── */
-
-function TimeRange({ period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, onApply }) {
-  const presets = [
-    { key: 'today', label: t('dashboard.periodToday') },
-    { key: 'week',  label: t('dashboard.periodThisWeek') },
-    { key: '7d',    label: t('dashboard.period7Days') },
-    { key: '30d',   label: t('dashboard.period30Days') },
-    { key: 'all',   label: t('dashboard.periodAll') },
-  ];
+/**
+ * The period control, and it lives in section 01's header rather than above the page.
+ *
+ * That placement is the fix for the thing the old page got wrong: a control at the top of a page
+ * looks like it governs the page. It governs sections 01, 02, 03 and 05, and section 04 says in its
+ * own first sentence that nothing governs it.
+ */
+function Period({ period, custom, onPick, onCustom, onApply }) {
+  const [open, setOpen] = useState(false);
   return html`
-    <div class="adm-time-range">
-      <span class="adm-time-range-label">${t('dashboard.periodLabel')}:</span>
-      ${presets.map(p => html`
-        <button class="adm-time-btn ${period === p.key ? 'active' : ''}"
-          onClick=${() => setPeriod(p.key)}>${p.label}</button>
-      `)}
-      <div class="adm-time-custom">
-        <span class="adm-text-dim adm-text-sm">${t('dashboard.periodCustom')}:</span>
-        <input type="date" value=${customFrom} aria-label=${t('dashboard.periodFrom')}
-          onInput=${e => setCustomFrom(e.target.value)} />
-        <span class="adm-date-separator">-</span>
-        <input type="date" value=${customTo} aria-label=${t('dashboard.periodTo')}
-          onInput=${e => setCustomTo(e.target.value)} />
-        <button class="adm-time-btn" onClick=${onApply}>${t('dashboard.periodApply')}</button>
+    <div class="adm-st-period">
+      <span class="adm-st-period-l">${S('period.label')}</span>
+      ${PRESETS.map(p => html`
+        <button type="button" class="adm-st-fchip ${period === p ? 'on' : ''}"
+          onClick=${() => { setOpen(false); onPick(p); }}>${S('period.' + p)}</button>`)}
+      ${open ? html`
+        <span class="adm-st-dates">
+          <input type="date" value=${custom.from} aria-label=${S('period.from')}
+            onInput=${e => onCustom({ ...custom, from: e.target.value })} />
+          <span class="adm-st-dash">–</span>
+          <input type="date" value=${custom.to} aria-label=${S('period.to')}
+            onInput=${e => onCustom({ ...custom, to: e.target.value })} />
+          <button type="button" class="adm-st-fchip" disabled=${!custom.from || !custom.to}
+            onClick=${onApply}>${S('period.apply')}</button>
+        </span>`
+    : html`<button type="button" class="og-door og-door--quiet" onClick=${() => setOpen(true)}>${S('period.pick')}</button>`}
+    </div>`;
+}
+
+/**
+ * Section 01: the word, and the five rows under it.
+ *
+ * The word is whichever counter is largest over the period, because that is the thing an operator
+ * is here to find out. When the largest is a refusal it wears the accent, which is the page saying
+ * something is happening to you rather than by you.
+ */
+function RightNow({ rows, live, days, from, to, control }) {
+  const ranked = [...rows].filter(r => r.state === 'live').sort((a, b) => b.total - a.total);
+  const lead = ranked[0] || null;
+  const perDay = lead && days.length ? Math.round(lead.total / days.length) : 0;
+  const alarming = !!lead && lead.role === 'critical';
+
+  const by = (key) => rows.find(r => r.key === key) || { total: 0, ever: 0, state: 'never', failed: 0 };
+  const reads = by('memory_reads');
+  const writes = by('memory_writes');
+  const schema = by('schema_validations');
+  const requests = by('requests_total');
+  const grants = by('consent_grants');
+  const revokes = by('consent_revocations');
+  const refused = by('auth_failures_total');
+  const memoryOps = reads.total + writes.total;
+  const consentOps = grants.total + revokes.total;
+  const consentEver = grants.ever + revokes.ever;
+
+  const stamp = [
+    from && to ? `${from} → ${to}` : S('now.everything'),
+    S('now.fromTallies'),
+    S('now.readAt', { at: new Date().toLocaleTimeString() }),
+  ].join(' · ');
+
+  return html`
+    <section class="og-sec og-sec--first" id="adm-st-01">
+      <div class="og-sec-h">
+        <h2>${S('now.title')}<small>01</small></h2>
+        ${control}
       </div>
-    </div>
-  `;
+
+      <div class="adm-ov-grid">
+        <div>
+          <div class="adm-ov-status ${alarming ? 'danger' : ''}">
+            ${lead ? S('now.word', { n: num(lead.total), what: S('word.' + lead.name) }) : S('now.wordNothing')}
+          </div>
+          <p class="adm-alert-line">
+            ${!lead ? S('now.lineNothing')
+    : alarming ? S('now.lineRefused', { n: num(perDay) })
+      : S('now.lineOrdinary', { what: S('counter.' + lead.name).toLowerCase(), n: num(perDay) })}
+          </p>
+          <div class="adm-ov-up">${stamp}</div>
+          ${alarming ? html`
+            <div class="adm-st-acts">
+              <a class="og-door og-door--danger" href="#/admin/security">${S('now.seeWho')}</a>
+            </div>` : null}
+        </div>
+
+        <div>
+          ${Row({
+    title: S('counter.refused'), why: S('now.refusedWhy'),
+    chip: refused.state === 'live'
+      ? html`<${Badge} type="danger" label=${S('now.aDay', { n: num(Math.round(refused.total / Math.max(1, days.length))) })} />`
+      : html`<${Badge} type="muted" label=${S('now.chipQuiet')} />`,
+    value: S('now.inPeriod', { n: num(refused.total) }),
+  })}
+          ${Row({
+    title: S('now.memory'), why: S('now.memoryWhy'),
+    chip: html`<${Badge} type=${memoryOps ? 'success' : 'muted'}
+      label=${memoryOps ? S('now.chipHealthy') : S('now.chipQuiet')} />`,
+    value: S('now.memoryValue', { n: num(memoryOps), r: num(reads.total), w: num(writes.total) }),
+  })}
+          ${Row({
+    title: S('counter.schema'), why: S('now.schemaWhy'),
+    chip: schema.failed
+      ? html`<${Badge} type="warning" label=${S('now.chipFailed', { n: num(schema.failed) })} />`
+      : html`<${Badge} type=${schema.total ? 'success' : 'muted'}
+        label=${schema.total ? S('now.chipAllPassed') : S('now.chipQuiet')} />`,
+    value: S('now.schemaValue', { n: num(schema.total) }),
+  })}
+          ${Row({
+    title: S('counter.requests'), why: requests.state === 'never' ? S('now.requestsNoneWhy') : S('now.requestsWhy'),
+    chip: requests.state === 'never'
+      ? html`<${Badge} type="muted" label=${S('now.chipNothingYet')} />`
+      : html`<${Badge} type="info" label=${S('now.aDay', { n: num(Math.round(requests.total / Math.max(1, days.length))) })} />`,
+    value: requests.state === 'never' ? 'requests_total' : S('now.inPeriod', { n: num(requests.total) }),
+  })}
+          ${Row({
+    title: S('now.consent'), why: S('now.consentWhy'), last: true,
+    chip: html`<${Badge} type="muted" label=${S('now.chipEver', { n: num(consentEver) })} />`,
+    value: S('now.inPeriod', { n: num(consentOps) }),
+  })}
+        </div>
+      </div>
+
+      <div class="og-strip">
+        <div>
+          <b class=${alarming ? 'adm-st-coral' : ''}>${lead ? num(lead.total) : '0'}</b>
+          <span>${lead ? S('word.' + lead.name) : S('strip.nothing')}</span>
+          <small>${lead ? S('strip.aDay', { n: num(perDay) }) : S('strip.nothingSub')}</small>
+        </div>
+        <div>
+          <b>${num(memoryOps)}</b><span>${S('strip.memory')}</span>
+          <small>${S('strip.memorySub', { r: num(reads.total), w: num(writes.total) })}</small>
+        </div>
+        <div>
+          <b>${num(schema.total)}</b><span>${S('strip.schema')}</span>
+          <small>${S('strip.schemaSub', { n: num(schema.failed) })}</small>
+        </div>
+        <div>
+          <b>${fmtUp(live.uptime_seconds || 0)}</b><span>${S('strip.up')}</span>
+          <small>${S('strip.upSub', { at: (live.started_at || '').slice(0, 16).replace('T', ' ') })}</small>
+        </div>
+      </div>
+    </section>`;
 }
 
-function BreakdownTable({ byType, columns, typePrefix }) {
-  if (!byType || Object.keys(byType).length === 0) return null;
+/** Section 06: what an agent can do with these numbers, and the paste. */
+function AskAi({ from, to }) {
+  const paste = buildStatsPrompt({ url: getNodeUrl(), from, to });
   return html`
-    <table class="adm-breakdown-table">
-      <thead><tr>
-        <th>${t('dashboard.breakdownType')}</th>
-        ${columns.map(c => html`<th class="num">${t(c.label)}</th>`)}
-      </tr></thead>
-      <tbody>
-        ${Object.keys(byType).map(type => html`
-          <tr>
-            <td>${t(typePrefix + type) || type}</td>
-            ${columns.map(c => html`<td class="num">${num(c.getData(type))}</td>`)}
-          </tr>
-        `)}
-      </tbody>
-    </table>
-  `;
+    <section class="og-sec" id="adm-st-06">
+      <div class="og-sec-h">
+        <h2>${S('ai.title')}<small>06</small></h2>
+        <div class="og-doors">
+          <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
+        </div>
+      </div>
+      <div class="adm-st-ai">
+        <div>
+          <p class="adm-st-lead">${S('ai.lead')}</p>
+          ${Row({ title: S('ai.read'), why: S('ai.readWhy'), chip: null, value: 'aimeat_admin_statistics' })}
+          ${Row({ title: S('ai.who'), why: S('ai.whoWhy'), chip: null, value: 'aimeat_admin_security_overview' })}
+          ${Row({ title: S('ai.raw'), why: S('ai.rawWhy'), chip: null, value: '/v1/metrics', last: true })}
+        </div>
+        <div class="og-box">
+          <span class="og-box-label">${S('ai.label')}</span>
+          <div class="adm-st-paste">${paste}</div>
+        </div>
+      </div>
+    </section>`;
 }
-
-/* ── Main component ── */
 
 export default function StatsTab({ data }) {
+  useViewCSS('/css/views/admin-stats.css');
   const [period, setPeriod] = useState('7d');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
-  const [sd, setSd] = useState(data.stats);
-  const [loading, setLoading] = useState(false);
-  const chartRefs = useRef({});
+  const [custom, setCustom] = useState({ from: '', to: '' });
+  const [applied, setApplied] = useState(null);
+  const [sd, setSd] = useState(data?.stats || null);
+  const [numbers, setNumbers] = useState(false);
+  const [failed, setFailed] = useState(null);
 
-  const fetchStats = useCallback(async (p, cf, ct, { showSpinner = true } = {}) => {
-    if (showSpinner) setLoading(true);
+  // The node's whole life, from the un-ranged read the dashboard shell already made. It is what
+  // lets a row say "nothing has ever written this" instead of drawing a zero for the period.
+  const life = data?.stats || {};
+
+  const load = useCallback(async (p, range) => {
     try {
-      const range = p === 'custom'
-        ? (cf && ct ? { from: cf, to: ct } : null)
-        : getDateRange(p);
-      const resp = await api.getStats(range?.from, range?.to);
-      if (resp.data) setSd(resp.data);
-    } catch (err) { swallowed('stats-tab: StatsTab', err); }
-    setLoading(false);
+      const r = p === 'custom' ? range : rangeFor(p);
+      const resp = await api.getStats(r?.from, r?.to);
+      if (resp.data) { setSd(resp.data); setFailed(null); }
+    } catch (err) {
+      // A refused or unreachable read says so. The page holding its last good numbers behind a
+      // spinner that never stops is the one outcome an operator cannot act on.
+      swallowed('stats-tab: load', err);
+      setFailed(err?.message || String(err));
+    }
   }, []);
 
-  useEffect(() => {
-    if (period !== 'custom') fetchStats(period);
-  }, [period, fetchStats]);
+  useEffect(() => { load(period, applied); }, [period, applied, load]);
+  // Statistics counts everything, so it follows every live update rather than a list of domains.
+  useEffect(() => onLiveUpdate(null, () => load(period, applied)), [period, applied, load]);
 
-  // Listen for live updates
-  useEffect(() => {
-    const handler = () => { fetchStats(period, customFrom, customTo, { showSpinner: false }); }; // silent: no flash
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [period, customFrom, customTo, fetchStats]);
+  if (!sd) return failed ? html`<${ErrorBox} message=${failed} />` : html`<${Spinner} text=${S('loading')} />`;
 
-  // Re-render charts when data changes; destroy on unmount
-  useEffect(() => {
-    if (sd) renderAllCharts(sd, chartRefs);
-    return () => {
-      // renderAllCharts reassigns chartRefs.current; the cleanup must read the LIVE ref (not a
-      // snapshot taken at effect-run time) to destroy whatever chart instances currently exist.
-      for (const key of Object.keys(chartRefs.current)) {
-        if (chartRefs.current[key]) {
-          chartRefs.current[key].destroy();
-          // eslint-disable-next-line react-hooks/exhaustive-deps
-          delete chartRefs.current[key];
-        }
-      }
-    };
-  }, [sd]);
-
-  if (!sd) return html`<div class="empty">${t('dashboard.statsNotAvailable')}</div>`;
-
-  const ts = sd.tunnel || {};
-  const ms = sd.mailbox || {};
-  const cs = sd.consent_permissions || {};
-  const gs = sd.gauges || {};
-
-  // Email stats
-  const emailSent    = sd.email_sent || 0;
-  const emailFailed  = sd.email_failed || 0;
-  const emailRetried = sd.email_retried || 0;
-  const emailRate    = successRate(emailSent, emailFailed);
-
-  // Push stats
-  const pushSent    = sd.push_sent || 0;
-  const pushFailed  = sd.push_failed || 0;
-  const pushExpired = sd.push_expired_subs || 0;
-  const pushRate    = successRate(pushSent, pushFailed);
-
-  // Mailbox notification stats
-  const mboxSent    = sd.mailbox_notif_sent || 0;
-  const mboxFailed  = sd.mailbox_notif_failed || 0;
-  const mboxBlocked = sd.mailbox_notif_blocked || 0;
-
-  return html`
-    <!-- Time Range Selector -->
-    <${TimeRange} period=${period} setPeriod=${setPeriod}
-      customFrom=${customFrom} setCustomFrom=${setCustomFrom}
-      customTo=${customTo} setCustomTo=${setCustomTo}
-      onApply=${() => fetchStats('custom', customFrom, customTo)} />
-
-    ${loading ? html`<div class="adm-text-dim adm-text-sm">${t('dashboard.loading')}</div>` : ''}
-
-    <p class="adm-text-dim adm-text-sm adm-mb-lg">${t('dashboard.statsExplain')}</p>
-
-    <!-- Top-level stat cards -->
-    <div class="adm-grid adm-grid-4">
-      <${StatCard} label=${t('dashboard.requestsTotal')} value=${sd.requests_total} />
-      <${StatCard} label=${t('dashboard.memoryOps')} value=${(sd.memory_reads || 0) + (sd.memory_writes || 0)} sub=${t('dashboard.reads') + ': ' + num(sd.memory_reads) + ' / ' + t('dashboard.writes') + ': ' + num(sd.memory_writes)} />
-      <${StatCard} label=${t('dashboard.consentOps')} value=${(sd.consent_grants || 0) + (sd.consent_revocations || 0)} sub=${t('dashboard.grants') + ': ' + num(sd.consent_grants) + ' / ' + t('dashboard.revocations') + ': ' + num(sd.consent_revocations)} />
-      <${StatCard} label=${t('dashboard.schemaOps')} value=${sd.schema_validations} sub=${t('dashboard.failures') + ': ' + num(sd.schema_validation_failures)} />
-    </div>
-
-    <div class="adm-grid adm-grid-4 adm-mb-lg">
-      <${StatCard} label=${t('dashboard.uptime')} value=${fmtUp(sd.uptime_seconds || 0)} />
-      <${StatCard} label=${t('dashboard.registeredOwners')} value=${sd.active_owners} />
-      <${StatCard} label=${t('dashboard.registeredAgents')} value=${sd.active_agents} />
-    </div>
-
-    <!-- Charts (daily, weekly, monthly) -->
-    <div class="adm-grid adm-grid-2">
-      <div class="adm-card"><h2>${t('dashboard.dailyActivity')}</h2><canvas id="chartDaily" height="200"></canvas></div>
-      <div class="adm-card"><h2>${t('dashboard.weeklyComparison')}</h2><canvas id="chartWeekly" height="200"></canvas></div>
-    </div>
-    <div class="adm-card adm-mt-lg"><h2>${t('dashboard.monthlyTrend')}</h2><canvas id="chartMonthly" height="160"></canvas></div>
-
-    <!-- Tunnel Stats -->
-    <h3 class="adm-mt-lg adm-text-sm adm-text-accent">${t('dashboard.tunnelStats')}</h3>
-    <div class="adm-grid adm-grid-4 adm-mt-md">
-      <${StatCard} label=${html`${t('dashboard.tunnelActive')} <span class="adm-badge-live">${t('dashboard.live')}</span>`} value=${gs.tunnel_connections_active ?? ts.connections_active ?? 0} tone="green" />
-      <${StatCard} label=${t('dashboard.tunnelTotal')} value=${ts.connections_total || 0} />
-      <${StatCard} label=${t('dashboard.tunnelDisconnections')} value=${ts.disconnections_total || 0} tone="amber" />
-      <${StatCard} label=${t('dashboard.tunnelReconnects')} value=${ts.reconnects_total || 0} tone="blue" />
-    </div>
-    <div class="adm-grid adm-grid-4">
-      <${StatCard} label=${t('dashboard.tunnelMsgSent')} value=${ts.messages_sent_total || 0} />
-      <${StatCard} label=${t('dashboard.tunnelMsgReceived')} value=${ts.messages_received_total || 0} />
-      <${StatCard} label=${t('dashboard.tunnelDeliveryFails')} value=${ts.delivery_failures_total || 0} tone=${ts.delivery_failures_total > 0 ? 'red' : 'green'} />
-      <${StatCard} label=${t('dashboard.tunnelHeartbeatMisses')} value=${ts.heartbeat_misses_total || 0} tone=${ts.heartbeat_misses_total > 0 ? 'amber' : 'green'} />
-    </div>
-    <div class="adm-grid adm-grid-2">
-      <div class="adm-card">
-        <h2>${t('dashboard.latency')}</h2>
-        <${EconRow} label=${t('dashboard.tunnelLatencyAvg')} value=${(ts.delivery_latency_avg_ms || 0).toFixed(1) + ' ms'} />
-        <${EconRow} label=${t('dashboard.tunnelLatencyP95')} value=${(ts.delivery_latency_p95_ms || 0).toFixed(1) + ' ms'} />
-        <${EconRow} label=${t('dashboard.tunnelMailboxFallbacks')} value=${num(ts.mailbox_fallbacks_total || 0)} />
-      </div>
-      <div class="adm-card"><h2>${t('dashboard.tunnelActivity')}</h2><canvas id="chartTunnel" height="180"></canvas></div>
-    </div>
-
-    <!-- Mailbox Stats -->
-    <h3 class="adm-mt-lg adm-text-sm adm-section-purple">${t('dashboard.mailboxStats')}</h3>
-    <div class="adm-grid adm-grid-4 adm-mt-md">
-      <${StatCard} label=${html`${t('dashboard.mailboxItems')} <span class="adm-badge-live">${t('dashboard.live')}</span>`} value=${gs.mailbox_items_total ?? ms.items_total ?? 0} />
-      <${StatCard} label=${html`${t('dashboard.mailboxBytes')} <span class="adm-badge-live">${t('dashboard.live')}</span>`} value=${fmtBytes(gs.mailbox_bytes_total ?? ms.bytes_total ?? 0)} />
-      <${StatCard} label=${t('dashboard.mailboxEnqueued')} value=${ms.enqueued_total || 0} tone="blue" />
-      <${StatCard} label=${t('dashboard.mailboxDelivered')} value=${ms.delivered_total || 0} tone="green" />
-    </div>
-    <div class="adm-grid adm-grid-4">
-      <${StatCard} label=${t('dashboard.mailboxExpired')} value=${ms.expired_total || 0} tone=${ms.expired_total > 0 ? 'amber' : 'green'} />
-      <${StatCard} label=${t('dashboard.mailboxQuotaRejects')} value=${ms.quota_rejections_total || 0} tone=${ms.quota_rejections_total > 0 ? 'red' : 'green'} />
-      <${StatCard} label=${html`${t('dashboard.mailboxOldestAge')} <span class="adm-badge-live">${t('dashboard.live')}</span>`} value=${fmtUp(gs.mailbox_oldest_item_age_seconds ?? ms.oldest_item_age_seconds ?? 0)} color="var(--text-dim)" />
-    </div>
-
-    <!-- Email Delivery -->
-    <h3 class="adm-mt-lg adm-text-sm adm-section-cyan">${t('dashboard.emailDelivery')}</h3>
-    <div class="adm-grid adm-grid-4 adm-mt-md">
-      <${StatCard} label=${t('dashboard.emailsSent')} value=${emailSent} />
-      <${StatCard} label=${t('dashboard.emailsFailed')} value=${emailFailed} tone=${emailFailed > 0 ? 'red' : 'green'} />
-      <${StatCard} label=${t('dashboard.emailsRetried')} value=${emailRetried} tone=${emailRetried > 0 ? 'amber' : 'green'} />
-      <${StatCard} label=${t('dashboard.successRate')} value=${emailRate !== null ? emailRate + '%' : '—'} tone=${rateTone(emailRate)} />
-    </div>
-    ${sd.email_sent_by_type ? html`
-      <div class="adm-card adm-mt-md">
-        <${BreakdownTable} byType=${sd.email_sent_by_type}
-          typePrefix="dashboard.emailType."
-          columns=${[
-            { label: 'dashboard.breakdownSent',    getData: type => (sd.email_sent_by_type || {})[type] || 0 },
-            { label: 'dashboard.breakdownFailed',  getData: type => (sd.email_failed_by_type || {})[type] || 0 },
-            { label: 'dashboard.breakdownRetried', getData: type => (sd.email_retried_by_type || {})[type] || 0 },
-          ]} />
-      </div>
-    ` : ''}
-    <div class="adm-card adm-mt-md"><canvas id="chartEmailDaily" height="180"></canvas></div>
-
-    <!-- Push Notifications -->
-    <h3 class="adm-mt-lg adm-text-sm adm-section-violet">${t('dashboard.pushDelivery')}</h3>
-    <div class="adm-grid adm-grid-4 adm-mt-md">
-      <${StatCard} label=${t('dashboard.pushSent')} value=${pushSent} />
-      <${StatCard} label=${t('dashboard.pushFailed')} value=${pushFailed} tone=${pushFailed > 0 ? 'red' : 'green'} />
-      <${StatCard} label=${t('dashboard.expiredSubs')} value=${pushExpired} tone=${pushExpired > 0 ? 'amber' : 'green'} />
-      <${StatCard} label=${t('dashboard.successRate')} value=${pushRate !== null ? pushRate + '%' : '—'} tone=${rateTone(pushRate)} />
-    </div>
-    ${sd.push_sent_by_type ? html`
-      <div class="adm-card adm-mt-md">
-        <${BreakdownTable} byType=${sd.push_sent_by_type}
-          typePrefix="dashboard.pushType."
-          columns=${[
-            { label: 'dashboard.breakdownSent',   getData: type => (sd.push_sent_by_type || {})[type] || 0 },
-            { label: 'dashboard.breakdownFailed', getData: type => (sd.push_failed_by_type || {})[type] || 0 },
-          ]} />
-      </div>
-    ` : ''}
-    <div class="adm-card adm-mt-md"><canvas id="chartPushDaily" height="180"></canvas></div>
-
-    <!-- Mailbox Notifications -->
-    <h3 class="adm-mt-lg adm-text-sm adm-section-amber">${t('dashboard.mailboxNotifications')}</h3>
-    <div class="adm-grid adm-grid-3 adm-mt-md">
-      <${StatCard} label=${t('dashboard.mailboxNotifSent')} value=${mboxSent} />
-      <${StatCard} label=${t('dashboard.mailboxNotifFailed')} value=${mboxFailed} tone=${mboxFailed > 0 ? 'red' : 'green'} />
-      <${StatCard} label=${t('dashboard.mailboxNotifBlocked')} value=${mboxBlocked} tone=${mboxBlocked > 0 ? 'amber' : 'green'} />
-    </div>
-    ${(sd.mailbox_notif_blocked_by_type || sd.mailbox_notif_sent_by_type) ? html`
-      <div class="adm-card adm-mt-md adm-text-sm adm-mailbox-inline">
-        ${sd.mailbox_notif_blocked_by_type ? html`
-          <div class="adm-blocked-reasons">
-            <strong>${t('dashboard.blocked')}:</strong>
-            ${' '} ${t('dashboard.blockedCooldown')}: ${num((sd.mailbox_notif_blocked_by_type || {}).cooldown || 0)}
-            ${' | '} ${t('dashboard.blockedQuietHours')}: ${num((sd.mailbox_notif_blocked_by_type || {}).quiet_hours || 0)}
-            ${' | '} ${t('dashboard.blockedDisabled')}: ${num((sd.mailbox_notif_blocked_by_type || {}).disabled || 0)}
-          </div>
-        ` : ''}
-        ${sd.mailbox_notif_sent_by_type ? html`
-          <div class="adm-channels-summary">
-            <strong>${t('dashboard.channels')}:</strong>
-            ${' '} ${t('dashboard.channelPush')}: ${num((sd.mailbox_notif_sent_by_type || {}).push || 0)} ${t('dashboard.breakdownSent').toLowerCase()}, ${num((sd.mailbox_notif_failed_by_type || {}).push || 0)} ${t('dashboard.breakdownFailed').toLowerCase()}
-            ${' | '} ${t('dashboard.channelEmail')}: ${num((sd.mailbox_notif_sent_by_type || {}).email || 0)} ${t('dashboard.breakdownSent').toLowerCase()}, ${num((sd.mailbox_notif_failed_by_type || {}).email || 0)} ${t('dashboard.breakdownFailed').toLowerCase()}
-          </div>
-        ` : ''}
-      </div>
-    ` : ''}
-
-    <!-- Consent Permission Stats -->
-    <h3 class="adm-mt-lg adm-text-sm adm-section-purple">${t('dashboard.consentPermStats')}</h3>
-    <div class="adm-grid adm-grid-4 adm-mt-md">
-      <${StatCard} label=${t('dashboard.consentActiveRules')} value=${cs.active_rules || 0} tone="purple" />
-      <${StatCard} label=${t('dashboard.consentByGaii')} value=${cs.by_gaii || 0} tone="blue" />
-      <${StatCard} label=${t('dashboard.consentByGhii')} value=${cs.by_ghii || 0} tone="purple" />
-      <${StatCard} label=${t('dashboard.consentByOrganism')} value=${cs.by_organism || 0} tone="green" />
-    </div>
-    <div class="adm-grid adm-grid-4">
-      <${StatCard} label=${t('dashboard.consentByDomain')} value=${cs.by_domain || 0} tone="amber" />
-      <${StatCard} label=${t('dashboard.consentByNode')} value=${cs.by_node || 0} color="var(--text-dim)" />
-      <${StatCard} label=${t('dashboard.consentByWildcard')} value=${cs.by_wildcard || 0} tone=${cs.by_wildcard > 0 ? 'red' : 'green'} />
-      <${StatCard} label=${t('dashboard.consentDataPatterns')} value=${cs.unique_patterns || 0} />
-    </div>
-
-    <!-- Security Stats -->
-    <h3 class="adm-mt-lg adm-text-sm adm-section-red">${t('dashboard.securityStats')}</h3>
-    <div class="adm-grid adm-grid-4 adm-mt-md">
-      <${StatCard} label=${t('dashboard.authFailures')} value=${sd.auth_failures_total || 0} tone=${sd.auth_failures_total > 0 ? 'red' : 'green'} />
-      <${StatCard} label=${t('dashboard.rateLimitHits')} value=${sd.rate_limit_hits_total || 0} tone=${sd.rate_limit_hits_total > 0 ? 'amber' : 'green'} />
-      <${StatCard} label=${t('dashboard.scopeDenials')} value=${sd.scope_denials_total || 0} tone=${sd.scope_denials_total > 0 ? 'amber' : 'green'} />
-    </div>
-  `;
-}
-
-/* ── Chart rendering ── */
-
-/** Load Chart.js from CDN and render all charts. */
-async function renderAllCharts(sd, chartRefs) {
-  // Load Chart.js if not already available
-  if (!window.Chart) {
-    await new Promise(resolve => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js';
-      s.onload = resolve;
-      document.head.appendChild(s);
-    });
-  }
-  if (!window.Chart) return;
-
-  // Destroy previous chart instances
-  const refs = chartRefs.current;
-  for (const key of Object.keys(refs)) {
-    if (refs[key] && typeof refs[key].destroy === 'function') {
-      refs[key].destroy();
-    }
-  }
-  chartRefs.current = {};
-
+  const from = sd.from || '';
+  const to = sd.to || '';
   const daily = sd.daily || sd.daily_history || {};
-  const days = Object.keys(daily).sort().slice(-30);
+  const days = daysInRange(from, to, daily);
+  const rows = counterRows(sd, life, daily, days);
 
-  const chartOpts = {
-    responsive: true,
-    plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
-    scales: {
-      x: { ticks: { color: '#94a3b8', maxRotation: 45 }, grid: { color: '#334155' } },
-      y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-    },
-  };
+  const control = html`<${Period} period=${period} custom=${custom}
+    onPick=${(p) => { setApplied(null); setPeriod(p); }}
+    onCustom=${setCustom}
+    onApply=${() => { setApplied({ ...custom }); setPeriod('custom'); }} />`;
 
-  // Daily Activity bar chart
-  const dc = document.getElementById('chartDaily');
-  if (dc) {
-    refs.chartDaily = new Chart(dc, { type: 'bar', data: {
-      labels: days.map(d => d.slice(5)),
-      datasets: [
-        { label: t('dashboard.requestsTotal') || 'Requests', data: days.map(d => (daily[d] || {}).requests_total || 0), backgroundColor: '#3b82f688' },
-        { label: t('dashboard.writes') || 'Writes',   data: days.map(d => (daily[d] || {}).memory_writes || 0),  backgroundColor: '#22c55e88' },
-        { label: t('dashboard.reads') || 'Reads',    data: days.map(d => (daily[d] || {}).memory_reads || 0),   backgroundColor: '#06b6d488' },
-      ],
-    }, options: chartOpts });
-  }
-
-  // Weekly Comparison line chart
-  const wc = document.getElementById('chartWeekly');
-  if (wc && days.length > 0) {
-    const weekLabels = [t('dashboard.weekMon'), t('dashboard.weekTue'), t('dashboard.weekWed'), t('dashboard.weekThu'), t('dashboard.weekFri'), t('dashboard.weekSat'), t('dashboard.weekSun')];
-    const getWeekData = (weeksAgo) => {
-      const data = new Array(7).fill(0);
-      const now = new Date();
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - d.getDay() + i + 1 - (weeksAgo * 7));
-        const key = d.toISOString().slice(0, 10);
-        if (daily[key]) data[i] = daily[key].requests_total || 0;
-      }
-      return data;
-    };
-    refs.chartWeekly = new Chart(wc, { type: 'line', data: {
-      labels: weekLabels,
-      datasets: [
-        { label: t('dashboard.thisWeek') || 'This week', data: getWeekData(0), borderColor: '#3b82f6', backgroundColor: '#3b82f622', fill: true },
-        { label: t('dashboard.lastWeek') || 'Last week', data: getWeekData(1), borderColor: 'green', backgroundColor: '#22c55e22', fill: true },
-      ],
-    }, options: chartOpts });
-  }
-
-  // Monthly Trend line chart
-  const mc = document.getElementById('chartMonthly');
-  if (mc && days.length > 0) {
-    refs.chartMonthly = new Chart(mc, { type: 'line', data: {
-      labels: days.map(d => d.slice(5)),
-      datasets: [{ label: t('dashboard.requestsTotal') || 'Requests', data: days.map(d => (daily[d] || {}).requests_total || 0), borderColor: '#06b6d4', backgroundColor: '#06b6d422', fill: true }],
-    }, options: chartOpts });
-  }
-
-  // Tunnel doughnut chart
-  const tc = document.getElementById('chartTunnel');
-  if (tc) {
-    const tunnel = sd.tunnel || {};
-    refs.chartTunnel = new Chart(tc, { type: 'doughnut', data: {
-      labels: [t('dashboard.tunnelMsgSent') || 'Sent', t('dashboard.tunnelMsgReceived') || 'Received', t('dashboard.tunnelDeliveryFails') || 'Rejected', t('dashboard.tunnelMailboxFallbacks') || 'Fallbacks'],
-      datasets: [{ data: [tunnel.messages_sent_total || 0, tunnel.messages_received_total || 0, tunnel.delivery_failures_total || 0, tunnel.mailbox_fallbacks_total || 0],
-        backgroundColor: ['#3b82f6', 'green', 'red', 'amber'] }],
-    }, options: { responsive: true, plugins: { legend: { labels: { color: '#94a3b8' } } } } });
-  }
-
-  // Email Daily bar chart
-  const ec = document.getElementById('chartEmailDaily');
-  if (ec && days.length > 0) {
-    refs.chartEmailDaily = new Chart(ec, { type: 'bar', data: {
-      labels: days.map(d => d.slice(5)),
-      datasets: [
-        { label: t('dashboard.breakdownSent') || 'Sent',    data: days.map(d => sumByPrefix(daily[d], 'email_sent')),    backgroundColor: '#06b6d488' },
-        { label: t('dashboard.breakdownFailed') || 'Failed',  data: days.map(d => sumByPrefix(daily[d], 'email_failed')),  backgroundColor: '#ef444488' },
-        { label: t('dashboard.breakdownRetried') || 'Retried', data: days.map(d => sumByPrefix(daily[d], 'email_retried')), backgroundColor: '#eab30888' },
-      ],
-    }, options: chartOpts });
-  }
-
-  // Push Daily bar chart
-  const pc = document.getElementById('chartPushDaily');
-  if (pc && days.length > 0) {
-    refs.chartPushDaily = new Chart(pc, { type: 'bar', data: {
-      labels: days.map(d => d.slice(5)),
-      datasets: [
-        { label: t('dashboard.breakdownSent') || 'Sent',   data: days.map(d => sumByPrefix(daily[d], 'push_sent')),   backgroundColor: '#8b5cf688' },
-        { label: t('dashboard.breakdownFailed') || 'Failed', data: days.map(d => sumByPrefix(daily[d], 'push_failed')), backgroundColor: '#ef444488' },
-      ],
-    }, options: chartOpts });
-  }
+  return html`<div class="adm-st">
+    <${RightNow} rows=${rows} live=${sd} days=${days} from=${from} to=${to} control=${control} />
+    <${WhatMoved} rows=${rows} days=${days} onShowNumbers=${() => {
+    setNumbers(true);
+    document.getElementById('adm-st-03')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }} />
+    <${TheDays} daily=${daily} days=${days} showNumbers=${numbers} onToggle=${() => setNumbers(v => !v)} />
+    <${LiveNow} live=${sd} gauges=${sd.gauges || {}} />
+    <${DidItArrive} period=${sd} />
+    <${AskAi} from=${from} to=${to} />
+  </div>`;
 }
