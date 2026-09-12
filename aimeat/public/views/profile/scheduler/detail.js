@@ -22,7 +22,7 @@ import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { Section, Fold } from '/views/profile/organisms/poster-parts.js';
 import { formatUntil, scheduleIo, describeDispatch } from '../schedule-item.js';
-import { cronWordsIn } from './cron-words.js';
+import { cronWordsFor } from './cron-words.js';
 import { kindOf, nameOf, dayLabel } from './model.js';
 import { ScheduleEditForm } from './edit-form.js';
 import { renderPage, whoRuns, resultWord, c, hhmm } from './frame.js';
@@ -64,7 +64,7 @@ export function renderDetail(ctx, s) {
 
   const chips = html`
     <span class=${`og-chip ${s.enabled === false ? 'og-chip--dim' : 'og-chip--sun'}`}>${s.enabled === false ? t('profile.scheduler.paused') : c('status.running')}</span>
-    <span class="og-chip">${cronWordsIn(s.cron, s.timezone)}</span>
+    <span class="og-chip">${cronWordsFor(s)}</span>
     ${s.timezone ? html`<span class="og-chip og-chip--dim sc-chip--mono">${s.timezone}</span>` : null}
     <span class="og-chip og-chip--dim sc-chip--mono">${s.cron}</span>
     <span class="og-chip">${whoRuns(s)}</span>

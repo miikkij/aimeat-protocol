@@ -85,6 +85,7 @@ import { logger } from '../utils/logger.js';
 import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord } from '../services/schedule-write.js';
 import type { ScheduleWriteCaller } from '../services/schedule-write.js';
 import { isManifestDeclaredJob } from '../services/extension-schedules.js';
+import { nodeTimeZone } from '../services/display-prefs.js';
 
 // The record build, the per-kind input checks and the write moved to services/schedule-write.ts on
 // 2026-08-11, so the MCP tools that create, edit and cancel schedules produce the same record this
@@ -162,11 +163,20 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
       entries: await readAgentInternal(a.name, a.gaii),
     })));
 
+    // WHICH CLOCK A CRON'S HOUR BELONGS TO, always answered. A schedule created without a zone runs
+    // on this node's, and the browser has no way to know what that is — so a reader keeping another
+    // clock saw "Mon at 23:00" beside a run the same screen correctly called Tuesday 05:00, with
+    // nothing on the page to reconcile them. This is a fact about the machine rather than a
+    // preference, so it is filled in rather than stored: `timezone` still says what the person
+    // chose, and null there still means "they chose nothing".
+    const nodeZone = nodeTimeZone();
+    const withZone = <T extends ScheduledJobRecord>(j: T) => ({ ...j, effectiveTimezone: j.timezone || nodeZone });
+
     return {
       agents,
       schedules: {
-        managed,
-        extensions,
+        managed: managed.map(withZone),
+        extensions: extensions.map(withZone),
         agentInternal: agentInternal.filter(a => a.entries.length > 0),
       },
     };

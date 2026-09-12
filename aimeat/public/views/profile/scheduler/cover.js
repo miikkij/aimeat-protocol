@@ -23,7 +23,7 @@ import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { Section, Fold, scrollTo } from '/views/profile/organisms/poster-parts.js';
 import SchedulerCalendar from '../scheduler-calendar.js';
 import { formatUntil } from '../schedule-item.js';
-import { cronWords, cronWordsIn } from './cron-words.js';
+import { cronWords, cronWordsFor } from './cron-words.js';
 import { kindOf, nameOf, dayLabel } from './model.js';
 import { CreateForm } from './create-form.js';
 import { renderDetail } from './detail.js';
@@ -112,7 +112,7 @@ function agendaRows(ctx, list) {
   return html`<div class="sc-agenda">
     ${list.map((o, i) => html`
       <div class="sc-at" key=${'a' + i}>${hhmm(o.at)}<small>${dayLabel(o.at)}</small></div>
-      <div class="sc-nm" key=${'n' + i}>${openBtn(ctx, o.s)}<small>${cronWordsIn(o.s.cron, o.s.timezone)}${o.s.purpose ? ` · ${o.s.purpose}` : ''}</small></div>
+      <div class="sc-nm" key=${'n' + i}>${openBtn(ctx, o.s)}<small>${cronWordsFor(o.s)}${o.s.purpose ? ` · ${o.s.purpose}` : ''}</small></div>
       <div class="sc-who" key=${'w' + i}>${whoRuns(o.s)}</div>
       <div class="sc-in" key=${'i' + i}>${o.at.getTime() > nowMs ? formatUntil(o.at.toISOString()) : ''}</div>`)}
   </div>`;
@@ -151,7 +151,7 @@ function secRhythm(ctx) {
         <div class="sc-hd">${c('colLast')}</div>
         ${rows.map(r => html`
           <div class="sc-t" key=${'t' + r.s.id}>${timeLabel(r)}</div>
-          <div class="sc-nm" key=${'n' + r.s.id}>${openBtn(ctx, r.s)}<i>${cronWordsIn(r.s.cron, r.s.timezone)}</i></div>
+          <div class="sc-nm" key=${'n' + r.s.id}>${openBtn(ctx, r.s)}<i>${cronWordsFor(r.s)}</i></div>
           ${r.days.map((on, i) => html`<div class=${`sc-d ${on ? '' : 'sc-d--no'} ${i === 0 ? 'sc-today' : ''} ${kindOf(r.s) === 'agent' ? 'sc-d--agent' : ''}`} key=${'d' + r.s.id + i}>${on ? '●' : '·'}</div>`)}
           <div class="sc-last" key=${'l' + r.s.id}>${lastRun(r.s)}</div>`)}
       </div>
@@ -185,7 +185,7 @@ function secRare(ctx) {
     ${list.length ? html`<div class="sc-agenda sc-agenda--rare">
       ${list.map(s => { const d = new Date(s.nextRunAt); return html`
         <div class="sc-at" key=${'a' + s.id}>${fmtDate(d, { day: 'numeric', month: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })}<small>${fmtDate(d, { weekday: 'short' })} ${hhmm(d)}</small></div>
-        <div class="sc-nm" key=${'n' + s.id}>${openBtn(ctx, s)}<small>${cronWordsIn(s.cron, s.timezone)}</small></div>
+        <div class="sc-nm" key=${'n' + s.id}>${openBtn(ctx, s)}<small>${cronWordsFor(s)}</small></div>
         <div class="sc-who" key=${'w' + s.id}>${whoRuns(s)}</div>
         <div class="sc-in" key=${'i' + s.id}>${formatUntil(s.nextRunAt)}</div>`; })}
     </div>` : html`<p class="og-empty">${c('noneRare')}</p>`}
@@ -201,7 +201,7 @@ export function registerTable(ctx, list, { id = 'reg', head = true } = {}) {
     <div class="sc-reg">
       ${shown.map(s => html`
         <div class="sc-nm" key=${'n' + s.id}>${openBtn(ctx, s)}${s.enabled === false ? html`<span class="og-chip og-chip--dim og-chip--xs">${t('profile.scheduler.paused')}</span>` : null}</div>
-        <div class="sc-w" key=${'w' + s.id}>${cronWordsIn(s.cron, s.timezone)}</div>
+        <div class="sc-w" key=${'w' + s.id}>${cronWordsFor(s)}</div>
         <div class="sc-m" key=${'o' + s.id}>${whoRuns(s)}</div>
         <div class="sc-m" key=${'l' + s.id}>${lastRun(s)}</div>
         <div class="sc-n" key=${'r' + s.id}>${s.runCount ?? 0}</div>
