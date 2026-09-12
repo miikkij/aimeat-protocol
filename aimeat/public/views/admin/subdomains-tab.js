@@ -28,6 +28,7 @@ import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { dt, num, Spinner, ErrorBox } from './shared.js';
 import { swallowed } from '/js/swallowed.js';
@@ -44,7 +45,7 @@ function targetOwnerOf(target) { return String(target || '').split('/')[0]; }
 /** The day a mapping was made. The hour is in the delete dialog, where it helps; in a list of a
  *  hundred and fifty rows it is forty characters of noise. */
 function day(iso) {
-  try { return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); }
+  try { return fmtDate(iso, { day: 'numeric', month: 'short', year: 'numeric' }); }
   catch (err) { swallowed('subdomains: day', err); return ''; }
 }
 

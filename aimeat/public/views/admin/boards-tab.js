@@ -30,6 +30,7 @@ import { useState, useMemo, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { num, dt, Empty, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
@@ -49,7 +50,7 @@ function ownerOf(gaii) {
 /** The day a board was made. The hour is noise in a column of fifty-seven. */
 function day(iso) {
   if (!iso) return '';
-  try { return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); }
+  try { return fmtDate(iso, { day: 'numeric', month: 'short' }); }
   catch { return String(iso).slice(0, 10); }
 }
 

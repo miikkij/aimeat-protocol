@@ -25,6 +25,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { time as fmtTime } from '/js/format.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { Spinner, ErrorBox, Badge, useToast, Toast, Row, when } from './shared.js';
@@ -53,7 +54,7 @@ function RightNow({ data, onBind, toSection }) {
     S('now.logHooks', { n: s.total }),
     S('now.logBound', { n: s.bound }),
     S('now.logActions', { n: s.actions_available }),
-    S('now.logRead', { at: new Date().toLocaleTimeString() }),
+    S('now.logRead', { at: fmtTime(new Date()) }),
   ].join(' · ');
   const last = data.runs[0] || null;
 

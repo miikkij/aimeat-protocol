@@ -31,6 +31,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { time as fmtTime } from '/js/format.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { Spinner, ErrorBox, Badge, useToast, Toast, Row, when } from './shared.js';
@@ -74,7 +75,7 @@ function RightNow({ status, served, toSection, onToggle, busy }) {
     S('now.logPages', { n: status.sitemap.page_count }),
     S('now.logHosts', { n: status.sitemap.app_host_count }),
     keyWord,
-    S('now.logRead', { at: new Date().toLocaleTimeString() }),
+    S('now.logRead', { at: fmtTime(new Date()) }),
   ].join(' · ');
   const last = ix.last;
   const lastValue = last

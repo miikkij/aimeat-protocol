@@ -39,6 +39,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { dt, Empty, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
@@ -68,7 +69,7 @@ function when(iso) {
   if (min < 60) return S('minsAgo', { n: min });
   const hrs = Math.round(min / 60);
   if (hrs < 24) return S('hoursAgo', { n: hrs });
-  try { return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); }
+  try { return fmtDate(iso, { day: 'numeric', month: 'short' }); }
   catch { return String(iso).slice(0, 10); }
 }
 

@@ -32,6 +32,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { time as fmtTime } from '/js/format.js';
 import { num, Badge, Row } from './shared.js';
 
 const S = (key, params) => t('admin.fed.' + key, params);
@@ -56,7 +57,7 @@ export function WhereWeStand({ data, onGoPeers, onGoRequests }) {
   const stamp = [
     S('now.stampPeers', { n: num(peers.total) }),
     S('now.stampNode', { id: data.this_node.node_id }),
-    S('now.readAt', { at: new Date().toLocaleTimeString() }),
+    S('now.readAt', { at: fmtTime(new Date()) }),
   ].join(' · ');
 
   /** One waiting thing, with the nodes it is about and the door that goes there. */

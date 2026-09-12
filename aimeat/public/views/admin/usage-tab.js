@@ -42,6 +42,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { time as fmtTime } from '/js/format.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { num, Badge, Row, Spinner, ErrorBox } from './shared.js';
@@ -103,7 +104,7 @@ function WhatItCostsYou({ data, control, onAskProvider, asking }) {
 
   const stamp = [
     `${data.from} → ${data.to}`,
-    S('now.readAt', { at: new Date().toLocaleTimeString() }),
+    S('now.readAt', { at: fmtTime(new Date()) }),
   ].join(' · ');
 
   /** The provider's answer for one key, or the reason there is none. */

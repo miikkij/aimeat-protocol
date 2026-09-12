@@ -20,6 +20,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { time as fmtTime } from '/js/format.js';
 import { num } from './shared.js';
 import { sendTestEmail, sendGroupEmail } from '/js/services/admin.js';
 
@@ -44,13 +45,13 @@ export function TestSend({ locale }) {
       const r = await sendTestEmail(to, type, locale);
       setResult({
         ok: !!r.data?.sent,
-        at: new Date().toLocaleTimeString(),
+        at: fmtTime(new Date()),
         seconds: Math.max(1, Math.round((Date.now() - started) / 1000)),
         type,
         message: r.data?.sent ? null : E('test.refused'),
       });
     } catch (e) {
-      setResult({ ok: false, at: new Date().toLocaleTimeString(), type, message: e.message });
+      setResult({ ok: false, at: fmtTime(new Date()), type, message: e.message });
     }
     setSending(false);
   }

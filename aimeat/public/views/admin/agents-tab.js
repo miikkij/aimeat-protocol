@@ -31,7 +31,7 @@ import { h } from 'preact';
 import { useState, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { num, Empty, Badge, Row, shortDate } from './shared.js';
 import { getAgentDetail } from '/js/services/admin.js';
@@ -77,7 +77,7 @@ function RightNow({ counts, fleets, nodeId, owners, onOwners }) {
             value=${A('valSplit', { app: num(counts.app), chat: num(counts.chat) })} />
           <${Row} title=${A('rowLow')} why=${A('rowLowWhy')} last=${true}
             chip=${html`<${Badge} type=${counts.low ? 'warning' : 'muted'} label=${num(counts.low)} />`}
-            value=${counts.lowest !== null ? A('valLowest', { score: trustText(counts.lowest, getLocale()) }) : ''} />
+            value=${counts.lowest !== null ? A('valLowest', { score: trustText(counts.lowest) }) : ''} />
         </div>
       </div>
       <div class="og-strip">

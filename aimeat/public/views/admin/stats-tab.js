@@ -41,6 +41,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { time as fmtTime } from '/js/format.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { num, fmtUp, Badge, Row, Spinner, ErrorBox } from './shared.js';
@@ -118,7 +119,7 @@ function RightNow({ rows, live, days, from, to, control }) {
   const stamp = [
     from && to ? `${from} → ${to}` : S('now.everything'),
     S('now.fromTallies'),
-    S('now.readAt', { at: new Date().toLocaleTimeString() }),
+    S('now.readAt', { at: fmtTime(new Date()) }),
   ].join(' · ');
 
   return html`

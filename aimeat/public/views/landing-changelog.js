@@ -22,6 +22,7 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale, onLocaleChange } from '/js/i18n.js';
+import { date as fmtDay } from '/js/format.js';
 import { Collapsible } from '/components/Collapsible.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -34,12 +35,17 @@ export function pick(value, lang) {
   return value[lang] || value.en || Object.values(value)[0] || '';
 }
 
-// The APP's language decides the format, not the browser's: a Finnish reader on a US-locale
-// browser was getting 7/31/2026, which reads as a different day here (and as noise anywhere).
-export function fmtDate(iso, lang) {
+/**
+ * A release date, in the reader's own format.
+ *
+ * It used to take the app's LANGUAGE, which was a better guess than the browser's — a Finnish
+ * reader on a US-locale browser had been getting 7/31/2026, which reads as a different day here.
+ * The reader's own setting beats both, so the argument is gone and format.js answers. The signature
+ * keeps its second parameter because the changelog page still passes one.
+ */
+export function fmtDate(iso, _lang) {
   try {
-    const d = new Date(iso);
-    return isNaN(d.getTime()) ? iso : d.toLocaleDateString(lang === 'fi' ? 'fi-FI' : 'en-GB');
+    return fmtDay(iso);
   } catch (err) { swallowed('landing-changelog: fmtDate', err); return iso; }
 }
 

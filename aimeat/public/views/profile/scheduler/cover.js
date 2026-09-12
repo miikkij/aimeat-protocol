@@ -18,6 +18,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { date as fmtDate, num as fmtNum } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { Section, Fold, scrollTo } from '/views/profile/organisms/poster-parts.js';
 import SchedulerCalendar from '../scheduler-calendar.js';
@@ -137,7 +138,7 @@ function secRhythm(ctx) {
     ${rows.length ? html`
       <div class="sc-rhythm">
         <div class="sc-hd">${c('colTime')}</div><div class="sc-hd">${c('colSchedule')}</div>
-        ${m.days.map((d, i) => html`<div class=${`sc-hd sc-hd--day ${i === 0 ? 'sc-today' : ''}`} key=${'h' + i}>${d.toLocaleDateString(loc(), { weekday: 'short' })}<small>${d.getDate()}</small></div>`)}
+        ${m.days.map((d, i) => html`<div class=${`sc-hd sc-hd--day ${i === 0 ? 'sc-today' : ''}`} key=${'h' + i}>${fmtDate(d, { weekday: 'short' })}<small>${d.getDate()}</small></div>`)}
         <div class="sc-hd">${c('colLast')}</div>
         ${rows.map(r => html`
           <div class="sc-t" key=${'t' + r.s.id}>${timeLabel(r)}</div>
@@ -162,7 +163,7 @@ function secContinuous(ctx) {
   return html`<${Section} id="sc-cont" num="03" title=${c('secCont')} count=${c('secContSub', { n: list.length })}>
     ${list.length ? html`<div class="sc-cont">
       ${list.map(f => html`<button type="button" key=${f.scheduleId} class=${`sc-job ${f.s.lastRunResult === 'error' ? 'sc-job--warn' : ''}`} onClick=${() => ctx.pickView({ kind: 'detail', id: f.s.id })}>
-        ${nameOf(f.s)}<i>${cadence(f)} · ${t('profile.scheduler.cal.perDay', { n: f.approxPerDay })}${f.s.runCount ? ` · ${c('runsN', { n: Number(f.s.runCount).toLocaleString(loc()) })}` : ''}</i>
+        ${nameOf(f.s)}<i>${cadence(f)} · ${t('profile.scheduler.cal.perDay', { n: f.approxPerDay })}${f.s.runCount ? ` · ${c('runsN', { n: fmtNum(Number(f.s.runCount)) })}` : ''}</i>
       </button>`)}
     </div>` : html`<p class="og-empty">${c('noneCont')}</p>`}
   <//>`;
@@ -174,7 +175,7 @@ function secRare(ctx) {
   return html`<${Section} id="sc-rare" num="04" title=${c('secRare')} count=${c('secRareSub')}>
     ${list.length ? html`<div class="sc-agenda sc-agenda--rare">
       ${list.map(s => { const d = new Date(s.nextRunAt); return html`
-        <div class="sc-at" key=${'a' + s.id}>${d.toLocaleDateString(loc(), { day: 'numeric', month: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })}<small>${d.toLocaleDateString(loc(), { weekday: 'short' })} ${hhmm(d)}</small></div>
+        <div class="sc-at" key=${'a' + s.id}>${fmtDate(d, { day: 'numeric', month: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })}<small>${fmtDate(d, { weekday: 'short' })} ${hhmm(d)}</small></div>
         <div class="sc-nm" key=${'n' + s.id}>${openBtn(ctx, s)}<small>${cronWords(s.cron)}</small></div>
         <div class="sc-who" key=${'w' + s.id}>${whoRuns(s)}</div>
         <div class="sc-in" key=${'i' + s.id}>${formatUntil(s.nextRunAt)}</div>`; })}

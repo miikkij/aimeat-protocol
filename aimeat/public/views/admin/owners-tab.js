@@ -39,6 +39,7 @@ import { useState, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { num, dt, Row, Badge, Empty, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
@@ -54,7 +55,7 @@ const DLG = 'adm-own-dlg';
 const FILTER_LABEL = { all: 'fAll', operators: 'fOperators', agents: 'fAgents', quiet: 'fQuiet', off: 'fOff' };
 
 /** The day alone. The clock time moves to the row's title, where a date's hour is worth having. */
-const day = (iso) => (iso ? new Date(iso).toLocaleDateString() : '—');
+const day = (iso) => (iso ? fmtDate(iso) : '—');
 
 /** "72 agents", "1 agent", "no agent" — the phrase, not a bare number. */
 function agentWords(count) {

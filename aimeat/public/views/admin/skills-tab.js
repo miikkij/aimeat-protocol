@@ -30,6 +30,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'preact/hooks'
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { num, Spinner, useToast, Toast } from './shared.js';
 import { Markdown } from '/components/Markdown.js';
@@ -94,14 +95,14 @@ function nextVersion(current) {
 /** The day a skill last changed, short; the hour is noise in a column of forty-seven. */
 function day(iso) {
   if (!iso) return '';
-  try { return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); }
+  try { return fmtDate(iso, { day: 'numeric', month: 'short' }); }
   catch { return String(iso).slice(0, 10); }
 }
 
 /** The same day written out, for the one place there is room for it. */
 function fullDay(iso) {
   if (!iso) return '';
-  try { return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }); }
+  try { return fmtDate(iso, { day: 'numeric', month: 'long', year: 'numeric' }); }
   catch { return String(iso).slice(0, 10); }
 }
 

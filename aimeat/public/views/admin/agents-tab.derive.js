@@ -16,6 +16,8 @@
  *   v1.0.0 — 2026-09-12 — Initial, with the Agents page in the poster face.
  */
 
+import { num as fmtNum } from '/js/format.js';
+
 /** One day in milliseconds. */
 export const DAY_MS = 86400000;
 /** Seen inside this many days counts as awake. */
@@ -97,19 +99,16 @@ export function trustKind(score) {
 }
 
 /**
- * A trust score written the way the page's own language writes it: 40.0 in English, 40,0 in
- * Finnish and Spanish.
+ * A trust score written the way THIS READER writes a number: 40.0 or 40,0.
  *
  * `toFixed(1)` is blind to that, and the sentence under the table spells the same number out in
- * words, so on a Finnish page the cell said 40.0 while the sentence said 40,0. The locale is the
- * one the reader chose on this page, not the browser's.
+ * words, so the cell said 40.0 while the sentence said 40,0. It took the page's language as its
+ * argument, which was the nearest available guess at the time; the reader's own format is a
+ * setting of its own now, so the argument is gone and format.js answers.
  * @param {number} score
- * @param {string} [locale] the page's locale tag; the browser's when it is not given
  */
-export function trustText(score, locale) {
-  return Number(score).toLocaleString(locale || undefined, {
-    minimumFractionDigits: 1, maximumFractionDigits: 1,
-  });
+export function trustText(score) {
+  return fmtNum(Number(Number(score).toFixed(1)));
 }
 
 /**

@@ -14,15 +14,17 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { date as fmtDate, num as fmtNum } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 
 export const c = (key, vars) => t('discover.cover.' + key, vars);
-export const loc = () => (getLocale() === 'fi' ? 'fi-FI' : getLocale() === 'es' ? 'es-CO' : 'en-GB');
-export const num = (n) => Number(n || 0).toLocaleString(loc());
+// The loc() helper here derived the FORMAT from the LANGUAGE. /js/format.js reads the
+// reader's own, from their profile, falling back to their browser.
+export const num = (n) => fmtNum(Number(n || 0));
 const two = (n) => String(n).padStart(2, '0');
 export const hhmm = (d) => `${two(d.getHours())}:${two(d.getMinutes())}`;
-export const dayLabel = (d) => d.toLocaleDateString(loc(), { weekday: 'short', day: 'numeric', month: 'numeric' });
+export const dayLabel = (d) => fmtDate(d, { weekday: 'short', day: 'numeric', month: 'numeric' });
 export const rel = (iso) => { if (!iso) return ''; const d = new Date(iso); return Date.now() - d.getTime() > 30 * 864e5 ? dayLabel(d) : formatRelativeTime(iso); };
 
 /** The kinds a person reads; `memory` is the raw store and is shown on its own terms. */

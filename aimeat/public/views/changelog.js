@@ -33,10 +33,10 @@ const KINDS = ['feature', 'fix', 'security', 'notice'];
 function monthKey(date) { return String(date || '').slice(0, 7); }
 
 /** "2026-08" → "August 2026" in the app's language, the same rule fmtDate follows. */
-function monthLabel(key, lang) {
+function monthLabel(key) {
   try {
     const d = new Date(key + '-01T12:00:00Z');
-    return isNaN(d.getTime()) ? key : d.toLocaleDateString(lang === 'fi' ? 'fi-FI' : 'en-GB', { month: 'long', year: 'numeric' });
+    return isNaN(d.getTime()) ? key : fmtDate(d, { month: 'long', year: 'numeric' });
   } catch (err) { swallowed('changelog: monthLabel', err); return key; }
 }
 
@@ -123,7 +123,7 @@ export default function Changelog({ navigate }) {
           ${months.map(([k, n]) => html`
             <a key=${k} class="chg-rail-month" href=${'#m-' + k}
               onClick=${(e) => { e.preventDefault(); document.getElementById('m-' + k)?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }}>
-              ${monthLabel(k, lang)} · ${n}
+              ${monthLabel(k)} · ${n}
             </a>`)}
           <div class="ld-sh-box chg-rail-json">
             <span class="ld-sh-box-label">${tr('changelog.machinesLabel', 'For machines:')}</span>
@@ -144,7 +144,7 @@ export default function Changelog({ navigate }) {
             const id = ids[i];
             const k = e.kind || 'notice';
             return html`
-              ${heading ? html`<h2 class="chg-month" id=${'m-' + mk}>${monthLabel(mk, lang)}</h2>` : ''}
+              ${heading ? html`<h2 class="chg-month" id=${'m-' + mk}>${monthLabel(mk)}</h2>` : ''}
               <article class="chg-entry" id=${id} key=${id}>
                 <div class="chg-meta">
                   <span class="chg-date">${fmtDate(e.date, lang)}</span>

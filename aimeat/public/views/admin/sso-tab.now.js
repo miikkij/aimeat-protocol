@@ -29,6 +29,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { time as fmtTime } from '/js/format.js';
 import { num, Badge, Row } from './shared.js';
 
 const S = (key, params) => t('admin.sso.' + key, params);
@@ -122,7 +123,7 @@ export function RightNow({ data, onConnect, toSection }) {
   const stamp = [
     S('now.stampOrgs', { n: s.total }),
     S('now.stampArrived', { n: s.logins_seen }),
-    S('now.readAt', { at: new Date().toLocaleTimeString() }),
+    S('now.readAt', { at: fmtTime(new Date()) }),
   ].join(' · ');
 
   return html`

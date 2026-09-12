@@ -27,6 +27,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { time as fmtTime } from '/js/format.js';
 import { num, Badge, Row } from './shared.js';
 
 const S = (key, params) => t('admin.knowledge.' + key, params);
@@ -75,7 +76,7 @@ export function RightNow({ data, onShowFlagged }) {
   const stamp = [
     S('now.stampPackages', { n: num(s.total) }),
     S('now.stampAuthors', { n: num(s.authors) }),
-    S('now.readAt', { at: new Date().toLocaleTimeString() }),
+    S('now.readAt', { at: fmtTime(new Date()) }),
   ].join(' · ');
 
   return html`
