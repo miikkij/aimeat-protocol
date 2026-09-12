@@ -1,5 +1,170 @@
 {
   "admin": {
+    "cortex": {
+      "intro": "Cortex is the browser code an app loads. Installing one puts its pieces here, and turning it on serves them to every app that asks for them.",
+      "state": {
+        "on": "On",
+        "off": "Off"
+      },
+      "thisSite": "This site",
+      "turnOff": "Turn off",
+      "turnOn": "Turn on",
+      "look": "Look at it",
+      "removeForGood": "Remove it for good",
+      "now": {
+        "title": "Right now",
+        "line": "{n} installed, and {unused} of them are loaded by no app at all.",
+        "lineOff": "{off} are switched off, and an app still asks for {breaking} of those."
+      },
+      "strip": {
+        "installed": "Installed",
+        "installedSub": "every cortex this site serves",
+        "carrying": "Carrying an app",
+        "carryingSub": "at least one app loads it",
+        "unused": "Loaded by nothing",
+        "unusedSub": "no app here opens them",
+        "busiest": "The busiest one",
+        "busiestNone": "no app loads anything yet"
+      },
+      "find": {
+        "placeholder": "Find by name, owner, tag or description"
+      },
+      "col": {
+        "name": "Name",
+        "version": "Version",
+        "by": "Installed by",
+        "apps": "Apps",
+        "pieces": "Pieces"
+      },
+      "loaded": {
+        "title": "Loaded by apps",
+        "count": "{n} of {total}, most-used first",
+        "noMatch": "Nothing here matches what you typed.",
+        "none": "No app loads any of these yet."
+      },
+      "unused": {
+        "title": "Loaded by nothing",
+        "count": "{n} of {total}",
+        "lead": "No app here loads any of these. They are grouped by facts you can check rather than by name, so the leftovers of one app that is gone, the same thing installed twice, and the kit this site ships do not all read alike.",
+        "none": "Every cortex here is loaded by at least one app."
+      },
+      "group": {
+        "lookalike": "{n} names that look like the same thing",
+        "sameLettersWhy": "The same letters and digits, written with different punctuation. One is almost certainly a second install of the other.",
+        "containsWhy": "One name sits inside the other, which usually means a rename that left the first one behind.",
+        "closeWhy": "The names differ by a few letters. That can be a typo and it can be two real things, so read the descriptions before deciding.",
+        "batch": "{n} put here by {who} on {day}",
+        "batchWhy": "Installed together in one sitting and loaded by nothing since. Usually the parts of one app that is no longer published.",
+        "site": "Shipped with this site: {n}",
+        "siteWhy": "This site installed these itself so that anyone building an app can reach for them. Nothing has asked yet, they cost nothing to leave on, and leaving them alone is the right move.",
+        "oneWhy": "Installed {when} by {who}. Nothing else here looks like it.",
+        "show": "Show them",
+        "close": "Hide them",
+        "removeAll": "Remove all {n}"
+      },
+      "off": {
+        "title": "What turning one off does",
+        "goes": "Off takes its pieces back out",
+        "goesWhy": "Its shapes, instructions, actions, boards and word lists are taken out, and its files stop being served. An app that loads it breaks the next time somebody opens it, with no warning to them.",
+        "stays": "The files and the data it wrote stay put",
+        "staysWhy": "Turning it back on puts everything back where it was. That is why off is the safe move: you can take it back.",
+        "remove": "Remove for good cannot be taken back",
+        "removeWhy": "It deletes the cortex and its files. Nothing puts them back, so it asks you to type the name first."
+      },
+      "read": {
+        "title": "Who can read the insides",
+        "lead": "Every cortex here is in exactly one of these three, and they answer one question: who besides you may read its pieces, instructions and files. The first two are the word its owner chose, and the third overrides that word. None of it decides whether the cortex runs.",
+        "public": "Public",
+        "publicWhy": "Anyone signed in here can read it. That is how a person builds an app on somebody else's kit.",
+        "private": "Private",
+        "privateWhy": "The person who installed it, and you. Nobody else, not even by guessing the name.",
+        "site": "Shipped with this site",
+        "siteWhy": "Readable by everyone whatever word is on it, because this is the site's own kit and every app is meant to build on it. Some of these are marked public and some private, and here that makes no difference.",
+        "boxLabel": "Worth knowing",
+        "box": "You see all {n} because you are the operator. A person signed in as themselves sees the public ones, this site's own, and their own. The count on their screen is a different number, and that is correct."
+      },
+      "kind": {
+        "schema": "Shape",
+        "prompt": "Instruction",
+        "action": "Action",
+        "board": "Board",
+        "ontology": "Words",
+        "seed": "Data",
+        "lib": "File",
+        "other": "Piece"
+      },
+      "piece": {
+        "schemaWhy": "Says what a saved record has to look like. This site checks it against every memory key matching",
+        "schemaPlain": "Says what a saved record has to look like.",
+        "promptWhy": "A written instruction an app can ask for, so the AI helping someone knows what this can do.",
+        "actionWhy": "Something an app can ask this site to run on its behalf.",
+        "boardWhy": "A board this site set up when the extension was turned on.",
+        "ontologyWhy": "A list of agreed words, so two apps mean the same thing by the same term.",
+        "seedWhy": "Turning it on wrote these into memory. They are somebody's data now, not the extension's:",
+        "seedNone": "It would write starting data into memory, and has written none.",
+        "libWhy": "Served to any browser that asks for it, and gives the app",
+        "libPlain": "Served to any browser that asks for it.",
+        "otherWhy": "A piece this page does not have a word for yet."
+      },
+      "detail": {
+        "back": "← All cortex extensions",
+        "meta": "Installed {when} by {who}, in the {space} space",
+        "who": "Who loads it",
+        "loadedBy": "{n} apps load this one.",
+        "loadedByOne": "One app loads this one.",
+        "nobody": "Nothing does.",
+        "nobodyWhy": "No app here has ever asked for it. Either it was built for something that is gone, or the app meant to use it was never published.",
+        "nobodySite": "No app here has ever asked for it. It ships with this site so that anyone building an app can reach for it, which is a reason to leave it on even while nothing uses it.",
+        "andMore": "and {n} more",
+        "put": "What it put on this site",
+        "pieceCount": "Pieces: {n}",
+        "noPieces": "It has no pieces at all, so turning it on does nothing.",
+        "keepsLabel": "If you turn it off",
+        "keeps": "The shapes, instructions and files go, right away. Anything it wrote into memory stays where it is, and so would removing it for good. Data this site wrote on somebody's behalf belongs to them, and no switch here takes it back.",
+        "versions": "Versions",
+        "versionCount": "Kept: {n}",
+        "noVersions": "No copies were kept, so there is nothing to go back to.",
+        "thisOne": "The one being served now.",
+        "olderOne": "An older copy, still served to anything that asks for it by name.",
+        "versionsWhy": "Every install keeps a copy of what it installed. An app may ask for a version by name and keeps getting exactly that one after you install a newer, which is why an old copy is worth keeping rather than tidying away.",
+        "can": "What you can do",
+        "canWhy": "Off is a decision you can take back. Removing is not, so it asks you to type the name first.",
+        "makePublic": "Let anyone read it",
+        "makePrivate": "Keep it to yourself"
+      },
+      "dialog": {
+        "offTitle": "Turn off {name}?",
+        "offLoaded": "{n} apps load this one.",
+        "offLoadedOne": "One app loads this one.",
+        "offBreaks": "They stop getting it the moment you press the button. The next person to open one of them meets a broken page, and nothing tells them why.",
+        "offNobody": "No app here loads this one, so nothing breaks today.",
+        "goes": "Goes",
+        "goesWhy": "Its shapes, instructions, actions and boards, and the files it serves to a browser.",
+        "stays": "Stays",
+        "staysWhy": "The files themselves and everything it has written. Turning it back on puts all of it back.",
+        "offDo": "Turn it off",
+        "offDoFor": "Turn it off for {n} apps",
+        "offDoForOne": "Turn it off for one app",
+        "removeTitle": "Remove {name} for good?",
+        "removeWarnLabel": "This cannot be undone",
+        "removeWarn": "The cortex and its files go, and nothing here puts them back. Anything it wrote into somebody's memory stays, because that is their data rather than this extension's.",
+        "removeTypeLabel": "Type {name} to confirm",
+        "removeWord": "remove",
+        "batchTitle": "Remove this whole group for good?",
+        "batchAsk": "All {n} of these go, one after the other. No app here loads any of them.",
+        "batchWarn": "Nothing puts them back. If one of them refuses, the rest still go, and you are told how many of each.",
+        "batchTypeLabel": "Type {word} to confirm"
+      },
+      "toast": {
+        "noDetail": "{name} could not be opened.",
+        "turnedOn": "{name} is on.",
+        "turnedOff": "{name} is off.",
+        "visibility": "Changed who can read {name}.",
+        "removed": "{name} is gone.",
+        "batchRemoved": "{n} removed.",
+        "batchPartly": "{gone} removed, {kept} refused."
+      }
+    },
     "prompts": {
       "intro": "The instructions this site gives an AI when it asks what it may do here. Every one of them can be read, changed, switched off, and put back to the version the software ships now.",
       "saved": "Saved.",
@@ -8943,33 +9108,6 @@
     "cfg_consul_watch_interval_seconds": "Watch Interval (seconds)",
     "cfg_consul_datacenter": "Datacenter",
     "cortexTab": "Cortex Extensions",
-    "cortex": {
-      "back": "← Back",
-      "total": "Total",
-      "active": "Active",
-      "inactive": "Inactive",
-      "loading": "Loading cortex extensions...",
-      "empty": "No cortex extensions installed.",
-      "name": "Name",
-      "version": "Version",
-      "installedBy": "Installed by",
-      "status": "Status",
-      "visibility": "Visibility",
-      "componentsCol": "Components",
-      "components": "Components",
-      "noComponents": "No components",
-      "author": "Author",
-      "activated": "Extension activated",
-      "deactivated": "Extension deactivated",
-      "uninstalled": "Extension uninstalled",
-      "visibilityChanged": "Visibility updated",
-      "confirmUninstall": "Uninstall this extension? This will remove all its components.",
-      "activate": "Activate",
-      "deactivate": "Deactivate",
-      "uninstall": "Uninstall",
-      "makePublic": "Make Public",
-      "makePrivate": "Make Private"
-    },
     "skills": {
       "tabLabel": "Skills"
     },

@@ -9,6 +9,10 @@
  *   badges come from admin.css and organism.css; only what this page adds lives here. Every value
  *   is a theme.css token, so the page flips with the theme.
  * @version-history
+ *   v1.1.0 — 2026-09-12 — The table stacks at 1100px rather than 768: the content column is about
+ *     290px narrower than the window, so between those two widths the table scrolled sideways
+ *     inside its own box with the row actions off the right edge, while the page reported no
+ *     overflow at all. Found by driving the browser on the Cortex page, which had the same rule.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 
@@ -97,9 +101,13 @@
   .adm-ap-step > .adm-mval { grid-column: 2; text-align: left; }
 }
 
-/* A phone: the table becomes a stack of rows, which is the card layout the other direction drew.
-   Every cell keeps its heading through a data attribute rather than a second markup. */
-@media (max-width: 768px) {
+/* The table becomes a stack of rows, which is the card layout the other direction drew. Every cell
+   keeps its heading through a data attribute rather than a second markup.
+   THE BREAKPOINT IS 1100 AND NOT A PHONE WIDTH: the table lives in a content column about 290px
+   narrower than the window, because of the fixed sidebar, so below roughly 1000px it scrolls
+   sideways inside its own box with the row actions off the right edge while the page itself
+   reports no overflow. Found on the Cortex page at 780px and fixed in both. */
+@media (max-width: 1100px) {
   .adm .adm-ap-tbl thead { display: none; }
   .adm .adm-ap-tbl, .adm .adm-ap-tbl tbody, .adm .adm-ap-tbl tr, .adm .adm-ap-tbl td { display: block; width: 100%; }
   .adm .adm-ap-tbl tr { border-bottom: 2px solid var(--text); padding: 8px 0; }
