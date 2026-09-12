@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.44.0 -- 2026-09-12 -- Add e2e-admin-organisms-page.ts to ALL_SUITES: GET /v1/admin/organisms,
+ *            which is new, and the repair behind it. Not in the guard tier yet.
  *   v1.43.0 -- 2026-09-12 -- Add e2e-admin-owners-page.ts to ALL_SUITES: the field set the Owners
  *            page counts every figure and filter from, and the two writes that move it. Not in the
  *            guard tier yet.
@@ -565,6 +567,9 @@ const ALL_SUITES = [
     // The one read the Owners page is folded from: the field set every figure, chip and filter is
     // counted from, and the two lifecycle writes moving the two fields the page draws.
     'test/e2e-admin-owners-page.ts',
+    // The listing the Organism ownership page is built on, which did not exist: its shape, its
+    // refusals, and the repair that moves the owner list the page folds "stuck" out of.
+    'test/e2e-admin-organisms-page.ts',
     // The System Prompts page: who owns a prompt, the round trip a version number cannot describe
     // (edit, take the current version, and the number rises while the text goes back), and what a
     // group take does besides replacing text.
