@@ -15,6 +15,9 @@
  *   the person is told.
  * @usage import { legalOnOpen, legalSectionInner, auditSectionInner, legalChipHtml, legalScrollTo, legalEdit, legalCancel, legalSave, legalRemove, auditMore } from './legal.js';
  * @version-history
+ *   v1.2.0 — 2026-09-13 — A page the app ought to have says so in a chip beside its name
+ *     ("Recommended") instead of a sun bar down the row's edge: the sun bar now means the lines a
+ *     chosen tab governs, and a recommendation is not a choice.
  *   v1.1.0 — 2026-08-29 — A hot chip on the masthead names how many pages are still to write and
  *     scrolls to the section. Nothing is blocked; it is meant to be noticed.
  *   v1.0.0 — 2026-08-29 — Initial.
@@ -187,7 +190,8 @@ function kindRow(kind) {
     dtlBtn(t(st ? 'legal.edit' : 'legal.write'), 'window._launcher.legalEdit(\'' + kind + '\')', { disabled: lgBusy })
     + (st ? ' ' + dtlBtn(t('legal.remove'), 'window._launcher.legalRemove(\'' + kind + '\')', { disabled: lgBusy }) : '');
   var html = '<div class="lg-row' + (recommended ? ' is-recommended' : '') + '">'
-    + '<div class="lg-row-head"><div class="lg-row-name">' + escapeHtml(t('legal.kind.' + kind)) + '</div>' + state + '</div>'
+    + '<div class="lg-row-head"><div class="lg-row-name">' + escapeHtml(t('legal.kind.' + kind)) + '</div>'
+    + (recommended ? '<span class="lg-rec">' + escapeHtml(t('legal.recommended')) + '</span>' : '') + state + '</div>'
     + '<div class="lg-row-why">' + escapeHtml(info.why) + '</div>'
     + '<div class="lg-row-actions">' + actions + '</div>';
   if (lgEditing === kind) html += editorHtml(kind, st);

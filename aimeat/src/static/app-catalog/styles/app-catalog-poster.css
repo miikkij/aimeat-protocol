@@ -16,6 +16,9 @@
   @structure tokens · site bar · masthead, band, tools · rail · the index (rows and panels) ·
     foot · detail view · phone
   @version-history
+    v1.9.0 — 2026-09-13 — Every dialog overlay scrolls, so a dialog taller than the screen starts at
+      its top instead of past it; the extension popup and editor in the dialog frame (.cx-*); the
+      legal pages' recommendation as a chip (.lg-rec) instead of a sun bar.
     v1.8.0 — 2026-09-13 — The home's headline and shape language (ruling "Julistekasvojen osio alkaa
       mustelaatalla aurinkoraidalla", design canvas "Osioiden rajat kotisivulla", B1): the detail's
       section headlines and the list headlines on an ink slab with a 6px sun stripe, the chapter
@@ -498,7 +501,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .lg-chip { cursor: pointer; font: inherit; }
 .lg-rows { display: flex; flex-direction: column; margin: 14px 0 0; }
 .lg-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; padding: 16px 0; border-bottom: 1px solid var(--border); }
-.lg-row.is-recommended { border-left: 3px solid var(--sun); padding-left: 14px; }
+/* A page the app ought to have carries a chip beside its name. It used to be a sun bar down the
+   row's edge, and the sun bar now means the lines a chosen tab governs. */
+.lg-rec { display: inline-flex; align-items: center; padding: 1px 7px; border: 2px solid var(--text); font-family: var(--font-mono); font-size: .68rem; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--text); }
 .lg-row-head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; grid-column: 1; }
 .lg-row-name { font-family: var(--font-body); font-weight: 800; font-size: .95rem; }
 .lg-state { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; letter-spacing: .04em; color: var(--text-dim); }
@@ -551,7 +556,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .modal h2 .aga-app-ref { font-family: var(--font-mono); font-size: .8rem; text-transform: none; letter-spacing: 0; color: inherit; }
 .modal p, .help-p, .confirm-message, .parked-blurb { font-size: .95rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; color: var(--text); }
 .help-p { color: var(--text-dim); margin: 6px 0 0; }
-.modal-label, .modal .settings-row label, .modal label:not(.protect-row):not(.mz-check):not(.pb-trackcard):not(.pb-pack-item):not(.pb-ext-toggle):not(.pb-mode-radio) { display: block; font-size: .9rem; font-weight: 700; color: var(--text); margin: 14px 0 2px; text-transform: none; letter-spacing: 0; }
+.modal-label, .modal .settings-row label, .modal label:not(.protect-row):not(.mz-check):not(.pb-trackcard):not(.pb-pack-item):not(.pb-ext-toggle):not(.pb-mode-radio):not(.cx-lib-name) { display: block; font-size: .9rem; font-weight: 700; color: var(--text); margin: 14px 0 2px; text-transform: none; letter-spacing: 0; }
 .label-hint { font-weight: 600; color: var(--text-dim); }
 .modal-input { margin: 0; }
 .modal-fields, .modal-row { gap: 0 24px; }
@@ -614,6 +619,51 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .prompt-builder-modal { max-width: 860px; background: var(--bg); border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); padding: 28px 32px 30px; }
 .prompt-builder-modal h2 { font-size: 1.4rem; }
 .consents-target { font-size: .8rem; color: var(--text-muted); margin: 0 0 12px; }
+#consents-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, .6); display: flex; justify-content: center; padding: 24px; }
+
+/* A dialog taller than the screen scrolls with its overlay instead of centring past the top edge,
+   where its title and first fields could not be reached (measured 2026-09-13: the add dialog's top
+   at -33px on a 390x844 phone, help at -180px, publish at -7px in a 1280x460 window). The overlay
+   scrolls; the auto margins centre a dialog that fits and fall to zero for one that does not. */
+#modal-overlay, #source-overlay, #settings-overlay, #help-overlay, #publish-overlay, #versions-overlay,
+#subdomain-overlay, #backup-overlay, #server-import-overlay, #json-import-overlay, #aimeat-import-overlay,
+#lineage-overlay, #confirm-overlay, #agents-overlay, #protection-overlay, #prompt-builder-overlay,
+#consents-overlay, #cortex-popup-overlay, #cortex-editor-overlay {
+  overflow-y: auto; overscroll-behavior: contain; align-items: flex-start;
+}
+.modal, .prompt-builder-modal { margin-block: auto; flex-shrink: 0; }
+
+/* ── The extension popup and the extension editor, in the dialog frame ───────────────────── */
+.cx-overlay { position: fixed; inset: 0; z-index: 650; background: rgba(0, 0, 0, .3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; justify-content: center; padding: 24px; }
+.cx-overlay--editor { z-index: 651; }
+.modal label.cx-lib-name { font-weight: 700; font-size: .9rem; color: var(--text); }
+.cx-overlay[hidden] { display: none; }
+.cx-modal { max-width: 560px; }
+.cx-modal--editor { max-width: 840px; }
+.modal .cx-sub { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); margin: 0 0 12px; overflow-wrap: anywhere; }
+.modal .cx-desc { margin: 0 0 18px; color: var(--text-dim); }
+.cx-label { font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; margin: 0; padding-bottom: 6px; border-bottom: 2px solid var(--text); }
+.cx-part { padding: 14px 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+.cx-part-name { font-weight: 700; font-size: .9rem; margin: 0 0 8px; }
+.cx-part-name + .cx-part-name, .cx-copy + .cx-part-name { margin-top: 14px; }
+.cx-part code { font-family: var(--font-mono); font-size: .8rem; }
+.cx-code {
+  display: block; width: 100%; box-sizing: border-box; margin: 0 0 8px; padding: 10px 12px;
+  border: 2px solid var(--text); border-radius: 0; background: var(--surface); color: var(--text);
+  font-family: var(--font-mono); font-size: .75rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.cx-code--api { max-height: 320px; overflow: auto; }
+textarea.cx-code { resize: vertical; tab-size: 2; }
+.cx-code--manifest { min-height: 280px; }
+.cx-code--lib { min-height: 160px; margin: 0; }
+.cx-owner { margin-top: 20px; }
+.cx-status { min-height: 1.2em; margin: 0 0 14px; font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); }
+.cx-status--err { color: var(--accent); }
+.cx-lib { margin: 14px 0 0; padding: 12px 14px 14px; border: 2px solid var(--text); }
+.cx-lib-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+.modal label.cx-lib-name { display: flex; align-items: baseline; gap: 10px; flex: 1 1 240px; min-width: 0; margin: 0; }
+.cx-lib-name .modal-input { flex: 1 1 auto; min-width: 0; font-family: var(--font-mono); font-size: .85rem; padding: 4px 0; }
+.cx-add { margin-top: 14px; }
 .pb-intro { font-size: .95rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; color: var(--text-dim); margin: 0 0 20px; }
 .pb-step { border-top: 3px solid var(--text); padding-top: 18px; margin-bottom: 22px; }
 .pb-step:first-of-type { border-top: 3px solid var(--text); padding-top: 18px; }
