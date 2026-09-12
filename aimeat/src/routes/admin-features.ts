@@ -436,8 +436,21 @@ export function adminFeaturesRouter(
         }
 
         res.json(success(config.nodeId, {
+            // `enabled` is the EFFECTIVE state: the switch, the keys and the web-push module all
+            // have to be there. `push_enabled` is the switch on its own, because a page that reads
+            // the effective state and prints it as the switch's value tells the operator their
+            // config says false when it says true.
             enabled: services.pushService.enabled,
+            push_enabled: config.pushEnabled,
             vapid_configured: !!config.vapidPublicKey && !!config.vapidPrivateKey,
+            // Already public: /v1/push/vapid-key serves it to anyone who is about to subscribe.
+            // The page shows the ends of it, which is how an operator tells one deployed key pair
+            // from another after a rotation invalidated every subscription.
+            vapid_public_key: config.vapidPublicKey ?? null,
+            // What ACTUALLY triggers a push. The page used to list four event types as though all
+            // four were live; the default here is two, so on most nodes half that list sent nothing
+            // and the page had no way to say so.
+            push_notify_types: [...config.pushNotifyTypes],
             locales: [...SUPPORTED_LOCALES],
             total_subscriptions: subs.length,
             subscriptions: subs.map(s => ({
