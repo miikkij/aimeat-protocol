@@ -234,7 +234,7 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_admin_sso_list',
-        description: 'Operator-only. List this node\'s SSO connections — the identity providers organisations have connected for SAML sign-in and SCIM provisioning — with each connection\'s domains, visibility, whether SAML and SCIM are configured, and the SP details (entity id, ACS URL, SCIM base URL) an IdP console asks for. Secrets are never returned.',
+        description: 'Operator-only. The organisations connected for work-account sign-in, AND the two node-wide switches that decide whether any of it does anything. READ `node` FIRST: `node.enabled` is the master switch, and while it is false the sign-in door and the provisioning door both answer 503 whatever a connection says — so a connection can be complete and reach nobody. `node.locked` means connection management is frozen and every write below will be refused with 403. Each connection carries `state` (no_idp · blocked_by_switch · live · live_hidden), `can_sign_in`, `button_showing` and `steps_done` out of six: report those rather than the raw flags, because "configured but unusable" and "live" look identical in `saml_configured` alone. The sixth step is the master switch and it is NOT one of these tools — it is `sso.enabled` in the node configuration, so say so when you report a setup as finished. Also per connection: its email domains (which decide whose existing accounts it may adopt), its visibility, and the SP details (entity id, ACS URL, SCIM base URL) an IdP console asks for. Secrets are never returned. The same data as GET /v1/admin/sso/connections.',
         caller: 'operator',
         visibility: agentEverywhere,
         input: {},

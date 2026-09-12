@@ -11,6 +11,8 @@
  * @structure registerAdminSsoTools(mcp, storage, config, getAgentGaii) — nine operator tools.
  * @usage registerAdminSsoTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.1.0 — 2026-09-12 — aimeat_admin_sso_list calls buildSsoOverview, the same build the HTTP
+ *     list calls, so both carry the node-wide switches and neither assembles the shape alone.
  *   v1.0.0 — 2026-08-24 — Initial (BR-04 phase 1's MCP batch).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -20,9 +22,10 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import {
-  listSsoConnectionViews, getSsoConnectionView, createSsoConnection, updateSsoConnectionAdmin,
+  createSsoConnection, updateSsoConnectionAdmin,
   deleteSsoConnectionAdmin, mintScimToken, setIdpMetadata,
 } from '../services/sso-connections.js';
+import { buildSsoOverview, buildSsoConnectionRow } from '../services/sso-overview.js';
 import { resolveOperatorName, deactivateOwnerByOperator, reactivateOwnerByOperator } from '../services/owner-lifecycle.js';
 import { resetTotpByOperator } from '../services/totp-recovery.js';
 import { emitChange } from '../services/event-bus.js';
@@ -46,7 +49,9 @@ export function registerAdminSsoTools(
     {}, annotationsFor('aimeat_admin_sso_list'),
     async () => {
       if (!(await operatorName())) return refuse('Operator role required');
-      return text({ connections: await listSsoConnectionViews(config, storage) });
+      // The same build the HTTP list calls. It used to assemble `{ connections }` here, which was
+      // one object with two authors and is how the two answers drift.
+      return text(await buildSsoOverview(config, storage));
     });
 
   mcp.tool('aimeat_admin_sso_get', descriptionFor('aimeat_admin_sso_get'),
@@ -54,7 +59,7 @@ export function registerAdminSsoTools(
     annotationsFor('aimeat_admin_sso_get'),
     async ({ id }) => {
       if (!(await operatorName())) return refuse('Operator role required');
-      const view = await getSsoConnectionView(config, storage, id);
+      const view = await buildSsoConnectionRow(config, storage, id);
       return view ? text({ connection: view }) : refuse('NOT_FOUND: Connection not found');
     });
 

@@ -1,0 +1,129 @@
+/* ── Admin Organisation sign-in page, in the poster face ──
+ * @file admin-sso.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's Organisation sign-in page (design canvas "AIMEAT Organisation
+ *   Sign-in"): the offer when nothing is connected, a row per company saying what it can do right
+ *   now, and the six setup steps with their measured state. The frame, the sections, the metric
+ *   rows, the numeral strip, the dashed box and the doors come from admin.css and organism.css;
+ *   only what this page adds lives here, and every value is a theme.css token.
+ *
+ *   NO SERIES COLOURS ON THIS PAGE. There is no chart and nothing to encode by hue: a step is done
+ *   or it is not, and a company can sign in or it cannot. Those are statuses, so they wear the
+ *   status tokens and nothing else is coloured.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial. Replaces the classic-shell cards the tab used.
+ */
+
+.adm-sso .adm-mrow--last { border-bottom: 0; }
+.adm-sso .adm-mrow .adm-mval { overflow-wrap: anywhere; }
+.adm-sso .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-sso .og-strip b.adm-sso-coral { color: var(--accent); }
+.adm-sso .og-strip b.adm-sso-dim { color: var(--text-muted); }
+.adm-sso .og-box { max-width: none; }
+.adm-sso .og-door:disabled { opacity: .5; cursor: default; }
+/* A door that names an action the page knows cannot work. Not a button: there is nothing to press. */
+.adm-sso .og-door--off { color: var(--text-muted); border-bottom-color: var(--border); cursor: default; }
+
+.adm-sso-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 90ch; }
+.adm-sso-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.adm-sso-note { margin: 12px 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); max-width: 92ch; }
+.adm-sso-acts { display: flex; gap: 22px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+.adm-sso-gap { margin-top: 14px; }
+.adm-sso-mono { font-family: var(--font-mono); font-size: .74rem; color: var(--text); white-space: nowrap; }
+.adm-sso-code { display: inline-block; padding: 2px 7px; font-family: var(--font-mono); font-size: .73rem; background: var(--code-bg); color: var(--text); overflow-wrap: anywhere; }
+.adm-sso-locked { margin: 12px 0 0; padding: 10px 14px; border-left: 3px solid var(--warn-fg); background: var(--warn-bg); color: var(--warn-fg); font-size: .85rem; line-height: 1.5; }
+
+/* 01, empty: the offer beside what it buys. */
+.adm-sso-offer { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 0 44px; align-items: start; }
+.adm-sso-offer > * { min-width: 0; }
+.adm-sso-gets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 28px; }
+.adm-sso-get { border-top: 2px solid var(--text); padding-top: 12px; }
+.adm-sso-get b { display: block; font-weight: 700; font-size: 1rem; margin-bottom: 5px; }
+.adm-sso-get p { margin: 0; font-size: .85rem; line-height: 1.55; color: var(--text-dim); }
+.adm-sso-get svg { width: 22px; height: 22px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-bottom: 8px; display: block; }
+
+/* 02: one company is a row — who, what it can do, and the doors. */
+.adm-sso-org { display: grid; grid-template-columns: 260px minmax(0, 1fr) 190px 150px; gap: 0 22px; align-items: start; padding: 13px 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text); }
+.adm-sso-org--last { border-bottom: 0; }
+.adm-sso-org b { font-weight: 700; }
+.adm-sso-org-id { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); }
+.adm-sso-org-when { margin-top: 6px; font-family: var(--font-mono); font-size: .7rem; line-height: 1.5; color: var(--text-dim); }
+.adm-sso-org-acts { display: flex; gap: 14px; justify-content: flex-end; flex-wrap: wrap; }
+.adm-sso-verdict { display: block; font-size: .9rem; }
+.adm-sso-doms { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
+.adm-sso-chip { display: inline-block; padding: 1px 7px; font-family: var(--font-mono); font-size: .66rem; font-weight: 500; line-height: 1.6; white-space: nowrap; background: var(--bg-surface); color: var(--text-dim); }
+
+/* The steps, in both the empty page's "what to gather" and a company's own six. */
+.adm-sso-steps { margin-top: 18px; }
+.adm-sso-step { display: grid; grid-template-columns: 44px minmax(0, 1fr) 150px; gap: 0 18px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.adm-sso-step--last { border-bottom: 0; }
+.adm-sso-step > * { min-width: 0; }
+.adm-sso-step-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.6rem; line-height: 1; color: var(--text-muted); }
+.adm-sso-step-n.done { color: var(--success-fg); }
+.adm-sso-step-n.now { color: var(--accent); }
+.adm-sso-step b { font-weight: 700; font-size: .95rem; }
+.adm-sso-step p { margin: 4px 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.adm-sso-step-r { text-align: right; }
+.adm-sso-copyrow { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.adm-sso-copyrow > span:first-child { font-size: .72rem; color: var(--text-dim); min-width: 88px; }
+.adm-sso-once { margin-top: 12px; padding: 12px 14px; border: 2px solid var(--accent); background: var(--card-bg); }
+.adm-sso-once b { display: block; margin-bottom: 6px; font-size: .88rem; }
+.adm-sso .adm-sso-step ol { margin: 6px 0 0; padding-left: 20px; font-size: .82rem; line-height: 1.6; color: var(--text-dim); }
+
+/* The one form on this page. Underlined fields, like the Hooks bind form. */
+.adm-sso-newbox { margin-top: 22px; padding: 16px 18px; border: 3px dashed var(--accent); background: var(--card-bg); }
+.adm-sso-newlabel { display: block; margin-bottom: 10px; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .75rem; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+.adm-sso-form { display: flex; flex-direction: column; gap: 16px; max-width: 560px; }
+.adm-sso-fld { display: flex; flex-direction: column; gap: 4px; }
+.adm-sso-fld label { font-size: .78rem; font-weight: 700; color: var(--text); }
+.adm .adm-sso-fld input[type="text"],
+.adm .adm-sso-fld input[type="url"],
+.adm .adm-sso-fld textarea { border: 0; border-bottom: 3px solid var(--text); border-radius: 0; background: none; padding: 4px 2px 5px; font: inherit; font-size: .9rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; width: 100%; }
+.adm .adm-sso-fld textarea { font-family: var(--font-mono); font-size: .78rem; font-weight: 400; resize: vertical; }
+.adm .adm-sso-fld input:focus, .adm .adm-sso-fld textarea:focus { border-bottom-color: var(--accent); }
+.adm .adm-sso-fld input::placeholder, .adm .adm-sso-fld textarea::placeholder { color: var(--text-muted); font-weight: 400; }
+.adm .adm-sso-fld input:disabled, .adm .adm-sso-fld textarea:disabled { opacity: .5; }
+.adm-sso-check { display: flex; align-items: flex-start; gap: 10px; font-size: .88rem; }
+.adm-sso-check input { margin-top: 3px; flex: none; }
+.adm-sso-check b { font-weight: 700; }
+
+/* The detail's head, its two columns, and the troubleshooting table. */
+.adm-sso-detail-h { margin-bottom: 16px; }
+.adm-sso-two { display: grid; grid-template-columns: minmax(0, 1fr) 520px; gap: 0 44px; align-items: start; margin-top: 26px; padding-top: 20px; border-top: 3px solid var(--text); }
+.adm-sso-ai { display: grid; grid-template-columns: minmax(0, 1fr) 560px; gap: 0 44px; align-items: start; }
+.adm-sso-two > *, .adm-sso-ai > * { min-width: 0; }
+.adm-sso-paste { white-space: pre-wrap; font-size: .85rem; line-height: 1.55; color: var(--text); }
+.adm-sso-scroll { overflow-x: auto; }
+.adm-sso-tbl { width: 100%; border-collapse: collapse; font-size: .81rem; }
+.adm-sso-tbl th { text-align: left; color: var(--text-muted); font-weight: 600; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); white-space: nowrap; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; }
+.adm-sso-tbl td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--border-subtle); color: var(--text-dim); vertical-align: top; }
+.adm-sso-tbl td b { display: block; color: var(--text); font-weight: 700; }
+
+@media (max-width: 1100px) {
+  .adm-sso .og-strip { flex-wrap: wrap; }
+  .adm-sso .og-strip > div { flex: 1 1 50%; border-right: 0; border-bottom: 1px solid var(--border); }
+  .adm-sso-offer, .adm-sso-two, .adm-sso-ai { grid-template-columns: 1fr; gap: 18px 0; }
+  .adm-sso-gets { grid-template-columns: 1fr; gap: 16px 0; }
+  .adm-sso-org { grid-template-columns: 220px minmax(0, 1fr); gap: 8px 20px; }
+  .adm-sso-org > :nth-child(3) { grid-column: 2; }
+  .adm-sso-org-acts { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+/* A phone: a metric row keeps its name readable and stacks the chip over the value; a company and
+   a step each become a column. */
+@media (max-width: 768px) {
+  .adm-sso .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; }
+  .adm-sso .adm-mrow > :nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+  .adm-sso .adm-mrow > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .adm-sso .adm-mrow > :nth-child(3) { grid-column: 2; grid-row: 2; max-width: 11rem; white-space: normal; text-align: right; }
+  .adm-sso-org { grid-template-columns: 1fr; gap: 8px 0; }
+  /* The 1100 rule puts the badge in column 2. Left standing under a single-track grid it creates an
+     IMPLICIT second column, which is how a one-column row measured as 77px + 283px at 390: the name
+     wrapped inside 77px and the greyed door broke across two lines. */
+  .adm-sso-org > :nth-child(3) { grid-column: 1; }
+  .adm-sso-org-acts { justify-content: flex-start; }
+  .adm-sso-step { grid-template-columns: 34px minmax(0, 1fr); gap: 4px 14px; }
+  .adm-sso-step > :nth-child(3) { grid-column: 2; text-align: left; }
+  .adm-sso-copyrow > span:first-child { min-width: 0; flex-basis: 100%; }
+}
