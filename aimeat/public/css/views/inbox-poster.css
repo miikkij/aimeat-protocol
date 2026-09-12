@@ -9,6 +9,8 @@
  *   an ink rule, and the pages (broadcast, tracked, results) with the head the mast already carries
  *   removed. Tokens only. NOTE: this file must be linked in spa.html after inbox.css.
  * @version-history
+ *   v1.2.0 — 2026-09-13 — The list's sections, the archive boxes and the selection in the poster face:
+ *     square corners, ink borders, a figure for the counts.
  *   v1.1.0 — 2026-09-08 — The ink on the sun reaches the words. A message one wrote oneself renders
  *     its body through .md-body, which sets its own colour, so in the dark theme the text came out
  *     near-white on sun yellow: measured 1.52:1 against the 4.5:1 floor for body text. Every
@@ -41,6 +43,17 @@
 .og-ib .inbox-via-chip { border-radius: 0; font-family: var(--font-mono); }
 .og-ib .inbox-request { border-radius: 0; border: 0; border-left: 3px solid var(--accent); border-bottom: 1px solid var(--border); padding: .7rem .75rem; }
 .og-ib .inbox-empty-sm { padding: .7rem .75rem; }
+/* The section headings keep the coral label face of .inbox-list-section; the count beside them is a figure. */
+.og-ib .inbox-sec { gap: 0; }
+.og-ib .inbox-sec-head { gap: .45rem; }
+.og-ib .inbox-sec-count { font-family: var(--font-mono); letter-spacing: 0; color: var(--text-dim); }
+.og-ib .inbox-sec + .inbox-sec > .inbox-sec-head { border-top: 1px solid var(--border); }
+.og-ib .inbox-conv-group-bar { padding-right: .5rem; }
+.og-ib .inbox-conv-act, .og-ib .inbox-group-act, .og-ib .inbox-conv-check { border-radius: 0; border-color: var(--text); color: var(--text); }
+.og-ib .inbox-conv-act:hover, .og-ib .inbox-group-act:hover { border-color: var(--accent); color: var(--accent); }
+.og-ib .inbox-list-tools { padding: .45rem .75rem; border-bottom: 1px solid var(--border); }
+.og-ib .inbox-conv--selected { background: var(--card-bg); border-left-color: var(--accent); }
+.og-ib .inbox-conv-why { font-family: var(--font-mono); }
 
 /* ── The thread ────────────────────────────────────────────────────────────────────────────── */
 .og-ib .inbox-thread-head { padding: .6rem 1rem; border-bottom: 3px solid var(--text); }

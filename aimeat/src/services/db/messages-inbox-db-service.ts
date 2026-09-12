@@ -12,6 +12,8 @@
  * @structure MessagesInboxService.overview(ownerGhii, ownerName, { inPerson }) → { requests, conversations, important, tracked, agents, groups, peerNames }
  * @usage const inbox = await createMessagesInboxService(storage).overview(ghii, owner);
  * @version-history
+ *   v1.3.0 — 2026-09-13 — peerNames also covers the rows folded under another and, on a folded row,
+ *     who opened each thread and to whom, which is how the Messages list names them.
  *   v1.2.0 — 2026-09-12 — `inPerson: false`: the messages part only, for an app or an agent reading in
  *     the owner's name (services/owner-mailbox-reads.ts).
  *   v1.1.0 — 2026-08-03 — peerNames: resolve every on-screen peer's display name (conversation peers,
@@ -109,9 +111,12 @@ export class MessagesInboxService {
     const ids = new Set<string>();
     const ownerKeyOf = (id: string) => { const h = id.indexOf('#'); return h >= 0 ? id.slice(h + 1) : id; };
     for (const c of convos) {
-      if (!c.peerGhii) continue;
-      ids.add(c.peerGhii);
-      ids.add(ownerKeyOf(c.peerGhii));
+      // A folded row is filed under who opened it, and each copy under it named by who it went to,
+      // so those names are resolved here too rather than fetched one by one by the page.
+      for (const r of [c, ...(c.folded ?? [])]) {
+        if (r.peerGhii) { ids.add(r.peerGhii); ids.add(ownerKeyOf(r.peerGhii)); }
+        if (c.fold) { if (r.openedBy) ids.add(r.openedBy); if (r.openedTo) ids.add(r.openedTo); }
+      }
     }
     for (const r of requests) if (r.contactId) ids.add(r.contactId);
 

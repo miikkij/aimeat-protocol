@@ -8,6 +8,9 @@
  * @structure deserialize helpers + message CRUD/list + contact-consent CRUD; all keyed by ownerGhii.
  * @usage import * as directMessageRepo from './repos/direct-message.js'; (wired in sqlite/index.ts)
  * @version-history
+ *   v1.6.0 -- 2026-09-13 -- Both conversation summaries carry lastForeignAt (the newest message not
+ *     written by the account's own agents) and the thread's opener, for the Messages list's archive
+ *     and rules. One aggregate column and one window query more; nothing existing changes.
  *   v1.5.0 -- 2026-08-22 -- Unread is ownerReadAt-based in all three counts, and markConversationRead
  *     stamps it in a SECOND statement so the read receipt stays inbound-only. `readAt` on that row is the RECIPIENT's read receipt, so the badge was cleared by somebody else's reading and could not be cleared by the owner's without faking one.
  *   v1.4.0 -- 2026-08-22 -- lastSenderGhii on both conversation summaries; listDmsAddressedTo honours
@@ -26,6 +29,20 @@ import type { DirectMessageRecord, ContactConsentRecord, ConversationRecord, Mes
 import type { ConversationSummary } from '../../../repositories/direct-message.repository.js';
 
 // ── Helpers ──
+
+/**
+ * The newest message in a thread NOT written by the account's own agents or apps, as an aggregate
+ * over one (ownerGhii, conversationId) group. The account is the mailbox itself for a person
+ * (`alice@node`) and the part after `#` for an agent's own mailbox (`bot#alice@node`), and a sender
+ * is one of its own when the sender ends in `#` + that account. Compared with substr rather than
+ * LIKE, because an account name may hold `_`, which LIKE reads as a wildcard.
+ */
+const ACCOUNT_OF_MAILBOX_SQL = `(CASE WHEN instr(ownerGhii, '#') > 0 THEN substr(ownerGhii, instr(ownerGhii, '#') + 1) ELSE ownerGhii END)`;
+const LAST_FOREIGN_AT_SQL = `MAX(CASE WHEN substr(senderGhii, -(length(${ACCOUNT_OF_MAILBOX_SQL}) + 1)) = '#' || ${ACCOUNT_OF_MAILBOX_SQL} THEN NULL ELSE createdAt END)`;
+/** Unread messages addressed to the mailbox itself, not to one of its agents. In a person's mailbox
+ *  the copies of their agents' traffic with each other count as unread too, and that is not a
+ *  message waiting for the person. */
+const UNREAD_TO_OWNER_SQL = 'SUM(CASE WHEN senderGhii <> ownerGhii AND ownerReadAt IS NULL AND recipientGhii = ownerGhii THEN 1 ELSE 0 END)';
 
 function deserializeMessage(row: Record<string, unknown>): DirectMessageRecord {
   const record: DirectMessageRecord = {
@@ -225,10 +242,11 @@ export function listConversations(
   ownerGhii: string,
 ): ConversationSummary[] {
   const rows = db.prepare(
-    `SELECT conversationId, COUNT(*) as messageCount, MAX(createdAt) as updatedAt
+    `SELECT conversationId, COUNT(*) as messageCount, MAX(createdAt) as updatedAt,
+       ${LAST_FOREIGN_AT_SQL} as lastForeignAt, ${UNREAD_TO_OWNER_SQL} as unreadToOwner
      FROM direct_messages WHERE ownerGhii = ?
      GROUP BY conversationId ORDER BY updatedAt DESC`,
-  ).all(ownerGhii) as Array<{ conversationId: string; messageCount: number; updatedAt: string }>;
+  ).all(ownerGhii) as Array<{ conversationId: string; messageCount: number; updatedAt: string; lastForeignAt: string | null; unreadToOwner: number }>;
 
   return rows.map(row => {
     const last = db.prepare(
@@ -241,6 +259,9 @@ export function listConversations(
     const subj = db.prepare(
       'SELECT subject FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? AND subject IS NOT NULL ORDER BY createdAt ASC LIMIT 1',
     ).get(ownerGhii, row.conversationId) as { subject: string } | undefined;
+    const open = db.prepare(
+      'SELECT senderGhii, recipientGhii, createdAt FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? ORDER BY createdAt ASC, id ASC LIMIT 1',
+    ).get(ownerGhii, row.conversationId) as { senderGhii: string; recipientGhii: string; createdAt: string } | undefined;
 
     // The peer is the other party relative to this mailbox owner.
     const peerGhii = last
@@ -258,6 +279,11 @@ export function listConversations(
       unread,
       updatedAt: row.updatedAt,
       broadcastId: last?.broadcastId ?? undefined,
+      lastForeignAt: row.lastForeignAt ?? undefined,
+      unreadToOwner: row.unreadToOwner ?? 0,
+      openedBy: open?.senderGhii,
+      openedTo: open?.recipientGhii,
+      openedAt: open?.createdAt,
     };
   });
 }
@@ -274,10 +300,11 @@ export function listConversationsForOwners(
   const ph = ownerGhiis.map(() => '?').join(',');
   const groups = db.prepare(
     `SELECT ownerGhii, conversationId, COUNT(*) as messageCount, MAX(createdAt) as updatedAt,
-       SUM(CASE WHEN senderGhii <> ownerGhii AND ownerReadAt IS NULL THEN 1 ELSE 0 END) as unread
+       SUM(CASE WHEN senderGhii <> ownerGhii AND ownerReadAt IS NULL THEN 1 ELSE 0 END) as unread,
+       ${LAST_FOREIGN_AT_SQL} as lastForeignAt, ${UNREAD_TO_OWNER_SQL} as unreadToOwner
      FROM direct_messages WHERE ownerGhii IN (${ph})
      GROUP BY ownerGhii, conversationId`,
-  ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; messageCount: number; updatedAt: string; unread: number }>;
+  ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; messageCount: number; updatedAt: string; unread: number; lastForeignAt: string | null; unreadToOwner: number }>;
   if (groups.length === 0) return {};
 
   // Last message per (owner, conversation): newest row — the row that fixes peer + lastMessage + direction.
@@ -296,14 +323,24 @@ export function listConversationsForOwners(
         FROM direct_messages WHERE ownerGhii IN (${ph}) AND subject IS NOT NULL
      ) WHERE rn = 1`,
   ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; subject: string }>;
+  // The opener: the first row this mailbox holds in the thread.
+  const opens = db.prepare(
+    `SELECT ownerGhii, conversationId, senderGhii, recipientGhii, createdAt FROM (
+        SELECT ownerGhii, conversationId, senderGhii, recipientGhii, createdAt,
+               ROW_NUMBER() OVER (PARTITION BY ownerGhii, conversationId ORDER BY createdAt ASC, id ASC) rn
+        FROM direct_messages WHERE ownerGhii IN (${ph})
+     ) WHERE rn = 1`,
+  ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; senderGhii: string; recipientGhii: string; createdAt: string }>;
 
   const ck = (o: string, c: string) => `${o} ${c}`;
   const lastBy = new Map(lasts.map(l => [ck(l.ownerGhii, l.conversationId), l]));
   const subjBy = new Map(subjects.map(s => [ck(s.ownerGhii, s.conversationId), s.subject]));
+  const openBy = new Map(opens.map(o => [ck(o.ownerGhii, o.conversationId), o]));
 
   const out: Record<string, ConversationSummary[]> = {};
   for (const g of groups) {
     const last = lastBy.get(ck(g.ownerGhii, g.conversationId));
+    const open = openBy.get(ck(g.ownerGhii, g.conversationId));
     const lastDirection = (last?.direction ?? 'inbound') as 'inbound' | 'outbound';
     (out[g.ownerGhii] ??= []).push({
       conversationId: g.conversationId,
@@ -316,6 +353,11 @@ export function listConversationsForOwners(
       unread: g.unread,
       updatedAt: g.updatedAt,
       broadcastId: last?.broadcastId ?? undefined,
+      lastForeignAt: g.lastForeignAt ?? undefined,
+      unreadToOwner: g.unreadToOwner ?? 0,
+      openedBy: open?.senderGhii,
+      openedTo: open?.recipientGhii,
+      openedAt: open?.createdAt,
     });
   }
   for (const arr of Object.values(out)) arr.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));

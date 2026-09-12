@@ -7,6 +7,8 @@
  *   the node REST API (POST /v1/messages, GET /v1/messages/agent-inbox|agent-thread). Distinct from the
  *   agent↔owner dashboard tools in agent-messages.ts. Mirrors the server MCP surface (src/mcp/dm-messages.ts).
  * @version-history
+ *   v1.6.0 -- 2026-09-13 -- aimeat_dm_archive_as_owner / aimeat_dm_organize_as_owner: organising the
+ *     owner's Messages list on messages:organize-as-owner, parity with the node MCP.
  *   v1.5.0 -- 2026-09-12 -- aimeat_dm_inbox_as_owner / aimeat_dm_thread_as_owner: the owner's own
  *     mailbox on messages:read-as-owner, parity with the node MCP.
  *   v1.4.0 -- 2026-09-06 -- aimeat_dm_broadcast: send-to-many in one call. Without it the only
@@ -27,6 +29,7 @@ import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
+import { organizePatchBody } from '../../tool-call-helpers-organize.js';
 
 export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry): void {
 
@@ -186,6 +189,32 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
     if (per_page) params.set('per_page', String(per_page));
     const qs = params.toString();
     return envelopeResult(await client.get(`/v1/messages/conversations/${encodeURIComponent(conversation_id)}${qs ? '?' + qs : ''}`));
+  });
+
+  // Organising the owner's Messages list, on messages:organize-as-owner. Thin over
+  // POST /v1/messages/organize/archive and GET/PUT /v1/messages/organize, where the word is enforced
+  // and the mailbox resolved.
+  mcp.tool('aimeat_dm_archive_as_owner', descriptionFor('aimeat_dm_archive_as_owner'), {
+    agent_name: agentNameSchema,
+    conversation_ids: z.array(z.string()).describe('Conversation ids to archive or restore (1-500), from aimeat_dm_inbox_as_owner.'),
+    restore: z.boolean().optional().describe('true brings the conversations back to the list instead of archiving them.'),
+  }, annotationsFor('aimeat_dm_archive_as_owner'), async ({ agent_name, conversation_ids, restore }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return envelopeResult(await client.post('/v1/messages/organize/archive', { conversation_ids, ...(restore !== undefined ? { restore } : {}) }));
+  });
+
+  mcp.tool('aimeat_dm_organize_as_owner', descriptionFor('aimeat_dm_organize_as_owner'), {
+    agent_name: agentNameSchema,
+    auto_archive_enabled: z.boolean().optional().describe("Archive the own agents' conversations by age."),
+    auto_archive_days: z.number().int().optional().describe('Days without a message before that happens (1-365).'),
+    fold_same_subject: z.boolean().optional().describe('One row for conversations one sender opened with the same subject within an hour.'),
+    add_rule: z.record(z.string(), z.unknown()).optional().describe('A rule { id?, name, enabled?, action: "fold" | "group" | "archive", match: { with?, subject?, body?, scope?, older_than_days? } }.'),
+    remove_rule: z.string().optional().describe('Id of a rule to remove.'),
+    rules: z.array(z.record(z.string(), z.unknown())).optional().describe('Replace every rule with this list.'),
+  }, annotationsFor('aimeat_dm_organize_as_owner'), async ({ agent_name, auto_archive_enabled, auto_archive_days, fold_same_subject, add_rule, remove_rule, rules }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const body = organizePatchBody({ auto_archive_enabled, auto_archive_days, fold_same_subject, add_rule, remove_rule, rules });
+    return envelopeResult(Object.keys(body).length ? await client.put('/v1/messages/organize', body) : await client.get('/v1/messages/organize'));
   });
 
   mcp.tool('aimeat_dm_thread', descriptionFor('aimeat_dm_thread'), {
