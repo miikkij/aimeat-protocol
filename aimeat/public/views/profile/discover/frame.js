@@ -9,6 +9,7 @@
  * @structure c · kindName · kindSub · HUMAN_TYPES · desk · entryCells · entryRows · crumb · renderPage · openEntry
  * @usage import { renderPage, desk, entryRows, openEntry } from './frame.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: use the shared ink rule on the search row.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import { h } from 'preact';
@@ -48,7 +49,7 @@ export const placeOf = (e) => (e.place ? `${e.place.organism} › ${e.place.work
 export function desk(ctx) {
   const count = (s) => { const f = ctx.facets[s]; if (!f) return ''; return (s === 'public' && f.types.some(x => x.count >= 50)) ? `${num(f.total)}+` : num(f.total); };
   return html`
-    <div class="dv-desk">
+    <div class="dv-desk poster-row--thing">
       <input type="search" class="dv-field" value=${ctx.q} placeholder=${ctx.scope === 'public' ? c('askPublic') : c('ask')}
         onInput=${(e) => ctx.setQ(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') ctx.submit(); }} />
       <div class="og-choice dv-scope">
