@@ -17,6 +17,7 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.17.0 -- 2026-09-13 -- V2: select the shared poster crumb in the tab header.
  *   v3.16.0 — 2026-09-03 — The AI page's route id is 'ai'; 'generator' (its old name, which an
  *     app or a bookmark may still carry) resolves to it from the URL, from a remembered session,
  *     from open() and from the aimeat-open-tab event, and the URL is rewritten to ?tab=ai on load.
@@ -449,7 +450,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
       <main class="pf-content">
         ${openView ? html`
           <div class="pf-content-head">
-            <span class="pf-back-current">${getTabLabel(openView.tabId)}</span>
+            <span class="poster-crumb">${getTabLabel(openView.tabId)}</span>
           </div>
           <div class="pf-content-body">${renderTab(openView.tabId)}</div>
         ` : html`
@@ -482,4 +483,3 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
     </div>
   `;
 }
-

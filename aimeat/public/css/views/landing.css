@@ -5,6 +5,7 @@
  * @description Logged-out landing + pricing pages (ld- prefix). Theme tokens only;
  *   path cards stack on mobile, ticker truncates to one line.
  * @version-history
+ *   v2.2.0 -- 2026-09-13 -- V2: the wall search composes its shared poster frame.
  *   v2.1.2 — 2026-08-29 — The pricing code block reads var(--font-mono) instead of a Consolas stack.
  *   v2.1.1 — 2026-08-29 — The business hero's shadow is the sun (with the front page), and the "why it
  *     improves this fast" label on the sun band is ink rather than coral on yellow.
@@ -115,7 +116,7 @@
 /* The wall's heading wears the showroom face; the older blocks that reuse .ld-h2 (the prompts,
    the folded builder) wear it too, which is the point: one page, one voice. */
 .ld-h2 { font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: clamp(1.3rem, 2.4vw, 1.8rem); line-height: 1.1; margin: 0 0 1rem; }
-.ld-wall-search { width: 100%; max-width: 360px; margin: 0 0 1rem; padding: .6rem .8rem; border: 3px solid var(--text); background: var(--card); color: var(--text); font-size: .9rem; font-family: var(--font-showroom-body); }
+.ld-wall-search { width: 100%; max-width: 360px; margin: 0 0 1rem; padding: .6rem .8rem; color: var(--text); font-size: .9rem; font-family: var(--font-showroom-body); }
 .ld-wall-search:focus { outline: none; box-shadow: 4px 4px 0 var(--accent); }
 /* Four up since the showroom: the page is wider and the cards are the proof, so more of them
    fit above the store. Three on a laptop, two on a tablet, one on a phone. */
