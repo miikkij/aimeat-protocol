@@ -29,6 +29,7 @@ import { useEffect, useState, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { apiGet } from '/js/api.js';
 import { tOr } from '/js/i18n.js';
+import { dateTime as fmtDateTime } from '/js/format.js';
 const html = htm.bind(h);
 
 const MAX_ROWS = 200;
@@ -144,7 +145,7 @@ export function MemoryEmbed({ spec: rawSpec }) {
     <div class="md-mem">
       <div class="md-mem-head">
         <span class="md-mem-title">${spec.title || spec.key || 'aimeat-memory'}</span>
-        ${state.updatedAt ? html`<span class="md-mem-upd">${new Date(state.updatedAt).toLocaleString()}</span>` : null}
+        ${state.updatedAt ? html`<span class="md-mem-upd">${fmtDateTime(state.updatedAt)}</span>` : null}
         <button type="button" class="md-mem-refresh" title=${tOr('markdown.embed.refresh', 'Refresh')} onClick=${load}>↻</button>
       </div>
       ${body}

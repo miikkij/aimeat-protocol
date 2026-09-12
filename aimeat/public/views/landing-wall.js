@@ -24,6 +24,7 @@ import { escHtml } from '/js/utils.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
 import { storeHref } from '/js/site.js';
 import { swallowed } from '/js/swallowed.js';
+import { date as fmtDate } from '/js/format.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -70,7 +71,7 @@ export function StatsPanel() {
 // pushed the card's footer onto a second line, so half the grid wrapped and half did not.
 function fmtPublished(iso) {
   try {
-    return new Date(iso).toLocaleDateString();
+    return fmtDate(iso);
   } catch (err) { swallowed('landing: fmtPublished', err); return ''; }
 }
 

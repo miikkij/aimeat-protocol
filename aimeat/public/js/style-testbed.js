@@ -16,6 +16,7 @@
  *     is safe here: init() already handles a readyState that is no longer 'loading'.
  */
 import { copyToClipboard } from '/js/utils.js';
+import { dateTime as fmtDateTime } from '/js/format.js';
 
 (function () {
   'use strict';
@@ -91,7 +92,7 @@ import { copyToClipboard } from '/js/utils.js';
     const theme = document.documentElement.getAttribute('data-theme') || 'light';
     const lines = [];
     lines.push('=== AIMEAT Style Decisions ===');
-    lines.push('(reviewed in ' + theme.toUpperCase() + ' theme · ' + new Date().toLocaleString() + ')');
+    lines.push('(reviewed in ' + theme.toUpperCase() + ' theme · ' + fmtDateTime(new Date()) + ')');
     lines.push('');
 
     let decided = 0;
