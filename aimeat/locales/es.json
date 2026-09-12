@@ -15296,6 +15296,16 @@
       "promptPortfolio": "Que la IA construya la página",
       "promptApp": "Que la IA construya la aplicación",
       "promptCopied": "Prompt copiado. Pégalo en tu chat de IA"
+    },
+    "prefs": {
+      "region": "Cómo se escriben tus fechas y tus números",
+      "regionHint": "Distinto del idioma de arriba. El idioma decide qué palabras lees; esto decide si una fecha es 9/12/2026 o 12.9.2026.",
+      "timezone": "Tu zona horaria",
+      "timezoneHint": "Las horas se muestran en este reloj en todas partes, también en el correo que este sitio te envía, donde no se puede preguntar a tu navegador.",
+      "followBrowser": "Seguir mi navegador ({what})",
+      "followBrowserZone": "Seguir mi navegador ({what})",
+      "zoneSearch": "Busca una ciudad: Helsinki, Madrid, Tokio…",
+      "sample": "Ahora mismo eso se lee"
     }
   },
   "profile.agents.detail.tabs.schedules": "Programaciones",

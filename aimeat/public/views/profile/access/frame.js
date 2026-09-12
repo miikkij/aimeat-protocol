@@ -16,25 +16,24 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { date as fmtDate, time as fmtTime, num as fmtNum } from '/js/format.js';
 
 export const x = (key, vars) => t('accesspage.' + key, vars);
 
-const localeTag = () => (getLocale() === 'fi' ? 'fi-FI' : getLocale() === 'es' ? 'es-ES' : 'en-GB');
+// The six copies of localeTag() that used to live here derived the FORMAT from the LANGUAGE, and
+// they had already drifted: five gave English en-GB while the money path special-cased en-US. The
+// format is the reader's own now, from their profile, falling back to their browser. /js/format.js
 
 export function dateWord(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(localeTag(), { day: 'numeric', month: 'numeric', year: 'numeric' });
+  return fmtDate(iso, { day: 'numeric', month: 'numeric', year: 'numeric' });
 }
 export function timeWord(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString(localeTag(), { hour: '2-digit', minute: '2-digit' });
+  return fmtTime(iso, { hour: '2-digit', minute: '2-digit' });
 }
-export const n = (v) => (Number(v) || 0).toLocaleString(localeTag());
+export const n = (v) => fmtNum(Number(v) || 0);
 export const daysAgo = (iso, now = Date.now()) => (iso ? Math.floor((now - new Date(iso).getTime()) / 86400000) : null);
 
 /* ── A scope word in the reader's language ──────────────────────────────────────────────────── */

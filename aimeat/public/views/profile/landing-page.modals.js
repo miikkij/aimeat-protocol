@@ -19,6 +19,8 @@ import { onLiveUpdate } from "/lib/live-updates.js";
 import { Spinner } from "./shared.js";
 import { PresenceDot } from "/components/PresenceDot.js";
 import { useToast } from "/components/Toast.js";
+import { DisplayPrefsFields } from "/components/DisplayPrefsFields.js";
+import { setDisplayPrefs } from "/js/display-prefs.js";
 import { swallowed } from '/js/swallowed.js';
 
 /* ───── Edit Profile Modal ───── */
@@ -27,7 +29,7 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
   const { showToast, ToastContainer } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [fields, setFields] = useState({ display_name: '', bio: '', avatar: '', locale: 'en', directory_listed: false });
+  const [fields, setFields] = useState({ display_name: '', bio: '', avatar: '', locale: 'en', region: '', timezone: '', directory_listed: false });
   const [currentEmail, setCurrentEmail] = useState('');
   const [dirty, setDirty] = useState(false);
   useLayoutEffect(() => {
@@ -49,6 +51,9 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
             bio: d.bio || '',
             avatar: d.avatar || '',
             locale: d.locale || 'en',
+            // Empty means "follow my browser", which is a real answer rather than a missing one.
+            region: d.region || '',
+            timezone: d.timezone || '',
             directory_listed: d.directory_listed === true,
           });
           setCurrentEmail(d.notification_email || '');
@@ -66,6 +71,8 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
     try {
       const resp = await updateProfile(fields);
       if (resp && resp.data) {
+        // Every date already on the screen repaints in the new format and clock, without a reload.
+        setDisplayPrefs({ region: resp.data.region, timezone: resp.data.timezone });
         if (session && typeof fields.display_name === 'string') {
           // Persist + re-render the golden login pill live (so it shows the new name now).
           updateSessionMeta({ displayName: fields.display_name });
@@ -128,6 +135,9 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
               </select>
               <div class="pf-edit-hint">${t('profile.landing.editLocaleHint') || 'Your preferred language — used for the portal UI; agents can read it from your profile to answer in it.'}</div>
             </label>
+            ${/* Beside the language, because they are the two settings it is NOT. */''}
+            <${DisplayPrefsFields} region=${fields.region} timezone=${fields.timezone}
+              onChange=${(k, v) => set(k, v)} />
             <div class="pf-edit-label">
               ${t('profile.landing.editEmail')}
               <div class="pf-edit-readonly">${currentEmail || t('profile.landing.editEmailNone')}</div>

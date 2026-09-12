@@ -26,6 +26,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from inbox-tab.js (max-file-lines)
  */
 import { t, getLocale } from '/js/i18n.js';
+import { date as fmtDate, time as fmtTime } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
 import { parkMessageToNotebook } from '/js/services/notebook.js';
 import { firstLine } from '../notebook-helpers.js';
@@ -212,7 +213,7 @@ export function statusTick(status) { return TICK[status] || ''; }
 export function timeShort(s) {
   const d = new Date(s);
   if (!Number.isFinite(d.getTime())) return '';
-  return d.toLocaleTimeString(getLocale() === 'fi' ? 'fi-FI' : undefined, { hour: '2-digit', minute: '2-digit' });
+  return fmtTime(d, { hour: '2-digit', minute: '2-digit' });
 }
 /**
  * The stamp for a LIST row, where the date is the information: a bare clock time on a week-old
@@ -252,7 +253,7 @@ export function dayLabel(s) {
   const yest = new Date(Date.now() - 86400000).toDateString();
   if (d.toDateString() === today) return t('inbox.today');
   if (d.toDateString() === yest) return t('inbox.yesterday');
-  return d.toLocaleDateString(getLocale() === 'fi' ? 'fi-FI' : undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return fmtDate(d, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 /* Build a markdown body safe to render: resolve cid:{id} inline media to the recipient's local

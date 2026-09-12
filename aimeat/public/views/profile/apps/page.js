@@ -20,9 +20,10 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
+import { num as fmtNum } from '/js/format.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { Section, scrollTo } from '/views/profile/organisms/poster-parts.js';
-import { a, day, rel, kb, locale, nameOf, appRef, appUrl, catalogUrl, noteFor, initials, crumb, pageLinks, goTab } from './frame.js';
+import { a, day, rel, kb, nameOf, appRef, appUrl, catalogUrl, noteFor, initials, crumb, pageLinks, goTab } from './frame.js';
 import { secAgents, secBuild } from './build.js';
 import { CollaborationSection, PublishDialog } from './collaboration.js';
 import { secBuilders } from './builders.js';
@@ -38,7 +39,7 @@ export function renderPage(ctx) {
   const opens = apps.reduce((s, x) => s + (x.downloads || 0), 0);
   const top = [...apps].sort((p, q) => (q.downloads || 0) - (p.downloads || 0)).slice(0, 2);
   const chip = (text, cls = '') => html`<span class=${`og-chip ${cls}`}>${text}</span>`;
-  const fmt = (n) => n.toLocaleString(locale());
+  const fmt = (n) => fmtNum(n);
 
   const strip = none ? html`
     <div class="og-strip">

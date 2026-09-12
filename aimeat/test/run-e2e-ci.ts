@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.50.0 -- 2026-09-12 -- Add e2e-display-prefs.ts to ALL_SUITES: language, format and time zone
+ *            are three independent settings, and the suite's job is that setting one never moves
+ *            another. Not in the guard tier yet.
  *   v1.49.0 -- 2026-09-12 -- Add e2e-admin-federation-page.ts to ALL_SUITES: the peer added and
  *            never switched on, which was in no count on the one screen that could fix it, and a
  *            peering request this node SENT being read as one arriving.
@@ -623,6 +626,10 @@ const ALL_SUITES = [
     // the sign-in answer says how many peers it can actually reach, and that the version baseline
     // spans the federation rather than the direct peers.
     'test/e2e-admin-federation-page.ts',
+    // The three settings that must stay independent: which words, how a date is written, and which
+    // clock. `locale` already meant the language AND picked the language of a person's email, so
+    // the whole point of the other two is that setting one does not move the others.
+    'test/e2e-display-prefs.ts',
     'test/e2e-living-pulse.ts',
     // Every core scheduled job fired through the operator's trigger door, on a node of its own
     // (40310) with an SMTP sink, short windows and the flags the seeding keys on. Lane 0.

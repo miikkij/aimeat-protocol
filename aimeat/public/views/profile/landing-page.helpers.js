@@ -7,12 +7,13 @@
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/landing-page.js (max-file-lines)
  */
 import { t, getLocale } from "/js/i18n.js";
+import { date as fmtDate } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
 
 /* ───── Small time helpers (reuse the organisms rel-time keys) ───── */
 
 export function fmtDateLocal(s) {
-  return new Date(s).toLocaleDateString(getLocale() === 'fi' ? 'fi-FI' : undefined);
+  return fmtDate(s);
 }
 export function relTime(s) {
   const ts = new Date(s).getTime();

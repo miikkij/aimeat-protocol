@@ -17273,6 +17273,16 @@
       "promptPortfolio": "Let AI build the page",
       "promptApp": "Let AI build the app",
       "promptCopied": "Prompt copied — paste it into your AI chat"
+    },
+    "prefs": {
+      "region": "How your dates and numbers are written",
+      "regionHint": "Separate from the language above. The language decides which words you read; this decides whether a date is 9/12/2026 or 12.9.2026.",
+      "timezone": "Your time zone",
+      "timezoneHint": "Times are shown in this clock everywhere, including in email this site sends you, where your browser cannot be asked.",
+      "followBrowser": "Follow my browser ({what})",
+      "followBrowserZone": "Follow my browser ({what})",
+      "zoneSearch": "Search for a city: Helsinki, Madrid, Tokyo…",
+      "sample": "Right now, that reads"
     }
   },
   "profile.agents.detail.tabs.schedules": "Schedules",

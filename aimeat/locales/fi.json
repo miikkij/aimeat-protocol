@@ -17256,6 +17256,16 @@
       "promptPortfolio": "Anna AI:n rakentaa sivu",
       "promptApp": "Anna AI:n rakentaa appi",
       "promptCopied": "Prompti kopioitu — liitä se AI-chattiisi"
+    },
+    "prefs": {
+      "region": "Miten päiväyksesi ja lukusi kirjoitetaan",
+      "regionHint": "Eri asia kuin yllä oleva kieli. Kieli ratkaisee mitkä sanat luet; tämä ratkaisee onko päiväys 9/12/2026 vai 12.9.2026.",
+      "timezone": "Aikavyöhykkeesi",
+      "timezoneHint": "Ajat näytetään tässä kellossa kaikkialla, myös sähköposteissa jotka tämä sivusto sinulle lähettää — niissä selainta ei voi kysyä.",
+      "followBrowser": "Seuraa selainta ({what})",
+      "followBrowserZone": "Seuraa selainta ({what})",
+      "zoneSearch": "Etsi kaupunkia: Helsinki, Madrid, Tokio…",
+      "sample": "Juuri nyt se lukee"
     }
   },
   "profile.agents.detail.tabs.schedules": "Ajastukset",

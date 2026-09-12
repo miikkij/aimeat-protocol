@@ -18,9 +18,10 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { num as fmtNum } from '/js/format.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { Section, scrollTo } from '/views/profile/organisms/poster-parts.js';
-import { a, areaLabel, crumb, pageLinks, buildPromptFileUrl, catalogUrl, locale } from './frame.js';
+import { a, areaLabel, crumb, pageLinks, buildPromptFileUrl, catalogUrl } from './frame.js';
 import { learnedRow, proposalRow, curatedRow } from './rows.js';
 
 export function renderPage(ctx) {
@@ -110,7 +111,7 @@ function criticalSub(ctx) {
 /* ── 01 · Start right ─────────────────────────────────────────────────────────────────────────── */
 
 function secStart(ctx) {
-  const fmt = (n) => Number(n || 0).toLocaleString(locale());
+  const fmt = (n) => fmtNum(Number(n || 0));
   const item = (id) => ctx.openItems?.[id];
   return html`
     <${Section} id="ad-start" num="01" title=${a('secStart')} count=${a('secStartSub')} first>

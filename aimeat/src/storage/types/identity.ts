@@ -379,7 +379,28 @@ export interface GHIIRecord {
   displayName: string;
   bio?: string;
   avatar?: string;                // emoji or storage key
-  locale?: string;                // preferred language
+  /**
+   * The person's LANGUAGE — which words they read. Not how anything is formatted.
+   *
+   * Load-bearing beyond the interface: routes/ghii/attach-email.ts picks the language of an
+   * outgoing email from this field. Hanging date and number formatting on it too would mean a
+   * Finnish speaker who prefers an American date format silently changes the language of their
+   * own email. Formatting is `region`; the clock is `timezone`.
+   * → decision "Kieli, esitysmuoto ja aikavyöhyke ovat kolme erillistä asetusta", 2026-09-12
+   */
+  locale?: string;
+  /**
+   * How dates, times and numbers are WRITTEN, as a BCP-47 tag (`fi-FI`, `en-GB`, `sv-SE`).
+   * Absent means follow the reader's browser, which is what every surface did before this field
+   * existed, so absent changes nothing.
+   */
+  region?: string;
+  /**
+   * Which clock the person reads, as an IANA zone (`Europe/Helsinki`). Absent means follow the
+   * browser. It is stored rather than detected because the node writes times into email and
+   * notifications, where there is no browser to ask.
+   */
+  timezone?: string;
   passwordHash?: string;          // scrypt hash for cross-device login
   verificationLevel: 0 | 1 | 2 | 3;  // 0=none, 1=email, 2=eidas/ftn, 3=eudiw-wallet
   ownerName: string;              // links to OwnerRecord.name

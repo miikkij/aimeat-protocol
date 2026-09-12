@@ -13,16 +13,13 @@
  *     denial reason) in the toast instead of a bare "Export failed".
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  */
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
 import { authHeaders } from '/js/services/auth.js';
 
-/** Date-only, formatted in the APP locale (browser locale may differ — fi must show 10.6.2026, not 6/10/2026).
- * @param {string} s ISO date string
- * @returns {string} */
-export function fmtDate(s) {
-  return new Date(s).toLocaleDateString(getLocale() === 'fi' ? 'fi-FI' : undefined);
-}
+/** Date-only, in the reader's own format and clock. → /js/format.js */
+export { fmtDate };
 
 /** Relative time for list metadata ("2 h ago" / "2 h sitten"); falls back to a locale date past 7 days.
  * @param {string} s ISO date string

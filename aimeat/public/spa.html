@@ -221,6 +221,7 @@
       "/js/theme.js": "/js/theme.js",
       "/js/utils.js": "/js/utils.js",
       "/js/app-sandbox.js": "/js/app-sandbox.js",
+      "/js/display-prefs.js": "/js/display-prefs.js",
       "/js/format.js": "/js/format.js",
       "/js/api.js": "/js/api.js",
       "/js/hooks.js": "/js/hooks.js",
@@ -289,6 +290,7 @@
       "/components/OpenItemsList.js": "/components/OpenItemsList.js",
       "/js/services/open-items.js": "/js/services/open-items.js",
       "/components/CopyButton.js": "/components/CopyButton.js",
+      "/components/DisplayPrefsFields.js": "/components/DisplayPrefsFields.js",
       "/components/PromptCard.js": "/components/PromptCard.js",
       "/components/Toast.js": "/components/Toast.js",
       "/components/ContactCard.js": "/components/ContactCard.js",
@@ -444,6 +446,11 @@
     // shortly after load, and the module must be listening before views lazy-load.
     import '/js/install-prompt.js';
     import { LOCALES } from '/js/utils.js';
+    // Side-effect call below, not an await: the reader's own date format and clock arrive one
+    // fetch after the first paint, and until they do every formatter follows the browser — which
+    // is exactly what it did before these settings existed. Awaiting it would put a network round
+    // trip in front of every date on the screen.
+    import { loadDisplayPrefs } from '/js/display-prefs.js';
     import { initThemeSystem } from '/js/theme.js';
     import { siteLink } from '/js/site.js';
     import { loadMarginPattern } from '/js/margin-pattern.js';
@@ -1083,6 +1090,14 @@
       // whenever the sign-in changes (a sign-out takes it away).
       loadMarginPattern();
       window.addEventListener('aimeat-auth-change', () => { loadMarginPattern(); });
+
+      // The reader's own date format and clock, read the same way and for the same reason: AFTER
+      // the session is restored, because the request carries a bearer from localStorage and the
+      // auth library is what puts it there. Called before this line it answered 401 on every load
+      // — indistinguishable from a signed-out reader, so every date silently kept the browser's
+      // format. Never awaited: it resolves after the first paint and the page repaints itself.
+      loadDisplayPrefs();
+      window.addEventListener('aimeat-auth-change', () => { loadDisplayPrefs(); });
 
       // Listen for session expiry — show notification and trigger re-login
       if (window.AIMEAT?.auth?.on) {

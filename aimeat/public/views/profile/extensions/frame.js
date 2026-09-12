@@ -15,12 +15,14 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { date as fmtDate, dateTime as fmtDateTime } from '/js/format.js';
 
 export const x = (key, vars) => t('extpage.' + key, vars);
-export const locale = () => (getLocale() === 'fi' ? 'fi-FI' : getLocale() === 'es' ? 'es-CO' : 'en-GB');
-export const day = (iso) => (iso ? new Date(iso).toLocaleDateString(locale()) : '');
-export const when = (iso) => (iso ? new Date(iso).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' }) : '');
+// The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
+// /js/format.js reads the reader's own, from their profile, falling back to their browser.
+export const day = (iso) => (iso ? fmtDate(iso) : '');
+export const when = (iso) => (iso ? fmtDateTime(iso, { dateStyle: 'short', timeStyle: 'short' }) : '');
 
 /**
  * The three kinds a server extension is, from the list row alone: apps (or cortexes) call it; it
