@@ -9,6 +9,9 @@
  *   telemetry. Translated 1:1 from the Prisma implementation (providers/mongodb/methods/messaging.ts):
  *   `id` is the composite mailbox-copy key `${mid}::${ownerGhii}`, `mid` the message uuid.
  * @version-history
+ *   v1.6.0 — 2026-09-13 — Both conversation-list reads carry lastForeignAt (the newest message not
+ *     written by the account's own agents) and the thread's opener, for the Messages list's archive
+ *     and rules. Parity with the SQLite repo.
  *   v1.5.0 — 2026-09-06 — Both conversation-list reads select the last message's broadcastId, so the
  *     owner's list can fold the copies of one broadcast into one row.
  *   v1.4.0 — 2026-08-22 — Unread is ownerReadAt-based: `senderGhii <> ownerGhii AND ownerReadAt IS
@@ -30,6 +33,20 @@ import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
+
+/**
+ * The newest message in a thread NOT written by the account's own agents or apps, as an aggregate
+ * over one ("ownerGhii", "conversationId") group. The account is the mailbox itself for a person
+ * (`alice@node`) and the part after `#` for an agent's own mailbox (`bot#alice@node`); a sender is one
+ * of its own when it ends in `#` + that account. RIGHT() rather than LIKE, because an account name may
+ * hold `_`, which LIKE reads as a wildcard. Mirrors LAST_FOREIGN_AT_SQL in the SQLite repo.
+ */
+const ACCOUNT_OF_MAILBOX_SQL = sql.raw(`COALESCE(NULLIF(SPLIT_PART("ownerGhii", '#', 2), ''), "ownerGhii")`);
+const LAST_FOREIGN_AT_SQL = sql`MAX(CASE WHEN RIGHT("senderGhii", LENGTH(${ACCOUNT_OF_MAILBOX_SQL}) + 1) = '#' || ${ACCOUNT_OF_MAILBOX_SQL} THEN NULL ELSE "createdAt" END)`;
+/** Unread messages addressed to the mailbox itself, not to one of its agents. In a person's mailbox
+ *  the copies of their agents' traffic with each other count as unread too, and that is not a
+ *  message waiting for the person. Mirrors UNREAD_TO_OWNER_SQL in the SQLite repo. */
+const UNREAD_TO_OWNER_SQL = sql`SUM(CASE WHEN "senderGhii" <> "ownerGhii" AND "ownerReadAt" IS NULL AND "recipientGhii" = "ownerGhii" THEN 1 ELSE 0 END)`;
 
 /** Composite _id for one mailbox copy of a message (sender + recipient each store their own row). */
 const dmDocId = (mid: string, ownerGhii: string): string => `${mid}::${ownerGhii}`;
@@ -195,7 +212,8 @@ export const directMessageMethods = {
 
   async listConversations(this: PostgresKyselyStorage, ownerGhii: string): Promise<ConversationSummary[]> {
     const groups = await this.db.selectFrom('DirectMessage')
-      .select(['conversationId', this.db.fn.countAll<number>().as('messageCount'), sql<Date | null>`max("createdAt")`.as('updatedAt')])
+      .select(['conversationId', this.db.fn.countAll<number>().as('messageCount'), sql<Date | null>`max("createdAt")`.as('updatedAt'),
+        sql<Date | null>`${LAST_FOREIGN_AT_SQL}`.as('lastForeignAt'), sql<string | number | null>`${UNREAD_TO_OWNER_SQL}`.as('unreadToOwner')])
       .where('ownerGhii', '=', ownerGhii).groupBy('conversationId').execute();
 
     const results: ConversationSummary[] = [];
@@ -207,6 +225,8 @@ export const directMessageMethods = {
       // Thread subject = the one set on the message that opened it (earliest non-null subject).
       const subj = await this.db.selectFrom('DirectMessage').select('subject')
         .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', g.conversationId).where('subject', 'is not', null).orderBy('createdAt', 'asc').limit(1).executeTakeFirst();
+      const open = await this.db.selectFrom('DirectMessage').select(['senderGhii', 'recipientGhii', 'createdAt'])
+        .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', g.conversationId).orderBy('createdAt', 'asc').orderBy('id', 'asc').limit(1).executeTakeFirst();
       const lastDirection = (last?.direction ?? 'inbound') as 'inbound' | 'outbound';
       results.push({
         conversationId: g.conversationId,
@@ -219,6 +239,11 @@ export const directMessageMethods = {
         unread: Number(unreadRow?.n ?? 0),
         updatedAt: g.updatedAt ? iso(g.updatedAt) : '',
         broadcastId: last?.broadcastId ?? undefined,
+        lastForeignAt: g.lastForeignAt ? iso(g.lastForeignAt) : undefined,
+        unreadToOwner: Number(g.unreadToOwner ?? 0),
+        openedBy: open?.senderGhii,
+        openedTo: open?.recipientGhii,
+        openedAt: open?.createdAt ? iso(open.createdAt) : undefined,
       });
     }
     results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -232,9 +257,10 @@ export const directMessageMethods = {
   async listConversationsForOwners(this: PostgresKyselyStorage, ownerGhiis: string[]): Promise<Record<string, ConversationSummary[]>> {
     if (ownerGhiis.length === 0) return {};
     const owners = sql.join(ownerGhiis);
-    const groups = await sql<{ ownerGhii: string; conversationId: string; messageCount: string | number; updatedAt: Date | string | null; unread: string | number }>`
+    const groups = await sql<{ ownerGhii: string; conversationId: string; messageCount: string | number; updatedAt: Date | string | null; unread: string | number; lastForeignAt: Date | string | null; unreadToOwner: string | number | null }>`
       SELECT "ownerGhii", "conversationId", COUNT(*) AS "messageCount", MAX("createdAt") AS "updatedAt",
-             SUM(CASE WHEN "senderGhii" <> "ownerGhii" AND "ownerReadAt" IS NULL THEN 1 ELSE 0 END) AS "unread"
+             SUM(CASE WHEN "senderGhii" <> "ownerGhii" AND "ownerReadAt" IS NULL THEN 1 ELSE 0 END) AS "unread",
+             ${LAST_FOREIGN_AT_SQL} AS "lastForeignAt", ${UNREAD_TO_OWNER_SQL} AS "unreadToOwner"
       FROM "DirectMessage" WHERE "ownerGhii" IN (${owners})
       GROUP BY "ownerGhii", "conversationId"
     `.execute(this.db);
@@ -254,14 +280,24 @@ export const directMessageMethods = {
         FROM "DirectMessage" WHERE "ownerGhii" IN (${owners}) AND "subject" IS NOT NULL
       ) t WHERE rn = 1
     `.execute(this.db);
+    // The opener: the first row this mailbox holds in the thread.
+    const opens = await sql<{ ownerGhii: string; conversationId: string; senderGhii: string; recipientGhii: string; createdAt: Date | string }>`
+      SELECT "ownerGhii", "conversationId", "senderGhii", "recipientGhii", "createdAt" FROM (
+        SELECT "ownerGhii", "conversationId", "senderGhii", "recipientGhii", "createdAt",
+               ROW_NUMBER() OVER (PARTITION BY "ownerGhii", "conversationId" ORDER BY "createdAt" ASC, "id" ASC) AS rn
+        FROM "DirectMessage" WHERE "ownerGhii" IN (${owners})
+      ) t WHERE rn = 1
+    `.execute(this.db);
 
     const ck = (o: string, c: string) => `${o} ${c}`;
     const lastBy = new Map(lasts.rows.map(l => [ck(l.ownerGhii, l.conversationId), l]));
     const subjBy = new Map(subjects.rows.map(s => [ck(s.ownerGhii, s.conversationId), s.subject]));
+    const openBy = new Map(opens.rows.map(o => [ck(o.ownerGhii, o.conversationId), o]));
 
     const out: Record<string, ConversationSummary[]> = {};
     for (const g of groups.rows) {
       const last = lastBy.get(ck(g.ownerGhii, g.conversationId));
+      const open = openBy.get(ck(g.ownerGhii, g.conversationId));
       const lastDirection = (last?.direction ?? 'inbound') as 'inbound' | 'outbound';
       (out[g.ownerGhii] ??= []).push({
         conversationId: g.conversationId,
@@ -274,6 +310,11 @@ export const directMessageMethods = {
         unread: Number(g.unread ?? 0),
         updatedAt: g.updatedAt ? iso(g.updatedAt) : '',
         broadcastId: last?.broadcastId ?? undefined,
+        lastForeignAt: g.lastForeignAt ? iso(g.lastForeignAt) : undefined,
+        unreadToOwner: Number(g.unreadToOwner ?? 0),
+        openedBy: open?.senderGhii,
+        openedTo: open?.recipientGhii,
+        openedAt: open?.createdAt ? iso(open.createdAt) : undefined,
       });
     }
     for (const arr of Object.values(out)) arr.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));

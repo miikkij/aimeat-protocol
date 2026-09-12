@@ -7,6 +7,10 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.17.0 -- 2026-09-13 -- The list's sections and closable groups (.inbox-sec*, .inbox-chev,
+ *     .inbox-conv-group-bar), the archive control on a row and a group (.inbox-conv-act,
+ *     .inbox-group-act), selection (.inbox-list-tools, .inbox-conv-check), and the "List rules" page
+ *     (.inbox-org*).
  *   v1.16.0 -- 2026-09-06 -- .inbox-conv-fold / .inbox-fold-toggle: the disclosure under a folded
  *     broadcast row, on the nesting rail, with a 40 px target on a phone.
  *   v1.15.2 -- 2026-08-29 -- The phone's list view takes the measured --inbox-desk-avail too (use-thread-ux
@@ -1049,4 +1053,77 @@
   /* Full width on a phone: a 380px cap would leave the player floating in a narrow column. */
   .inbox-attach-audio { max-width: 100%; }
   .inbox-audio--chip { max-width: 100%; }
+}
+
+/* ── Sections, closable groups, the archive and selection ──────────────────────────────────────
+   The list comes in the sections the server placed each conversation in: people, the owner's own
+   agents, one heading per group rule, the archive. Every heading is a button that closes what is
+   under it, and a closed heading still shows how many are unread. */
+.inbox-sec { display: flex; flex-direction: column; gap: 4px; }
+.inbox-sec-head { width: 100%; background: none; border: 0; cursor: pointer; text-align: left; font-family: inherit; }
+.inbox-sec-head:hover .inbox-sec-name { color: var(--accent); }
+.inbox-sec-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-sec-count { flex: none; font-size: 11px; font-weight: 600; color: var(--text-dim); }
+.inbox-chev { flex: none; transition: transform 120ms ease; }
+.inbox-chev.is-open { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .inbox-chev { transition: none; } }
+
+/* A person or agent group: the heading closes the group; the box beside it archives all of it. */
+.inbox-conv-group-bar { display: flex; align-items: center; gap: 4px; }
+button.inbox-conv-group-head { flex: 1; min-width: 0; background: none; border: 0; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+button.inbox-conv-group-head:hover .inbox-name { color: var(--accent); }
+
+/* The row's own archive control sits beside the row, over its corner, and shows under the pointer or
+   on keyboard focus. It takes no clicks while hidden, so a click on the time never archives. */
+.inbox-conv-wrap { position: relative; }
+.inbox-conv-act, .inbox-group-act {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0; cursor: pointer;
+  background: var(--card-bg); color: var(--text-dim); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.inbox-conv-act { position: absolute; top: 6px; right: 6px; opacity: 0; pointer-events: none; }
+.inbox-conv-wrap:hover .inbox-conv-act, .inbox-conv-act:focus-visible { opacity: 1; pointer-events: auto; }
+.inbox-group-act { opacity: 0; pointer-events: none; }
+.inbox-conv-group-bar:hover .inbox-group-act, .inbox-group-act:focus-visible { opacity: 1; pointer-events: auto; }
+.inbox-conv-act:hover, .inbox-group-act:hover { color: var(--accent); border-color: var(--accent); }
+.inbox-group-act--pick { opacity: 1; pointer-events: auto; width: auto; padding: 0 8px; font-size: 11px; font-weight: 700; font-family: inherit; }
+/* No pointer to hover with: a group's box stays visible at a finger's size, and single rows are
+   archived by selecting them, which is the phone's way of acting on several things at once. */
+@media (hover: none) {
+  .inbox-conv-act { display: none; }
+  .inbox-group-act { opacity: 1; pointer-events: auto; width: 40px; height: 40px; }
+}
+
+.inbox-list-tools { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; padding: 6px 6px 2px; }
+.inbox-list--selecting .inbox-list-tools {
+  justify-content: flex-start; position: sticky; top: 0; z-index: 2;
+  background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 8px 6px;
+}
+.inbox-list-tools-count { margin-right: auto; font-size: 12px; font-weight: 700; }
+.inbox-list-tools .og-door:disabled { opacity: .45; cursor: default; }
+.inbox-conv-check {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border: 2px solid var(--text-dim); font-size: 12px; line-height: 1; color: var(--accent);
+}
+.inbox-conv--selected { background: var(--accent-subtle); }
+.inbox-conv--selected .inbox-conv-check { border-color: var(--accent); }
+.inbox-conv-why { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 760px) {
+  .inbox-sec-head, .inbox-list-tools .og-door, .inbox-group-act--pick { min-height: 40px; }
+}
+
+/* ── The "List rules" page ───────────────────────────────────────────────────────────────────── */
+.inbox-org { display: flex; flex-direction: column; gap: 1rem; max-width: 60rem; }
+.inbox-org-line { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
+.inbox-org-rules { display: flex; flex-direction: column; margin: .6rem 0 1.4rem; }
+.inbox-org-rule { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; padding: .7rem 0; border-bottom: 1px solid var(--border); }
+.inbox-org-rule.is-off .inbox-org-rule-words { opacity: .6; }
+.inbox-org-rule-words { flex: 1 1 16rem; min-width: 0; display: flex; flex-direction: column; gap: .15rem; }
+.inbox-org-rule-words small { font-size: .82rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.inbox-org-actions { margin-top: 1.2rem; }
+/* A row of choices gets the whole width, so its buttons stay on one line inside their frame. */
+.inbox-org .inbox-org-wide { grid-column: 1 / -1; align-items: flex-start; }
+@media (max-width: 760px) {
+  .inbox-org .og-fields--2 { grid-template-columns: minmax(0, 1fr); }
+  .inbox-org .og-choice-btn, .inbox-org .nt-sw, .inbox-org .og-slab { min-height: 40px; }
 }

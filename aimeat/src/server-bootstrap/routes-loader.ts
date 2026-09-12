@@ -9,6 +9,8 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.16.0 — 2026-09-13 — Mounts messagesOrganizeRouter: the owner's archive, rules and sections for
+ *     the Messages list (GET/PUT /v1/messages/organize, POST /v1/messages/organize/archive).
  *   v1.15.0 — 2026-09-12 — Mounts the realtime router whether or not realtime is enabled, so the
  *     refusal at the top of its ten routes is what a caller gets (503 FEATURE_DISABLED) instead of
  *     a 404 from the fallthrough. The manager returned to the WebSocket upgrade handler is still
@@ -212,6 +214,7 @@ import { agentCapabilitiesRouter } from '../routes/agent-capabilities.js';
 import { agentActivityRouter } from '../routes/agent-activity.js';
 import { agentMessagesRouter } from '../routes/agent-messages.js';
 import { messagesRouter } from '../routes/messages.js';
+import { messagesOrganizeRouter } from '../routes/messages-organize.js';
 import { contactsRouter } from '../routes/contacts.js';
 import { openItemsRouter } from '../routes/open-items.js';
 import { settingsProactiveRouter } from '../routes/settings-proactive.js';
@@ -475,7 +478,7 @@ export async function mountRoutes(
   app.use(agentCapabilitiesRouter(config, storage));
   app.use(agentActivityRouter(config, storage));
   app.use(agentMessagesRouter(config, storage, webhookDispatcher));
-  app.use(messagesRouter(config, storage, peers));
+  app.use(messagesRouter(config, storage, peers), messagesOrganizeRouter(config, storage));   // + the owner's archive and list rules
   app.use(contactsRouter(config, storage));       // Contacts (address book) — generic identity picker source
   app.use(openItemsRouter(config, storage));      // Open items — what the owner is going to do here
   app.use(settingsProactiveRouter(config, storage));  // Whether this account's AIs offer what else is here

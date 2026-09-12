@@ -20,6 +20,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.22.0 -- 2026-09-13 -- aimeat_dm_archive_as_owner and aimeat_dm_organize_as_owner →
+ *     messages:organize-as-owner, outside the '*' bundle.
  *   v1.21.0 -- 2026-09-12 -- aimeat_dm_inbox_as_owner and aimeat_dm_thread_as_owner → messages:read-as-owner,
  *     outside the '*' bundle.
  *   v1.20.0 -- 2026-09-08 -- aimeat_admin_cors_overview and aimeat_admin_cors_set join the
@@ -541,6 +543,12 @@ export const TOOL_SCOPES: Record<string, string> = {
     // and /conversations/:id) through services/owner-mailbox-reads.ts.
     aimeat_dm_inbox_as_owner: 'messages:read-as-owner',
     aimeat_dm_thread_as_owner: 'messages:read-as-owner',
+    // Organising the owner's Messages list: archiving and restoring conversations, and the rules that
+    // fold, group or archive them. Its own word, NOT part of the '*' bundle: archiving deletes nothing
+    // but is how a message stops being seen. Same doors as REST (GET/PUT /v1/messages/organize and
+    // POST /v1/messages/organize/archive) through services/inbox-organize/record.ts.
+    aimeat_dm_archive_as_owner: 'messages:organize-as-owner',
+    aimeat_dm_organize_as_owner: 'messages:organize-as-owner',
     aimeat_notify: 'notifications:send',
     aimeat_dm_inbox: 'messages:read',
     aimeat_dm_thread: 'messages:read',

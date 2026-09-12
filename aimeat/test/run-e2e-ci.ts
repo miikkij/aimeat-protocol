@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.53.0 -- 2026-09-13 -- Add e2e-inbox-organize.ts to ALL_SUITES: the Messages list's sections,
+ *            archive and rules, and messages:organize-as-owner. Not in the guard tier.
  *   v1.52.0 -- 2026-09-13 -- Add e2e-ai-provider-allowlist.ts to ALL_SUITES: the operator's provider
  *            allowlist on the model picker and on the settings write, each proved against a node
  *            booted with a list. Own node on 40420, so it lands in lane 0. Not in the guard tier.
@@ -782,6 +784,7 @@ const ALL_SUITES = [
     'test/e2e-dm-send-as-owner.ts',
     'test/e2e-dm-delete-as-owner.ts',
     'test/e2e-dm-read-as-owner.ts',
+    'test/e2e-inbox-organize.ts',
     'test/e2e-federated-namesake.ts',
     'test/e2e-interactive-messages.ts',
     'test/e2e-broadcast.ts',

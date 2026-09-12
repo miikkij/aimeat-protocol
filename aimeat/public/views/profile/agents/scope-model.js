@@ -18,6 +18,8 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.10.0 — 2026-09-13 — messages:organize-as-owner, outside every wildcard: archiving the owner's
+ *     conversations and writing the rules for their Messages list, as the owner.
  *   v1.9.0 — 2026-09-12 — messages:read-as-owner, outside every wildcard: reading the owner's own
  *     mailbox as the owner, beside send-as-owner and delete-as-owner.
  *   v1.8.0 — 2026-09-06 — secrets:manage, in its own domain and outside every wildcard: the owner's
@@ -125,6 +127,11 @@ export const NOT_IN_WILDCARD = [
   // plain read box is the agent's OWN messages. This is what lets "reply as me" read the thread it
   // is answering, and it costs its own tick because a read leaves nothing behind to see.
   'messages:read-as-owner',
+  // ── Added 2026-09-13 ─────────────────────────────────────────────────────────────────────────
+  // Organising the owner's Messages list, as the owner: archiving and restoring conversations and
+  // writing the rules that fold, group or archive them. Nothing is deleted, but archiving is how a
+  // message stops being seen, so it costs its own tick rather than riding along with "Full access".
+  'messages:organize-as-owner',
 ];
 
 /**
@@ -164,7 +171,8 @@ export const SCOPE_DOMAINS = [
   // delete-as-owner — remove a message from the owner's own mailbox. Its own tick beside
   //   send-as-owner, because the two are not the same promise: one adds, the other destroys.
   // read-as-owner — read the owner's own mailbox. `read` is the agent's own messages.
-  { key: 'messages',  permissions: ['send', 'read', 'send-as-owner', 'read-as-owner', 'delete-as-owner'] },
+  // organize-as-owner — archive the owner's conversations and write the rules for their list.
+  { key: 'messages',  permissions: ['send', 'read', 'send-as-owner', 'read-as-owner', 'delete-as-owner', 'organize-as-owner'] },
   { key: 'wallet',    permissions: ['read'] },
   // consent:groups — create a sharing group and decide who is in it. A sharing group IS the
   //   boundary of who reads the owner's memory, so it is separated from managing consents.
