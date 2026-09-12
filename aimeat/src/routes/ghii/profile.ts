@@ -184,6 +184,15 @@ export function registerProfileRoutes(
     // Must be registered before GET /v1/ghii/:ghii to avoid :ghii matching "me"
     router.get('/v1/ghii/me', requireAuth(), async (req, res) => {
         const ownerName = req.auth!.owner;
+        // A visitor signed in from another node has no profile HERE, and the lookup below is by the
+        // bare owner NAME: for a visitor that name is the local part of an account on their home
+        // node, so it answered with the profile of whichever local account shares it — including
+        // the account-security half. Their profile lives on their home node.
+        if (req.auth!.federated) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+                `This account lives on ${req.auth!.homeNode ?? 'another node'}, and its profile is read there.`));
+            return;
+        }
         const ghiiRecord = await storage.getGHIIByOwner(ownerName);
         if (!ghiiRecord) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No GHII profile found'));

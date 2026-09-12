@@ -207,13 +207,17 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // keyspace — it reads its own eco: namespace and only the owner areas its data-area grants cover
     // (enforced per-key on the single-key route). Without this, ?owner_scope=true would hand a
     // restricted GEAI the whole owner keyspace, bypassing its data-area allowlist.
-    const ownerScope = (isOwnerSession || req.query.owner_scope === 'true') && !req.auth!.roles.includes('ecosystem');
+    // NOT a federated session: the broadening resolves from the bare owner NAME, and a visitor from
+    // another node carries the local part of THEIR name, which names the local account sharing it.
+    const ownerScope = (isOwnerSession || req.query.owner_scope === 'true')
+      && !req.auth!.roles.includes('ecosystem') && !req.auth!.federated;
 
     // Allow owner to view another of their agents' memory
     if (agentParam && agentParam !== gaii) {
       const callerOwner = req.auth!.owner;
       const targetAgent = await storage.getAgent(agentParam);
-      if (!targetAgent || targetAgent.owner !== callerOwner) {
+      // The name comparison is not an ownership test for a visitor from another node (see above).
+      if (!targetAgent || targetAgent.owner !== callerOwner || req.auth!.federated) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only view memory of your own agents'));
         return;
       }

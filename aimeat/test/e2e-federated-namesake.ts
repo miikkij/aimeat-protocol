@@ -18,6 +18,9 @@
  *   attestation. The runner pins AIMEAT_FEDERATION_AUTH_POLICY=all_peers and private egress.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-namesake
  * @version-history
+ *   v1.1.0 — 2026-09-13 — The identity itself, which is the root: the visitor's session resolves to
+ *     their HOME GHII, so it reads none of the namesake's memory (direct, ?owner_scope=true or a
+ *     listing), writes into none of it, and GET /v1/ghii/me is not the namesake's profile.
  *   v1.0.0 — 2026-09-13 — Initial, with requireLocalSession on every door in routes/messages.ts.
  */
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -155,6 +158,45 @@ async function run() {
         fedToken = r.body.data.token;
         const c = claims(fedToken);
         assert(c.federated === true && c.owner === namesake, `the session this suite is about: ${JSON.stringify({ federated: c.federated, owner: c.owner })}`);
+    });
+
+    // ── The identity itself. Everything below follows from this one answer. ──
+    await test('The visitor IS NOT the local namesake: their identity carries their HOME node', async () => {
+        const me = await json('/v1/ghii/me', as(fedToken));
+        const seen = me.body?.data?.ghii ?? '';
+        assert(seen !== `${namesake}@${NODE_ID}`,
+            `the visitor was handed the LOCAL account's identity: ${seen}`);
+        assert(me.status === 404 || String(seen).endsWith(`@${homeNodeId}`),
+            `a visitor is their home GHII or nothing here, got ${me.status} ${JSON.stringify(me.body?.data ?? me.body?.error).slice(0, 200)}`);
+    });
+
+    await test('The visitor cannot read the local namesake\'s PRIVATE memory', async () => {
+        const w = await json('/v1/memory', as(alice.token, { method: 'POST', body: JSON.stringify({ key: 'namesake.private', value: { secret: `alice-${stamp}` }, visibility: 'private' }) }));
+        assert(w.status === 201, `setup: the local account writes its own private record: ${w.status} ${JSON.stringify(w.body)}`);
+        for (const path of ['/v1/memory/namesake.private', '/v1/memory/namesake.private?owner_scope=true']) {
+            const r = await json(path, as(fedToken));
+            const leaked = JSON.stringify(r.body?.data?.value ?? '');
+            assert(!leaked.includes(`alice-${stamp}`),
+                `the visitor read the local account's private memory via ${path}: ${r.status} ${leaked}`);
+        }
+        for (const path of ['/v1/memory', '/v1/memory?owner_scope=true', '/v1/memory?prefix=namesake.']) {
+            const l = await json(path, as(fedToken));
+            assert(!JSON.stringify(l.body?.data ?? '').includes('namesake.private'),
+                `the visitor listed the local account's keys via ${path}: ${JSON.stringify(l.body?.data).slice(0, 300)}`);
+        }
+    });
+
+    await test('A visitor\'s own write lands in THEIR namespace, never the namesake\'s', async () => {
+        const vw = await json('/v1/memory', as(fedToken, { method: 'POST', body: JSON.stringify({ key: 'namesake.visitor', value: { by: `visitor-${stamp}` }, visibility: 'private' }) }));
+        // The write is refused (no memory:write in this node's federated scopes) or it is stored
+        // under the visitor's HOME identity. What it may never be is the namesake's namespace.
+        if (vw.status === 201) {
+            const landed = vw.body?.data?.owner_gaii ?? '';
+            assert(landed !== `${namesake}@${NODE_ID}`, `the visitor wrote into the local account's namespace: ${landed}`);
+        }
+        const seen = await json('/v1/memory/namesake.visitor', as(alice.token));
+        assert(!JSON.stringify(seen.body?.data?.value ?? '').includes(`visitor-${stamp}`),
+            `the local account can see the visitor's write in its own namespace: ${JSON.stringify(seen.body?.data)}`);
     });
 
     await test('The local account itself still reads its own mailbox', async () => {
