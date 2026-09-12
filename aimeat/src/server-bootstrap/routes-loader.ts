@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.14.0 — 2026-09-12 — Mounts statsMiddleware, written 2026-07 and never wired to anything.
  *   v1.13.0 — 2026-09-08 — Mounts the admin CORS router (GET /v1/admin/cors/overview).
  *   v1.12.0 — 2026-09-06 — Mounts the secrets router (/v1/secrets: the owner's credential vault).
  *   v1.11.0 — 2026-09-03 — Mounts the dependencies router (GET /v1/dependencies).
@@ -245,6 +246,7 @@ import { startBackgroundJobs } from './background-jobs.js';
 import { initProcessBuffers } from './process-buffers.js';
 import { createMetricsRegistry } from '../services/prometheus.js';
 import { metricsMiddleware } from '../middleware/metrics.js';
+import { statsMiddleware } from '../middleware/stats.js';
 
 export interface MountRoutesOptions {
   rejectForRelay: express.RequestHandler;
@@ -300,6 +302,9 @@ export async function mountRoutes(
     ? createMetricsRegistry(config)
     : undefined;
   if (metricsRegistry) app.use(metricsMiddleware(metricsRegistry));
+  // The same request, counted for the Statistics page. Beside the Prometheus one on purpose, and
+  // not opt-in: see the header of src/middleware/stats.ts for what this line being absent cost.
+  app.use(statsMiddleware(stats));
 
   // Presigned upload endpoint (raw body — no JSON parsing needed)
   app.use(uploadRouter(config, storage));

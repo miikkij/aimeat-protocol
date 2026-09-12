@@ -9,13 +9,15 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-12 -- aimeat_admin_statistics (GET /v1/stats, with from and to forwarded as
+ *     a pair), the third surface of the Statistics page's one read.
  *   v1.1.0 -- 2026-09-12 -- aimeat_admin_hooks (GET /v1/admin/hooks) and aimeat_admin_hook_set
  *     (PUT /v1/admin/hooks/:hook), on the third surface in the same change as the other two.
  *   v1.0.0 -- 2026-09-08 -- Initial: aimeat_admin_cors_overview (GET /v1/admin/cors/overview) and
  *     aimeat_admin_cors_set (the two PUT cors routes, chosen by the `#` in `who`).
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { requiredString, requiredValue } from './tool-call-helpers.js';
+import { requiredString, requiredValue, optionalString, query } from './tool-call-helpers.js';
 
 export const adminCliTools: ConnectCliToolDefinition[] = [
     {
@@ -25,6 +27,14 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_admin_hooks',
         handler: ({ client }) => client.get('/v1/admin/hooks'),
+    },
+    {
+        // THE THIRD SURFACE forwards both dates, and forwards them TOGETHER. The route uses them
+        // only as a pair, so dropping one here would answer the node's whole life under a period's
+        // label — the exact silence this file's wrapper exists to prevent.
+        name: 'aimeat_admin_statistics',
+        handler: ({ client }, input) => client.get(
+            `/v1/stats${query({ from: optionalString(input, 'from'), to: optionalString(input, 'to') })}`),
     },
     {
         // THE THIRD SURFACE forwards both parameters: `hook` picks the moment and `actions` is the

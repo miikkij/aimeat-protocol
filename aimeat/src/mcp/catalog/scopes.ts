@@ -129,6 +129,9 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     // The Hooks page's read and its one write: the same decision again.
     'aimeat_admin_hooks',
     'aimeat_admin_hook_set',
+    // The Statistics page's read. Operator-gated in the handler like the rest of this block; there
+    // is nothing to narrow, because it is one read of counters the node keeps about itself.
+    'aimeat_admin_statistics',
     // Reading how a page is arranged, and the catalogue of blocks this node can serve. Gated in the
     // handler on the operator, like the admin tools above it, and there is nothing here to narrow:
     // a layout is a list of block names, and the front page's describes a page anyone can look at.

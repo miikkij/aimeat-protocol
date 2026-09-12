@@ -19647,8 +19647,24 @@ paths:
                             type: string
                             format: date-time
                             description: ISO 8601 timestamp when server started
+                          from:
+                            type: string
+                            format: date
+                            description: >-
+                              Present only on a ranged read. The counters in this response are the
+                              sum of the day tallies in [from, to], and are NOT the lifetime totals.
+                              Omit from/to to get the node's whole life instead. A counter reading 0
+                              over a range may have a large lifetime total, so the two readings
+                              together are what distinguish a quiet period from a dead counter.
+                          to:
+                            type: string
+                            format: date
+                            description: Present only on a ranged read. The last day counted, inclusive.
                           requests_total:
                             type: integer
+                            description: >-
+                              Every HTTP request served, counted by the same middleware that feeds
+                              aimeat_http_requests_total in GET /v1/metrics. The two must agree.
                           requests_by_method:
                             type: object
                             additionalProperties:
@@ -19676,10 +19692,27 @@ paths:
                             type: integer
                           schema_validation_failures:
                             type: integer
+                          auth_failures_total:
+                            type: integer
+                            description: >-
+                              Requests refused for want of a credential: missing, expired, or not
+                              enough. On a node reachable from the public internet this is usually
+                              the largest counter here, and a rate that stays flat across a weekend
+                              is a script working through credentials rather than people.
+                          rate_limit_hits_total:
+                            type: integer
+                            description: Requests refused for arriving too fast.
+                          scope_denials_total:
+                            type: integer
+                            description: >-
+                              A named, authenticated principal refused at a door it lacks the scope
+                              for. Either a misconfigured integration or somebody testing the fence.
                           active_owners:
                             type: integer
+                            description: A gauge, read at the moment of the call. Not summable and unaffected by from/to.
                           active_agents:
                             type: integer
+                            description: A gauge, read at the moment of the call. Not summable and unaffected by from/to.
                           daily_history:
                             type: object
                             description: Daily counter breakdown (last 90 days)

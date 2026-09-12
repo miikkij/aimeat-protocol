@@ -289,6 +289,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_admin_cors_overview', 'aimeat_admin_cors_set',
         // The Hooks page in one read, and the write that binds a moment to an address.
         'aimeat_admin_hooks', 'aimeat_admin_hook_set',
+        // The Statistics page in one read: the counters, their day tallies, and the live gauges.
+        'aimeat_admin_statistics',
         // Arranging this node's front page and the page its members land on.
         'aimeat_surface_layout_get', 'aimeat_surface_layout_set',
         // The operator's break-glass over an organism whose creator account is unreachable, plus the

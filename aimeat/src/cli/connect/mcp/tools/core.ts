@@ -8,6 +8,8 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.15.0 -- 2026-09-12 -- aimeat_admin_statistics, thin over GET /v1/stats, with from and to
+ *     forwarded as a pair because the route reads them only as a pair.
  *   v1.14.0 -- 2026-09-12 -- aimeat_admin_hooks and aimeat_admin_hook_set, thin over
  *     GET /v1/admin/hooks and the PUT the Hooks page uses to bind a moment.
  *   v1.13.0 -- 2026-09-08 -- aimeat_admin_cors_overview and aimeat_admin_cors_set, thin over
@@ -624,6 +626,18 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_admin_hooks'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.get('/v1/admin/hooks'));
+  });
+
+  mcp.tool('aimeat_admin_statistics', descriptionFor('aimeat_admin_statistics'), {
+    agent_name: agentNameSchema,
+    from: z.string().optional().describe('First day of the period, inclusive, as YYYY-MM-DD. Give `to` as well, or neither is used and you get the whole life of this node.'),
+    to: z.string().optional().describe('Last day of the period, inclusive, as YYYY-MM-DD. Give `from` as well, or neither is used.'),
+  }, annotationsFor('aimeat_admin_statistics'), async ({ agent_name, from, to }) => {
+    const { client } = pickAgent(registry, agent_name);
+    // Both or neither: the route reads them as a pair, and one alone would silently return the
+    // node's whole life wearing a period's label.
+    const qs = from && to ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : '';
+    return asText(await client.get(`/v1/stats${qs}`));
   });
 
   mcp.tool('aimeat_admin_hook_set', descriptionFor('aimeat_admin_hook_set'), {
