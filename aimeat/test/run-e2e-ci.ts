@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.42.0 -- 2026-09-12 -- Add e2e-admin-owners-page.ts to ALL_SUITES: the field set the Owners
+ *            page counts every figure and filter from, and the two writes that move it. Not in the
+ *            guard tier yet.
  *   v1.41.0 -- 2026-09-12 -- Add e2e-admin-stats-page.ts to ALL_SUITES: the twin of e2e-metrics,
  *            asserting that GET /v1/stats counts requests at all. Not in the guard tier yet.
  *   v1.40.0 -- 2026-09-12 -- Add e2e-admin-hooks-page.ts to ALL_SUITES: the Hooks page's read, the
@@ -557,6 +560,9 @@ const ALL_SUITES = [
     // The Portal page's reads: the facts its first section states, the parts with the words under
     // their names, the save that makes the page the operator's own, and every refusal for a member.
     'test/e2e-admin-portal-page.ts',
+    // The one read the Owners page is folded from: the field set every figure, chip and filter is
+    // counted from, and the two lifecycle writes moving the two fields the page draws.
+    'test/e2e-admin-owners-page.ts',
     // The numbers behind the Statistics page: that requests_total is counted at all (its middleware
     // was written and never mounted), that a scope refusal is counted, and that a period reading is
     // a different reading from the node's whole life.

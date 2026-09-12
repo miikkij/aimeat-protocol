@@ -17,6 +17,11 @@
  *     keeps a stable component identity. Previously it was redefined every render,
  *     so any re-render of the host (e.g. the agents list polling) unmounted +
  *     remounted the open dialog, causing it to strobe/flicker.
+ *   v1.5.0 — 2026-09-12 — ConfirmDialog takes the same `className` Modal has (useConfirm forwards
+ *     it), so one page can wear its own face without restyling every dialog, and it draws the
+ *     close X its header was missing. The design language gives a dialog three ways out — the X,
+ *     Escape and the backdrop — and this one had two, with nothing in the corner people look at
+ *     first. Additive: no dialog loses a route, and every caller's appearance is unchanged.
  *   v1.4.0 — 2026-06-02 — Add optional `className` prop on Modal (applied to the
  *     .modal box) so views can pass width modifiers (e.g. scope-modal,
  *     ext-modal-narrow) when migrating their inline overlays to <Modal> (#2).
@@ -59,10 +64,11 @@ export function Modal({ open, onClose, title, className = '', children }) {
 
 /**
  * ConfirmDialog — modal asking for user confirmation before a destructive or important action.
- * @param {{ open, onClose, onConfirm, title, message, confirmLabel, cancelLabel, danger }} props
+ * @param {{ open, onClose, onConfirm, title, message, confirmLabel, cancelLabel, danger, className? }} props
  *   - danger: if true, confirm button is styled red (for destructive actions)
+ *   - className: optional extra class on the .modal box, so one page can dress its own question
  */
-export function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel, cancelLabel, danger }) {
+export function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel, cancelLabel, danger, className = '' }) {
   // Hooks must run unconditionally before any early return (Rules of Hooks).
   const onBackdrop = useCallback((e) => {
     if (e.target === e.currentTarget) onClose();
@@ -79,8 +85,9 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, message, confir
 
   return html`
     <div class="modal-overlay" onClick=${onBackdrop}>
-      <div class="modal">
-        ${title && html`<div class="modal-header"><h3>${title}</h3></div>`}
+      <div class="modal ${className}">
+        ${title && html`<div class="modal-header"><h3>${title}</h3>
+          <button class="modal-close" onClick=${onClose} aria-label=${t('common.close') || 'Close'}>✕</button></div>`}
         <div class="modal-body">
           <p class="modal-confirm-message">${message}</p>
         </div>
@@ -134,6 +141,7 @@ export function useConfirm() {
       confirmLabel=${state.confirmLabel}
       cancelLabel=${state.cancelLabel}
       danger=${state.danger}
+      className=${state.className}
     />`;
   }, [state, close]);
 
