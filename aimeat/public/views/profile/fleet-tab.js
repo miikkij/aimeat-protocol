@@ -23,6 +23,7 @@
  * @usage registered in views/profile.js TABS as `fleet`, listed in the Automation group of
  *   SIDEBAR_GROUPS (landing-page.cards.js).
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-09-05 — The agent defaults (the rules every agent carries, the token budget) sit
  *     at the foot of this page. They lived on the Access page, which is about who holds a key to
  *     the account; a rule that says "always answer in Finnish" is about the agents, and this is
@@ -40,7 +41,7 @@ import { AgentDefaultsSection } from './agents/agent-defaults-section.js';
 export default function FleetTab({ session, showToast }) {
   return html`
     <div class="pf-fleet-tab">
-      <h2 class="section-title">${t('profile.tabs.fleet')}</h2>
+      <h2 class="poster-page-title">${t('profile.tabs.fleet')}</h2>
       <p class="section-desc">${t('fleet.desc')}</p>
 
       ${/* THE STARTER CARD IS A SLOT, NOT A HEADER. It sat above the fleet at first, and on a

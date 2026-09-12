@@ -11,6 +11,7 @@
  *   - NotebookTab (default export) — capture box, trust toggles, librarian search, inbox list → NoteCard
  * @usage html`<${NotebookTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-06-19 — Initial: capture + librarian search (slice A).
  *   v1.1.0 — 2026-06-21 — Enrich stage (Phase 1) + delegate (Phase 2) + distribute & trust toggles (Phase 3).
  *   v1.2.0 — 2026-06-21 — Split per-note organize workflow into NoteCard; tab keeps capture/search/inbox.
@@ -227,7 +228,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
 
   return html`
     ${ConfirmUI}
-    <div class="section-title">${t('profile.notebook.title')}</div>
+    <div class="poster-page-title">${t('profile.notebook.title')}</div>
     <div class="section-desc">${t('profile.notebook.desc')}</div>
 
     <div class="pf-nb-capture">
@@ -248,7 +249,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
       </div>
     </div>
 
-    <div class="section-title pf-nb-section">${t('profile.notebook.librarianTitle')}</div>
+    <div class="poster-section-title pf-nb-section">${t('profile.notebook.librarianTitle')}</div>
     <div class="section-desc">${t('profile.notebook.librarianDesc')}</div>
     <div class="sub-tabs pf-nb-scope">
       <button class="sub-tab ${searchScope === 'own' ? 'active' : ''}" onClick=${() => pickScope('own')}>${t('profile.notebook.scopeOwn')}</button>
@@ -272,7 +273,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
         `}
     `}
 
-    <div class="section-title pf-nb-section">${t('profile.notebook.inboxTitle')}</div>
+    <div class="poster-section-title pf-nb-section">${t('profile.notebook.inboxTitle')}</div>
     ${inbox === null
       ? html`<${Spinner} text=${t('profile.notebook.inboxLoading')} />`
       : inbox.length === 0
