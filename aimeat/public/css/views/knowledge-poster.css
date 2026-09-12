@@ -10,6 +10,7 @@
  *   list. The public page has no profile shell, so the heading rule the shell scopes is repeated
  *   here for .og-kp--public. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose the public search row's top rule from poster.css.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
@@ -111,7 +112,7 @@
 .og-kp--public .og-sec h2 { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.6rem; line-height: 1.05; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text); }
 .og-kp--public .og-sec h2 small { font-family: var(--font-mono); font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--accent); margin-left: .6rem; }
 .og-kp--public .og-title { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 2.6rem; line-height: 1; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; margin: 0; }
-.kp-desk { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: .8rem 1.4rem; align-items: end; margin-top: 1.4rem; padding: 1rem 0; border-top: 3px solid var(--text); border-bottom: 3px solid var(--text); }
+.kp-desk { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: .8rem 1.4rem; align-items: end; margin-top: 1.4rem; padding: 1rem 0; border-bottom: 3px solid var(--text); }
 .kp-field { width: 100%; min-width: 0; box-sizing: border-box; border: 0; border-bottom: 3px solid var(--text); background: transparent; padding: .45rem 0; font: inherit; font-size: 1.2rem; color: var(--text); }
 .kp-field:focus { outline: none; border-bottom-color: var(--accent); }
 .kp-desk .og-choice-btn { text-transform: uppercase; letter-spacing: .04em; font-size: .7rem; padding: .5rem .8rem; }
