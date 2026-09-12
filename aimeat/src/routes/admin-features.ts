@@ -12,6 +12,9 @@
  *   - Route groups: GHII users, notification templates, directory, push, genesis peering
  *
  * @version-history
+ *   v1.3.0 — 2026-09-12 — GET /v1/admin/csm carries each CSM's description, schema mode and field
+ *     counts. They sit in the definition the record already holds, and without them a list row
+ *     could not say how hard a CSM bites or over how many fields.
  *   v1.2.0 — 2026-09-09 — GET /v1/admin/marketplace deleted: it read a table nothing writes and
  *     answered total 0 on every node, and the admin view fetched it without rendering it.
  *   v1.1.0 — 2026-09-08 — The GHII CORS write goes through services/cors-overview.ts (setCorsList),
@@ -527,14 +530,29 @@ export function adminFeaturesRouter(
     router.get('/v1/admin/csm', ...auth, handle(async (_req, res) => {
         const csms = await storage.listCsms();
         res.json(success(config.nodeId, {
-            templates: csms.map(c => ({
-                name: c.name,
-                service_type: c.serviceType,
-                registered_by: c.registeredBy,
-                registered_at: c.registeredAt,
-                updated_at: c.updatedAt,
-                federate: c.federate ?? false,
-            })),
+            templates: csms.map(c => {
+                // The two questions a row has to answer — how hard does this bite, and over how
+                // many fields — are in the definition the record already carries. Reading them
+                // here is what saves the page a second call per row to answer them.
+                const def = c.definition as {
+                    schemaMode?: string;
+                    dataSchema?: { required?: Record<string, unknown>; optional?: Record<string, unknown> };
+                    service?: { description?: string };
+                };
+                return {
+                    name: c.name,
+                    service_type: c.serviceType,
+                    registered_by: c.registeredBy,
+                    registered_at: c.registeredAt,
+                    updated_at: c.updatedAt,
+                    federate: c.federate ?? false,
+                    description: def?.service?.description ?? '',
+                    schema_mode: def?.schemaMode ?? 'open',
+                    json_schema_key: c.jsonSchemaKey,
+                    required_fields: Object.keys(def?.dataSchema?.required ?? {}).length,
+                    optional_fields: Object.keys(def?.dataSchema?.optional ?? {}).length,
+                };
+            }),
             total: csms.length,
         }));
     }));

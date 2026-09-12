@@ -2,82 +2,169 @@
  * @file csm-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin dashboard CSM (Community Service Manifest) tab — list,
- *   detail, create and delete of registered CSM templates, plus an AI builder
- *   prompt view.
- * @structure default export CsmTab({ data, reload }); list/detail/create/prompt views.
+ * @description Admin dashboard CSM page in the poster face (design canvas "AIMEAT Admin CSM").
+ *   Four views under one crumb: the list of registered CSMs, the empty state that says what a CSM
+ *   refuses and offers the eight that ship with the build, one CSM open with its fields rendered as
+ *   a person reads them, and the create view. A CSM is the one thing on this installation that can
+ *   refuse a write, so the page leads on what is refused rather than on what is installed.
+ *
+ * @structure
+ *   - default CsmTab({ data, reload }): the model and the four views
+ *   - Empty: what a CSM refuses, the two ways in, and the eight shipped examples
+ *   - List: the strip, the headline, one row per CSM
+ *   - One: the fields, then the facts (mode, consent, retention, vocabulary)
+ *   - Create: the YAML, with the shipped examples as a starting point
+ *   - fieldsOf / bounds: reading one field's rule out of the definition
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
- *   v1.1.0 — 2026-06-02 — Admin design unification: inline danger styles → adm-btn-danger
- *     (2 delete buttons), raw textarea → adm-textarea adm-input-full, error div → <ErrorBox>.
+ *   v2.0.0 — 2026-09-12 — The poster face, and the list that could never show anything: the tab
+ *     read `data.csm?.templates` while admin.js stores the read at `d.csmTemplates`, so the array
+ *     was always empty and the page said "No CSM templates installed" whatever was registered.
+ *     The detail view printed JSON.stringify(definition) into a grey box; the fields, their bounds
+ *     and their allowed values are the whole point of the document and are a table now. The eight
+ *     examples that ship with the build were reachable only from a dropdown inside the create form.
  *   v1.2.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
  *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
  *       removed from both locales. Same words on screen.
+ *   v1.1.0 — 2026-06-02 — Admin design unification: inline danger styles → adm-btn-danger
+ *     (2 delete buttons), raw textarea → adm-textarea adm-input-full, error div → <ErrorBox>.
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
-import { dt, Empty, ExpandableHelp, ErrorBox, useToast, Toast } from './shared.js';
+import { t, tOr } from '/js/i18n.js';
+import { useViewCSS } from '/components/useViewCSS.js';
+import { num, dt, ErrorBox, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { getCsmDetail, deleteCsm, createCsm, getCsmFileTemplates, getCsmFileTemplate, getCsmBuilderPrompt } from '/js/services/admin.js';
 
+const S = (key, params) => t('admin.csm.' + key, params);
+/**
+ * The same lookup, falling back to the raw value when there is no translation for it. A CSM may
+ * name a retention period, a visibility or a field type this page has no words for, and the raw
+ * value it wrote is better on screen than the key path t() hands back for a miss.
+ */
+const SOr = (key, fallback) => tOr('admin.csm.' + key, fallback);
+
+/** One field's rule, said the way the page reads it: what it takes, and what it refuses. */
+function bounds(def) {
+  const parts = [];
+  if (Array.isArray(def?.enum) && def.enum.length) return { kind: S('typeOneOf', { n: num(def.enum.length) }), rule: def.enum.join(' · ') };
+  const type = def?.type ?? 'string';
+  const kind = SOr('type.' + type, type);
+  if (type === 'array') {
+    const item = typeof def.items === 'string' ? def.items : def.items?.type;
+    if (def.min != null) parts.push(S('atLeast', { n: num(def.min) }));
+    if (def.max != null) parts.push(S('atMost', { n: num(def.max) }));
+    return { kind: item ? S('listOf', { of: SOr('type.' + item, item) }) : kind, rule: parts.join(', ') };
+  }
+  if (type === 'object') {
+    const props = Object.entries(def.properties ?? {});
+    const req = props.filter(([, p]) => p?.required !== false).map(([k]) => k);
+    const opt = props.filter(([, p]) => p?.required === false).map(([k]) => k);
+    if (!req.length && !opt.length) return { kind, rule: '' };
+    if (!opt.length) return { kind, rule: S('insideAllRequired', { req: req.join(', ') }) };
+    if (!req.length) return { kind, rule: S('insideNoneRequired', { opt: opt.join(', ') }) };
+    return { kind, rule: S('inside', { req: req.join(', '), opt: opt.join(', ') }) };
+  }
+  if (type === 'string') {
+    if (def.min != null && def.max != null) parts.push(S('charsBetween', { min: num(def.min), max: num(def.max) }));
+    else if (def.min != null) parts.push(S('charsAtLeast', { n: num(def.min) }));
+    else if (def.max != null) parts.push(S('charsAtMost', { n: num(def.max) }));
+    if (def.format) parts.push(S('mustBeFormat', { format: def.format }));
+  } else {
+    if (def.min != null) parts.push(S('numAtLeast', { n: num(def.min) }));
+    if (def.max != null) parts.push(S('numAtMost', { n: num(def.max) }));
+  }
+  return { kind, rule: parts.join(', ') };
+}
+
+/** The required and optional field lists of a definition, in the order the author wrote them. */
+function fieldsOf(definition) {
+  const ds = definition?.dataSchema ?? definition?.data_schema ?? {};
+  const toRows = (obj) => Object.entries(obj ?? {}).map(([name, def]) => ({ name, ...bounds(def) }));
+  return { required: toRows(ds.required), optional: toRows(ds.optional) };
+}
+
 export default function CsmTab({ data, reload }) {
-  const templates = data.csm?.templates || [];
-  const [view, setView] = useState('list');    // list | detail | create | prompt
-  const [detail, setDetail] = useState(null);
+  useViewCSS('/css/views/admin-csm.css');
+  const [view, setView] = useState('list');    // list | one | create | prompt
+  const [open, setOpen] = useState(null);
   const [yaml, setYaml] = useState('');
-  const [fileTemplates, setFileTemplates] = useState(null);
+  const [examples, setExamples] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [prompt, setPrompt] = useState('');
   const [toast, showErr, , clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
 
-  async function showDetail(name) {
+  // admin.js stores this read at `csmTemplates`. Reading `data.csm` — which nothing sets — is what
+  // made the list permanently empty and the page permanently say nothing was installed.
+  const csms = useMemo(() => data.csmTemplates?.templates || [], [data.csmTemplates]);
+
+  // useToast hands back a fresh function every render; an effect keyed on it would never settle.
+  const showErrRef = useRef(showErr);
+  showErrRef.current = showErr;
+
+  const m = useMemo(() => ({
+    total: csms.length,
+    strict: csms.filter(c => c.schema_mode === 'strict').length,
+    fields: csms.reduce((n, c) => n + (c.required_fields || 0) + (c.optional_fields || 0), 0),
+    required: csms.reduce((n, c) => n + (c.required_fields || 0), 0),
+    federating: csms.filter(c => c.federate).length,
+  }), [csms]);
+
+  async function showOne(name) {
+    setErr('');
     try {
       const r = await getCsmDetail(name);
-      setDetail(r.data);
-      setView('detail');
-    } catch (e) { setErr(e.message); }
+      setOpen(r.data);
+      setView('one');
+    } catch (e) { showErr(e.message); }
   }
 
-  async function doDelete(name) {
-    const msg = t('dashboard.csmDeleteConfirm').replace('{name}', name);
-    confirm(msg, async () => {
+  function remove(c) {
+    confirm(S('deleteAsk', { name: c.name }), async () => {
       try {
-        await deleteCsm(name);
+        await deleteCsm(c.name);
         setView('list');
-        setDetail(null);
+        setOpen(null);
         reload();
       } catch (e) { showErr(e.message); }
     }, { danger: true });
   }
 
-  async function openCreate() {
+  async function startCreate(withYaml) {
     setErr('');
-    setYaml('');
+    setYaml(withYaml || '');
     setView('create');
-    if (!fileTemplates) {
-      try {
-        const r = await getCsmFileTemplates();
-        setFileTemplates(r.data?.templates || []);
-      } catch (e) { console.warn('Failed to load:', e.message); setFileTemplates([]); }
-    }
+    if (!examples) loadExamples();
   }
 
-  async function loadTemplate(type) {
+  async function takeExample(type) {
     if (!type) return;
     setLoading(true);
     try {
       const text = await getCsmFileTemplate(type);
       setYaml(text);
+      setView('create');
     } catch (e) { setErr(e.message); }
     setLoading(false);
   }
+
+  /** Fetch the shipped examples once. Sets state; an empty list here means the read failed, and
+   *  the toast says so rather than the page pretending the build shipped none. */
+  const loadExamples = useCallback(async () => {
+    try {
+      const r = await getCsmFileTemplates();
+      setExamples(r.data?.templates || []);
+    } catch (e) {
+      showErrRef.current(S('examplesFailed') + ': ' + e.message);
+      setExamples([]);
+    }
+  }, []);
 
   async function doCreate() {
     if (!yaml.trim()) return;
@@ -89,182 +176,308 @@ export default function CsmTab({ data, reload }) {
       setYaml('');
       reload();
     } catch (e) {
-      setErr(e.message || t('dashboard.errorLabel'));
+      setErr(e.message || S('createFailed'));
     }
     setLoading(false);
   }
 
-  async function openPrompt() {
+  async function showPrompt() {
     setErr('');
     setLoading(true);
     try {
       const r = await getCsmBuilderPrompt();
       setPrompt(r.data?.prompt || '');
       setView('prompt');
-    } catch (e) { setErr(e.message); }
+    } catch (e) { showErr(e.message); }
     setLoading(false);
   }
 
-  function backToList() { setView('list'); setDetail(null); setErr(''); }
-
-  // ── Detail view ──
-  if (view === 'detail' && detail) {
-    const def = detail.definition || {};
-    const svc = def.service || {};
-    return html`
-      <div>
-        ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-        <button class="adm-btn-sm" onClick=${backToList}>← ${t('dashboard.back')}</button>
-        <div class="adm-card adm-mt-md">
-          <div class="adm-flex-between">
-            <h4 style="margin:0">${escHtml(detail.name)}</h4>
-            <button class="adm-btn-sm adm-btn-danger" onClick=${() => doDelete(detail.name)}>
-              ${t('dashboard.delete')}
-            </button>
-          </div>
-          ${svc.description && html`<p class="adm-text-base adm-text-dim" style="margin:4px 0 12px">${escHtml(svc.description)}</p>`}
-
-          <div class="adm-text-base" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin:12px 0">
-            <div><strong>${t('dashboard.csmServiceType')}:</strong> ${escHtml(detail.service_type || '—')}</div>
-            <div><strong>${t('dashboard.csmRegisteredBy')}:</strong> ${escHtml(detail.registered_by || '—')}</div>
-            <div><strong>${t('dashboard.created')}:</strong> ${dt(detail.registered_at)}</div>
-            <div><strong>${t('dashboard.updated')}:</strong> ${dt(detail.updated_at)}</div>
-            <div><strong>${t('dashboard.csmFederate')}:</strong> ${detail.federate ? '✓' : '—'}</div>
-            ${detail.json_schema_key && html`<div><strong>${t('dashboard.schema')}:</strong> <code style="font-size:.75rem">${detail.json_schema_key}</code></div>`}
-          </div>
-
-          ${detail.semantic && html`
-            <h5 style="margin:16px 0 4px">${t('dashboard.semantic') || 'Semantic'}</h5>
-            <pre style="background:var(--bg-card);padding:12px;border-radius:6px;overflow:auto;font-size:.75rem">${JSON.stringify(detail.semantic, null, 2)}</pre>
-          `}
-
-          <h5 style="margin:16px 0 4px">${t('dashboard.csmDefinition')}</h5>
-          <pre style="background:var(--bg-card);padding:12px;border-radius:6px;overflow:auto;font-size:.75rem">${JSON.stringify(def, null, 2)}</pre>
-        </div>
-        <${ConfirmUI} />
-      </div>
-    `;
-  }
-
-  // ── AI Prompt view ──
-  if (view === 'prompt') {
-    return html`
-      <div>
-        <button class="adm-btn-sm" onClick=${backToList}>← ${t('dashboard.back')}</button>
-        <div class="adm-card adm-mt-md">
-          <h4 style="margin:0 0 4px">${t('dashboard.csmAiPromptTitle')}</h4>
-          <p class="adm-text-base adm-text-dim" style="margin:0 0 12px">${t('dashboard.csmAiPromptDesc')}</p>
-
-          <div style="position:relative">
-            <pre style="background:var(--bg-deep,#0f172a);padding:16px;border-radius:8px;overflow:auto;font-size:.8rem;max-height:500px;white-space:pre-wrap;line-height:1.5;border:1px solid var(--glass-border,#334155)">${prompt}</pre>
-            <span style="position:absolute;top:8px;right:8px">
-              <${CopyButton} text=${prompt} className="adm-btn"
-                label=${t('common.copy')} copiedLabel=${t('common.copied')} />
-            </span>
-          </div>
-
-          <div class="adm-mt-lg">
-            <${ExpandableHelp} title=${t('dashboard.csmAiPromptHow')}>
-              <ol style="margin:0;padding-left:20px;font-size:.85rem;line-height:1.8">
-                <li>${t('dashboard.csmAiStep1')}</li>
-                <li>${t('dashboard.csmAiStep2')}</li>
-                <li>${t('dashboard.csmAiStep3')}</li>
-                <li>${t('dashboard.csmAiStep4')}</li>
-              </ol>
-            <//>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  // ── Create view ──
-  if (view === 'create') {
-    return html`
-      <div>
-        <button class="adm-btn-sm" onClick=${backToList}>← ${t('dashboard.back')}</button>
-        <div class="adm-card adm-mt-md">
-          <h4 style="margin:0 0 12px">${t('dashboard.csmCreate')}</h4>
-
-          ${fileTemplates && fileTemplates.length > 0 && html`
-            <div class="adm-mb-md">
-              <label class="adm-text-base adm-text-dim" style="display:block;margin-bottom:4px">${t('dashboard.csmCreateFromTemplate')}</label>
-              <select style="width:auto;min-width:200px" onChange=${e => loadTemplate(e.target.value)}>
-                <option value="">${t('dashboard.csmSelectTemplate')}</option>
-                ${fileTemplates.map(ft => html`<option value=${ft.type}>${escHtml(ft.name)} (${ft.type})</option>`)}
-              </select>
-            </div>
-          `}
-
-          <label class="adm-text-base adm-text-dim" style="display:block;margin-bottom:4px">${t('dashboard.csmDefinition')}</label>
-          <textarea
-            rows="16"
-            class="adm-textarea adm-input-full"
-            placeholder=${t('dashboard.csmYamlPlaceholder')}
-            value=${yaml}
-            onInput=${e => setYaml(e.target.value)}
-          />
-
-          ${err && html`<div class="adm-mt-sm"><${ErrorBox} message=${err} /></div>`}
-
-          <div class="adm-flex adm-mt-md">
-            <button class="adm-btn" onClick=${doCreate} disabled=${loading || !yaml.trim()}>
-              ${loading ? '...' : t('dashboard.csmCreate')}
-            </button>
-            <button class="adm-btn-sm" onClick=${backToList}>${t('dashboard.cancel')}</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  // ── List view ──
-  return html`
+  const wrap = (inner) => html`<div class="og adm-csm">
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-    <p class="adm-text-dim" style="margin:0 0 12px">${t('dashboard.csmExplain')}</p>
-    <${ExpandableHelp} title=${t('dashboard.csmHelpTitle')}>
-      ${t('dashboard.csmHelpDetail')}
-    <//>
+    ${inner}
+    <${ConfirmUI} />
+  </div>`;
 
-    <div class="adm-flex adm-mb-md">
-      <button class="adm-btn" onClick=${openCreate}>${t('dashboard.csmAddNew')}</button>
-      <button class="adm-btn-action" onClick=${openPrompt}>${t('dashboard.csmCreateWithAi')}</button>
+  if (view === 'one' && open) {
+    return wrap(html`<${One} csm=${open} onBack=${() => { setView('list'); setOpen(null); }}
+      onDelete=${() => remove(open)} />`);
+  }
+
+  if (view === 'create') {
+    return wrap(html`<${Create} yaml=${yaml} setYaml=${setYaml} examples=${examples}
+      onTake=${takeExample} onCreate=${doCreate} loading=${loading} err=${err}
+      onCancel=${() => { setView('list'); setErr(''); }} />`);
+  }
+
+  if (view === 'prompt') {
+    return wrap(html`<${PromptView} prompt=${prompt} onBack=${() => setView('list')} />`);
+  }
+
+  if (csms.length === 0) {
+    return wrap(html`<${Empty} examples=${examples} loadExamples=${loadExamples}
+      onWrite=${() => startCreate('')} onTake=${takeExample} onPrompt=${showPrompt} />`);
+  }
+
+  return wrap(html`
+    <div class="og-strip">
+      <div><b>${num(m.total)}</b><span>${S('cntAll')}</span><small>${S('cntAllSub')}</small></div>
+      <div><b>${num(m.strict)}</b><span>${S('cntStrict')}</span><small>${S('cntStrictSub', { n: num(m.total - m.strict) })}</small></div>
+      <div><b>${num(m.fields)}</b><span>${S('cntFields')}</span><small>${S('cntFieldsSub', { n: num(m.required) })}</small></div>
+      <div><b>${num(m.federating)}</b><span>${S('cntFederate')}</span><small>${S('cntFederateSub')}</small></div>
     </div>
 
-    ${!templates.length
-      ? html`<${Empty} text=${t('dashboard.noCsmTemplates')} />`
-      : html`
-        <div class="adm-card">
-          <div class="scrollable">
-            <table>
-              <thead><tr>
-                <th>${t('dashboard.name')}</th>
-                <th>${t('dashboard.csmServiceType')}</th>
-                <th>${t('dashboard.csmRegisteredBy')}</th>
-                <th>${t('dashboard.csmFederate')}</th>
-                <th>${t('dashboard.created')}</th>
-                <th></th>
-              </tr></thead>
-              <tbody>
-                ${templates.map(c => html`<tr>
-                  <td><strong>${escHtml(c.name)}</strong></td>
-                  <td class="adm-text-sm adm-text-dim">${escHtml(c.service_type || '—')}</td>
-                  <td class="adm-text-sm">${escHtml(c.registered_by || '—')}</td>
-                  <td>${c.federate ? '✓' : '—'}</td>
-                  <td class="adm-text-dim">${dt(c.registered_at)}</td>
-                  <td style="white-space:nowrap">
-                    <button class="adm-btn-sm" onClick=${() => showDetail(c.name)}>${t('dashboard.details')}</button>
-                    ${' '}
-                    <button class="adm-btn-sm adm-btn-danger" onClick=${() => doDelete(c.name)}>
-                      ${t('dashboard.delete')}
-                    </button>
-                  </td>
-                </tr>`)}
-              </tbody>
-            </table>
+    <section class="og-sec og-sec--first">
+      <div class="og-sec-h">
+        <h2>${S('listTitle')}<small>01</small></h2>
+        <button type="button" class="adm-btn" onClick=${() => startCreate('')}>${S('add')}</button>
+      </div>
+
+      <div class="adm-csm-top">
+        <div>
+          <div class="adm-csm-lbl">${S('heroLabel')}</div>
+          <div class="adm-csm-hero">${S('hero', { n: num(m.total) })}</div>
+          <p class="adm-csm-hero-sub">${S('heroSub')}</p>
+        </div>
+        <div><p class="adm-csm-lead">${S('lead')}</p></div>
+      </div>
+
+      <div class="adm-csm-rows">
+        <div class="adm-csm-hrow">
+          <span>${S('colCsm')}</span><span>${S('colFields')}</span><span>${S('colApplies')}</span>
+          <span>${S('colMode')}</span><span></span>
+        </div>
+        ${csms.map(c => html`
+          <div class="adm-csm-row" key=${c.name}>
+            <span class="adm-csm-name">${c.name}<em>${S('typeIs', { type: c.service_type || '—' })}</em></span>
+            <span class="adm-csm-fields">${S('nRequired', { n: num(c.required_fields || 0) })}
+              <em>${S('nOptional', { n: num(c.optional_fields || 0) })}</em></span>
+            <span class="adm-csm-where">${c.json_schema_key || 'csm.' + c.name}<em>${S('appliesWhy')}</em></span>
+            <span class="adm-csm-mode">
+              <span class="adm-csm-chip ${c.schema_mode === 'strict' ? 'is-strict' : ''}">${c.schema_mode === 'strict' ? S('modeStrict') : S('modeOpen')}</span>
+              ${c.federate && html`<span class="adm-csm-chip is-fed">${S('federates')}</span>`}
+            </span>
+            <span class="adm-csm-doors">
+              <button type="button" class="adm-csm-door" onClick=${() => showOne(c.name)}>${S('openIt')}</button>
+              <button type="button" class="adm-csm-door is-quiet" onClick=${() => remove(c)}>${S('remove')}</button>
+            </span>
+          </div>`)}
+      </div>
+
+      <div class="adm-csm-foot">
+        <span>${S('foot', { n: num(m.total), fields: num(m.fields) })}</span>
+        <span>${S('footRemove')}</span>
+      </div>
+    </section>`);
+}
+
+/* ── Nothing registered: the page has to say what the thing is ───────────────────────────────── */
+
+function Empty({ examples, loadExamples, onWrite, onTake, onPrompt }) {
+  // The shipped examples ARE the page when nothing is registered, so they are fetched on arrival
+  // rather than waiting behind the Add button nobody presses.
+  useEffect(() => { if (!examples) loadExamples(); }, [examples, loadExamples]);
+  const list = examples || [];
+
+  return html`
+    <section class="og-sec og-sec--first adm-csm-page">
+      <div class="og-sec-h"><h2>${S('emptyTitle')}<small>01</small></h2></div>
+
+      <div class="adm-csm-two adm-csm-two--empty">
+        <div>
+          <div class="adm-csm-lbl">${S('emptyLabel')}</div>
+          <div class="adm-csm-hero adm-csm-hero--empty">${S('emptyHero')}</div>
+          <p class="adm-csm-lead">${S('emptyLead1')}</p>
+          <p class="adm-csm-lead">${S('emptyLead2')}</p>
+
+          <div class="adm-csm-refusals">
+            <div class="adm-csm-ref"><b>${S('refMissing')}</b><span>${S('refMissingWhy')}</span></div>
+            <div class="adm-csm-ref"><b>${S('refBounds')}</b><span>${S('refBoundsWhy')}</span></div>
+            <div class="adm-csm-ref"><b>${S('refUnknown')}</b><span>${S('refUnknownWhy')}</span></div>
+          </div>
+
+          <div class="adm-csm-act">
+            <button type="button" class="adm-btn" onClick=${onWrite}>${S('writeOne')}</button>
+            <button type="button" class="adm-csm-door" onClick=${onPrompt}>${S('aiWritesIt')}</button>
+          </div>
+          <p class="adm-csm-hint">${S('aiHint')}</p>
+        </div>
+
+        <div>
+          ${list.length > 0 && html`
+            <div class="adm-csm-starts">
+              <div class="adm-csm-starts-l">${S('shipped', { n: num(list.length) })}</div>
+              <p class="adm-csm-starts-s">${S('shippedWhy')}</p>
+              ${list.map(ex => html`
+                <div class="adm-csm-srow" key=${ex.type}>
+                  <span class="adm-csm-sname">${ex.name}</span>
+                  <button type="button" class="adm-csm-stake" onClick=${() => onTake(ex.type)}>${S('takeIt')}</button>
+                  <span class="adm-csm-swhat">${ex.description}</span>
+                </div>`)}
+            </div>`}
+        </div>
+      </div>
+    </section>`;
+}
+
+/* ── One CSM open ────────────────────────────────────────────────────────────────────────────── */
+
+function One({ csm, onBack, onDelete }) {
+  const [showYaml, setShowYaml] = useState(false);
+  const def = csm.definition || {};
+  const svc = def.service || {};
+  const { required, optional } = fieldsOf(def);
+  const consent = def.consentRequirements || def.consent_requirements || {};
+  const moderation = def.moderation || {};
+  const strict = (def.schemaMode ?? def.schema_mode) === 'strict';
+  const sem = csm.semantic || svc.semantic;
+  const semType = sem?.['@type'];
+
+  const fieldRow = (f) => html`
+    <div class="adm-csm-frow" key=${f.name}>
+      <span class="adm-csm-fname">${f.name}</span>
+      <span class="adm-csm-ftype">${f.kind}</span>
+      <span class="adm-csm-frule ${f.rule ? '' : 'is-none'}">${f.rule || S('noBounds')}</span>
+    </div>`;
+
+  return html`
+    <div class="adm-csm-page">
+      <div class="adm-csm-crumb">
+        <button type="button" onClick=${onBack}>${S('crumb')}</button> · ${csm.name}
+      </div>
+
+      <div class="adm-csm-head">
+        <h2>${csm.name}<i>${svc.version ? 'v' + svc.version + ' · ' : ''}${csm.json_schema_key}</i></h2>
+        <div class="adm-csm-doors">
+          <button type="button" class="adm-csm-door" onClick=${() => setShowYaml(!showYaml)}>
+            ${showYaml ? S('hideDefinition') : S('theDefinition')}
+          </button>
+          <button type="button" class="adm-csm-door is-quiet" onClick=${onDelete}>${S('remove')}</button>
+        </div>
+      </div>
+      ${svc.description && html`<p class="adm-csm-what">${svc.description}</p>`}
+      <p class="adm-csm-applies">${S('appliesTo', { key: csm.json_schema_key })}</p>
+
+      ${showYaml && html`
+        <pre class="adm-csm-yaml">${JSON.stringify(def, null, 2)}</pre>`}
+
+      <div class="adm-csm-two">
+        <div>
+          <div class="adm-csm-fhead">${S('fieldHead')}</div>
+          ${required.length > 0 && html`
+            <div class="adm-csm-grp">${S('groupRequired')}</div>
+            ${required.map(fieldRow)}`}
+          ${optional.length > 0 && html`
+            <div class="adm-csm-grp">${S('groupOptional')}</div>
+            ${optional.map(fieldRow)}`}
+          ${required.length === 0 && optional.length === 0 && html`
+            <p class="adm-csm-hint">${S('noFields')}</p>`}
+        </div>
+
+        <div>
+          <dl class="adm-csm-facts">
+            <div class="adm-csm-fact">
+              <dt>${S('factUnknown')}</dt>
+              <dd><span class="adm-csm-chip ${strict ? 'is-strict' : ''}">${strict ? S('modeStrict') : S('modeOpen')}</span>
+                <em>${strict ? S('factUnknownStrict') : S('factUnknownOpen')}</em></dd>
+            </div>
+            ${consent.consentPurpose && html`
+              <div class="adm-csm-fact">
+                <dt>${S('factFor')}</dt>
+                <dd>${consent.consentPurpose}
+                  ${consent.requiresConsent && html`<em>${S('factForConsent')}</em>`}</dd>
+              </div>`}
+            ${consent.dataRetention && html`
+              <div class="adm-csm-fact"><dt>${S('factKept')}</dt><dd>${SOr('retention.' + consent.dataRetention, consent.dataRetention)}</dd></div>`}
+            ${consent.visibilityDefault && html`
+              <div class="adm-csm-fact">
+                <dt>${S('factSeen')}</dt>
+                <dd>${SOr('visibility.' + consent.visibilityDefault, consent.visibilityDefault)}
+                  <em>${S('factSeenWhy')}</em></dd>
+              </div>`}
+            ${moderation.flagsEnabled && html`
+              <div class="adm-csm-fact">
+                <dt>${S('factFlags')}</dt>
+                <dd>${S('factFlagsOn', { n: num(moderation.autoHideThreshold ?? 0) })}
+                  <em>${moderation.appealsEnabled ? S('factAppealsOn') : S('factAppealsOff')}</em></dd>
+              </div>`}
+            ${semType && html`
+              <div class="adm-csm-fact">
+                <dt>${S('factVocab')}</dt>
+                <dd><code>${semType}</code><em>${S('factVocabWhy')}</em></dd>
+              </div>`}
+            <div class="adm-csm-fact">
+              <dt>${S('factRegistered')}</dt>
+              <dd>${S('factRegisteredBy', { who: csm.registered_by || '—', when: dt(csm.registered_at) })}</dd>
+            </div>
+            ${csm.federate && html`
+              <div class="adm-csm-fact"><dt>${S('factFederate')}</dt><dd>${S('factFederateOn')}</dd></div>`}
+          </dl>
+
+          <div class="adm-csm-warn">
+            <b>${S('warnTitle')}</b>${S('warnBody')}
           </div>
         </div>
-      `}
-    <${ConfirmUI} />
-  `;
+      </div>
+    </div>`;
+}
+
+/* ── Writing one ─────────────────────────────────────────────────────────────────────────────── */
+
+function Create({ yaml, setYaml, examples, onTake, onCreate, loading, err, onCancel }) {
+  return html`
+    <div class="adm-csm-page">
+      <div class="adm-csm-head">
+        <h2>${S('createTitle')}<small>02</small></h2>
+        <button type="button" class="adm-csm-door" onClick=${onCancel}>${t('common.cancel')}</button>
+      </div>
+      <p class="adm-csm-lead">${S('createLead')}</p>
+
+      <div class="adm-csm-two adm-csm-two--create">
+        <div>
+          <div class="adm-csm-lbl">${S('theFile')}</div>
+          <textarea class="adm-csm-editor" rows="22" value=${yaml}
+            placeholder=${S('yamlPlaceholder')}
+            onInput=${e => setYaml(e.target.value)}></textarea>
+          ${err && html`<div class="adm-csm-err"><${ErrorBox} message=${err} /></div>`}
+          <div class="adm-csm-act">
+            <button class="adm-btn" disabled=${loading || !yaml.trim()} onClick=${onCreate}>
+              ${loading ? t('common.loading') : S('registerIt')}
+            </button>
+            <span class="adm-csm-hint">${S('registerHint')}</span>
+          </div>
+        </div>
+
+        <div>
+          ${(examples || []).length > 0 && html`
+            <div class="adm-csm-starts">
+              <div class="adm-csm-starts-l">${S('startFrom')}</div>
+              <p class="adm-csm-starts-s">${S('startFromWhy')}</p>
+              ${examples.map(ex => html`
+                <div class="adm-csm-srow" key=${ex.type}>
+                  <span class="adm-csm-sname">${ex.name}</span>
+                  <button type="button" class="adm-csm-stake" onClick=${() => onTake(ex.type)}>${S('takeIt')}</button>
+                  <span class="adm-csm-swhat">${ex.description}</span>
+                </div>`)}
+            </div>`}
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ── The prompt an owner takes to their own chat ─────────────────────────────────────────────── */
+
+function PromptView({ prompt, onBack }) {
+  return html`
+    <div class="adm-csm-page">
+      <div class="adm-csm-crumb">
+        <button type="button" onClick=${onBack}>${S('crumb')}</button> · ${S('aiWritesIt')}
+      </div>
+      <div class="adm-csm-head">
+        <h2>${S('promptTitle')}</h2>
+        <${CopyButton} text=${prompt} className="adm-btn"
+          label=${t('common.copy')} copiedLabel=${t('common.copied')} />
+      </div>
+      <p class="adm-csm-lead">${S('promptLead')}</p>
+      <pre class="adm-csm-prompt">${prompt}</pre>
+    </div>`;
 }
