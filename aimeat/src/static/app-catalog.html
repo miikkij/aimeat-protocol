@@ -8992,9 +8992,15 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       return sec.querySelector(":scope > h3");
     });
   }
+  var pinned = -1;
+  function resetDetailRail() {
+    pinned = -1;
+  }
   function goToSection(bodyEl, index) {
     var sec = sectionsOf(bodyEl)[index];
     if (!sec) return;
+    pinned = index;
+    markCurrent(bodyEl);
     var top = bodyEl.scrollTop + sec.getBoundingClientRect().top - bodyEl.getBoundingClientRect().top - 24;
     bodyEl.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
   }
@@ -9002,13 +9008,17 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     var rail = document.getElementById("detail-rail");
     if (!rail) return;
     var secs = sectionsOf(bodyEl);
-    var box = bodyEl.getBoundingClientRect();
-    var line = box.top + box.height / 3;
     var current = -1;
-    for (var i = 0; i < secs.length; i++) {
-      if (secs[i].getBoundingClientRect().top <= line) current = i;
+    if (pinned >= 0 && pinned < secs.length) {
+      current = pinned;
+    } else {
+      var box = bodyEl.getBoundingClientRect();
+      var line = box.top + box.height / 3;
+      for (var i = 0; i < secs.length; i++) {
+        if (secs[i].getBoundingClientRect().top <= line) current = i;
+      }
+      if (bodyEl.scrollTop + bodyEl.clientHeight >= bodyEl.scrollHeight - 4 && secs.length) current = secs.length - 1;
     }
-    if (bodyEl.scrollTop + bodyEl.clientHeight >= bodyEl.scrollHeight - 4 && secs.length) current = secs.length - 1;
     var links = rail.querySelectorAll(".dtl-rail-link");
     for (var j = 0; j < links.length; j++) {
       var on = j === current;
@@ -9032,14 +9042,33 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     if (!bodyEl.dataset.railWatch) {
       bodyEl.dataset.railWatch = "1";
       var queued = false;
-      bodyEl.addEventListener("scroll", function() {
+      var remark = function() {
         if (queued) return;
         queued = true;
         requestAnimationFrame(function() {
           queued = false;
           markCurrent(bodyEl);
         });
-      }, { passive: true });
+      };
+      bodyEl.addEventListener("scroll", remark, { passive: true });
+      var release = function() {
+        if (pinned < 0) return;
+        pinned = -1;
+        remark();
+      };
+      bodyEl.addEventListener("wheel", release, { passive: true });
+      bodyEl.addEventListener("touchmove", release, { passive: true });
+      bodyEl.addEventListener("pointerdown", function(e) {
+        if (e.target === bodyEl && e.offsetX >= bodyEl.clientWidth) release();
+      });
+      document.addEventListener("keydown", function(e) {
+        if (pinned < 0 || document.getElementById("detail-view").hidden) return;
+        if (!/^(ArrowUp|ArrowDown|PageUp|PageDown|Home|End| )$/.test(e.key)) return;
+        var el = e.target;
+        if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+        if (e.key === " " && el && /^(BUTTON|A)$/.test(el.tagName)) return;
+        release();
+      });
     }
     markCurrent(bodyEl);
   }
@@ -9153,6 +9182,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     detailCheckpointsHtml = null;
     detailCheckpointBusy = false;
     detailEpoch++;
+    resetDetailRail();
     var app = detailGetApp();
     if (!app) return;
     var wcState = app.publishedFilename && getServerState()[app.publishedFilename] || null;
