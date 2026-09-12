@@ -22,7 +22,7 @@ import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { Section, Fold } from '/views/profile/organisms/poster-parts.js';
 import { formatUntil, scheduleIo, describeDispatch } from '../schedule-item.js';
-import { cronWordsFor } from './cron-words.js';
+import { cronWordsFor, zoneOf } from './cron-words.js';
 import { kindOf, nameOf, dayLabel } from './model.js';
 import { ScheduleEditForm } from './edit-form.js';
 import { renderPage, whoRuns, resultWord, c, hhmm } from './frame.js';
@@ -65,7 +65,10 @@ export function renderDetail(ctx, s) {
   const chips = html`
     <span class=${`og-chip ${s.enabled === false ? 'og-chip--dim' : 'og-chip--sun'}`}>${s.enabled === false ? t('profile.scheduler.paused') : c('status.running')}</span>
     <span class="og-chip">${cronWordsFor(s)}</span>
-    ${s.timezone ? html`<span class="og-chip og-chip--dim sc-chip--mono">${s.timezone}</span>` : null}
+    ${/* The effective zone, so a schedule that never named one still says which clock its hour
+          belongs to. It was `s.timezone` alone, which is null for anything created without the
+          field and left the chip off exactly where it was most needed. */''}
+    ${zoneOf(s) ? html`<span class="og-chip og-chip--dim sc-chip--mono">${zoneOf(s)}</span>` : null}
     <span class="og-chip og-chip--dim sc-chip--mono">${s.cron}</span>
     <span class="og-chip">${whoRuns(s)}</span>
     ${s.createdByAgent ? html`<span class="og-chip og-chip--coral">${t('profile.scheduler.byAgent')}</span>` : null}`;
@@ -115,7 +118,7 @@ export function renderDetail(ctx, s) {
       <//>
       <${Section} id="sc-coming" num="03" title=${c('secComing')}>
         ${coming.length ? html`<div class="sc-agenda sc-agenda--coming">
-          ${coming.map((o, i) => html`<div class="sc-at" key=${'a' + i}>${hhmm(o.at)}<small>${dayLabel(o.at)}</small></div><div class="sc-who" key=${'w' + i}>${s.timezone || ''}</div>`)}
+          ${coming.map((o, i) => html`<div class="sc-at" key=${'a' + i}>${hhmm(o.at)}<small>${dayLabel(o.at)}</small></div><div class="sc-who" key=${'w' + i}>${zoneOf(s)}</div>`)}
         </div>` : html`<p class="og-empty">${s.enabled === false ? t('profile.scheduler.paused') : (s.nextRunAt ? `${dayLabel(new Date(s.nextRunAt))} ${hhmm(new Date(s.nextRunAt))}` : c('noneNext'))}</p>`}
       <//>
       ${s.readOnly ? null : html`<${Fold} id="sc-edit" num="04" title=${t('profile.scheduler.edit')} sub=${c('editSub')} open=${ctx.editOpen} onToggle=${() => ctx.setEditOpen(v => !v)}>

@@ -55,7 +55,12 @@ function dateLabel(d, m) {
  * @param {object} s the schedule record; reads `cron`, `effectiveTimezone`, `timezone`
  */
 export function cronWordsFor(s) {
-  return cronWordsIn(s?.cron, s?.effectiveTimezone || s?.timezone);
+  return cronWordsIn(s?.cron, zoneOf(s));
+}
+
+/** The zone a schedule's hour belongs to: the one its owner chose, or the node's. Always a name. */
+export function zoneOf(s) {
+  return s?.effectiveTimezone || s?.timezone || '';
 }
 
 /**

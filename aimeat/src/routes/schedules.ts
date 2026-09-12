@@ -131,7 +131,12 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
-    res.status(201).json(success(config.nodeId, { schedule: out.schedule }));
+    // The same effective zone the list carries, so a client that renders straight from this answer
+    // — rather than re-reading — does not show an hour belonging to nothing it can name.
+    const created = out.schedule as ScheduledJobRecord;
+    res.status(201).json(success(config.nodeId, {
+      schedule: { ...created, effectiveTimezone: created.timezone || nodeTimeZone() },
+    }));
   }
 
   // Master schedule aggregate — managed jobs + the owner's extension cron jobs + each agent's
