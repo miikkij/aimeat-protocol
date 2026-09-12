@@ -21,6 +21,10 @@
  *   made appeared under "asking to join" with Approve and Refuse beside it, naming this node as the
  *   asker. Found by driving the browser on 2026-09-12.
  * @version-history
+ *   v1.2.0 — 2026-09-12 — aimeat_admin_federation over a real MCP session, held against the HTTP
+ *     door. The tool takes the LIVE peers map through an optional parameter that defaults to an
+ *     empty one, and a tool handed the empty one answers "no peers" — which is what a quiet node
+ *     says, so no gate and no payload could tell the two apart.
  *   v1.1.0 — 2026-09-12 — A sent request is not an arriving one, and does not wait on the operator.
  *   v1.0.0 — 2026-09-12 — Initial, with the Federation page's rebuild.
  */
@@ -214,6 +218,89 @@ await test('A peer with no key is named, because it cannot be switched on at all
     const need = d.needs.find((n: any) => n.kind === 'key');
     assert(d.peers.keyless === 0 ? !need : (!!need && need.count === d.peers.keyless),
         `the need and the count agree: ${d.peers.keyless} vs ${JSON.stringify(need)}`);
+});
+
+/* ── The chat path ──
+ *
+ * THE ONE THING THE STATIC GATES CANNOT SEE. The tool takes the LIVE peers map, the one the
+ * federation routes and the heartbeat job share, and it is an optional parameter of
+ * registerCoreTools with `new Map()` as its default. Nothing in a type check or a schema audit
+ * notices it not being passed: the tool answers, the shape is right, and every count is zero.
+ * "This node has no peers" is exactly the answer a quiet node gives, so the failure is invisible
+ * from the payload.
+ */
+let mcpToken = '';
+let mcpSession = '';
+
+async function mcpRpc(method: string, params: Record<string, unknown> = {}, id = 1) {
+    const res = await fetch(`${BASE}/v1/mcp`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json, text/event-stream',
+            ...(mcpToken ? { Authorization: `Bearer ${mcpToken}` } : {}),
+            ...(mcpSession ? { 'mcp-session-id': mcpSession, 'mcp-protocol-version': '2025-03-26' } : {}),
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+    });
+    const sid = res.headers.get('mcp-session-id');
+    if (sid) mcpSession = sid;
+    const ct = res.headers.get('content-type') ?? '';
+    if (!ct.includes('text/event-stream')) return await res.json() as any;
+    const messages = (await res.text()).split('\n\n').map(evt => {
+        const data = evt.trim().split('\n').filter(l => l.startsWith('data: ')).map(l => l.slice(6)).join('');
+        try { return data ? JSON.parse(data) : null; } catch { return null; }
+    }).filter(Boolean);
+    return messages.find((m: any) => m.id === id) ?? messages[0] ?? {};
+}
+
+await test("The operator's agent reads the same federation over MCP", async () => {
+    const agent = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${opToken}` },
+        body: JSON.stringify({ name: 'fedopagent', owner: opName, capabilities: ['federation'], model: 'gpt-4o' }),
+    });
+    assert(agent.status === 201, `agent: ${agent.status} ${JSON.stringify(agent.body.error ?? '')}`);
+    const gaii = agent.body.data.agent.gaii as string;
+
+    const client = await json('/v1/mcp/register', {
+        method: 'POST',
+        body: JSON.stringify({ client_name: 'Admin Federation E2E', redirect_uris: [] }),
+    });
+    assert(client.status === 201, `mcp register: ${client.status}`);
+
+    const ts = new Date().toISOString();
+    const params = new URLSearchParams({
+        response_type: 'code',
+        client_id: client.body.client_id,
+        gaii,
+        signature: await signMsg(agent.body.data.private_key, gaii + NODE_ID + ts),
+        timestamp: ts,
+    });
+    const auth = await json(`/v1/mcp/authorize?${params}`);
+    assert(typeof auth.body.code === 'string', `authorize: ${JSON.stringify(auth.body)}`);
+    const tok = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({
+            grant_type: 'authorization_code', code: auth.body.code,
+            client_id: client.body.client_id, client_secret: client.body.client_secret,
+        }),
+    });
+    assert(tok.status === 200, `mcp token: ${tok.status}`);
+    mcpToken = tok.body.access_token;
+
+    await mcpRpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'Admin Federation E2E', version: '1.0.0' } });
+    const called = await mcpRpc('tools/call', { name: 'aimeat_admin_federation', arguments: {} }, 2);
+    assert(called?.result?.isError !== true, `tool errored: ${JSON.stringify(called?.result ?? called).slice(0, 300)}`);
+    const payload = JSON.parse(called.result.content[0].text);
+
+    // The HTTP door is the control: the two read the same live map, or the tool was handed an empty one.
+    const overHttp = (await overview()).body.data;
+    assert(payload.peers.total === overHttp.peers.total,
+        `MCP says ${payload.peers.total} peers, the page says ${overHttp.peers.total}`);
+    assert(payload.peers.total > 0, 'and it is not an empty federation, which would prove nothing');
+    assert(payload.standing === overHttp.standing, `the same standing: ${payload.standing} vs ${overHttp.standing}`);
+    assert(payload.roster.length === overHttp.roster.length, 'and the same roster');
 });
 
 await test('The door is operator-only', async () => {
