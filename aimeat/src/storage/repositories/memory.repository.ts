@@ -224,6 +224,19 @@ export interface MemoryRepository {
   /** What is in this owner's bin, newest first. The one read allowed to see it: every other memory
    *  read hides deleted rows, by key and in bulk alike. */
   listDeletedMemory(ownerGaii: string): Promise<MemoryRecord[]>;
+  /**
+   * THE WHOLE BIN, across every owner — the operator's read, newest first.
+   *
+   * A deliberate second method rather than a flag on the bulk reads. Those all funnel through one
+   * archive filter that appends `deletedAt IS NULL` on EVERY branch, which is what keeps the bin out
+   * of ordinary reads and out of any AI-facing material assembly by construction. Teaching that
+   * filter to sometimes show deleted rows would put the whole invariant one boolean away from
+   * failing. So this names `deletedAt` explicitly and stands beside {@link listDeletedMemory},
+   * {@link restoreMemory} and {@link purgeDeletedMemory}, which already do the same.
+   *
+   * Gate it on the operator role at the door. A bin holds other people's records.
+   */
+  listAllDeletedMemory(opts?: { prefix?: string; ownerPrefix?: string; limit?: number; offset?: number }): Promise<{ items: MemoryRecord[]; total: number }>;
   /** The sweeper's hand — everything deleted before `cutoffIso` goes for good. The one call in the
    *  memory path that destroys anything, and what makes "delete" mean delete. */
   purgeDeletedMemory(cutoffIso: string): Promise<number>;

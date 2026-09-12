@@ -275,6 +275,34 @@ await test('16. THE OPERATOR IS RECORDED AS THE DELETER — the field that answe
     assert(!!row.restorable_until, 'the bin row does not say how long is left');
 });
 
+await test('16b. The bin reads across every owner without being told whose record it was', async () => {
+    // The operator who deleted it does not know, and should not have to remember, which namespace
+    // it was in. Without an owner the bin is the whole node's.
+    const { status, body } = await json('/v1/admin/memory?bin=1&limit=200', op());
+    assert(status === 200, `bin without an owner: ${status} ${JSON.stringify(body.error)}`);
+    const row = (body.data.items as any[]).find(i => i.key === `${PREFIX}theirs`);
+    assert(!!row, 'the record deleted from another owner\'s namespace is not in the node-wide bin');
+    assert(row.owner_gaii === plainGhii, `the bin row names the wrong owner: ${row.owner_gaii}`);
+    assert(body.data.bin === true && typeof body.data.total === 'number', 'the bin view does not say what it is');
+});
+
+await test('16c. A deleted record stays out of every ORDINARY read — the invariant the bin must not cost', async () => {
+    // The bin is its own query for this reason: the shared archive filter hides deleted rows on
+    // every branch, and a bin that worked by relaxing that filter would let them back into the
+    // listing, the search and every AI-facing assembly behind them.
+    for (const path of [
+        `/v1/admin/memory?prefix=${enc(PREFIX)}&limit=200`,
+        `/v1/admin/memory?prefix=${enc(PREFIX)}&archived=include&limit=200`,
+        `/v1/admin/memory?prefix=${enc(PREFIX)}&archived=only&limit=200`,
+        `/v1/admin/memory/search?q=plain&prefix=${enc(PREFIX)}&limit=200`,
+        `/v1/admin/memory/search?q=plain&prefix=${enc(PREFIX)}&archived=include&limit=200`,
+    ]) {
+        const { body } = await json(path, op());
+        assert(!(body.data.items as any[]).some(i => i.key === `${PREFIX}theirs`),
+            `a deleted record came back from ${path}`);
+    }
+});
+
 await test('17. …and it has left every ordinary read', async () => {
     const { status } = await json(recPath(plainGhii, `${PREFIX}theirs`), op());
     assert(status === 404, `a deleted record still answers by key: ${status}`);
@@ -298,9 +326,10 @@ await test('19. Restoring something that was never deleted is refused, and says 
         `the refusal does not say what happened: ${body.error?.message}`);
 });
 
-await test('20. The bin without an owner is refused rather than answered empty', async () => {
-    const { status } = await json('/v1/admin/memory?bin=1', op());
-    assert(status === 400, `expected 400 for a bin read with no owner, got ${status}`);
+await test('20. An empty bin answers empty rather than refusing', async () => {
+    const { status, body } = await json(`/v1/admin/memory?bin=1&prefix=${enc(PREFIX)}nothinghere`, op());
+    assert(status === 200, `expected 200 for a bin read that matches nothing, got ${status}`);
+    assert(body.data.total === 0 && (body.data.items as any[]).length === 0, 'an empty bin returned rows');
 });
 
 // ─── Section E: the refusals ───

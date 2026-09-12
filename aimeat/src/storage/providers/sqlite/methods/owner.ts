@@ -492,6 +492,23 @@ export const ownerMethods = {
     return rows.map(r => this.deserializeMemory(r));
   },
 
+  /** The whole bin, across every owner — the operator's read. Names `deletedAt` itself rather than
+   *  going through archivedSql, which hides the bin on every branch and must keep doing so. */
+  async listAllDeletedMemory(this: SqliteStorage, opts?: { prefix?: string; ownerPrefix?: string; limit?: number; offset?: number }): Promise<{ items: MemoryRecord[]; total: number }> {
+    let where = ' WHERE deletedAt IS NOT NULL';
+    const params: unknown[] = [];
+    if (opts?.ownerPrefix) { where += ' AND ownerGaii LIKE ?'; params.push(opts.ownerPrefix + '%'); }
+    if (opts?.prefix) { where += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
+
+    const { cnt } = this.db.prepare('SELECT COUNT(*) AS cnt FROM memory' + where).get(...params) as { cnt: number };
+    const offset = opts?.offset ?? 0;
+    const rows = (opts?.limit
+      ? this.db.prepare('SELECT * FROM memory' + where + ' ORDER BY deletedAt DESC LIMIT ? OFFSET ?').all(...params, opts.limit, offset)
+      : this.db.prepare('SELECT * FROM memory' + where + ' ORDER BY deletedAt DESC').all(...params)
+    ) as Array<Record<string, unknown>>;
+    return { items: rows.map(r => this.deserializeMemory(r)), total: cnt };
+  },
+
   /** The sweeper's hand. Everything deleted before `cutoff` goes for good — this is the call that
    *  makes "delete" mean delete, and the only one in the memory path that destroys anything. */
   async purgeDeletedMemory(this: SqliteStorage, cutoffIso: string): Promise<number> {

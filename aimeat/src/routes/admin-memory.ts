@@ -168,17 +168,21 @@ export function adminMemoryRouter(
         const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
         const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
 
-        // The bin is its own read in storage and stays its own view here: every other memory read
-        // hides deleted rows on purpose, and it is per-owner because that is the primitive there is.
+        // The bin is its own read, here as in storage: every other memory read hides deleted rows on
+        // purpose, through one filter that appends `deletedAt IS NULL` on every branch, and teaching
+        // that filter to sometimes show them would put the whole invariant one boolean from failing.
+        // So this calls the method that names `deletedAt` itself — across every owner, because the
+        // question an operator has after a delete is "where did it go", not "whose was it".
         if (req.query.bin === '1' || req.query.bin === 'true') {
-            if (!owner) {
-                res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'The bin is read one owner at a time: pass ?owner='));
-                return;
-            }
             const graceMs = config.memoryDeleteGraceDays * 86_400_000;
-            const rows = await storage.listDeletedMemory(owner);
+            const binned = await storage.listAllDeletedMemory({
+                ownerPrefix: owner || undefined,
+                prefix: (req.query.prefix as string) || undefined,
+                limit,
+                offset,
+            });
             res.json(success(config.nodeId, {
-                items: rows.map(r => ({
+                items: binned.items.map(r => ({
                     key: r.key,
                     owner_gaii: r.ownerGaii,
                     visibility: r.visibility,
@@ -190,7 +194,9 @@ export function adminMemoryRouter(
                         ? new Date(new Date(r.deletedAt).getTime() + graceMs).toISOString()
                         : null,
                 })),
-                total: rows.length,
+                total: binned.total,
+                limit,
+                offset,
                 grace_days: config.memoryDeleteGraceDays,
                 bin: true,
             }));
