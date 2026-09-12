@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.47.0 -- 2026-09-12 -- Add e2e-admin-realtime-page.ts to ALL_SUITES: the overview the Realtime
+ *            page reads, and the switched-off answer that used to be a 503 the dashboard could not
+ *            tell from a quiet node. Not in the guard tier yet.
  *   v1.46.0 -- 2026-09-12 -- Add e2e-admin-work-page.ts to ALL_SUITES: the shape of a row in
  *            GET /v1/admin/work, which was only ever asserted on an empty node, and the escrow
  *            inside its cost object. Not in the guard tier yet.
@@ -572,6 +575,9 @@ const ALL_SUITES = [
     // The one read the Work page is folded from: the shape of a row, which nothing has ever held,
     // and the escrow inside cost that "morsels held" sums.
     'test/e2e-admin-work-page.ts',
+    // The one read the Realtime page is folded from: all eight counters, the documents living per
+    // room rather than under a key nothing sends, and the switched-off answer on a node of its own.
+    'test/e2e-admin-realtime-page.ts',
     // The one read the Owners page is folded from: the field set every figure, chip and filter is
     // counted from, and the two lifecycle writes moving the two fields the page draws.
     'test/e2e-admin-owners-page.ts',

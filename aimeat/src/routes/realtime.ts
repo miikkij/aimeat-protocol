@@ -12,6 +12,10 @@
  *   - additional room listing/lookup routes over realtimeManager
  *
  * @version-history
+ *   v1.1.0 — 2026-09-12 — GET /v1/admin/realtime answers 200 with `enabled: false` when realtime is
+ *     switched off, instead of refusing with 503 (the admin page could not tell "off" from "quiet"),
+ *     and carries the three readings its numbers need: uptime_seconds (the window the in-memory
+ *     counters cover), room_idle_timeout_ms and ws_url.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -318,9 +322,20 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
   });
 
   // GET /v1/admin/realtime — full realtime overview for admin dashboard (operator only)
+  //
+  // SWITCHED OFF IS AN ANSWER, NOT A FAILURE. This one route used to refuse with 503 when realtime
+  // was disabled; the dashboard stores a rejected read as null, and the page then drew exactly what
+  // it draws when nobody happens to be connected. An operator could not tell a node with the
+  // feature turned off from a quiet one, so the switch is reported as a fact instead. Every
+  // WRITE route in this file keeps its 503: refusing to act is not the same as refusing to say.
   router.get('/v1/admin/realtime', requireAuth(), requireRole('operator'), (_req, res) => {
     if (!config.realtimeEnabled) {
-      res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Realtime is disabled on this node'));
+      res.json(success(config.nodeId, {
+        enabled: false,
+        stats: null,
+        rooms: [],
+        total: 0,
+      }));
       return;
     }
 
@@ -348,7 +363,20 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
       last_activity_at: r.lastActivityAt.toISOString(),
     }));
 
-    res.json(success(config.nodeId, { stats, rooms, total: rooms.length }));
+    // The three that turn a number into a reading. Every counter above is held in memory and starts
+    // at zero on a restart, so `uptime_seconds` is the window they cover and without it they are
+    // read as all-time totals. `room_idle_timeout_ms` is the real setting rather than the number a
+    // page would otherwise print from memory, and `ws_url` is the address a browser actually opens,
+    // which is what makes "nothing has ever connected" something an operator can go and check.
+    res.json(success(config.nodeId, {
+      enabled: true,
+      stats,
+      rooms,
+      total: rooms.length,
+      uptime_seconds: Math.floor(process.uptime()),
+      room_idle_timeout_ms: config.realtimeRoomIdleTimeoutMs,
+      ws_url: `${config.baseUrl.replace(/^http/, 'ws')}/v1/realtime/ws`,
+    }));
   });
 
   return router;

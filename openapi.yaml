@@ -54678,7 +54678,15 @@ paths:
       summary: Realtime overview
       description: |
         Operator only. Returns realtime stats plus all active rooms with their peers and Yjs docs.
-        Returns 503 when realtime is disabled on this node.
+
+        `enabled` is false when realtime is switched off on this node (AIMEAT_REALTIME_ENABLED=false),
+        and then `stats` is null and `rooms` is empty. This read answers 200 either way: the write
+        routes in this file refuse with 503 when the feature is off, but an operator overview that
+        refuses cannot say whether a node is quiet or switched off, and both drew as zeros.
+
+        `stats` holds eight in-memory counters that start at zero on every restart, so
+        `uptime_seconds` is the window they cover. A room's documents are in its own `yjs_docs`;
+        there is no node-wide document list. `ws_url` is the address a browser opens to join a room.
       security:
         - BearerAuth: []
       responses:
@@ -54694,7 +54702,24 @@ paths:
                       data:
                         type: object
                         properties:
-                          stats: { type: object }
+                          enabled:
+                            type: boolean
+                            description: Whether realtime is switched on. False leaves stats null and rooms empty.
+                          stats:
+                            type: object
+                            nullable: true
+                            description: In-memory counters since the last restart; null when realtime is off.
+                            properties:
+                              rooms: { type: integer, description: Rooms open right now. }
+                              peers: { type: integer, description: People connected right now. }
+                              messagesIn: { type: integer }
+                              messagesOut: { type: integer }
+                              messagesRejected:
+                                type: integer
+                                description: Messages the node would not pass on — over the size cap, over the rate limit, or from a peer not in the room.
+                              roomsCreated: { type: integer }
+                              roomsClosed: { type: integer }
+                              peakConcurrentPeers: { type: integer, description: The most people connected at once since the restart. }
                           rooms:
                             type: array
                             items:
@@ -54712,20 +54737,36 @@ paths:
                                 peer_count: { type: integer }
                                 peers:
                                   type: array
-                                  items: { type: object }
+                                  items:
+                                    type: object
+                                    properties:
+                                      peer_id: { type: string }
+                                      nick:
+                                        type: string
+                                        description: What the peer called itself when it joined. Not an account — the socket asks nobody who they are.
+                                      joined_at: { type: string }
                                 yjs_docs:
                                   type: array
-                                  items: { type: object }
+                                  description: The shared documents of THIS room. Documents are per room; there is no node-wide list.
+                                  items:
+                                    type: object
+                                    properties:
+                                      doc_id: { type: string }
+                                      snapshot_size: { type: integer, description: Bytes this document takes in memory right now. }
                                 created_at: { type: string }
                                 last_activity_at: { type: string }
                           total: { type: integer }
+                          uptime_seconds:
+                            type: integer
+                            description: How long this node has been up, which is the window every counter in stats covers.
+                          room_idle_timeout_ms:
+                            type: integer
+                            description: How long a room with nobody in it is kept before the reaper closes it.
+                          ws_url:
+                            type: string
+                            description: The WebSocket address a browser opens to join a room.
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '503':
-          description: Realtime disabled on this node
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
   /v1/admin/work:
     get:
       operationId: getAdminWork

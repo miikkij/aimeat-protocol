@@ -9,6 +9,11 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.15.0 — 2026-09-12 — Mounts the realtime router whether or not realtime is enabled, so the
+ *     refusal at the top of its ten routes is what a caller gets (503 FEATURE_DISABLED) instead of
+ *     a 404 from the fallthrough. The manager returned to the WebSocket upgrade handler is still
+ *     null when the feature is off, so a disabled node opens no socket. The decision moved to
+ *     realtime-mount.ts by pure extraction: it no longer fits under the 800-line ceiling here.
  *   v1.14.0 — 2026-09-12 — Mounts statsMiddleware, written 2026-07 and never wired to anything.
  *   v1.13.0 — 2026-09-08 — Mounts the admin CORS router (GET /v1/admin/cors/overview).
  *   v1.12.0 — 2026-09-06 — Mounts the secrets router (/v1/secrets: the owner's credential vault).
@@ -42,7 +47,7 @@ import type { PeerInfo } from '../services/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import type { DirectoryService } from '../services/directory.js';
 import type { TunnelManager } from '../services/personal-tunnel.js';
-import { RealtimeManager } from '../services/realtime-manager.js';
+import type { RealtimeManager } from '../services/realtime-manager.js';
 import type { MailboxNotificationService } from '../services/mailbox-notification.js';
 import type { Scheduler } from '../services/scheduler.js';
 import type { WorkflowEngine } from '../services/workflow/engine.js';
@@ -161,7 +166,7 @@ import { samlLoginRouter } from '../routes/saml-login.js';
 import { buildOidcProviders } from '../services/oidc-providers.js';
 import { knowledgeRouter } from '../routes/knowledge.js';
 import { siteRouter } from '../routes/site.js';
-import { realtimeRouter } from '../routes/realtime.js';
+import { mountRealtime } from './realtime-mount.js';
 import { sseRouter } from '../routes/sse.js';
 import { presenceRouter } from '../routes/presence.js';
 import { adminFeaturesRouter } from '../routes/admin-features.js';
@@ -786,14 +791,7 @@ export async function mountRoutes(
     app.use(personalRouter(config, storage, tunnelManager, mailboxNotificationService));
   }
 
-  // Realtime P2P rooms — Phase 0
-  let realtimeManager: RealtimeManager | null = null;
-  if (config.realtimeEnabled) {
-    realtimeManager = new RealtimeManager(config, storage);
-    app.use(realtimeRouter(config, storage, realtimeManager, peers));
-    realtimeManager.startCleanupJob();
-    logger.info('Realtime P2P rooms enabled', { maxRooms: config.realtimeMaxRooms });
-  }
-
-  return { realtimeManager };
+  // Realtime P2P rooms — Phase 0. The router is mounted either way and the manager comes back null
+  // when the feature is off; realtime-mount.ts says why both halves are like that.
+  return { realtimeManager: mountRealtime(app, config, storage, peers) };
 }
