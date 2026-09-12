@@ -62,7 +62,7 @@ import MessagesAdminTab from './admin/messages-tab.js';
 import EmailTab        from './admin/email-tab.js';
 import PushTab         from './admin/push-tab.js';
 import DirectoryTab    from './admin/directory-tab.js';
-import ServicesTab     from './admin/services-tab.js';
+import ExtensionsTab   from './admin/extensions-tab.js';
 import CortexTab       from './admin/cortex-tab.js';
 import CsmTab          from './admin/csm-tab.js';
 import MsmTab          from './admin/msm-tab.js';
@@ -84,6 +84,9 @@ import SkillsAdminTab      from './admin/skills-tab.js';
 import { swallowed } from '/js/swallowed.js';
 
 // ── Sidebar nav structure ──
+/** Old tab words that still have to work in a saved link, mapped to the page they became. */
+const TAB_ALIASES = { services: 'extensions' };
+
 const NAV_GROUPS = [
   { key: 'dashboard.navNode', items: [
     { id: 'overview',     key: 'dashboard.overview',   component: OverviewTab },
@@ -132,7 +135,7 @@ const NAV_GROUPS = [
   ]},
   { key: 'dashboard.navServices', items: [
     { id: 'directory',   key: 'dashboard.directory',      component: DirectoryTab },
-    { id: 'services',    key: 'dashboard.services',       component: ServicesTab },
+    { id: 'extensions',  key: 'dashboard.extensionsTab',  component: ExtensionsTab },
     { id: 'cortex',      key: 'dashboard.cortexTab',      component: CortexTab },
     { id: 'csm',         key: 'dashboard.csmManagement',  component: CsmTab },
     { id: 'knowledge',   key: 'knowledge.operator.tabLabel', component: KnowledgeAdminTab },
@@ -181,10 +184,12 @@ export default function Admin({ navigate, locale }) {
     });
   }, []);
 
-  // URL tab param
+  // URL tab param. A renamed tab keeps its old word here, so a link somebody saved or wrote into a
+  // note still lands on the page: ?tab=services is the Extensions page.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const tab = params.get('tab');
+    const asked = params.get('tab');
+    const tab = TAB_ALIASES[asked] || asked;
     if (tab) {
       const flat = NAV_GROUPS.flatMap(g => g.items);
       if (flat.some(i => i.id === tab)) setActivePage(tab);

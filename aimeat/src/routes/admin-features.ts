@@ -12,6 +12,9 @@
  *   - Route groups: GHII users, notification templates, directory, push, genesis peering
  *
  * @version-history
+ *   v1.3.0 — 2026-09-12 — GET /v1/admin/csm carries each CSM's description, schema mode and field
+ *     counts. They sit in the definition the record already holds, and without them a list row
+ *     could not say how hard a CSM bites or over how many fields.
  *   v1.2.0 — 2026-09-09 — GET /v1/admin/marketplace deleted: it read a table nothing writes and
  *     answered total 0 on every node, and the admin view fetched it without rendering it.
  *   v1.1.0 — 2026-09-08 — The GHII CORS write goes through services/cors-overview.ts (setCorsList),
@@ -35,6 +38,7 @@ import type { GenesisPeeringService } from '../services/genesis-peering.js';
 import { TEMPLATE_IDS, SUPPORTED_LOCALES, getDefaultTemplate, seedDefaultTemplates } from '../services/notification-templates.js';
 import type { TemplateId } from '../services/notification-templates.js';
 import { LOCALES } from '../i18n.js';
+import { msmHosts, msmActionIds } from '../services/msm-parser.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -527,14 +531,29 @@ export function adminFeaturesRouter(
     router.get('/v1/admin/csm', ...auth, handle(async (_req, res) => {
         const csms = await storage.listCsms();
         res.json(success(config.nodeId, {
-            templates: csms.map(c => ({
-                name: c.name,
-                service_type: c.serviceType,
-                registered_by: c.registeredBy,
-                registered_at: c.registeredAt,
-                updated_at: c.updatedAt,
-                federate: c.federate ?? false,
-            })),
+            templates: csms.map(c => {
+                // The two questions a row has to answer — how hard does this bite, and over how
+                // many fields — are in the definition the record already carries. Reading them
+                // here is what saves the page a second call per row to answer them.
+                const def = c.definition as {
+                    schemaMode?: string;
+                    dataSchema?: { required?: Record<string, unknown>; optional?: Record<string, unknown> };
+                    service?: { description?: string };
+                };
+                return {
+                    name: c.name,
+                    service_type: c.serviceType,
+                    registered_by: c.registeredBy,
+                    registered_at: c.registeredAt,
+                    updated_at: c.updatedAt,
+                    federate: c.federate ?? false,
+                    description: def?.service?.description ?? '',
+                    schema_mode: def?.schemaMode ?? 'open',
+                    json_schema_key: c.jsonSchemaKey,
+                    required_fields: Object.keys(def?.dataSchema?.required ?? {}).length,
+                    optional_fields: Object.keys(def?.dataSchema?.optional ?? {}).length,
+                };
+            }),
             total: csms.length,
         }));
     }));
@@ -576,19 +595,32 @@ export function adminFeaturesRouter(
 
     // ── MSM Integrations ────────────────────────────────────
 
+    // The operator's listing carries WHERE each manifest points and WHAT it offers, which the
+    // record already holds: `listMsms()` reads the whole definition and the answer used to throw it
+    // away, so five manifests describing one RSS feed read as five separate integrations. Both are
+    // derived from the definition in memory, so this costs no extra read.
     router.get('/v1/admin/msm', ...auth, handle(async (_req, res) => {
         const msms = await storage.listMsms();
         res.json(success(config.nodeId, {
-            integrations: msms.map(m => ({
-                name: m.name,
-                category: m.category,
-                auth_type: m.authType,
-                actions_count: m.actionsCount,
-                registered_by: m.registeredBy,
-                registered_at: m.registeredAt,
-                updated_at: m.updatedAt,
-                federate: m.federate ?? false,
-            })),
+            integrations: msms.map(m => {
+                const service = (m.definition as Record<string, unknown>)?.service;
+                const description = service && typeof service === 'object'
+                    ? (service as Record<string, unknown>).description
+                    : undefined;
+                return {
+                    name: m.name,
+                    description: typeof description === 'string' ? description : '',
+                    category: m.category,
+                    auth_type: m.authType,
+                    actions_count: m.actionsCount,
+                    actions: msmActionIds(m.definition),
+                    hosts: msmHosts(m.definition),
+                    registered_by: m.registeredBy,
+                    registered_at: m.registeredAt,
+                    updated_at: m.updatedAt,
+                    federate: m.federate ?? false,
+                };
+            }),
             total: msms.length,
         }));
     }));

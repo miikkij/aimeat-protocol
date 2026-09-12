@@ -39,6 +39,16 @@ export interface BoardRepository {
   listReplies(boardId: string, postId: string): Promise<BoardPostRecord[]>;
   /** How many replies each of `postIds` has, for a listing that says "5 replies" without loading them. */
   replyCounts(boardId: string, postIds: string[]): Promise<Record<string, number>>;
+  /**
+   * How many live notices each of `boardIds` carries, and when the newest one was written — one
+   * grouped query for a whole listing. Counts what a reader would see: top-level posts only, and
+   * not the expired ones. A board with nothing gets no entry, so the caller reads zero from its
+   * own default rather than from a row that says so.
+   *
+   * Without this, a page listing boards has to fetch each board's posts to say whether anyone has
+   * ever used it, which on an installation with 57 boards is 57 requests for one column.
+   */
+  boardPostCounts(boardIds: string[]): Promise<Record<string, { posts: number; lastAt: string }>>;
   /** Posts published, thanks received and first-post date for each of `gaiis`, one grouped query. */
   boardAuthorStanding(gaiis: string[]): Promise<Record<string, BoardAuthorStanding>>;
   deletePost(boardId: string, postId: string): Promise<boolean>;

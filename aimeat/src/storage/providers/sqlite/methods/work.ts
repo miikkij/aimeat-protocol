@@ -450,6 +450,23 @@ export const workMethods = {
     return out;
   },
 
+  async boardPostCounts(this: SqliteStorage, boardIds: string[]): Promise<Record<string, { posts: number; lastAt: string }>> {
+    // The same "live top-level notice" the reader's listPosts sees: replies excluded, expired rows
+    // excluded. ISO-8601 compares as text, so the expiry test is a plain comparison and MAX() gives
+    // the newest write without loading a post.
+    const out: Record<string, { posts: number; lastAt: string }> = {};
+    if (boardIds.length === 0) return out;
+    const marks = boardIds.map(() => '?').join(', ');
+    const rows = this.db.prepare(
+      `SELECT boardId, COUNT(*) AS n, MAX(createdAt) AS lastAt
+         FROM board_posts
+        WHERE boardId IN (${marks}) AND replyTo IS NULL AND (ttlExpiresAt IS NULL OR ttlExpiresAt > ?)
+        GROUP BY boardId`,
+    ).all(...boardIds, new Date().toISOString()) as Array<{ boardId: string; n: number; lastAt: string | null }>;
+    for (const r of rows) out[r.boardId] = { posts: Number(r.n), lastAt: r.lastAt ?? '' };
+    return out;
+  },
+
   async updatePostExpiry(this: SqliteStorage, boardId: string, postId: string, ttlExpiresAt: string): Promise<boolean> {
     const result = this.db.prepare('UPDATE board_posts SET ttlExpiresAt = ? WHERE boardId = ? AND id = ?').run(ttlExpiresAt, boardId, postId);
     return result.changes > 0;

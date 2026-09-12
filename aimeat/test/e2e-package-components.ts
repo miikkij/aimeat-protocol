@@ -369,6 +369,41 @@ await test('E2. removeComponents=true takes the msm and every memory key with it
     assert(gone.status === 404, `and the instance itself: ${gone.status}`);
 });
 
+// ── Part E2: the counts the admin page reads ─────────────────────────────────
+console.log('\nPart E2 — the list routes carry a total');
+
+// The Packages page shows how many packages, instances and listings there are. It used to count
+// the array it had fetched with limit: 50, so past fifty of anything every headline number on the
+// page, and the count in the rail beside it, was silently wrong. It reads `total` now, and these
+// three assertions are what keep that field in the responses.
+await test('E3. GET /v1/packages carries a total beside the array', async () => {
+    const r = await json('/v1/packages?limit=1', { headers: authH(A.token) });
+    assert(r.status === 200, `status ${r.status}`);
+    assert(Array.isArray(r.body.data?.packages), 'packages is an array');
+    assert(typeof r.body.data?.total === 'number', `total is ${typeof r.body.data?.total}`);
+    assert(r.body.data.total >= r.body.data.packages.length, `total ${r.body.data.total} < page ${r.body.data.packages.length}`);
+});
+
+await test('E4. GET /v1/instances carries a total beside the array', async () => {
+    const r = await json('/v1/instances?limit=1', { headers: authH(A.token) });
+    assert(r.status === 200, `status ${r.status}`);
+    assert(Array.isArray(r.body.data?.instances), 'instances is an array');
+    assert(typeof r.body.data?.total === 'number', `total is ${typeof r.body.data?.total}`);
+});
+
+await test('E5. GET /v1/templates carries a total, and every listing it returns is `listed`', async () => {
+    const r = await json('/v1/templates?limit=5');
+    assert(r.status === 200, `status ${r.status}`);
+    const rows = r.body.data?.listings ?? r.body.data?.templates ?? [];
+    assert(Array.isArray(rows), 'listings is an array');
+    assert(typeof r.body.data?.total === 'number', `total is ${typeof r.body.data?.total}`);
+    // The gallery route pins status to 'listed'. The admin page counts "in the store" with that
+    // word; the card-face page counted approved|published|active, which no listing has ever been,
+    // so its published-templates section was empty on every node.
+    const wrong = rows.filter((x: { status?: string }) => x.status !== 'listed').map((x: { status?: string }) => x.status);
+    assert(wrong.length === 0, `the gallery returned listings that are not listed: ${JSON.stringify(wrong)}`);
+});
+
 // ── Part F: refusals ─────────────────────────────────────────────────────────
 console.log('\nPart F — refusals');
 

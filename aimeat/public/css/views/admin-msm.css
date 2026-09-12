@@ -1,0 +1,127 @@
+/* ── Admin MSM page, in the poster face ──
+ * @file admin-msm.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's page for the machine service manifests this site keeps (design canvas
+ *   "MSM Management Page", direction A): what is registered and where each one points, which of
+ *   them describe the same thing, the ten ready-made ones, one manifest opened with its actions,
+ *   and the screen for writing a new one. The frame, the sections, the metric rows, the numeral
+ *   strip and the badges come from admin.css and organism.css; only what this page adds lives here.
+ *   Every value is a theme.css token, so the page flips with the theme.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial.
+ */
+
+.adm-msm-intro { margin: 0 0 .9rem; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 88ch; }
+.adm-msm-lead { margin: 0 0 14px; font-size: .88rem; line-height: 1.55; color: var(--text-dim); max-width: 80ch; }
+.adm-msm-note { margin: 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-msm .adm-mrow--last { border-bottom: 0; }
+.adm-msm .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+
+/* ── search ── */
+.adm-msm-tools { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; padding: 2px 0 10px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.adm-msm-find { flex: 1; min-width: 260px; display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 2px 2px 4px; }
+.adm-msm-find:focus-within { border-bottom-color: var(--accent); }
+.adm-msm-find svg { width: 16px; height: 16px; flex: none; stroke: var(--text); fill: none; stroke-width: 2.5; stroke-linecap: square; }
+.adm .adm-msm-find input[type="text"] { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .92rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-msm-find input[type="text"]::placeholder { color: var(--text-dim); font-weight: 600; }
+
+/* ── the table: one row is one manifest ── */
+.adm-msm-scroll { overflow-x: auto; }
+.adm .adm-msm-tbl { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.adm .adm-msm-tbl th {
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .72rem;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim);
+  text-align: left; padding: 0 12px 7px 0; border-bottom: 2px solid var(--text); white-space: nowrap;
+}
+.adm .adm-msm-tbl th.r { text-align: right; }
+.adm .adm-msm-tbl td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text); }
+.adm .adm-msm-tbl td.r { text-align: right; font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
+.adm-msm-name { display: block; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.adm-msm-name button { background: none; border: 0; padding: 0; font: inherit; color: var(--text); cursor: pointer; text-align: left; }
+.adm-msm-name button:hover { color: var(--accent); }
+.adm-msm-chips { display: inline-flex; gap: 5px; margin-left: 7px; flex-wrap: wrap; vertical-align: middle; }
+.adm-msm-sub { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: 3px; line-height: 1.55; overflow-wrap: anywhere; }
+.adm-msm-acts { display: flex; gap: 12px; align-items: center; justify-content: flex-end; white-space: nowrap; }
+
+/* ── the sets that describe the same thing ── */
+.adm-msm-set { padding: .85rem 0; border-bottom: 1px solid var(--border); }
+.adm-msm-set--last { border-bottom: 0; }
+.adm-msm-seth { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.adm-msm-seth > b { font-weight: 700; font-size: .95rem; }
+.adm-msm-seth > .adm-mval { font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); }
+.adm-msm-setacts { margin-left: auto; display: flex; gap: 14px; align-items: baseline; }
+.adm-msm-setnames { display: block; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); margin-top: 6px; line-height: 1.6; overflow-wrap: anywhere; }
+.adm-msm-setwhy { display: block; font-size: .78rem; line-height: 1.5; color: var(--text-dim); margin-top: 4px; max-width: 88ch; }
+.adm-msm-open { margin-top: 10px; padding-left: 14px; border-left: 2px solid var(--border); }
+
+/* ── the ready-made ones ── */
+.adm-msm-tpls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 34px; }
+.adm-msm-tpl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 16px; align-items: baseline; padding: .7rem 0; border-bottom: 1px solid var(--border); }
+.adm-msm-tpl b { font-weight: 700; font-size: .9rem; }
+.adm-msm-tpl .adm-why { margin-top: 3px; }
+
+/* ── what happens when you save ── */
+.adm-msm-step { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 0 19px; align-items: baseline; padding: .7rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text); }
+.adm-msm-step--last { border-bottom: 0; }
+.adm-msm-step b { font-weight: 700; }
+.adm-msm-stepn { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.5rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); color: var(--accent); }
+
+/* ── one manifest opened ── */
+.adm-msm-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
+.adm-msm-head h2 { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 2.2rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); text-transform: none; color: var(--text); overflow-wrap: anywhere; }
+.adm-msm-desc { margin: 12px 0 0; font-size: .95rem; line-height: 1.6; max-width: 88ch; }
+.adm-msm-meta { margin: 10px 0 22px; font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); line-height: 1.6; overflow-wrap: anywhere; }
+.adm-msm-krow { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 0 22px; align-items: baseline; padding: .65rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+.adm-msm-krow--last { border-bottom: 0; }
+.adm-msm-krow--wide { grid-template-columns: 250px minmax(0, 1fr); padding: .8rem 0; }
+.adm-msm-k { font-family: var(--font-mono); font-size: .7rem; text-transform: uppercase; color: var(--text-dim); }
+.adm-msm-act { border-top: 2px solid var(--text); padding: .9rem 0 1rem; }
+.adm-msm-acth { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.adm-msm-acth b { font-weight: 700; font-size: 1rem; }
+.adm-msm-verb { font-family: var(--font-mono); font-size: .7rem; font-weight: 500; color: var(--accent); text-transform: uppercase; }
+.adm-msm-actid { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); margin-left: auto; }
+.adm-msm-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 34px; margin-top: 12px; }
+.adm-msm-flab { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .75rem; letter-spacing: .05em; text-transform: uppercase; color: var(--text-dim); margin: 0 0 6px; }
+.adm-msm-f { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 14px; align-items: baseline; padding: .35rem 0; border-bottom: 1px solid var(--border); font-size: .84rem; }
+.adm-msm-f--last { border-bottom: 0; }
+.adm-msm-f em { font-style: normal; font-family: var(--font-mono); font-weight: 500; overflow-wrap: anywhere; }
+.adm-msm-f .adm-msm-req { color: var(--accent); font-family: var(--font-body); font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; }
+.adm-msm-f .adm-msm-type { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.adm-msm-code { font-family: var(--font-mono); font-size: .78rem; background: var(--bg-surface); padding: 1px 6px; overflow-wrap: anywhere; }
+.adm-msm-doers { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; padding: 18px 0 4px; }
+
+/* ── writing a new one ── */
+.adm-msm-field { display: block; margin-top: 14px; }
+.adm-msm-field > span { display: block; font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.adm .adm-msm-yaml {
+  width: 100%; box-sizing: border-box; background: var(--card-bg); border: 2px solid var(--text); border-radius: 0;
+  padding: 14px 16px; font-family: var(--font-mono); font-size: .78rem; line-height: 1.7; color: var(--text);
+  outline: none; resize: vertical; min-height: 320px;
+}
+.adm .adm-msm-yaml:focus { border-color: var(--accent); }
+.adm-msm-pick { display: flex; align-items: center; gap: 12px; margin-top: 16px; font-size: .9rem; cursor: pointer; }
+.adm-msm-dialog-acts { display: flex; gap: 16px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+
+@media (max-width: 1100px) {
+  .adm-msm-tpls { grid-template-columns: minmax(0, 1fr); }
+  .adm-msm-fields { grid-template-columns: minmax(0, 1fr); gap: 14px 0; }
+  /* The table stacks well before a phone width: the content column is about 290px narrower than
+     the window because of the fixed sidebar, so between 769 and roughly 1000px a table scrolls
+     sideways inside its own box with the row actions off the right edge, and the page reports no
+     overflow at all. Measured in a browser on the Cortex page, which had the same rule. */
+  .adm .adm-msm-tbl thead { display: none; }
+  .adm .adm-msm-tbl, .adm .adm-msm-tbl tbody, .adm .adm-msm-tbl tr, .adm .adm-msm-tbl td { display: block; width: 100%; }
+  .adm .adm-msm-tbl tr { border-bottom: 2px solid var(--text); padding: 8px 0; }
+  .adm .adm-msm-tbl td { border-bottom: 0; padding: 2px 0; }
+  .adm .adm-msm-tbl td.r { text-align: left; }
+  .adm .adm-msm-tbl td[data-label]::before { content: attr(data-label) ": "; font-family: var(--font-mono); font-size: .68rem; color: var(--text-muted); text-transform: uppercase; }
+  .adm-msm-acts { justify-content: flex-start; margin-top: 6px; }
+  .adm-msm-setacts { margin-left: 0; flex-basis: 100%; margin-top: 6px; }
+}
+
+@media (max-width: 860px) {
+  .adm-msm-step { grid-template-columns: 36px minmax(0, 1fr); gap: 4px 12px; }
+  .adm-msm-krow { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .adm-msm-head h2 { font-size: 1.7rem; }
+}

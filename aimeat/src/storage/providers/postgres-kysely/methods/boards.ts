@@ -171,6 +171,22 @@ export const boardMethods = {
     }
     return out;
   },
+  async boardPostCounts(this: PostgresKyselyStorage, boardIds: string[]): Promise<Record<string, { posts: number; lastAt: string }>> {
+    // The same "live top-level notice" listPosts shows a reader: replies excluded, expired rows
+    // excluded. One grouped query for the whole listing.
+    const out: Record<string, { posts: number; lastAt: string }> = {};
+    if (boardIds.length === 0) return out;
+    const now = new Date();
+    const res = await sql<{ boardId: string; n: string | number; lastAt: Date | string | null }>`
+      SELECT "boardId", COUNT(*) AS n, MAX("createdAt") AS "lastAt"
+      FROM "BoardPost"
+      WHERE "boardId" = ANY(${boardIds})
+        AND "replyTo" IS NULL
+        AND ("ttlExpiresAt" IS NULL OR "ttlExpiresAt" > ${now})
+      GROUP BY "boardId"`.execute(this.db);
+    for (const r of res.rows) out[r.boardId] = { posts: Number(r.n), lastAt: r.lastAt ? iso(r.lastAt) : '' };
+    return out;
+  },
   async pruneExpiredBoardPosts(this: PostgresKyselyStorage, nowIso: string): Promise<number> {
     // One cross-board DELETE. Until 2026-08-17 this backend never removed expired posts at all:
     // listPosts only filtered them out, so the rows accumulated forever on production.

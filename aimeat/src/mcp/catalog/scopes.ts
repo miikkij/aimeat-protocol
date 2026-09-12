@@ -134,6 +134,10 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     'aimeat_admin_statistics',
     // The Usage page's read: what AI costs here and whose money paid. Same gate, same reason.
     'aimeat_admin_usage',
+    // The Knowledge page's read: the whole collection, its shape and its review trail. Operator-
+    // gated in the handler, and there is nothing to narrow — an operator either moderates this node
+    // or does not, and a scope word here would let a credential hold half of that.
+    'aimeat_admin_knowledge',
     // Reading how a page is arranged, and the catalogue of blocks this node can serve. Gated in the
     // handler on the operator, like the admin tools above it, and there is nothing here to narrow:
     // a layout is a list of block names, and the front page's describes a page anyone can look at.

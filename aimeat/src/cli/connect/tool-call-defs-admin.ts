@@ -9,6 +9,8 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-12 -- aimeat_admin_knowledge (GET /v1/admin/knowledge), the third surface of
+ *     the Knowledge page's one read, with all six filters forwarded independently.
  *   v1.2.0 -- 2026-09-12 -- aimeat_admin_statistics (GET /v1/stats, with from and to forwarded as
  *     a pair), the third surface of the Statistics page's one read.
  *   v1.1.0 -- 2026-09-12 -- aimeat_admin_hooks (GET /v1/admin/hooks) and aimeat_admin_hook_set
@@ -17,7 +19,7 @@
  *     aimeat_admin_cors_set (the two PUT cors routes, chosen by the `#` in `who`).
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { requiredString, requiredValue, optionalString, optionalBoolean, query } from './tool-call-helpers.js';
+import { requiredString, requiredValue, optionalString, optionalNumber, optionalBoolean, query } from './tool-call-helpers.js';
 
 export const adminCliTools: ConnectCliToolDefinition[] = [
     {
@@ -49,6 +51,20 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
             if (!keys.ok || !answered) return page;
             return { ...page, data: { ...(page.data as object), keys: answered } };
         },
+    },
+    {
+        // THE THIRD SURFACE forwards all six, each on its own. None of these is read as a pair, and
+        // a filter dropped here answers about a LARGER collection than the caller asked about while
+        // still wearing their label — which on a moderation surface reads as "nothing to see".
+        name: 'aimeat_admin_knowledge',
+        handler: ({ client }, input) => client.get(`/v1/admin/knowledge${query({
+            page: optionalNumber(input, 'page'),
+            limit: optionalNumber(input, 'limit'),
+            q: optionalString(input, 'q'),
+            author_key: optionalString(input, 'author_key'),
+            content_type: optionalString(input, 'content_type'),
+            flagged: optionalBoolean(input, 'flagged'),
+        })}`),
     },
     {
         // THE THIRD SURFACE forwards both dates, and forwards them TOGETHER. The route uses them

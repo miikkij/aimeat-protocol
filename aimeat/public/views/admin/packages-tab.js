@@ -1,18 +1,26 @@
 /**
- * @file packages-tab.js
+ * @file public/views/admin/packages-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin dashboard tab for managing packages, template listings, instances,
- *   and template moderation queue. Shows overview stats, recent packages, instance
- *   distribution, pending review queue, and moderation history.
+ * @description Admin Packages page in the poster face (design canvas "AIMEAT Admin Packages").
+ *   Six numbered sections instead of four sub-tabs: what is here, the packages with what is inside
+ *   each one, the instances, the store listings, the review board, and re-seeding the examples.
+ *   Every count comes from the response's `total` rather than the length of the page fetched.
+ *
  * @structure
- *   - PackagesAdminTab — main tab component with subtabs for packages/templates/instances/moderation
- *   - ModerationQueue — pending template review queue
- *   - ReviewPanel — expanded review panel for a single pending template
- *   - ModerationHistory — recent moderation decisions
- * @usage
- *   Loaded by admin.js as a nav item component.
+ *   - PackagesAdminTab() — loads the four lists and renders the six sections
+ *   - partChips(components) — `type ×N` chips for what a package installs
+ *   - Suspend: a reason field opened on the listing's own row
+ *   - ReviewBoard lives in packages-tab.review.js
+ *
  * @version-history
+ *   v2.0.0 — 2026-09-12 — The poster face. The four sub-tabs go: with six packages, six listings
+ *     and one instance the whole page fits on one screen, and hiding three quarters of it cost a
+ *     click for nothing. The package row shows the description and the parts inside it, which is
+ *     what tells an operator whether a package matters. Counts read `total` from the response
+ *     instead of counting a 50-row page, so they stop being silently wrong past fifty. Re-seeding
+ *     says what it archives and what it deletes (the listing, with its rating and install count)
+ *     and asks before it runs; it was a one-click button in the middle of the page.
  *   v1.1.0 — 2026-09-05 — The rating loses its star and the featured cell says ✓: no emoji anywhere in the interface.
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 6)
  *   v1.1.0 — 2026-03-20 — add template moderation queue subtab
@@ -21,295 +29,55 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
-import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
+import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
-import { StatsGrid, Empty, Spinner, Badge, ExpandableHelp, ErrorBox, dt } from './shared.js';
+import { useViewCSS } from '/components/useViewCSS.js';
+import { num, when, Row, Badge, Spinner, useToast, Toast } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import * as pkgService from '/js/services/packages.js';
+import { seedExamples, listPendingTemplates, suspendTemplate } from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
-import {
-  seedExamples,
-  listPendingTemplates,
-  reviewTemplate,
-  approveTemplate,
-  rejectTemplate,
-  suspendTemplate,
-} from '/js/services/admin.js';
+import { ReviewBoard } from './packages-tab.review.js';
 
-/* ── Review Panel ── */
-function ReviewPanel({ item, onDone }) {
-  const [detail, setDetail] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [comment, setComment] = useState('');
-  const [reason, setReason] = useState('');
-  const [acting, setActing] = useState(false);
-  const [error, setError] = useState('');
+const P = (key, vars) => t('dashboard.pkgPage.' + key, vars);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const res = await reviewTemplate(item.id);
-        if (!cancelled && res.ok !== false) setDetail(res.data);
-      } catch (err) { swallowed('packages-tab: ReviewPanel', err); }
-      if (!cancelled) setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, [item.id]);
-
-  const handleApprove = async () => {
-    setActing(true);
-    setError('');
-    try {
-      const res = await approveTemplate(item.id, comment || undefined);
-      if (res.ok === false) setError(res.error?.message || 'Failed');
-      else onDone();
-    } catch (e) { setError(e.message); }
-    setActing(false);
-  };
-
-  const handleReject = async () => {
-    if (!reason.trim()) { setError(t('dashboard.modReasonRequired') || 'Reason is required'); return; }
-    setActing(true);
-    setError('');
-    try {
-      const res = await rejectTemplate(item.id, reason);
-      if (res.ok === false) setError(res.error?.message || 'Failed');
-      else onDone();
-    } catch (e) { setError(e.message); }
-    setActing(false);
-  };
-
-  if (loading) return html`<div class="adm-sub-panel"><${Spinner} text=${t('dashboard.loading')} /></div>`;
-
-  const d = detail || item;
-  const components = d.components || d.manifest?.components || [];
-  const dryRun = d.dryRunResults || d.dryRun || null;
-
-  return html`
-    <div class="adm-sub-panel adm-mod-review">
-      <h4 class="adm-mod-review-title">${escHtml(d.name || d.title || '')}</h4>
-
-      <div class="adm-mod-meta">
-        ${d.description ? html`<p class="adm-mod-desc">${escHtml(d.description)}</p>` : null}
-        <div class="adm-mod-meta-grid">
-          ${d.category ? html`<span class="adm-mod-meta-item"><strong>${t('dashboard.pkgCategory') || 'Category'}:</strong> ${escHtml(d.category)}</span>` : null}
-          ${d.version ? html`<span class="adm-mod-meta-item"><strong>${t('dashboard.pkgVersion') || 'Version'}:</strong> <code>${escHtml(d.version)}</code></span>` : null}
-          ${d.author ? html`<span class="adm-mod-meta-item"><strong>${t('dashboard.pkgAuthor') || 'Author'}:</strong> ${escHtml(d.author)}</span>` : null}
-        </div>
-        ${d.tags && d.tags.length > 0 ? html`<div class="adm-mod-tags">${d.tags.map(tag => html`<span class="tag">${escHtml(tag)}</span>`)}</div>` : null}
-        ${d.changelog ? html`<${ExpandableHelp} title=${t('dashboard.modChangelog') || 'Changelog'}><pre class="adm-mod-pre">${escHtml(d.changelog)}</pre><//>` : null}
-      </div>
-
-      ${components.length > 0 ? html`
-        <div class="adm-mod-components">
-          <h5>${t('dashboard.pkgComponents') || 'Components'} (${components.length})</h5>
-          ${components.map(c => html`
-            <${ExpandableHelp} title=${escHtml(c.name || c.id || 'Component')}>
-              <pre class="adm-mod-pre">${escHtml(typeof c.content === 'string' ? c.content : JSON.stringify(c, null, 2))}</pre>
-            <//>
-          `)}
-        </div>
-      ` : null}
-
-      ${dryRun ? html`
-        <${ExpandableHelp} title=${t('dashboard.modDryRun') || 'Dry-Run Results'}>
-          <pre class="adm-mod-pre">${escHtml(typeof dryRun === 'string' ? dryRun : JSON.stringify(dryRun, null, 2))}</pre>
-        <//>
-      ` : null}
-
-      ${error ? html`<${ErrorBox} message=${error} />` : null}
-
-      <div class="adm-mod-actions">
-        <div class="adm-mod-action-group">
-          <label class="adm-mod-action-label">${t('dashboard.modComment') || 'Comment (optional)'}</label>
-          <input
-            class="adm-input adm-mod-input"
-            type="text"
-            value=${comment}
-            onInput=${e => setComment(e.target.value)}
-            placeholder=${t('dashboard.modCommentPlaceholder') || 'Optional approval comment...'}
-          />
-          <button class="adm-btn" onClick=${handleApprove} disabled=${acting}>
-            ${t('dashboard.modApprove') || 'Approve'}
-          </button>
-        </div>
-        <div class="adm-mod-action-group">
-          <label class="adm-mod-action-label">${t('dashboard.modReason') || 'Reason (required)'}</label>
-          <input
-            class="adm-input adm-mod-input"
-            type="text"
-            value=${reason}
-            onInput=${e => setReason(e.target.value)}
-            placeholder=${t('dashboard.modReasonPlaceholder') || 'Reason for rejection...'}
-          />
-          <button class="adm-btn-action adm-btn-danger" onClick=${handleReject} disabled=${acting}>
-            ${t('dashboard.modReject') || 'Reject'}
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
+/** What a package installs, as `type` chips with a count when a type repeats. A name, an author
+ *  and a version do not say whether a package matters; an extension, a cortex and two apps do. */
+function partChips(components) {
+  const counts = {};
+  for (const c of components || []) {
+    const type = c.type || c.kind || 'part';
+    counts[type] = (counts[type] ?? 0) + 1;
+  }
+  return Object.entries(counts).map(([type, n]) => (n > 1 ? `${type} ×${n}` : type));
 }
 
-/* ── Moderation Queue ── */
-function ModerationQueue({ pending, onReload }) {
-  const [reviewId, setReviewId] = useState(null);
+/** A listing's life: pending_review, then listed or rejected, and a listed one can be suspended.
+ *  The card-face page filtered its published list on approved|published|active, none of which a
+ *  listing has ever had, so that section was empty on every node and looked like an empty store. */
+const LISTED = 'listed';
 
-  if (pending.length === 0) return html`<${Empty} text=${t('dashboard.modNoPending') || 'No pending templates'} />`;
-
-  return html`
-    <div>
-      <table class="adm-table">
-        <thead><tr>
-          <th>${t('dashboard.name')}</th>
-          <th>${t('dashboard.pkgAuthor') || 'Author'}</th>
-          <th>${t('dashboard.modProposedDate') || 'Proposed'}</th>
-          <th>${t('dashboard.actions') || 'Actions'}</th>
-        </tr></thead>
-        <tbody>
-          ${pending.map(p => html`
-            <tr key=${p.id}>
-              <td><strong>${escHtml(p.name || p.title || '')}</strong></td>
-              <td>${escHtml(p.author || '')}</td>
-              <td>${dt(p.proposedAt || p.createdAt)}</td>
-              <td>
-                <button
-                  class="adm-btn-sm"
-                  onClick=${() => setReviewId(reviewId === p.id ? null : p.id)}
-                >
-                  ${reviewId === p.id ? (t('dashboard.modClose') || 'Close') : (t('dashboard.modReview') || 'Review')}
-                </button>
-              </td>
-            </tr>
-            ${reviewId === p.id ? html`
-              <tr key=${p.id + '-review'}>
-                <td colspan="4">
-                  <${ReviewPanel} item=${p} onDone=${() => { setReviewId(null); onReload(); }} />
-                </td>
-              </tr>
-            ` : null}
-          `)}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
-
-/* ── Published Templates with Suspend ── */
-function PublishedTemplates({ templates, onReload }) {
-  const [suspendId, setSuspendId] = useState(null);
-  const [suspendReason, setSuspendReason] = useState('');
-  const [acting, setActing] = useState(false);
-  const [error, setError] = useState('');
-
-  const published = templates.filter(tpl => tpl.status === 'approved' || tpl.status === 'published' || tpl.status === 'active');
-  if (published.length === 0) return html`<${Empty} text=${t('dashboard.modNoPublished') || 'No published templates'} />`;
-
-  const handleSuspend = async (id) => {
-    if (!suspendReason.trim()) { setError(t('dashboard.modReasonRequired') || 'Reason is required'); return; }
-    setActing(true);
-    setError('');
-    try {
-      const res = await suspendTemplate(id, suspendReason);
-      if (res.ok === false) setError(res.error?.message || 'Failed');
-      else { setSuspendId(null); setSuspendReason(''); onReload(); }
-    } catch (e) { setError(e.message); }
-    setActing(false);
-  };
-
-  return html`
-    <table class="adm-table">
-      <thead><tr>
-        <th>${t('dashboard.pkgTitle') || 'Title'}</th>
-        <th>${t('dashboard.pkgAuthor') || 'Author'}</th>
-        <th>${t('dashboard.status')}</th>
-        <th>${t('dashboard.actions') || 'Actions'}</th>
-      </tr></thead>
-      <tbody>
-        ${published.map(tpl => html`
-          <tr key=${tpl.id}>
-            <td><strong>${escHtml(tpl.title || tpl.name || '')}</strong></td>
-            <td>${escHtml(tpl.author || '')}</td>
-            <td><${Badge} type=${tpl.status} /></td>
-            <td>
-              <button
-                class="adm-btn-sm adm-btn-danger"
-                onClick=${() => setSuspendId(suspendId === tpl.id ? null : tpl.id)}
-              >
-                ${t('dashboard.modSuspend') || 'Suspend'}
-              </button>
-            </td>
-          </tr>
-          ${suspendId === tpl.id ? html`
-            <tr key=${tpl.id + '-suspend'}>
-              <td colspan="4">
-                <div class="adm-sub-panel adm-mod-suspend-panel">
-                  ${error ? html`<${ErrorBox} message=${error} />` : null}
-                  <label class="adm-mod-action-label">${t('dashboard.modSuspendReason') || 'Suspension reason (required)'}</label>
-                  <div class="adm-mod-suspend-row">
-                    <input
-                      class="adm-input adm-mod-input"
-                      type="text"
-                      value=${suspendReason}
-                      onInput=${e => setSuspendReason(e.target.value)}
-                      placeholder=${t('dashboard.modSuspendReasonPlaceholder') || 'Reason for suspension...'}
-                    />
-                    <button class="adm-btn-action adm-btn-danger" onClick=${() => handleSuspend(tpl.id)} disabled=${acting}>
-                      ${t('dashboard.modConfirmSuspend') || 'Confirm Suspend'}
-                    </button>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          ` : null}
-        `)}
-      </tbody>
-    </table>
-  `;
-}
-
-/* ── Moderation History ── */
-function ModerationHistory({ history }) {
-  if (!history || history.length === 0) return html`<${Empty} text=${t('dashboard.modNoHistory') || 'No moderation history'} />`;
-
-  return html`
-    <table class="adm-table">
-      <thead><tr>
-        <th>${t('dashboard.name')}</th>
-        <th>${t('dashboard.modDecision') || 'Decision'}</th>
-        <th>${t('dashboard.modReviewer') || 'Reviewer'}</th>
-        <th>${t('dashboard.modReasonCol') || 'Reason'}</th>
-        <th>${t('dashboard.date') || 'Date'}</th>
-      </tr></thead>
-      <tbody>
-        ${history.map((h, i) => html`
-          <tr key=${i}>
-            <td><strong>${escHtml(h.templateName || h.name || '')}</strong></td>
-            <td><${Badge} type=${h.decision || h.action || ''} /></td>
-            <td>${escHtml(h.reviewer || h.reviewedBy || '')}</td>
-            <td>${escHtml(h.reason || h.comment || '')}</td>
-            <td>${dt(h.reviewedAt || h.date)}</td>
-          </tr>
-        `)}
-      </tbody>
-    </table>
-  `;
-}
-
-/* ── Main Tab ── */
 export default function PackagesAdminTab() {
+  // A no-op these days: the sheet is a <link> in spa.html. The call stays because every other
+  // tab makes it, and check:importmap holds the two together.
+  useViewCSS('/css/views/admin-packages.css');
+
   const [packages, setPackages] = useState([]);
   const [instances, setInstances] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [pending, setPending] = useState([]);
   const [history, setHistory] = useState([]);
+  // The response says how many there are; the array is at most one page of them. Counting the
+  // array made every number on this page silently wrong past the fifty it fetches.
+  const [totals, setTotals] = useState({ packages: 0, instances: 0, templates: 0 });
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
-  const [seedMsg, setSeedMsg] = useState('');
-  const [subtab, setSubtab] = useState('packages');
+  const [said, setSaid] = useState(null);
+  const [suspendId, setSuspendId] = useState(null);
+  const [suspendReason, setSuspendReason] = useState('');
+  const { confirm, ConfirmUI } = useConfirm();
+  const [toast, showErr, showOk, clearToast] = useToast();
 
   const loadData = useCallback(async ({ showSpinner = true } = {}) => {
     if (showSpinner) setLoading(true);
@@ -320,192 +88,234 @@ export default function PackagesAdminTab() {
         pkgService.listTemplates({ limit: 50 }),
         listPendingTemplates().catch(() => ({ ok: false })),
       ]);
-      if (pkgRes.ok !== false) setPackages(pkgRes.data?.packages ?? []);
-      if (instRes.ok !== false) setInstances(instRes.data?.instances ?? []);
-      if (tplRes.ok !== false) setTemplates(tplRes.data?.listings ?? tplRes.data?.templates ?? []);
+      const next = { packages: 0, instances: 0, templates: 0 };
+      if (pkgRes.ok !== false) {
+        const rows = pkgRes.data?.packages ?? [];
+        setPackages(rows);
+        next.packages = pkgRes.data?.total ?? rows.length;
+      }
+      if (instRes.ok !== false) {
+        const rows = instRes.data?.instances ?? [];
+        setInstances(rows);
+        next.instances = instRes.data?.total ?? rows.length;
+      }
+      if (tplRes.ok !== false) {
+        const rows = tplRes.data?.listings ?? tplRes.data?.templates ?? [];
+        setTemplates(rows);
+        next.templates = tplRes.data?.total ?? rows.length;
+      }
+      setTotals(next);
       if (pendRes.ok !== false) {
         setPending(pendRes.data?.pending ?? pendRes.data?.templates ?? []);
         setHistory(pendRes.data?.history ?? []);
       }
-    } catch (err) { swallowed('packages-tab: PackagesAdminTab', err); }
+    } catch (err) { swallowed('packages-tab: load', err); }
     setLoading(false);
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
-
-  // Live updates
   useEffect(() => onLiveUpdate(['packages'], () => loadData({ showSpinner: false })), [loadData]);
 
   if (loading) return html`<${Spinner} text=${t('dashboard.loading')} />`;
 
   const pendingCount = pending.length;
-  const stats = [
-    { label: t('dashboard.pkgTotalPackages') || 'Total Packages', value: packages.length, color: 'var(--accent, #60a5fa)' },
-    { label: t('dashboard.pkgTotalInstances') || 'Total Instances', value: instances.length, color: 'var(--green, #34d399)' },
-    { label: t('dashboard.pkgTotalTemplates') || 'Template Listings', value: templates.length, color: 'var(--purple, #a78bfa)' },
-    { label: t('dashboard.pkgPending') || 'Pending Review', value: pendingCount, color: 'var(--amber, #fbbf24)' },
-  ];
+  const installsOf = (pkg) => instances.filter((i) => i.packageGroupId === pkg.packageGroupId).length;
+  const publishedCount = packages.filter((p) => p.status === 'published').length;
+  const listedCount = templates.filter((tpl) => tpl.status === LISTED).length;
+  const installedPackages = new Set(instances.map((i) => i.packageGroupId).filter(Boolean)).size;
+  const oldest = packages.reduce((min, p) => (!min || String(p.createdAt) < min ? String(p.createdAt) : min), '');
 
-  const handleSeed = async () => {
+  /** Re-seeding is a write that throws things away, so it says what and asks first. */
+  function askSeed() {
+    const body = html`<span>
+      <span>${P('seedAskBody')}</span>
+      <span class="adm-pk-note">${P('seedAskArchives')}</span>
+      <span class="adm-pk-note">${P('seedAskDeletes')}</span>
+    </span>`;
+    confirm(body, doSeed, { title: P('seedAskTitle'), confirmLabel: P('seedBtn'), danger: true });
+  }
+
+  async function doSeed() {
     setSeeding(true);
-    setSeedMsg('');
+    setSaid(null);
     try {
       const res = await seedExamples();
-      if (res.ok !== false) {
-        const names = (res.data?.seeded ?? []).map(s => s.name).join(', ');
-        setSeedMsg(names ? `Seeded: ${names}` : 'Done');
+      if (res.ok === false) setSaid({ ok: false, msg: res.error?.message ?? P('failed') });
+      else {
+        const names = (res.data?.seeded ?? []).map((s) => s.name);
+        setSaid({ ok: true, msg: P('seedDone', { n: num(names.length), names: names.join(', ') }) });
         loadData();
-      } else {
-        setSeedMsg(res.error?.message ?? 'Failed');
       }
-    } catch (e) { setSeedMsg('Error: ' + e.message); }
+    } catch (e) { setSaid({ ok: false, msg: e.message }); }
     setSeeding(false);
-  };
+  }
+
+  async function doSuspend(id) {
+    if (!suspendReason.trim()) { showErr(P('reasonRequired')); return; }
+    try {
+      const res = await suspendTemplate(id, suspendReason);
+      if (res.ok === false) showErr(res.error?.message || P('failed'));
+      else { setSuspendId(null); setSuspendReason(''); showOk(P('suspended')); loadData(); }
+    } catch (e) { showErr(e.message); }
+  }
+
+  const statusLine = totals.packages === 0
+    ? P('lineNone')
+    : P('lineSome', { published: num(publishedCount), listed: num(listedCount), installed: num(installedPackages) });
 
   return html`
-    <div>
-      <${StatsGrid} items=${stats} />
+    <div class="og adm-pk">
+      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
-      <div class="adm-card adm-pkg-seed-card">
-        ${packages.length === 0 && templates.length === 0
-          ? html`<p class="adm-pkg-seed-text">${t('dashboard.pkgNoPackages') || 'No packages yet. Seed example packages to get started.'}</p>`
-          : html`<p class="adm-pkg-seed-text">${t('dashboard.pkgReseedHint') || 'Re-seed to update example packages to latest version.'}</p>`
-        }
-        <button class="adm-btn" onClick=${handleSeed} disabled=${seeding}>
-          ${seeding ? (t('dashboard.loading') || 'Loading...') : (t('dashboard.pkgSeedExamples') || 'Seed Example Packages')}
-        </button>
-        ${seedMsg && html`<p class="adm-pkg-seed-msg">${seedMsg}</p>`}
+      <section class="og-sec og-sec--first">
+        <div class="og-sec-h"><h2>${P('now')}<small>01</small></h2></div>
+        <div class="adm-ov-grid">
+          <div>
+            <div class="adm-ov-status">${P('statusPackages', { n: num(totals.packages) })}</div>
+            <p class="adm-alert-line">${statusLine}</p>
+            <div class="adm-ov-up">${oldest ? P('oldest', { when: when(oldest) }) : ''}</div>
+          </div>
+          <div>
+            <${Row} title=${P('rowPublished')} why=${P('rowPublishedWhy')}
+              chip=${html`<${Badge} type=${publishedCount ? 'healthy' : 'muted'} label=${num(publishedCount)} />`}
+              value=${P('ofAll', { n: num(publishedCount), all: num(totals.packages) })} />
+            <${Row} title=${P('rowListed')} why=${P('rowListedWhy')}
+              chip=${html`<${Badge} type=${listedCount ? 'healthy' : 'muted'} label=${num(listedCount)} />`}
+              value=${P('ofAll', { n: num(listedCount), all: num(totals.packages) })} />
+            <${Row} title=${P('rowInstalled')} why=${P('rowInstalledWhy')}
+              chip=${html`<${Badge} type="muted" label=${num(totals.instances)} />`}
+              value=${P('ofAllPackages', { n: num(installedPackages), all: num(totals.packages) })} />
+            <${Row} title=${P('rowWaiting')} why=${P('rowWaitingWhy')}
+              chip=${html`<${Badge} type=${pendingCount ? 'watch' : 'muted'} label=${num(pendingCount)} />`}
+              value=${pendingCount ? P('nWaiting', { n: num(pendingCount) }) : P('nothing')} last=${true} />
+          </div>
+        </div>
+      </section>
+
+      <div class="og-strip">
+        <div><b>${num(totals.packages)}</b><span>${P('stripPackages')}</span><small>${P('stripPackagesSub')}</small></div>
+        <div><b>${num(totals.templates)}</b><span>${P('stripListings')}</span><small>${P('stripListingsSub')}</small></div>
+        <div><b class=${totals.instances ? 'og-coral-num' : ''}>${num(totals.instances)}</b><span>${P('stripInstalled')}</span><small>${P('stripInstalledSub')}</small></div>
+        <div><b>${num(pendingCount)}</b><span>${P('stripWaiting')}</span><small>${pendingCount ? P('stripWaitingSome') : P('stripWaitingNone')}</small></div>
       </div>
 
-      <div class="adm-subtabs">
-        <button class=${'adm-btn' + (subtab === 'packages' ? ' adm-btn-active' : '')} onClick=${() => setSubtab('packages')}>
-          ${t('dashboard.pkgPackagesTab') || 'Packages'} (${packages.length})
-        </button>
-        <button class=${'adm-btn' + (subtab === 'templates' ? ' adm-btn-active' : '')} onClick=${() => setSubtab('templates')}>
-          ${t('dashboard.pkgTemplatesTab') || 'Templates'} (${templates.length})
-        </button>
-        <button class=${'adm-btn' + (subtab === 'instances' ? ' adm-btn-active' : '')} onClick=${() => setSubtab('instances')}>
-          ${t('dashboard.pkgInstancesTab') || 'Instances'} (${instances.length})
-        </button>
-        <button class=${'adm-btn' + (subtab === 'moderation' ? ' adm-btn-active' : '')} onClick=${() => setSubtab('moderation')}>
-          ${t('dashboard.modModerationTab') || 'Moderation'}
-          ${pendingCount > 0 ? html` <${Badge} type="pending" />` : null}
-          ${pendingCount > 0 ? html` (${pendingCount})` : null}
-        </button>
-      </div>
-
-      ${subtab === 'packages' && html`
-        <div class="adm-card">
-          <h3>${t('dashboard.pkgAllPackages') || 'All Packages'}</h3>
-          ${packages.length === 0 ? html`<${Empty} text=${t('dashboard.pkgNoPackages') || 'No packages yet'} />` : html`
-            <table class="adm-table">
-              <thead><tr>
-                <th>${t('dashboard.name')}</th>
-                <th>${t('dashboard.pkgAuthor') || 'Author'}</th>
-                <th>${t('dashboard.pkgVersion') || 'Version'}</th>
-                <th>${t('dashboard.status')}</th>
-                <th>${t('dashboard.pkgCategory') || 'Category'}</th>
-                <th>${t('dashboard.created')}</th>
-              </tr></thead>
-              <tbody>
-                ${packages.map(p => html`
-                  <tr key=${p.id}>
-                    <td><strong>${escHtml(p.name)}</strong></td>
-                    <td>${escHtml(p.author || '')}</td>
-                    <td><code>${escHtml(p.version || '')}</code></td>
-                    <td><${Badge} type=${p.status} /></td>
-                    <td>${escHtml(p.category || '')}</td>
-                    <td>${dt(p.createdAt)}</td>
-                  </tr>
-                `)}
-              </tbody>
-            </table>
-          `}
+      <section class="og-sec">
+        <div class="og-sec-h"><h2>${P('packages')}<small>02</small></h2></div>
+        <p class="adm-pk-lead">${P('packagesLead')}</p>
+        ${!packages.length
+    ? html`<p class="adm-pk-quiet">${P('noPackages')}</p>`
+    : html`
+        <div class="adm-pk-phead">
+          <span>${P('colPackage')}</span><span>${P('colVersion')}</span><span>${P('colCategory')}</span>
+          <span>${P('colInstalls')}</span><span>${P('colStatus')}</span>
         </div>
-      `}
+        ${packages.map((p) => {
+      const chips = partChips(p.components);
+      const n = installsOf(p);
+      return html`
+          <div class="adm-pk-prow" key=${p.id || p.packageGroupId}>
+            <span>
+              <b>${p.name}</b>
+              <span class="adm-pk-gid">${p.packageGroupId || ''}</span>
+              ${p.description ? html`<span class="adm-pk-desc">${p.description}</span>` : null}
+              ${chips.length ? html`<span class="adm-pk-parts">${chips.map((c) => html`<span>${c}</span>`)}</span>` : null}
+            </span>
+            <span class="adm-pk-ver" data-l=${P('colVersion')}>${p.version || '–'}</span>
+            <span data-l=${P('colCategory')}>${p.category || '–'}</span>
+            <span class="adm-pk-num ${n ? '' : 'is-zero'}" data-l=${P('colInstalls')}>${num(n)}</span>
+            <span data-l=${P('colStatus')}><${Badge} type=${p.status === 'published' ? 'healthy' : 'muted'} label=${p.status} /></span>
+          </div>`;
+    })}
+        <p class="adm-pk-note">${P('packagesNote')}</p>`}
+      </section>
 
-      ${subtab === 'templates' && html`
-        <div class="adm-card">
-          <h3>${t('dashboard.pkgAllTemplates') || 'Template Listings'}</h3>
-          ${templates.length === 0 ? html`<${Empty} text=${t('dashboard.pkgNoTemplates') || 'No template listings yet'} />` : html`
-            <table class="adm-table">
-              <thead><tr>
-                <th>${t('dashboard.pkgTitle') || 'Title'}</th>
-                <th>${t('dashboard.pkgPackage') || 'Package'}</th>
-                <th>${t('dashboard.pkgRating') || 'Rating'}</th>
-                <th>${t('dashboard.pkgInstalls') || 'Installs'}</th>
-                <th>${t('dashboard.pkgFeatured') || 'Featured'}</th>
-                <th>${t('dashboard.status')}</th>
-              </tr></thead>
-              <tbody>
-                ${templates.map(tpl => html`
-                  <tr key=${tpl.id}>
-                    <td><strong>${escHtml(tpl.title || '')}</strong></td>
-                    <td>${escHtml(tpl.packageName || tpl.packageGroupId || '')}</td>
-                    <td>${tpl.rating?.toFixed(1) ?? '0.0'} (${tpl.reviewCount ?? 0})</td>
-                    <td>${tpl.installCount ?? 0}</td>
-                    <td>${tpl.featured ? '\u2713' : '\u2014'}</td>
-                    <td><${Badge} type=${tpl.status} /></td>
-                  </tr>
-                `)}
-              </tbody>
-            </table>
-          `}
+      <section class="og-sec">
+        <div class="og-sec-h"><h2>${P('installed')}<small>03</small></h2></div>
+        ${!instances.length
+    ? html`<p class="adm-pk-quiet">${P('noInstances')}</p>`
+    : html`
+        <p class="adm-pk-lead">${P('installedLead')}</p>
+        <div class="adm-pk-ihead">
+          <span>${P('colLabel')}</span><span>${P('colPackage')}</span><span>${P('colOwner')}</span>
+          <span>${P('colVersionTaken')}</span><span>${P('colParts')}</span><span>${P('colInstalledAt')}</span>
         </div>
-      `}
+        ${instances.map((inst) => html`
+          <div class="adm-pk-irow" key=${inst.id}>
+            <span><b>${inst.label || '–'}</b></span>
+            <span class="adm-pk-mono" data-l=${P('colPackage')}>${inst.packageGroupId || '–'}</span>
+            <span class="adm-pk-mono" data-l=${P('colOwner')}>${inst.owner || '–'}</span>
+            <span class="adm-pk-mono" data-l=${P('colVersionTaken')}>${inst.packageVersion || '–'}</span>
+            <span class="adm-pk-mono" data-l=${P('colParts')}>${num(inst.installedComponents?.length ?? 0)}</span>
+            <span class="adm-pk-mono" data-l=${P('colInstalledAt')}>${when(inst.installedAt)}</span>
+          </div>`)}`}
+      </section>
 
-      ${subtab === 'instances' && html`
-        <div class="adm-card">
-          <h3>${t('dashboard.pkgAllInstances') || 'All Instances'}</h3>
-          ${instances.length === 0 ? html`<${Empty} text=${t('dashboard.pkgNoInstances') || 'No instances yet'} />` : html`
-            <table class="adm-table">
-              <thead><tr>
-                <th>${t('dashboard.pkgLabel') || 'Label'}</th>
-                <th>${t('dashboard.pkgPackage') || 'Package'}</th>
-                <th>${t('dashboard.pkgOwner') || 'Owner'}</th>
-                <th>${t('dashboard.pkgVersion') || 'Version'}</th>
-                <th>${t('dashboard.status')}</th>
-                <th>${t('dashboard.pkgComponents') || 'Components'}</th>
-                <th>${t('dashboard.pkgInstalled') || 'Installed'}</th>
-              </tr></thead>
-              <tbody>
-                ${instances.map(inst => html`
-                  <tr key=${inst.id}>
-                    <td><strong>${escHtml(inst.label || '\u2014')}</strong></td>
-                    <td>${escHtml(inst.packageGroupId || '')}</td>
-                    <td>${escHtml(inst.owner || '')}</td>
-                    <td><code>${escHtml(inst.packageVersion || '')}</code></td>
-                    <td><${Badge} type=${inst.status} /></td>
-                    <td>${inst.installedComponents?.length ?? 0}</td>
-                    <td>${dt(inst.installedAt)}</td>
-                  </tr>
-                `)}
-              </tbody>
-            </table>
-          `}
+      <section class="og-sec">
+        <div class="og-sec-h"><h2>${P('store')}<small>04</small></h2></div>
+        ${!templates.length
+    ? html`<p class="adm-pk-quiet">${P('noListings')}</p>`
+    : html`
+        <p class="adm-pk-lead">${P('storeLead')}</p>
+        <div class="adm-pk-lhead">
+          <span>${P('colListing')}</span><span>${P('colPackage')}</span><span>${P('colRating')}</span>
+          <span>${P('colInstalls')}</span><span>${P('colFeatured')}</span><span></span>
         </div>
-      `}
+        ${templates.map((tpl) => html`
+          <div key=${tpl.id}>
+            <div class="adm-pk-lrow">
+              <span><b>${tpl.title || tpl.name || '–'}</b>
+                ${tpl.status !== LISTED ? html` <${Badge} type=${tpl.status === 'rejected' ? 'critical' : 'watch'} label=${tpl.status} />` : null}</span>
+              <span class="adm-pk-mono" data-l=${P('colPackage')}>${tpl.packageGroupId || tpl.packageName || '–'}</span>
+              <span class="adm-pk-mono" data-l=${P('colRating')}>${tpl.reviewCount ? `${tpl.rating?.toFixed(1) ?? '0.0'} (${tpl.reviewCount})` : P('noRating')}</span>
+              <span class="adm-pk-mono" data-l=${P('colInstalls')}>${num(tpl.installCount ?? 0)}</span>
+              <span data-l=${P('colFeatured')}>${tpl.featured ? '✓' : '–'}</span>
+              <span>
+                ${tpl.status === LISTED
+      ? html`<button type="button" class="og-door og-door--quiet og-door--danger"
+                    onClick=${() => { setSuspendId(suspendId === tpl.id ? null : tpl.id); setSuspendReason(''); }}>
+                    ${suspendId === tpl.id ? P('cancel') : P('suspendBtn')}</button>`
+      : null}
+              </span>
+            </div>
+            ${suspendId === tpl.id && html`
+              <div class="adm-pk-panel">
+                <div class="adm-pk-fld">
+                  <div class="adm-pk-fldl">${P('suspendReasonLabel')}</div>
+                  <input type="text" value=${suspendReason} onInput=${(e) => setSuspendReason(e.target.value)}
+                    placeholder=${P('suspendReasonPlaceholder')} />
+                </div>
+                <div class="adm-pk-acts">
+                  <button class="adm-btn" onClick=${() => doSuspend(tpl.id)}>${P('suspendConfirm')}</button>
+                </div>
+                <p class="adm-pk-note">${P('suspendNote')}</p>
+              </div>`}
+          </div>`)}`}
+      </section>
 
-      ${subtab === 'moderation' && html`
-        <div>
-          <div class="adm-card adm-mod-section">
-            <h3>${t('dashboard.modPendingQueue') || 'Pending Review Queue'}
-              ${pendingCount > 0 ? html` <${Badge} type="pending" />` : null}
-            </h3>
-            <${ModerationQueue} pending=${pending} onReload=${loadData} />
-          </div>
-
-          <div class="adm-card adm-mod-section">
-            <h3>${t('dashboard.modPublishedTemplates') || 'Published Templates'}</h3>
-            <${PublishedTemplates} templates=${templates} onReload=${loadData} />
-          </div>
-
-          <div class="adm-card adm-mod-section">
-            <h3>${t('dashboard.modHistory') || 'Moderation History'}</h3>
-            <${ModerationHistory} history=${history} />
-          </div>
+      <section class="og-sec">
+        <div class="og-sec-h">
+          <h2>${P('review')}<small>05</small></h2>
+          ${pendingCount > 0 && html`<span><${Badge} type="watch" label=${P('nWaiting', { n: num(pendingCount) })} /></span>`}
         </div>
-      `}
+        <${ReviewBoard} pending=${pending} history=${history} onReload=${loadData} />
+      </section>
+
+      <section class="og-sec">
+        <div class="og-sec-h"><h2>${P('examples')}<small>06</small></h2></div>
+        <p class="adm-pk-lead">${P('examplesLead')}</p>
+        <${Row} title=${P('rowArchives')} why=${P('rowArchivesWhy')} value=${P('systemPackages')} />
+        <${Row} title=${P('rowDeletes')} why=${P('rowDeletesWhy')}
+          chip=${html`<${Badge} type="watch" label=${P('countsReset')} />`}
+          value=${P('systemListings')} last=${true} />
+        <div class="adm-pk-acts">
+          <button class="adm-btn" disabled=${seeding} onClick=${askSeed}>
+            ${seeding ? t('dashboard.loading') : P('seedBtn')}</button>
+          <span class="adm-pk-note" style="margin: 0">${P('seedAsks')}</span>
+        </div>
+        ${said && html`<p class="adm-pk-said ${said.ok ? 'is-ok' : 'is-bad'}">${said.msg}</p>`}
+      </section>
+
+      <${ConfirmUI} />
     </div>
   `;
 }

@@ -1,10 +1,10 @@
 /**
- * @file public/views/admin/services-tab.action-editor.js
+ * @file public/views/admin/extensions-tab.action-editor.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Installed-extension action script editor for the admin Services tab. Extracted from services-tab.js to satisfy max-file-lines.
+ * @description Installed-extension action script editor for the admin Extensions tab. Extracted from the tab file to satisfy max-file-lines.
  * @version-history
- *   v1.0.0 — 2026-07-13 — Extracted from services-tab.js (max-file-lines)
+ *   v1.0.0 — 2026-07-13 — Extracted from the tab file (max-file-lines)
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
