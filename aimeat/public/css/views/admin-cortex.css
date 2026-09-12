@@ -1,0 +1,114 @@
+/* ── Admin Cortex extensions page, in the poster face ──
+ * @file admin-cortex.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's page for the browser code apps load (design canvas "Cortex
+ *   Extensions Page", direction A): the list split by what turning one off would cost, the groups
+ *   that make twenty-seven unused names readable, one cortex opened, and the confirmation that
+ *   names the apps before it breaks them. The frame, the sections, the metric rows, the numeral
+ *   strip and the badges come from admin.css and organism.css; only what this page adds lives here.
+ *   Every value is a theme.css token, so the page flips with the theme.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial.
+ */
+
+.adm-cx-intro { margin: 0 0 .9rem; font-size: .88rem; line-height: 1.55; color: var(--text-dim); max-width: 76ch; }
+.adm-cx-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
+.adm-cx-note { margin: 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-cx .adm-mrow--last { border-bottom: 0; }
+.adm-cx .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+
+/* ── search ── */
+.adm-cx-tools { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; padding: 2px 0 10px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.adm-cx-find { flex: 1; min-width: 260px; display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 2px 2px 4px; }
+.adm-cx-find:focus-within { border-bottom-color: var(--accent); }
+.adm-cx-find svg { width: 16px; height: 16px; flex: none; stroke: var(--text); fill: none; stroke-width: 2.5; stroke-linecap: square; }
+.adm .adm-cx-find input[type="text"] { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .92rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-cx-find input[type="text"]::placeholder { color: var(--text-dim); font-weight: 600; }
+
+/* ── the table: one row is one cortex ── */
+.adm-cx-scroll { overflow-x: auto; }
+.adm .adm-cx-tbl { width: 100%; border-collapse: collapse; font-size: .86rem; }
+.adm .adm-cx-tbl th {
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .72rem;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim);
+  text-align: left; padding: 0 12px 7px 0; border-bottom: 2px solid var(--text); white-space: nowrap;
+}
+.adm .adm-cx-tbl th.r { text-align: right; }
+.adm .adm-cx-tbl td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text); }
+.adm .adm-cx-tbl td.r { text-align: right; font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); white-space: nowrap; }
+.adm-cx-row--off td { opacity: .55; }
+.adm-cx-name { display: block; font-weight: 700; line-height: 1.3; }
+.adm-cx-name button { background: none; border: 0; padding: 0; font: inherit; color: var(--text); cursor: pointer; text-align: left; }
+.adm-cx-name button:hover { color: var(--accent); }
+.adm-cx-chips { display: inline-flex; gap: 5px; margin-left: 7px; flex-wrap: wrap; vertical-align: middle; }
+.adm-cx-apps { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: 3px; line-height: 1.55; overflow-wrap: anywhere; }
+.adm-cx-n { color: var(--text); font-weight: 500; }
+.adm-cx-n--zero { color: var(--accent); font-weight: 500; }
+.adm-cx-acts { display: flex; gap: 12px; align-items: center; justify-content: flex-end; white-space: nowrap; }
+
+/* ── the groups that make the unused ones readable ── */
+.adm-cx-grp { padding: .8rem 0; border-bottom: 1px solid var(--border); }
+.adm-cx-grp--last { border-bottom: 0; }
+.adm-cx-grph { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.adm-cx-grph > b { font-weight: 700; font-size: .95rem; }
+.adm-cx-grph > .adm-mval { font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); }
+.adm-cx-grph > .adm-cx-grpacts { margin-left: auto; display: flex; gap: 14px; align-items: baseline; }
+.adm-cx-names { display: block; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); margin-top: 6px; line-height: 1.6; overflow-wrap: anywhere; }
+.adm-cx-grpwhy { display: block; font-size: .78rem; line-height: 1.5; color: var(--text-dim); margin-top: 4px; max-width: 86ch; }
+.adm-cx-open { margin-top: 10px; padding-left: 14px; border-left: 2px solid var(--border); }
+
+/* ── what turning one off does ── */
+.adm-cx-step { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 0 19px; align-items: baseline; padding: .7rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text); }
+.adm-cx-step--last { border-bottom: 0; }
+.adm-cx-step b { font-weight: 700; }
+.adm-cx-stepn { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.5rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); color: var(--accent); }
+
+/* ── one cortex opened ── */
+.adm-cx-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
+.adm-cx-head h2 { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 2.4rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); text-transform: none; color: var(--text); overflow-wrap: anywhere; }
+.adm-cx-ver { font-family: var(--font-mono); font-size: .9rem; color: var(--text-dim); }
+.adm-cx-desc { margin: 12px 0 0; font-size: .95rem; line-height: 1.6; max-width: 86ch; }
+.adm-cx-meta { margin: 10px 0 22px; font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); line-height: 1.6; overflow-wrap: anywhere; }
+.adm-cx-big { margin: 0; font-size: 1.3rem; font-weight: 700; line-height: 1.35; }
+.adm-cx-piece { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 0 22px; align-items: baseline; padding: .85rem 0; border-bottom: 1px solid var(--border); }
+.adm-cx-piece--last { border-bottom: 0; }
+.adm-cx-piece b { font-weight: 700; font-size: .92rem; overflow-wrap: anywhere; }
+.adm-cx-kind { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .9rem; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
+.adm-cx-code { font-family: var(--font-mono); font-size: .78rem; background: var(--bg-surface); padding: 1px 6px; overflow-wrap: anywhere; }
+.adm-cx-vrow { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 0 22px; align-items: baseline; padding: .7rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+.adm-cx-vrow--last { border-bottom: 0; }
+.adm-cx-doers { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; padding: 8px 0 4px; }
+
+/* ── the two dialogs ── */
+.adm-cx-applist { margin: 8px 0 0; font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); line-height: 1.7; overflow-wrap: anywhere; }
+.adm-cx-field { display: block; margin-top: 12px; }
+.adm-cx-field > span { display: block; font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+.adm .adm-cx-field input[type="text"] { width: 100%; box-sizing: border-box; }
+.adm-cx-dialog-acts { display: flex; gap: 16px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+
+@media (max-width: 860px) {
+  .adm-cx-step { grid-template-columns: 36px minmax(0, 1fr); gap: 4px 12px; }
+  .adm-cx-piece { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .adm-cx-vrow { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 14px; }
+  .adm-cx-vrow > :nth-child(2) { grid-column: 1 / span 2; }
+}
+
+/* The table becomes a stack of rows, each cell keeping its heading through a data attribute rather
+   than a second markup.
+   THE BREAKPOINT IS 1100 AND NOT A PHONE WIDTH, because the table does not live in the viewport: a
+   fixed 220px sidebar and the page's own padding take about 290px off it, so at a 780px window the
+   column is 490px and a 602px table scrolls sideways inside it with the Turn off button off the
+   right edge. Nothing overflows the page, so a width check passes while the actions are
+   unreachable. Measured in a browser at 780px; the same 1100 is where the numeral strip wraps. */
+@media (max-width: 1100px) {
+  .adm .adm-cx-tbl thead { display: none; }
+  .adm .adm-cx-tbl, .adm .adm-cx-tbl tbody, .adm .adm-cx-tbl tr, .adm .adm-cx-tbl td { display: block; width: 100%; }
+  .adm .adm-cx-tbl tr { border-bottom: 2px solid var(--text); padding: 8px 0; }
+  .adm .adm-cx-tbl td { border-bottom: 0; padding: 2px 0; }
+  .adm .adm-cx-tbl td.r { text-align: left; }
+  .adm .adm-cx-tbl td[data-label]::before { content: attr(data-label) ": "; font-family: var(--font-mono); font-size: .68rem; color: var(--text-muted); text-transform: uppercase; }
+  .adm-cx-acts { justify-content: flex-start; margin-top: 6px; }
+  .adm-cx-grph > .adm-cx-grpacts { margin-left: 0; flex-basis: 100%; margin-top: 6px; }
+  .adm-cx-head h2 { font-size: 1.8rem; }
+}

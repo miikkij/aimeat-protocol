@@ -579,6 +579,9 @@ const ALL_SUITES = [
     // The Applications page: the four states a listing must separate, taking an app off the wall
     // and back with the reason kept, the narrow search-engine block beside it, and the refusals.
     'test/e2e-admin-apps-page.ts',
+    // The Cortex extensions page: the dependant count the whole page is arranged by, the pieces one
+    // cortex put here, and the promise that a switch-off leaves the files and the written data.
+    'test/e2e-admin-cortex-page.ts',
     // The numbers behind the Statistics page: that requests_total is counted at all (its middleware
     // was written and never mounted), that a scope refusal is counted, and that a period reading is
     // a different reading from the node's whole life.

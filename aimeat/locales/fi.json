@@ -1,5 +1,170 @@
 {
   "admin": {
+    "cortex": {
+      "intro": "Cortex on selaimessa ajettavaa koodia, jonka sovellus lataa. Asennus tuo sen osat tänne, ja päälle kytkeminen tarjoilee ne jokaiselle sovellukselle joka niitä pyytää.",
+      "state": {
+        "on": "Päällä",
+        "off": "Pois"
+      },
+      "thisSite": "Tämä sivusto",
+      "turnOff": "Sammuta",
+      "turnOn": "Kytke päälle",
+      "look": "Katso",
+      "removeForGood": "Poista lopullisesti",
+      "now": {
+        "title": "Juuri nyt",
+        "line": "{n} asennettu, ja {unused} niistä ei lataa yksikään sovellus.",
+        "lineOff": "{off} on sammutettu, ja {breaking} niistä on yhä jonkin sovelluksen pyytämä."
+      },
+      "strip": {
+        "installed": "Asennettu",
+        "installedSub": "kaikki mitä tämä sivusto tarjoilee",
+        "carrying": "Sovelluksen käytössä",
+        "carryingSub": "vähintään yksi sovellus lataa sen",
+        "unused": "Ei kenenkään lataama",
+        "unusedSub": "yksikään sovellus ei avaa niitä",
+        "busiest": "Kysytyin",
+        "busiestNone": "yksikään sovellus ei lataa vielä mitään"
+      },
+      "find": {
+        "placeholder": "Etsi nimellä, omistajalla, tunnisteella tai kuvauksella"
+      },
+      "col": {
+        "name": "Nimi",
+        "version": "Versio",
+        "by": "Asentaja",
+        "apps": "Sovelluksia",
+        "pieces": "Osat"
+      },
+      "loaded": {
+        "title": "Sovellusten lataamat",
+        "count": "{n} / {total}, kysytyin ensin",
+        "noMatch": "Mikään täällä ei vastaa hakuasi.",
+        "none": "Yksikään sovellus ei lataa näistä mitään."
+      },
+      "unused": {
+        "title": "Ei kenenkään lataamat",
+        "count": "{n} / {total}",
+        "lead": "Yksikään sovellus ei lataa näistä yhtäkään. Ne on ryhmitelty tarkistettavien tosiasioiden mukaan eikä nimen mukaan, jotta poistuneen sovelluksen jäänteet, kahdesti asennettu sama asia ja sivuston oma perusvarustus eivät näytä keskenään samalta.",
+        "none": "Jokainen täällä oleva cortex on vähintään yhden sovelluksen käytössä."
+      },
+      "group": {
+        "lookalike": "{n} nimeä jotka näyttävät samalta asialta",
+        "sameLettersWhy": "Samat kirjaimet ja numerot, eri välimerkeillä kirjoitettuna. Toinen on lähes varmasti toisen uudelleenasennus.",
+        "containsWhy": "Toinen nimi on toisen sisällä. Yleensä se tarkoittaa nimenvaihtoa, joka jätti ensimmäisen jäljelle.",
+        "closeWhy": "Nimet eroavat parilla kirjaimella. Se voi olla kirjoitusvirhe ja se voi olla kaksi eri asiaa, joten lue kuvaukset ennen päätöstä.",
+        "batch": "{n} kpl, asentanut {who} {day}",
+        "batchWhy": "Asennettu yhdellä istumalla, eikä mikään ole ladannut niitä sen jälkeen. Yleensä yhden julkaisemattoman sovelluksen osat.",
+        "site": "Sivuston mukana tulleita: {n}",
+        "siteWhy": "Tämä sivusto asensi nämä itse, jotta kuka tahansa sovelluksen rakentaja voi ottaa ne käyttöön. Kukaan ei ole vielä pyytänyt, päällä olo ei maksa mitään, ja oikea siirto on jättää ne rauhaan.",
+        "oneWhy": "Asennettu {when}, asentaja {who}. Mikään muu täällä ei muistuta sitä.",
+        "show": "Näytä ne",
+        "close": "Piilota ne",
+        "removeAll": "Poista kaikki {n}"
+      },
+      "off": {
+        "title": "Mitä sammuttaminen tekee",
+        "goes": "Sammutus ottaa osat pois",
+        "goesWhy": "Sen muodot, ohjeet, toiminnot, taulut ja sanastot otetaan pois, eikä sen tiedostoja enää tarjoilla. Sen lataava sovellus hajoaa heti kun joku seuraavan kerran avaa sen, eikä siitä varoiteta ketään.",
+        "stays": "Tiedostot ja kirjoitettu data jäävät paikoilleen",
+        "staysWhy": "Takaisin päälle kytkeminen palauttaa kaiken entiselleen. Siksi sammutus on turvallinen liike: sen voi perua.",
+        "remove": "Lopullista poistoa ei voi perua",
+        "removeWhy": "Se poistaa cortexin ja sen tiedostot. Mikään ei tuo niitä takaisin, joten se pyytää kirjoittamaan nimen ensin."
+      },
+      "read": {
+        "title": "Kuka saa lukea sisällön",
+        "lead": "Jokainen täällä oleva cortex kuuluu tasan yhteen näistä kolmesta, ja ne vastaavat yhteen kysymykseen: kuka sinun lisäksesi saa lukea sen osat, ohjeet ja tiedostot. Kaksi ensimmäistä on omistajan valitsema sana, kolmas ohittaa sen. Mikään näistä ei ratkaise, toimiiko cortex.",
+        "public": "Julkinen",
+        "publicWhy": "Kuka tahansa tänne kirjautunut saa lukea sen. Juuri niin ihminen rakentaa sovelluksen toisen tekemän varustuksen päälle.",
+        "private": "Yksityinen",
+        "privateWhy": "Asentaja ja sinä. Ei kukaan muu, ei edes nimeä arvaamalla.",
+        "site": "Sivuston mukana tullut",
+        "siteWhy": "Kaikkien luettavissa riippumatta siitä, mikä sana rivillä lukee, koska tämä on sivuston omaa varustusta ja jokaisen sovelluksen on tarkoitus rakentaa sen päälle. Osa näistä on merkitty julkisiksi ja osa yksityisiksi, eikä sillä ole tässä mitään väliä.",
+        "boxLabel": "Hyvä tietää",
+        "box": "Näet kaikki {n}, koska olet operaattori. Omana itsenään kirjautunut näkee julkiset, sivuston omat ja omansa. Hänen ruudullaan luku on eri, ja niin kuuluukin olla."
+      },
+      "kind": {
+        "schema": "Muoto",
+        "prompt": "Ohje",
+        "action": "Toiminto",
+        "board": "Taulu",
+        "ontology": "Sanasto",
+        "seed": "Data",
+        "lib": "Tiedosto",
+        "other": "Osa"
+      },
+      "piece": {
+        "schemaWhy": "Kertoo miltä tallennetun tietueen pitää näyttää. Tämä sivusto tarkistaa sen jokaista muistiavainta vastaan joka täsmää",
+        "schemaPlain": "Kertoo miltä tallennetun tietueen pitää näyttää.",
+        "promptWhy": "Kirjoitettu ohje jota sovellus voi pyytää, jotta ihmistä auttava tekoäly tietää mihin tämä pystyy.",
+        "actionWhy": "Jotain mitä sovellus voi pyytää tätä sivustoa ajamaan puolestaan.",
+        "boardWhy": "Taulu jonka tämä sivusto perusti kun laajennus kytkettiin päälle.",
+        "ontologyWhy": "Lista sovituista sanoista, jotta kaksi sovellusta tarkoittaa samalla termillä samaa.",
+        "seedWhy": "Päälle kytkeminen kirjoitti nämä muistiin. Ne ovat nyt jonkun omaa dataa eivätkä laajennuksen:",
+        "seedNone": "Se kirjoittaisi aloitusdataa muistiin, eikä ole kirjoittanut yhtään.",
+        "libWhy": "Tarjoillaan jokaiselle selaimelle joka sitä pyytää, ja antaa sovellukselle",
+        "libPlain": "Tarjoillaan jokaiselle selaimelle joka sitä pyytää.",
+        "otherWhy": "Osa jolle tällä sivulla ei ole vielä sanaa."
+      },
+      "detail": {
+        "back": "← Kaikki cortex-laajennukset",
+        "meta": "Asennettu {when}, asentaja {who}, nimiavaruus {space}",
+        "who": "Kuka lataa sen",
+        "loadedBy": "{n} sovellusta lataa tämän.",
+        "loadedByOne": "Yksi sovellus lataa tämän.",
+        "nobody": "Ei kukaan.",
+        "nobodyWhy": "Yksikään sovellus ei ole koskaan pyytänyt sitä. Joko se rakennettiin johonkin mitä ei enää ole, tai sitä käyttäväksi tarkoitettua sovellusta ei koskaan julkaistu.",
+        "nobodySite": "Yksikään sovellus ei ole koskaan pyytänyt sitä. Se tulee sivuston mukana, jotta kuka tahansa sovelluksen rakentaja voi ottaa sen käyttöön, ja se on syy pitää se päällä vaikka mikään ei käytä sitä.",
+        "andMore": "ja {n} muuta",
+        "put": "Mitä se toi tälle sivustolle",
+        "pieceCount": "Osia: {n}",
+        "noPieces": "Sillä ei ole yhtään osaa, joten päälle kytkeminen ei tee mitään.",
+        "keepsLabel": "Jos sammutat sen",
+        "keeps": "Muodot, ohjeet ja tiedostot lähtevät heti. Kaikki mitä se on kirjoittanut muistiin jää paikoilleen, ja jäisi myös lopullisessa poistossa. Data jonka tämä sivusto kirjoitti jonkun puolesta kuuluu hänelle, eikä mikään kytkin täällä ota sitä pois.",
+        "versions": "Versiot",
+        "versionCount": "Tallessa: {n}",
+        "noVersions": "Kopioita ei tallennettu, joten mihinkään ei voi palata.",
+        "thisOne": "Tätä tarjoillaan nyt.",
+        "olderOne": "Vanhempi kopio, jota tarjoillaan yhä sille joka pyytää sitä nimellä.",
+        "versionsWhy": "Jokainen asennus tallentaa kopion siitä mitä asennettiin. Sovellus voi pyytää versiota nimellä ja saa juuri sen vielä senkin jälkeen kun asennat uudemman, ja siksi vanha kopio kannattaa pitää eikä siivota pois.",
+        "can": "Mitä voit tehdä",
+        "canWhy": "Sammutuksen voi perua. Poistoa ei, joten se pyytää kirjoittamaan nimen ensin.",
+        "makePublic": "Anna kaikkien lukea",
+        "makePrivate": "Pidä omana tietona"
+      },
+      "dialog": {
+        "offTitle": "Sammutetaanko {name}?",
+        "offLoaded": "{n} sovellusta lataa tämän.",
+        "offLoadedOne": "Yksi sovellus lataa tämän.",
+        "offBreaks": "Ne lakkaavat saamasta sitä sillä sekunnilla kun painat nappia. Seuraava joka avaa jonkin niistä kohtaa rikkinäisen sivun, eikä mikään kerro hänelle miksi.",
+        "offNobody": "Yksikään sovellus ei lataa tätä, joten mikään ei hajoa tänään.",
+        "goes": "Lähtee",
+        "goesWhy": "Sen muodot, ohjeet, toiminnot ja taulut, sekä tiedostot joita se tarjoilee selaimelle.",
+        "stays": "Jää",
+        "staysWhy": "Itse tiedostot ja kaikki mitä se on kirjoittanut. Takaisin päälle kytkeminen palauttaa kaiken.",
+        "offDo": "Sammuta",
+        "offDoFor": "Sammuta {n} sovellukselta",
+        "offDoForOne": "Sammuta yhdeltä sovellukselta",
+        "removeTitle": "Poistetaanko {name} lopullisesti?",
+        "removeWarnLabel": "Tätä ei voi perua",
+        "removeWarn": "Cortex ja sen tiedostot lähtevät, eikä mikään täällä tuo niitä takaisin. Kaikki mitä se on kirjoittanut jonkun muistiin jää, koska se on hänen dataansa eikä tämän laajennuksen.",
+        "removeTypeLabel": "Kirjoita {name} vahvistukseksi",
+        "removeWord": "poista",
+        "batchTitle": "Poistetaanko koko ryhmä lopullisesti?",
+        "batchAsk": "Kaikki {n} lähtevät, yksi kerrallaan. Yksikään sovellus ei lataa niistä yhtäkään.",
+        "batchWarn": "Mikään ei tuo niitä takaisin. Jos yksi kieltäytyy, loput lähtevät silti, ja saat tiedon kummankin määrästä.",
+        "batchTypeLabel": "Kirjoita {word} vahvistukseksi"
+      },
+      "toast": {
+        "noDetail": "{name} ei auennut.",
+        "turnedOn": "{name} on päällä.",
+        "turnedOff": "{name} on pois.",
+        "visibility": "Muutettiin kuka saa lukea kohteen {name}.",
+        "removed": "{name} on poissa.",
+        "batchRemoved": "{n} poistettu.",
+        "batchPartly": "{gone} poistettu, {kept} kieltäytyi."
+      }
+    },
     "prompts": {
       "intro": "Ohjeet, jotka tämä sivusto antaa tekoälylle kun se kysyy mitä se saa täällä tehdä. Jokaisen voi lukea, muuttaa, kytkeä pois ja palauttaa siihen versioon jota ohjelmisto nyt toimittaa.",
       "saved": "Tallennettu.",
@@ -8928,33 +9093,6 @@
     "cfg_consul_watch_interval_seconds": "Tarkkailuväli (sekuntia)",
     "cfg_consul_datacenter": "Datakeskus",
     "cortexTab": "Cortex-laajennukset",
-    "cortex": {
-      "back": "← Takaisin",
-      "total": "Yhteensä",
-      "active": "Aktiivinen",
-      "inactive": "Ei aktiivinen",
-      "loading": "Ladataan cortex-laajennuksia...",
-      "empty": "Ei asennettuja cortex-laajennuksia.",
-      "name": "Nimi",
-      "version": "Versio",
-      "installedBy": "Asentaja",
-      "status": "Tila",
-      "visibility": "Näkyvyys",
-      "componentsCol": "Komponentit",
-      "components": "Komponentit",
-      "noComponents": "Ei komponentteja",
-      "author": "Tekijä",
-      "activated": "Laajennus aktivoitu",
-      "deactivated": "Laajennus deaktivoitu",
-      "uninstalled": "Laajennus poistettu",
-      "visibilityChanged": "Näkyvyys päivitetty",
-      "confirmUninstall": "Poista tämä laajennus? Kaikki sen komponentit poistetaan.",
-      "activate": "Aktivoi",
-      "deactivate": "Deaktivoi",
-      "uninstall": "Poista",
-      "makePublic": "Tee julkiseksi",
-      "makePrivate": "Tee yksityiseksi"
-    },
     "skills": {
       "tabLabel": "Taidot"
     },
