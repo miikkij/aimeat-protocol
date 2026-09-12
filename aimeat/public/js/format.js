@@ -32,6 +32,9 @@
  *   money(12.5, 'EUR')           → "12,50 €"
  *   morsels(625)                 → "625 morsels" — never a currency symbol
  * @version-history
+ *   v2.4.0 — 2026-09-12 — minutesOfDay(): what o'clock an instant is in the READER'S zone, as a
+ *     number, for sorting and bucketing. The scheduler's rhythm grid bucketed by `getHours()` and
+ *     so placed a row at 23:00 on a page whose own next-run card said 05:00 the next day.
  *   v2.3.0 — 2026-09-12 — calendar(): a DATE rather than a moment, pinned so no zone can slide it.
  *     A heat-map square, a month rail and a usage day are days on a calendar, not instants, and
  *     re-reading them in the reader's clock had them label themselves as the day before.
@@ -161,6 +164,28 @@ export function dayKey(s) {
 export function sameDay(a, b) {
   const ka = dayKey(a);
   return !!ka && ka === dayKey(b);
+}
+
+/**
+ * Minutes since midnight, IN THE READER'S ZONE. For sorting and bucketing, never for display.
+ *
+ * `getHours()` answers for the browser, which is right until somebody keeps a different clock and
+ * then puts a row at 23:00 on a page that draws its own time as 05:00. A number is returned rather
+ * than a string because a 12-hour format does not sort: "11:00 PM" lands before "5:00 AM".
+ * @returns {number} 0..1439, or -1 when the value is not a time
+ */
+export function minutesOfDay(s) {
+  const d = new Date(s);
+  if (!Number.isFinite(d.getTime())) return -1;
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', withZone({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })).formatToParts(d);
+    const h = Number(parts.find(p => p.type === 'hour')?.value ?? NaN);
+    const m = Number(parts.find(p => p.type === 'minute')?.value ?? NaN);
+    return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : -1;
+  } catch (err) {
+    swallowed('format: minutesOfDay fell back to the browser clock', err);
+    return d.getHours() * 60 + d.getMinutes();
+  }
 }
 
 /** The name this module has always had for a date-and-time. Kept, because 161 places call it. */

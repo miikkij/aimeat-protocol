@@ -18,12 +18,12 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { date as fmtDate, num as fmtNum } from '/js/format.js';
+import { date as fmtDate, num as fmtNum, time as fmtTime, calendar } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { Section, Fold, scrollTo } from '/views/profile/organisms/poster-parts.js';
 import SchedulerCalendar from '../scheduler-calendar.js';
 import { formatUntil } from '../schedule-item.js';
-import { cronWords } from './cron-words.js';
+import { cronWords, cronWordsIn } from './cron-words.js';
 import { kindOf, nameOf, dayLabel } from './model.js';
 import { CreateForm } from './create-form.js';
 import { renderDetail } from './detail.js';
@@ -112,7 +112,7 @@ function agendaRows(ctx, list) {
   return html`<div class="sc-agenda">
     ${list.map((o, i) => html`
       <div class="sc-at" key=${'a' + i}>${hhmm(o.at)}<small>${dayLabel(o.at)}</small></div>
-      <div class="sc-nm" key=${'n' + i}>${openBtn(ctx, o.s)}<small>${cronWords(o.s.cron)}${o.s.purpose ? ` · ${o.s.purpose}` : ''}</small></div>
+      <div class="sc-nm" key=${'n' + i}>${openBtn(ctx, o.s)}<small>${cronWordsIn(o.s.cron, o.s.timezone)}${o.s.purpose ? ` · ${o.s.purpose}` : ''}</small></div>
       <div class="sc-who" key=${'w' + i}>${whoRuns(o.s)}</div>
       <div class="sc-in" key=${'i' + i}>${o.at.getTime() > nowMs ? formatUntil(o.at.toISOString()) : ''}</div>`)}
   </div>`;
@@ -133,16 +133,25 @@ function secRhythm(ctx) {
   const doors = html`
     <button type="button" class=${`og-door og-door--quiet ${ctx.rhythmSort === 'time' ? 'on' : ''}`} onClick=${() => ctx.setRhythmSort('time')}>${c('byTime')}</button>
     <button type="button" class=${`og-door og-door--quiet ${ctx.rhythmSort === 'name' ? 'on' : ''}`} onClick=${() => ctx.setRhythmSort('name')}>${c('byName')}</button>`;
-  const timeLabel = (r) => (r.times.length === 1 ? r.times[0] : r.times.length <= 3 ? r.times.map(x => x.slice(0, 2)).join(' · ') : c('timesN', { n: r.times.length }));
+  // `times` are MINUTES past midnight in the reader's own zone — a number, because that is what
+  // sorts. They are a WALL CLOCK rather than an instant, so they are written out as one: anchored
+  // in UTC and formatted in UTC, which leaves the digits alone and still gives the reader their own
+  // 12- or 24-hour face. The short form names the hours only, which is what the column has room for.
+  const wall = (mins) => new Date(Date.UTC(2024, 0, 1, Math.floor(mins / 60), mins % 60));
+  const clockOf = (mins) => fmtTime(wall(mins), { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+  const hourOf = (mins) => fmtTime(wall(mins), { hour: '2-digit', timeZone: 'UTC' });
+  const timeLabel = (r) => (r.times.length === 1 ? clockOf(r.times[0]) : r.times.length <= 3 ? r.times.map(hourOf).join(' · ') : c('timesN', { n: r.times.length }));
   return html`<${Section} id="sc-rhythm" num="02" title=${c('secRhythm')} count=${c('secRhythmSub', { n: m.rhythm.length })} doors=${doors}>
     ${rows.length ? html`
       <div class="sc-rhythm">
         <div class="sc-hd">${c('colTime')}</div><div class="sc-hd">${c('colSchedule')}</div>
-        ${m.days.map((d, i) => html`<div class=${`sc-hd sc-hd--day ${i === 0 ? 'sc-today' : ''}`} key=${'h' + i}>${fmtDate(d, { weekday: 'short' })}<small>${d.getDate()}</small></div>`)}
+        ${/* A column IS a calendar day, so it is written as one: calendar() cannot be slid into the
+              day before by a reader whose clock sits west of the browser's. */''}
+        ${m.days.map((d, i) => html`<div class=${`sc-hd sc-hd--day ${i === 0 ? 'sc-today' : ''}`} key=${'h' + i}>${calendar(d, { weekday: 'short' })}<small>${d.getDate()}</small></div>`)}
         <div class="sc-hd">${c('colLast')}</div>
         ${rows.map(r => html`
           <div class="sc-t" key=${'t' + r.s.id}>${timeLabel(r)}</div>
-          <div class="sc-nm" key=${'n' + r.s.id}>${openBtn(ctx, r.s)}<i>${cronWords(r.s.cron)}</i></div>
+          <div class="sc-nm" key=${'n' + r.s.id}>${openBtn(ctx, r.s)}<i>${cronWordsIn(r.s.cron, r.s.timezone)}</i></div>
           ${r.days.map((on, i) => html`<div class=${`sc-d ${on ? '' : 'sc-d--no'} ${i === 0 ? 'sc-today' : ''} ${kindOf(r.s) === 'agent' ? 'sc-d--agent' : ''}`} key=${'d' + r.s.id + i}>${on ? '●' : '·'}</div>`)}
           <div class="sc-last" key=${'l' + r.s.id}>${lastRun(r.s)}</div>`)}
       </div>
@@ -176,7 +185,7 @@ function secRare(ctx) {
     ${list.length ? html`<div class="sc-agenda sc-agenda--rare">
       ${list.map(s => { const d = new Date(s.nextRunAt); return html`
         <div class="sc-at" key=${'a' + s.id}>${fmtDate(d, { day: 'numeric', month: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })}<small>${fmtDate(d, { weekday: 'short' })} ${hhmm(d)}</small></div>
-        <div class="sc-nm" key=${'n' + s.id}>${openBtn(ctx, s)}<small>${cronWords(s.cron)}</small></div>
+        <div class="sc-nm" key=${'n' + s.id}>${openBtn(ctx, s)}<small>${cronWordsIn(s.cron, s.timezone)}</small></div>
         <div class="sc-who" key=${'w' + s.id}>${whoRuns(s)}</div>
         <div class="sc-in" key=${'i' + s.id}>${formatUntil(s.nextRunAt)}</div>`; })}
     </div>` : html`<p class="og-empty">${c('noneRare')}</p>`}
@@ -192,7 +201,7 @@ export function registerTable(ctx, list, { id = 'reg', head = true } = {}) {
     <div class="sc-reg">
       ${shown.map(s => html`
         <div class="sc-nm" key=${'n' + s.id}>${openBtn(ctx, s)}${s.enabled === false ? html`<span class="og-chip og-chip--dim og-chip--xs">${t('profile.scheduler.paused')}</span>` : null}</div>
-        <div class="sc-w" key=${'w' + s.id}>${cronWords(s.cron)}</div>
+        <div class="sc-w" key=${'w' + s.id}>${cronWordsIn(s.cron, s.timezone)}</div>
         <div class="sc-m" key=${'o' + s.id}>${whoRuns(s)}</div>
         <div class="sc-m" key=${'l' + s.id}>${lastRun(s)}</div>
         <div class="sc-n" key=${'r' + s.id}>${s.runCount ?? 0}</div>

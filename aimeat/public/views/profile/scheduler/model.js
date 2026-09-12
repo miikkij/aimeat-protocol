@@ -13,12 +13,10 @@
  *   v1.0.0 — 2026-08-30 — Initial, for the scheduler in the poster face.
  */
 
-import { date as fmtDate } from '/js/format.js';
+import { date as fmtDate, dayKey, minutesOfDay } from '/js/format.js';
 
 const DAY = 864e5;
 export const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
-const two = (n) => String(n).padStart(2, '0');
-const hhmm = (d) => `${two(d.getHours())}:${two(d.getMinutes())}`;
 export const nameOf = (s) => (s && (s.displayName || s.name)) || '';
 export const byName = (a, b) => nameOf(a).localeCompare(nameOf(b));
 
@@ -51,17 +49,30 @@ export function buildModel({ managed = [], extensions = [], occurrences = [], fr
   // The agenda: what fires next, in order.
   const agenda = occ.filter(o => o.at.getTime() >= nowMs);
 
+  // The seven day columns of the rhythm table, starting today. Their identity is the calendar day
+  // IN THE READER'S ZONE, because that is the day the times drawn beside them belong to.
+  const days = Array.from({ length: 7 }, (_, i) => new Date(startMs + i * DAY));
+  const columnKey = days.map(d => dayKey(d));
+
   // The rhythm: one row per schedule with a fire in the window.
+  //
+  // Every bucket here is the READER'S, not the browser's. It used to be `getHours()` and a local
+  // midnight, which put a Tokyo reader's Tuesday-05:00 run in Monday's column at 23:00 — on the
+  // same screen as a next-run card that said Tuesday 05:00, because that card had been fixed and
+  // this had not. Minutes are kept as a NUMBER: a 12-hour label does not sort, and "11:00 PM"
+  // would land before "5:00 AM".
   const rows = new Map();
   for (const o of occ) {
     let r = rows.get(o.s.id);
-    if (!r) { r = { s: o.s, times: new Set(), days: [0, 0, 0, 0, 0, 0, 0], firstMin: 1e9 }; rows.set(o.s.id, r); }
-    r.times.add(hhmm(o.at));
-    const di = Math.floor((startOfDay(o.at).getTime() - startMs) / DAY);
-    if (di >= 0 && di < 7) r.days[di] = 1;
-    r.firstMin = Math.min(r.firstMin, o.at.getHours() * 60 + o.at.getMinutes());
+    if (!r) { r = { s: o.s, times: new Set(), days: [0, 0, 0, 0, 0, 0, 0], firstMin: 1e9, at: o.at }; rows.set(o.s.id, r); }
+    const mins = minutesOfDay(o.at);
+    if (mins >= 0) { r.times.add(mins); r.firstMin = Math.min(r.firstMin, mins); }
+    const di = columnKey.indexOf(dayKey(o.at));
+    if (di >= 0) r.days[di] = 1;
   }
-  const rhythm = [...rows.values()].map(r => ({ ...r, times: [...r.times].sort() })).sort((a, b) => a.firstMin - b.firstMin || byName(a.s, b.s));
+  const rhythm = [...rows.values()]
+    .map(r => ({ ...r, times: [...r.times].sort((x, y) => x - y) }))
+    .sort((a, b) => a.firstMin - b.firstMin || byName(a.s, b.s));
 
   const continuous = frequent
     .map(f => ({ ...f, s: byId.get(f.scheduleId) }))
@@ -82,9 +93,6 @@ export function buildModel({ managed = [], extensions = [], occurrences = [], fr
   const todayEnd = startMs + DAY;
   const todayLeft = agenda.filter(o => o.at.getTime() < todayEnd).length;
   const latest = all.filter(s => s.lastRunAt).sort((a, b) => new Date(b.lastRunAt).getTime() - new Date(a.lastRunAt).getTime())[0] || null;
-
-  // The seven day columns of the rhythm table, starting today.
-  const days = Array.from({ length: 7 }, (_, i) => new Date(startMs + i * DAY));
 
   return { all, byId, agenda, rhythm, continuous, rare, paused, failed, agentMade, next, todayLeft, latest, days, occ };
 }
