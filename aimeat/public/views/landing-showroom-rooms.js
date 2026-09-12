@@ -19,6 +19,7 @@
  * @structure StoreSection · parseTiers · Star · TrustList · Rooms
  * @usage import { StoreSection, TrustList, Rooms } from '/views/landing-showroom-rooms.js';
  * @version-history
+ *   2026-09-13 -- V2: compose the safety band and named sun/coral room frames.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.1.0 — 2026-08-28 — The store section reads its ladder and its "from" price from the store's
  *     public record (ext:shop / tiers); the block's settings became the fallback.
@@ -128,7 +129,7 @@ export function TrustList({ navigate }) {
     [tr('landing.trust4Title', 'GDPR as buttons'), tr('landing.trust4Text', 'Export and delete are things you press, in Europe, on European terms.')],
   ];
   return html`
-    <section class="ld-sh-trust">
+    <section class="ld-sh-trust showroom-band">
       <h2 class="ld-sh-trust-title">${tr('landing.trustTitle', 'Safe is not a word here. It is a list.')}</h2>
       <div class="ld-sh-trust-grid">
         ${items.map(([title, text]) => html`
@@ -161,7 +162,7 @@ export function Rooms() {
   }
   return html`
     <section class="ld-sh-rooms">
-      <div class="ld-sh-room ld-sh-room--sun">
+      <div class="ld-sh-room showroom-section">
         <img class="ld-sh-room-img" src="/img/wiifm/incubator.jpg" width="600" height="600" loading="lazy"
           alt=${tr('landing.roomIncAlt', 'A delighted scientist in a hatchery full of robot chicks hatching from glowing eggs')} />
         <h3 class="ld-sh-h3">${tr('landing.roomIncTitle', 'Adopt agents from the incubator')}</h3>
@@ -176,7 +177,7 @@ export function Rooms() {
             ${' '}${tr('landing.roomIncStartTail', 'hatches helpers ready to work, and the demo lets you watch them earn their name before you take one home.')}
           </div>` : ''}
       </div>
-      <div class="ld-sh-room ld-sh-room--coral">
+      <div class="ld-sh-room showroom-section showroom-section--coral">
         <img class="ld-sh-room-img" src="/img/frontdemo/clubhouse.jpg" width="600" height="600" loading="lazy"
           alt=${tr('landing.roomClubAlt', 'A warm treehouse clubhouse at dusk where a friendly robot doorman lifts a velvet rope for a group of friends')} />
         <h3 class="ld-sh-h3">${tr('landing.roomClubTitle', 'Nobody in it but you')}</h3>
