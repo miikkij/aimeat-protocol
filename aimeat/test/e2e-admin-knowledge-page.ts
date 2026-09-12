@@ -16,6 +16,11 @@
  *   defect wearing a different door.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-admin-knowledge-page
  * @version-history
+ *   v1.2.0 — 2026-09-12 — aimeat_admin_knowledge over a real MCP session, held against the HTTP
+ *     door. The static gates prove the name and the parameters on all three surfaces; only this
+ *     proves the tool looks under the operator's own identity rather than the calling agent's.
+ *   v1.1.0 — 2026-09-12 — A page or a limit that is not a number: five spellings of it, each of
+ *     which used to answer with an empty list and a null count.
  *   v1.0.0 — 2026-09-12 — Initial, with the Knowledge page's rebuild.
  */
 
@@ -125,6 +130,19 @@ await test('A page past the end comes back as the last page, not empty', async (
     assert(d.packages.length > 0, 'and it has packages on it');
 });
 
+await test('A page or a limit that is not a number falls back instead of emptying the list', async () => {
+    // `Math.max(1, NaN)` is NaN, so ?page=abc used to slice with NaN: an empty array, and paging
+    // numbers that serialise as null. A moderator reading "0 packages" on a node holding hundreds
+    // could not tell a typo from an empty store, which is the silence this whole read ends.
+    for (const qs of ['?page=abc', '?limit=abc', '?page=abc&limit=abc', '?page=-3', '?limit=0']) {
+        const d = (await list(qs)).body.data;
+        assert(Number.isFinite(d.paging.number) && d.paging.number >= 1, `${qs}: paging.number is ${d.paging.number}`);
+        assert(Number.isFinite(d.paging.per_page) && d.paging.per_page >= 1, `${qs}: paging.per_page is ${d.paging.per_page}`);
+        assert(Number.isFinite(d.paging.total) && d.paging.total > 0, `${qs}: paging.total is ${d.paging.total}`);
+        assert(d.packages.length > 0, `${qs}: the page came back empty`);
+    }
+});
+
 await test('The shape counts the whole match, not the page', async () => {
     const d = (await list('?limit=1')).body.data;
     assert(d.packages.length === 1, 'one package on the page');
@@ -214,6 +232,90 @@ await test('A review is recorded and the list says somebody looked', async () =>
     assert(!!after, 'the package is still there');
     assert(after.reviews >= 1, `the trail is counted, got ${after.reviews}`);
     assert(after.last_review?.action === 'approve', `and the last action is named, got ${after.last_review?.action}`);
+});
+
+/* ── The chat path ──
+ *
+ * THE ONE THING THE STATIC GATES CANNOT SEE. check:mcp-tools proves the name is on all three
+ * surfaces and check:mcp-schemas proves they take the same parameters; neither can tell whether the
+ * tool looks under the right identity. It builds the operator's GHII from the CALLING AGENT's
+ * owner, because the operator's own imports are stored there — read the agent's GAII instead and
+ * the tool answers with a smaller collection and no sign that it did, which is the exact failure
+ * this whole page was rebuilt to end.
+ */
+let mcpToken = '';
+let mcpSession = '';
+
+async function mcpRpc(method: string, params: Record<string, unknown> = {}, id = 1) {
+    const res = await fetch(`${BASE}/v1/mcp`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json, text/event-stream',
+            ...(mcpToken ? { Authorization: `Bearer ${mcpToken}` } : {}),
+            ...(mcpSession ? { 'mcp-session-id': mcpSession, 'mcp-protocol-version': '2025-03-26' } : {}),
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+    });
+    const sid = res.headers.get('mcp-session-id');
+    if (sid) mcpSession = sid;
+    const ct = res.headers.get('content-type') ?? '';
+    if (!ct.includes('text/event-stream')) return await res.json() as any;
+    // SSE: the reply is one `data:` line per message; take the one carrying our id.
+    const messages = (await res.text()).split('\n\n').map(evt => {
+        const data = evt.trim().split('\n').filter(l => l.startsWith('data: ')).map(l => l.slice(6)).join('');
+        try { return data ? JSON.parse(data) : null; } catch { return null; }
+    }).filter(Boolean);
+    return messages.find((m: any) => m.id === id) ?? messages[0] ?? {};
+}
+
+await test("The operator's agent reads the same collection over MCP", async () => {
+    const agent = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${opToken}` },
+        body: JSON.stringify({ name: 'knopagent', owner: opName, capabilities: ['knowledge'], model: 'gpt-4o' }),
+    });
+    assert(agent.status === 201, `agent: ${agent.status} ${JSON.stringify(agent.body.error ?? '')}`);
+    const gaii = agent.body.data.agent.gaii as string;
+
+    const client = await json('/v1/mcp/register', {
+        method: 'POST',
+        body: JSON.stringify({ client_name: 'Admin Knowledge E2E', redirect_uris: [] }),
+    });
+    assert(client.status === 201, `mcp register: ${client.status}`);
+
+    const ts = new Date().toISOString();
+    const params = new URLSearchParams({
+        response_type: 'code',
+        client_id: client.body.client_id,
+        gaii,
+        signature: await signMsg(agent.body.data.private_key, gaii + NODE_ID + ts),
+        timestamp: ts,
+    });
+    const auth = await json(`/v1/mcp/authorize?${params}`);
+    assert(typeof auth.body.code === 'string', `authorize: ${JSON.stringify(auth.body)}`);
+    const tok = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({
+            grant_type: 'authorization_code', code: auth.body.code,
+            client_id: client.body.client_id, client_secret: client.body.client_secret,
+        }),
+    });
+    assert(tok.status === 200, `mcp token: ${tok.status}`);
+    mcpToken = tok.body.access_token;
+
+    await mcpRpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'Admin Knowledge E2E', version: '1.0.0' } });
+    const called = await mcpRpc('tools/call', { name: 'aimeat_admin_knowledge', arguments: { limit: 1 } }, 2);
+    assert(called?.result?.isError !== true, `tool errored: ${JSON.stringify(called?.result ?? called).slice(0, 300)}`);
+    const payload = JSON.parse(called.result.content[0].text);
+
+    // The HTTP door is the control: the two must agree, or the tool is looking somewhere else.
+    const overHttp = (await list('?limit=1')).body.data;
+    assert(payload.paging.total === overHttp.paging.total,
+        `MCP says ${payload.paging.total}, the page says ${overHttp.paging.total}`);
+    assert(payload.paging.total > 0, 'and it is not an empty collection, which would prove nothing');
+    assert(payload.packages.length === 1, `the limit was forwarded, got ${payload.packages.length}`);
+    assert(Array.isArray(payload.facets?.authors) && payload.facets.authors.length > 0, 'the shape comes with it');
 });
 
 await test('The door is operator-only', async () => {
