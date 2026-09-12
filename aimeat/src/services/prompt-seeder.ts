@@ -11,9 +11,14 @@
  *   - seedSystemPrompts(storage): upsert seeds, insert-or-update, and version new inserts
  *
  * @version-history
+ *   v1.1.0 — 2026-09-12 — The two lists that decide whether a prompt is rewritten from source move
+ *     to prompt-ownership.ts, unchanged. The admin page reads the same rule, so it can tell an
+ *     operator whose prompt they are editing before they spend an hour on one the next deploy
+ *     overwrites.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { PROMPT_SEEDS } from './prompt-defaults.js';
+import { promptSourceKind } from './prompt-ownership.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
@@ -71,16 +76,10 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
       // Always update generator and builder prompt content from seeds.
       // These prompts are code — they must match the source code version.
       // Admin edits are preserved in version history and can be restored.
-      // syncIds extends this to individual code-owned prompts in other groups
-      // (e.g. the portal template-editor prompt, which must track its tag/header
-      // guidance in source; and bootstrap-anon, which DESCRIBES API FLOWS — when a flow is
-      // removed, a node still serving the old description sends every agent that reads its
-      // front door to a dead end, and it stayed wrong for exactly that reason).
-      const syncGroups = ['generator', 'builders', 'tiers'];
-      // 'surface-layout' joins them for the same reason: its block catalogue is generated from the
-      // registry, and a node serving last month's description hands an AI names it no longer has.
-      const syncIds = ['site-portal', 'bootstrap-anon', 'surface-layout'];
-      if ((syncGroups.includes(seed.group) || syncIds.includes(seed.id)) && existing.content !== seed.content) {
+      // The two lists moved to prompt-ownership.ts on 2026-09-12, unchanged: the admin page has to
+      // tell an operator which kind of prompt they are editing, and a second copy of this rule
+      // there would drift from this one the day a group is added.
+      if (promptSourceKind(seed.id, seed.group) === 'code' && existing.content !== seed.content) {
         metaUpdate.content = seed.content;
         metaUpdate.updatedAt = new Date().toISOString();
         logger.info(`System prompt "${seed.id}" content synced from seed (${seed.content.length} chars)`);

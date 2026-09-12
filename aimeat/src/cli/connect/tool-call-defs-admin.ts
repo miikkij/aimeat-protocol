@@ -17,7 +17,7 @@
  *     aimeat_admin_cors_set (the two PUT cors routes, chosen by the `#` in `who`).
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { requiredString, requiredValue, optionalString, query } from './tool-call-helpers.js';
+import { requiredString, requiredValue, optionalString, optionalBoolean, query } from './tool-call-helpers.js';
 
 export const adminCliTools: ConnectCliToolDefinition[] = [
     {
@@ -27,6 +27,28 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_admin_hooks',
         handler: ({ client }) => client.get('/v1/admin/hooks'),
+    },
+    {
+        // THE THIRD SURFACE forwards all three, and forwards each date WHETHER OR NOT its partner
+        // is there. A lone date is a mistake, and the route says so in a 400; withholding it here
+        // would turn that refusal into thirty days of numbers wearing the caller's label.
+        // `ask_provider` picks a SECOND route rather than a query parameter, because asking the
+        // provider costs an outbound round trip the page's own read never pays.
+        name: 'aimeat_admin_usage',
+        handler: async ({ client }, input) => {
+            const page = await client.get(`/v1/admin/usage/page${query({
+                from: optionalString(input, 'from'),
+                to: optionalString(input, 'to'),
+            })}`);
+            if (optionalBoolean(input, 'ask_provider') !== true || !page.ok) return page;
+            // The answered keys REPLACE the page's own `keys`, which is the same block with every
+            // `spend` left null. Merging into `data` rather than beside the envelope keeps the one
+            // shape every other tool on this surface returns.
+            const keys = await client.get('/v1/admin/usage/keys');
+            const answered = (keys.data as { keys?: unknown } | undefined)?.keys;
+            if (!keys.ok || !answered) return page;
+            return { ...page, data: { ...(page.data as object), keys: answered } };
+        },
     },
     {
         // THE THIRD SURFACE forwards both dates, and forwards them TOGETHER. The route uses them
