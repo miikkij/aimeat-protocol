@@ -15,6 +15,10 @@
  *   - setLevel / doDelete / doRemoveEmail / doResetTotp: call admin service
  *
  * @version-history
+ *   v2.1.0 — 2026-09-12 — The row prints the name before the @ and keeps the whole identity in the
+ *     hover and in the stacked view: at 1280 the person column had 4px to spare on a local node's
+ *     ids, and a production one is six characters longer, so the identity would have wrapped on
+ *     every row. Sixty-four repetitions of the node id is not information.
  *   v2.0.0 — 2026-09-12 — The poster face: the explanation card and its three accordions become
  *     section 03, the stat cards become the numeral strip, and the eight-column table that was
  *     766px wide inside a sideways-scrolling box becomes grid rows that stack on a phone. The red
