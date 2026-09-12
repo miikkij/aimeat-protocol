@@ -56,7 +56,7 @@
 .adm-st-crow b { font-weight: 700; }
 .adm-st-crow .adm-why { overflow-wrap: anywhere; }
 .adm-st-num { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.5rem; line-height: 1; letter-spacing: var(--font-poster-tracking, .01em); text-align: right; color: var(--text); }
-.adm-st-num--none { color: var(--text-muted); }
+.adm-st-num--none { color: var(--text-dim); }
 .adm-st-chip { display: inline-block; padding: 1px 7px; font-family: var(--font-mono); font-size: .66rem; font-weight: 500; text-transform: uppercase; line-height: 1.6; white-space: nowrap; }
 .adm-st-chip--ok { background: var(--success-bg); color: var(--success-fg); }
 .adm-st-chip--bad { background: var(--danger-bg); color: var(--danger-fg); }
@@ -87,19 +87,19 @@
 .adm-st-key--writes { background: var(--st-writes); }
 .adm-st-key--critical { background: var(--st-critical); }
 .adm-st-key--plain { background: var(--text-dim); }
-.adm-st-yhint { font-family: var(--font-mono); font-size: .66rem; color: var(--text-muted); }
+.adm-st-yhint { font-family: var(--font-mono); font-size: .66rem; color: var(--text-dim); }
 .adm-st-yhint--on { color: var(--text); }
 .adm-st-plot { display: flex; align-items: flex-end; gap: 6px; height: 150px; margin-top: 14px; padding-bottom: 2px; border-bottom: 1px solid var(--border); }
 .adm-st-day { flex: 1 1 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; min-width: 0; }
 .adm-st-day:hover { background: var(--bg-surface); }
 .adm-st-pair { display: flex; align-items: flex-end; gap: 2px; width: 100%; height: 100%; }
 .adm-st-xaxis { display: flex; gap: 6px; margin-top: 6px; }
-.adm-st-xaxis span { flex: 1 1 0; text-align: center; font-family: var(--font-mono); font-size: .64rem; color: var(--text-muted); min-width: 0; overflow: hidden; }
+.adm-st-xaxis span { flex: 1 1 0; text-align: center; font-family: var(--font-mono); font-size: .64rem; color: var(--text-dim); min-width: 0; overflow: hidden; }
 
 /* 03 and 05: the numbers behind a chart, and the delivery table. */
 .adm-st-scroll { overflow-x: auto; }
 .adm-st-tbl { width: 100%; border-collapse: collapse; font-size: .81rem; }
-.adm-st-tbl th { text-align: left; color: var(--text-muted); font-weight: 600; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); white-space: nowrap; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; }
+.adm-st-tbl th { text-align: left; color: var(--text-dim); font-weight: 600; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); white-space: nowrap; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; }
 .adm-st-tbl td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--border-subtle); color: var(--text-dim); vertical-align: top; }
 .adm-st-tbl td b { color: var(--text); font-weight: 700; }
 .adm-st-tbl th.num, .adm-st-tbl td.num { text-align: right; }
