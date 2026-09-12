@@ -9,8 +9,10 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
- *   v1.44.0 -- 2026-09-12 -- Add e2e-admin-organisms-page.ts to ALL_SUITES: GET /v1/admin/organisms,
+ *   v1.45.0 -- 2026-09-12 -- Add e2e-admin-organisms-page.ts to ALL_SUITES: GET /v1/admin/organisms,
  *            which is new, and the repair behind it. Not in the guard tier yet.
+ *   v1.44.0 -- 2026-09-12 -- Add e2e-admin-sso-page.ts to ALL_SUITES: a connection can be complete
+ *            and reach nobody. Not in the guard tier yet.
  *   v1.43.0 -- 2026-09-12 -- Add e2e-admin-owners-page.ts to ALL_SUITES: the field set the Owners
  *            page counts every figure and filter from, and the two writes that move it. Not in the
  *            guard tier yet.
@@ -581,6 +583,9 @@ const ALL_SUITES = [
     // The Usage page's read: that every figure says whose money it is, that the chat agent's key is
     // reported as NOT metered here, and that a half-stated period is refused rather than completed.
     'test/e2e-admin-usage-page.ts',
+    // The Organisation sign-in page's read: that a connection can be complete and still reach
+    // nobody, because the node-wide switch is off and both public doors answer 503.
+    'test/e2e-admin-sso-page.ts',
     'test/e2e-living-pulse.ts',
     // Every core scheduled job fired through the operator's trigger door, on a node of its own
     // (40310) with an SMTP sink, short windows and the flags the seeding keys on. Lane 0.

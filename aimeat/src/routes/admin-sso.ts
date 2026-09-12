@@ -11,6 +11,9 @@
  *   POST …/:id/scim-token, POST …/:id/idp-metadata, and the public GET /v1/sso/:id/metadata.
  * @usage app.use(adminSsoRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-09-12 — The list also carries the two node-wide switches and what they mean for
+ *     each connection. A complete connection on a node with sso.enabled off reaches nobody, and no
+ *     surface could say so. → services/sso-overview.ts
  *   v1.1.0 — 2026-08-24 — Thin over services/sso-connections.ts (pure logic move) when the MCP
  *     tools became the second caller.
  *   v1.0.0 — 2026-08-23 — Initial (BR-04 phase 1).
@@ -23,9 +26,10 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { spMetadataXml } from '../services/saml-sp.js';
 import {
-  listSsoConnectionViews, getSsoConnectionView, createSsoConnection, updateSsoConnectionAdmin,
+  createSsoConnection, updateSsoConnectionAdmin,
   deleteSsoConnectionAdmin, mintScimToken, setIdpMetadata, type SsoAdminRefusal,
 } from '../services/sso-connections.js';
+import { buildSsoOverview, buildSsoConnectionRow } from '../services/sso-overview.js';
 
 export function adminSsoRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -33,9 +37,15 @@ export function adminSsoRouter(config: AimeatConfig, storage: Storage): Router {
   const sendRefusal = (res: Response, r: SsoAdminRefusal) =>
     res.status(r.status).json(error(config.nodeId, r.code, r.message));
 
-  // GET /v1/admin/sso/connections — the operator's list.
+  // GET /v1/admin/sso/connections — the operator's list, AND the two switches that decide whether
+  // any of it does anything.
+  //
+  // The `node` and `summary` blocks are additive, and they are here rather than on a page-shaped
+  // route of their own because the question they answer is the same question this list was always
+  // being asked: can anybody sign in. A connection can be complete and nobody can, because
+  // sso.enabled is off and both public doors answer 503. → services/sso-overview.ts
   router.get('/v1/admin/sso/connections', ...operator, async (_req, res) => {
-    res.json(success(config.nodeId, { connections: await listSsoConnectionViews(config, storage) }));
+    res.json(success(config.nodeId, await buildSsoOverview(config, storage)));
   });
 
   // POST /v1/admin/sso/connections — create.
@@ -45,11 +55,15 @@ export function adminSsoRouter(config: AimeatConfig, storage: Storage): Router {
     res.status(201).json(success(config.nodeId, { connection: r.connection }));
   });
 
-  // GET /v1/admin/sso/connections/:id
+  // GET /v1/admin/sso/connections/:id — the same derived fields the list carries, for one company.
+  //
+  // It used to return the raw view, so a surface showing ONE connection had no `state`, no
+  // `can_sign_in` and no `steps_done`, and the detail view read "0 of 6" beside a list saying 4 of
+  // 6. Two reads of the same thing answer the same thing now.
   router.get('/v1/admin/sso/connections/:id', ...operator, async (req, res) => {
-    const view = await getSsoConnectionView(config, storage, req.params.id as string);
-    if (!view) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Connection not found')); return; }
-    res.json(success(config.nodeId, { connection: view }));
+    const row = await buildSsoConnectionRow(config, storage, req.params.id as string);
+    if (!row) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Connection not found')); return; }
+    res.json(success(config.nodeId, { connection: row }));
   });
 
   // PUT /v1/admin/sso/connections/:id — the mutable half; never the id, never SAML directly.

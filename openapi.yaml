@@ -47457,8 +47457,18 @@ paths:
                                   type: string
                                 bundle_name:
                                   type: string
+                                detect_pattern:
+                                  type: string
                                 agent_count:
                                   type: integer
+                                self_reported:
+                                  type: boolean
+                                  description: |
+                                    The platform id came from the agent itself, as free text in the
+                                    identify step, and matches no pattern in the registry.
+                          total_agents:
+                            type: integer
+                            description: Every agent on this node, whatever its platform value.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -47499,8 +47509,20 @@ paths:
                                   type: string
                                 current_step:
                                   type: string
+                                  description: The title of the step the agent is waiting at.
+                                current_step_id:
+                                  type: string
+                                  nullable: true
+                                  description: |
+                                    The id of that step, which is what POST
+                                    /v1/admin/agents/{gaii}/onboarding/skip takes.
                                 stuck_since:
                                   type: string
+                                never_moved:
+                                  type: boolean
+                                  description: |
+                                    True when no step was ever validated, so stuck_since is the day
+                                    the onboarding started rather than the day of its last step.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
