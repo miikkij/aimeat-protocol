@@ -13,6 +13,10 @@
  *   - (module) replicationState + tracking-key helpers for per-peer/per-key sync state
  *
  * @version-history
+ *   v1.0.1 — 2026-09-13 — A consent pattern that will not compile now says so and matches nothing.
+ *     It fell back to `key === pattern`, which cannot be true — the equal case returns true at the
+ *     top of the same function — so it was `false` written in a way that hid a malformed consent
+ *     pattern from the operator who wrote it. Found by no-silent-catch's fourth shape.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
@@ -87,8 +91,15 @@ function matchesPattern(key: string, pattern: string): boolean {
 
   try {
     return new RegExp(`^${regexStr}$`).test(key);
-  } catch {
-    return key === pattern;
+  } catch (e) {
+    // A consent pattern that will not compile decides nothing, so the key is NOT eligible. This
+    // read `return key === pattern`, which cannot be true: the equal case returned true at the top
+    // of this function, so the fallback was `false` written in a way that hid a malformed consent
+    // pattern from the operator who wrote it. Fail closed and say which pattern it was.
+    logger.warn('Federation consent pattern does not compile; no key matches it', {
+      pattern, error: e instanceof Error ? e.message : String(e),
+    });
+    return false;
   }
 }
 

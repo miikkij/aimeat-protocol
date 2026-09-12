@@ -45,6 +45,10 @@ export const FAST_CHECKS = [
     { script: 'check:doc-counts -- --strict', label: 'The counts this project states about itself' },
     { script: 'check:scope-parity', label: 'One permission word, every door' },
     { script: 'check:liaison-surface', label: 'Published surfaces match, and neither needs a release' },
+    // The whole-tree silent-exception pass, which until 2026-09-13 ran nowhere: the hook sees only
+    // staged files and nothing else called it, so the three cleaned shapes were held at zero by
+    // eslint alone and the fourth had no keeper at all.
+    { script: 'check:silent-catch -- --strict', label: 'A caught error leaves a trace, and no file answers with more substitutes than before' },
 ];
 
 // The five compiler invariants share one program and run together, outside the fast pool.

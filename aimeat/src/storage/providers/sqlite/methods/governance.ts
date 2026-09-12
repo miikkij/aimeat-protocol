@@ -9,6 +9,11 @@
  *   v1.2.0 — 2026-07-23 — listOrganisms member-scoped queries return ALL matches (no default 20-item page cap).
  *   v1.3.0 — 2026-08-23 — consentFacets(), the node-wide SQL roll-up the compliance report reads (BR-02).
  *   v1.4.0 — 2026-09-09 — updateCsm deleted: no caller.
+ *   v1.4.1 — 2026-09-13 — parseOwners says out loud when the owners column does not parse. It
+ *     returned the creator alone, which is the safe direction and stays, but it is also exactly
+ *     what the "column did not exist" path returns, so a CORRUPT row and an old row were
+ *     indistinguishable and an organism could quietly lose its co-owners. Found by
+ *     no-silent-catch's fourth shape.
  */
 import type {
   ArchiveFilter, SchemaRecord, CsmRecord, MsmRecord,
@@ -16,6 +21,7 @@ import type {
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { consentMethods } from './consent.js';
+import { logger } from '../../../../utils/logger.js';
 import { matchWildcardPattern } from '../../../pattern-utils.js';
 import { getCachedSchemaLocks, setCachedSchemaLocks, invalidateSchemaLockCache } from '../../../schema-lock-cache.js';
 
@@ -23,7 +29,18 @@ import { getCachedSchemaLocks, setCachedSchemaLocks, invalidateSchemaLockCache }
 function parseOwners(raw: unknown, creatorGhii: string): string[] {
   if (typeof raw !== 'string' || !raw) return [creatorGhii];
   let parsed: unknown;
-  try { parsed = JSON.parse(raw); } catch { return [creatorGhii]; }
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    // Narrowing to the creator is the safe direction, so the value stays. What did not stay is the
+    // silence: this returned exactly what the "column did not exist" path above returns, so a
+    // CORRUPT owners column and an old row were indistinguishable, and an organism could quietly
+    // lose its co-owners with nothing to read.
+    logger.warn('Organism owners column does not parse; falling back to the creator alone', {
+      creatorGhii, error: e instanceof Error ? e.message : String(e),
+    });
+    return [creatorGhii];
+  }
   if (Array.isArray(parsed) && parsed.length) return parsed.filter((x): x is string => typeof x === 'string');
   return [creatorGhii];
 }
