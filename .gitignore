@@ -178,6 +178,11 @@ docs/internal/
 # session (e.g. cadence-app.json, cadence-cortex-lib.json). The real app/cortex live in the
 # node store, not the repo — these are throwaway fetch snapshots.
 /cadence-*.json
+# Accessibility-tree snapshots from a browser check (e.g. access-tab-snapshot.md): the page as the
+# driver reads it, hundreds of lines of nodes and ref ids. The Playwright MCP server resolves a
+# BARE filename against the repo root, which is the same slip the /*.png rule above was written
+# for; that one only covered the screenshot half, and a snapshot is Markdown.
+/*-snapshot.md
 # Package build artifacts — packages/ holds app SOURCE; built .zip bundles are outputs.
 packages/*.zip
 
