@@ -2,15 +2,26 @@
  * @file public/views/admin/ghii-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin dashboard tab for managing GHII human users — lists accounts with
- *   verification level, email, TOTP status and timestamps, and lets the operator change
- *   verification level, remove an attached email, or delete a GHII.
+ * @description Admin GHII Users page in the poster face (design canvas "AIMEAT Admin GHII Users",
+ *   list direction A). Three sections in the order an operator asks: what is true of these people
+ *   right now, the people themselves behind a search and seven filter chips, and what a level
+ *   means. The four writes go through the same routes as before; nothing new is fetched, and the
+ *   sign-in count the route has always returned is on the screen for the first time.
  *
  * @structure
- *   - GhiiTab({ data, reload }): renders stats + user table with confirm-guarded actions
+ *   - GhiiTab({ data, reload, switchPage }) — the three sections, the strip and the actions
+ *   - tally(): every count the page shows, from the one list the dashboard already loaded
+ *   - PersonRow: one person as a grid row (a block, with its values named, under 900px)
  *   - setLevel / doDelete / doRemoveEmail / doResetTotp: call admin service
  *
  * @version-history
+ *   v2.0.0 — 2026-09-12 — The poster face: the explanation card and its three accordions become
+ *     section 03, the stat cards become the numeral strip, and the eight-column table that was
+ *     766px wide inside a sideways-scrolling box becomes grid rows that stack on a phone. The red
+ *     CRITICAL chip leaves the list (it was drawn 128 times for the ordinary fact that somebody
+ *     registered with a password) and the level becomes three chips with the current one on the
+ *     sun, in place of a select that wrote on change. Search and filters arrive because 64 rows
+ *     cannot be read; login_count arrives because the route has always sent it.
  *   v1.2.0 — 2026-09-05 — The remove-email button says its words instead of two glyphs: no emoji anywhere in the interface.
  *   v1.1.0 — 2026-09-04 — The two-step sign-in reset, on the rows that have it armed. Removing it
  *     the normal way needs a code from the device the person lost, so this was the account's only
@@ -20,118 +31,258 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
-import { dt, Badge, StatsGrid, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
+import { useViewCSS } from '/components/useViewCSS.js';
+import { num, when, Row, Badge, useToast, Toast } from './shared.js';
 import { updateGhiiLevel, deleteGhii, removeGhiiEmail, resetGhiiTotp } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 
-export default function GhiiTab({ data, reload }) {
+const G = (key, vars) => t('dashboard.ghiiPage.' + key, vars);
+
+/** The name to call somebody by: what they chose, then their username, then the identity itself. */
+const nameOf = (u) => u.display_name || u.username || u.ghii;
+
+/** An account the chat opened for somebody who never registered. index-start.ts names them
+ *  `anon-<four hex>`; the node's own first one is plain `anonymous`. Twelve of sixty-four on
+ *  aimeat.io, and the reason "64 people" is not sixty-four people. */
+const isAnon = (u) => u.username === 'anonymous' || /^anon-/.test(String(u.username || ''));
+
+const FILTERS = ['all', 'l0', 'l1', 'l2', 'totp', 'cold', 'anon'];
+
+/** Every count the page shows, read off the list the dashboard already holds. No second fetch. */
+function tally(users) {
+  const c = { all: users.length, l0: 0, l1: 0, l2: 0, totp: 0, cold: 0, anon: 0, mail: 0, seen: 0 };
+  for (const u of users) {
+    if (u.verification_level === 2) c.l2++;
+    else if (u.verification_level === 1) c.l1++;
+    else c.l0++;
+    if (u.totp_enabled) c.totp++;
+    if (u.last_login_at) c.seen++; else c.cold++;
+    if (isAnon(u)) c.anon++;
+    if (u.masked_email) c.mail++;
+  }
+  return c;
+}
+
+/** True when this person is in the chosen filter. */
+function inFilter(u, filter) {
+  if (filter === 'l0') return (u.verification_level || 0) === 0;
+  if (filter === 'l1') return u.verification_level === 1;
+  if (filter === 'l2') return u.verification_level === 2;
+  if (filter === 'totp') return !!u.totp_enabled;
+  if (filter === 'cold') return !u.last_login_at;
+  if (filter === 'anon') return isAnon(u);
+  return true;
+}
+
+/** Free text against the four things an operator would type: name, username, GHII, mail. */
+function matches(u, q) {
+  if (!q) return true;
+  const hay = [u.display_name, u.username, u.ghii, u.masked_email].filter(Boolean).join(' ').toLowerCase();
+  return hay.includes(q);
+}
+
+export default function GhiiTab({ data, reload, switchPage }) {
+  // A no-op these days: the sheet is a <link> in spa.html, and a view stylesheet that is only
+  // named here loads nowhere. The call stays because every other tab makes it.
+  useViewCSS('/css/views/admin-ghii.css');
   const [toast, showErr, showOk, clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
-  const users = data.ghiiUsers || [];
+  const [q, setQ] = useState('');
+  const [filter, setFilter] = useState('all');
 
-  async function setLevel(ghii, level) {
-    try { await updateGhiiLevel(ghii, parseInt(level)); reload(); }
-    catch (e) { showErr(e.message); }
+  const users = data.ghiiUsers || [];
+  const nodeId = (data.dash || {}).node_id || '';
+  const c = tally(users);
+
+  // Oldest first, which is what the foot says. The route returns storage order, and on a page
+  // where the question is "who has been here since the start" that order is nobody's.
+  const shown = users
+    .filter((u) => inFilter(u, filter) && matches(u, q.trim().toLowerCase()))
+    .slice()
+    .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
+
+  const oldest = users.reduce((min, u) => (!min || String(u.created_at) < min ? String(u.created_at) : min), '');
+
+  async function setLevel(u, level) {
+    try {
+      await updateGhiiLevel(u.ghii, level);
+      showOk(G('levelSet', { name: nameOf(u), level: 'L' + level }));
+      reload();
+    } catch (e) { showErr(e.message); }
   }
 
-  function doDelete(ghii) {
-    confirm(t('dashboard.deleteGhiiConfirm') + ' ' + ghii + '?', async () => {
-      try { await deleteGhii(ghii); reload(); }
+  function doDelete(u) {
+    confirm(G('deleteAsk', { name: nameOf(u) }), async () => {
+      try { await deleteGhii(u.ghii); showOk(G('deleteDone', { name: nameOf(u) })); reload(); }
       catch (e) { showErr(e.message); }
-    }, { danger: true });
+    }, { title: G('deleteTitle'), confirmLabel: G('deleteBtn'), danger: true });
   }
 
   // The answer to "I lost my phone and my backup codes". It hands the operator nothing: the
   // password still stands, and the person is told on their own feed who did this.
   function doResetTotp(u) {
-    confirm(t('dashboard.ghiiTotpResetConfirm').replace('{name}', u.display_name || u.username), async () => {
+    confirm(t('dashboard.ghiiTotpResetConfirm').replace('{name}', nameOf(u)), async () => {
       try { await resetGhiiTotp(u.username); showOk(t('dashboard.ghiiTotpResetDone')); reload(); }
       catch (e) { showErr(e.message); }
     }, { danger: true });
   }
 
   function doRemoveEmail(u) {
-    confirm(t('dashboard.ghiiRemoveEmailConfirm').replace('{name}', u.display_name || u.username), async () => {
+    confirm(t('dashboard.ghiiRemoveEmailConfirm').replace('{name}', nameOf(u)), async () => {
       try { await removeGhiiEmail(u.ghii); showOk(t('dashboard.ghiiEmailRemoved')); reload(); }
       catch (e) { showErr(e.message); }
     }, { danger: true });
   }
 
+  /** The status line under the big number, and it has to stay true of whatever is here. One
+   *  verified person is the case a plural template gets wrong, and the first one always is one. */
+  const statusLine = c.l2 === 1
+    ? G('lineOne', { rest: num(c.all - 1) })
+    : (c.l2 > 1
+      ? G('lineSome', { verified: num(c.l2), rest: num(c.all - c.l2) })
+      : (c.totp > 0 ? G('lineNoneVerified', { n: num(c.all) }) : G('lineNothing', { n: num(c.all) })));
+
+  const chip = (id) => html`
+    <button type="button" class="adm-gh-chip ${filter === id ? 'on' : ''}"
+      disabled=${c[id] === 0 && id !== 'all'} onClick=${() => setFilter(id)}>
+      ${G('f' + id.charAt(0).toUpperCase() + id.slice(1))} · ${num(c[id])}
+    </button>`;
+
+  const level = (u) => html`
+    <span class="adm-gh-lvl" data-l=${G('colLevel')}>
+      ${[0, 1, 2].map((n) => html`
+        <button type="button" class="adm-gh-lchip ${(u.verification_level || 0) === n ? 'on' : ''}"
+          disabled=${(u.verification_level || 0) === n}
+          title=${G('levelSetHint', { level: 'L' + n })}
+          onClick=${() => setLevel(u, n)}>L${n}</button>`)}
+    </span>`;
+
+  const person = (u) => html`
+    <div class="adm-gh-row" key=${u.ghii}>
+      <span><b>${nameOf(u)}</b><span class="adm-gh-id">${u.ghii}</span></span>
+      <span data-l=${G('colMail')}>
+        ${u.masked_email
+    ? html`<span class="adm-gh-mail ${u.email_verified ? '' : 'adm-gh-mail--unconfirmed'}">${u.masked_email}</span>`
+    : html`<span class="adm-gh-none">–</span>`}
+      </span>
+      ${level(u)}
+      <span data-l=${G('colTotp')}>
+        ${u.totp_enabled
+    ? html`<${Badge} type="healthy" label=${G('on')} />`
+    : html`<span class="adm-gh-none">–</span>`}
+      </span>
+      <span class="adm-gh-when" data-l=${G('colSeen')}>
+        ${u.last_login_at ? when(u.last_login_at) : html`<span class="adm-gh-none">${G('never')}</span>`}
+        ${u.login_count ? html`<small>${u.login_count === 1 ? G('timesOne') : G('times', { n: num(u.login_count) })}</small>` : null}
+      </span>
+      <span class="adm-gh-made" data-l=${G('colMade')}>${when(u.created_at)}</span>
+      <span class="adm-gh-acts">
+        ${u.masked_email
+    ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => doRemoveEmail(u)}>${G('doMail')}</button>`
+    : null}
+        ${u.totp_enabled
+    ? html`<button type="button" class="og-door og-door--quiet" title=${t('dashboard.ghiiTotpResetHint')} onClick=${() => doResetTotp(u)}>${G('doTotp')}</button>`
+    : null}
+        <button type="button" class="og-door og-door--danger" onClick=${() => doDelete(u)}>${G('doDelete')}</button>
+      </span>
+    </div>`;
+
   return html`
-    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-    <div class="adm-card" style="margin-bottom:12px">
-      <h2>GHII <span style="font-weight:400;font-size:.85rem;color:var(--text-dim)">— ${t('dashboard.ghiiExplain')}</span></h2>
-      <${ExpandableHelp} title=${t('dashboard.ghiiLevelsTitle')}>
-        <div>
-          <div style="margin-bottom:4px"><${Badge} type="critical" /> ${t('dashboard.ghiiLevelL0')}</div>
-          <div style="margin-bottom:4px"><${Badge} type="watch" /> ${t('dashboard.ghiiLevelL1')}</div>
-          <div style="margin-bottom:4px"><${Badge} type="healthy" /> ${t('dashboard.ghiiLevelL2')}</div>
+    <div class="og adm-gh">
+      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+
+      <section class="og-sec og-sec--first">
+        <div class="og-sec-h">
+          <h2>${G('now')}<small>01</small></h2>
+          <div class="og-doors">
+            <button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('owners')}>${G('nowToOwners')}</button>
+          </div>
         </div>
-      </${ExpandableHelp}>
-      <${ExpandableHelp} title="TOTP">
-        <p>${t('dashboard.ghiiTotpExplain')}</p>
-      </${ExpandableHelp}>
-      <${ExpandableHelp} title=${t('dashboard.ghiiVerificationExplain').split('.')[0]}>
-        <p>${t('dashboard.ghiiVerificationExplain')}</p>
-      </${ExpandableHelp}>
+        <div class="adm-ov-grid">
+          <div>
+            <div class="adm-ov-status">${c.all === 1 ? G('statusPerson') : G('statusPeople', { n: num(c.all) })}</div>
+            <p class="adm-alert-line">${statusLine}</p>
+            <div class="adm-ov-up">${nodeId}${oldest ? html`<br />${G('oldest', { when: when(oldest) })}` : null}</div>
+          </div>
+          <div>
+            <${Row} title=${G('rowL0')} why=${G('rowL0Why')} chip=${html`<${Badge} type="critical" label="L0" />`}
+              value=${G('ofAll', { n: num(c.l0), all: num(c.all) })} />
+            <${Row} title=${G('rowL1')} why=${G('rowL1Why')} chip=${html`<${Badge} type="watch" label="L1" />`}
+              value=${G('ofAll', { n: num(c.l1), all: num(c.all) })} />
+            <${Row} title=${G('rowL2')} why=${G('rowL2Why')} chip=${html`<${Badge} type="healthy" label="L2" />`}
+              value=${G('ofAll', { n: num(c.l2), all: num(c.all) })} />
+            <${Row} title=${G('rowTotp')} why=${G('rowTotpWhy')}
+              chip=${html`<${Badge} type=${c.totp ? 'healthy' : 'critical'} label=${G('armedN', { n: num(c.totp) })} />`}
+              value=${G('ofAll', { n: num(c.totp), all: num(c.all) })} />
+            <${Row} title=${G('rowSeen')} why=${G('rowSeenWhy')}
+              chip=${html`<${Badge} type="muted" label=${G('liveN', { n: num(c.seen) })} />`}
+              value=${G('ofAll', { n: num(c.seen), all: num(c.all) })} last=${true} />
+          </div>
+        </div>
+      </section>
+
+      <div class="og-strip">
+        <div><b>${num(c.all)}</b><span>${G('stripPeople')}</span><small>${G('stripPeopleSub')}</small></div>
+        <div><b class="og-coral-num">${num(c.l0)}</b><span>${G('stripL0')}</span><small>${G('stripL0Sub')}</small></div>
+        <div><b>${num(c.totp)}</b><span>${G('stripTotp')}</span><small>${G('ofAll', { n: num(c.totp), all: num(c.all) })}</small></div>
+        <div><b>${num(c.cold)}</b><span>${G('stripCold')}</span><small>${G('stripColdSub')}</small></div>
+      </div>
+
+      <section class="og-sec">
+        <div class="og-sec-h">
+          <h2>${G('people')}<small>02</small></h2>
+          <div class="og-doors">
+            <button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('agents')}>${G('peopleToAgents')}</button>
+          </div>
+        </div>
+        <p class="adm-gh-lead">${G('peopleLead')}</p>
+
+        <div class="adm-gh-filters">
+          <label class="adm-gh-fld">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></svg>
+            <input type="search" value=${q} onInput=${(e) => setQ(e.target.value)}
+              placeholder=${G('searchPlaceholder')} aria-label=${G('searchPlaceholder')} />
+          </label>
+          <span class="adm-gh-sep"></span>
+          ${FILTERS.map(chip)}
+        </div>
+
+        ${!users.length
+    ? html`<div class="adm-gh-empty">${t('dashboard.noGhiiUsers')}</div>`
+    : html`
+        <div class="adm-gh-head">
+          <span>${G('colPerson')}</span><span>${G('colMail')}</span><span>${G('colLevel')}</span>
+          <span>${G('colTotp')}</span><span>${G('colSeen')}</span>
+          <span class="adm-gh-made-h">${G('colMade')}</span><span></span>
+        </div>
+        ${shown.length
+    ? shown.map(person)
+    : html`<div class="adm-gh-empty">${G('noMatch')}</div>`}
+        <div class="adm-gh-foot">
+          <span>${G('footShown', { n: num(shown.length), all: num(c.all) })}</span>
+          <span>${G('footOrder')}</span>
+        </div>`}
+      </section>
+
+      <section class="og-sec">
+        <div class="og-sec-h"><h2>${G('levels')}<small>03</small></h2></div>
+        <${Row} title=${G('lvl0')} why=${G('lvl0Why')} chip=${html`<${Badge} type="critical" label="L0" />`}
+          value=${G('nPeople', { n: num(c.l0) })} />
+        <${Row} title=${G('lvl1')} why=${G('lvl1Why')} chip=${html`<${Badge} type="watch" label="L1" />`}
+          value=${G('nPeople', { n: num(c.l1) })} />
+        <${Row} title=${G('lvl2')} why=${G('lvl2Why')} chip=${html`<${Badge} type="healthy" label="L2" />`}
+          value=${G('nPeople', { n: num(c.l2) })} />
+        <${Row} title=${G('lvlTotp')} why=${G('lvlTotpWhy')}
+          chip=${html`<${Badge} type=${c.totp ? 'healthy' : 'critical'} label=${G('armedN', { n: num(c.totp) })} />`}
+          value=${G('nPeople', { n: num(c.totp) })} last=${true} />
+        <p class="adm-gh-note">${G('levelsNote')}</p>
+      </section>
+
+      <${ConfirmUI} />
     </div>
-
-    <${StatsGrid} items=${[
-      { label: t('dashboard.totalGhiiUsers'), value: users.length, tone: 'cyan' },
-      { label: t('dashboard.totpEnabled'), value: users.filter(u => u.totp_enabled).length, tone: 'green' },
-      { label: t('dashboard.verifiedL2'), value: users.filter(u => u.verification_level === 2).length, tone: 'purple' },
-    ]} />
-
-    ${!users.length
-      ? html`<${Empty} text=${t('dashboard.noGhiiUsers')} />`
-      // Eight columns and an actions cell: 766px wide, against a page that clips at overflow-x
-      // hidden. On a phone the actions column was simply cut off, and the reset button added here
-      // is the last control in it. The box scrolls; the page still must not.
-      : html`<div class="adm-table-wrap"><table>
-        <thead><tr>
-          <th>GHII</th>
-          <th>${t('dashboard.displayName')}</th>
-          <th>${t('dashboard.ghiiEmail')}</th>
-          <th>${t('dashboard.verification')}</th>
-          <th>${t('dashboard.totp')}</th>
-          <th>${t('dashboard.lastLogin')}</th>
-          <th>${t('dashboard.created')}</th>
-          <th>${t('dashboard.actions')}</th>
-        </tr></thead>
-        <tbody>
-          ${users.map(u => {
-            const vBadge = u.verification_level === 2 ? 'healthy' : u.verification_level === 1 ? (u.email_verified ? 'healthy' : 'watch') : 'critical';
-            return html`<tr>
-              <td><code>${escHtml(u.ghii).substring(0, 16)}...</code></td>
-              <td>${escHtml(u.display_name || u.username || '-')}</td>
-              <td>${u.masked_email
-                ? html`<span style="color:${u.email_verified ? 'var(--green,#22c55e)' : 'var(--text-dim)'}">${escHtml(u.masked_email)}</span>`
-                : html`<span style="color:var(--text-dim)">–</span>`
-              }</td>
-              <td><${Badge} type=${vBadge} /> L${u.verification_level}</td>
-              <td><${Badge} type=${u.totp_enabled ? 'healthy' : 'critical'} /></td>
-              <td>${u.last_login_at ? dt(u.last_login_at) : html`<span style="color:var(--text-dim)">–</span>`}</td>
-              <td>${dt(u.created_at)}</td>
-              <td>
-                <select onChange=${e => setLevel(u.ghii, e.target.value)}>
-                  <option value="0" selected=${u.verification_level === 0}>L0</option>
-                  <option value="1" selected=${u.verification_level === 1}>L1</option>
-                  <option value="2" selected=${u.verification_level === 2}>L2</option>
-                </select>
-                ${' '}
-                ${u.masked_email ? html`<button class="adm-btn-sm" onClick=${() => doRemoveEmail(u)} title=${t('dashboard.ghiiRemoveEmail')}>${t('dashboard.ghiiRemoveEmail')}</button> ` : ''}
-                ${u.totp_enabled ? html`<button class="adm-btn-sm" onClick=${() => doResetTotp(u)} title=${t('dashboard.ghiiTotpResetHint')}>${t('dashboard.ghiiTotpReset')}</button> ` : ''}
-                <button class="adm-btn-sm" onClick=${() => doDelete(u.ghii)}>${t('dashboard.deleteLabel')}</button>
-              </td>
-            </tr>`;
-          })}
-        </tbody>
-      </table></div>`
-    }
-    <${ConfirmUI} />
   `;
 }
