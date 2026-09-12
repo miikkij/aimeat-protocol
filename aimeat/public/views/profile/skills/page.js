@@ -10,6 +10,7 @@
  * @structure renderPage · shelf · secNew · secAgent
  * @usage import { renderPage } from './skills/page.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: select the shared ink frame for the agent rule.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { h } from 'preact';
@@ -177,7 +178,7 @@ function secAgent(ctx, num, node) {
   return html`
     <${Section} id="sk-ai" num=${num} title=${x('secAi')} count=${null}>
       <p class="sk-para">${x('aiIntro')}</p>
-      <div class="sk-rule">
+      <div class="sk-rule poster-frame">
         <span class="og-label">${x('ruleLabel')}</span>
         <p class="sk-para">${x('ruleBody')}</p>
         <div class="og-doors"><${CopyButton} text=${agentRule(ctx.nodeUrl)} className="og-door" label=${x('copyRule')} copiedLabel=${x('copied')} /></div>

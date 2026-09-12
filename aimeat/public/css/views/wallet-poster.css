@@ -10,6 +10,7 @@
  *   column is bounded so a long tracking code or label wraps inside its cell. NOTE: this file must
  *   be linked in spa.html.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose the pace explanation with the shared ink frame.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 
@@ -41,7 +42,7 @@
 .wal-src span { min-width: 0; overflow-wrap: anywhere; }
 .wal-src small { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
 .wal-src b { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.15rem; white-space: nowrap; }
-.wal-pace { display: flex; align-items: center; gap: 1.2rem; margin-top: .9rem; padding: .8rem 1rem; border: 3px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; }
+.wal-pace { display: flex; align-items: center; gap: 1.2rem; margin-top: .9rem; padding: .8rem 1rem; font-size: .9rem; line-height: 1.55; }
 .wal-pace b { font-weight: 800; }
 .wal-bar { position: relative; flex: 0 0 15rem; height: 1.5rem; border: 2px solid var(--text); background: var(--bg); overflow: hidden; }
 .wal-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--sun); }
