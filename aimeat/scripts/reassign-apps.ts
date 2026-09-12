@@ -19,6 +19,8 @@
  *        target app bucket key resolves correctly when the owner is not yet in the
  *        identity table (a registered owner resolves regardless).
  * @version-history
+ *   v1.0.1 — 2026-09-12 — resolveGhii takes the node. The compiler found this call site, which a
+ *     grep of src/ had missed. wish-identity-gate-sees-resolveghii.
  *   v1.0.0 — 2026-06-20 — Initial (move anonymous-owned apps to a real owner for H-2 SSO).
  */
 import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
@@ -47,7 +49,7 @@ async function main(): Promise<void> {
     dbUrl: arg('db-url', process.env.DATABASE_URL),
   });
 
-  const toGhii = await resolveGhii(storage, TO, `${TO}@${nodeId}`);
+  const toGhii = await resolveGhii(storage, TO, { nodeId });
   console.log(`\nReassign apps:  "${FROM}"  →  "${TO}"  (target bucket: ${toGhii})`);
   console.log(`Mode: ${APPLY ? '\x1b[31mAPPLY\x1b[0m' : 'DRY-RUN'}${ONLY ? `  (only ${ONLY})` : ''}\n`);
 

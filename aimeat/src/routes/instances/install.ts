@@ -6,6 +6,10 @@
  *   itself (dry_run validation, component registration, @activate-cron firing, rollback on failure)
  *   lives in the service, so this door and the MCP tool run the same code.
  * @version-history
+ *   v1.4.1 — 2026-09-12 — resolveGhii takes the node rather than a fallback identity from here, so
+ *     an owner session can no longer file the install under the bare account name. The `sub` still
+ *     handed to installPackage is a different thing: the principal recorded on the schedules the
+ *     manifest brings. wish-identity-gate-sees-resolveghii.
  *   v1.4.0 — 2026-08-23 — The body moved to services/package-install.ts so the node's own MCP
  *     surface can install too. Pure extraction: same statuses, same messages, same shape.
  *   v1.3.0 — 2026-08-16 — Manifest schedules go through services/extension-schedules.ts, the one
@@ -46,7 +50,7 @@ export function registerInstallRoutes(
   router.post('/v1/packages/:groupId/install', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const owner = req.auth!.owner;
-    const ownerGhii = await resolveGhii(storage, owner, req.auth!.sub);
+    const ownerGhii = await resolveGhii(storage, owner, config);
 
     const { label, version, dry_run: dryRun } = req.body ?? {};
 

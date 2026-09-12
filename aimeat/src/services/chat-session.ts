@@ -22,6 +22,8 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.5.1 — 2026-09-12 — resolveGhii takes the node; the composed GHII moved into the helper.
+ *     wish-identity-gate-sees-resolveghii.
  *   v1.5.0 — 2026-09-08 — An agent process that exited is replaced on the next turn instead of
  *     being kept as a client that refuses everything.
  *   v1.4.0 — 2026-08-17 — A spreadsheet, a Word document and a PDF become text instead of being
@@ -152,7 +154,7 @@ export async function* runChatTurn(
         return;
     }
 
-    const gaii = await resolveGhii(storage, ownerName, `${ownerName}@${config.nodeId}`);
+    const gaii = await resolveGhii(storage, ownerName, config);
     const now = new Date().toISOString();
 
     // What the person attached, read from THEIR OWN namespace by key. The browser uploaded through

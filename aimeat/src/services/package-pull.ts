@@ -24,6 +24,9 @@
  *   import { pullPackage } from '../services/package-pull.js';
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
+ *   v1.1.0 — 2026-09-12 — PackagePullCaller loses `sub`, which travelled from the federation route
+ *     through here into importParsedPackage to be resolveGhii's fallback identity.
+ *     wish-identity-gate-sees-resolveghii.
  *   v1.0.1 — 2026-09-06 — Both trailing-slash strips of a caller-supplied address go through
  *     stripTrailingSlashes, which is a scan rather than a backtracking regex (CodeQL
  *     js/polynomial-redos, alerts 1609 and 1610).
@@ -50,7 +53,6 @@ export interface PackagePullDeps {
 
 export interface PackagePullCaller {
     owner: string;
-    sub: string;
     /** Operator role is what the arbitrary-URL branch requires. */
     isOperator: boolean;
 }
@@ -273,7 +275,7 @@ export async function pullPackage(
 
     // 10. Only now.
     const written = await importParsedPackage({ storage, config },
-        { owner: caller.owner, sub: caller.sub }, { parsed, upstream, via: 'pull' });
+        { owner: caller.owner }, { parsed, upstream, via: 'pull' });
     if (!written.ok) return written;
 
     return { ok: true, applied: true, package: written.package, upstream };

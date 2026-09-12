@@ -6,6 +6,9 @@
  *   and apply a migration to an instance (replace/skip/custom/install_new actions).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.1 — 2026-09-12 — The same bare-name trap the v1.2.0 entry below describes is now closed at
+ *     its source: resolveGhii takes the node and no longer accepts a fallback identity from a
+ *     caller, so a route cannot hand it `sub` by accident. wish-identity-gate-sees-resolveghii.
  *   v1.2.0 — 2026-09-05 — The apply-migration body moves to services/package-migrate.ts, so the
  *     whole-instance update act runs the same loop rather than a second copy of it. Three defects
  *     went with it, argued in that file: the cortex and extension rewrites were never repeated, a
@@ -73,7 +76,7 @@ export function registerMigrationRoutes(
       return;
     }
 
-    const promptOwnerGaii = await resolveGhii(storage, owner, req.auth!.sub);
+    const promptOwnerGaii = await resolveGhii(storage, owner, config);
     const currentCompMap = new Map(currentPkg.components.map(c => [c.id, c]));
     const latestCompMap = new Map(latestPkg.components.map(c => [c.id, c]));
 
@@ -179,7 +182,7 @@ export function registerMigrationRoutes(
   router.post('/v1/instances/:id/apply-migration', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
-    const ownerGaii = await resolveGhii(storage, owner, req.auth!.sub);
+    const ownerGaii = await resolveGhii(storage, owner, config);
     const { targetVersion, components: migrationActions } = req.body ?? {};
 
     const out = await applyInstanceMigration({ storage, config },
@@ -210,7 +213,7 @@ export function registerMigrationRoutes(
   router.post('/v1/instances/:id/update', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
-    const ownerGaii = await resolveGhii(storage, owner, req.auth!.sub);
+    const ownerGaii = await resolveGhii(storage, owner, config);
     const out = await updateInstanceToLatest({ storage, config },
       { owner, ownerGhii: ownerGaii, sub: req.auth!.sub },
       { instanceId: id, dryRun: req.body?.dry_run === true });

@@ -23,6 +23,10 @@
  *   const out = await createPackageGroup({ storage, config }, caller, { name, components });
  *   if (!out.ok) return res.status(out.status).json(error(nodeId, out.code, out.message));
  * @version-history
+ *   v1.1.0 — 2026-09-12 — PackageCreateCaller loses `sub`. Its own comment said the field existed
+ *     only as the fallback resolveGhii took, and that fallback was the bare account name on an owner
+ *     session; the helper composes the GHII from the node now, so five doors and two MCP tools stop
+ *     carrying the value. wish-identity-gate-sees-resolveghii.
  *   v1.0.0 — 2026-09-05 — Extraction out of routes/packages.ts (create + versions), with three
  *     deliberate changes to what the create act does, each named here because a reader of the diff
  *     will otherwise take them for extraction slips:
@@ -77,10 +81,14 @@ export interface PackageCreateDeps {
     config: AimeatConfig;
 }
 
-/** Who is writing. `sub` is only the fallback resolveGhii takes when the owner has no GHII record. */
+/**
+ * Who is writing. The bare account name is all of it: the author a package records is the owner's
+ * GHII, and resolveGhii composes that from the node itself. The raw principal used to travel here
+ * too, as the fallback identity that helper took, and on an owner session it was the bare account
+ * name — the one value a stored record must never carry (2026-09-12).
+ */
 export interface PackageCreateCaller {
     owner: string;
-    sub: string;
 }
 
 export interface PackageCreateInput {
@@ -263,7 +271,7 @@ export async function createPackageGroup(
         packageGroupId,
         name: input.name,
         author: owner,
-        authorGhii: await resolveGhii(storage, owner, caller.sub),
+        authorGhii: await resolveGhii(storage, owner, config),
         version: generateVersion(),
         changelog: input.changelog ?? '',
         description: input.description ?? '',

@@ -23,6 +23,8 @@
  *   import { importParsedPackage } from '../services/package-import.js';
  *   const out = await importParsedPackage({ storage, config }, caller, { parsed, via: 'zip' });
  * @version-history
+ *   v1.0.1 — 2026-09-12 — The author GHII is resolved from the node instead of falling back to the
+ *     caller's `sub`. wish-identity-gate-sees-resolveghii.
  *   v1.0.0 — 2026-09-05 — Extraction out of routes/packages.ts POST /v1/packages/import, so the
  *     federation pull writes through the same door. One behaviour change: the version string goes
  *     through nextPackageVersion, so two imports in the same minute get -2 instead of colliding on
@@ -131,7 +133,7 @@ export async function importParsedPackage(
         packageGroupId,
         name: parsed.name,
         author: owner,
-        authorGhii: await resolveGhii(storage, owner, caller.sub),
+        authorGhii: await resolveGhii(storage, owner, config),
         version: await nextPackageVersion(storage, packageGroupId),
         changelog: parsed.changelog
             ?? (input.via === 'pull' ? `Pulled from ${input.upstream?.node ?? 'another node'}` : 'Imported from ZIP'),

@@ -34,6 +34,9 @@
  *     refusals rather than a second copy of them. The three deliberate behaviour changes that came
  *     with the move (status defaults to published, visibility defaults to private, both are
  *     validated) are argued in that file's version history.
+ *   v2.2.1 — 2026-09-12 — Seven doors stop reading `sub`: resolveGhii takes the node, and the caller
+ *     bags handed to the package services stop carrying a field those services used only as that
+ *     fallback. wish-identity-gate-sees-resolveghii.
  */
 
 import { Router } from 'express';
@@ -102,8 +105,8 @@ export function packagesRouter(
       include_cortex: includeCortex, allow_expectations: allowExpectations,
     } = req.body ?? {};
 
-    const ownerGhii = await resolveGhii(storage, owner, req.auth!.sub);
-    const out = await composePackageFromApps({ storage, config }, { owner, sub: req.auth!.sub, ownerGhii }, {
+    const ownerGhii = await resolveGhii(storage, owner, config);
+    const out = await composePackageFromApps({ storage, config }, { owner, ownerGhii }, {
       name, apps, description, category, tags, visibility, status,
       includeCortex, allowExpectations,
     });
@@ -221,7 +224,7 @@ export function packagesRouter(
     }
 
     const out = await importParsedPackage({ storage, config },
-      { owner, sub: req.auth!.sub }, { parsed, upstream, via: 'zip' });
+      { owner }, { parsed, upstream, via: 'zip' });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
@@ -270,7 +273,7 @@ export function packagesRouter(
 
     const { name, description, category, tags, visibility, status, components, manifest } = req.body ?? {};
 
-    const out = await createPackageGroup({ storage, config }, { owner, sub: req.auth!.sub }, {
+    const out = await createPackageGroup({ storage, config }, { owner }, {
       name, description, category, tags, visibility, status, components, manifest,
     });
     if (!out.ok) {
@@ -288,7 +291,7 @@ export function packagesRouter(
   // POST /v1/packages/:groupId/propose — propose package as template for gallery
   router.post('/v1/packages/:groupId/propose', requireAuth(), requireRole('owner'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
-    const ghii = await resolveGhii(storage, req.auth!.owner, req.auth!.sub);
+    const ghii = await resolveGhii(storage, req.auth!.owner, config);
 
     // Verify the package has at least one published version
     const pkg = await storage.getLatestPublished(groupId);
@@ -360,7 +363,7 @@ export function packagesRouter(
     const owner = req.auth!.owner;
     const { changelog, components, manifest, status } = req.body ?? {};
 
-    const out = await addPackageVersion({ storage, config }, { owner, sub: req.auth!.sub }, {
+    const out = await addPackageVersion({ storage, config }, { owner }, {
       groupId, changelog, components, manifest, status,
     });
     if (!out.ok) {
@@ -488,7 +491,7 @@ export function packagesRouter(
     const { status } = req.body ?? {};
 
     const out = await setPackageVersionStatus({ storage, config },
-      { owner: req.auth!.owner, sub: req.auth!.sub }, { groupId, version, status });
+      { owner: req.auth!.owner }, { groupId, version, status });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
@@ -510,7 +513,7 @@ export function packagesRouter(
     const { status, version } = req.body ?? {};
 
     const out = await setPackageVersionStatus({ storage, config },
-      { owner: req.auth!.owner, sub: req.auth!.sub }, { groupId, version, status });
+      { owner: req.auth!.owner }, { groupId, version, status });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;

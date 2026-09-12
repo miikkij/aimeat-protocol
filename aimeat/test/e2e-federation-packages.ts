@@ -217,7 +217,14 @@ await test('And the record says where it came from, verified', async () => {
     assert(up.publicKey === aPublicKey, "A's key is pinned on the record");
     assert(typeof up.verifiedAt === 'string', `verified, got ${up.verifiedAt}`);
     // The author's GHII travels as provenance and authorizes nothing.
-    assert(up.authorGhii.startsWith(A.ownerName), `the publishing author is recorded, got ${up.authorGhii}`);
+    //
+    // Asked for the WHOLE coordinate, not a prefix of it. `startsWith(ownerName)` was true of the
+    // bare account name as well, so this line passed on exactly the value a GHII must never be: a
+    // record filed under `alice` rather than `alice@node-id` is invisible to list, search and
+    // update, and until 2026-09-12 that was what a missing owner record or a moment's database
+    // trouble produced here. wish-identity-gate-sees-resolveghii.
+    assert(up.authorGhii === `${A.ownerName}@${A.nodeId}`,
+        `the publishing author is recorded as a whole GHII, got ${up.authorGhii}`);
 });
 
 await test('B installs what it pulled', async () => {
