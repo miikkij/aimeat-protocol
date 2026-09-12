@@ -8,6 +8,8 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-09-12 — The sections sit beside an "On this page" rail (detail-rail.js): one numbered link
+ *     per section, kept in view while the page scrolls.
  *   2026-08-29 — The "Legal pages" and "Audit log" sections (legal.js) after Marks, own published apps only.
  *   2026-08-29 — The "Marks and authorship" section (marks.js) after Search, own published apps only.
  *   2026-08-29 — Chapter numbers over the section headlines: the total is counted after the assembly
@@ -73,6 +75,7 @@ import { legalSectionInner, auditSectionInner, legalOnOpen, legalChipHtml } from
 import { appManifestAgents } from './app-agents.js';
 import { isFavorite } from './favorites.js';
 import { saveWorkingCopy, loadCheckpoints, getCheckpoints, readCheckpoint, deleteCheckpoint, discardWorkingCopy, getDraft } from './workcopy.js';
+import { detailRailPage, renderDetailRail } from './detail-rail.js';
 
 // Injected once at bootstrap by main.js. Functions are main-local; the get* return main's LIVE
 // state (so reads + in-place mutations propagate across the reassignments main does each render).
@@ -790,15 +793,16 @@ function renderDetailView() {
   // One column of bands, the way the home page reads: where the work is, edit it, what it is,
   // its versions, then the switches on the server, and the rest.
   var bodyEl = document.getElementById('detail-body');
-  bodyEl.innerHTML =
+  bodyEl.innerHTML = detailRailPage(
     heroHtml + bandHtml +
     statusHtml + aiHtml + aboutHtml + dataMapHtml + requiresHtml + historyHtml + versionsHtml +
-    mgmtHtml + skillsHtml + seoHtml + marksHtml + legalHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
+    mgmtHtml + skillsHtml + seoHtml + marksHtml + legalHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml);
   // The chapter number over every headline ("03 / 09") is a CSS counter; only the total needs
   // counting here, and it goes on the body as a string so the stylesheet can print it. Counted
   // AFTER the assembly so a section a later load re-renders in place keeps its number.
   var chapters = bodyEl.querySelectorAll('.dtl-section').length;
   bodyEl.style.setProperty('--dtl-chapters', '"' + (chapters < 10 ? '0' : '') + chapters + '"');
+  renderDetailRail(bodyEl);
 
   var dmOwner = detailServerOwner(app);
   var dmFile = app.publishedFilename || '';

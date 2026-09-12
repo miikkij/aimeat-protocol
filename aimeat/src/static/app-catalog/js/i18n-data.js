@@ -5,6 +5,7 @@
  *   stay in main.js and import this table. Keep en + fi keys in lockstep (Rule 4).
  * @usage import { I18N } from './i18n-data.js'
  * @version-history
+ *   v1.2.0 — 2026-09-12 — detail.railTitle (en, fi).
  *   v1.1.0 — 2026-09-03 — detail.requires, detail.requiresHint, detail.requiresNone (en, fi).
  */
 export const I18N = {
@@ -584,6 +585,7 @@ export const I18N = {
       'detail.requires': 'Needs',
       'detail.requiresHint': 'The cortexes this app loads and the extensions it calls, read from its published source. A version after @ is the one the app pinned.',
       'detail.requiresNone': 'Nothing beyond the platform itself.',
+      'detail.railTitle': 'On this page',
       'detail.loadingVersions': 'Loading versions…',
       'detail.noVersions': 'No published versions yet.',
       'detail.skills': 'Skills for this app',
@@ -1580,6 +1582,7 @@ export const I18N = {
       'detail.requires': 'Tarvitsee',
       'detail.requiresHint': 'Cortexit, jotka sovellus lataa, ja laajennukset, joita se kutsuu, luettuna julkaistusta lähteestä. @-merkin jälkeinen versio on se, johon sovellus on kiinnittynyt.',
       'detail.requiresNone': 'Ei mitään alustan itsensä lisäksi.',
+      'detail.railTitle': 'Tällä sivulla',
       'detail.loadingVersions': 'Ladataan versioita…',
       'detail.noVersions': 'Ei vielä julkaistuja versioita.',
       'detail.skills': 'Sovelluksen taidot',
