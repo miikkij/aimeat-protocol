@@ -66,8 +66,10 @@
 .adm-db-n { font-family: var(--font-mono); font-size: .85rem; color: var(--text); }
 .adm-db-d { font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); }
 .adm-db-pct { font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); }
-.adm-db-bar { height: 10px; background: var(--bg-surface); }
-.adm-db-bar i { display: block; height: 100%; background: var(--text); }
+/* Not `.adm-db-bar`: admin.css has owned that name since the old table, as the blue FILL inside
+   a track, and redefining it here reached every page that still draws one. */
+.adm-db-share { height: 10px; background: var(--bg-surface); }
+.adm-db-share i { display: block; height: 100%; background: var(--text); }
 .adm-db-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 12px 2px 0; font-size: .78rem; color: var(--text-dim); }
 .adm-db-foot .adm-db-note { font-family: var(--font-mono); font-size: .72rem; }
 
@@ -83,7 +85,7 @@
   .adm-db-d, .adm-db-pct { grid-row: 2; }
   .adm-db-pct { grid-column: 1; text-align: left; }
   .adm-db-d { grid-column: 2; }
-  .adm-db-bar { grid-column: 1 / -1; height: 8px; margin-top: 2px; }
+  .adm-db-share { grid-column: 1 / -1; height: 8px; margin-top: 2px; }
   .adm-db .og-strip { display: grid; grid-template-columns: 1fr 1fr; }
   .adm-db .og-strip > div { padding: .8rem 0; border-right: 0; }
   .adm-db .og-strip > div:nth-child(odd) { border-right: 1px solid var(--border); padding-right: .9rem; }

@@ -285,7 +285,7 @@ export default function DatabaseTab() {
               <span class="adm-db-n r">${num(r.n)}</span>
               <span class="adm-db-d r">${signed(r.delta)}</span>
               <span class="adm-db-pct r">${shareOf(r)}</span>
-              <span class="adm-db-bar"><i style=${`width:${barOf(r).toFixed(1)}%`}></i></span>
+              <span class="adm-db-share"><i style=${`width:${barOf(r).toFixed(1)}%`}></i></span>
             </div>`)}
         </div>
 
