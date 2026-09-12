@@ -21,6 +21,9 @@
  *   aimeat_package_list, aimeat_package_get, aimeat_package_status_set, aimeat_package_install.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.1.1 — 2026-09-12 — resolveGhii takes the node here too. These tools passed the AGENT's GAII
+ *     as the fallback identity, so a missing owner record would have filed the package under the
+ *     agent rather than the person it acted for. wish-identity-gate-sees-resolveghii.
  *   v1.1.0 — 2026-09-05 — list, get and status_set join install, because install alone was a step
  *     with no way in and no way out: an agent could not name the group id install requires without
  *     listing, and could not make its own package installable, since a package is created private
@@ -115,9 +118,8 @@ export function registerPackageTools(
         allow_expectations: z.boolean().optional().describe('Compose even when an app calls an extension the package cannot carry.'),
     }, annotationsFor('aimeat_package_compose'), async (args) => {
         const owner = ownerOf();
-        const gaii = getAgentGaii();
         const out = await composePackageFromApps({ storage, config },
-            { owner, sub: gaii, ownerGhii: await resolveGhii(storage, owner, gaii) },
+            { owner, ownerGhii: await resolveGhii(storage, owner, config) },
             {
                 name: args.name, apps: args.apps, description: args.description, category: args.category,
                 tags: args.tags, visibility: args.visibility, status: args.status,
@@ -150,7 +152,6 @@ export function registerPackageTools(
     }, annotationsFor('aimeat_package_pull'), async (args) => {
         const out = await pullPackage({ storage, config, peers }, {
             owner: ownerOf(),
-            sub: getAgentGaii(),
             // An agent acts within its own grant; the operator branch of a pull is a person's
             // decision at a keyboard, so it is not offered here.
             isOperator: false,
@@ -190,7 +191,7 @@ export function registerPackageTools(
         const owner = ownerOf();
         const gaii = getAgentGaii();
         const out = await updateInstanceToLatest({ storage, config },
-            { owner, ownerGhii: await resolveGhii(storage, owner, gaii), sub: gaii },
+            { owner, ownerGhii: await resolveGhii(storage, owner, config), sub: gaii },
             { instanceId: instance_id, dryRun: dryRun === true });
         if (!out.ok) {
             return {
@@ -208,7 +209,7 @@ export function registerPackageTools(
     }, annotationsFor('aimeat_package_status_set'), async ({ group_id, version, status }) => {
         const owner = ownerOf();
         const out = await setPackageVersionStatus({ storage, config },
-            { owner, sub: getAgentGaii() }, { groupId: group_id, version, status });
+            { owner }, { groupId: group_id, version, status });
         if (!out.ok) {
             return {
                 content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }],
@@ -226,7 +227,7 @@ export function registerPackageTools(
         // Packages install under the OWNER, so resolve the agent's owner and never a supplied id.
         const gaii = getAgentGaii();
         const owner = parseGaiiLoose(gaii).owner || gaii;
-        const ownerGhii = await resolveGhii(storage, owner, gaii);
+        const ownerGhii = await resolveGhii(storage, owner, config);
 
         const out = await installPackage(
             { storage, config, scheduler: getActiveScheduler() ?? undefined },

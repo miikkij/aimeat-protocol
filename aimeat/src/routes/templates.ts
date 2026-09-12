@@ -34,6 +34,10 @@
  *     resolve the owner's GHII (resolveGhii) instead of storing the raw `sub`, closing the two TODOs.
  *     A raw `sub` is a bare name on an owner session and an agent GAII on an agent, so one person
  *     posted under two identities and their unique review doubled.
+ *   v1.4.1 — 2026-09-12 — The seven resolveGhii calls take the node. The fix above left `sub` as the
+ *     helper's FALLBACK, so the bare name it removed from the normal path was still what a missing
+ *     record or a database disturbance produced; the helper composes `owner@nodeId` itself now.
+ *     wish-identity-gate-sees-resolveghii.
  */
 
 import { Router } from 'express';
@@ -97,7 +101,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
       }
 
       const now = new Date().toISOString();
-      const authorGhii = await resolveGhii(storage, owner, req.auth!.sub);
+      const authorGhii = await resolveGhii(storage, owner, config);
 
       const record: TemplateListingRecord = {
         id: randomUUID(),
@@ -239,7 +243,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
         return;
       }
 
-      const reviewedBy = await resolveGhii(storage, req.auth!.owner, req.auth!.sub);
+      const reviewedBy = await resolveGhii(storage, req.auth!.owner, config);
       const now = new Date().toISOString();
       const { comment } = req.body ?? {};
 
@@ -279,7 +283,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
         return;
       }
 
-      const reviewedBy = await resolveGhii(storage, req.auth!.owner, req.auth!.sub);
+      const reviewedBy = await resolveGhii(storage, req.auth!.owner, config);
       const now = new Date().toISOString();
 
       const updated = await storage.updateTemplateListing(id, {
@@ -312,7 +316,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
         return;
       }
 
-      const reviewedBy = await resolveGhii(storage, req.auth!.owner, req.auth!.sub);
+      const reviewedBy = await resolveGhii(storage, req.auth!.owner, config);
       const now = new Date().toISOString();
       const { comment } = req.body ?? {};
 
@@ -350,7 +354,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
         return;
       }
 
-      const reviewedBy = await resolveGhii(storage, req.auth!.owner, req.auth!.sub);
+      const reviewedBy = await resolveGhii(storage, req.auth!.owner, config);
       const now = new Date().toISOString();
       const { comment } = req.body ?? {};
 
@@ -471,7 +475,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
     // raw `sub`, which is a bare name on an owner session and an agent GAII on an agent, so the same
     // person would post under two identities and their UNIQUE(listingId, authorGhii) review would
     // double (audit AI-triage 2026-08-23, invariant 1).
-    const authorGhii = await resolveGhii(storage, owner, req.auth!.sub);
+    const authorGhii = await resolveGhii(storage, owner, config);
 
     const { rating, comment } = req.body ?? {};
 
@@ -555,7 +559,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
     // raw `sub`, which is a bare name on an owner session and an agent GAII on an agent, so the same
     // person would post under two identities and their UNIQUE(listingId, authorGhii) review would
     // double (audit AI-triage 2026-08-23, invariant 1).
-    const authorGhii = await resolveGhii(storage, owner, req.auth!.sub);
+    const authorGhii = await resolveGhii(storage, owner, config);
 
     const { message, parentId } = req.body ?? {};
 

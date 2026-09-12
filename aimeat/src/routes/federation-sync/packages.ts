@@ -12,6 +12,9 @@
  * @structure registerFederationPackageRoutes(router, config, storage, peers)
  * @usage import { registerFederationPackageRoutes } from './federation-sync/packages.js';
  * @version-history
+ *   v1.0.1 — 2026-09-12 — The pull caller stops carrying `sub`. It travelled three files to become
+ *     the fallback identity resolveGhii took, and that fallback is gone: the helper composes the
+ *     GHII from the node. wish-identity-gate-sees-resolveghii.
  *   v1.0.0 — 2026-09-05 — Initial.
  */
 import type { Router } from 'express';
@@ -69,7 +72,6 @@ export function registerFederationPackageRoutes(
 
         const out = await pullPackage({ storage, config, peers }, {
             owner: req.auth!.owner,
-            sub: req.auth!.sub,
             isOperator: req.auth!.roles.includes('operator'),
         }, { groupId, nodeId, sourceUrl, trust, version });
 

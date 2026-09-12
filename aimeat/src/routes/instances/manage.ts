@@ -6,6 +6,9 @@
  *   check-update diff, instance details, and instance removal (optional component cleanup).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.1 — 2026-09-12 — The three resolveGhii calls take the node instead of `req.auth!.sub`, so
+ *     the coordinate an instance is compared against can no longer be the bare account name.
+ *     wish-identity-gate-sees-resolveghii.
  *   v1.1.0 — 2026-09-08 — GET /:id/status answers with the customizedAt it just wrote, not the one
  *     read before the write.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/instances.ts (max-file-lines)
@@ -69,7 +72,7 @@ export function registerManageRoutes(
       return;
     }
 
-    const ownerGaii = await resolveGhii(storage, owner, req.auth!.sub);
+    const ownerGaii = await resolveGhii(storage, owner, config);
 
     // Live hash comparison: fetch current content and compare
     const components = await Promise.all(
@@ -126,7 +129,7 @@ export function registerManageRoutes(
     const id = req.params.id as string;
     const owner = req.auth!.owner;
 
-    const ownerGhii = await resolveGhii(storage, owner, req.auth!.sub);
+    const ownerGhii = await resolveGhii(storage, owner, config);
     const out = await planInstanceUpdate({ storage }, { owner, ownerGhii }, id);
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
@@ -164,7 +167,7 @@ export function registerManageRoutes(
   router.delete('/v1/instances/:id', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
-    const ownerGaii = await resolveGhii(storage, owner, req.auth!.sub);
+    const ownerGaii = await resolveGhii(storage, owner, config);
 
     const instance = await storage.getInstance(id);
     if (!instance) {

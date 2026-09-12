@@ -13,6 +13,9 @@
  *   the caller's own account regardless of the backup's source owner.
  * @structure appsBackupRouter(config, storage) — mount BEFORE appsRouter.
  * @version-history
+ *   v1.0.1 — 2026-09-12 — The owner bucket comes from resolveGhii(storage, owner, config); the
+ *     `${owner}@${config.nodeId}` this composed by hand is what the helper composes now.
+ *     wish-identity-gate-sees-resolveghii.
  *   v1.0.0 — 2026-06-12 — Initial: app-catalog backup export + selective import
  */
 import { Router, raw } from 'express';
@@ -56,7 +59,7 @@ export function appsBackupRouter(config: AimeatConfig, storage: Storage): Router
   const canonicalOwner = async (req: Express.Request): Promise<{ owner: string; ownerGhii: string }> => {
     const rawOwner = req.auth!.owner;
     const owner = rawOwner.includes('@') ? rawOwner.split('@')[0] : rawOwner;
-    const ownerGhii = await resolveGhii(storage, owner, `${owner}@${config.nodeId}`);
+    const ownerGhii = await resolveGhii(storage, owner, config);
     return { owner, ownerGhii };
   };
 

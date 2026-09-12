@@ -41,6 +41,8 @@
  *   const t = await resolveAppTarget(storage, config, { callerOwner, requestedOwner, filename, act: 'publish' });
  *   if (!t.ok) return res.status(t.status).json(error(config.nodeId, t.code, t.message));
  * @version-history
+ *   v1.0.1 — 2026-09-12 — Both resolveGhii calls hand it the node; the GHII these composed by hand
+ *     is what the helper composes. wish-identity-gate-sees-resolveghii.
  *   v1.0.0 — 2026-09-08 — Initial. The ladder, both grant records, and the seam. No door passes a
  *     `requestedOwner` yet, so nothing that exists today behaves differently: the delegated branch
  *     is built and tested here first, and the doors are opened one at a time after it.
@@ -399,7 +401,7 @@ export async function listAppsBuiltFor(
     out.push({ ...row, devLevel: a.level });
   }
   for (const o of held.owners) {
-    const theirGhii = await resolveGhii(storage, o.owner, `${o.owner}@${config.nodeId}`);
+    const theirGhii = await resolveGhii(storage, o.owner, config);
     for (let offset = 0; ; ) {
       const theirs = await storage.listApps({
         ownerGaii: theirGhii, limit: 200, offset,
@@ -466,7 +468,7 @@ export async function ownAppScope(
   storage: Storage, config: AimeatConfig, callerOwner: string,
 ): Promise<{ ownerName: string; ownerGhii: string }> {
   const owner = String(callerOwner ?? '').trim();
-  return { ownerName: owner, ownerGhii: await resolveGhii(storage, owner, `${owner}@${config.nodeId}`) };
+  return { ownerName: owner, ownerGhii: await resolveGhii(storage, owner, config) };
 }
 
 export type AppTargetResolution =

@@ -23,6 +23,8 @@
  *   GET/PUT/DELETE dev-grants (per app), GET/PUT/DELETE /v1/app-dev-grants (across all of them)
  * @usage app.use(appMembersRouter(config, storage))
  * @version-history
+ *   v1.1.1 — 2026-09-12 — bucketOf hands resolveGhii the node; composing `${owner}@${nodeId}` at the
+ *     call site is what the helper does now. wish-identity-gate-sees-resolveghii.
  *   v1.1.0 — 2026-09-08 — The DEVELOPMENT right: who, other than the owner, may build this app. Three
  *     rungs from services/app-dev-grant.ts, written on the roster row because it is the same person
  *     keyed the same way, and a blanket "any app of mine" list that is its own record so an owner can
@@ -84,7 +86,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
    * The app's bucket key. Resolved where it is needed rather than in `context`, because every roster
    * call goes through that and only the development-right doors have to touch the app row itself.
    */
-  const bucketOf = (owner: string) => resolveGhii(storage, owner, `${owner}@${config.nodeId}`);
+  const bucketOf = (owner: string) => resolveGhii(storage, owner, config);
 
   /** A deep link back to the app, which is where every one of these notifications should land. */
   const appLink = (appId: string) => {

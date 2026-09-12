@@ -32,6 +32,9 @@
  *   import { composePackageFromApps } from '../services/package-compose.js';
  *   const out = await composePackageFromApps({ storage, config }, caller, { name, apps });
  * @version-history
+ *   v1.1.0 — 2026-09-12 — PackageComposeCaller loses `sub`: it was forwarded to createPackageGroup
+ *     as the fallback identity resolveGhii took, and nothing needs it now.
+ *     wish-identity-gate-sees-resolveghii.
  *   v1.0.0 — 2026-09-05 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -63,7 +66,6 @@ export interface PackageComposeDeps {
 
 export interface PackageComposeCaller {
     owner: string;
-    sub: string;
     ownerGhii: string;
 }
 
@@ -269,7 +271,7 @@ export async function composePackageFromApps(
 
     const written: PackageWriteResult = await createPackageGroup(
         { storage, config },
-        { owner: caller.owner, sub: caller.sub },
+        { owner: caller.owner },
         {
             name: input.name,
             components,
