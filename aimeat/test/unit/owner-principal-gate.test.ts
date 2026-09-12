@@ -13,10 +13,13 @@
  *   the exact string only, so a wildcard grant never reaches these doors.
  * @usage cd aimeat && pnpm exec vitest run test/unit/owner-principal-gate.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-12 — isThirdPartyPrincipal(), the read-side companion: among the principals
+ *     carrying one person's name, which are that person's own machinery and which are a published
+ *     product. GET /v1/ghii/me shows its account-security half on that question.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit, H-1/H-7 step 7b).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { requireOwnerPrincipal, requireRole } from '../../src/auth/middleware.js';
+import { isOwnerPrincipal, isThirdPartyPrincipal, requireOwnerPrincipal, requireRole } from '../../src/auth/middleware.js';
 import { ACCOUNT_SECURITY_SCOPE, SCOPES_OUTSIDE_WILDCARD } from '../../src/utils/scope-coverage.js';
 import type { VerifiedToken } from '../../src/auth/jwt.js';
 import type { Request, Response } from 'express';
@@ -158,5 +161,40 @@ describe('the companion scope, and only on the exact word', () => {
         // Without this, the narrow-only check on the agent-configure surface would read a '*'
         // agent as already holding it and let the agent write the word onto itself.
         expect(SCOPES_OUTSIDE_WILDCARD).toContain(ACCOUNT_SECURITY_SCOPE);
+    });
+});
+
+describe('whose software, as opposed to whose name', () => {
+    // isThirdPartyPrincipal answers a question the gate above deliberately does not: among the
+    // principals carrying one person's account name, which of them is that person's own machinery
+    // and which is a product somebody else published. A READ door with a half that suits the first
+    // and not the second needs it, because req.auth.owner is identical across all of them. It is
+    // asserted here rather than in a route suite because it is a property of the principal, and
+    // GET /v1/ghii/me only exercises the two roles its own e2e can mint.
+
+    it('a person and their own agents are not third-party software', () => {
+        expect(isThirdPartyPrincipal(token({ roles: ['owner'] }))).toBe(false);
+        expect(isThirdPartyPrincipal(token({ sub: 'claude#alice@node', roles: ['agent'], scopes: ['*'] }))).toBe(false);
+        expect(isThirdPartyPrincipal(token({ roles: ['owner', 'operator'] }))).toBe(false);
+    });
+
+    it('an app grant and a GEAI token are', () => {
+        expect(isThirdPartyPrincipal(token({ sub: 'app:board@alice@node', roles: ['app'], scopes: ['*'] }))).toBe(true);
+        expect(isThirdPartyPrincipal(token({ sub: 'eco:news#alice@node', roles: ['ecosystem'], scopes: ['*'] }))).toBe(true);
+    });
+
+    it('no auth is not third-party software either — it is nobody, and the caller must say so', () => {
+        // The predicate is not a gate. Returning false for an absent credential is only safe
+        // because every caller pairs it with a door that has already required authentication;
+        // this assertion is here so that reading it as an authorization test fails loudly.
+        expect(isThirdPartyPrincipal(undefined)).toBe(false);
+    });
+
+    it('carrying account:security does not change what KIND of principal it is', () => {
+        // The two questions compose rather than overlap: GET /v1/ghii/me shows the account half to
+        // third-party software only when isOwnerPrincipal also says yes, and that is the scope.
+        const eco = token({ roles: ['ecosystem'], scopes: [ACCOUNT_SECURITY_SCOPE] });
+        expect(isThirdPartyPrincipal(eco)).toBe(true);
+        expect(isOwnerPrincipal(eco)).toBe(true);
     });
 });

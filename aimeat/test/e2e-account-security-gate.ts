@@ -17,6 +17,12 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-account-security-gate
  * @version-history
+ *   v1.1.0 — 2026-09-12 — Phase 1b: the read side, on the one door of this family that could not
+ *     take a gate. GET /v1/ghii/me is how any principal learns who it acts for, so it stays open to
+ *     everything carrying the person's name and splits its response instead. The four assertions
+ *     are the whole ruling: the person sees everything, so do their own agents, a published app
+ *     gets the identity half without the account half, and a second person's session reads their
+ *     own row, which is why no scope word was ever needed across people.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit, H-1/H-7 step 7b).
  */
 import * as ed from '@noble/ed25519';
@@ -224,6 +230,60 @@ async function main() {
             assert(r.status === 403, `${door.method} ${door.path}: expected 403, got ${r.status} ${JSON.stringify(r.body)}`);
         });
     }
+
+    // The READ side of the same question, on the one door of this family that could not take a
+    // gate: GET /v1/ghii/me is how any principal learns who it acts for, so every agent on the node
+    // calls it and refusing them all was never on the table. It splits its response instead, and
+    // these four assertions are the whole ruling.
+    //
+    // It runs HERE, before Phase 2, for the reason the comment at the bottom of this file records:
+    // Phase 2 drives "sign the person out of every device" with the owner's own session, so from
+    // there down ownerAToken is revoked until Phase 4 re-mints it.
+    console.log('\nPhase 1b: GET /v1/ghii/me splits, rather than closing');
+
+    const ACCOUNT_HALF = ['notification_email', 'email_verified_at', 'has_password', 'public_key'];
+    const IDENTITY_HALF = ['ghii', 'display_name', 'verification_level', 'directory_listed'];
+
+    await test('the owner session sees the whole record', async () => {
+        const r = await json('/v1/ghii/me', { headers: auth(ownerAToken) });
+        assert(r.status === 200, `expected 200, got ${r.status} ${JSON.stringify(r.body)}`);
+        for (const f of [...IDENTITY_HALF, ...ACCOUNT_HALF]) {
+            assert(f in r.body.data, `owner session is missing ${f}: ${JSON.stringify(Object.keys(r.body.data))}`);
+        }
+    });
+
+    await test('the owner\'s own agent sees it too, on full access alone', async () => {
+        // Ruled 2026-09-12. An agent acting for someone should be able to tell them the recovery
+        // address is stale or that they never set a password, and the alternative on the table —
+        // requiring account:security here, the way every door in Phase 1 does — would have refused
+        // every agent on the node until each owner went and ticked a box.
+        const r = await json('/v1/ghii/me', { headers: auth(plainAgentToken) });
+        assert(r.status === 200, `expected 200, got ${r.status} ${JSON.stringify(r.body)}`);
+        for (const f of ACCOUNT_HALF) {
+            assert(f in r.body.data, `the owner's agent is missing ${f}: ${JSON.stringify(Object.keys(r.body.data))}`);
+        }
+    });
+
+    await test('a published app running in the same person\'s name gets the identity half and not the account half', async () => {
+        const r = await json('/v1/ghii/me', { headers: auth(appToken) });
+        assert(r.status === 200, `expected 200, got ${r.status} ${JSON.stringify(r.body)}`);
+        for (const f of IDENTITY_HALF) {
+            assert(f in r.body.data, `the app is missing ${f}, which it needs to know who it works for: ${JSON.stringify(Object.keys(r.body.data))}`);
+        }
+        for (const f of ACCOUNT_HALF) {
+            assert(!(f in r.body.data), `the app can read ${f}, which is the input to taking the account over`);
+        }
+        assert(r.body.data.ghii === `${ownerA}@${NODE_ID}`, `the app should still learn whose name it acts under, got ${r.body.data.ghii}`);
+    });
+
+    await test('the door answers about the CALLER, so another person\'s session reads their own row', async () => {
+        // Why no scope word was ever needed across PEOPLE: the record is looked up by the account
+        // name the credential carries, so there is no target id to tamper with and this account is
+        // not addressable from another person's principal at all.
+        const r = await json('/v1/ghii/me', { headers: auth(ownerBToken) });
+        assert(r.status === 200, `expected 200, got ${r.status} ${JSON.stringify(r.body)}`);
+        assert(r.body.data.ghii === `${ownerB}@${NODE_ID}`, `expected ${ownerB}'s own row, got ${r.body.data.ghii}`);
+    });
 
     console.log('\nPhase 2: The account holder still gets through');
 
