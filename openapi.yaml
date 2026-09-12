@@ -53860,6 +53860,18 @@ paths:
                                 registered_at: { type: string }
                                 updated_at: { type: string }
                                 federate: { type: boolean }
+                                description: { type: string }
+                                json_schema_key: { type: string }
+                                schema_mode:
+                                  type: string
+                                  enum: [open, strict]
+                                  description: strict also refuses a field the definition does not name.
+                                required_fields:
+                                  type: integer
+                                  description: How many fields a record must carry.
+                                optional_fields:
+                                  type: integer
+                                  description: How many more it may carry, checked when present.
                           total: { type: integer }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
