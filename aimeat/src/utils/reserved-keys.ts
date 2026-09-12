@@ -18,6 +18,8 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.9.0 — 2026-09-13 — `messages.organize.` joins the list: the owner's archive and rules for their
+ *     Messages list, which decide what the server shows them.
  *   v1.8.0 — 2026-09-09 — `crews.llm.` joins the list: which model an agent thinks with, and the
  *     provider block behind it, which names the endpoint that agent's runtime will call.
  *   v1.7.0 — 2026-08-31 — `ai.jobs.` joins the list. A job record is an INSTRUCTION the server reads
@@ -123,6 +125,14 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // `crews.runtime.` stay OFF the list deliberately: a definition is checked by the runtime that
   // will run it, and misdirectedCrewKey already refuses one written into the wrong namespace.
   'crews.llm.',
+  // 2026-09-13: `messages.organize.settings` is what the owner decided about their own Messages list
+  // (services/inbox-organize/record.ts): which conversations are archived, the rules that archive or
+  // fold, whether their agents' traffic archives itself. The server composes the list with it, so it
+  // decides what the owner is SHOWN: an app that could write it could archive the message warning
+  // the owner about that app. The owner's route and `messages:organize-as-owner` are the doors.
+  // `messages.organize.` rather than `messages.`, because nothing else under that word is
+  // server-trusted. Measured 2026-09-13: nothing wrote this prefix through the memory API; it is new.
+  'messages.organize.',
 ] as const;
 
 /** True iff `key` falls under a reserved, server-trusted owner-namespace prefix. */

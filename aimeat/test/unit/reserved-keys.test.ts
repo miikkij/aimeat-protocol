@@ -21,6 +21,8 @@
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-09-13 — `messages.organize.` is the thirteenth: the owner's archive and rules for the
+ *     Messages list, which decide what the server shows them.
  *   v1.x — 2026-08-30 — `notifications.` is the ninth: the owner's notification settings, which
  *     notify() acts on before it writes.
  *   v1.x — 2026-08-24 — `signals.` is the seventh: an unauthenticated public door reads
@@ -43,7 +45,10 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all twelve, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all thirteen, and a removal is a test failure rather than a silent regression', () => {
+        // `messages.organize.` (2026-09-13): the owner's archive and rules for their Messages list.
+        // The server composes the list with it, so an app that could write it could archive the
+        // message warning the owner about that very app.
         // `audit.` (2026-08-29): the per-app audit log, which a granted app must not rewrite.
         // `notifications.` (2026-08-30): the owner's notification settings, which notify() acts on
         // to drop a muted sender before the write; an app that could write it could silence the
@@ -62,8 +67,16 @@ describe('the list holds every prefix the server reads and acts on', () => {
         // point every agent this owner has at an endpoint of its choosing. `crews.llm.catalog` is
         // the list the picker offers, which is how a person would be led to pick it themselves.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'finance.', 'notifications.', 'openrouter.', 'profile.', 'signals.'],
+            ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'profile.', 'signals.'],
         );
+    });
+
+    it('refuses a granted app the Messages list organisation, and leaves the rest of `messages.` alone', () => {
+        expect(isReservedServerKey('messages.organize.settings')).toBe(true);
+        expect(appMayWriteKey(['app'], 'messages.organize.settings')).toBe(false);
+        expect(appMayWriteKey(['agent'], 'messages.organize.settings', true)).toBe(false);
+        expect(appMayWriteKey(['owner'], 'messages.organize.settings')).toBe(true);
+        expect(isReservedServerKey('messages.drafts')).toBe(false);
     });
 
     it('refuses a granted app the model choice, and leaves the DEFINITION keys alone', () => {

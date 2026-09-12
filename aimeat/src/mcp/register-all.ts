@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.2.0 — 2026-09-13 — registerDmOrganizeTools: archiving and the list rules on the chat path.
  *   v1.1.0 — 2026-09-06 — registerSecretTools: the owner's secrets vault on the chat path.
  *   v1.0.0 — 2026-09-03 — Extracted from index.ts so the schema audit registers what the server
  *     registers instead of a hand-kept copy that had drifted to half.
@@ -75,6 +76,7 @@ import { registerAgentMessageTools } from './agent-messages.js';
 import { registerAgentV2MessagingTools } from './agent-v2-messaging.js';
 import { registerAgentV2TaskTools } from './agent-v2-tasks.js';
 import { registerDmMessageTools } from './dm-messages.js';
+import { registerDmOrganizeTools } from './dm-organize.js';
 import { registerNotifyTools } from './notify.js';
 import { registerContactTools } from './contacts.js';
 import { registerCompanyTools } from './companies.js';
@@ -173,6 +175,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     // The v2 task handle, beside the dashboard work item registered above. Both stay.
     registerAgentV2TaskTools(mcp, storage, config, agentGaii, owner);
     registerDmMessageTools(mcp, storage, config, agentGaii, peers);
+    registerDmOrganizeTools(mcp, storage, config, agentGaii);
     registerNotifyTools(mcp, storage, config, agentGaii);
     registerContactTools(mcp, storage, config, agentGaii);
     registerCompanyTools(mcp, storage, config, agentGaii);

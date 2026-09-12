@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 -- 2026-09-13 -- aimeat_dm_archive_as_owner / aimeat_dm_organize_as_owner on the CLI
+ *     dispatch, over POST /v1/messages/organize/archive and GET/PUT /v1/messages/organize.
  *   v1.9.0 -- 2026-09-12 -- aimeat_dm_inbox_as_owner / aimeat_dm_thread_as_owner on the CLI dispatch,
  *     over GET /v1/messages/overview and /conversations/:id (messages:read-as-owner).
  *   v1.8.0 -- 2026-09-08 -- aimeat_agent_propose, and the sixteen v2 agent-plane tools move to
@@ -27,7 +29,8 @@
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { agentCrewCliTools } from './tool-call-defs-agent-crew.js';
 import { agentV2CliTools } from './tool-call-defs-agent-v2.js';
-import { query, optionalString, requiredString, optionalArray, optionalRecord, optionalNumber, optionalBoolean, taskTodoPayload } from './tool-call-helpers.js';
+import { query, optionalString, requiredString, optionalArray, requiredArray, optionalRecord, optionalNumber, optionalBoolean, taskTodoPayload } from './tool-call-helpers.js';
+import { organizePatchBody } from './tool-call-helpers-organize.js';
 
 export const agentTools: ConnectCliToolDefinition[] = [
     {
@@ -422,6 +425,41 @@ export const agentTools: ConnectCliToolDefinition[] = [
             per_page: { type: 'number', description: 'Messages per page (default 50, max 200).' },
         },
         handler: ({ client }, input) => client.get(`/v1/messages/conversations/${encodeURIComponent(requiredString(input, 'conversation_id'))}${query({ page: optionalNumber(input, 'page'), per_page: optionalNumber(input, 'per_page') })}`),
+    },
+    {
+        name: 'aimeat_dm_archive_as_owner',
+        description: "Archive conversations in the OWNER's Messages list, as the owner, or bring them back with restore: true. Nothing is deleted; an archived conversation comes back when somebody other than the owner's own agents writes in it. Requires the messages:organize-as-owner scope.",
+        input: {
+            conversation_ids: { type: 'array', required: true, description: 'Conversation ids to archive or restore (1-500), from aimeat_dm_inbox_as_owner.' },
+            restore: { type: 'boolean', description: 'true brings the conversations back to the list instead of archiving them.' },
+        },
+        handler: ({ client }, input) => {
+            const restore = optionalBoolean(input, 'restore');
+            return client.post('/v1/messages/organize/archive', { conversation_ids: requiredArray(input, 'conversation_ids'), ...(restore !== undefined ? { restore } : {}) });
+        },
+    },
+    {
+        name: 'aimeat_dm_organize_as_owner',
+        description: "Read or change how the OWNER's Messages list is organised: auto-archive by age for the owner's own agents, one row for copies with the same subject, and the rules that fold, group or archive. Called with nothing, it returns the current settings. Requires the messages:organize-as-owner scope.",
+        input: {
+            auto_archive_enabled: { type: 'boolean', description: "Archive the own agents' conversations by age." },
+            auto_archive_days: { type: 'number', description: 'Days without a message before that happens (1-365).' },
+            fold_same_subject: { type: 'boolean', description: 'One row for conversations one sender opened with the same subject within an hour.' },
+            add_rule: { type: 'object', description: 'A rule { id?, name, enabled?, action: "fold" | "group" | "archive", match: { with?, subject?, body?, scope?, older_than_days? } }.' },
+            remove_rule: { type: 'string', description: 'Id of a rule to remove.' },
+            rules: { type: 'array', description: 'Replace every rule with this list.' },
+        },
+        handler: ({ client }, input) => {
+            const body = organizePatchBody({
+                auto_archive_enabled: optionalBoolean(input, 'auto_archive_enabled'),
+                auto_archive_days: optionalNumber(input, 'auto_archive_days'),
+                fold_same_subject: optionalBoolean(input, 'fold_same_subject'),
+                add_rule: optionalRecord(input, 'add_rule'),
+                remove_rule: optionalString(input, 'remove_rule'),
+                rules: optionalArray(input, 'rules'),
+            });
+            return Object.keys(body).length ? client.put('/v1/messages/organize', body) : client.get('/v1/messages/organize');
+        },
     },
     {
         name: 'aimeat_dm_thread',

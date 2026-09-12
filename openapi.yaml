@@ -4574,9 +4574,87 @@ components:
           description: >-
             The other copies of the same broadcast, newest first, carried with the row rather than
             behind a second request. They were already in this response before folding, so nesting
-            them cannot make it larger.
+            them cannot make it larger. The same field carries the threads a subject or rule fold
+            (`fold`) stands for.
           items:
             $ref: '#/components/schemas/ConversationSummary'
+        lastForeignAt:
+          type: string
+          format: date-time
+          description: >-
+            When somebody other than the account's own agents and apps last wrote in the thread (the
+            owner, another person, another account's agent). Absent when only the account's own agents
+            ever wrote in it. An archived thread comes back to the list when this is newer than the
+            archiving.
+        unreadToOwner:
+          type: integer
+          description: >-
+            Unread messages addressed to the mailbox owner themself. `unread` also counts the copies of
+            the owner's agents talking to each other, which sit in the owner's mailbox.
+        openedBy: { type: string, description: Who wrote the first message this mailbox holds in the thread. }
+        openedTo: { type: string, description: To whom that first message was addressed. }
+        openedAt: { type: string, format: date-time, description: When the first message was written. }
+        section:
+          type: string
+          enum: [people, agents, group, archive]
+          description: >-
+            Where the owner's Messages list puts the row: other people and their agents, the owner's own
+            agents (threads between the owner and their agents, or between those agents), a heading a
+            group rule names (`group`), or the archive.
+        group: { type: string, description: The heading a group rule names, when section is group. }
+        archived:
+          type: object
+          description: Why the row is archived, and since when. Present only when section is archive.
+          properties:
+            reason: { type: string, enum: [manual, rule, age] }
+            since: { type: string, format: date-time }
+            rule: { type: string, description: The rule's name, for a rule archive. }
+        fold:
+          type: object
+          description: >-
+            Present on a row standing for several threads: the ones one sender opened with the same
+            subject within an hour (`subject`), or the ones a fold rule matched (`rule`).
+          properties:
+            kind: { type: string, enum: [subject, rule] }
+            count: { type: integer }
+            label: { type: string }
+
+    InboxOrganizeRule:
+      type: object
+      required: [name, action, match]
+      properties:
+        id: { type: string, pattern: '^[a-z0-9-]{1,40}$', description: Keep an existing rule's id to edit it in place. }
+        name: { type: string, maxLength: 80 }
+        enabled: { type: boolean }
+        action:
+          type: string
+          enum: [fold, group, archive]
+          description: fold makes the matching threads one row; group puts them under a heading of their own (the rule's name); archive sends them to the archive.
+        match:
+          type: object
+          description: Every condition given must hold. The first enabled rule that matches a thread decides for it.
+          properties:
+            with: { type: string, maxLength: 200, description: Part of an identity in the thread (the other party, who opened it, to whom, or who wrote last). }
+            subject: { type: string, maxLength: 200, description: Text the subject contains. }
+            body: { type: string, maxLength: 200, description: Text the newest message contains. }
+            scope: { type: string, enum: [agents, all], description: 'agents (default): only threads between the owner and their own agents, or between those agents.' }
+            older_than_days: { type: integer, minimum: 1, maximum: 365 }
+        created_at: { type: string, format: date-time, readOnly: true }
+
+    InboxOrganizeSettings:
+      type: object
+      properties:
+        auto_archive:
+          type: object
+          properties:
+            enabled: { type: boolean, description: "Archive the owner's own agents' threads after `days` without a message, unless a message to the owner in them is unread. On by default." }
+            days: { type: integer, minimum: 1, maximum: 365, description: Default 14. }
+        fold_same_subject: { type: boolean, description: One row for threads one sender opened with the same subject within an hour. On by default. }
+        rules:
+          type: array
+          items: { $ref: '#/components/schemas/InboxOrganizeRule' }
+        archived_count: { type: integer, readOnly: true }
+        kept_count: { type: integer, readOnly: true }
 
     ContactConsentRecord:
       type: object
@@ -43411,6 +43489,138 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /v1/messages/organize:
+    get:
+      operationId: getInboxOrganize
+      summary: How the owner's Messages list is organised
+      description: >
+        The auto-archive setting for the owner's own agents' threads, subject folding, and the rules
+        that fold, group or archive threads, with how many threads are archived. The list itself is
+        GET /v1/messages/conversations, whose rows carry the section each one lands in. An owner session
+        may always read this; another principal acting for the owner needs `messages:organize-as-owner`,
+        which no wildcard carries.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The settings and rules
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/InboxOrganizeSettings' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      operationId: updateInboxOrganize
+      summary: Change how the owner's Messages list is organised
+      description: >
+        Every field is optional. `rules` replaces the whole list; `add_rule` adds a rule or, given an
+        existing id, edits it (its creation time is kept); `remove_rule` removes one. A rule over every
+        thread (`scope: all`) must name something to match. The mailbox is always the acting
+        principal's own owner. Needs `messages:organize-as-owner` for anything but an owner session.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                auto_archive:
+                  type: object
+                  properties:
+                    enabled: { type: boolean }
+                    days: { type: integer, minimum: 1, maximum: 365 }
+                fold_same_subject: { type: boolean }
+                rules:
+                  type: array
+                  maxItems: 50
+                  items: { $ref: '#/components/schemas/InboxOrganizeRule' }
+                add_rule: { $ref: '#/components/schemas/InboxOrganizeRule' }
+                remove_rule: { type: string }
+      responses:
+        '200':
+          description: The settings and rules as saved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/InboxOrganizeSettings' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/messages/organize/archive:
+    post:
+      operationId: archiveInboxConversations
+      summary: Archive conversations, or bring them back
+      description: >
+        Nothing is deleted. An archived conversation moves to the archive section of the owner's list
+        and comes back by itself when somebody other than the owner's own agents writes in it.
+        `restore: true` brings conversations back and keeps them in the list, so neither a rule nor the
+        age limit archives them again on its own. The mailbox is always the acting principal's own
+        owner. Needs `messages:organize-as-owner` for anything but an owner session.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [conversation_ids]
+              additionalProperties: false
+              properties:
+                conversation_ids:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items: { type: string }
+                restore: { type: boolean }
+      responses:
+        '200':
+          description: Archived or restored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          archived: { type: integer }
+                          restored: { type: integer }
+                          conversation_ids: { type: array, items: { type: string } }
+                          archived_count: { type: integer }
+                          note: { type: string }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /v1/messages/requests:
     get:

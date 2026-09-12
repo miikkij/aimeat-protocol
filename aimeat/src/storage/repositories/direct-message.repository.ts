@@ -7,6 +7,8 @@
  * @structure DirectMessageRepository — message + contact-consent methods, mirrored across SQLite + Mongo.
  * @usage import type { DirectMessageRepository } from '../interface.js'; (composed into Storage)
  * @version-history
+ *   v1.5.0 -- 2026-09-13 -- ConversationSummary carries lastForeignAt, unreadToOwner and the opener (openedBy /
+ *     openedTo / openedAt), for the Messages list's archive and rules (services/inbox-organize/).
  *   v1.4.0 -- 2026-09-06 -- ConversationSummary carries broadcastId, read off the thread's NEWEST
  *     message. That one choice is the whole fold rule: copies of one announcement collapse into a
  *     single row, and a thread somebody answered lifts back out because a reply carries no id.
@@ -47,6 +49,26 @@ export type ConversationSummary = {
    * be folded away, and nothing had to detect one.
    */
   broadcastId?: string;
+  /**
+   * When somebody OTHER than the account's own agents and apps last wrote in this thread: the owner
+   * themself, another person, another account's agent. Absent when only the account's own agents
+   * ever wrote here.
+   *
+   * The Messages list archives a thread and lets it come back, and "comes back" has to mean a message
+   * a person should see. An own agent's ACK in an archived coordination thread is the noise the
+   * archive was for, so it must not lift the thread; a person writing into it must. The account is
+   * read off the mailbox itself (`owner@node`, or the part after `#` for an agent's own mailbox), so
+   * one query answers it for every mailbox in the batch.
+   */
+  lastForeignAt?: string;
+  /** Unread messages addressed to the mailbox itself. `unread` also counts the copies of the owner's
+   *  agents talking to each other, which sit in the owner's mailbox; this is only what waits for them. */
+  unreadToOwner?: number;
+  /** The first message this mailbox holds in the thread: who wrote it, to whom, and when. Rules
+   *  match on the opener, and copies of one announcement sent in a loop share opener and subject. */
+  openedBy?: string;
+  openedTo?: string;
+  openedAt?: string;
 };
 
 export interface DirectMessageRepository {
