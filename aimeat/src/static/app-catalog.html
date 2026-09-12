@@ -1,4 +1,4 @@
-<!-- GENERATED FILE — do not edit directly. Source: src/static/app-catalog/ (js/*.js + styles/app-catalog.css + _template.html). Rebuild: pnpm build:app-catalog -->
+<!-- GENERATED FILE — do not edit directly. Source: src/static/app-catalog/ (js/*.js + styles/*.css + _template.html) and the type tokens of public/css/theme.css. Rebuild: pnpm build:app-catalog -->
 <!DOCTYPE html>
 <!--
   @file src/static/app-catalog.html
@@ -2434,15 +2434,25 @@
   SPDX-License-Identifier: MIT
   @description The catalog's poster face (cat- prefix), appended after app-catalog.css by
     scripts/build-app-catalog.ts so it wins every cascade it shares. The language is the one the
-    home, chat and profile pages wear (public/css/views/home.css, chat.css, profile.css): Archivo
-    Black mastheads over ink rules, the diagonal coral band with the big numbers, the profile's index
-    with the open row on the sun, the chat's underline field and ink slab, actions as underlined
-    words. Every rule and shadow is var(--text), so the dark theme inverts instead of painting ink.
-    Built to the design canvas "App Catalog Poster" (2026-08-28), which replaced the showroom skin
-    of the same morning.
+    home, chat and profile pages wear (public/css/views/home.css, chat.css, profile.css): headline
+    mastheads, each section opening on an ink slab with a sun stripe, the diagonal coral band with
+    the big numbers, the profile's index with the open row on the sun, the chat's underline field
+    and ink slab, actions as underlined words. Every rule and shadow is var(--text), so the dark
+    theme inverts instead of painting ink. Built to the design canvas "App Catalog Poster"
+    (2026-08-28), which replaced the showroom skin of the same morning.
+    THE TOKENS ARE A COPY. The faces, the headline tracking and leading and the sun are declared in
+    aimeat/public/css/theme.css, which this page cannot link; scripts/build-app-catalog.ts copies
+    them in where the marker in :root stands, so they change in theme.css and nowhere here.
   @structure tokens · site bar · masthead, band, tools · rail · the index (rows and panels) ·
     foot · detail view · phone
   @version-history
+    v1.8.0 — 2026-09-13 — The home's headline and shape language (ruling "Julistekasvojen osio alkaa
+      mustelaatalla aurinkoraidalla", design canvas "Osioiden rajat kotisivulla", B1): the detail's
+      section headlines and the list headlines on an ink slab with a 6px sun stripe, the chapter
+      number a mono line above it, and no rule under the headline; every dialog title on the same
+      slab at the dialog's size; the add dialog's tab body under a sun bracket. The type tokens are
+      copied from theme.css at build time, so the headlines wear Fjalla One at .01em and leading 1
+      instead of the 2026-08-28 copy's Archivo Black at -.035em.
     v1.0.0 — 2026-08-28 — Initial.
     v1.1.0 — 2026-08-29 — The detail page's insides and every dialog: the data map as a paragraph, fact
       rows and a key table; the monetize rows and the four-question form; the ODPS defaults on an
@@ -2467,19 +2477,23 @@
 */
 
 /* ── Tokens the poster needs on top of the catalog's own ─────────────────────────────────── */
-/* This page cannot read theme.css, so the poster tokens are repeated here with the values the
-   design language names (skill `aimeat-design-language`); change them there first, then here. */
+/* This page cannot read theme.css. The marker below is where the build copies theme.css's faces,
+   headline tracking and leading, and sun (THEME_TOKENS in scripts/build-app-catalog.ts); change
+   them in theme.css, then run pnpm build:app-catalog. The rest of the block is the catalog's own. */
 :root {
-  --sun: #FFB52E;
-  --on-sun: #1A1A2E;
-  --font-poster: 'Archivo Black', 'Archivo', 'DM Sans', system-ui, sans-serif;
+  --font-headline: 'Fjalla One', 'Archivo Black', 'Archivo', 'DM Sans', system-ui, sans-serif;
+  --font-body: 'Archivo', 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+  --font-poster: var(--font-headline);
   --font-poster-weight: 400;
   --font-poster-text-weight: 400;
   --font-poster-strong-weight: 600;
-  --font-poster-section: 'Archivo', 'DM Sans', system-ui, sans-serif;
+  --font-poster-tracking: 0.01em;
+  --font-poster-leading: 1;
+  --font-poster-section: var(--font-body);
   --font-poster-section-weight: 400;
-  --font-body: 'Archivo', 'DM Sans', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+  --sun: #FFB52E;
+  --on-sun: #1A1A2E;
   --card-bg: var(--surface);
   --bg-surface: var(--bg-subtle);
   --border: var(--border-subtle);
@@ -2556,7 +2570,7 @@ header.cat-bar .icon-btn:hover { transform: none; box-shadow: none; background: 
 .cat-masthead { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
 .cat-masthead-main { display: flex; flex-direction: column; min-width: 0; }
 h1.cat-title {
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 2.8rem; line-height: .9; letter-spacing: -.035em;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 2.8rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking);
   text-transform: uppercase; color: var(--text); max-width: 12ch;
 }
 .cat-mastline { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); margin-top: 14px; min-height: 1.2em; }
@@ -2574,7 +2588,7 @@ h1.cat-title {
 .cat-band::after { bottom: 6px; height: 20px; background: var(--sun); transform: rotate(-2.5deg); }
 .cat-band-in { position: relative; z-index: 1; display: flex; gap: 36px 56px; align-items: flex-end; padding: 0 16px; flex-wrap: wrap; }
 .cat-band-item { display: flex; flex-direction: column; gap: 6px; }
-.cat-band-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3rem; line-height: .85; letter-spacing: -.04em; color: var(--bg); }
+.cat-band-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); color: var(--bg); }
 .cat-band-l { font-size: .78rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--bg); }
 
 /* Search and order: an underline field and underlined words. */
@@ -2608,7 +2622,7 @@ body[data-active-view="favorites"] [data-view]:not([data-view="favorites"]) { di
 .cat-rail-home:hover { text-decoration: underline; }
 .cat-rail-id { display: flex; align-items: center; gap: 10px; padding: 6px 0 16px; }
 .cat-rail-avatar { width: 38px; height: 38px; flex: 0 0 auto; border: 3px solid var(--text); background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
-.cat-rail-idname { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1rem; line-height: 1.1; text-transform: uppercase; color: var(--text); }
+.cat-rail-idname { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text); }
 .cat-rail-group { display: flex; flex-direction: column; margin-top: 18px; }
 #view-tabs.cat-rail-group { margin-top: 0; }
 #tag-bar { padding: 0; display: flex; flex-direction: column; flex-wrap: nowrap; gap: 0; z-index: auto; }
@@ -2633,23 +2647,27 @@ body[data-active-view="favorites"] [data-view]:not([data-view="favorites"]) { di
 /* ── The index of apps ─────────────────────────────────────────────────────────────────────── */
 .local-apps-block { margin: 48px 0 0; padding: 0; background: transparent; border: 0; border-radius: 0; flex: 0 0 auto; }
 #published-section, #parked-section, #community-section, #favorites-section { margin: 48px 0 0; }
-.cat-list-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 20px; }
+.cat-list-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0; }
+/* The list headline is a slab (the shared rule is under "The slab a section opens on"), as wide
+   as the list under it; the count rides on the slab in the slab's own colour. */
 .cat-list-title h2, .cat-list-title .fav-section-title, .published-header h2 {
-  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); text-transform: uppercase; font-size: 1.9rem; line-height: .95; letter-spacing: -.03em;
-  color: var(--text); margin: 0; display: flex; align-items: baseline; gap: 12px;
+  font-size: 1.9rem; flex: 1 1 auto; display: flex; align-items: baseline; gap: 12px;
 }
-.cat-list-title .cat-count, .published-header h2 span:last-child, .fav-section-count, #local-apps-count { font-family: var(--font-mono); font-size: .9rem; color: var(--accent); opacity: 1; font-weight: 400; letter-spacing: 0; }
-.published-header { margin-bottom: 20px; }
+.cat-list-title .cat-count, .published-header h2 span:last-child, .fav-section-count, #local-apps-count { font-family: var(--font-mono); font-size: .9rem; color: inherit; opacity: 1; font-weight: 400; letter-spacing: 0; }
+.published-header { margin-bottom: 0; }
 .published-header .arrow { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1rem; color: var(--text); }
 .local-apps-note, .local-apps-hint { display: none; }
 .view-empty { margin: 0; border: 0; border-top: 3px solid var(--text); border-radius: 0; background: transparent; text-align: left; padding: 22px 0; }
 .view-empty p { font-family: var(--font-body); }
+/* No rule over a list, or over the empty line that stands in for one under its headline: the
+   slab already says where it starts, and a rule inside a section means a row. The rows keep their
+   own hairlines. */
+#favorites-empty { border-top: 0; }
 
 #app-grid, .published-grid.cat-list {
   display: flex; flex-direction: column; padding: 0; gap: 0; margin: 0;
-  border: 0; border-top: 3px solid var(--text); background: transparent; box-shadow: none;
+  border: 0; background: transparent; box-shadow: none;
 }
-#app-grid:empty, .published-grid.cat-list:empty { border: 0; }
 .cat-list-foot { margin-top: 14px; font-size: .85rem; font-weight: var(--font-poster-text-weight); color: var(--text-dim); line-height: 1.5; }
 .cat-list .empty-state, #app-grid .empty-state { padding: 40px 0; align-items: flex-start; text-align: left; }
 #app-grid .empty-state h3 { font-family: var(--font-poster); font-weight: var(--font-poster-weight); text-transform: uppercase; font-size: 1.4rem; color: var(--text); }
@@ -2676,7 +2694,7 @@ body[data-active-view="favorites"] [data-view]:not([data-view="favorites"]) { di
 .cat-row-desc { font-weight: var(--font-poster-text-weight); font-size: .9rem; color: var(--text-dim); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cat-row.is-open .cat-row-desc { color: var(--text); }
 .cat-row-state { font-family: var(--font-mono); font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
-.cat-row-opens { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.125rem; letter-spacing: -.02em; text-align: right; color: var(--text); }
+.cat-row-opens { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.125rem; letter-spacing: var(--font-poster-tracking); text-align: right; color: var(--text); }
 .cat-row-arrow { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.125rem; text-align: right; color: var(--text); }
 .cat-row-arrow::before { content: '\2192'; }
 .cat-row.is-open .cat-row-arrow::before { content: '\2193'; }
@@ -2730,7 +2748,7 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
 .dtl-mast-main { display: flex; gap: 24px; align-items: flex-end; min-width: 0; }
 .dtl-mast-icon { width: 96px; height: 96px; flex: 0 0 auto; border: 3px solid var(--text); background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 3rem; }
 .dtl-mast-copy { display: flex; flex-direction: column; min-width: 0; }
-.dtl-mast-name { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 2.8rem; line-height: .9; letter-spacing: -.035em; text-transform: uppercase; color: var(--text); overflow-wrap: anywhere; }
+.dtl-mast-name { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 2.8rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text); overflow-wrap: anywhere; }
 .dtl-mast-line { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); margin-top: 14px; overflow-wrap: anywhere; }
 .dtl-mast-desc { font-size: 1.05rem; font-weight: var(--font-poster-text-weight); line-height: 1.5; color: var(--text); margin-top: 12px; max-width: 66ch; }
 .dtl-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
@@ -2743,27 +2761,44 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
 .dtl-mast-hint { font-size: .78rem; font-weight: var(--font-poster-text-weight); color: var(--text-dim); text-align: right; max-width: 300px; line-height: 1.5; }
 .dtl-band { margin-top: 8px; }
 
-/* Sections as bands: a chapter number, a poster headline, an ink rule. The rhythm is
-   asymmetric on purpose: far more air above a headline (112px) than under its rule (22px), so the
-   eye reads the gap as "the previous one ended" and not as more of the same. The number is a CSS
-   counter and the total is a string the detail view sets on its body (--dtl-chapters). */
+/* Sections as bands: a chapter number, then the headline on its slab. The rhythm is asymmetric on
+   purpose: far more air above a section (112px) than under its slab, so the eye reads the gap as
+   "the previous one ended" and not as more of the same. The number is a CSS counter printed on the
+   section itself, a mono line above the slab, and the total is a string the detail view sets on its
+   body (--dtl-chapters). */
 #detail-body { counter-reset: dtl-chapter; }
 .dtl-section { background: transparent; border: 0; border-radius: 0; padding: 0; margin: 112px 0 0; counter-increment: dtl-chapter; }
+.dtl-section::before {
+  content: counter(dtl-chapter, decimal-leading-zero) " / " var(--dtl-chapters, "");
+  display: block; margin-bottom: 8px;
+  font-family: var(--font-mono); font-size: .72rem; font-weight: 700; letter-spacing: .1em; color: var(--accent);
+}
 .dtl-band + .dtl-section { margin-top: 72px; }
 /* What the app needs: the cortexes it loads and the extensions it calls, one chip each. */
 .dtl-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .dtl-chip { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; padding: 2px 8px; border: 1px solid var(--text, #111); color: var(--text, #111); background: var(--card-bg, transparent); }
+/* The slab a section opens on. Ruling "Julistekasvojen osio alkaa mustelaatalla aurinkoraidalla"
+   (2026-09-12) and the home's .koti-band-title: paper words on ink, a 6px sun stripe under it, the
+   headline face at the poster tracking and leading. Ink and paper swap in the dark theme, so the
+   slab turns light with dark words there. It replaces the rule that sat under the headline; a 3px
+   rule inside a section now means a row and only a row. The size stays each place's own. */
+.dtl-section > h3,
+.cat-list-title h2, .cat-list-title .fav-section-title, .published-header h2,
+.modal h2, .prompt-builder-modal h2 {
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
+  line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
+  color: var(--bg); background: var(--text);
+  padding: .55rem 1rem .5rem; border: 0; border-bottom: 6px solid var(--sun);
+  margin: 0 0 1.4rem;
+}
 .dtl-section > h3 {
   display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 12px;
-  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); text-transform: uppercase; font-size: 1.9rem; line-height: .95; letter-spacing: -.03em;
-  color: var(--text); margin: 0 0 14px;
+  font-size: 1.9rem;
 }
-.dtl-section > h3::before {
-  content: counter(dtl-chapter, decimal-leading-zero) " / " var(--dtl-chapters, "");
-  flex: 0 0 100%; margin-bottom: 4px;
-  font-family: var(--font-mono); font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: none; color: var(--accent);
-}
-.dtl-section > h3 + * { border-top: 3px solid var(--text); padding-top: 22px; }
+/* A door that sits in a headline (About's edit) is a word on the slab, in the slab's colour. */
+.dtl-section > h3 .dtl-btn { color: var(--bg); border-bottom-color: var(--bg); }
+.dtl-section > h3 .dtl-btn:hover { color: var(--bg); border-bottom-color: var(--sun); }
+.dtl-h3-doors { display: flex; align-items: center; gap: 8px; }
 .dtl-desc { font-size: 1rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; }
 .dtl-btn-row { gap: 24px; align-items: center; }
 .dtl-btn {
@@ -2791,7 +2826,7 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
 /* The base stylesheet tints the live and active stops; here the state is the value on the sun. */
 .wc-stop.is-live, .wc-stop.is-active, .wc-stop.is-idle { background: transparent; border-color: var(--text); }
 .wc-stop-label { flex: 0 0 176px; }
-.wc-stop-val { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.75rem; letter-spacing: -.02em; color: var(--text); }
+.wc-stop-val { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.75rem; letter-spacing: var(--font-poster-tracking); color: var(--text); }
 .wc-stop.is-active .wc-stop-val { background: var(--sun); padding: 2px 10px; }
 .wc-stop-note { font-size: 1rem; font-weight: 700; color: var(--text); }
 .wc-arrow { display: none; }
@@ -2953,11 +2988,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
   background: var(--bg); border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun);
   padding: 28px 32px 30px; font-family: var(--font-body); animation: none;
 }
-.modal h2 {
-  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); text-transform: uppercase; font-size: 1.4rem; line-height: 1; letter-spacing: -.02em;
-  color: var(--text); margin: 0 0 18px; padding-bottom: 12px; border-bottom: 3px solid var(--text);
-}
-.modal h2 .aga-app-ref { font-family: var(--font-mono); font-size: .8rem; text-transform: none; letter-spacing: 0; color: var(--text-dim); }
+/* The dialog's title is the section slab at the dialog's size (the shared rule above). */
+.modal h2 { font-size: 1.4rem; }
+.modal h2 .aga-app-ref { font-family: var(--font-mono); font-size: .8rem; text-transform: none; letter-spacing: 0; color: inherit; }
 .modal p, .help-p, .confirm-message, .parked-blurb { font-size: .95rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; color: var(--text); }
 .help-p { color: var(--text-dim); margin: 6px 0 0; }
 .modal-label, .modal .settings-row label, .modal label:not(.protect-row):not(.mz-check):not(.pb-trackcard):not(.pb-pack-item):not(.pb-ext-toggle):not(.pb-mode-radio) { display: block; font-size: .9rem; font-weight: 700; color: var(--text); margin: 14px 0 2px; text-transform: none; letter-spacing: 0; }
@@ -2968,6 +3001,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .modal-tab { padding: 0 0 2px; border: 0 !important; border-bottom: 3px solid transparent !important; border-radius: 0; background: transparent; font-family: var(--font-body); font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim); }
 .modal-tab:hover { color: var(--text); background: transparent; }
 .modal-tab.active { color: var(--text); background: transparent; border-bottom-color: var(--accent) !important; }
+/* The tabs govern the body under them and nothing after it: a 4px sun bar down the left edge from
+   under the tabs to the last line the chosen tab decides, as on the home (.koti-journey-panel). */
+.modal-tabs ~ .tab-content.active { border-left: 4px solid var(--sun); padding-left: 1.25rem; }
 .modal-actions { display: flex; gap: 22px; align-items: center; justify-content: flex-start; flex-wrap: wrap; margin-top: 24px; }
 .modal-btn, .modal-btn.secondary, .modal-btn.danger {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0 0 1px;
@@ -3018,10 +3054,8 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 
 /* The generate-with-AI dialog: three numbered steps, the same numerals as the monetize form. */
 .prompt-builder-modal { max-width: 860px; background: var(--bg); border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); padding: 28px 32px 30px; }
-.prompt-builder-modal h2 {
-  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); text-transform: uppercase; font-size: 1.4rem; line-height: 1; letter-spacing: -.02em;
-  color: var(--text); margin: 0 0 18px; padding-bottom: 12px; border-bottom: 3px solid var(--text);
-}
+.prompt-builder-modal h2 { font-size: 1.4rem; }
+.consents-target { font-size: .8rem; color: var(--text-muted); margin: 0 0 12px; }
 .pb-intro { font-size: .95rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; color: var(--text-dim); margin: 0 0 20px; }
 .pb-step { border-top: 3px solid var(--text); padding-top: 18px; margin-bottom: 22px; }
 .pb-step:first-of-type { border-top: 3px solid var(--text); padding-top: 18px; }
@@ -3108,7 +3142,6 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
   .cat-tools { margin-top: 20px; gap: 12px; }
   .cat-sort { padding-bottom: 0; gap: 14px; overflow-x: auto; scrollbar-width: none; }
   .local-apps-block, #community-section, #favorites-section { margin-top: 28px; }
-  .cat-list-title h2, .published-header h2 { font-size: 1.5rem; }
   .cat-row { display: flex; flex-wrap: wrap; gap: 6px 10px; padding: 12px 0; }
   .cat-row.is-open { padding: 12px 8px; margin: 0 -8px; }
   .cat-row-icon { display: none; }
@@ -3132,7 +3165,6 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
   .dtl-mast-hint { text-align: left; max-width: none; }
   .dtl-section { margin-top: 72px; }
   .dtl-band + .dtl-section { margin-top: 48px; }
-  .dtl-section h3 { font-size: 1.5rem; }
   .dtl-mast-name { font-size: 2.2rem; }
   .wc-stop-label { flex: 0 0 100%; }
   .wc-explain, .wc-size { margin-left: 0; }
@@ -3150,6 +3182,13 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
   .lg-editor select.modal-input { max-width: none; }
   .mz-group > .mz-field, .mz-group > .mz-grid, .mz-group > .mz-more, .mz-group > .mz-check, .mz-group > .mz-hint, .mz-group > .od-tool-head, .mz-group > .od-form, .mz-group-lede { margin-left: 0; }
   .modal { padding: 20px 18px 22px; box-shadow: 5px 5px 0 var(--sun); }
+}
+
+/* ── Narrow phone: the slabs at the home's phone numbers ─────────────────────────────────── */
+@media (max-width: 560px) {
+  .dtl-section > h3, .cat-list-title h2, .cat-list-title .fav-section-title, .published-header h2 { font-size: 1.7rem; padding: .45rem .8rem .4rem; }
+  .modal h2, .prompt-builder-modal h2 { padding: .45rem .8rem .4rem; }
+  .modal-tabs ~ .tab-content.active { padding-left: .9rem; }
 }
 </style>
 </head>
@@ -9334,7 +9373,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     var cortex = app.usesCortex && app.usesCortex.length ? app.usesCortex.join(", ") : "—";
     var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : "—";
     var favBtn = "";
-    var aboutHeader = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>' + t("detail.about") + '</span><span style="display:flex;align-items:center;gap:8px">' + favBtn + (canEditAbout && !detailEditingAbout ? dtlBtn(t("detail.editDetails"), "window._launcher.detailAboutEdit()") : "") + "</span></h3>";
+    var aboutHeader = "<h3><span>" + t("detail.about") + '</span><span class="dtl-h3-doors">' + favBtn + (canEditAbout && !detailEditingAbout ? dtlBtn(t("detail.editDetails"), "window._launcher.detailAboutEdit()") : "") + "</span></h3>";
     var descs = app.descriptions || {};
     var descEnVal = descs.en || (app.description || "");
     var descFiVal = descs.fi || "";
@@ -9570,7 +9609,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     var ref = promoteRef(app);
     var cur = getPromotion(ref) || {};
     var on = !!(cur.en || cur.fi);
-    return '<div class="dtl-section" id="detail-promote"><h3 style="display:flex;align-items:center;gap:8px">' + t("promote.title") + (on ? ' <span class="dtl-badge-on">' + t("promote.on") + "</span>" : "") + '</h3><p class="dtl-desc">' + t("promote.hint") + '</p><label class="dtl-stat-label" for="detail-promo-en">' + t("promote.en") + '</label><textarea id="detail-promo-en" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.en || "") + '</textarea><label class="dtl-stat-label" for="detail-promo-fi">' + t("promote.fi") + '</label><textarea id="detail-promo-fi" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.fi || "") + '</textarea><div class="dtl-btn-row" style="margin:0 0 4px">' + dtlBtn(t("detail.translateEnFi"), "window._launcher.detailTranslateDesc('en','fi','detail-promo-','detail-promo-tr-status')") + dtlBtn(t("detail.translateFiEn"), "window._launcher.detailTranslateDesc('fi','en','detail-promo-','detail-promo-tr-status')") + '</div><div class="dtl-ai-status" id="detail-promo-tr-status" style="margin:0 0 8px"></div><div class="dtl-btn-row">' + dtlBtn(t("promote.save"), "window._launcher.detailPromoteSave()", { variant: "primary" }) + (on ? dtlBtn(t("promote.remove"), "window._launcher.detailPromoteClear()") : "") + '</div><div class="dtl-ai-status" id="detail-promo-status"></div></div>';
+    return '<div class="dtl-section" id="detail-promote"><h3>' + t("promote.title") + (on ? ' <span class="dtl-badge-on">' + t("promote.on") + "</span>" : "") + '</h3><p class="dtl-desc">' + t("promote.hint") + '</p><label class="dtl-stat-label" for="detail-promo-en">' + t("promote.en") + '</label><textarea id="detail-promo-en" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.en || "") + '</textarea><label class="dtl-stat-label" for="detail-promo-fi">' + t("promote.fi") + '</label><textarea id="detail-promo-fi" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.fi || "") + '</textarea><div class="dtl-btn-row" style="margin:0 0 4px">' + dtlBtn(t("detail.translateEnFi"), "window._launcher.detailTranslateDesc('en','fi','detail-promo-','detail-promo-tr-status')") + dtlBtn(t("detail.translateFiEn"), "window._launcher.detailTranslateDesc('fi','en','detail-promo-','detail-promo-tr-status')") + '</div><div class="dtl-ai-status" id="detail-promo-tr-status" style="margin:0 0 8px"></div><div class="dtl-btn-row">' + dtlBtn(t("promote.save"), "window._launcher.detailPromoteSave()", { variant: "primary" }) + (on ? dtlBtn(t("promote.remove"), "window._launcher.detailPromoteClear()") : "") + '</div><div class="dtl-ai-status" id="detail-promo-status"></div></div>';
   }
   function detailPromoteSave() {
     var app = detailGetApp();
@@ -11891,7 +11930,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     };
     var box = document.createElement("div");
     box.className = "modal";
-    box.innerHTML = '<div style="font-size:1.05rem;font-weight:700;margin-bottom:4px">' + t("consents.title") + '</div><div style="font-size:.8rem;color:var(--text-muted);margin-bottom:12px">' + escapeHtml(appName || filename) + " · " + escapeHtml(target) + '</div><div id="consents-body" style="font-size:.9rem;color:var(--text-muted)">' + t("common.loading") + '</div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px"><button type="button" class="modal-btn secondary" onclick="window._launcher.closeConsents()">' + t("common.close") + "</button></div>";
+    box.innerHTML = "<h2>" + t("consents.title") + '</h2><div class="consents-target">' + escapeHtml(appName || filename) + " · " + escapeHtml(target) + '</div><div id="consents-body" style="font-size:.9rem;color:var(--text-muted)">' + t("common.loading") + '</div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px"><button type="button" class="modal-btn secondary" onclick="window._launcher.closeConsents()">' + t("common.close") + "</button></div>";
     ov.appendChild(box);
     document.body.appendChild(ov);
     subdomainApiCall("GET", "/v1/app-grants").then(function(json) {
