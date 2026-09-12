@@ -38,10 +38,13 @@
 /* One person is a grid row, not a table cell: at 390px the eight-column table was 766px wide and
    the actions column was simply off the screen. Below 900px the row becomes a block and each
    value says its own name. */
+/* The seven columns need 892px of content width at their minimums, which a 1180px window is the
+   first to give (a 220px rail and 64px of page padding come off first). Below that the row stacks
+   rather than losing its last columns off the side, which is what the old table did at 390px. */
 .adm-gh-head,
 .adm-gh-row {
   display: grid;
-  grid-template-columns: minmax(200px, 1.7fr) minmax(90px, 1fr) 152px 80px minmax(110px, 1.1fr) 116px minmax(120px, 1.2fr);
+  grid-template-columns: minmax(130px, 1.6fr) minmax(100px, 1fr) 152px 76px minmax(112px, 1fr) 116px minmax(110px, 1.2fr);
   gap: 0 16px;
   align-items: baseline;
 }
@@ -50,6 +53,8 @@
 .adm-gh-row:hover { background: var(--bg-surface); }
 .adm-gh-row b { display: block; font-size: .88rem; font-weight: 700; color: var(--text); }
 .adm-gh-id { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); margin-top: 2px; overflow-wrap: anywhere; }
+/* The whole identity, for the stacked view where there is room for it. */
+.adm-gh-id--full { display: none; }
 .adm-gh-mail { font-family: var(--font-mono); font-size: .72rem; color: var(--success-fg); overflow-wrap: anywhere; }
 .adm-gh-mail--unconfirmed { color: var(--text-dim); }
 .adm-gh-none { color: var(--text-muted); }
@@ -71,25 +76,21 @@
 .adm-gh-empty { padding: 14px 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text-dim); }
 
 @media (max-width: 1180px) {
-  .adm-gh-head,
-  .adm-gh-row { grid-template-columns: minmax(160px, 1.6fr) minmax(80px, 1fr) 140px 74px minmax(100px, 1fr) minmax(110px, 1.1fr); }
-  .adm-gh-head .adm-gh-made-h,
-  .adm-gh-row .adm-gh-made { display: none; }
-}
-
-@media (max-width: 900px) {
   .adm-gh-head { display: none; }
-  .adm-gh-row { display: block; padding: 12px 0; }
-  /* Off the grid the cells are inline spans, so each one is told to be a line of its own —
-     without this, two-step and the sign-in stamp share a line with no space between them. */
-  .adm-gh-row > span { display: block; margin-top: 6px; }
-  .adm-gh-row > span:first-child { margin-top: 0; }
+  /* Off the grid the values flow and wrap rather than taking a line each: one line each turned a
+     person into 224px of mostly empty row on a 1000px screen. The name and the doors take a full
+     line of their own; everything between them fills the width it has. */
+  .adm-gh-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 20px; padding: 12px 0; }
+  .adm-gh-row > span:first-child { flex-basis: 100%; }
   /* Every value says what it is; the name and the doors need no label. */
   .adm-gh-row > [data-l]::before { content: attr(data-l) ': '; font-family: var(--font-mono); font-size: .68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .3px; }
   /* Beats the block rule above on specificity, which is why both name the row. */
   .adm-gh-row > .adm-gh-lvl,
   .adm-gh-row > .adm-gh-acts { display: flex; align-items: center; flex-wrap: wrap; }
-  .adm-gh-row > .adm-gh-acts { justify-content: flex-start; gap: 18px; margin-top: 10px; }
+  .adm-gh-row > .adm-gh-acts { flex-basis: 100%; justify-content: flex-start; gap: 18px; margin-top: 4px; }
   .adm-gh-row > .adm-gh-made { display: block; }
   .adm-gh-when small { display: inline; margin: 0 0 0 8px; }
+  /* Room for the whole identity here, so the short form steps aside. */
+  .adm-gh-row .adm-gh-id { display: none; }
+  .adm-gh-row .adm-gh-id--full { display: block; margin-top: 2px; }
 }
