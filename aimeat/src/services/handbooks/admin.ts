@@ -6,6 +6,9 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — most tools require operator role and
  *   are runtime-gated (a non-operator caller will get "Operator role required").
  * @version-history
+ *   v1.3.0 -- 2026-09-12 -- aimeat_admin_usage, with the two things an AI reporting a bill has to
+ *     say out loud: which of the three totals is the operator's, and that none of them contains the
+ *     chat agent's key.
  *   v1.2.0 -- 2026-09-12 -- aimeat_admin_statistics, and the correction that goes with it:
  *     aimeat_admin_stats was described here as "health/metrics" and carries neither.
  *   v1.1.0 -- 2026-08-24 -- Organisation sign-in (BR-04): the SSO-connection tools, the setup
@@ -22,7 +25,13 @@ operator they return "Operator role required". Use deliberately.
 
 ## Your tools
 
-**Node administration (operator).** \`aimeat_admin_statistics\` (what the node COUNTED: requests,
+**Node administration (operator).** \`aimeat_admin_usage\` (what AI COSTS here, and whose money it
+is: \`whose_money.house\` is the operator's own bill, \`whose_money.own\` is other people's provider
+accounts and costs them nothing, \`whose_money.ledger\` is a third count off a different table — never
+add the three together. \`ceiling_usd\` is the grant × the accounts: the most the house key can cost
+before somebody is refused. \`keys.chat.metered_here\` is false because every chat turn is spent from
+a key handed to a child process, so say that whenever you report a total, and pass ask_provider true
+to get the provider's own figure for it) · \`aimeat_admin_statistics\` (what the node COUNTED: requests,
 memory, refusals, the day-by-day tallies, and the live gauges — give both \`from\` and \`to\` for a
 period, neither for the node's whole life, and read it both ways to tell a quiet period from a
 counter nothing writes) · \`aimeat_admin_stats\` (a different question: how many agents, actions,
@@ -67,6 +76,8 @@ the manual offboarding door; a connected directory does the same automatically o
 
 ## Typical uses
 - Audit the node: \`aimeat_admin_statistics\` / \`aimeat_admin_stats\` / \`aimeat_admin_agents\` / \`aimeat_admin_config\`.
+- Answer "what is this costing me": \`aimeat_admin_usage\` for the period and the one before it, and
+  lead with whose money each figure is rather than with the largest number in the payload.
 - Answer "is anything happening to us": \`aimeat_admin_statistics\` for the period and the week before
   it, then \`aimeat_admin_security_overview\` if the refusals are flat across a weekend.
 - Govern data sharing: create a group, add members, then grant consent for a data-pattern.

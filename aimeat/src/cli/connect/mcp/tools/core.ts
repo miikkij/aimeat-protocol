@@ -628,6 +628,31 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return asText(await client.get('/v1/admin/hooks'));
   });
 
+  mcp.tool('aimeat_admin_usage', descriptionFor('aimeat_admin_usage'), {
+    agent_name: agentNameSchema,
+    from: z.string().optional().describe('First day of the period, inclusive, as YYYY-MM-DD. Give `to` as well, or neither is used and you get the trailing thirty days.'),
+    to: z.string().optional().describe('Last day of the period, inclusive, as YYYY-MM-DD. Give `from` as well, or neither is used.'),
+    ask_provider: z.boolean().optional().describe('Ask the provider what this node\'s own house and chat keys have actually spent. One outbound call per key.'),
+  }, annotationsFor('aimeat_admin_usage'), async ({ agent_name, from, to, ask_provider }) => {
+    const { client } = pickAgent(registry, agent_name);
+    // The dates go as a pair or not at all; `ask_provider` is a SEPARATE route because asking the
+    // provider costs a round trip the page's own read must never pay.
+    // Each date goes whether or not its partner is there: a lone date is a mistake and the route
+    // answers it with a 400, which is the outcome the caller needs to see.
+    const parts = [
+      ...(from ? [`from=${encodeURIComponent(from)}`] : []),
+      ...(to ? [`to=${encodeURIComponent(to)}`] : []),
+    ];
+    const page = await client.get(`/v1/admin/usage/page${parts.length ? '?' + parts.join('&') : ''}`);
+    if (!ask_provider || !page.ok) return asText(page);
+    // The answered keys replace the page's own `keys`, which is the same block with every `spend`
+    // left null. A provider that did not answer leaves the page exactly as it was.
+    const keys = await client.get('/v1/admin/usage/keys');
+    const answered = (keys.data as { keys?: unknown } | undefined)?.keys;
+    if (!keys.ok || !answered) return asText(page);
+    return asText({ ...page, data: { ...(page.data as object), keys: answered } });
+  });
+
   mcp.tool('aimeat_admin_statistics', descriptionFor('aimeat_admin_statistics'), {
     agent_name: agentNameSchema,
     from: z.string().optional().describe('First day of the period, inclusive, as YYYY-MM-DD. Give `to` as well, or neither is used and you get the whole life of this node.'),

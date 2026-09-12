@@ -1,0 +1,105 @@
+/* ── Admin System Prompts page, in the poster face ──
+ * @file admin-prompts.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's system prompts page (design canvas "AIMEAT Admin System Prompts",
+ *   direction A): the list and the open prompt side by side so eighty-eight of them can be searched
+ *   without losing your place, the group headings that carry the everyday button, and the editor
+ *   with the two languages under each other. The frame, the sections, the metric rows, the numeral
+ *   strip and the badges come from admin.css and organism.css; only what this page adds lives here.
+ *   Every value is a theme.css token, so the page flips with the theme.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial.
+ */
+
+.adm-pr-intro { margin: 0 0 .9rem; font-size: .88rem; line-height: 1.55; color: var(--text-dim); max-width: 76ch; }
+.adm-pr-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
+.adm-pr-note { margin: 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-pr .adm-mrow--last { border-bottom: 0; }
+.adm-pr .adm-mrow .adm-mval { overflow-wrap: anywhere; }
+.adm-pr .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-pr .og-strip b.adm-pr-coral { color: var(--accent); }
+
+/* ── the two panes ── */
+.adm-pr-bench { display: grid; grid-template-columns: 360px minmax(0, 1fr); border: 2px solid var(--text); background: var(--card-bg); }
+.adm-pr-list { border-right: 2px solid var(--text); min-width: 0; display: flex; flex-direction: column; max-height: 78vh; }
+.adm-pr-rows { overflow-y: auto; }
+.adm-pr-editor { min-width: 0; display: flex; flex-direction: column; max-height: 78vh; overflow-y: auto; }
+
+/* the search field: the page's one input shape, an ink underline that turns coral in use */
+.adm-pr-find { display: flex; align-items: center; gap: 9px; border-bottom: 3px solid var(--text); padding: 6px 10px; }
+.adm-pr-find:focus-within { border-bottom-color: var(--accent); }
+.adm-pr-find svg { width: 16px; height: 16px; flex: none; stroke: var(--text); fill: none; stroke-width: 2.5; stroke-linecap: square; }
+.adm .adm-pr-find input[type="text"] { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .88rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-pr-find input[type="text"]::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm-pr-filters { display: flex; gap: 12px; padding: 8px 10px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.adm-pr-filter { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 0 0 1px; font-family: inherit; font-size: .78rem; font-weight: 700; color: var(--text-dim); cursor: pointer; }
+.adm-pr-filter:hover { color: var(--text); }
+.adm-pr-filter.on { color: var(--accent); border-bottom-color: var(--accent); }
+
+.adm-pr-ghead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 9px 10px 6px; background: var(--bg-surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.adm-pr-ghead b { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .86rem; letter-spacing: var(--font-poster-tracking, .01em); text-transform: uppercase; color: var(--text); }
+.adm-pr-ghead small { font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
+.adm-pr-ghead .og-door { font-size: .76rem; }
+
+.adm-pr-row { display: block; width: 100%; text-align: left; padding: 8px 10px; border: 0; border-bottom: 1px solid var(--border-subtle); border-radius: 0; background: none; font: inherit; cursor: pointer; }
+.adm-pr-row:hover { background: var(--bg-surface); }
+.adm-pr-row.on { background: var(--sun); }
+.adm-pr-row.on .adm-pr-addr { color: var(--on-sun); }
+.adm-pr-row.off { opacity: .6; }
+.adm-pr-name { display: block; font-size: .84rem; font-weight: 700; line-height: 1.3; color: var(--text); }
+.adm-pr-row.on .adm-pr-name { color: var(--on-sun); }
+.adm-pr-addr { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-pr-chips { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+.adm-pr-none { padding: 14px 10px; font-size: .85rem; color: var(--text-dim); }
+
+/* ── the open prompt ── */
+.adm-pr-head { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.adm-pr-title { display: block; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.15rem; line-height: 1.1; letter-spacing: var(--font-poster-tracking, .01em); text-transform: uppercase; color: var(--text); }
+.adm-pr-desc { display: block; font-size: .82rem; color: var(--text-dim); line-height: 1.5; margin-top: 4px; }
+.adm-pr-headrow { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+.adm-pr-facts { padding: 10px 16px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 6px 14px; font-size: .8rem; align-items: baseline; }
+.adm-pr-facts .k { color: var(--text-dim); }
+.adm-pr-mono { font-family: var(--font-mono); font-size: .72rem; overflow-wrap: anywhere; }
+.adm-pr-body { padding: 12px 16px 16px; }
+.adm-pr-label { display: block; font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+.adm .adm-pr-text { width: 100%; box-sizing: border-box; border: 2px solid var(--text); border-radius: 0; background: var(--bg-input); color: var(--text); font-family: var(--font-mono); font-size: .74rem; line-height: 1.55; padding: 9px 11px; resize: vertical; }
+.adm-pr-hint { margin: 5px 0 0; font-size: .75rem; line-height: 1.5; color: var(--text-dim); }
+.adm-pr-lang { margin-top: 16px; }
+.adm-pr-foot { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.adm-pr-notefield { flex: 1 1 220px; min-width: 0; display: flex; align-items: center; border-bottom: 3px solid var(--text); padding: 3px 2px 4px; }
+.adm-pr-notefield:focus-within { border-bottom-color: var(--accent); }
+.adm .adm-pr-notefield input[type="text"] { width: 100%; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .85rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm-pr-empty { padding: 40px 20px; text-align: center; font-size: .9rem; color: var(--text-dim); }
+.adm-pr-versions { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+.adm-pr-vrow { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: .45rem 0; border-bottom: 1px solid var(--border-subtle); font-size: .8rem; }
+.adm-pr-vrow:last-child { border-bottom: 0; }
+.adm-pr-vwhen { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+
+/* ── which version wins: a coral numeral, the sentence, the count ── */
+.adm-pr-step { display: grid; grid-template-columns: 44px minmax(0, 1fr) minmax(190px, auto); gap: 0 19px; align-items: baseline; padding: .7rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text); }
+.adm-pr-step--last { border-bottom: 0; }
+.adm-pr-step b { font-weight: 700; }
+.adm-pr-stepn { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.5rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); color: var(--accent); }
+
+@media (max-width: 1400px) {
+  /* One column under a wide desktop: the editor needs the width more than the list needs to stay
+     beside it, and at 1280 the two panes leave the prompt text about sixty characters a line. */
+  .adm-pr-bench { grid-template-columns: 1fr; }
+  .adm-pr-list { border-right: 0; border-bottom: 2px solid var(--text); max-height: 420px; }
+  .adm-pr-editor { max-height: none; }
+}
+
+@media (max-width: 860px) {
+  .adm-pr-step { grid-template-columns: 36px minmax(0, 1fr); gap: 4px 12px; }
+  .adm-pr-step > .adm-mval { grid-column: 2; text-align: left; }
+  .adm-pr-facts { grid-template-columns: 1fr; gap: 2px 0; }
+  .adm-pr-facts .k { margin-top: 6px; }
+}
+
+@media (max-width: 768px) {
+  .adm-pr .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; }
+  .adm-pr .adm-mrow > :nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+  .adm-pr .adm-mrow > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .adm-pr .adm-mrow > :nth-child(3) { grid-column: 2; grid-row: 2; max-width: 11rem; white-space: normal; }
+}

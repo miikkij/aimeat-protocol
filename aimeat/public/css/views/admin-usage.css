@@ -1,0 +1,123 @@
+/* ── Admin Usage page, in the poster face ──
+ * @file admin-usage.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's Usage page (design canvas "AIMEAT Admin Usage"): whose money paid for
+ *   the AI here, the models ranked with a bar each, one chart split by whose key paid, and the call
+ *   stream. The frame, the sections, the metric rows, the numeral strip, the dashed box and the
+ *   doors come from admin.css and organism.css; only what this page adds lives here.
+ *
+ *   TWO COLOURS HERE ARE NOT TOKENS, and deliberately. The chart's two series mean "your money" and
+ *   "not your money", and a series colour is data: it has to stay the same colour when the theme
+ *   flips, or the same bar means two different things in light and dark. They are slots 1 and 2 of
+ *   the validated categorical palette. Everything else on this page is a theme.css token.
+ *
+ *   THE MODEL BARS CARRY NO SERIES COLOUR AT ALL. Their length is the encoding, which is why this
+ *   page can rank eighty models where the old chart ran out of distinct colours at twelve and began
+ *   repeating them inside a stacked bar.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial. Replaces the classic-shell cards and the two Chart.js canvases.
+ */
+
+.adm-us {
+  /* The two series. Fixed, for the reason in the header. */
+  --us-house: #eb6834;
+  --us-own: #2a78d6;
+}
+
+.adm-us .adm-mrow--last { border-bottom: 0; }
+.adm-us .adm-mrow .adm-mval { overflow-wrap: anywhere; }
+.adm-us .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-us .og-strip b.adm-us-coral { color: var(--accent); }
+.adm-us .og-strip b.adm-us-dim { color: var(--text-muted); }
+.adm-us .og-box { max-width: none; }
+
+.adm-us-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 90ch; }
+.adm-us-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.adm-us-note { margin: 10px 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); max-width: 92ch; }
+.adm-us-acts { display: flex; gap: 22px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+.adm-us-empty { padding: 26px; text-align: center; color: var(--text-dim); font-size: .9rem; border: 2px dashed var(--border); background: var(--bg); }
+.adm-us .og-door:disabled { opacity: .5; cursor: default; }
+
+/* 01: the period control, in the section header where it governs only what is under it. */
+.adm-us-period { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.adm-us-period-l { font-size: .78rem; color: var(--text-dim); margin-right: 4px; }
+.adm-us-fchip { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 9px; border: 2px solid var(--border); background: none; color: var(--text-dim); cursor: pointer; border-radius: 0; }
+.adm-us-fchip:hover { border-color: var(--text); color: var(--text); }
+.adm-us-fchip.on { border-color: var(--text); background: var(--sun); color: var(--on-sun); }
+
+/* 02: one model is a row — what it is, what it cost, and a bar whose length is the whole encoding. */
+.adm-us-brow { display: grid; grid-template-columns: minmax(0, 1fr) 110px 96px 96px 230px; gap: 0 22px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: .88rem; color: var(--text); }
+.adm-us-brow--last { border-bottom: 0; }
+.adm-us-brow--head { border-bottom: 2px solid var(--text); padding-bottom: 6px; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; color: var(--text-muted); font-weight: 600; }
+.adm-us-brow b { font-weight: 700; }
+.adm-us-mono { font-family: var(--font-mono); font-size: .8rem; color: var(--text); overflow-wrap: anywhere; }
+.adm-us-num { font-family: var(--font-mono); font-size: .8rem; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-dim); white-space: nowrap; }
+.adm-us-num--strong { color: var(--text); font-weight: 500; }
+.adm-us-bar { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.adm-us-bar-fill { display: block; height: 12px; border-radius: 2px; background: var(--text); min-width: 2px; }
+/* The folded tail is many models, not one, so it does not wear the ink the named rows do. */
+.adm-us-bar-fill--tail { background: var(--text-muted); }
+.adm-us-bar > span { font-family: var(--font-mono); font-size: .7rem; color: var(--text-muted); white-space: nowrap; }
+
+/* 03: one chart, two series, its own axis. */
+.adm-us-chart { border: 2px solid var(--text); background: var(--card-bg); padding: 16px 18px 12px; }
+.adm-us-chart-h { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 4px; flex-wrap: wrap; }
+.adm-us-chart-t { font-weight: 700; font-size: .95rem; }
+.adm-us-legend { display: flex; gap: 16px; align-items: center; font-size: .78rem; color: var(--text-dim); }
+.adm-us-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.adm-us-key { width: 10px; height: 10px; border-radius: 2px; display: block; }
+.adm-us-key--house { background: var(--us-house); }
+.adm-us-key--own { background: var(--us-own); }
+.adm-us-yhint { font-family: var(--font-mono); font-size: .66rem; color: var(--text-muted); }
+.adm-us-yhint--on { color: var(--text); }
+.adm-us-plot { display: flex; align-items: flex-end; gap: 4px; height: 160px; margin-top: 14px; padding-bottom: 2px; border-bottom: 1px solid var(--border); }
+.adm-us-day { flex: 1 1 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; min-width: 0; }
+.adm-us-day:hover { background: var(--bg-surface); }
+.adm-us-pair { display: flex; align-items: flex-end; gap: 2px; width: 100%; height: 100%; }
+.adm-us-pair i { flex: 1 1 0; min-width: 0; max-width: 14px; border-radius: 3px 3px 0 0; }
+.adm-us-bar-house { background: var(--us-house); }
+.adm-us-bar-own { background: var(--us-own); }
+.adm-us-xaxis { display: flex; gap: 4px; margin-top: 6px; }
+.adm-us-xaxis span { flex: 1 1 0; text-align: center; font-family: var(--font-mono); font-size: .62rem; color: var(--text-muted); min-width: 0; overflow: hidden; }
+
+/* 03, 04: the numbers behind a chart, and the people. */
+.adm-us-scroll { overflow-x: auto; }
+.adm-us-tbl { width: 100%; border-collapse: collapse; font-size: .81rem; }
+.adm-us-tbl th { text-align: left; color: var(--text-muted); font-weight: 600; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); white-space: nowrap; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; }
+.adm-us-tbl td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--border-subtle); color: var(--text-dim); vertical-align: top; }
+.adm-us-tbl td b { color: var(--text); font-weight: 700; }
+.adm-us-tbl th.num, .adm-us-tbl td.num { text-align: right; }
+.adm-us-tbl td.num { font-family: var(--font-mono); font-size: .76rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* 05: the surfaces beside what was refused. 06: the checks beside the paste. */
+.adm-us-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 44px; }
+.adm-us-ai { display: grid; grid-template-columns: minmax(0, 1fr) 560px; gap: 0 44px; align-items: start; }
+.adm-us-two > *, .adm-us-ai > * { min-width: 0; }
+.adm-us-paste { white-space: pre-wrap; font-size: .85rem; line-height: 1.55; color: var(--text); }
+
+@media (max-width: 1100px) {
+  .adm-us .og-strip { flex-wrap: wrap; }
+  .adm-us .og-strip > div { flex: 1 1 50%; border-right: 0; border-bottom: 1px solid var(--border); }
+  .adm-us-two, .adm-us-ai { grid-template-columns: 1fr; gap: 18px 0; }
+  .adm-us-brow { grid-template-columns: minmax(0, 1fr) 100px 90px; gap: 6px 18px; }
+  .adm-us-brow > :nth-child(4) { display: none; }
+  .adm-us-brow > :nth-child(5) { grid-column: 1 / -1; }
+}
+
+/* A phone: a metric row keeps its name readable and stacks the chip over the value; a model row
+   puts its bar on a line of its own, where it is the only thing that needs the width. */
+@media (max-width: 768px) {
+  .adm-us .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; }
+  .adm-us .adm-mrow > :nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+  .adm-us .adm-mrow > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .adm-us .adm-mrow > :nth-child(3) { grid-column: 2; grid-row: 2; max-width: 11rem; white-space: normal; text-align: right; }
+  .adm-us-brow { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
+  .adm-us-brow > :nth-child(2) { grid-column: 2; grid-row: 1; }
+  .adm-us-brow > :nth-child(3) { grid-column: 2; grid-row: 2; }
+  .adm-us-brow > :nth-child(5) { grid-column: 1 / -1; grid-row: 3; }
+  .adm-us-brow--head > :nth-child(3), .adm-us-brow--head > :nth-child(5) { display: none; }
+  .adm-us-plot { height: 120px; gap: 2px; }
+  .adm-us-xaxis { gap: 2px; }
+  .adm-us-xaxis span:not(:first-child):not(:last-child) { visibility: hidden; }
+}

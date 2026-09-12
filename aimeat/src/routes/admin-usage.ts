@@ -20,12 +20,17 @@
  *   - GET  /v1/admin/usage/summary        -- any node report, or one owner's slice of it
  *   - GET  /v1/admin/usage/calls          -- raw call rows (audited)
  *   - GET  /v1/admin/usage/status         -- fold freshness + hot-window settings
+ *   - GET  /v1/admin/usage/page           -- the Usage page in one read, by whose money it is
+ *   - GET  /v1/admin/usage/keys           -- what the PROVIDER says the operator's own keys spent
  *   - POST /v1/admin/usage/rollup/rebuild -- clear a bucket range and re-fold it
  *   - POST /v1/admin/usage/archive/prune  -- destroy archived rows before an explicit date
  * @usage
  *   import { adminUsageRouter } from './routes/admin-usage.js';
  *   app.use(adminUsageRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-09-12 — The Usage page's own read, and the one route that asks the provider what
+ *     the operator's own keys have spent. The chat agent's key is spent by a child process and no
+ *     figure this node counts had ever included a cent of it.
  *   v1.0.0 — 2026-08-14 — Initial: the operator usage surface.
  */
 import { Router } from 'express';
@@ -41,6 +46,7 @@ import {
 } from '../services/usage/usage-read.js';
 import { rebuildUsageRollup } from '../services/usage/rollup-engine.js';
 import { recordUsageCall, pendingUsageCalls } from '../services/usage/usage-buffer.js';
+import { buildUsagePage } from '../services/usage-page.js';
 import { logger } from '../utils/logger.js';
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -233,6 +239,60 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
           metered_here: false,
         },
       }));
+    });
+
+  // ── GET /v1/admin/usage/page ── the Usage page in one read, organised by whose money it is.
+  //
+  // The three routes above each answer a piece of "what is this costing me" and the page had to
+  // fetch all of them and decide how they relate, which it did not. This one composes the same
+  // services — nothing is counted a second time — and states the relation the surfaces could not:
+  // which money is the operator's, which is not, and which key the node cannot see at all.
+  //
+  // It makes NO outbound call. Asking the provider what a key spent is the route below, behind an
+  // explicit press, because a page that reaches a third party on every render stops loading when
+  // that third party is slow.
+  router.get('/v1/admin/usage/page',
+    requireAuth(), requireRole('operator'),
+    async (req: Request, res: Response) => {
+      const rawFrom = typeof req.query.from === 'string' ? req.query.from : undefined;
+      const rawTo = typeof req.query.to === 'string' ? req.query.to : undefined;
+      // A LONE DATE IS REFUSED, not quietly completed. The two are a period, and answering a caller
+      // who named one boundary with thirty days ending today hands them a number under a label they
+      // chose and a range they did not.
+      if ((rawFrom === undefined) !== (rawTo === undefined)) {
+        res.status(400).json(error(config.nodeId, 'BAD_RANGE',
+          'Give both `from` and `to`, or neither for the trailing thirty days. One alone would answer a different question than the one asked.'));
+        return;
+      }
+      const to = rawTo ?? dayNDaysAgo(0);
+      const from = rawFrom ?? dayNDaysAgo(29);
+      if (!ISO_DAY.test(from) || !ISO_DAY.test(to)) {
+        res.status(400).json(error(config.nodeId, 'BAD_RANGE', '`from` and `to` are days, as YYYY-MM-DD.'));
+        return;
+      }
+      if (from > to) {
+        res.status(400).json(error(config.nodeId, 'BAD_RANGE', `\`from\` (${from}) is after \`to\` (${to}).`));
+        return;
+      }
+      res.json(success(config.nodeId, await buildUsagePage(config, storage, { from, to })));
+    });
+
+  // ── GET /v1/admin/usage/keys ── what the provider says the operator's own keys have spent.
+  //
+  // THE ONLY PLACE THIS NODE ASKS SOMEBODY ELSE WHAT IT OWES. Every other money figure here is
+  // something the node counted itself, and two keys are spent where it cannot count: the chat
+  // agent's key is handed to a child process, and the house key's own account may hold calls that
+  // never reached the metering. The provider knows both. → services/openrouter-key.ts
+  //
+  // Its own route rather than a flag on the one above, because it costs a round trip to a third
+  // party and the page must load without one.
+  router.get('/v1/admin/usage/keys',
+    requireAuth(), requireRole('operator'),
+    async (_req: Request, res: Response) => {
+      const page = await buildUsagePage(config, storage, {
+        from: dayNDaysAgo(0), to: dayNDaysAgo(0), includeKeySpend: true,
+      });
+      res.json(success(config.nodeId, { keys: page.keys }));
     });
 
   // ── POST /v1/admin/usage/rollup/rebuild ── recompute a bucket range from raw.

@@ -227,6 +227,43 @@ await test('GET /v1/admin/ghii \u2192 200, has ghii_users array', async () => {
     assert(typeof body.data?.total === 'number', 'has total');
 });
 
+// The GHII Users page reads these seven fields off this one list and fetches nothing else, so a
+// field quietly leaving the row is a column quietly going blank. login_count is the one the page
+// had never shown until the poster face arrived, which is exactly why nothing asserted it.
+await test('GET /v1/admin/ghii \u2192 a row carries every field the page reads', async () => {
+    const { body } = await json('/v1/admin/ghii', authed());
+    const row = (body.data?.ghii_users ?? []).find((u: any) => u.username === nonOpName);
+    assert(!!row, `no row for ${nonOpName} in ${body.data?.ghii_users?.length} users`);
+    assert(typeof row.ghii === 'string' && row.ghii.includes('@'), `ghii: ${row.ghii}`);
+    assert(typeof row.verification_level === 'number', `verification_level: ${row.verification_level}`);
+    assert(typeof row.totp_enabled === 'boolean', `totp_enabled: ${row.totp_enabled}`);
+    assert(typeof row.login_count === 'number', `login_count: ${row.login_count}`);
+    assert(typeof row.created_at === 'string' && row.created_at.length > 0, `created_at: ${row.created_at}`);
+    assert('last_login_at' in row, 'last_login_at is absent, so the page cannot tell a dormant account');
+    assert('masked_email' in row, 'masked_email is absent, so the mail column cannot render');
+    assert('email_verified' in row, 'email_verified is absent, so a confirmed address reads as unconfirmed');
+});
+
+// The level is three chips on the page and each one is this write. A level that does not come back
+// changed leaves the chip on the sun lying about what the account is.
+await test('PUT /v1/admin/ghii level \u2192 the list comes back at the new level', async () => {
+    const ghii = `${nonOpName}@${NODE_ID}`;
+    const put = await json(`/v1/admin/ghii/${encodeURIComponent(ghii)}`, authed({
+        method: 'PUT',
+        body: JSON.stringify({ verificationLevel: 2 }),
+    }));
+    assert(put.status === 200, `PUT ${put.status}: ${JSON.stringify(put.body)}`);
+    const after = await json('/v1/admin/ghii', authed());
+    const row = (after.body.data?.ghii_users ?? []).find((u: any) => u.username === nonOpName);
+    assert(row?.verification_level === 2, `level after write: ${row?.verification_level}`);
+
+    const back = await json(`/v1/admin/ghii/${encodeURIComponent(ghii)}`, authed({
+        method: 'PUT',
+        body: JSON.stringify({ verificationLevel: 0 }),
+    }));
+    assert(back.status === 200, `restore ${back.status}`);
+});
+
 await test('PUT /v1/admin/ghii/nonexistent \u2192 404', async () => {
     const { status, body } = await json('/v1/admin/ghii/nonexistent%40nowhere', authed({
         method: 'PUT',

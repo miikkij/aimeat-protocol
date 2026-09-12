@@ -47033,6 +47033,68 @@ paths:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /v1/admin/usage/page:
+    get:
+      operationId: adminUsagePage
+      summary: What AI costs on this node, by whose money it is (operator only)
+      description: >-
+        The Usage page in one read. THREE TOTALS appear and they are never summed:
+        `whose_money.house` is the operator's own bill (people spending the node's key because they
+        had not brought their own), `whose_money.own` is other people's own provider accounts and
+        costs the operator nothing, and `whose_money.ledger` is a third count off a different table
+        and the larger set. `ceiling_usd` is the free grant times the number of accounts: the most
+        the house key can cost before somebody is refused.
+        THE LIMIT WORTH STATING: `keys.chat.metered_here` is false, because every chat turn is spent
+        from a key handed to a child process, so no figure here contains any of it. GET
+        /v1/admin/usage/keys asks the provider what that key actually spent.
+        `from` and `to` go together or not at all; one alone is refused rather than completed, since
+        answering it would label thirty days with a range the caller did not ask for.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+          description: First day of the period, inclusive. Requires `to`.
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+          description: Last day of the period, inclusive. Requires `from`.
+      responses:
+        '200':
+          description: Whose money paid, what it went on, who spent it, and the keys
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: One date without the other, a malformed day, or `from` after `to`
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/admin/usage/keys:
+    get:
+      operationId: adminUsageKeys
+      summary: What the PROVIDER says this node's own keys have spent (operator only)
+      description: >-
+        The only money figure on this node that the node did not count itself. Two of the operator's
+        keys are spent where the metering cannot see them: the chat agent's key is handed to a child
+        process, and the house key's provider account may hold calls that never reached the
+        metering. This asks the provider directly, one outbound call per key, cached for a minute.
+        A key that is unset, refused, or whose provider does not answer comes back with `ok: false`
+        and a reason rather than an error status: not knowing is an answer a surface can print.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The `keys` block with each key's provider-reported spend, or why there is none
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/admin/usage/rollup/rebuild:
     post:
       operationId: adminUsageRollupRebuild

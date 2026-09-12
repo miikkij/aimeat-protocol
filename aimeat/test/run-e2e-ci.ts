@@ -9,9 +9,11 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
- *   v1.42.0 -- 2026-09-12 -- Add e2e-admin-owners-page.ts to ALL_SUITES: the field set the Owners
+ *   v1.43.0 -- 2026-09-12 -- Add e2e-admin-owners-page.ts to ALL_SUITES: the field set the Owners
  *            page counts every figure and filter from, and the two writes that move it. Not in the
  *            guard tier yet.
+ *   v1.42.0 -- 2026-09-12 -- Add e2e-admin-usage-page.ts to ALL_SUITES: whose money each figure is,
+ *            and the key this node cannot meter. Not in the guard tier yet.
  *   v1.41.0 -- 2026-09-12 -- Add e2e-admin-stats-page.ts to ALL_SUITES: the twin of e2e-metrics,
  *            asserting that GET /v1/stats counts requests at all. Not in the guard tier yet.
  *   v1.40.0 -- 2026-09-12 -- Add e2e-admin-hooks-page.ts to ALL_SUITES: the Hooks page's read, the
@@ -563,10 +565,17 @@ const ALL_SUITES = [
     // The one read the Owners page is folded from: the field set every figure, chip and filter is
     // counted from, and the two lifecycle writes moving the two fields the page draws.
     'test/e2e-admin-owners-page.ts',
+    // The System Prompts page: who owns a prompt, the round trip a version number cannot describe
+    // (edit, take the current version, and the number rises while the text goes back), and what a
+    // group take does besides replacing text.
+    'test/e2e-admin-prompts-page.ts',
     // The numbers behind the Statistics page: that requests_total is counted at all (its middleware
     // was written and never mounted), that a scope refusal is counted, and that a period reading is
     // a different reading from the node's whole life.
     'test/e2e-admin-stats-page.ts',
+    // The Usage page's read: that every figure says whose money it is, that the chat agent's key is
+    // reported as NOT metered here, and that a half-stated period is refused rather than completed.
+    'test/e2e-admin-usage-page.ts',
     'test/e2e-living-pulse.ts',
     // Every core scheduled job fired through the operator's trigger door, on a node of its own
     // (40310) with an SMTP sink, short windows and the flags the seeding keys on. Lane 0.

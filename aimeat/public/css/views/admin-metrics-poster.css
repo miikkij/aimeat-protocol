@@ -1,0 +1,98 @@
+/* ── Admin Metrics page, in the poster face ──
+ * @file admin-metrics-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's metrics page (design canvas "AIMEAT Admin Metrics"): the memory in
+ *   actual use beside the line the session was already keeping, the ledger that explains why the
+ *   operating system's number is bigger, the routes by share of every call answered, the three
+ *   refusal counters as sentences, and the raw scrape with its filter. Every share column names
+ *   its own maximum in the header, so a bar is never a proportion of something a reader guesses.
+ *   The sections, the strip and the doors come from admin.css and organism.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial.
+ */
+
+.adm-mx-top { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 0 48px; align-items: start; }
+.adm-mx-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+.adm-mx-hero { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 3.4rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); color: var(--text); }
+.adm-mx-hero-sub { margin: .7rem 0 0; font-family: var(--font-mono); font-size: .75rem; line-height: 1.7; color: var(--text-dim); }
+.adm-mx-hero-sub b { font-weight: 500; color: var(--text); }
+.adm-mx-live { display: inline-flex; align-items: center; gap: 7px; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.adm-mx-live i { width: 9px; height: 9px; background: var(--accent); }
+
+/* One series: a sun ground under an ink line, the newest reading marked in coral. */
+.adm-mx-chart-h { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.adm-mx-chart-h small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.adm-mx-chart { position: relative; border-bottom: 2px solid var(--text); }
+.adm-mx-chart svg { display: block; width: 100%; height: 150px; }
+/* The ground under the line is the sun at half weight: a full-strength fill covers most of the
+   box, because the readings sit in a narrow band and the area is nearly the whole frame. */
+.adm-mx-area { fill: var(--sun); opacity: .5; }
+.adm-mx-line { fill: none; stroke: var(--text); stroke-width: 2; stroke-linejoin: round; }
+.adm-mx-now { stroke: var(--accent); stroke-width: 3; }
+.adm-mx-cursor { stroke: var(--text); stroke-width: 1; }
+.adm-mx-hit { fill: transparent; cursor: crosshair; }
+.adm-mx-read { position: absolute; top: 0; right: 0; font-family: var(--font-mono); font-size: .72rem; color: var(--text); background: var(--bg); padding: 2px 6px; border: 2px solid var(--text); }
+.adm-mx-x { display: flex; justify-content: space-between; padding-top: 7px; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.adm-mx-wait { border: 2px solid var(--text); background: var(--bg-surface); padding: 22px 24px; font-size: .92rem; line-height: 1.6; color: var(--text); }
+
+.adm-mx .og-strip { margin-top: 1.6rem; }
+.adm-mx .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-mx-lead { margin: 0 0 18px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
+
+/* The rows: the ledger, the routes and the raw scrape all use this grid with their own columns. */
+.adm-mx-rows { border-top: 2px solid var(--text); }
+.adm-mx-hrow, .adm-mx-row { display: grid; gap: 0 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border); }
+.adm-mx-hrow { padding: 8px 0; border-bottom: 2px solid var(--text); font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); }
+.adm-mx-hrow .r, .adm-mx-row .r { text-align: right; }
+.adm-mx-ledger .adm-mx-hrow, .adm-mx-ledger .adm-mx-row { grid-template-columns: 230px 110px 160px minmax(0, 1fr); align-items: baseline; }
+.adm-mx-routes .adm-mx-hrow, .adm-mx-routes .adm-mx-row { grid-template-columns: minmax(0, 1fr) 120px 96px 200px; }
+.adm-mx-raw .adm-mx-hrow, .adm-mx-raw .adm-mx-row { grid-template-columns: 340px minmax(0, 1fr) 130px; align-items: baseline; padding: 9px 0; }
+.adm-mx-part { font-weight: 700; font-size: .92rem; color: var(--text); }
+.adm-mx-val { font-family: var(--font-mono); font-size: .88rem; color: var(--text); }
+.adm-mx-what { font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.adm-mx-route { font-family: var(--font-mono); font-size: .85rem; color: var(--text); overflow-wrap: anywhere; }
+.adm-mx-rate { font-family: var(--font-mono); font-size: .85rem; color: var(--text-dim); }
+.adm-mx-name { font-family: var(--font-mono); font-size: .82rem; color: var(--text); overflow-wrap: anywhere; }
+.adm-mx-labels { font-family: var(--font-mono); font-size: .76rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.adm-mx-bar { height: 12px; background: var(--bg-surface); }
+.adm-mx-bar i { display: block; height: 100%; background: var(--sun); }
+/* The total is measured, not a part of the stack, so it is not the parts' colour. */
+.adm-mx-row--sum { border-bottom: 0; border-top: 2px solid var(--text); padding-top: 13px; }
+.adm-mx-row--sum .adm-mx-bar i { background: var(--text); }
+.adm-mx-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 12px 2px 0; font-size: .78rem; color: var(--text-dim); }
+.adm-mx-foot .adm-mx-note { font-family: var(--font-mono); font-size: .72rem; }
+
+/* Three counters, each one a sentence rather than a card with a number. */
+.adm-mx-refusals { border-top: 2px solid var(--text); }
+.adm-mx-rrow { display: grid; grid-template-columns: 190px minmax(0, 1fr) 210px; gap: 0 22px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--border); }
+.adm-mx-rrow:last-child { border-bottom: 0; }
+.adm-mx-rrow b { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 2.1rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); color: var(--text); }
+.adm-mx-rname { display: block; font-weight: 800; font-size: .9rem; margin-top: 4px; }
+.adm-mx-rwhy { font-size: .84rem; line-height: 1.5; color: var(--text-dim); }
+.adm-mx-rmetric { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); text-align: right; overflow-wrap: anywhere; }
+
+/* The filter over the raw scrape, and the match it found. */
+.adm-mx-find { display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 4px 2px 6px; max-width: 520px; }
+.adm-mx-find:focus-within { border-bottom-color: var(--accent); }
+.adm .adm-mx-find input[type="search"], .adm .adm-mx-find input[type="text"] { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font-family: var(--font-mono); font-size: .9rem; font-weight: 500; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-mx-find input::placeholder { color: var(--text-dim); }
+.adm-mx-find svg { width: 16px; height: 16px; flex: none; stroke: var(--text); fill: none; stroke-width: 2.5; }
+.adm-mx-name mark { background: var(--sun); color: var(--on-sun); }
+
+@media (max-width: 1100px) {
+  .adm-mx-top { grid-template-columns: 1fr; gap: 30px 0; }
+}
+@media (max-width: 860px) {
+  .adm-mx-hrow { display: none; }
+  .adm-mx-ledger .adm-mx-row, .adm-mx-routes .adm-mx-row, .adm-mx-raw .adm-mx-row { grid-template-columns: minmax(0, 1fr) auto; gap: 5px 10px; align-items: baseline; }
+  .adm-mx-what, .adm-mx-labels { grid-column: 1 / -1; }
+  .adm-mx-bar { grid-column: 1 / -1; height: 10px; margin-top: 2px; }
+  .adm-mx-rrow { grid-template-columns: minmax(0, 1fr); gap: 6px 0; }
+  .adm-mx-rmetric { text-align: left; }
+  .adm-mx .og-strip { display: grid; grid-template-columns: 1fr 1fr; }
+  .adm-mx .og-strip > div { padding: .8rem 0; border-right: 0; }
+  .adm-mx .og-strip > div:nth-child(odd) { border-right: 1px solid var(--border); padding-right: .9rem; }
+  .adm-mx .og-strip > div:nth-child(even) { padding-left: .9rem; }
+  .adm-mx .og-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+}
