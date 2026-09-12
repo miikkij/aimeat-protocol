@@ -138,6 +138,10 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     // gated in the handler, and there is nothing to narrow — an operator either moderates this node
     // or does not, and a scope word here would let a credential hold half of that.
     'aimeat_admin_knowledge',
+    // The Federation page's read: the peers, what waits on a person, and the book. Operator-gated in
+    // the handler like the rest of this block, and there is nothing here to narrow — it is one read
+    // of what this node's own federation looks like from the inside.
+    'aimeat_admin_federation',
     // Reading how a page is arranged, and the catalogue of blocks this node can serve. Gated in the
     // handler on the operator, like the admin tools above it, and there is nothing here to narrow:
     // a layout is a list of block names, and the front page's describes a page anyone can look at.

@@ -665,6 +665,13 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return asText(await client.get(`/v1/stats${qs}`));
   });
 
+  mcp.tool('aimeat_admin_federation', descriptionFor('aimeat_admin_federation'), {
+    agent_name: agentNameSchema,
+  }, annotationsFor('aimeat_admin_federation'), async ({ agent_name }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.get('/v1/admin/federation/overview'));
+  });
+
   mcp.tool('aimeat_admin_knowledge', descriptionFor('aimeat_admin_knowledge'), {
     agent_name: agentNameSchema,
     page: z.number().int().optional().describe('Which page of packages, from 1. A page past the end comes back as the last page rather than empty.'),

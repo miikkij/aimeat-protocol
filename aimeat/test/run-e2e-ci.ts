@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.49.0 -- 2026-09-12 -- Add e2e-admin-federation-page.ts to ALL_SUITES: the peer added and
+ *            never switched on, which was in no count on the one screen that could fix it, and a
+ *            peering request this node SENT being read as one arriving.
  *   v1.48.0 -- 2026-09-12 -- Add e2e-admin-realtime-page.ts to ALL_SUITES: the overview the Realtime
  *            page reads, and the switched-off answer that used to be a 503 the dashboard could not
  *            tell from a quiet node. Not in the guard tier yet.
@@ -612,6 +615,10 @@ const ALL_SUITES = [
     // The Knowledge page's read: that the count survives the paging, and that the OPERATOR's import
     // now passes the same schema the agent's always did.
     'test/e2e-admin-knowledge-page.ts',
+    // The Federation page's read: that a peer approved and never switched on is in a count, that
+    // the sign-in answer says how many peers it can actually reach, and that the version baseline
+    // spans the federation rather than the direct peers.
+    'test/e2e-admin-federation-page.ts',
     'test/e2e-living-pulse.ts',
     // Every core scheduled job fired through the operator's trigger door, on a node of its own
     // (40310) with an SMTP sink, short windows and the flags the seeding keys on. Lane 0.
