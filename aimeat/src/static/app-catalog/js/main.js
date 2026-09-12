@@ -17,6 +17,8 @@
  *   v2.5.0 — 2026-08-29 — Legal pages and audit log: expose legalEdit / legalCancel / legalSave /
  *     legalRemove / legalFormatHint / auditMore.
  *   v2.6.0 — 2026-09-03 — getServerAppRow handed to initDetail.
+ *   v2.7.0 — 2026-09-13 — The extension popup and editor overlays open and close by `hidden`, and
+ *     Escape closes the popup too, as it closes every other dialog.
  */
 import { t, getLang, setLang, applyI18n } from './i18n.js';
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl, currentOwnerName, generateId, readFileAsText } from './util.js';
@@ -480,7 +482,7 @@ import { toggleFavorite } from './favorites.js';
     // ── Click cortex popup overlay to close ─────────
     document.getElementById('cortex-popup-overlay').addEventListener('click', function (e) {
       if (e.target === this) {
-        this.style.display = 'none';
+        this.hidden = true;
       }
     });
 
@@ -621,8 +623,10 @@ import { toggleFavorite } from './favorites.js';
       if (e.key === 'Escape') {
         if (!document.getElementById('iframe-view').hidden) {
           closeIframe();
-        } else if (document.getElementById('cortex-editor-overlay').style.display === 'flex') {
+        } else if (!document.getElementById('cortex-editor-overlay').hidden) {
           closeCortexEditor();
+        } else if (!document.getElementById('cortex-popup-overlay').hidden) {
+          document.getElementById('cortex-popup-overlay').hidden = true;
         } else if (document.getElementById('prompt-builder-overlay').style.display === 'flex') {
           closePbPanel();
         } else if (!document.getElementById('source-overlay').hidden) {

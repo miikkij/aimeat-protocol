@@ -2446,6 +2446,9 @@
   @structure tokens · site bar · masthead, band, tools · rail · the index (rows and panels) ·
     foot · detail view · phone
   @version-history
+    v1.9.0 — 2026-09-13 — Every dialog overlay scrolls, so a dialog taller than the screen starts at
+      its top instead of past it; the extension popup and editor in the dialog frame (.cx-*); the
+      legal pages' recommendation as a chip (.lg-rec) instead of a sun bar.
     v1.8.0 — 2026-09-13 — The home's headline and shape language (ruling "Julistekasvojen osio alkaa
       mustelaatalla aurinkoraidalla", design canvas "Osioiden rajat kotisivulla", B1): the detail's
       section headlines and the list headlines on an ink slab with a 6px sun stripe, the chapter
@@ -2940,7 +2943,9 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .lg-chip { cursor: pointer; font: inherit; }
 .lg-rows { display: flex; flex-direction: column; margin: 14px 0 0; }
 .lg-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; padding: 16px 0; border-bottom: 1px solid var(--border); }
-.lg-row.is-recommended { border-left: 3px solid var(--sun); padding-left: 14px; }
+/* A page the app ought to have carries a chip beside its name. It used to be a sun bar down the
+   row's edge, and the sun bar now means the lines a chosen tab governs. */
+.lg-rec { display: inline-flex; align-items: center; padding: 1px 7px; border: 2px solid var(--text); font-family: var(--font-mono); font-size: .68rem; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--text); }
 .lg-row-head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; grid-column: 1; }
 .lg-row-name { font-family: var(--font-body); font-weight: 800; font-size: .95rem; }
 .lg-state { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; letter-spacing: .04em; color: var(--text-dim); }
@@ -2993,7 +2998,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .modal h2 .aga-app-ref { font-family: var(--font-mono); font-size: .8rem; text-transform: none; letter-spacing: 0; color: inherit; }
 .modal p, .help-p, .confirm-message, .parked-blurb { font-size: .95rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; color: var(--text); }
 .help-p { color: var(--text-dim); margin: 6px 0 0; }
-.modal-label, .modal .settings-row label, .modal label:not(.protect-row):not(.mz-check):not(.pb-trackcard):not(.pb-pack-item):not(.pb-ext-toggle):not(.pb-mode-radio) { display: block; font-size: .9rem; font-weight: 700; color: var(--text); margin: 14px 0 2px; text-transform: none; letter-spacing: 0; }
+.modal-label, .modal .settings-row label, .modal label:not(.protect-row):not(.mz-check):not(.pb-trackcard):not(.pb-pack-item):not(.pb-ext-toggle):not(.pb-mode-radio):not(.cx-lib-name) { display: block; font-size: .9rem; font-weight: 700; color: var(--text); margin: 14px 0 2px; text-transform: none; letter-spacing: 0; }
 .label-hint { font-weight: 600; color: var(--text-dim); }
 .modal-input { margin: 0; }
 .modal-fields, .modal-row { gap: 0 24px; }
@@ -3056,6 +3061,51 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .prompt-builder-modal { max-width: 860px; background: var(--bg); border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); padding: 28px 32px 30px; }
 .prompt-builder-modal h2 { font-size: 1.4rem; }
 .consents-target { font-size: .8rem; color: var(--text-muted); margin: 0 0 12px; }
+#consents-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, .6); display: flex; justify-content: center; padding: 24px; }
+
+/* A dialog taller than the screen scrolls with its overlay instead of centring past the top edge,
+   where its title and first fields could not be reached (measured 2026-09-13: the add dialog's top
+   at -33px on a 390x844 phone, help at -180px, publish at -7px in a 1280x460 window). The overlay
+   scrolls; the auto margins centre a dialog that fits and fall to zero for one that does not. */
+#modal-overlay, #source-overlay, #settings-overlay, #help-overlay, #publish-overlay, #versions-overlay,
+#subdomain-overlay, #backup-overlay, #server-import-overlay, #json-import-overlay, #aimeat-import-overlay,
+#lineage-overlay, #confirm-overlay, #agents-overlay, #protection-overlay, #prompt-builder-overlay,
+#consents-overlay, #cortex-popup-overlay, #cortex-editor-overlay {
+  overflow-y: auto; overscroll-behavior: contain; align-items: flex-start;
+}
+.modal, .prompt-builder-modal { margin-block: auto; flex-shrink: 0; }
+
+/* ── The extension popup and the extension editor, in the dialog frame ───────────────────── */
+.cx-overlay { position: fixed; inset: 0; z-index: 650; background: rgba(0, 0, 0, .3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; justify-content: center; padding: 24px; }
+.cx-overlay--editor { z-index: 651; }
+.modal label.cx-lib-name { font-weight: 700; font-size: .9rem; color: var(--text); }
+.cx-overlay[hidden] { display: none; }
+.cx-modal { max-width: 560px; }
+.cx-modal--editor { max-width: 840px; }
+.modal .cx-sub { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); margin: 0 0 12px; overflow-wrap: anywhere; }
+.modal .cx-desc { margin: 0 0 18px; color: var(--text-dim); }
+.cx-label { font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; margin: 0; padding-bottom: 6px; border-bottom: 2px solid var(--text); }
+.cx-part { padding: 14px 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+.cx-part-name { font-weight: 700; font-size: .9rem; margin: 0 0 8px; }
+.cx-part-name + .cx-part-name, .cx-copy + .cx-part-name { margin-top: 14px; }
+.cx-part code { font-family: var(--font-mono); font-size: .8rem; }
+.cx-code {
+  display: block; width: 100%; box-sizing: border-box; margin: 0 0 8px; padding: 10px 12px;
+  border: 2px solid var(--text); border-radius: 0; background: var(--surface); color: var(--text);
+  font-family: var(--font-mono); font-size: .75rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.cx-code--api { max-height: 320px; overflow: auto; }
+textarea.cx-code { resize: vertical; tab-size: 2; }
+.cx-code--manifest { min-height: 280px; }
+.cx-code--lib { min-height: 160px; margin: 0; }
+.cx-owner { margin-top: 20px; }
+.cx-status { min-height: 1.2em; margin: 0 0 14px; font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); }
+.cx-status--err { color: var(--accent); }
+.cx-lib { margin: 14px 0 0; padding: 12px 14px 14px; border: 2px solid var(--text); }
+.cx-lib-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+.modal label.cx-lib-name { display: flex; align-items: baseline; gap: 10px; flex: 1 1 240px; min-width: 0; margin: 0; }
+.cx-lib-name .modal-input { flex: 1 1 auto; min-width: 0; font-family: var(--font-mono); font-size: .85rem; padding: 4px 0; }
+.cx-add { margin-top: 14px; }
 .pb-intro { font-size: .95rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; color: var(--text-dim); margin: 0 0 20px; }
 .pb-step { border-top: 3px solid var(--text); padding-top: 18px; margin-bottom: 22px; }
 .pb-step:first-of-type { border-top: 3px solid var(--text); padding-top: 18px; }
@@ -3294,38 +3344,6 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     <div id="cortex-bar-grid" style="display:none;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
   </div>
 
-  <!-- Extension Popup Overlay -->
-  <div id="cortex-popup-overlay" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.3);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:24px">
-    <div style="background:var(--surface);border:1px solid var(--border-subtle);border-radius:16px;padding:32px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.12)">
-      <div id="cortex-popup-content"></div>
-      <div style="display:flex;justify-content:flex-end;margin-top:1rem">
-        <button onclick="document.getElementById('cortex-popup-overlay').style.display='none'" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer" data-i18n="common.close">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Cortex Extension Editor Overlay -->
-  <div id="cortex-editor-overlay" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.35);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px">
-    <div style="background:var(--surface);border:1px solid var(--border-subtle);border-radius:16px;padding:32px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.12)">
-      <h2 style="margin-top:0;font-size:1.1rem" data-i18n="cortex.editorTitle">&#x1F6E0;&#xFE0F; Extension Editor</h2>
-      <p id="cortex-editor-name" style="color:var(--text-muted);font-size:.85rem;margin-top:-.5rem"></p>
-      <div id="cortex-editor-status" style="font-size:.8rem;margin-bottom:1rem;min-height:1.2em;color:#34d399"></div>
-      <div style="margin-bottom:1rem">
-        <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.5rem" data-i18n="cortex.manifest">Manifest (YAML)</label>
-        <textarea id="cortex-editor-manifest" spellcheck="false" style="width:100%;min-height:300px;background:var(--bg-subtle);color:var(--text);border:1px solid var(--border-subtle);border-radius:8px;padding:12px;font-family:monospace;font-size:.8rem;resize:vertical;tab-size:2"></textarea>
-      </div>
-      <div id="cortex-editor-libs"></div>
-      <div style="margin-bottom:1.5rem">
-        <button onclick="window._launcher.cortexEditorAddLib()" style="font-size:.8rem;padding:4px 12px;border-radius:6px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer" data-i18n="cortex.addLib">+ Add Lib File</button>
-      </div>
-      <div style="display:flex;gap:.75rem;justify-content:flex-end;flex-wrap:wrap">
-        <button onclick="window._launcher.cortexEditorExport()" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer" data-i18n="cortex.exportFiles">&#x1F4E5; Export Files</button>
-        <button onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" style="padding:6px 20px;border-radius:8px;border:none;background:#E8564A;color:#fff;font-weight:600;cursor:pointer" data-i18n="cortex.saveReinstall">Save &amp; Re-install</button>
-        <button onclick="window._launcher.closeCortexEditor()" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer" data-i18n="common.cancel">Cancel</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Published + Parked apps are now merged into the unified #app-grid below (status badges);
        their standalone sections were removed with the old renderers (TARGET-021 Aalto 3). -->
 
@@ -3380,6 +3398,36 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
   </footer>
   </div><!-- .cat-main -->
   </div><!-- .cat-body -->
+
+  <!-- Extension popup: what one active extension offers an app. The dialog frame and the title
+       slab every other dialog wears; cortex.js fills #cortex-popup-content. It sits out here with
+       the other dialogs: inside .cat-body (a stacking context) it opened under the site bar. -->
+  <div id="cortex-popup-overlay" class="cx-overlay" hidden>
+    <div class="modal cx-modal">
+      <div id="cortex-popup-content"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('cortex-popup-overlay').hidden = true" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Extension editor: the manifest and its library files, for the extension's owner. -->
+  <div id="cortex-editor-overlay" class="cx-overlay cx-overlay--editor" hidden>
+    <div class="modal cx-modal cx-modal--editor">
+      <h2 data-i18n="cortex.editorTitle">Extension Editor</h2>
+      <p id="cortex-editor-name" class="cx-sub"></p>
+      <div id="cortex-editor-status" class="cx-status" role="status" aria-live="polite"></div>
+      <label class="modal-label" for="cortex-editor-manifest" data-i18n="cortex.manifest">Manifest (YAML)</label>
+      <textarea id="cortex-editor-manifest" class="cx-code cx-code--manifest" spellcheck="false"></textarea>
+      <div id="cortex-editor-libs"></div>
+      <button type="button" class="modal-btn secondary cx-add" onclick="window._launcher.cortexEditorAddLib()" data-i18n="cortex.addLib">+ Add Lib File</button>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="window._launcher.cortexEditorExport()" data-i18n="cortex.exportFiles">Export Files</button>
+        <button type="button" class="modal-btn primary" onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" data-i18n="cortex.saveReinstall">Save &amp; Re-install</button>
+        <button type="button" class="modal-btn secondary" onclick="window._launcher.closeCortexEditor()" data-i18n="common.cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <div id="modal-overlay" hidden>
     <div class="modal" id="add-app-modal">
@@ -3964,6 +4012,31 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "cortex.addLib": "+ Add Lib File",
       "cortex.exportFiles": "Export Files",
       "cortex.saveReinstall": "Save & Re-install",
+      "cortex.loading": "Loading…",
+      "cortex.noToken": "This page has no sign-in token, so the extension could not be read.",
+      "cortex.loadFailed": "The extension could not be read: {msg}",
+      "cortex.forApps": "What your apps can use",
+      "cortex.lib": "Library file",
+      "cortex.copy": "Copy",
+      "cortex.copied": "Copied",
+      "cortex.apiSurface": "What the library offers (API)",
+      "cortex.copyApi": "Copy API",
+      "cortex.schema": "Data schema",
+      "cortex.schemaNote": "data under this key is checked against it automatically",
+      "cortex.prompt": "Prompt",
+      "cortex.copyPrompt": "Copy prompt",
+      "cortex.edit": "Edit extension",
+      "cortex.stateActive": "in use",
+      "cortex.stateInactive": "not in use",
+      "cortex.loadingData": "Loading the extension…",
+      "cortex.loaded": "Loaded, library files: {n}",
+      "cortex.saving": "Saving…",
+      "cortex.saved": "Saved.",
+      "cortex.saveFailed": "Could not save: {msg}",
+      "cortex.remove": "Remove",
+      "cortex.libName": "File",
+      "cortex.needOwner": "Sign in as the owner to edit extensions.",
+      "cortex.manifestEmpty": "The manifest is empty.",
       "sec.published": "Published Apps",
       "sec.community": "Community apps",
       "view.library": "Your apps",
@@ -4465,6 +4538,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "legal.missing": "Missing",
       "legal.none": "Not written",
       "legal.open": "Open",
+      "legal.recommended": "Recommended",
       "legal.write": "Write",
       "legal.edit": "Edit",
       "legal.remove": "Remove",
@@ -4964,6 +5038,31 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "cortex.addLib": "+ Lisää lib-tiedosto",
       "cortex.exportFiles": "Vie tiedostot",
       "cortex.saveReinstall": "Tallenna & asenna uudelleen",
+      "cortex.loading": "Ladataan…",
+      "cortex.noToken": "Laajennusta ei voitu lukea, koska sivulla ei ole kirjautumistunnusta.",
+      "cortex.loadFailed": "Laajennusta ei voitu lukea: {msg}",
+      "cortex.forApps": "Mitä sovelluksesi voivat käyttää",
+      "cortex.lib": "Kirjastotiedosto",
+      "cortex.copy": "Kopioi",
+      "cortex.copied": "Kopioitu",
+      "cortex.apiSurface": "Mitä kirjasto tarjoaa (API)",
+      "cortex.copyApi": "Kopioi API",
+      "cortex.schema": "Tietoskeema",
+      "cortex.schemaNote": "tämän avaimen tiedot tarkistetaan sitä vasten automaattisesti",
+      "cortex.prompt": "Prompti",
+      "cortex.copyPrompt": "Kopioi prompti",
+      "cortex.edit": "Muokkaa laajennusta",
+      "cortex.stateActive": "käytössä",
+      "cortex.stateInactive": "ei käytössä",
+      "cortex.loadingData": "Ladataan laajennusta…",
+      "cortex.loaded": "Ladattu, kirjastotiedostoja: {n}",
+      "cortex.saving": "Tallennetaan…",
+      "cortex.saved": "Tallennettu.",
+      "cortex.saveFailed": "Tallennus ei onnistunut: {msg}",
+      "cortex.remove": "Poista",
+      "cortex.libName": "Tiedosto",
+      "cortex.needOwner": "Kirjaudu omistajana, niin voit muokata laajennuksia.",
+      "cortex.manifestEmpty": "Manifesti on tyhjä.",
       "sec.published": "Julkaistut sovellukset",
       "sec.community": "Yhteisön sovellukset",
       "view.library": "Omat sovellukset",
@@ -5460,6 +5559,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "legal.missing": "Puuttuu",
       "legal.none": "Ei kirjoitettu",
       "legal.open": "Avaa",
+      "legal.recommended": "Suositeltu",
       "legal.write": "Kirjoita",
       "legal.edit": "Muokkaa",
       "legal.remove": "Poista",
@@ -6446,14 +6546,17 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       console.warn("Cortex bar load failed:", e);
     });
   }
+  function cortexCopyBtn(text, labelKey) {
+    return `<button type="button" class="modal-btn secondary cx-copy" onclick="cortexCopy('` + cortexArg(text) + `',this)">` + cortexEsc(t(labelKey)) + "</button>";
+  }
   function showCortexPopup(encodedName) {
     var config = loadConfig();
     var url = config.aimeatUrl.replace(/\/+$/, "");
     var el = document.getElementById("cortex-popup-content");
-    el.innerHTML = "<p>Loading...</p>";
-    document.getElementById("cortex-popup-overlay").style.display = "flex";
+    el.innerHTML = '<p class="cx-sub">' + cortexEsc(t("cortex.loading")) + "</p>";
+    document.getElementById("cortex-popup-overlay").hidden = false;
     if (!cortexToken) {
-      el.innerHTML = "<p>No auth token available</p>";
+      el.innerHTML = '<p class="cx-sub">' + cortexEsc(t("cortex.noToken")) + "</p>";
       return;
     }
     fetch(url + "/v1/cortex/" + encodedName, {
@@ -6463,30 +6566,30 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     }).then(function(data) {
       var ext = data.data;
       var comps = ext.components || [];
-      var html = '<h2 style="margin-top:0">' + cortexEsc(ext.name) + "</h2>";
-      html += '<p style="color:var(--text-muted)">' + cortexEsc(ext.description || "") + "</p>";
-      html += '<h3 style="font-size:.9rem">Available for your apps:</h3>';
+      var html = "<h2>" + cortexEsc(ext.name) + "</h2>";
+      if (ext.description) html += '<p class="cx-desc">' + cortexEsc(ext.description) + "</p>";
+      html += '<div class="cx-label">' + cortexEsc(t("cortex.forApps")) + "</div>";
       comps.filter(function(c) {
         return c.type === "lib";
       }).forEach(function(lib) {
         var scriptUrl = url + "/v1/cortex/" + encodedName + "/libs/" + encodeURIComponent(lib.filename);
         var tag = '<script src="' + scriptUrl + '"><\/script>';
-        html += '<div style="margin-bottom:1rem"><div style="font-weight:600;font-size:.85rem">&#x1F4E6; Lib: ' + cortexEsc(lib.filename) + '</div><div style="font-family:monospace;font-size:.75rem;background:var(--hover);padding:8px;border-radius:6px;margin-top:4px;word-break:break-all">' + cortexEsc(tag) + `</div><button onclick="cortexCopy('` + cortexArg(tag) + `',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy</button>`;
+        html += '<div class="cx-part"><div class="cx-part-name">' + cortexEsc(t("cortex.lib")) + " <code>" + cortexEsc(lib.filename) + '</code></div><pre class="cx-code">' + cortexEsc(tag) + "</pre>" + cortexCopyBtn(tag, "cortex.copy");
         if (lib.api_surface) {
-          html += '<div style="font-size:.8rem;font-weight:600;margin-top:8px">API Surface:</div><div style="font-family:monospace;font-size:.75rem;background:var(--hover);padding:8px;border-radius:6px;margin-top:4px;white-space:pre-wrap">' + cortexEsc(lib.api_surface) + `</div><button onclick="cortexCopy('` + cortexArg(lib.api_surface) + `',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy API</button>`;
+          html += '<div class="cx-part-name">' + cortexEsc(t("cortex.apiSurface")) + '</div><pre class="cx-code cx-code--api">' + cortexEsc(lib.api_surface) + "</pre>" + cortexCopyBtn(lib.api_surface, "cortex.copyApi");
         }
         html += "</div>";
       });
       comps.filter(function(c) {
         return c.type === "schema";
       }).forEach(function(s) {
-        html += '<div style="margin-bottom:.5rem;font-size:.85rem">&#x1F4D0; Schema: <code>' + cortexEsc(s.key_pattern) + "</code> &mdash; data validated automatically</div>";
+        html += '<div class="cx-part cx-part--line">' + cortexEsc(t("cortex.schema")) + " <code>" + cortexEsc(s.key_pattern) + "</code>: " + cortexEsc(t("cortex.schemaNote")) + "</div>";
       });
       comps.filter(function(c) {
         return c.type === "prompt";
       }).forEach(function(p) {
         var preview = (p.content || "").substring(0, 150);
-        html += '<div style="margin-bottom:.5rem"><div style="font-size:.85rem">&#x1F4AC; Prompt: ' + cortexEsc(p.name) + '</div><div style="font-size:.75rem;color:var(--text-muted)">&ldquo;' + cortexEsc(preview) + `...&rdquo;</div><button onclick="cortexCopy('` + cortexArg(p.content) + `',this)" style="font-size:.7rem;margin-top:2px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy Prompt</button></div>`;
+        html += '<div class="cx-part"><div class="cx-part-name">' + cortexEsc(t("cortex.prompt")) + " " + cortexEsc(p.name) + '</div><div class="cx-sub">&ldquo;' + cortexEsc(preview) + "&hellip;&rdquo;</div>" + cortexCopyBtn(p.content, "cortex.copyPrompt") + "</div>";
       });
       var isOwner = false;
       try {
@@ -6495,21 +6598,26 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       } catch (e) {
       }
       if (isOwner) {
-        html += `<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border-subtle)"><button onclick="window._launcher.openCortexEditor('` + encodedName + `')" style="padding:6px 16px;border-radius:8px;border:1px solid var(--accent,#34d399);background:transparent;color:var(--accent,#34d399);cursor:pointer;font-size:.85rem">&#x1F6E0;&#xFE0F; Edit Extension</button></div>`;
+        html += `<div class="cx-owner"><button type="button" class="modal-btn secondary" onclick="window._launcher.openCortexEditor('` + encodedName + `')">` + cortexEsc(t("cortex.edit")) + "</button></div>";
       }
       el.innerHTML = html;
     }).catch(function(e) {
-      el.innerHTML = "<p>Error: " + cortexEsc(e.message) + "</p>";
+      el.innerHTML = '<p class="cx-status cx-status--err">' + cortexEsc(t("cortex.loadFailed").replace("{msg}", e.message)) + "</p>";
     });
   }
   function cortexCopy(text, btn) {
     navigator.clipboard.writeText(text.replace(/\\n/g, "\n")).then(function() {
       var orig = btn.textContent;
-      btn.textContent = "Copied!";
+      btn.textContent = t("cortex.copied");
       setTimeout(function() {
         btn.textContent = orig;
       }, 1500);
     });
+  }
+  function cortexEditorStatus(text, isError) {
+    var el = document.getElementById("cortex-editor-status");
+    el.textContent = text;
+    el.className = "cx-status" + (isError ? " cx-status--err" : "");
   }
   var cortexEditorExtName = null;
   var cortexEditorWasActive = false;
@@ -6533,32 +6641,30 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     var url = config.aimeatUrl.replace(/\/+$/, "");
     var token = getCortexOwnerToken();
     if (!token) {
-      showNotice("You must be logged in as an owner to edit extensions.");
+      showNotice(t("cortex.needOwner"));
       return;
     }
-    var statusEl = document.getElementById("cortex-editor-status");
-    statusEl.textContent = "Loading extension data...";
-    statusEl.style.color = "#34d399";
+    cortexEditorStatus(t("cortex.loadingData"), false);
     document.getElementById("cortex-editor-manifest").value = "";
     document.getElementById("cortex-editor-libs").innerHTML = "";
     document.getElementById("cortex-editor-name").textContent = "";
     cortexEditorLibCounter = 0;
-    document.getElementById("cortex-popup-overlay").style.display = "none";
-    document.getElementById("cortex-editor-overlay").style.display = "flex";
+    document.getElementById("cortex-popup-overlay").hidden = true;
+    document.getElementById("cortex-editor-overlay").hidden = false;
     fetch(url + "/v1/cortex/" + encodedName + "/export", {
       headers: { "Authorization": "Bearer " + token }
     }).then(function(r) {
       return r.json();
     }).then(function(data) {
       if (!data.data) {
-        statusEl.textContent = "Error: " + (data.error || "Unknown error");
-        statusEl.style.color = "var(--accent,#e74c6f)";
+        var why = data.error && (data.error.message || data.error.code) || data.error || "";
+        cortexEditorStatus(t("cortex.loadFailed").replace("{msg}", String(why)), true);
         return;
       }
       var ext = data.data;
       cortexEditorExtName = ext.name;
       cortexEditorWasActive = ext.status === "active";
-      document.getElementById("cortex-editor-name").textContent = ext.name + (cortexEditorWasActive ? " (active)" : " (inactive)");
+      document.getElementById("cortex-editor-name").textContent = ext.name + " · " + t(cortexEditorWasActive ? "cortex.stateActive" : "cortex.stateInactive");
       document.getElementById("cortex-editor-manifest").value = ext.manifest || "";
       var libsHtml = "";
       var libs = ext.libs || {};
@@ -6569,14 +6675,13 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
         libsHtml += cortexEditorLibSection(cortexEditorLibCounter, fname, libs[fname]);
       }
       document.getElementById("cortex-editor-libs").innerHTML = libsHtml;
-      statusEl.textContent = "Loaded. " + filenames.length + " lib file" + (filenames.length !== 1 ? "s" : "") + ".";
+      cortexEditorStatus(t("cortex.loaded").replace("{n}", String(filenames.length)), false);
     }).catch(function(e) {
-      statusEl.textContent = "Error loading: " + e.message;
-      statusEl.style.color = "var(--accent,#e74c6f)";
+      cortexEditorStatus(t("cortex.loadFailed").replace("{msg}", e.message), true);
     });
   }
   function cortexEditorLibSection(id, filename, content) {
-    return '<div id="cortex-lib-' + id + '" style="margin-bottom:1rem;border:1px solid var(--border-subtle);border-radius:8px;padding:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem"><label style="font-size:.85rem;font-weight:600">Lib: <input type="text" value="' + cortexEsc(filename) + '" data-lib-name="' + id + `" style="background:var(--bg-subtle);border:1px solid var(--border-subtle);border-radius:4px;padding:2px 6px;color:var(--text);font-family:monospace;font-size:.8rem;width:200px" /></label><button onclick="document.getElementById('cortex-lib-` + id + `').remove()" style="font-size:.7rem;padding:2px 8px;border-radius:4px;border:1px solid rgba(232,86,74,.3);background:transparent;color:#E8564A;cursor:pointer">Remove</button></div><textarea data-lib-content="` + id + '" spellcheck="false" style="width:100%;min-height:150px;background:var(--bg-subtle);color:var(--text);border:1px solid var(--border-subtle);border-radius:8px;padding:10px;font-family:monospace;font-size:.78rem;resize:vertical;tab-size:2">' + cortexEsc(content || "") + "</textarea></div>";
+    return '<div id="cortex-lib-' + id + '" class="cx-lib"><div class="cx-lib-head"><label class="cx-lib-name">' + cortexEsc(t("cortex.libName")) + ' <input type="text" class="modal-input" value="' + cortexEsc(filename) + '" data-lib-name="' + id + `" /></label><button type="button" class="modal-btn danger" onclick="document.getElementById('cortex-lib-` + id + `').remove()">` + cortexEsc(t("cortex.remove")) + '</button></div><textarea data-lib-content="' + id + '" class="cx-code cx-code--lib" spellcheck="false">' + cortexEsc(content || "") + "</textarea></div>";
   }
   function cortexEditorAddLib() {
     cortexEditorLibCounter++;
@@ -6602,20 +6707,18 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     var url = config.aimeatUrl.replace(/\/+$/, "");
     var token = getCortexOwnerToken();
     if (!token) {
-      showNotice("No auth token available.");
+      showNotice(t("cortex.needOwner"));
       return;
     }
     var manifest = document.getElementById("cortex-editor-manifest").value;
     if (!manifest.trim()) {
-      showNotice("Manifest cannot be empty.");
+      showNotice(t("cortex.manifestEmpty"));
       return;
     }
     var libs = cortexEditorCollectLibs();
-    var statusEl = document.getElementById("cortex-editor-status");
     var saveBtn = document.getElementById("cortex-editor-save-btn");
     var name = cortexEditorExtName;
-    statusEl.textContent = "Saving...";
-    statusEl.style.color = "#34d399";
+    cortexEditorStatus(t("cortex.saving"), false);
     saveBtn.disabled = true;
     fetch(url + "/v1/cortex/" + encodeURIComponent(name), {
       method: "PUT",
@@ -6630,20 +6733,17 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       var data = res.data || {};
       if (!res.ok || data.ok === false) {
         var err = data.error || {};
-        var msg = err.message || err.code || "Save failed";
+        var msg = err.message || err.code || "";
         if (err.details && err.details.errors) msg += ": " + err.details.errors.join("; ");
-        statusEl.textContent = "Error: " + msg;
-        statusEl.style.color = "#E8564A";
+        cortexEditorStatus(t("cortex.saveFailed").replace("{msg}", msg), true);
         return;
       }
       if (data.data && data.data.name) cortexEditorExtName = data.data.name;
-      statusEl.textContent = "Saved successfully!";
-      statusEl.style.color = "#34d399";
+      cortexEditorStatus(t("cortex.saved"), false);
       loadCortexExtensions();
     }).catch(function(e) {
       saveBtn.disabled = false;
-      statusEl.textContent = "Error: " + e.message;
-      statusEl.style.color = "#E8564A";
+      cortexEditorStatus(t("cortex.saveFailed").replace("{msg}", e.message), true);
     });
   }
   function cortexEditorExport() {
@@ -6667,7 +6767,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     }
   }
   function closeCortexEditor() {
-    document.getElementById("cortex-editor-overlay").style.display = "none";
+    document.getElementById("cortex-editor-overlay").hidden = true;
     cortexEditorExtName = null;
   }
   var pbSourceApp = null;
@@ -8569,7 +8669,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       state = '<span class="lg-state">' + escapeHtml(t("legal.none")) + "</span>";
     }
     var actions = lgEditing === kind ? "" : dtlBtn(t(st ? "legal.edit" : "legal.write"), "window._launcher.legalEdit('" + kind + "')", { disabled: lgBusy }) + (st ? " " + dtlBtn(t("legal.remove"), "window._launcher.legalRemove('" + kind + "')", { disabled: lgBusy }) : "");
-    var html = '<div class="lg-row' + (recommended ? " is-recommended" : "") + '"><div class="lg-row-head"><div class="lg-row-name">' + escapeHtml(t("legal.kind." + kind)) + "</div>" + state + '</div><div class="lg-row-why">' + escapeHtml(info.why) + '</div><div class="lg-row-actions">' + actions + "</div>";
+    var html = '<div class="lg-row' + (recommended ? " is-recommended" : "") + '"><div class="lg-row-head"><div class="lg-row-name">' + escapeHtml(t("legal.kind." + kind)) + "</div>" + (recommended ? '<span class="lg-rec">' + escapeHtml(t("legal.recommended")) + "</span>" : "") + state + '</div><div class="lg-row-why">' + escapeHtml(info.why) + '</div><div class="lg-row-actions">' + actions + "</div>";
     if (lgEditing === kind) html += editorHtml2(kind, st);
     return html + "</div>";
   }
@@ -11924,7 +12024,6 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     closeConsents();
     var ov = document.createElement("div");
     ov.id = "consents-overlay";
-    ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999";
     ov.onclick = function(e) {
       if (e.target === ov) closeConsents();
     };
@@ -13760,7 +13859,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     });
     document.getElementById("cortex-popup-overlay").addEventListener("click", function(e) {
       if (e.target === this) {
-        this.style.display = "none";
+        this.hidden = true;
       }
     });
     document.getElementById("cortex-editor-overlay").addEventListener("click", function(e) {
@@ -13866,8 +13965,10 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       if (e.key === "Escape") {
         if (!document.getElementById("iframe-view").hidden) {
           closeIframe();
-        } else if (document.getElementById("cortex-editor-overlay").style.display === "flex") {
+        } else if (!document.getElementById("cortex-editor-overlay").hidden) {
           closeCortexEditor();
+        } else if (!document.getElementById("cortex-popup-overlay").hidden) {
+          document.getElementById("cortex-popup-overlay").hidden = true;
         } else if (document.getElementById("prompt-builder-overlay").style.display === "flex") {
           closePbPanel();
         } else if (!document.getElementById("source-overlay").hidden) {
