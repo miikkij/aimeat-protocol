@@ -119,6 +119,8 @@ export function normalizeSettings(raw: unknown): NotificationSettings {
 }
 
 function validTz(tz: string): boolean {
+  // Intl as a VALIDATOR, not a formatter: building the thing IS the test, and nothing is displayed.
+  // eslint-disable-next-line aimeat/no-raw-locale-format -- asking whether the runtime knows a zone
   try { new Intl.DateTimeFormat('en-GB', { timeZone: tz }); return true; }
   catch (err) { logger.warn('notification-settings: unknown timezone, using UTC', { tz, error: String(err) }); return false; }
 }
@@ -190,6 +192,9 @@ export function prefsFor(settings: NotificationSettings, source: NotifSource, ty
 /** Minutes since local midnight in a timezone. */
 export function localMinutes(now: Date, tz: string): number {
   try {
+    // Intl as a CLOCK, not a formatter: this reads what o'clock it is in a zone so quiet hours can
+    // be compared, and the fixed tag is what guarantees two digits to parse. Nobody reads this.
+    // eslint-disable-next-line aimeat/no-raw-locale-format -- reading the wall clock in a zone
     const parts = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now);
     const h = Number(parts.find(p => p.type === 'hour')?.value ?? 0);
     const m = Number(parts.find(p => p.type === 'minute')?.value ?? 0);

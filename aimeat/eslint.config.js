@@ -87,6 +87,14 @@ export default tseslint.config(
       'aimeat/no-storage-in-mcp': 'error',
       'aimeat/no-express-in-service': 'error',
 
+      // Language, regional format and time zone are three settings and a person mixes them freely.
+      // The formatter that reads all three existed; what was missing was anything stopping the next
+      // call site from writing its own, and there were thirty of them by 2026-09-12, five saying
+      // en-GB and one en-US for the same reader. Straight to 'error' with a four-file allowlist and
+      // no backlog, because the sweep that emptied it shipped in the same set of commits — a seeded
+      // list here would forgive precisely what the rule is for.
+      'aimeat/no-raw-locale-format': 'error',
+
       // A caught error must be rethrown with its cause attached, not replaced by a fresh one that
       // loses the original. Already 'error' for public/ since 2026-07-13; extended to src/ as part
       // of the silent-exception cleanup, since `{ cause }` is what makes a rethrown error traceable.

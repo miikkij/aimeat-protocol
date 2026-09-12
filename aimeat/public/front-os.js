@@ -76,7 +76,10 @@
     .then(function (j) {
       var d = j && j.data;
       if (!d) return;
-      var fmt = function (n) { return Number(n).toLocaleString(FI ? 'fi-FI' : 'en-US'); };
+      // The reader's own number format. It used to be the page LANGUAGE, which decides the words
+      // and not how a thousand is separated; this page has no sign-in, so the browser answers.
+      // eslint-disable-next-line aimeat/no-raw-locale-format -- signed-out page, no profile to read
+      var fmt = function (n) { return Number(n).toLocaleString(); };
       txt('fos-p-apps', fmt(d.apps));
       txt('fos-p-agents', fmt(d.agents));
       txt('fos-c-count', fmt(d.apps));
