@@ -21,6 +21,10 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   v1.11.0 -- 2026-09-12 -- The four mailbox reads (inbox, conversations, one thread, overview) take
+ *     requireOwnerMailboxRead instead of requireRole('owner'): an app holding messages:read and an
+ *     agent holding the new messages:read-as-owner read the owner's own mailbox, through the same
+ *     service the MCP tools call (services/owner-mailbox-reads.ts). A federated session is refused.
  *   v1.10.0 -- 2026-09-08 -- A send naming a file that is in nobody's storage is 400
  *     ATTACHMENT_NOT_FOUND, not 201 with an attachment the recipient can never open.
  *   v1.9.0 -- 2026-09-06 -- A 404 here names the part of the address that was wrong (the account is
@@ -73,23 +77,19 @@ import { MessageSendSchema, BroadcastSendSchema } from '../models/message-schema
 import { propagateReadReceipt } from '../services/message-delivery.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
 import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
-import { sendGroupMessage, isParticipant } from '../services/conversation-group.js';
+import { sendGroupMessage } from '../services/conversation-group.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
-import { withMessageProvenance } from '../services/message-provenance.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 import { broadcastFromPrincipal } from '../services/message-broadcast.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
-import { createMessagingDbService } from '../services/db/messaging-db-service.js';
-import { createMessagesInboxService } from '../services/db/messages-inbox-db-service.js';
+import { mailboxReaderOf, readOwnerInbox, readOwnerConversations, readOwnerThread, readOwnerOverview } from '../services/owner-mailbox-reads.js';
+import { requireOwnerMailboxRead } from '../auth/owner-mailbox-gate.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
 import { AiCompletionError } from '../services/ai-completion.js';
-import { logger } from '../utils/logger.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
   const router = Router();
   const deliveryCtx = { config, storage, peers };
-  const messagingDb = createMessagingDbService(storage);
-  const inboxDb = createMessagesInboxService(storage);
 
   /** Resolve the caller's effective identity (owner→GHII, agent/eco→sub). */
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
@@ -346,22 +346,24 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     }));
   });
 
+  /* ── The four mailbox READS. ──
+   * One door and one implementation for all four (services/owner-mailbox-reads.ts): the owner in
+   * person; a published app holding messages:read (an app grant resolves to the owner, and
+   * messages:send already sends as the owner, so this is the read half of that pair); an agent holding
+   * messages:read-as-owner (a delegation beside send-as-owner and delete-as-owner, outside every
+   * wildcard). The last two read the owner's OWN mailbox: no agent's threads, no agent list, no groups.
+   * They were requireRole('owner') until 2026-09-12, which an app grant can never pass. */
+  const readerOf = (req: Express.Request) => mailboxReaderOf(req.auth!, config.nodeId)!;
+
   /* ── GET /v1/messages/inbox — inbound from accepted contacts ── */
-  router.get('/v1/messages/inbox', requireAuth(), requireRole('owner'), async (req, res) => {
-    const ghii = resolve(req);
+  router.get('/v1/messages/inbox', requireAuth(), requireOwnerMailboxRead(config.nodeId), async (req, res) => {
     const unreadOnly = req.query.unread === 'true';
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
     const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string || '20', 10)));
-
-    const { messages, total, unread } = await storage.listInbox(ghii, { unreadOnly, page, perPage });
-    const pending = new Set((await storage.listContacts(ghii, { state: 'pending' })).map(c => c.contactId));
-    const visible = messages.filter(m => !pending.has(m.senderGhii));
-
     // Each message says which model wrote it, when an agent wrote it and said so. A person reading
     // AI-written text addressed to them has been able to see THAT since TARGET-058 and not WHICH.
-    res.json(success(config.nodeId, {
-      messages: await withMessageProvenance(storage, visible), total, unread, page, per_page: perPage,
-    }));
+    const { messages, total, unread } = await readOwnerInbox(storage, readerOf(req), { unreadOnly, page, perPage });
+    res.json(success(config.nodeId, { messages, total, unread, page, per_page: perPage }));
   });
 
   /* ── GET /v1/messages/conversations — thread list (accepted) ──
@@ -369,63 +371,42 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
    * contacts hidden, internal own-owner peers skipped) is composed in MessagingDbService, which resolves
    * the agent fleet once and batches the owner + per-agent conversations read into ONE call (was one
    * listConversations per agent). Owner is server-derived → only this owner's agents (no cross-owner leak). */
-  router.get('/v1/messages/conversations', requireAuth(), requireRole('owner'), async (req, res) => {
-    const { conversations } = await messagingDb.ownerConversations(resolve(req), req.auth!.owner as string);
+  router.get('/v1/messages/conversations', requireAuth(), requireOwnerMailboxRead(config.nodeId), async (req, res) => {
+    const { conversations } = await readOwnerConversations(storage, readerOf(req));
     res.json(success(config.nodeId, { conversations }));
   });
 
   /* ── GET /v1/messages/overview — the whole inbox mount in ONE call (requests + conversations +
    * important-flags + tracked-responses + agents + groups), composed in one read scope by
-   * MessagesInboxService. Owner-scope: requires 'owner' role (the strictest of the six folded endpoints,
-   * so authorization is unchanged). The individual list endpoints stay for interactive re-fetches. ── */
-  router.get('/v1/messages/overview', requireAuth(), requireRole('owner'), async (req, res) => {
-    const data = await inboxDb.overview(resolve(req), req.auth!.owner as string);
-    res.json(success(config.nodeId, data));
+   * MessagesInboxService. The individual list endpoints stay for interactive re-fetches.
+   * `?unread=true` and `?limit=` narrow the conversation list for a chat; without them it is whole. ── */
+  router.get('/v1/messages/overview', requireAuth(), requireOwnerMailboxRead(config.nodeId), async (req, res) => {
+    const limitRaw = parseInt(String(req.query.limit ?? ''), 10);
+    res.json(success(config.nodeId, await readOwnerOverview(storage, readerOf(req), {
+      unreadOnly: req.query.unread === 'true',
+      ...(Number.isFinite(limitRaw) ? { limit: Math.min(200, Math.max(1, limitRaw)) } : {}),
+    })));
   });
 
-  /* ── GET /v1/messages/conversations/:conversationId — full thread ── */
-  router.get('/v1/messages/conversations/:conversationId', requireAuth(), requireRole('owner'), async (req, res) => {
-    const ghii = resolve(req);
+  /* ── GET /v1/messages/conversations/:conversationId — full thread ──
+   * `?agent=<gaii>` reads one of the owner's OWN agents' threads (the read-only "via <agent>" rows),
+   * for the owner in person only; ownership is verified before anything is read under that identity. */
+  router.get('/v1/messages/conversations/:conversationId', requireAuth(), requireOwnerMailboxRead(config.nodeId), async (req, res) => {
     const conversationId = req.params.conversationId as string;
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
     const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string || '50', 10)));
-    // `?agent=<gaii>` reads an agent-owned thread (the read-only "via <agent>" rows from the list). Only
-    // the owner's OWN agents are readable — verify ownership before reading under that identity.
     const asAgent = String(req.query.agent || '').trim();
-    let readAs = ghii;
-    if (asAgent) {
-      const agents = await storage.getAgentsByOwner(req.auth!.owner).catch(err => { logger.warn('GET /v1/messages/conversations/:conversationId: continuing after a suppressed failure', { error: String(err) }); return []; });
-      if (!agents.some(a => a.gaii === asAgent)) {
-        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not one of your agents'));
-        return;
-      }
-      readAs = asAgent;
+    const result = await readOwnerThread(storage, readerOf(req), conversationId, {
+      page, perPage, ...(asAgent ? { agentGaii: asAgent } : {}),
+    });
+    if (!result.ok) {
+      res.status(403).json(error(config.nodeId, result.code, result.message));
+      return;
     }
-    // `?agent=` reads under the agent, and a GROUP thread's copies live in the owner's mailbox rather
-    // than the agent's — so the plain owner-keyed read returned an empty thread for exactly the rows
-    // the list had just advertised. readAgentDmThread resolves that the same way the agent's own door
-    // does; without the flag this is the owner's own mailbox and unchanged.
-    const result = asAgent
-      ? await readAgentDmThread(storage, asAgent, conversationId, { page, perPage })
-      : await storage.listConversation(readAs, conversationId, { page, perPage });
-    // A group thread carries its membership: who else is reading this is part of reading it, and in
-    // a support thread it is the answer to "am I talking to one operator or to all of them". That
-    // is true FOR A PARTICIPANT and for nobody else. The message rows are already fenced by
-    // `readAs`, so an outsider's page is empty — but this block was attached unconditionally, so
-    // anyone holding the id (every former participant, and every operator GHII named in a support
-    // thread is exactly what it discloses) got the subject, the creator and the full participant
-    // list back with HTTP 200.
-    const found = await storage.getConversation(conversationId);
-    const conversation = found && isParticipant(found, readAs) ? found : null;
     res.json(success(config.nodeId, {
-      messages: await withMessageProvenance(storage, result.messages),
+      messages: result.messages,
       total: result.total, page, per_page: perPage,
-      ...(conversation ? {
-        conversation: {
-          id: conversation.id, kind: conversation.kind, subject: conversation.subject,
-          participants: conversation.participants, alias: conversation.alias, created_by: conversation.createdBy,
-        },
-      } : {}),
+      ...(result.conversation ? { conversation: result.conversation } : {}),
     }));
   });
 

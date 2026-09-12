@@ -18,6 +18,8 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.9.0 — 2026-09-12 — messages:read-as-owner, outside every wildcard: reading the owner's own
+ *     mailbox as the owner, beside send-as-owner and delete-as-owner.
  *   v1.8.0 — 2026-09-06 — secrets:manage, in its own domain and outside every wildcard: the owner's
  *     credential vault. The word is new rather than borrowed from memory: reusing memory:write
  *     would have handed every live agent and app grant the power to rotate the owner's credentials
@@ -118,6 +120,11 @@ export const NOT_IN_WILDCARD = [
   // read. An agent is not shut out — asking your own AI to clear out a thread is the use it exists
   // for — but it costs its own tick rather than riding along with "Full access".
   'messages:delete-as-owner',
+  // ── Added 2026-09-12 ─────────────────────────────────────────────────────────────────────────
+  // Reading the owner's own mailbox, as the owner: the conversations and every message in them. The
+  // plain read box is the agent's OWN messages. This is what lets "reply as me" read the thread it
+  // is answering, and it costs its own tick because a read leaves nothing behind to see.
+  'messages:read-as-owner',
 ];
 
 /**
@@ -156,7 +163,8 @@ export const SCOPE_DOMAINS = [
   { key: 'social',    permissions: ['read', 'write', 'members'] },
   // delete-as-owner — remove a message from the owner's own mailbox. Its own tick beside
   //   send-as-owner, because the two are not the same promise: one adds, the other destroys.
-  { key: 'messages',  permissions: ['send', 'read', 'send-as-owner', 'delete-as-owner'] },
+  // read-as-owner — read the owner's own mailbox. `read` is the agent's own messages.
+  { key: 'messages',  permissions: ['send', 'read', 'send-as-owner', 'read-as-owner', 'delete-as-owner'] },
   { key: 'wallet',    permissions: ['read'] },
   // consent:groups — create a sharing group and decide who is in it. A sharing group IS the
   //   boundary of who reads the owner's memory, so it is separated from managing consents.

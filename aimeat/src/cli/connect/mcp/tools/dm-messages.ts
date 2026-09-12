@@ -7,6 +7,8 @@
  *   the node REST API (POST /v1/messages, GET /v1/messages/agent-inbox|agent-thread). Distinct from the
  *   agent↔owner dashboard tools in agent-messages.ts. Mirrors the server MCP surface (src/mcp/dm-messages.ts).
  * @version-history
+ *   v1.5.0 -- 2026-09-12 -- aimeat_dm_inbox_as_owner / aimeat_dm_thread_as_owner: the owner's own
+ *     mailbox on messages:read-as-owner, parity with the node MCP.
  *   v1.4.0 -- 2026-09-06 -- aimeat_dm_broadcast: send-to-many in one call. Without it the only
  *     fan-out an agent had was a loop over aimeat_dm_send, which tags nothing and fills a list.
  *   v1.3.0 -- 2026-08-01 -- TARGET-058 Phase 11: dm_send / dm_ask / dm_send_as_owner carry
@@ -157,6 +159,33 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
   }, annotationsFor('aimeat_dm_delete_as_owner'), async ({ agent_name, message_id }) => {
     const { client } = pickAgent(registry, agent_name);
     return envelopeResult(await client.delete(`/v1/messages/${encodeURIComponent(message_id)}`));
+  });
+
+  // Reading the owner's mailbox, on messages:read-as-owner. Thin over GET /v1/messages/overview and
+  // /conversations/:id, which is where the word is enforced and the mailbox resolved.
+  mcp.tool('aimeat_dm_inbox_as_owner', descriptionFor('aimeat_dm_inbox_as_owner'), {
+    agent_name: agentNameSchema,
+    limit: z.number().int().positive().max(200).optional().describe('At most this many conversations, newest first (default 30, max 200).'),
+    unread_only: z.boolean().optional().describe('Only conversations with something unread.'),
+  }, annotationsFor('aimeat_dm_inbox_as_owner'), async ({ agent_name, limit, unread_only }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const params = new URLSearchParams({ limit: String(limit ?? 30) });
+    if (unread_only) params.set('unread', 'true');
+    return envelopeResult(await client.get(`/v1/messages/overview?${params}`));
+  });
+
+  mcp.tool('aimeat_dm_thread_as_owner', descriptionFor('aimeat_dm_thread_as_owner'), {
+    agent_name: agentNameSchema,
+    conversation_id: z.string().describe("The owner's conversation id (from aimeat_dm_inbox_as_owner or the reply context)."),
+    page: z.number().int().positive().optional().describe('Page number (default 1)'),
+    per_page: z.number().int().positive().max(200).optional().describe('Messages per page (default 50, max 200)'),
+  }, annotationsFor('aimeat_dm_thread_as_owner'), async ({ agent_name, conversation_id, page, per_page }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const params = new URLSearchParams();
+    if (page) params.set('page', String(page));
+    if (per_page) params.set('per_page', String(per_page));
+    const qs = params.toString();
+    return envelopeResult(await client.get(`/v1/messages/conversations/${encodeURIComponent(conversation_id)}${qs ? '?' + qs : ''}`));
   });
 
   mcp.tool('aimeat_dm_thread', descriptionFor('aimeat_dm_thread'), {

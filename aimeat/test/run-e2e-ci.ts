@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.51.0 -- 2026-09-12 -- Add e2e-dm-read-as-owner.ts to ALL_SUITES: the four owner-mailbox reads
+ *            for an app on messages:read and an agent on messages:read-as-owner. Not in the guard tier.
  *   v1.50.0 -- 2026-09-12 -- Add e2e-display-prefs.ts to ALL_SUITES: language, format and time zone
  *            are three independent settings, and the suite's job is that setting one never moves
  *            another. Not in the guard tier yet.
@@ -772,6 +774,7 @@ const ALL_SUITES = [
     'test/e2e-agent-dm.ts',
     'test/e2e-dm-send-as-owner.ts',
     'test/e2e-dm-delete-as-owner.ts',
+    'test/e2e-dm-read-as-owner.ts',
     'test/e2e-interactive-messages.ts',
     'test/e2e-broadcast.ts',
     'test/e2e-chat-capabilities.ts',

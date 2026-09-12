@@ -30,6 +30,8 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.6.0 — 2026-09-12 — messages:read-as-owner joins the own-tick family: an agent reading the
+ *     owner's own mailbox, as the owner.
  *   v1.5.0 — 2026-09-06 — SECRETS_MANAGE_SCOPE, the owner's credential vault. Outside the wildcard
  *     from the day it exists, and a NEW word rather than memory:write-as-owner precisely because
  *     that one is already held: reusing it would have handed every live agent and app grant the
@@ -206,6 +208,13 @@ const OWN_TICK_SCOPES = [
     // Nobody is grandfathered onto it (scope-vocabulary-migration.ts has no entry) because the
     // capability did not exist before -- no agent can lose one it had.
     'messages:delete-as-owner',
+    // Read the OWNER's own mailbox, as the owner: every conversation and every message in it. On an
+    // agent `messages:read` means the agent's own messages, so this is a delegation of its own beside
+    // send-as-owner and delete-as-owner. Outside the wildcard because a read leaves nothing behind
+    // for the owner to see: a send at least leaves the message. Not grandfathered, for the same
+    // reason as the word above. (An APP needs none of this: an app grant already acts as the owner,
+    // and `messages:read` is its word for the same mailbox — services/owner-mailbox-reads.ts.)
+    'messages:read-as-owner',
 ] as const;
 
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [

@@ -5,6 +5,8 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.4.0 — 2026-09-12 — aimeat_dm_inbox_as_owner and aimeat_dm_thread_as_owner: reading the owner's
+ *     own mailbox as the owner, on the new messages:read-as-owner word.
  *   v1.3.0 — 2026-09-01 — The five Agent v2 task tools (V5), in MCP's task shape.
  *   v1.2.0 — 2026-09-01 — The five Agent v2 messaging tools (V4): a turn between two
  *     principals of one account, and the delivery target that reaches an absent one.
@@ -321,6 +323,27 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             message_id: { type: 'string', required: true, description: "Id of the message to remove, from aimeat_dm_inbox or aimeat_dm_thread." },
+        },
+    },
+    {
+        name: 'aimeat_dm_inbox_as_owner',
+        description: "Read the OWNER's own mailbox, as the owner: their conversations newest first, each with the other party, the last message and how many are unread, plus the first-contact requests waiting for them and a display name for everyone listed. Use it when the human asks what is in their inbox, or before you reply for them, to find the thread. aimeat_dm_inbox is different: it reads the messages sent to YOU. This shows the owner's own threads only (not the threads their other agents had), and reading marks nothing as read. The mailbox is always your OWN owner's (derived server-side). Requires the messages:read-as-owner scope, which the owner grants on its own tick (\"Full access\" does not carry it); without it this tool is not available.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            limit: { type: 'number', description: 'At most this many conversations, newest first (default 30, max 200). conversations_total says how many there are.' },
+            unread_only: { type: 'boolean', description: 'Only conversations with something unread.' },
+        },
+    },
+    {
+        name: 'aimeat_dm_thread_as_owner',
+        description: "Read one conversation from the OWNER's own mailbox, as the owner, oldest first: every message the owner sent and received in it, with attachments and how each message was made. Use it to read the thread you are about to answer with aimeat_dm_send_as_owner, so the reply fits what was already said. Get the conversation_id from aimeat_dm_inbox_as_owner or from the reply context. Reading marks nothing as read. The mailbox is always your OWN owner's (derived server-side). Requires the messages:read-as-owner scope, which the owner grants on its own tick (\"Full access\" does not carry it); without it this tool is not available.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            conversation_id: { type: 'string', required: true, description: "The owner's conversation id." },
+            page: { type: 'number', description: 'Page number (default 1).' },
+            per_page: { type: 'number', description: 'Messages per page (default 50, max 200).' },
         },
     },
     {

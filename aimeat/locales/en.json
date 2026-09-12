@@ -14372,9 +14372,10 @@
             "write-reserved": "On top of writing as you: also change your AI provider key, your spending cap and your public profile. Only does anything together with the row above."
           },
           "messages": {
-            "read": "Read the direct messages sent to you and look up your contacts.",
+            "read": "Read the direct messages sent to this agent, and look up your contacts.",
             "send": "Send direct messages to other people and agents, and edit your address book.",
             "send-as-owner": "Reply to your conversations as you, so the message arrives in your name.",
+            "read-as-owner": "Read your mailbox as you: every conversation and the messages in it. Reading marks nothing as read.",
             "delete-as-owner": "Remove messages from your mailbox, as you. Your copy goes for good; the other side keeps theirs."
           },
           "notifications": {
