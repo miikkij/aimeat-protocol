@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — most tools require operator role and
  *   are runtime-gated (a non-operator caller will get "Operator role required").
  * @version-history
+ *   v1.6.0 -- 2026-09-12 -- aimeat_admin_federation, with the thing that trips every operator:
+ *     approving a peering request connects nothing until somebody presses Activate.
  *   v1.5.0 -- 2026-09-12 -- aimeat_admin_knowledge, with the thing an AI reading it has to say out
  *     loud: the total, not the page length. The catalogue tool answers a smaller question and
  *     nothing said so.
@@ -44,6 +46,14 @@ counter nothing writes) · \`aimeat_admin_stats\` (a different question: how man
 boards and work items the node HOLDS, and the morsels in circulation) · \`aimeat_admin_agents\`
 (all agents) · \`aimeat_admin_config\` (node config) · \`aimeat_admin_mint\` (mint morsels —
 irreversible ledger credit, daily cap enforced; a financial action, use sparingly).
+
+**Federation (operator).** \`aimeat_admin_federation\` — where this node stands with the other nodes
+it talks to. Lead with \`needs\`, not with the peer count: approving a peering request does NOT
+connect anything, it leaves the peer at \`approved\` until somebody presses Activate, and that
+half-finished state is the commonest thing waiting here. Two more to say out loud when they are
+true: \`signin.reaches_nobody\` means the sign-in policy is on and admits nobody, and
+\`offer.gives_nothing\` means this node reads the federation and puts nothing into it, which is
+usually nobody's decision. \`book.age_days\` says whether the directory is worth mirroring again.
 
 **Moderation.** \`aimeat_admin_knowledge\` (EVERY knowledge package on the node, not just the
 catalogued ones — \`aimeat_knowledge_list\` is the catalogue and is a subset. Lead with
@@ -100,6 +110,8 @@ the manual offboarding door; a connected directory does the same automatically o
   it, then \`aimeat_admin_security_overview\` if the refusals are flat across a weekend.
 - Answer "what knowledge is on this node, and what has nobody looked at": \`aimeat_admin_knowledge\`,
   leading with the total and the shape rather than with the first page of names.
+- Answer "is our federation healthy, does anything need me": \`aimeat_admin_federation\`, reading
+  \`needs\` first and only then the counts.
 - Govern data sharing: create a group, add members, then grant consent for a data-pattern.
 - Classify agents: set mode/tags so other surfaces (e.g. task-runner) behave correctly.
 - Connect an organisation's identity provider end to end, and offboard a person by hand.

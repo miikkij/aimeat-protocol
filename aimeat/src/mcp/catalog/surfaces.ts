@@ -295,6 +295,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_admin_usage',
         // The Knowledge page in one read: the whole collection, its shape, and who has already looked.
         'aimeat_admin_knowledge',
+        // The Federation page in one read: the peers, what waits on a person, and the book's age.
+        'aimeat_admin_federation',
         // Arranging this node's front page and the page its members land on.
         'aimeat_surface_layout_get', 'aimeat_surface_layout_set',
         // The operator's break-glass over an organism whose creator account is unreachable, plus the

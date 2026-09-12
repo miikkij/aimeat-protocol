@@ -9,6 +9,8 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-12 -- aimeat_admin_federation (GET /v1/admin/federation/overview), the third
+ *     surface of the Federation page's one read. It takes no parameters: the whole page is the answer.
  *   v1.3.0 -- 2026-09-12 -- aimeat_admin_knowledge (GET /v1/admin/knowledge), the third surface of
  *     the Knowledge page's one read, with all six filters forwarded independently.
  *   v1.2.0 -- 2026-09-12 -- aimeat_admin_statistics (GET /v1/stats, with from and to forwarded as
@@ -29,6 +31,10 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_admin_hooks',
         handler: ({ client }) => client.get('/v1/admin/hooks'),
+    },
+    {
+        name: 'aimeat_admin_federation',
+        handler: ({ client }) => client.get('/v1/admin/federation/overview'),
     },
     {
         // THE THIRD SURFACE forwards all three, and forwards each date WHETHER OR NOT its partner

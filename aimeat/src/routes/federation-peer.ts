@@ -18,6 +18,10 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.2.0 — 2026-09-12 — registerOverviewRoutes: the Federation page's one read, through
+ *     services/federation-overview.ts. The page had been assembling itself from five calls and
+ *     working the answers out in the browser, and four of the facts it exists to show were in none
+ *     of them.
  *   v1.1.0 — 2026-07-13 — Split handler groups into ./federation-peer/* siblings (max-file-lines); order/behaviour preserved
  */
 
@@ -30,6 +34,7 @@ import { registerPeersRoutes } from './federation-peer/peers.js';
 import { registerPolicyBookRoutes } from './federation-peer/policy-book.js';
 import { registerLifecycleRoutes } from './federation-peer/lifecycle.js';
 import { registerLinkInviteRoutes } from './federation-peer/link-invites.js';
+import { registerOverviewRoutes } from './federation-peer/overview.js';
 
 export function federationPeerRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -40,6 +45,9 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
     registerPolicyBookRoutes(router, config, storage, peers);
     registerLifecycleRoutes(router, config, storage, peers);
     registerLinkInviteRoutes(router, config, storage);
+    // The Federation page in one read. Last, because it matches an exact path and nothing above it
+    // is a prefix of that path; its place in the file is alphabetical, not load-bearing.
+    registerOverviewRoutes(router, config, storage, peers);
 
     return router;
 }

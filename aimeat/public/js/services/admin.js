@@ -120,6 +120,8 @@ export const removePeerEmergency = (nodeId) => apiDelete(`/v1/federation/peers/$
 export const testFederationNode = (targetUrl) => apiPost('/v1/federation/test', { target_url: targetUrl });
 export const updatePeerPolicy = (nodeId, policy) => apiPut(`/v1/federation/peers/${encodeURIComponent(nodeId)}`, policy);
 export const promotePeer = (nodeId, opts = {}) => apiPost(`/v1/federation/peers/${encodeURIComponent(nodeId)}/promote`, opts);
+/** The Federation page in one read: standing, needs, counts, sign-in reach, offer, book, roster. */
+export const getFederationOverview = () => apiGet('/v1/admin/federation/overview');
 export const getFederationBook = () => apiGet('/v1/federation/book');
 export const rebuildFederationBook = () => apiPost('/v1/federation/book/rebuild', {});
 export const pullFederationBook = () => apiPost('/v1/federation/book/pull', {});

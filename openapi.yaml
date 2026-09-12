@@ -21042,6 +21042,27 @@ paths:
                       data:
                         $ref: '#/components/schemas/FederationHeartbeat'
 
+  /v1/admin/federation/overview:
+    get:
+      operationId: adminFederationOverview
+      summary: The Federation page in one read (admin)
+      description: >-
+        Where this node stands with its peers and what is waiting on a person. `needs` is the list
+        to act on, in order; it includes peers that were added and never switched on, a state two
+        doors produce under two different words (`pending` and `approved`) and that no count
+        covered before. `signin.reaches` is how many peers a person could actually arrive from,
+        because the node-wide policy and a per-peer switch must both say yes. `offer` counts only
+        what somebody ticked Federate on. `versions_behind` is measured against `newest_version`,
+        which spans the peers, the federation book and this node.
+      tags: [Admin, Federation]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/federation/peers:
     get:
       operationId: listPeers

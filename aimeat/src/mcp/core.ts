@@ -11,6 +11,9 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.24.0 — 2026-09-12 — registerAdminFederationTools: where this node stands with its peers and
+ *     what is waiting on a person. The federation surface had doors for peers, settlements and
+ *     genesis peering, and nothing at all for the operator's own view of it.
  *   v1.23.0 — 2026-09-12 — registerAdminKnowledgeTools: the operator's whole knowledge collection,
  *     its shape and its review trail. aimeat_knowledge_list is the catalogue — what a caller may
  *     read — so an operator asking their AI what is on the node got a subset and no way to tell.
@@ -126,6 +129,7 @@ import { registerAdminCorsTools } from './admin-cors.js';
 import { registerAdminHooksTools } from './admin-hooks.js';
 import { registerAdminStatisticsTools } from './admin-statistics.js';
 import { registerAdminKnowledgeTools } from './admin-knowledge.js';
+import { registerAdminFederationTools } from './admin-federation.js';
 import { registerCoreStorageTools } from './core-storage.js';
 import { registerCoreDataPackageTools } from './core-datapackage.js';
 import { logger } from '../utils/logger.js';
@@ -758,4 +762,6 @@ export function registerCoreTools(
     registerAdminStatisticsTools(mcp, storage, config, getAgentGaii);
     // The Knowledge page in one read: the whole collection, its shape, and who has already looked.
     registerAdminKnowledgeTools(mcp, storage, config, getAgentGaii);
+    // The Federation page in one read: where this node stands, and what is waiting on a person.
+    registerAdminFederationTools(mcp, storage, config, peers, getAgentGaii);
 }
