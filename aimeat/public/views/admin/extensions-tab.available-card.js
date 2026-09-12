@@ -1,11 +1,13 @@
 /**
- * @file public/views/admin/services-tab.available-card.js
+ * @file public/views/admin/extensions-tab.available-card.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Available (bundled) extension card with disk-script editor + add-action for the admin Services tab. Extracted from services-tab.js to satisfy max-file-lines.
+ * @description Available (bundled) extension card with disk-script editor + add-action for the admin Extensions tab. Extracted from the tab file to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-12 — The action count is one translated string with the number in it. Gluing
+ *     a number to a lowercased noun read as "7 toiminnot" in Finnish, which no Finnish says.
  *   v1.1.0 — 2026-09-05 — The script-editor button loses its emoji: no emoji anywhere in the interface.
- *   v1.0.0 — 2026-07-13 — Extracted from services-tab.js (max-file-lines)
+ *   v1.0.0 — 2026-07-13 — Extracted from the tab file (max-file-lines)
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -15,7 +17,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { getDiskScript, saveDiskScript, addDiskAction } from '/js/services/admin.js';
-import { inputStyle, labelStyle, fieldWrap } from './services-tab.config-form.js';
+import { inputStyle, labelStyle, fieldWrap } from './extensions-tab.config-form.js';
 
 // ── Available Extension Card (with disk script editor + add action) ──
 function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinstall, loadAvailable }) {
@@ -86,7 +88,7 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
         <span style="color:${ext.instancesSupported ? 'var(--green, #22c55e)' : 'var(--text-dim)'}">
           ${ext.instancesSupported ? t('dashboard.servicesMultiInstance') : t('dashboard.servicesSingleInstance')}
         </span>
-        <span class="adm-text-dim">${actions.length} ${t('dashboard.servicesActionsCount').toLowerCase()}</span>
+        <span class="adm-text-dim">${t('admin.ext.actionsCount', { n: actions.length })}</span>
       </div>
       <div style="margin-top:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         ${isInstalled

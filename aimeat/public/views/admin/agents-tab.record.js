@@ -20,24 +20,9 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { kindOf, freshness, isAwake, daysSince, trustText } from './agents-tab.derive.js';
+import { shortDate } from './shared.js';
 
 const A = (key, params) => t('dashboard.agentsTab.' + key, params);
-
-/**
- * "16 Mar", or "16 Mar 2025" once it is not this year.
- *
- * `dt()` writes the whole stamp ("3/16/2026, 10:25:19 AM"), which is four times the width the
- * Last seen column has and says nothing a reader of this page needs at that precision.
- */
-export function shortDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const thisYear = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleDateString(undefined, thisYear
-    ? { day: 'numeric', month: 'short' }
-    : { day: 'numeric', month: 'short', year: 'numeric' });
-}
 
 /** "2 min", "5 h", "3 d", "16 Mar" — the same reading the list column uses. */
 export function seenWords(iso, now) {
