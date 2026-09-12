@@ -19,6 +19,7 @@
  * @structure BEATS · BeatRail · Beat · default export BuildStory({ navigate })
  * @usage routed at /v1/how-an-app-builds by spa.html; listed in routes/portal.ts spaRoutes
  * @version-history
+ *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.0.1 — 2026-08-29 — The connect door leads to the connect story (/v1/connect-your-ai), not to a
  *     profile tab that a signed-out reader cannot see.
  *   v1.0.0 — 2026-08-28 — Initial, built to the design canvas "Changelog and Build Story".
@@ -116,7 +117,7 @@ export default function BuildStory({ navigate }) {
           </h1>
           <p class="ld-sh-position">${tr('story.position', 'Four beats. Ten minutes. Any AI chat you already have.')}</p>
           <p class="bs-lead">${tr('story.lead', 'This is the whole road, shown once, with the real pieces. Read it through, or skip to the bottom where the builder is open and waiting.')}</p>
-          <a class="ld-sh-door" href="#bs-builder" onClick=${toBuilder}>${tr('story.skip', 'Skip to the builder ↓')}</a>
+          <a class="ld-sh-door showroom-door" href="#bs-builder" onClick=${toBuilder}>${tr('story.skip', 'Skip to the builder ↓')}</a>
         </div>
         <${BeatRail} current=${current} />
       </section>
@@ -137,7 +138,7 @@ export default function BuildStory({ navigate }) {
               <span class="bs-track-desc">${tr('landing.trackAtelierDesc', 'The new track: living looks (newspaper, gallery, neon console…), layouts your AI can rearrange later without republishing, motion built in.')}</span>
             </div>
           </div>
-          <div class="ld-sh-box"><span class="ld-sh-box-label">${tr('story.b1PacksLabel', 'Packs, picked for you:')}</span> ${tr('landing.genPacksHint', 'Charts, editable flow diagrams, games, 3D. Self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.')}</div>
+          <div class="ld-sh-box poster-aside"><span class="ld-sh-box-label">${tr('story.b1PacksLabel', 'Packs, picked for you:')}</span> ${tr('landing.genPacksHint', 'Charts, editable flow diagrams, games, 3D. Self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.')}</div>
         </div>
         <img class="bs-picture bs-picture--sun" src="/img/build-story/beat1-say.jpg" width="1200" height="900" loading="lazy"
           alt=${tr('story.b1Alt', 'A person at a bright workshop counter telling a friendly retro robot what they want; the robot writes it on a paper ticket')} />
@@ -177,12 +178,12 @@ export default function BuildStory({ navigate }) {
             <div class="bs-door bs-door--coral">
               <span class="bs-door-title">${tr('story.b3ByHand', 'By hand')}</span>
               <span class="bs-door-text">${tr('landing.genStep3Hint', 'Got the code or HTML file back from the AI? Create an account, it takes a minute, then paste the code or upload the file. The app goes live at its own address and you get a link to share.')}</span>
-              <a class="ld-sh-btn ld-sh-btn--ink bs-door-btn" href="/v1/portal" onClick=${register}>${tr('landing.genStep3Btn', 'Register and add your app')} →</a>
+              <a class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink bs-door-btn" href="/v1/portal" onClick=${register}>${tr('landing.genStep3Btn', 'Register and add your app')} →</a>
             </div>
             <div class="bs-door bs-door--ink">
               <span class="bs-door-title">${tr('story.b3ByAi', 'By your AI')}</span>
               <span class="bs-door-text">${tr('landing.genStep3Mcp', 'If the AI you pasted the prompt into is connected to this node over MCP, it can publish the app for you, with no file to move by hand.')} ${tr('story.b3Connect', 'Connecting takes five minutes and is the better road for everything after this.')}</span>
-              <a class="ld-sh-door" href="/v1/connect-your-ai" onClick=${(e) => { e.preventDefault(); navigate('/v1/connect-your-ai'); }}>${tr('landing.showConnect', 'Connect the AI you already use →')}</a>
+              <a class="ld-sh-door showroom-door" href="/v1/connect-your-ai" onClick=${(e) => { e.preventDefault(); navigate('/v1/connect-your-ai'); }}>${tr('landing.showConnect', 'Connect the AI you already use →')}</a>
             </div>
           </div>
         </div>
@@ -204,7 +205,7 @@ export default function BuildStory({ navigate }) {
           <span class="bs-num">4</span>
           <h2 class="ld-sh-h2"><span>${tr('story.b4Title1', 'It lands')}</span><span class="ld-sh-accent">${tr('story.b4Title2', 'on the wall')}</span></h2>
           <p class="ld-sh-text">${tr('story.b4Text', 'Your card appears among the others, with your name, the date and a live count of opens. Anyone can open it; anyone who likes it can copy it and make it their own, the same way you can copy theirs. From here on your AI can keep it running, and when it is good, you can sell it.')}</p>
-          <div class="ld-sh-box"><span class="ld-sh-box-label">${tr('story.b4ThenLabel', 'And then:')}</span> ${tr('story.b4Then', 'connect the AI you already use, and the next app, the next change and the publishing itself all happen from your own chat.')}</div>
+          <div class="ld-sh-box poster-aside"><span class="ld-sh-box-label">${tr('story.b4ThenLabel', 'And then:')}</span> ${tr('story.b4Then', 'connect the AI you already use, and the next app, the next change and the publishing itself all happen from your own chat.')}</div>
           <img class="bs-picture bs-picture--small" src="/img/build-story/beat4-wall.jpg" width="1200" height="900" loading="lazy"
             alt=${tr('story.b4Alt', 'A bright gallery wall of framed app pictures; a retro robot on a stepladder hangs the newest frame with a yellow ribbon while a small crowd applauds')} />
         </div>

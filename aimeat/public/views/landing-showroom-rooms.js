@@ -19,6 +19,7 @@
  * @structure StoreSection · parseTiers · Star · TrustList · Rooms
  * @usage import { StoreSection, TrustList, Rooms } from '/views/landing-showroom-rooms.js';
  * @version-history
+ *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.1.0 — 2026-08-28 — The store section reads its ladder and its "from" price from the store's
  *     public record (ext:shop / tiers); the block's settings became the fallback.
  *   v1.0.0 — 2026-08-28 — Initial, built to the design canvas "AIMEAT Front Page" (direction A).
@@ -113,7 +114,7 @@ export function StoreSection({ fromPrice, tiers }) {
                 <span class="ld-sh-tier-unit">${tr('landing.storePerMonth', 'per month')}</span>
               </div>`)}
           </div>` : ''}
-        ${store ? html`<a class="ld-sh-btn ld-sh-btn--ink" href=${store} target="_blank" rel="noopener">${tr('landing.storeCta', 'Step into the store →')}</a>` : ''}
+        ${store ? html`<a class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" href=${store} target="_blank" rel="noopener">${tr('landing.storeCta', 'Step into the store →')}</a>` : ''}
       </div>
     </section>`;
 }
@@ -168,7 +169,7 @@ export function Rooms() {
           ${tr('landing.roomIncText', 'A helper with a name, its own permissions and its own working hours: all of them. Adopt one, then a second. This is how one person starts moving like a crew.')}
         </p>
         ${hasSite('incubator') ? html`
-          <div class="ld-sh-box">
+          <div class="ld-sh-box poster-aside">
             <span class="ld-sh-box-label">${tr('landing.roomIncStart', 'Start here:')}</span>
             ${' '}${tr('landing.roomIncStartText', 'the incubator at')}${' '}
             <a href=${incubator} target="_blank" rel="noopener">${incubatorHost}</a>
@@ -182,7 +183,7 @@ export function Rooms() {
         <p class="ld-sh-text">
           ${tr('landing.roomClubText', 'This demo is a public square. Your own AIMEAT is the opposite: a clubhouse with one name on the deed. Invite people in when you feel like company, or build alone in peace.')}
         </p>
-        <div class="ld-sh-box">
+        <div class="ld-sh-box poster-aside">
           <span class="ld-sh-box-label">${tr('landing.roomClubRulesLabel', 'The house rules, all two of them:')}</span>
           ${' '}${tr('landing.roomClubRules', 'what you make there is yours, and the door opens only from the inside. Everything else you decide as you go.')}
         </div>
