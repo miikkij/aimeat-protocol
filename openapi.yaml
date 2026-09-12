@@ -22106,6 +22106,70 @@ paths:
         '403':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/admin/organisms:
+    get:
+      operationId: adminListOrganisms
+      summary: Every organism on this node, and who holds it (operator)
+      description: |
+        The listing the repair door needs. Installing an owner takes an organism id, and until this
+        existed nothing on the operator's surface could name one.
+
+        Crossed against the owner list, it is also how a screen works out whether any organism is
+        stuck: one whose every owner is deactivated or has no account here cannot be repaired by
+        anybody inside it.
+
+        Archived organisms are left out unless `archived=include`. At most 1000 are returned;
+        `complete` says whether that cap was reached, because a total folded over a truncated list
+        would answer "nothing is stuck" while the stuck one sits past the cap.
+
+        Reserved to the node operator. An operator's agent also needs the exact scope
+        `operator:organism-repair`, which no wildcard carries.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: archived
+          in: query
+          required: false
+          schema: { type: string, enum: [exclude, include] }
+          description: Whether archived organisms are counted. Default `exclude`.
+      responses:
+        '200':
+          description: The organisms on this node
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          organisms:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                name: { type: string }
+                                type: { type: string }
+                                visibility: { type: string, enum: [public, listed, private] }
+                                owners:
+                                  type: array
+                                  items: { type: string }
+                                  description: Bare owner names holding this organism, in the order they were added.
+                                created_by: { type: string, description: Who made it. Never moves. }
+                                members: { type: integer, description: How many people are inside. }
+                                created_at: { type: string }
+                                updated_at: { type: string }
+                                archived_at: { type: string, nullable: true }
+                          count: { type: integer }
+                          complete:
+                            type: boolean
+                            description: False when the 1000-organism cap was reached and the list is partial.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v1/admin/organisms/{id}/ownership:
     get:
       operationId: adminGetOrganismOwnership

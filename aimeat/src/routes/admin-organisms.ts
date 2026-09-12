@@ -16,10 +16,15 @@
  *
  * @structure
  *   - adminOrganismsRouter(config, storage): Router factory
+ *   - GET  /v1/admin/organisms: every organism on this node and who holds it
  *   - GET  /v1/admin/organisms/:id/ownership: read the ownership state before changing it
  *   - POST /v1/admin/organisms/:id/ownership: install `ghii` as the organism's creator
  *
  * @version-history
+ *   v1.1.0 — 2026-09-12 — GET /v1/admin/organisms. The repair door took an organism id, and no
+ *     operator surface on this node could tell anyone one: the page could only be used by somebody
+ *     who already knew the answer. The listing is also what lets a screen work out whether any
+ *     organism is stuck, instead of waiting for its people to write in and say so.
  *   v1.0.0 — 2026-08-15 — Initial. Written after an unscoped agent transferred this node's own
  *     development organism away in a test run and nothing on any surface could put it back.
  */
@@ -32,8 +37,46 @@ import { emitChange } from '../services/event-bus.js';
 import { addOrganismOwner, organismOwners } from '../services/organism-ownership.js';
 import { logger } from '../utils/logger.js';
 
+/**
+ * How many organisms one read carries. The page that consumes this answers "is any organism stuck",
+ * and an answer folded over a truncated list would say "none" while the one nobody can reach sits on
+ * the next page. So the cap is generous and the answer says whether it was reached: a reader that
+ * sees `complete: false` must say what it counted rather than state a total.
+ */
+const LIST_CAP = 1000;
+
 export function adminOrganismsRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
+
+    /* ── GET /v1/admin/organisms ──
+     * Every organism on this node with who holds it. The repair below takes an id, and until this
+     * existed there was nowhere on the operator's surface to get one. `?archived=include` counts the
+     * archived ones too; they are left out by default because an archived organism nobody can reach
+     * is not the emergency the repair door is for. */
+    router.get('/v1/admin/organisms', requireAuth(), requireOperatorPrincipal(storage), async (req, res) => {
+        const archived = req.query.archived === 'include' ? 'include' : 'exclude';
+        const organisms = await storage.listOrganisms({ perPage: LIST_CAP, archived });
+        res.json(success(config.nodeId, {
+            organisms: organisms.map(o => ({
+                id: o.id,
+                name: o.name,
+                type: o.type,
+                visibility: o.visibility,
+                owners: organismOwners(o),
+                created_by: o.createdBy,
+                members: o.members?.length ?? 0,
+                created_at: o.createdAt,
+                updated_at: o.updatedAt,
+                archived_at: o.archivedAt ?? null,
+            })),
+            count: organisms.length,
+            complete: organisms.length < LIST_CAP,
+        }, [{
+            description: 'Read one organism\'s ownership before changing it',
+            method: 'GET',
+            url: '/v1/admin/organisms/{id}/ownership',
+        }]));
+    });
 
     /* ── GET /v1/admin/organisms/:id/ownership ──
      * Who holds this organism, and who else could. Read this before writing: the repair is a

@@ -60,6 +60,11 @@ export const revokeRole      = (owner, role) => apiPost('/v1/admin/roles/revoke'
 export const disableOwner    = (name) => apiPost(`/v1/admin/owners/${encodeURIComponent(name)}/disable`);
 export const enableOwner     = (name) => apiPost(`/v1/admin/owners/${encodeURIComponent(name)}/enable`);
 
+// ── Organism ownership: the operator's break-glass over an organism nobody inside can repair ──
+export const getAdminOrganisms   = (archived) => apiGet(`/v1/admin/organisms${archived ? '?archived=include' : ''}`);
+export const getOrganismOwnership = (id) => apiGet(`/v1/admin/organisms/${encodeURIComponent(id)}/ownership`);
+export const addOrganismOwner    = (id, ghii) => apiPost(`/v1/admin/organisms/${encodeURIComponent(id)}/ownership`, { ghii });
+
 // ── Organisation sign-in (BR-04: SSO connections) ──
 export const getSsoConnections   = ()   => apiGet('/v1/admin/sso/connections');
 export const getSsoConnection    = (id) => apiGet(`/v1/admin/sso/connections/${encodeURIComponent(id)}`);

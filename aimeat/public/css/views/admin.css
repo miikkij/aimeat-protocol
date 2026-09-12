@@ -1071,12 +1071,8 @@
 .adm-fb-replybox { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; }
 .adm-fb-replybox textarea { width: 100%; resize: vertical; }
 
-/* ── Organism ownership tab (operator break-glass) ── */
-/* The lookup and add-owner rows: one input that takes the width, one button beside it. Without
-   this the button dropped under a full-width input and the pair stopped reading as one action. */
-.adm-oo-row { display: flex; gap: 0.5rem; align-items: center; margin: 0.75rem 0; flex-wrap: wrap; }
-.adm-oo-row .input-field { flex: 1 1 20rem; }
-.adm-oo-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.4rem 0.9rem; margin: 0.75rem 0; }
+/* The organism ownership tab's rules moved to views/admin-organism-ownership.css with the page
+   (2026-09-12). The lookup row and the card they dressed are gone: the page reads the listing now. */
 
 /* ── Metrics tab ── */
 /* The page is in the poster face now and brings its own sheet (admin-metrics-poster.css); the
