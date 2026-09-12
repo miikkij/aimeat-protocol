@@ -34,6 +34,9 @@
  * @usage
  *   import { buildKnowledgeOverview } from '../services/knowledge-overview.js';
  * @version-history
+ *   v1.1.0 — 2026-09-12 — A page or a limit that is not a number falls back instead of becoming
+ *     NaN. `?page=abc` had been answering with an empty array and paging numbers that serialise as
+ *     null, which is the same silence this read was written to end.
  *   v1.0.0 — 2026-09-12 — Initial, with the Knowledge page's rebuild.
  */
 import type { AimeatConfig } from '../config.js';
@@ -209,10 +212,16 @@ export async function buildKnowledgeOverview(
     return (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt);
   });
 
-  const perPage = Math.min(MAX_PER_PAGE, Math.max(1, filters.perPage ?? DEFAULT_PER_PAGE));
+  // A NUMBER THAT IS NOT A NUMBER FALLS BACK, it does not propagate. The route parses these out of
+  // a query string, and `Math.max(1, NaN)` is NaN: `?page=abc` sliced with NaN, returned an empty
+  // array and paging numbers that serialise as null, so a moderator reading "0 packages" on a node
+  // holding two hundred had no way to tell a typo from an empty store. That is the exact failure
+  // this whole read exists to end, and it does not get to survive in the read itself.
+  const num = (v: number | undefined, fallback: number) => (Number.isFinite(v) ? (v as number) : fallback);
+  const perPage = Math.min(MAX_PER_PAGE, Math.max(1, Math.floor(num(filters.perPage, DEFAULT_PER_PAGE))));
   const total = matched.length;
   const pages = Math.max(1, Math.ceil(total / perPage));
-  const page = Math.min(pages, Math.max(1, filters.page ?? 1));
+  const page = Math.min(pages, Math.max(1, Math.floor(num(filters.page, 1))));
   const paged = matched.slice((page - 1) * perPage, page * perPage);
 
   // ── Has anybody looked? ──
