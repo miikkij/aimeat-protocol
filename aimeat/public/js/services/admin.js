@@ -13,6 +13,8 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   v1.10.0 — 2026-09-12 — setBoardVisibility, setBoardFederate and deleteBoard: three board doors
+ *     the routes have always had and no frontend function reached.
  *   v1.9.0 — 2026-09-12 — updateSchedulerJob sends PATCH, the verb its route is registered under;
  *     it sent PUT, so switching a scheduled job on or off answered 404. pruneSchedulerLog added.
  *   v1.8.0 — 2026-09-12 — setHook: binding a hook from the page, which the PUT route has always
@@ -83,6 +85,9 @@ export const getBoardPosts   = (id, limit = 50) => apiGet(`/v1/boards/${encodeUR
 export const createBoard      = (name, visibility, description) => apiPost('/v1/boards', { name, visibility: visibility || 'public', description });
 export const postToBoard     = (id, body, title) => apiPost(`/v1/boards/${encodeURIComponent(id)}/posts`, { body, title: title || 'msg' });
 export const patchBoardMembers = (id, body) => apiPatch(`/v1/boards/${encodeURIComponent(id)}/members`, body);
+export const setBoardVisibility = (id, visibility) => apiPatch(`/v1/boards/${encodeURIComponent(id)}/visibility`, { visibility });
+export const setBoardFederate  = (id, federate)   => apiPatch(`/v1/boards/${encodeURIComponent(id)}/visibility`, { federate });
+export const deleteBoard       = (id)             => apiDelete(`/v1/boards/${encodeURIComponent(id)}`);
 
 // ── Work ──
 export const getAdminWork    = ()       => apiGet('/v1/admin/work');

@@ -19051,7 +19051,10 @@ paths:
     get:
       operationId: listBoards
       summary: List boards
-      description: List all accessible boards (including private).
+      description: |
+        List all accessible boards (including private). Each board carries `posts`, the number of
+        live top-level notices on it, and `last_post_at` when there is at least one — both from a
+        single grouped query, so a listing can say which boards are used without a request each.
       tags: [Boards]
       security:
         - BearerAuth: []
