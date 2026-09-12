@@ -25,7 +25,7 @@ import { formatUntil, scheduleIo, describeDispatch } from '../schedule-item.js';
 import { cronWords } from './cron-words.js';
 import { kindOf, nameOf, dayLabel } from './model.js';
 import { ScheduleEditForm } from './edit-form.js';
-import { renderPage, whoRuns, resultWord, c, loc, hhmm } from './frame.js';
+import { renderPage, whoRuns, resultWord, c, hhmm } from './frame.js';
 
 function limitsOf(s) {
   const out = [];
@@ -40,7 +40,7 @@ function limitsOf(s) {
 function runRows(runs) {
   return html`<div class="sc-agenda sc-agenda--runs">
     ${runs.map((r, i) => { const d = new Date(r.createdAt); return html`
-      <div class="sc-at" key=${'a' + i}>${hhmm(d)}<small>${dayLabel(d, loc())}</small></div>
+      <div class="sc-at" key=${'a' + i}>${hhmm(d)}<small>${dayLabel(d)}</small></div>
       <div class="sc-nm sc-nm--run" key=${'n' + i}>
         <b class=${`sc-res sc-res--${r.result}`}>${resultWord(r.result)}</b> · ${c('trigger.' + (r.trigger || 'cron'))}${r.durationMs ? ` · ${(r.durationMs / 1000).toFixed(1)} s` : ''}
         ${r.errorMessage ? html`<small class="sc-err">${r.errorMessage}</small>` : null}
@@ -79,11 +79,11 @@ export function renderDetail(ctx, s) {
   const strip = html`
     <div class="og-strip">
       <div>${s.lastRunAt
-        ? html`<b class=${`og-strip-coral sc-res--${s.lastRunResult || 'success'}`}>${resultWord(s.lastRunResult || 'success')}</b><span>${c('stripLast')}</span><small>${formatRelativeTime(s.lastRunAt)} · ${dayLabel(new Date(s.lastRunAt), loc())} ${hhmm(new Date(s.lastRunAt))}${s.lastRunError ? ` · ${s.lastRunError}` : ''}</small>`
+        ? html`<b class=${`og-strip-coral sc-res--${s.lastRunResult || 'success'}`}>${resultWord(s.lastRunResult || 'success')}</b><span>${c('stripLast')}</span><small>${formatRelativeTime(s.lastRunAt)} · ${dayLabel(new Date(s.lastRunAt))} ${hhmm(new Date(s.lastRunAt))}${s.lastRunError ? ` · ${s.lastRunError}` : ''}</small>`
         : html`<b>·</b><span>${c('stripLast')}</span><small>${t('profile.scheduler.never')}</small>`}</div>
       <div>${s.enabled === false
         ? html`<b>·</b><span>${c('stripNextRun')}</span><small>${t('profile.scheduler.paused')}</small>`
-        : html`<b>${formatUntil(s.nextRunAt)}</b><span>${c('stripNextRun')}</span><small>${s.nextRunAt ? `${dayLabel(new Date(s.nextRunAt), loc())} ${hhmm(new Date(s.nextRunAt))}` : ''}</small>`}</div>
+        : html`<b>${formatUntil(s.nextRunAt)}</b><span>${c('stripNextRun')}</span><small>${s.nextRunAt ? `${dayLabel(new Date(s.nextRunAt))} ${hhmm(new Date(s.nextRunAt))}` : ''}</small>`}</div>
       <div><b>${s.runCount ?? 0}</b><span>${c('stripRuns')}</span><small>${s.createdAt ? c('sinceDate', { d: fmtDate(s.createdAt) }) : ''}</small></div>
       <div><b class="og-strip-coral">${s.createdByAgent ? (s.agentName || t('profile.scheduler.byAgent')) : c('byYou')}</b><span>${c('stripCreator')}</span><small>${s.createdAt ? fmtDate(s.createdAt) : ''}</small></div>
     </div>`;
@@ -115,8 +115,8 @@ export function renderDetail(ctx, s) {
       <//>
       <${Section} id="sc-coming" num="03" title=${c('secComing')}>
         ${coming.length ? html`<div class="sc-agenda sc-agenda--coming">
-          ${coming.map((o, i) => html`<div class="sc-at" key=${'a' + i}>${hhmm(o.at)}<small>${dayLabel(o.at, loc())}</small></div><div class="sc-who" key=${'w' + i}>${s.timezone || ''}</div>`)}
-        </div>` : html`<p class="og-empty">${s.enabled === false ? t('profile.scheduler.paused') : (s.nextRunAt ? `${dayLabel(new Date(s.nextRunAt), loc())} ${hhmm(new Date(s.nextRunAt))}` : c('noneNext'))}</p>`}
+          ${coming.map((o, i) => html`<div class="sc-at" key=${'a' + i}>${hhmm(o.at)}<small>${dayLabel(o.at)}</small></div><div class="sc-who" key=${'w' + i}>${s.timezone || ''}</div>`)}
+        </div>` : html`<p class="og-empty">${s.enabled === false ? t('profile.scheduler.paused') : (s.nextRunAt ? `${dayLabel(new Date(s.nextRunAt))} ${hhmm(new Date(s.nextRunAt))}` : c('noneNext'))}</p>`}
       <//>
       ${s.readOnly ? null : html`<${Fold} id="sc-edit" num="04" title=${t('profile.scheduler.edit')} sub=${c('editSub')} open=${ctx.editOpen} onToggle=${() => ctx.setEditOpen(v => !v)}>
         <${ScheduleEditForm} schedule=${s} showToast=${ctx.showToast} onSaved=${() => { ctx.setEditOpen(false); ctx.loadData(); }} onClose=${() => ctx.setEditOpen(false)} />

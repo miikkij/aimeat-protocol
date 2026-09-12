@@ -18,6 +18,7 @@ import { useConfirm } from '/components/Modal.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { date as fmtDate, dateTime as fmtDateTime } from '/js/format.js';
 
 // Mirrors the agent scope domains (agents-tab.js) — the same list agents are granted from.
 const PAT_SCOPE_DOMAINS = [
@@ -169,9 +170,9 @@ export function AccessTokensSection({ session, showToast, initial }) {
                 ${levelBadge(tok)}
               </div>
               <div class="detail-grid">
-                <div class="detail-item"><span class="detail-label">${t('profile.access.patCreatedAt') || 'Created'}</span><span class="detail-value">${new Date(tok.created_at).toLocaleDateString()}</span></div>
-                <div class="detail-item"><span class="detail-label">${t('profile.access.patLastUsed') || 'Last used'}</span><span class="detail-value">${tok.last_used_at ? new Date(tok.last_used_at).toLocaleString() : (t('profile.access.patNever') || 'never')}</span></div>
-                <div class="detail-item"><span class="detail-label">${t('profile.access.patExpires') || 'Expires'}</span><span class="detail-value">${tok.expires_at ? new Date(tok.expires_at).toLocaleDateString() : (t('profile.access.patNoExpiry') || 'never')}</span></div>
+                <div class="detail-item"><span class="detail-label">${t('profile.access.patCreatedAt') || 'Created'}</span><span class="detail-value">${fmtDate(tok.created_at)}</span></div>
+                <div class="detail-item"><span class="detail-label">${t('profile.access.patLastUsed') || 'Last used'}</span><span class="detail-value">${tok.last_used_at ? fmtDateTime(tok.last_used_at) : (t('profile.access.patNever') || 'never')}</span></div>
+                <div class="detail-item"><span class="detail-label">${t('profile.access.patExpires') || 'Expires'}</span><span class="detail-value">${tok.expires_at ? fmtDate(tok.expires_at) : (t('profile.access.patNoExpiry') || 'never')}</span></div>
               </div>
               ${!tok.grant_owner && !tok.grant_operator && (tok.scopes || []).length > 0 && html`
                 <div class="flex-row-wrap mt-half">

@@ -25,8 +25,8 @@
  *   v1.1.0 — 2026-07-17 — quoteSnippet(): one-line plain-text excerpt of a message body for reply-quotes.
  *   v1.0.0 — 2026-07-13 — Extracted from inbox-tab.js (max-file-lines)
  */
-import { t, getLocale } from '/js/i18n.js';
-import { date as fmtDate, time as fmtTime } from '/js/format.js';
+import { t } from '/js/i18n.js';
+import { date as fmtDate, time as fmtTime, dateTime as fmtDateTime, sameDay, dayKey as zoneDayKey } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
 import { parkMessageToNotebook } from '/js/services/notebook.js';
 import { firstLine } from '../notebook-helpers.js';
@@ -225,14 +225,14 @@ export function timeShort(s) {
 export function stampShort(s) {
   const d = new Date(s);
   if (!Number.isFinite(d.getTime())) return '';
-  const locale = getLocale() === 'fi' ? 'fi-FI' : undefined;
   const now = new Date();
-  if (d.toDateString() === now.toDateString()) {
-    return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
-  }
-  if (d.toDateString() === new Date(Date.now() - 86400000).toDateString()) return t('inbox.yesterday');
-  if (Date.now() - d.getTime() < 6 * 86400000) return d.toLocaleDateString(locale, { weekday: 'short' });
-  return d.toLocaleDateString(locale, {
+  // Today and yesterday are decided in the READER'S zone, the same one the clock below is drawn in.
+  // Asked of the browser instead, a reader on another clock got "14.20" under the heading for a
+  // different day.
+  if (sameDay(d, now)) return fmtTime(d, { hour: '2-digit', minute: '2-digit' });
+  if (sameDay(d, new Date(Date.now() - 86400000))) return t('inbox.yesterday');
+  if (Date.now() - d.getTime() < 6 * 86400000) return fmtDate(d, { weekday: 'short' });
+  return fmtDate(d, {
     day: 'numeric', month: 'short',
     ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
   });
@@ -242,17 +242,15 @@ export function stampShort(s) {
 export function stampFull(s) {
   const d = new Date(s);
   if (!Number.isFinite(d.getTime())) return '';
-  const locale = getLocale() === 'fi' ? 'fi-FI' : undefined;
-  return d.toLocaleString(locale, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return fmtDateTime(d, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export function dayKey(s) { return new Date(s).toDateString(); }
+/** Which day a message groups under — the reader's own day, so the heading matches the stamp. */
+export function dayKey(s) { return zoneDayKey(s); }
 export function dayLabel(s) {
   const d = new Date(s);
-  const today = new Date().toDateString();
-  const yest = new Date(Date.now() - 86400000).toDateString();
-  if (d.toDateString() === today) return t('inbox.today');
-  if (d.toDateString() === yest) return t('inbox.yesterday');
+  if (sameDay(d, new Date())) return t('inbox.today');
+  if (sameDay(d, new Date(Date.now() - 86400000))) return t('inbox.yesterday');
   return fmtDate(d, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 

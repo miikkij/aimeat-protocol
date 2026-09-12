@@ -23,17 +23,16 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 
-/** Short calendar day for a retired-since stamp (locale date, no time). '' if absent/unparseable. */
+/** Short calendar day for a retired-since stamp, in the reader's own format. '' if absent. */
 function fmtDay(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+  return iso ? fmtDate(iso) : '';
 }
 import * as orgService from '/js/services/organisms.js';
 import { listAgents, offersWorkspaceContract, contractNamesOf, adoptContractTask } from '/js/services/agents.js';
 import { Mermaid } from '/components/Mermaid.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { swallowed } from '/js/swallowed.js';
+import { date as fmtDate } from '/js/format.js';
 
 /* Participants panel — who takes part in this workspace, as a node → owner → agents chart plus a
  * listing. Built from the records' identity traces (humans + their agents) + organism membership.

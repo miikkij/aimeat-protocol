@@ -29,6 +29,7 @@ import { listOrganisms, listWorkspaces } from '/js/services/organisms.js';
 import * as offersService from '/js/services/offers.js';
 import { buildCatalogue } from '/js/services/notebook-plan.js';
 import { swallowed } from '/js/swallowed.js';
+import { dateTime as fmtDateTime } from '/js/format.js';
 
 export default function LivingTab({ session, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -346,7 +347,7 @@ export default function LivingTab({ session, showToast }) {
   const renderOpened = () => {
     const md = living.renderInstanceMarkdown(opened);
     const st = opened.config.status || {};
-    const lastPulse = st.last_pulse ? new Date(st.last_pulse).toLocaleString() : t('profile.living.never');
+    const lastPulse = st.last_pulse ? fmtDateTime(st.last_pulse) : t('profile.living.never');
     return html`
       <div class="pf-ld-editor">
         <div class="pf-ld-opened-head">
@@ -395,7 +396,7 @@ export default function LivingTab({ session, showToast }) {
                   <span class="text-meta-sm">${t('profile.living.timeline')}:</span>
                   <select class="pf-ld-cadence" value=${pickedVer ? String(versions.indexOf(pickedVer)) : ''} onChange=${e => pickVersion(sec.slot, e.target.value)}>
                     <option value="">${t('profile.living.versionCurrent')}</option>
-                    ${versions.map((v, i) => html`<option key=${i} value=${i}>${new Date(v.producedAt).toLocaleString()} · ${escHtml(v.producedBy || '')}</option>`)}
+                    ${versions.map((v, i) => html`<option key=${i} value=${i}>${fmtDateTime(v.producedAt)} · ${escHtml(v.producedBy || '')}</option>`)}
                   </select>
                 </div>
                 ${pickedVer && html`<div class="pf-ld-charter-box"><${Markdown} text=${pickedVer.markdown} /></div>`}`}
@@ -432,7 +433,7 @@ export default function LivingTab({ session, showToast }) {
         ${ledger.length > 0 && html`
           <div class="pf-nb-suggest-label">${t('profile.living.ledgerTitle')}</div>
           <ul class="pf-ld-ledger">
-            ${ledger.slice(0, 10).map((ev, i) => html`<li key=${i} class="text-meta-sm">${new Date(ev.at).toLocaleString()} — ${escHtml(ev.event)}${ev.slot ? ` · ${escHtml(ev.slot)}` : ''}${typeof ev.costUsd === 'number' ? ` · $${ev.costUsd.toFixed(4)}` : ''}</li>`)}
+            ${ledger.slice(0, 10).map((ev, i) => html`<li key=${i} class="text-meta-sm">${fmtDateTime(ev.at)} — ${escHtml(ev.event)}${ev.slot ? ` · ${escHtml(ev.slot)}` : ''}${typeof ev.costUsd === 'number' ? ` · $${ev.costUsd.toFixed(4)}` : ''}</li>`)}
           </ul>`}
       </div>`;
   };
@@ -494,7 +495,7 @@ export default function LivingTab({ session, showToast }) {
                     </div>
                     <div class="text-meta-sm">
                       v${inst.config.status?.version || 1} ·
-                      ${t('profile.living.lastPulse')}: ${inst.config.status?.last_pulse ? new Date(inst.config.status.last_pulse).toLocaleString() : t('profile.living.never')} ·
+                      ${t('profile.living.lastPulse')}: ${inst.config.status?.last_pulse ? fmtDateTime(inst.config.status.last_pulse) : t('profile.living.never')} ·
                       ${t('profile.living.cost')}: $${(inst.config.status?.cost || 0).toFixed(4)}
                       ${inst.config.status?.paused && html` · <span class="badge badge-warning">${t('profile.living.paused')}</span>`}
                     </div>

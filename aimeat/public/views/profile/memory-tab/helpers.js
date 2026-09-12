@@ -9,6 +9,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
  */
 import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 
 /* Visibility is edited via an explicit select inside the EXPANDED detail (and in the
    edit modal) — the old per-row click-to-cycle pill meant one stray click in the list
@@ -34,7 +35,7 @@ export function formatRelativeTime(isoStr) {
   if (hrs < 24) return t('profile.memory.timeHoursAgo').replace('{n}', hrs);
   const days = Math.floor(hrs / 24);
   if (days < 30) return t('profile.memory.timeDaysAgo').replace('{n}', days);
-  return d.toLocaleDateString();
+  return fmtDate(d);
 }
 
 /* ── Key grouping helpers: keys are already hierarchical (agents.*, organism.<uuid>.*,

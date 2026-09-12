@@ -5,22 +5,32 @@
  * @description What the scheduler's cover and its pages share: the crumb, the page frame with its
  *   rail, the rail's page links, and the small words (who runs a schedule, how its last run went).
  *   Lives apart from cover.js so the detail page and the cover import one way only.
- * @structure c · loc · hhmm · whoRuns · resultWord · lastRun · crumb · pageLinks · renderPage
- * @usage import { renderPage, whoRuns, c, loc } from './frame.js';
+ * @structure c · hhmm · whoRuns · resultWord · lastRun · crumb · pageLinks · renderPage
+ * @usage import { renderPage, whoRuns, c, hhmm } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-09-12 — `loc()` is gone: it derived the date FORMAT from the page LANGUAGE, which
+ *     is a separate setting, and /js/format.js reads the reader's own. `hhmm` reads their clock too
+ *     rather than the browser's, which matters most here, where the clock IS the content.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
+import { time } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { kindOf } from './model.js';
 
 export const c = (key, vars) => t('profile.scheduler.cover.' + key, vars);
-export const loc = () => (getLocale() === 'fi' ? 'fi-FI' : getLocale() === 'es' ? 'es-CO' : 'en-GB');
-const two = (n) => String(n).padStart(2, '0');
-export const hhmm = (d) => `${two(d.getHours())}:${two(d.getMinutes())}`;
+
+/**
+ * A fire time on the reader's own clock.
+ *
+ * It used to be `getHours()`/`getMinutes()` padded by hand, which is the BROWSER's clock and a
+ * 24-hour face for everybody. A schedule is the one page where the clock is the whole content, so
+ * a reader who keeps a different zone was being shown the wrong hour for their own jobs.
+ */
+export const hhmm = (d) => time(d, { hour: '2-digit', minute: '2-digit' });
 
 /** "AI, with your key" · "agent claude-desktop" · "extension pulse": who does the work. */
 export function whoRuns(s) {

@@ -17,6 +17,7 @@ import { useConfirm } from '/components/Modal.js';
 import { listMyServices, browse, publish, unpublish } from '/js/services/catalogue.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { dateTime as fmtDateTime } from '/js/format.js';
 
 const SERVICE_CATEGORIES = ['language','translation','analysis','generation','coding','data','image','audio','video','search','utility','other'];
 
@@ -26,10 +27,9 @@ async function fetchServiceDetail(id) {
   return data?.data || data || {};
 }
 
-/** Format a date string for display */
+/** Format a date string for display, in the reader's own format and clock. */
 function fmtDate(s) {
-  if (!s) return null;
-  try { return new Date(s).toLocaleString(); } catch { return s; }
+  return s ? fmtDateTime(s) : null;
 }
 
 /** Render a JSON schema as a compact preview */

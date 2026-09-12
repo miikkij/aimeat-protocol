@@ -26,6 +26,7 @@ import { CopyButton } from '/components/CopyButton.js';
 import { formatBytes, formatRelativeTime, shortTok, groupOfKey, displayRemainder, VIS_OPTIONS } from './helpers.js';
 import { MemoryForm } from './components.js';
 import { swallowed } from '/js/swallowed.js';
+import { dateTime as fmtDateTime } from '/js/format.js';
 
 export function sortEntries(entries, sortBy) {
   const sorted = [...entries];
@@ -109,7 +110,7 @@ export function renderEntries(ctx) {
           onClick=${(e) => e.stopPropagation()} onChange=${() => toggleSelected(m.key)} />
         <span class="mem-key" title=${m.key}>${escHtml(displayRemainder(m.key, g))}</span>
         ${typeof m.bytes === 'number' && html`<span class="pf-mem-size" title=${t('profile.memory.sizeLabel') || 'Value size'}>${formatBytes(m.bytes)}</span>`}
-        <span class="mem-time" title="${m.created_at ? new Date(m.created_at).toLocaleString() : ''} / ${m.updated_at ? new Date(m.updated_at).toLocaleString() : ''}">
+        <span class="mem-time" title="${m.created_at ? fmtDateTime(m.created_at) : ''} / ${m.updated_at ? fmtDateTime(m.updated_at) : ''}">
           ${formatRelativeTime(m.updated_at || m.created_at)}
         </span>
         <${VisibilityPill} visibility=${m.visibility || 'private'}

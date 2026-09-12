@@ -10,6 +10,7 @@
  *   v1.0.0 — 2026-06-21 — Extracted from notebook-tab.js when the tab was split into tab + card.
  */
 import { t } from '/js/i18n.js';
+import { date as fmtDate } from '/js/format.js';
 
 /** Placement sentinel: "create a new organism/workspace" choice in the suggest dropdowns. */
 export const NEW = '__new__';
@@ -30,7 +31,7 @@ export function relTime(iso) {
   if (hrs < 24) return (t('profile.memory.timeHoursAgo') || '{n}h ago').replace('{n}', String(hrs));
   const days = Math.floor(hrs / 24);
   if (days < 30) return (t('profile.memory.timeDaysAgo') || '{n}d ago').replace('{n}', String(days));
-  return new Date(iso).toLocaleDateString();
+  return fmtDate(iso);
 }
 
 /** First non-empty line of a note (markdown heading marks stripped), for the collapsed one-line view. */

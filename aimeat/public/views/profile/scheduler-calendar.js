@@ -26,6 +26,7 @@ import { useState, useMemo, useEffect, useCallback } from 'preact/hooks';
 import { t } from '/js/i18n.js';
 import { listScheduleOccurrences } from '/js/services/schedules.js';
 import { swallowed } from '/js/swallowed.js';
+import { time, calendar, dayKey } from '/js/format.js';
 
 const html = htm.bind(h);
 
@@ -34,8 +35,22 @@ function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x
 function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
 function startOfWeek(d) { const x = startOfDay(d); const wd = (x.getDay() + 6) % 7; return addDays(x, -wd); } // Monday-first
 function startOfMonth(d) { const x = startOfDay(d); x.setDate(1); return x; }
-function sameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
-function fmtTime(d) { return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+/**
+ * A grid cell's own identity: the calendar date it stands for, as `YYYY-MM-DD`.
+ *
+ * The cells are enumerated with local Date arithmetic, which is fine — they are dates, not moments.
+ * What has to agree with them is where an OCCURRENCE lands, and an occurrence is a moment. Both
+ * sides are therefore reduced to a day string, the cell from its own components and the moment
+ * through the reader's chosen clock. Compared as Date objects instead, a reader on a zone other
+ * than their browser's saw an event drawn at 06.30 sitting in the cell for the day before.
+ */
+function cellDay(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function sameDay(a, b) { return cellDay(a) === cellDay(b); }
+/** Whether a moment falls on a given cell's date, in the reader's own clock. */
+function fallsOn(at, cell) { return dayKey(at) === cellDay(cell); }
+function fmtTime(d) { return time(d, { hour: '2-digit', minute: '2-digit' }); }
 
 /** Schedule kind → the CSS/colour suffix used by .sch-cal-ev--* and .sch-badge--*. */
 function kindClass(type) {
@@ -92,14 +107,14 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
     if (mode === 'month') {
       const first = startOfMonth(anchor);
       const gridStart = startOfWeek(first);
-      return { start: gridStart, end: addDays(gridStart, 42), title: anchor.toLocaleDateString([], { month: 'long', year: 'numeric' }) };
+      return { start: gridStart, end: addDays(gridStart, 42), title: calendar(anchor, { month: 'long', year: 'numeric' }) };
     }
     if (mode === 'week') {
       const s = startOfWeek(anchor);
-      return { start: s, end: addDays(s, 7), title: `${s.toLocaleDateString([], { day: 'numeric', month: 'short' })} – ${addDays(s, 6).toLocaleDateString([], { day: 'numeric', month: 'short' })}` };
+      return { start: s, end: addDays(s, 7), title: `${calendar(s, { day: 'numeric', month: 'short' })} – ${calendar(addDays(s, 6), { day: 'numeric', month: 'short' })}` };
     }
     const s = startOfDay(anchor);
-    return { start: s, end: addDays(s, 1), title: s.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' }) };
+    return { start: s, end: addDays(s, 1), title: calendar(s, { weekday: 'long', day: 'numeric', month: 'long' }) };
   }, [mode, anchor]);
 
   // Fetch projected fire-times for the visible window (refetch on window change + data reload).
@@ -138,7 +153,7 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [occ, byId]);
 
-  const eventsOn = useCallback((day) => events.filter((e) => sameDay(e.at, day)), [events]);
+  const eventsOn = useCallback((day) => events.filter((e) => fallsOn(e.at, day)), [events]);
 
   // Continuous / high-frequency schedules joined to their meta, busiest first.
   const frequentList = useMemo(() => freq
@@ -170,7 +185,7 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
 
   const weekdays = useMemo(() => {
     const mon = startOfWeek(new Date(2024, 0, 1));
-    return Array.from({ length: 7 }, (_, i) => addDays(mon, i).toLocaleDateString([], { weekday: 'short' }));
+    return Array.from({ length: 7 }, (_, i) => calendar(addDays(mon, i), { weekday: 'short' }));
   }, []);
 
   const legend = kindsPresent.length ? html`<div class="sch-cal-legend">
@@ -270,7 +285,7 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
           const evs = eventsOn(day);
           return html`<div class="sch-cal-weekcol ${sameDay(day, now) ? 'sch-cal-weekcol--today' : ''}" key=${i}>
             <div class="sch-cal-weekcol-head">
-              <span class="sch-cal-wd">${day.toLocaleDateString([], { weekday: 'short' })}</span>
+              <span class="sch-cal-wd">${calendar(day, { weekday: 'short' })}</span>
               <span class="sch-cal-daynum">${day.getDate()}</span>
             </div>
             <div class="sch-cal-weekcol-evs">

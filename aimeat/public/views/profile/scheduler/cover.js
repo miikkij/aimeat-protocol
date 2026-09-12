@@ -27,7 +27,7 @@ import { cronWords } from './cron-words.js';
 import { kindOf, nameOf, dayLabel } from './model.js';
 import { CreateForm } from './create-form.js';
 import { renderDetail } from './detail.js';
-import { c, loc, hhmm, whoRuns, resultWord, lastRun, crumb, pageLinks, renderPage } from './frame.js';
+import { c, hhmm, whoRuns, resultWord, lastRun, crumb, pageLinks, renderPage } from './frame.js';
 
 const AGENDA_ROWS = 6;
 const TABLE_ROWS = 12;
@@ -55,7 +55,7 @@ function renderCover(ctx) {
   const strip = html`
     <div class="og-strip">
       <div>${m.next
-        ? html`<b>${hhmm(m.next.at)}</b><span>${c('stripNext')}</span><small>${nameOf(m.next.s)} · ${dayLabel(m.next.at, loc())} · ${formatUntil(m.next.at.toISOString())}</small>`
+        ? html`<b>${hhmm(m.next.at)}</b><span>${c('stripNext')}</span><small>${nameOf(m.next.s)} · ${dayLabel(m.next.at)} · ${formatUntil(m.next.at.toISOString())}</small>`
         : html`<b>·</b><span>${c('stripNext')}</span><small>${c('stripNextNone')}</small>`}</div>
       <div><b>${m.todayLeft}</b><span>${c('stripToday')}</span><small>${c('stripTodaySub')}</small></div>
       <div>${m.latest
@@ -111,7 +111,7 @@ function agendaRows(ctx, list) {
   const nowMs = Date.now();
   return html`<div class="sc-agenda">
     ${list.map((o, i) => html`
-      <div class="sc-at" key=${'a' + i}>${hhmm(o.at)}<small>${dayLabel(o.at, loc())}</small></div>
+      <div class="sc-at" key=${'a' + i}>${hhmm(o.at)}<small>${dayLabel(o.at)}</small></div>
       <div class="sc-nm" key=${'n' + i}>${openBtn(ctx, o.s)}<small>${cronWords(o.s.cron)}${o.s.purpose ? ` · ${o.s.purpose}` : ''}</small></div>
       <div class="sc-who" key=${'w' + i}>${whoRuns(o.s)}</div>
       <div class="sc-in" key=${'i' + i}>${o.at.getTime() > nowMs ? formatUntil(o.at.toISOString()) : ''}</div>`)}
@@ -121,7 +121,7 @@ function secNext(ctx) {
   const list = ctx.nextOpen ? ctx.model.agenda : ctx.model.agenda.slice(0, AGENDA_ROWS);
   const doors = ctx.model.agenda.length > AGENDA_ROWS
     ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => ctx.setNextOpen(v => !v)}>${ctx.nextOpen ? c('showFewer') : c('showAllComing', { n: ctx.model.agenda.length })}</button>` : null;
-  return html`<${Section} id="sc-next" num="01" title=${c('secNext')} count=${ctx.model.next ? dayLabel(ctx.model.next.at, loc()) : null} doors=${doors} first=${true}>
+  return html`<${Section} id="sc-next" num="01" title=${c('secNext')} count=${ctx.model.next ? dayLabel(ctx.model.next.at) : null} doors=${doors} first=${true}>
     ${list.length ? agendaRows(ctx, list) : html`<p class="og-empty">${ctx.occLoading ? t('profile.scheduler.cal.loading') : c('noneNext')}</p>`}
   <//>`;
 }
