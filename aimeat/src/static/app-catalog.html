@@ -2462,6 +2462,8 @@
     v1.5.0 — 2026-08-29 — The "Legal pages" section (.lg-*): one row per kind with the editor inside
       the row, a sun rule on the recommended ones; the audit log reuses .mk-log.
     v1.6.0 — 2026-09-03 — The Needs section's chips (.dtl-chips / .dtl-chip): one per cortex or extension.
+    v1.7.0 — 2026-09-12 — The detail view's "On this page" rail (.dtl-page, .dtl-rail): the profile's
+      ink box with the sun shadow, beside the sections, kept in view while the page scrolls.
 */
 
 /* ── Tokens the poster needs on top of the catalog's own ─────────────────────────────────── */
@@ -2702,7 +2704,25 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
 #detail-view .dtl-toolbar .icon-btn { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); box-shadow: none; }
 #detail-view .dtl-toolbar .dtl-toolbar-title { font-family: var(--font-body); font-weight: 800; }
 #detail-view .dtl-toolbar #detail-launch-btn { display: none; }
-#detail-view .dtl-body { max-width: 1180px; padding: 40px 44px 0; font-family: var(--font-body); }
+#detail-view .dtl-body { max-width: none; padding: 40px 44px 0; font-family: var(--font-body); }
+
+/* The sections and the "On this page" rail beside them. The body scrolls and spans the window, so
+   the column keeps the width it had (1180 less the padding) and the rail stands to its right. The
+   rail is the profile's .og-rail (public/css/views/organism.css), repeated because this page cannot
+   read that sheet; change it there first, then here. */
+.dtl-page { display: grid; grid-template-columns: minmax(0, 1092px) 250px; gap: 56px; justify-content: center; align-items: start; }
+.dtl-main { min-width: 0; }
+/* A sticky inset counts from inside the body's 40px padding, so top 0 lines the rail up with the
+   back link's rule and holds it 40px under the toolbar; the height leaves the same 40px below. */
+.dtl-rail { position: sticky; top: 0; max-height: calc(100vh - 136px); overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; padding: 1rem 1.1rem; background: var(--text); color: var(--bg); border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); }
+.dtl-rail-label { font-family: var(--font-poster); font-weight: var(--font-poster-weight); text-transform: uppercase; font-size: .75rem; letter-spacing: .06em; color: var(--sun); margin-bottom: .25rem; }
+.dtl-rail-link { display: flex; align-items: baseline; gap: .6rem; width: 100%; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; font-family: var(--font-body); font-size: .8rem; font-weight: 800; line-height: 1.4; color: var(--bg); opacity: .65; }
+.dtl-rail-link:hover, .dtl-rail-link.on { opacity: 1; }
+.dtl-rail-link i { flex: 0 0 auto; min-width: 18px; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--sun); }
+@media (max-width: 1100px) {
+  .dtl-page { grid-template-columns: minmax(0, 1fr); }
+  .dtl-rail { display: none; }
+}
 
 .dtl-back { display: block; border-top: 3px solid var(--text); padding-top: 14px; font-family: var(--font-mono); font-size: .8rem; color: var(--accent); background: none; border-left: 0; border-right: 0; border-bottom: 0; border-radius: 0; cursor: pointer; text-align: left; width: 100%; }
 .dtl-back:hover { text-decoration: underline; }
@@ -4279,6 +4299,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "detail.requires": "Needs",
       "detail.requiresHint": "The cortexes this app loads and the extensions it calls, read from its published source. A version after @ is the one the app pinned.",
       "detail.requiresNone": "Nothing beyond the platform itself.",
+      "detail.railTitle": "On this page",
       "detail.loadingVersions": "Loading versions…",
       "detail.noVersions": "No published versions yet.",
       "detail.skills": "Skills for this app",
@@ -5275,6 +5296,7 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
       "detail.requires": "Tarvitsee",
       "detail.requiresHint": "Cortexit, jotka sovellus lataa, ja laajennukset, joita se kutsuu, luettuna julkaistusta lähteestä. @-merkin jälkeinen versio on se, johon sovellus on kiinnittynyt.",
       "detail.requiresNone": "Ei mitään alustan itsensä lisäksi.",
+      "detail.railTitle": "Tällä sivulla",
       "detail.loadingVersions": "Ladataan versioita…",
       "detail.noVersions": "Ei vielä julkaistuja versioita.",
       "detail.skills": "Sovelluksen taidot",
@@ -8956,6 +8978,72 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     });
   }
 
+  // src/static/app-catalog/js/detail-rail.js
+  function detailRailPage(mainHtml) {
+    return '<div class="dtl-page"><div class="dtl-main">' + mainHtml + '</div><nav class="dtl-rail" id="detail-rail" aria-label="' + escapeHtml(t("detail.railTitle")) + '"></nav></div>';
+  }
+  function sectionLabel(h3) {
+    var first = h3.firstChild;
+    var text = first ? first.nodeType === 3 ? first.nodeValue : first.textContent : "";
+    return (text || h3.textContent || "").trim();
+  }
+  function sectionsOf(bodyEl) {
+    return Array.prototype.slice.call(bodyEl.querySelectorAll(".dtl-main .dtl-section")).filter(function(sec) {
+      return sec.querySelector(":scope > h3");
+    });
+  }
+  function goToSection(bodyEl, index) {
+    var sec = sectionsOf(bodyEl)[index];
+    if (!sec) return;
+    var top = bodyEl.scrollTop + sec.getBoundingClientRect().top - bodyEl.getBoundingClientRect().top - 24;
+    bodyEl.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }
+  function markCurrent(bodyEl) {
+    var rail = document.getElementById("detail-rail");
+    if (!rail) return;
+    var secs = sectionsOf(bodyEl);
+    var box = bodyEl.getBoundingClientRect();
+    var line = box.top + box.height / 3;
+    var current = -1;
+    for (var i = 0; i < secs.length; i++) {
+      if (secs[i].getBoundingClientRect().top <= line) current = i;
+    }
+    if (bodyEl.scrollTop + bodyEl.clientHeight >= bodyEl.scrollHeight - 4 && secs.length) current = secs.length - 1;
+    var links = rail.querySelectorAll(".dtl-rail-link");
+    for (var j = 0; j < links.length; j++) {
+      var on = j === current;
+      links[j].classList.toggle("on", on);
+      if (on) links[j].setAttribute("aria-current", "location");
+      else links[j].removeAttribute("aria-current");
+    }
+  }
+  function renderDetailRail(bodyEl) {
+    var rail = document.getElementById("detail-rail");
+    if (!rail) return;
+    var secs = sectionsOf(bodyEl);
+    rail.innerHTML = '<span class="dtl-rail-label">' + escapeHtml(t("detail.railTitle")) + "</span>" + secs.map(function(sec, i) {
+      var n = i + 1;
+      return '<button type="button" class="dtl-rail-link" data-chapter="' + i + '"><i>' + (n < 10 ? "0" : "") + n + "</i>" + escapeHtml(sectionLabel(sec.querySelector(":scope > h3"))) + "</button>";
+    }).join("");
+    rail.addEventListener("click", function(e) {
+      var link = e.target.closest(".dtl-rail-link");
+      if (link) goToSection(bodyEl, Number(link.getAttribute("data-chapter")));
+    });
+    if (!bodyEl.dataset.railWatch) {
+      bodyEl.dataset.railWatch = "1";
+      var queued = false;
+      bodyEl.addEventListener("scroll", function() {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(function() {
+          queued = false;
+          markCurrent(bodyEl);
+        });
+      }, { passive: true });
+    }
+    markCurrent(bodyEl);
+  }
+
   // src/static/app-catalog/js/detail.js
   var refreshAll;
   var loadPublishedApps;
@@ -9327,9 +9415,12 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
     }
     var bandHtml = bandItems ? '<div class="cat-band dtl-band"><div class="cat-band-in">' + bandItems + "</div></div>" : "";
     var bodyEl = document.getElementById("detail-body");
-    bodyEl.innerHTML = heroHtml + bandHtml + statusHtml + aiHtml + aboutHtml + dataMapHtml + requiresHtml + historyHtml + versionsHtml + mgmtHtml + skillsHtml + seoHtml + marksHtml + legalHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml;
+    bodyEl.innerHTML = detailRailPage(
+      heroHtml + bandHtml + statusHtml + aiHtml + aboutHtml + dataMapHtml + requiresHtml + historyHtml + versionsHtml + mgmtHtml + skillsHtml + seoHtml + marksHtml + legalHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml
+    );
     var chapters = bodyEl.querySelectorAll(".dtl-section").length;
     bodyEl.style.setProperty("--dtl-chapters", '"' + (chapters < 10 ? "0" : "") + chapters + '"');
+    renderDetailRail(bodyEl);
     var dmOwner = detailServerOwner(app);
     var dmFile = app.publishedFilename || "";
     if (dmOwner && dmFile) loadDataMapInto(dmOwner, dmFile, { docKey: "apps." + dmFile.replace(/\.html$/i, "") + ".datamap" });

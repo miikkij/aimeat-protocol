@@ -32,6 +32,8 @@
     v1.5.0 — 2026-08-29 — The "Legal pages" section (.lg-*): one row per kind with the editor inside
       the row, a sun rule on the recommended ones; the audit log reuses .mk-log.
     v1.6.0 — 2026-09-03 — The Needs section's chips (.dtl-chips / .dtl-chip): one per cortex or extension.
+    v1.7.0 — 2026-09-12 — The detail view's "On this page" rail (.dtl-page, .dtl-rail): the profile's
+      ink box with the sun shadow, beside the sections, kept in view while the page scrolls.
 */
 
 /* ── Tokens the poster needs on top of the catalog's own ─────────────────────────────────── */
@@ -272,7 +274,25 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
 #detail-view .dtl-toolbar .icon-btn { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); box-shadow: none; }
 #detail-view .dtl-toolbar .dtl-toolbar-title { font-family: var(--font-body); font-weight: 800; }
 #detail-view .dtl-toolbar #detail-launch-btn { display: none; }
-#detail-view .dtl-body { max-width: 1180px; padding: 40px 44px 0; font-family: var(--font-body); }
+#detail-view .dtl-body { max-width: none; padding: 40px 44px 0; font-family: var(--font-body); }
+
+/* The sections and the "On this page" rail beside them. The body scrolls and spans the window, so
+   the column keeps the width it had (1180 less the padding) and the rail stands to its right. The
+   rail is the profile's .og-rail (public/css/views/organism.css), repeated because this page cannot
+   read that sheet; change it there first, then here. */
+.dtl-page { display: grid; grid-template-columns: minmax(0, 1092px) 250px; gap: 56px; justify-content: center; align-items: start; }
+.dtl-main { min-width: 0; }
+/* A sticky inset counts from inside the body's 40px padding, so top 0 lines the rail up with the
+   back link's rule and holds it 40px under the toolbar; the height leaves the same 40px below. */
+.dtl-rail { position: sticky; top: 0; max-height: calc(100vh - 136px); overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; padding: 1rem 1.1rem; background: var(--text); color: var(--bg); border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); }
+.dtl-rail-label { font-family: var(--font-poster); font-weight: var(--font-poster-weight); text-transform: uppercase; font-size: .75rem; letter-spacing: .06em; color: var(--sun); margin-bottom: .25rem; }
+.dtl-rail-link { display: flex; align-items: baseline; gap: .6rem; width: 100%; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; font-family: var(--font-body); font-size: .8rem; font-weight: 800; line-height: 1.4; color: var(--bg); opacity: .65; }
+.dtl-rail-link:hover, .dtl-rail-link.on { opacity: 1; }
+.dtl-rail-link i { flex: 0 0 auto; min-width: 18px; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--sun); }
+@media (max-width: 1100px) {
+  .dtl-page { grid-template-columns: minmax(0, 1fr); }
+  .dtl-rail { display: none; }
+}
 
 .dtl-back { display: block; border-top: 3px solid var(--text); padding-top: 14px; font-family: var(--font-mono); font-size: .8rem; color: var(--accent); background: none; border-left: 0; border-right: 0; border-bottom: 0; border-radius: 0; cursor: pointer; text-align: left; width: 100%; }
 .dtl-back:hover { text-decoration: underline; }
