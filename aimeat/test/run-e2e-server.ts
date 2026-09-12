@@ -7,6 +7,12 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.3.0 -- 2026-09-12 -- A port that will not come free says WHO holds it. The refusal named the
+ *            port and the moment and nothing else, so five red CI runs in one day were each answered
+ *            with a re-run and a guess; an AIMEAT node answers /v1/build with its own id and build
+ *            stamp, which separates "one of ours was left behind" from "this machine is busy" in one
+ *            read. The probe is bounded at two seconds and decides nothing: the refusal stands
+ *            either way.
  *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.2.0 -- 2026-09-05 -- Two more pins: the login rate limit (e2e-auth-lib tripped it at random
  *            once the tarpit stopped spacing its logins out) and the MCP idle-sweep interval (1 s,
@@ -582,11 +588,30 @@ export async function waitForPortFree(port: number, timeoutMs: number): Promise<
     }
 }
 
+/**
+ * Who is holding a port, in one line, asked only when the refusal below is already certain.
+ *
+ * A port that will not come free is the hardest failure in this runner to read after the fact: the
+ * message names the port and the moment, and nothing about the holder, so every occurrence has been
+ * answered with a re-run and a guess. An AIMEAT node answers /v1/build with its own id and its build
+ * stamp, which says at once whether this is one of ours left behind or somebody else's process, and
+ * that is the difference between a bug in the runner and a busy machine. Bounded, and it never
+ * decides anything: the refusal happens either way.
+ */
+async function whoHolds(port: number): Promise<string> {
+    const probe = await fetch(`http://127.0.0.1:${port}/v1/build`, { signal: AbortSignal.timeout(2_000) }).then(
+        async (r) => `An AIMEAT node answers /v1/build on it (HTTP ${r.status}): ${(await r.text()).slice(0, 200)}`,
+        (e: unknown) => `Nothing answers /v1/build on it (${(e as Error).message}), so whatever holds it is not a node that finished starting.`,
+    );
+    return probe;
+}
+
 /** Fail loudly rather than start a second server that cannot bind and then test the first one. */
 export async function requirePortFree(port: number, timeoutMs: number, context: string): Promise<void> {
     const started = Date.now();
     if (await waitForPortFree(port, timeoutMs)) return;
-    throw new Error(`Port ${port} was still bound ${Date.now() - started}ms after ${context}. Nothing can be trusted from here: a suite would talk to whichever server holds it, on whichever database that one opened. Clear it with \`AIMEAT_PORT=${port} pnpm exec tsx scripts/kill-port.ts\` (that script reads the env var, not an argument), or give this run a port of its own with AIMEAT_PORT.`);
+    const holder = await whoHolds(port);
+    throw new Error(`Port ${port} was still bound ${Date.now() - started}ms after ${context}. ${holder} Nothing can be trusted from here: a suite would talk to whichever server holds it, on whichever database that one opened. Clear it with \`AIMEAT_PORT=${port} pnpm exec tsx scripts/kill-port.ts\` (that script reads the env var, not an argument), or give this run a port of its own with AIMEAT_PORT.`);
 }
 
 // ── Server lifecycle ──
