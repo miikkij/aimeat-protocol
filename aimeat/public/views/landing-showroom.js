@@ -22,6 +22,7 @@
  * @structure ShowroomHero · WallIntro · ShowroomClose · AgentDoor (private)
  * @usage import { ShowroomHero, WallIntro, ShowroomClose } from '/views/landing-showroom.js';
  * @version-history
+ *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.0.1 — 2026-08-29 — The connect door leads to the connect story (/v1/connect-your-ai): a signed-out
  *     visitor used to land on an empty profile that said sign in.
  *   v1.0.0 — 2026-08-28 — Initial, built to the design canvas "AIMEAT Front Page" (direction A).
@@ -114,14 +115,14 @@ export function ShowroomHero({ navigate, picture = true }) {
             ${tr('landing.wishLead', 'Say what you need and press GO. You land in a chat that starts building it with you; new here, you make an account on the way and lose nothing you typed.')}
           </p>
           <div class="ld-sh-doors">
-            ${store ? html`<a class="ld-sh-door" href=${store} target="_blank" rel="noopener">${tr('landing.showGetOwn', 'Get your own →')}</a>` : ''}
-            <a class="ld-sh-door" href="/v1/connect-your-ai" onClick=${go('/v1/connect-your-ai')}>${tr('landing.showConnect', 'Connect the AI you already use →')}</a>
+            ${store ? html`<a class="ld-sh-door showroom-door" href=${store} target="_blank" rel="noopener">${tr('landing.showGetOwn', 'Get your own →')}</a>` : ''}
+            <a class="ld-sh-door showroom-door" href="/v1/connect-your-ai" onClick=${go('/v1/connect-your-ai')}>${tr('landing.showConnect', 'Connect the AI you already use →')}</a>
             ${session ? '' : html`
-              <a class="ld-sh-door" href="#agent-door" aria-expanded=${agentOpen}
+              <a class="ld-sh-door showroom-door" href="#agent-door" aria-expanded=${agentOpen}
                 onClick=${(e) => { e.preventDefault(); setAgentOpen(o => !o); }}>
                 ${tr('landing.showAgentDoor', 'Let your AI register you →')}
               </a>
-              <a class="ld-sh-door" href="/v1/portal" onClick=${register}>${tr('landing.registerHome', 'Register your home')} →</a>`}
+              <a class="ld-sh-door showroom-door" href="/v1/portal" onClick=${register}>${tr('landing.registerHome', 'Register your home')} →</a>`}
           </div>
           <${AgentDoor} open=${agentOpen && !session} />
         </div>
@@ -157,7 +158,7 @@ export function WallIntro({ money = true }) {
           <a href="/v1/how-an-app-builds">${tr('landing.wallIntroStory', 'How an app gets built here →')}</a>
         </p>
         ${money ? html`
-          <div class="ld-sh-box">
+          <div class="ld-sh-box poster-aside">
             <span class="ld-sh-box-label">${tr('landing.moneyLabel', 'Money angle, said out loud:')}</span>
             ${' '}
             ${tr('landing.moneyText', 'the payment rails are built in. Cards ride through Stripe (UCP), and x402 lets agents pay agents, so your own store or marketplace is up the same day.')}
@@ -189,8 +190,8 @@ export function ShowroomClose() {
         ${tr('landing.closeText', 'Still reading? The demo is right there, it is free, and it does not mind being poked. Say what you need at the top of this page and watch it happen.')}
       </p>
       <div class="ld-sh-close-actions">
-        <a class="ld-sh-btn ld-sh-btn--hot" href="#top" onClick=${backToTop}>${tr('landing.closeDemo', 'Into the demo')}</a>
-        ${store ? html`<a class="ld-sh-btn ld-sh-btn--sun" href=${store} target="_blank" rel="noopener">${tr('landing.closeStore', 'Into the store')}</a>` : ''}
+        <a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href="#top" onClick=${backToTop}>${tr('landing.closeDemo', 'Into the demo')}</a>
+        ${store ? html`<a class="ld-sh-btn showroom-slab ld-sh-btn--sun showroom-slab--sun" href=${store} target="_blank" rel="noopener">${tr('landing.closeStore', 'Into the store')}</a>` : ''}
       </div>
     </section>`;
 }

@@ -15,6 +15,7 @@
  * @structure BEATS · BeatRail · default export ConnectStory({ navigate })
  * @usage routed at /v1/connect-your-ai by spa.html; listed in routes/portal.ts spaRoutes
  * @version-history
+ *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.0.0 — 2026-08-29 — Initial, on the build-story page's shapes (build-story.css, bs- prefix).
  */
 import { h } from 'preact';
@@ -109,7 +110,7 @@ export default function ConnectStory({ navigate }) {
           </h1>
           <p class="ld-sh-position">${tr('connectStory.position', 'After this, you run all of it from your own chat.')}</p>
           <p class="bs-lead">${tr('connectStory.lead', 'Here is the whole road, shown once, before you make an account. Read it through, or skip to the door at the bottom.')}</p>
-          <a class="ld-sh-door" href="#cs-door" onClick=${toDoor}>${tr('connectStory.skip', 'Skip to the door ↓')}</a>
+          <a class="ld-sh-door showroom-door" href="#cs-door" onClick=${toDoor}>${tr('connectStory.skip', 'Skip to the door ↓')}</a>
         </div>
         <${BeatRail} current=${current} />
       </section>
@@ -126,7 +127,7 @@ export default function ConnectStory({ navigate }) {
                 <span>${typeof p.name === 'function' ? p.name() : p.name}</span>
               </span>`)}
           </div>
-          <div class="ld-sh-box"><span class="ld-sh-box-label">${tr('connectStory.b1WorksLabel', 'Works with:')}</span> ${tr('landing.connectWorks', 'Works with Claude (a free account is enough to start), ChatGPT on a paid plan, Claude Code, Cursor, VS Code, Codex CLI and Grok. The guided path checks your setup at every step.')}</div>
+          <div class="ld-sh-box poster-aside"><span class="ld-sh-box-label">${tr('connectStory.b1WorksLabel', 'Works with:')}</span> ${tr('landing.connectWorks', 'Works with Claude (a free account is enough to start), ChatGPT on a paid plan, Claude Code, Cursor, VS Code, Codex CLI and Grok. The guided path checks your setup at every step.')}</div>
         </div>
         <img class="bs-picture bs-picture--sun" src="/img/connect-story/beat1-pick.jpg" width="1200" height="900" loading="lazy"
           alt=${tr('connectStory.b1Alt', 'A person at a bright showroom counter choosing between four friendly retro robots, each holding up a small name sign')} />
@@ -152,7 +153,7 @@ export default function ConnectStory({ navigate }) {
           <span class="bs-num">3</span>
           <h2 class="ld-sh-h2"><span>${tr('connectStory.b3Title1', 'Prove it')}</span><span class="ld-sh-accent">${tr('connectStory.b3Title2', 'with one prompt')}</span></h2>
           <p class="ld-sh-text">${tr('connectStory.b3Text', 'A connection that looks fine and is not there fails quietly: the AI keeps answering and nothing errors. So the path hands you one prompt, you paste it into your chat, and one button here shows the answer. When it lands, you are in.')}</p>
-          <div class="ld-sh-box"><span class="ld-sh-box-label">${tr('connectStory.b3WhyLabel', 'Why this step exists:')}</span> ${tr('connectStory.b3Why', 'because a silent failure would send you off building on top of nothing. Two minutes now, and you never wonder again.')}</div>
+          <div class="ld-sh-box poster-aside"><span class="ld-sh-box-label">${tr('connectStory.b3WhyLabel', 'Why this step exists:')}</span> ${tr('connectStory.b3Why', 'because a silent failure would send you off building on top of nothing. Two minutes now, and you never wonder again.')}</div>
         </div>
         <img class="bs-picture bs-picture--ink" src="/img/connect-story/beat3-prove.jpg" width="1200" height="900" loading="lazy"
           alt=${tr('connectStory.b3Alt', 'A person types one line into a huge speech bubble while a retro robot holds up a big green check-mark sign')} />
@@ -165,7 +166,7 @@ export default function ConnectStory({ navigate }) {
           <span class="bs-num">4</span>
           <h2 class="ld-sh-h2"><span>${tr('connectStory.b4Title1', 'Then everything')}</span><span class="ld-sh-accent">${tr('connectStory.b4Title2', 'runs from your chat')}</span></h2>
           <p class="ld-sh-text">${tr('connectStory.b4Text', 'Your notes, your documents, what your team knows, the apps you build and the agents you adopt: your AI reads and writes them here, in your own space, under permissions you gave and can take back. You never have to open this site again to get work done. It stays here for when you want to look.')}</p>
-          <div class="ld-sh-box"><span class="ld-sh-box-label">${tr('landing.connectSub', 'Five minutes. After it, you run all of this from your own chat: notes, documents, team knowledge, agents.')}</span></div>
+          <div class="ld-sh-box poster-aside"><span class="ld-sh-box-label">${tr('landing.connectSub', 'Five minutes. After it, you run all of this from your own chat: notes, documents, team knowledge, agents.')}</span></div>
         </div>
       </section>
 
@@ -176,10 +177,10 @@ export default function ConnectStory({ navigate }) {
           : tr('connectStory.doorLead', 'The connection is to YOUR space, so there has to be one: an account takes a minute, and the guided path opens right after.')}</p>
         <div class="cs-door-actions">
           ${signedIn
-            ? html`<a class="ld-sh-btn ld-sh-btn--hot" href=${GUIDED_PATH} onClick=${open('signin')}>${tr('landing.connectCta', 'Open the guided path →')}</a>`
+            ? html`<a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href=${GUIDED_PATH} onClick=${open('signin')}>${tr('landing.connectCta', 'Open the guided path →')}</a>`
             : html`
-              <a class="ld-sh-btn ld-sh-btn--hot" href="/v1/portal" onClick=${open('register')}>${tr('connectStory.doorCreate', 'Create your account →')}</a>
-              <a class="ld-sh-door" href="/v1/portal" onClick=${open('signin')}>${tr('connectStory.doorSignIn', 'I already have one, sign me in →')}</a>`}
+              <a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href="/v1/portal" onClick=${open('register')}>${tr('connectStory.doorCreate', 'Create your account →')}</a>
+              <a class="ld-sh-door showroom-door" href="/v1/portal" onClick=${open('signin')}>${tr('connectStory.doorSignIn', 'I already have one, sign me in →')}</a>`}
         </div>
       </section>
     </div>`;
