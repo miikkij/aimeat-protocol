@@ -525,16 +525,32 @@ exists because the library was already there and thirty call sites wrote their o
 copies disagreed with each other about what English meant.
 
 ```javascript
-import { num, date, time, dateTime, calendar, relative, money, morsels } from '/js/format.js';
+import { num, date, time, dateTime, calendar, relative, ago, duration, money, morsels } from '/js/format.js';
 
 num(1234)                                  // 1 234   — the reader's own grouping
 date(iso)                                  // their date format
 time(iso, { hour: '2-digit', minute: '2-digit' })   // their clock
 dateTime(iso)                              // both
-relative(iso)                              // "3 days ago", in their format
+relative(iso)                              // "3 päivää sitten", "eilen" — a POINT in the past
+ago(iso, { horizonDays: 7 })               // the same, giving way to a date past the horizon
+duration(ms)                               // "1pv 23t 26min" — a LENGTH of time
+duration(ms, { style: 'long', max: 2 })    // "1 päivä ja 23 tuntia"
 money(12.5, 'EUR')                         // 12,50 €
 morsels(625)                               // 625 morsels — never a currency symbol
 ```
+
+**A word is not a unit, and the two follow different settings.** `relative()` and `duration()`
+produce WORDS, so they follow the page's LANGUAGE: a person who chose Finnish words with a British
+date format asked for exactly that, and gets `3 päivää sitten` beside `13/09/2026`. Everything else
+here — a number's separators, a date's order, a clock — follows the regional format. Getting this
+backwards is how a Finnish page came to read `3 days ago` beside a Finnish `eilen` that a
+translation key had produced, on the same screen.
+
+**Never write a `{n} min ago` translation key.** It survives Finnish only because `min` does not
+inflect, it cannot produce `eilen`, and one `{n}` cannot carry a language whose noun changes with
+the number: Polish writes `1 dzień` but `2 dni`, Russian `1 день`, `2 дня`, `5 дней`. CLDR holds
+every one of those rules and these two functions read them. Eleven such keys were deleted on
+2026-09-13 for that reason.
 
 **A moment and a calendar date are different things, and the difference is a wrong number rather
 than a wrong format.** A message arrived at an instant, and the reader should see it on their own

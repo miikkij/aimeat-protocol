@@ -24,6 +24,8 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   v1.3.0 — 2026-09-13 — A word is not a unit: fmt.relative and fmt.duration follow the LANGUAGE,
+ *     and the {n}-key trap is named, because it is the repair every app author reaches for first.
  *   v1.2.0 — 2026-09-12 — "Dates, times and numbers: never from the language". The app-side half of
  *     the ruling that language, regional format and time zone are three settings; AIMEAT.fmt is
  *     what an app calls, and the moment-versus-calendar-date distinction is stated because getting
@@ -243,9 +245,20 @@ AIMEAT.fmt.num(1234)                      // their grouping
 AIMEAT.fmt.date(iso)                      // their date format
 AIMEAT.fmt.time(iso, { hour: '2-digit', minute: '2-digit' })   // their clock
 AIMEAT.fmt.dateTime(iso)
+AIMEAT.fmt.relative(iso)                  // "3 päivää sitten", "eilen" — a POINT in the past
+AIMEAT.fmt.duration(ms)                   // "1pv 23t 26min" — a LENGTH of time
 AIMEAT.fmt.money(12.5, 'EUR')
 AIMEAT.fmt.morsels(625)                   // never a currency symbol
 \`\`\`
+
+**A word is not a unit.** \`relative\` and \`duration\` produce WORDS, so they follow the app's
+LANGUAGE; everything else follows the regional format. A person who chose Finnish words with a
+British date format gets \`3 päivää sitten\` beside \`13/09/2026\`, and that is what they asked for.
+
+**Never write a \`{n} min ago\` translation key for this.** It survives Finnish only because \`min\`
+does not inflect, it cannot produce \`eilen\`, and one \`{n}\` cannot carry a language whose noun
+changes with the number — Polish writes \`1 dzień\` but \`2 dni\`, Russian \`1 день\`, \`2 дня\`,
+\`5 дней\`. CLDR knows every one of those rules; a key does not.
 
 Three things that are easy to get wrong:
 

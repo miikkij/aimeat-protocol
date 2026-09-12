@@ -167,6 +167,16 @@
   /** The tag to format with, or undefined — which IS the browser's own default. */
   function fmtTag() { return fmtState.region || undefined; }
 
+  /**
+   * The tag to write WORDS with: this app's LANGUAGE, which is a different setting from the format.
+   *
+   * A relative phrase and a duration's unit names are words — "3 päivää sitten", "eilen",
+   * "1pv 23t" — so they follow the language a person chose to read, exactly as they do on an
+   * operating system whose display language and regional format are separate. Numbers, dates and
+   * clocks follow fmtTag() instead, which is the regional format.
+   */
+  function wordTag() { return (typeof getLocale === 'function' && getLocale()) || undefined; }
+
   /** Merge the reader's clock into an option bag. Nothing set: the browser's own zone applies. */
   function withZone(opts) {
     if (!fmtState.timezone) return opts || {};
@@ -233,7 +243,8 @@
       if (Math.abs(value) < steps[i][1]) break;
       value = Math.round(value / steps[i][1]);
     }
-    try { return new Intl.RelativeTimeFormat(fmtTag(), { numeric: 'auto' }).format(value, unit); }
+    // wordTag, not fmtTag: "3 päivää sitten" and "eilen" are words, and words follow the language.
+    try { return new Intl.RelativeTimeFormat(wordTag(), { numeric: 'auto' }).format(value, unit); }
     catch (e) { return fmtDateTime(d); }
   }
 
@@ -309,7 +320,8 @@
     if (zero) bag.secondsDisplay = 'always';
     for (var k in o) if (k !== 'max') bag[k] = o[k];
     try {
-      return new Intl.DurationFormat(fmtTag(), bag).format(parts);
+      // wordTag, not fmtTag: "1pv 23t 26min" is unit NAMES, and those are words.
+      return new Intl.DurationFormat(wordTag(), bag).format(parts);
     } catch (e) {
       // Intl.DurationFormat is Baseline since March 2025; an older browser lands here.
       var out = [];

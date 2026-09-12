@@ -32,6 +32,14 @@
  *   money(12.5, 'EUR')           → "12,50 €"
  *   morsels(625)                 → "625 morsels" — never a currency symbol
  * @version-history
+ *   v2.6.0 — 2026-09-13 — A WORD IS NOT A UNIT. `relative()` and `duration()` follow the page's
+ *     LANGUAGE; everything else keeps following the regional format. They write words — "3 päivää
+ *     sitten", "eilen", "1pv 23t" — and a person who sets Finnish words with British dates asked
+ *     for exactly that. Until now a Finnish page showed "3 days ago" beside a Finnish "eilen" that
+ *     came from a translation key, which is how the split was noticed. Ruled by Jouni, 2026-09-13.
+ *   v2.5.0 — 2026-09-13 — duration() and ago(): a LENGTH of time and a POINT in the past. Four
+ *     surfaces built the first out of 'd', 'h' and 'min' and four more built the second out of
+ *     `{n}` keys, which cannot say "eilen" and go wrong in any language that inflects its nouns.
  *   v2.4.0 — 2026-09-12 — minutesOfDay(): what o'clock an instant is in the READER'S zone, as a
  *     number, for sorting and bucketing. The scheduler's rhythm grid bucketed by `getHours()` and
  *     so placed a row at 23:00 on a page whose own next-run card said 05:00 the next day.
@@ -63,6 +71,28 @@ import { swallowed } from '/js/swallowed.js';
 /** The tag to format with: the reader's own, or undefined, which IS the browser default. */
 function tag() {
   return getRegion() || undefined;
+}
+
+/**
+ * The tag to write WORDS with: the page's language.
+ *
+ * A relative phrase and a duration's unit names are words — "3 päivää sitten", "eilen", "1pv 23t" —
+ * and words follow the language a person chose to read, exactly as they do on an operating system
+ * whose display language and regional format are separate settings. Everything that is a FORMAT
+ * rather than a word — a number's separators, a date's order, a clock — follows `tag()` above.
+ * → decision "Kieli, esitysmuoto ja aikavyöhyke ovat kolme erillistä asetusta", 2026-09-12,
+ *   and the reading of it settled on 2026-09-13: a word is not a unit.
+ *
+ * Read off `<html lang>`, which i18n.js keeps current, rather than imported from i18n.js: that
+ * module reaches utils.js, utils.js reaches this one, and the import would be a cycle.
+ */
+function wordTag() {
+  try {
+    return document.documentElement.getAttribute('lang') || undefined;
+  } catch (err) {
+    swallowed('format: no page language, falling back to the browser', err);
+    return undefined;
+  }
 }
 
 /**
@@ -238,7 +268,8 @@ export function duration(ms, opts) {
   const zero = used === 0;
   if (zero) parts.seconds = 0;
   try {
-    return new Intl.DurationFormat(tag(), {
+    // wordTag, not tag: "1pv 23t 26min" is unit NAMES, and those are words.
+    return new Intl.DurationFormat(wordTag(), {
       style: 'narrow', ...(zero ? { secondsDisplay: 'always' } : {}), ...rest,
     }).format(parts);
   } catch (err) {
@@ -277,12 +308,15 @@ export const dt = dateTime;
 export const day = date;
 
 /**
- * "3 days ago", "in 2 hours" — in the reader's language for the words and their format for the number.
+ * "3 päivää sitten", "eilen", "in 2 hours" — a point in time said in the reader's own language.
  *
- * The one formatter here that IS language-shaped, because its output is words. It takes the tag
- * anyway: a reader whose words are Finnish and whose format is en-GB gets the English phrasing, and
- * that is the consistent answer rather than a special case, because every other number on the same
- * row is written in that same format.
+ * ONE OF THE TWO FORMATTERS HERE THAT FOLLOW THE LANGUAGE rather than the regional format, and the
+ * distinction took a round to get right. Its output is WORDS, and a person who set their language
+ * to Finnish and their format to en-GB asked for Finnish words with British dates: that is what the
+ * pill means, and what an operating system does. Until 2026-09-13 this took the format tag, so a
+ * Finnish page read "3 days ago" beside a Finnish "eilen" that came from a translation key.
+ * The numbers inside a phrase are written by the same tag; they are single digits here, so the
+ * question does not arise in practice.
  */
 export function relative(s) {
   if (!s) return '—';
@@ -299,7 +333,8 @@ export function relative(s) {
     value = Math.round(value / spans[i]);
   }
   try {
-    return new Intl.RelativeTimeFormat(tag(), { numeric: 'auto' }).format(value, unit);
+    // wordTag, not tag: "3 päivää sitten" and "eilen" are words, and words follow the language.
+    return new Intl.RelativeTimeFormat(wordTag(), { numeric: 'auto' }).format(value, unit);
   } catch {
     return String(s);
   }

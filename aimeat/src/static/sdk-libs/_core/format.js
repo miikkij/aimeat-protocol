@@ -133,13 +133,27 @@ export function duration(ms, opts) {
   const zero = used === 0;
   if (zero) parts.seconds = 0;
   try {
-    return new Intl.DurationFormat(undefined, {
+    return new Intl.DurationFormat(wordTag(), {
       style: 'narrow', ...(zero ? { secondsDisplay: 'always' } : {}), ...rest,
     }).format(parts);
   } catch {
     // Intl.DurationFormat is Baseline since March 2025; an older browser lands here.
     return Object.entries(parts).map(([u, v]) => `${v}${u[0]}`).join(' ');
   }
+}
+
+/**
+ * The tag to write WORDS with: the page's language, off `<html lang>`.
+ *
+ * A relative phrase and a duration's unit names are words, and words follow the language a person
+ * chose to read rather than the regional format they chose to see numbers in. When aimeat-i18n is
+ * installed this never runs — the pack answers from its own locale state — so this is the fallback
+ * for an app that has no i18n pack and only the document to ask.
+ */
+function wordTag() {
+  try {
+    return (typeof document !== 'undefined' && document.documentElement.getAttribute('lang')) || undefined;
+  } catch { return undefined; }
 }
 
 /** How long ago, in words. "3 days ago", "eilen" — never a hand-built "3d". */
@@ -158,7 +172,7 @@ export function relative(v) {
     value = Math.round(value / span);
   }
   try {
-    return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(value, unit);
+    return new Intl.RelativeTimeFormat(wordTag(), { numeric: 'auto' }).format(value, unit);
   } catch {
     return dateTime(d);
   }

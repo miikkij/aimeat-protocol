@@ -22,7 +22,7 @@
  *   v1.0.0 — 2026-09-13 — Written with duration() itself.
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -32,23 +32,43 @@ const DAY = 24 * HOUR;
    and through it auth.js — and auth.js subscribes to an event at module scope. Nothing is fetched
    at import time, so the stubs only have to exist and do nothing. */
 const noop = () => {};
+/** The page's language lives on `<html lang>`, which is where format.js reads it from. */
+const htmlEl = {
+    lang: '' as string,
+    getAttribute(key: string) { return key === 'lang' ? (this.lang || null) : null; },
+};
 Object.assign(globalThis, {
     addEventListener: noop, removeEventListener: noop, dispatchEvent: () => true,
     localStorage: { getItem: () => null, setItem: noop, removeItem: noop },
+    document: { documentElement: htmlEl, querySelector: () => null },
 });
 (globalThis as unknown as { window: unknown }).window = globalThis;
 
 let duration: (ms: unknown, opts?: Record<string, unknown>) => string;
 let relative: (s: unknown) => string;
 let ago: (s: unknown, opts?: { horizonDays?: number }) => string;
+let date: (s: unknown, opts?: Record<string, unknown>) => string;
+let num: (n: unknown) => string;
+let setDisplayPrefs: (p: { region?: string | null; timezone?: string | null } | null) => void;
 
 beforeAll(async () => {
     const mod = await import('../../public/js/format.js') as {
         duration: typeof duration; relative: typeof relative; ago: typeof ago;
+        date: typeof date; num: typeof num;
     };
     duration = mod.duration;
     relative = mod.relative;
     ago = mod.ago;
+    date = mod.date;
+    num = mod.num;
+    ({ setDisplayPrefs } = await import('../../public/js/display-prefs.js') as {
+        setDisplayPrefs: typeof setDisplayPrefs;
+    });
+});
+
+afterEach(() => {
+    htmlEl.lang = '';
+    setDisplayPrefs(null);
 });
 
 describe('duration: a span in the reader\'s own words', () => {
@@ -113,6 +133,46 @@ describe('relative: a point in the past, which is a different question', () => {
         expect(out).toBeTruthy();
         expect(out).not.toMatch(/^\d+d$/);
         expect(out).not.toContain('NaN');
+    });
+});
+
+describe('a word is not a unit: which setting each formatter follows', () => {
+    /* THE RULING, 2026-09-13. Three settings, and the split between the second and the third is
+       what this pins: which WORDS a person reads is the language, how a number or a date is WRITTEN
+       is the regional format. A relative phrase and a duration's unit names are words. Before this
+       they took the format tag, so a Finnish page read "3 days ago" beside a Finnish "eilen" that
+       came from a translation key — one screen answering the same question two ways. */
+    const setUp = () => { htmlEl.lang = 'fi'; setDisplayPrefs({ region: 'en-GB', timezone: null }); };
+
+    it('a relative phrase follows the LANGUAGE, so Finnish words survive a British format', () => {
+        setUp();
+        const out = relative(new Date(Date.now() - 3 * DAY));
+        expect(out).toContain('sitten');
+        expect(out).not.toContain('ago');
+    });
+
+    it('a duration\'s unit names follow the LANGUAGE too, because they are words', () => {
+        setUp();
+        const out = duration(1 * DAY + 23 * HOUR);
+        // Finnish abbreviates days as "pv"; English as "d". The tell is the presence of the letters
+        // rather than the exact CLDR spelling, which a future ICU may respell.
+        expect(out).toContain('pv');
+        expect(out).not.toMatch(/\dd\b/);
+    });
+
+    it('and a date and a number keep following the REGIONAL FORMAT, which is the other half', () => {
+        setUp();
+        // en-GB writes a short date day-first with slashes; Finnish writes it with full stops.
+        expect(date('2026-09-13T12:00:00Z', { dateStyle: 'short' })).toContain('/');
+        // en-GB groups with a comma; Finnish with a space.
+        expect(num(1234567)).toContain(',');
+    });
+
+    it('the other way round as well: English words with a Finnish format', () => {
+        htmlEl.lang = 'en';
+        setDisplayPrefs({ region: 'fi-FI', timezone: null });
+        expect(relative(new Date(Date.now() - 3 * DAY))).toContain('ago');
+        expect(num(1234567)).not.toContain(',');
     });
 });
 
