@@ -11,6 +11,7 @@
  *   - inferModeFromPlatform(platform) -- 'workstation' for an agent that lives in the user's own tool
  *   - getKnownPlatforms() -- list all known platforms
  * @version-history
+ *   v1.2.0 -- 2026-09-12 -- getKnownPlatforms() gives each pattern with its delimiters and flags.
  *   v1.1.0 -- 2026-08-11 -- inferModeFromPlatform(): the platform an agent reports already says
  *     whether it is node-resident, so the mode no longer has to be guessed by the agent itself.
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase B
@@ -143,5 +144,7 @@ export function parsePlatformFromMessage(message: string): PlatformInfo | null {
 }
 
 export function getKnownPlatforms(): Array<{ id: string; displayName: string; bundleName: string; detectPattern: string }> {
-  return KNOWN_PLATFORMS.map(p => ({ id: p.id, displayName: p.displayName, bundleName: p.bundleName, detectPattern: p.userAgentPattern.source }));
+  // The pattern is given WITH its delimiters and flags. `.source` alone dropped the `i`, so the
+  // admin registry printed a pattern that matches less than the one the detector runs.
+  return KNOWN_PLATFORMS.map(p => ({ id: p.id, displayName: p.displayName, bundleName: p.bundleName, detectPattern: p.userAgentPattern.toString() }));
 }

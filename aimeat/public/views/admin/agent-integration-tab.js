@@ -2,375 +2,330 @@
  * @file agent-integration-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin dashboard Agent Integration tab. Four sections:
- *   Platform Registry, Onboarding Overview (with readiness distribution),
- *   Skill Bundle Management, Bundle Templates.
+ * @description Admin dashboard Agent integration page in the poster face (design canvas "AIMEAT
+ *   Admin Agent integration"). Four sections: which tool each agent came from, how far the ones
+ *   getting set up have come, how far the finished ones got, and which skill bundle each agent is
+ *   handed. The reads are the same three routes as before; what changed is which of their numbers
+ *   the page believes.
+ *
+ * @structure
+ *   - AgentIntegrationTab (default): loads the three reads, renders the four sections
+ *   - PlatformRegistry: the unrecognised headline, one row per platform, share of every agent
+ *   - GettingSetUp: the four counters, and one row per stuck run with its two actions
+ *   - StuckRun: a single stuck run — what it waits at, what that usually means, remind and skip
+ *   - Readiness: the four score bands over the runs that finished
+ *   - Bundles: one row per bundle that an agent actually asks for
+ * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
- *   v1.0.0 -- 2026-05-24 -- Initial creation for Governance Phase C
- *   v1.1.0 -- 2026-05-24 -- Fix M8 M9 F19 F20 F21 audit findings
- *   v1.2.0 -- 2026-05-24 -- Move readiness into onboarding, add bundle templates, add notify button
+ *   v2.0.0 — 2026-09-12 — The poster face, and three things the old screen showed as if they
+ *     worked: "Not started" read onboarding.not_started while the route sends `pending`, so it was
+ *     always 0; the readiness bars divided by completed + in progress + not started while counting
+ *     only completed runs, so every bar read short and the footer called that sum the total; and
+ *     "Regenerate all bundles" answered queued and did nothing, so it is gone, with the Notify
+ *     button and the Bundle templates stub beside it (two "coming soon" buttons and three counters
+ *     that were 0, 0 and --). The bundle rows are built from the platform registry, which carries
+ *     the bundle name; /v1/admin/skill-bundles buckets an unknown platform as `generic` while the
+ *     registry buckets it as `other`, and only one of the two can be right on one screen. The Add
+ *     platform form is gone: the route it posted to keeps custom platforms in a module array that
+ *     no detection path reads and no restart survives.
  *   v1.3.0 -- 2026-06-02 -- Admin design unification: main btn-* classes → adm-btn /
  *     adm-btn-action; the bespoke adm-agi-stat-card stat rows → canonical <StatsGrid>
  *     (tones success→green, accent→indigo). adm-agi-mono-sm retained (table cells).
+ *   v1.2.0 -- 2026-05-24 -- Move readiness into onboarding, add bundle templates, add notify button
+ *   v1.1.0 -- 2026-05-24 -- Fix M8 M9 F19 F20 F21 audit findings
+ *   v1.0.0 -- 2026-05-24 -- Initial creation for Governance Phase C
  */
 import { h } from 'preact';
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
-import { num, dt, Empty, StatsGrid } from './shared.js';
+import { num, dt, Spinner } from './shared.js';
 import * as api from '/js/services/admin-agent-integration.js';
 import { swallowed } from '/js/swallowed.js';
 
+const S = (key, params) => t('admin.agi.' + key, params);
 
-export default function AgentIntegrationTab({ data: _data, session }) {
+/** A share of the whole, to one decimal, for a column that names its own maximum. */
+function share(n, total) {
+  if (!total) return '0 %';
+  return `${(n / total * 100).toFixed(1)} %`;
+}
+
+/** The day a row is dated by. The hour matters on a stuck run, so it keeps its full stamp. */
+function day(iso) {
+  try { return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); }
+  catch (err) { swallowed('agent-integration: day', err); return ''; }
+}
+
+export default function AgentIntegrationTab({ session }) {
   useViewCSS('/css/views/admin-agent-integration.css');
   const [platforms, setPlatforms] = useState([]);
+  const [totalAgents, setTotalAgents] = useState(0);
   const [onboarding, setOnboarding] = useState(null);
   const [readiness, setReadiness] = useState(null);
-  const [bundles, setBundles] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [regenerating, setRegenerating] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!session) return;
     try {
-      const [platRes, onbRes, readRes, bundRes] = await Promise.all([
+      const [platRes, onbRes, readRes] = await Promise.all([
         api.getPlatforms(session),
         api.getOnboardingOverview(session),
         api.getReadinessDistribution(session),
-        api.getSkillBundles(session),
       ]);
       setPlatforms(platRes.data?.platforms || []);
+      // The agent count comes from the route, which counts agents. Adding up the rows it drew was
+      // what made the page report 76 agents on a node that holds 143.
+      setTotalAgents(platRes.data?.total_agents ?? 0);
       setOnboarding(onbRes.data || null);
       setReadiness(readRes.data || null);
-      setBundles(bundRes.data?.bundles || null);
-    } catch (err) { swallowed('agent-integration-tab: AgentIntegrationTab', err); }
+    } catch (err) { swallowed('agent-integration-tab: loadData', err); }
     setLoading(false);
   }, [session]);
 
   useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => onLiveUpdate(['agents', 'agent-onboarding'], () => loadData()), [loadData]);
 
-  useEffect(() => onLiveUpdate(['agents'], () => loadData()), [loadData]);
-
-  if (loading) return html`<div class="adm-card">${t('common.loading')}</div>`;
-
-  const handleRegenerate = async () => {
-    setRegenerating(true);
-    try {
-      await api.regenerateBundles(session);
-      await loadData();
-    } catch (err) { swallowed('agent-integration-tab: handleRegenerate', err); }
-    setRegenerating(false);
-  };
-
-  const totalAgents = platforms.reduce((sum, p) => sum + (p.agent_count || 0), 0);
+  if (loading) return html`<div class="og adm-agi"><${Spinner} /></div>`;
 
   return html`
-    <div>
-      <${PlatformRegistry} platforms=${platforms} totalAgents=${totalAgents} session=${session} loadData=${loadData} />
-      ${renderOnboardingOverview(onboarding, readiness, session, loadData)}
-      ${renderSkillBundles(bundles, handleRegenerate, regenerating, session)}
-      ${renderBundleTemplates()}
+    <div class="og adm-agi">
+      <${PlatformRegistry} platforms=${platforms} totalAgents=${totalAgents} />
+      <${GettingSetUp} onboarding=${onboarding} session=${session} onAction=${loadData} />
+      <${Readiness} readiness=${readiness} />
+      <${Bundles} platforms=${platforms} totalAgents=${totalAgents} />
     </div>
   `;
 }
 
-/* ── M8: Merged Platform column (name + ID as secondary text) ──
-   A real component (not a render-helper) so its useState obeys the Rules of Hooks. */
-function PlatformRegistry({ platforms, totalAgents, session, loadData }) {
-  const [showForm, setShowForm] = useState(false);
+/* ── 01 · Which tool each agent came from ────────────────────────────────────────────────────── */
+
+function PlatformRegistry({ platforms, totalAgents }) {
+  // "Recognised" means a pattern in the registry matched. `other` is the bucket for everything
+  // else, and a self-reported id is a name the agent typed that no pattern knows.
+  const recognised = platforms
+    .filter(p => p.id !== 'other' && !p.self_reported)
+    .reduce((sum, p) => sum + (p.agent_count || 0), 0);
+  const unrecognised = Math.max(totalAgents - recognised, 0);
+  const withAgents = platforms.filter(p => (p.agent_count || 0) > 0).length;
+
+  if (platforms.length === 0) {
+    return html`<section class="og-sec og-sec--first">
+      <div class="og-sec-h"><h2>${S('regTitle')}<small>01</small></h2></div>
+      <p class="adm-agi-lead">${S('regEmpty')}</p>
+    </section>`;
+  }
 
   return html`
-    <div class="adm-agi-section">
-      <div class="adm-agi-section-title">${t('admin.agentIntegration.platformRegistry')}</div>
-      ${platforms.length === 0
-        ? html`<${Empty} text=${t('admin.agentIntegration.noPlatforms')} />`
-        : html`
-          <table class="adm-agi-table">
-            <thead><tr>
-              <th>${t('admin.agentIntegration.platform')}</th>
-              <th>${t('admin.agentIntegration.agentCount')}</th>
-              <th>${t('admin.agentIntegration.adapter')}</th>
-              <th>${t('admin.agentIntegration.detectPattern')}</th>
-            </tr></thead>
-            <tbody>
-              ${platforms.map(p => html`
-                <tr>
-                  <td>
-                    <div>${p.display_name}</div>
-                    <div class="adm-agi-platform-id">${p.id}</div>
-                  </td>
-                  <td>${num(p.agent_count)}</td>
-                  <td class="adm-agi-mono-sm">${p.bundle_name}</td>
-                  <td class="adm-agi-mono-sm">${p.detect_pattern || '--'}</td>
-                </tr>
-              `)}
-            </tbody>
-          </table>
-          <div class="adm-agi-footer">
-            ${t('admin.agentIntegration.totalAgents')}: ${num(totalAgents)}
-          </div>
-        `
-      }
-      ${showForm
-        ? html`<${AddPlatformForm} session=${session} onDone=${() => { setShowForm(false); loadData(); }} onCancel=${() => setShowForm(false)} />`
-        : html`<button class="adm-btn-action adm-agi-add-btn" onClick=${() => setShowForm(true)}>
-            ${t('admin.agentIntegration.addPlatform')}
-          </button>`
-      }
-    </div>
-  `;
-}
+    <section class="og-sec og-sec--first">
+      <div class="og-sec-h"><h2>${S('regTitle')}<small>01</small></h2></div>
 
-/* ── F19: Inline Add Platform form ── */
-function AddPlatformForm({ session, onDone, onCancel }) {
-  const [name, setName] = useState('');
-  const [id, setId] = useState('');
-  const [adapter, setAdapter] = useState('');
-  const [pattern, setPattern] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleSubmit = async () => {
-    if (!name.trim() || !id.trim()) return;
-    setSubmitting(true);
-    try {
-      await api.registerPlatform(session, {
-        id: id.trim(),
-        display_name: name.trim(),
-        bundle_name: adapter.trim() || undefined,
-        detect_pattern: pattern.trim() || undefined,
-      });
-      onDone();
-    } catch (err) { swallowed('agent-integration-tab: handleSubmit', err); }
-    setSubmitting(false);
-  };
-
-  return html`
-    <div class="adm-agi-add-form">
-      <div class="adm-agi-add-form-row">
-        <label class="adm-agi-add-form-label">${t('admin.agentIntegration.platformName')}</label>
-        <input class="adm-agi-add-form-input" value=${name} onInput=${e => setName(e.target.value)} placeholder=${t('admin.agentIntegration.placeholders.name')} />
-      </div>
-      <div class="adm-agi-add-form-row">
-        <label class="adm-agi-add-form-label">${t('admin.agentIntegration.platformId')}</label>
-        <input class="adm-agi-add-form-input" value=${id} onInput=${e => setId(e.target.value)} placeholder=${t('admin.agentIntegration.placeholders.id')} />
-      </div>
-      <div class="adm-agi-add-form-row">
-        <label class="adm-agi-add-form-label">${t('admin.agentIntegration.adapterPattern')}</label>
-        <input class="adm-agi-add-form-input" value=${adapter} onInput=${e => setAdapter(e.target.value)} placeholder=${t('admin.agentIntegration.placeholders.adapter')} />
-      </div>
-      <div class="adm-agi-add-form-row">
-        <label class="adm-agi-add-form-label">${t('admin.agentIntegration.autoDetectRegex')}</label>
-        <input class="adm-agi-add-form-input" value=${pattern} onInput=${e => setPattern(e.target.value)} placeholder=${t('admin.agentIntegration.placeholders.regex')} />
-      </div>
-      <div class="adm-agi-add-form-actions">
-        <button class="adm-btn" onClick=${handleSubmit} disabled=${submitting || !name.trim() || !id.trim()}>
-          ${submitting ? t('common.loading') : t('common.add')}
-        </button>
-        <button class="adm-btn-action" onClick=${onCancel}>${t('common.cancel')}</button>
-      </div>
-    </div>
-  `;
-}
-
-/* ── M9: Not Started stat card + F20: Stuck section with suggestions + actions ── */
-function renderOnboardingOverview(onboarding, readiness, session, loadData) {
-  if (!onboarding) return html`<div class="adm-agi-section"><${Empty} text=${t('common.noData')} /></div>`;
-
-  const stuck = onboarding.stuck || [];
-  const notStarted = onboarding.not_started || 0;
-  const readinessTotal = (onboarding.completed || 0) + (onboarding.in_progress || 0) + notStarted;
-
-  return html`
-    <div class="adm-agi-section">
-      <div class="adm-agi-section-title">${t('admin.agentIntegration.onboardingOverview')}</div>
-      <${StatsGrid} items=${[
-        { label: t('admin.agentIntegration.completed'), value: onboarding.completed, tone: 'green' },
-        { label: t('admin.agentIntegration.inProgress'), value: onboarding.in_progress, tone: 'indigo' },
-        { label: t('admin.agentIntegration.notStarted'), value: notStarted },
-      ]} />
-      ${stuck.length > 0 ? html`
-        <div class="adm-agi-stuck-title">${t('admin.agentIntegration.stuckAgents')}</div>
-        <div class="adm-agi-stuck">
-          ${stuck.map(s => html`
-            <${StuckAgentRow} agent=${s} session=${session} onAction=${loadData} />
-          `)}
-        </div>
-      ` : ''}
-      ${renderReadinessDistribution(readiness, readinessTotal)}
-    </div>
-  `;
-}
-
-/* ── F20: Single stuck agent row with suggestion + actions ── */
-function StuckAgentRow({ agent, session, onAction }) {
-  const [acting, setActing] = useState(false);
-  const suggestion = getSuggestion(agent.current_step);
-
-  const handleRemind = async () => {
-    setActing(true);
-    try {
-      await api.sendReminder(session, agent.agent_gaii);
-      onAction();
-    } catch (err) { swallowed('agent-integration-tab: handleRemind', err); }
-    setActing(false);
-  };
-
-  const handleSkip = async () => {
-    setActing(true);
-    try {
-      await api.skipOnboardingStep(session, agent.agent_gaii, agent.current_step);
-      onAction();
-    } catch (err) { swallowed('agent-integration-tab: handleSkip', err); }
-    setActing(false);
-  };
-
-  return html`
-    <div class="adm-agi-stuck-agent">
-      <div class="adm-agi-stuck-info">
+      <div class="adm-agi-top">
         <div>
-          <span class="adm-agi-stuck-name">${agent.agent_gaii}</span>
-          <div class="adm-agi-stuck-detail">${agent.current_step}</div>
+          <div class="adm-agi-lbl">${S('regHeroLabel')}</div>
+          <div class="adm-agi-hero">${S('regHero', { n: num(unrecognised), total: num(totalAgents) })}</div>
+          <p class="adm-agi-hero-sub">${S('regHeroSub')}</p>
         </div>
-        <div class="adm-agi-stuck-detail">
-          ${t('admin.agentIntegration.stuckSince')}: ${dt(agent.stuck_since)}
+        <div><p class="adm-agi-lead">${S('regLead')}</p></div>
+      </div>
+
+      <div class="adm-agi-rows">
+        <div class="adm-agi-hrow">
+          <span>${S('colPlatform')}</span>
+          <span class="r">${S('colAgents')}</span>
+          <span>${S('colBundle')}</span>
+          <span>${S('colRecognisedBy')}</span>
+          <span>${S('colShare', { total: num(totalAgents) })}</span>
         </div>
-        <div class="adm-agi-stuck-suggestion">${suggestion}</div>
+        ${platforms.map(p => {
+    const count = p.agent_count || 0;
+    return html`
+          <div class="adm-agi-row ${count === 0 ? 'is-none' : ''}" key=${p.id}>
+            <span class="adm-agi-name">${p.display_name}<em>${p.id}</em></span>
+            <span class="adm-agi-n r">${num(count)}</span>
+            <span class="adm-agi-mono">${p.bundle_name}</span>
+            <span class="adm-agi-mono">${p.self_reported
+    ? S('recSelfReported')
+    : p.id === 'other' ? S('recNothing') : p.detect_pattern}</span>
+            <span class="adm-agi-bar">${count > 0
+    ? html`<i style="width: ${Math.min(count / (totalAgents || 1) * 100, 100)}%"></i>`
+    : null}</span>
+          </div>`;
+  })}
       </div>
-      <div class="adm-agi-stuck-actions">
-        <button class="adm-btn-action adm-agi-stuck-btn" onClick=${handleRemind} disabled=${acting}>
-          ${t('admin.agentIntegration.sendReminder')}
-        </button>
-        <button class="adm-btn-action adm-agi-stuck-btn" onClick=${handleSkip} disabled=${acting}>
-          ${t('admin.agentIntegration.skipStep')}
-        </button>
+      <div class="adm-agi-foot">
+        <span>${S('regFoot', { agents: num(totalAgents), used: num(withAgents), rows: num(platforms.length) })}</span>
       </div>
+    </section>
+  `;
+}
+
+/* ── 02 · Getting set up ─────────────────────────────────────────────────────────────────────── */
+
+function GettingSetUp({ onboarding, session, onAction }) {
+  if (!onboarding) return null;
+  const stuck = onboarding.stuck || [];
+  const completed = onboarding.completed || 0;
+  const inProgress = onboarding.in_progress || 0;
+  // `pending` is the field the route sends. The old page read `not_started`, which nothing sends,
+  // so this counter was 0 on every node whatever was waiting.
+  const waiting = onboarding.pending || 0;
+
+  return html`
+    <section class="og-sec">
+      <div class="og-sec-h"><h2>${S('setupTitle')}<small>02</small></h2></div>
+
+      <div class="og-strip">
+        <div><b>${num(completed)}</b><span>${S('cntFinished')}</span><small>${S('cntFinishedSub')}</small></div>
+        <div><b>${num(inProgress)}</b><span>${S('cntPartway')}</span><small>${S('cntPartwaySub')}</small></div>
+        <div><b>${num(waiting)}</b><span>${S('cntWaiting')}</span><small>${S('cntWaitingSub')}</small></div>
+        <div class="adm-agi-cnt-stuck"><b>${num(stuck.length)}</b><span>${S('cntStuck')}</span><small>${S('cntStuckSub')}</small></div>
+      </div>
+
+      <p class="adm-agi-lead">${S('setupLead')}</p>
+
+      ${stuck.length === 0
+    ? html`<p class="adm-agi-note">${S('setupNoneStuck')}</p>`
+    : html`<div class="adm-agi-stuck">
+          ${stuck.map(s => html`<${StuckRun} run=${s} session=${session} onAction=${onAction} key=${s.agent_gaii} />`)}
+        </div>`}
+    </section>
+  `;
+}
+
+function StuckRun({ run, session, onAction }) {
+  const [acting, setActing] = useState(false);
+  const [failed, setFailed] = useState(null);
+
+  const act = async (fn, what) => {
+    setActing(true);
+    setFailed(null);
+    try {
+      await fn();
+      onAction();
+    } catch (err) {
+      swallowed('agent-integration: ' + what, err);
+      setFailed(err?.message || String(err));
+    }
+    setActing(false);
+  };
+
+  return html`
+    <div class="adm-agi-srow">
+      <span class="adm-agi-sname">${run.agent_gaii}
+        <span class="adm-agi-sstep">${S('waitingAt', { step: run.current_step })}</span>
+      </span>
+      <span class="adm-agi-swhy">${meaningOf(run.current_step_id)}
+        <span class="adm-agi-swhen">${run.never_moved
+    ? S('startedNoStep', { day: day(run.stuck_since) })
+    : S('lastStep', { when: dt(run.stuck_since) })}</span>
+        ${failed && html`<span class="adm-agi-serr">${failed}</span>`}
+      </span>
+      <span class="adm-agi-sacts">
+        <button type="button" class="adm-agi-sdoor" disabled=${acting}
+          onClick=${() => act(() => api.sendReminder(session, run.agent_gaii), 'remind')}>${S('remind')}</button>
+        ${run.current_step_id && html`
+          <button type="button" class="adm-agi-sdoor" disabled=${acting}
+            onClick=${() => act(() => api.skipOnboardingStep(session, run.agent_gaii, run.current_step_id), 'skip')}>${S('skip')}</button>`}
+      </span>
     </div>
   `;
 }
 
-function getSuggestion(stepId) {
-  if (stepId?.includes('webhook') || stepId?.includes('delivery'))
-    return t('admin.agentIntegration.suggestion.webhook');
-  if (stepId?.includes('platform') || stepId?.includes('detect'))
-    return t('admin.agentIntegration.suggestion.platform');
-  if (stepId?.includes('skill') || stepId?.includes('bundle'))
-    return t('admin.agentIntegration.suggestion.skillBundle');
-  return t('admin.agentIntegration.suggestion.default');
+/** What waiting at this step usually means, keyed on the step's own id. */
+function meaningOf(stepId) {
+  const known = ['install_skill', 'configure_delivery', 'identify_platform', 'accept_test_task',
+    'complete_test_task', 'read_directives', 'report_capabilities', 'send_test_message',
+    'report_telemetry'];
+  return known.includes(stepId) ? S('meaning.' + stepId) : S('meaning.other');
 }
 
-function renderReadinessDistribution(readiness, total) {
-  if (!readiness) return '';
-  const dist = readiness.distribution || {};
+/* ── 03 · How far the finished ones got ──────────────────────────────────────────────────────── */
+
+function Readiness({ readiness }) {
+  const dist = readiness?.distribution || {};
+  // The route's own total: the runs that finished. Nothing else has a level.
+  const total = readiness?.total || 0;
   const levels = ['expert', 'full', 'standard', 'basic'];
 
   return html`
-    <div class="adm-agi-subsection">
-      <div class="adm-agi-section-title">${t('admin.agentIntegration.readinessDistribution')}</div>
+    <section class="og-sec">
+      <div class="og-sec-h"><h2>${S('readyTitle')}<small>03</small></h2></div>
+      <p class="adm-agi-lead">${S('readyLead')}</p>
       ${total === 0
-        ? html`<div class="adm-agi-empty-text">${t('common.noData')}</div>`
-        : html`
-          ${levels.map(level => {
-            const count = dist[level] || 0;
-            const pct = total > 0 ? (count / total * 100) : 0;
-            return html`
-              <div class="adm-agi-readiness-bar">
-                <div class="adm-agi-readiness-level">${t(`agentOnboarding.readiness.${level}`)}</div>
-                <div class="adm-agi-readiness-track">
-                  <div class="adm-agi-readiness-fill" style="width:${pct}%" data-level="${level}"></div>
-                </div>
-                <div class="adm-agi-readiness-count">${count}</div>
-              </div>
-            `;
-          })}
-          <div class="adm-agi-footer">
-            ${t('admin.agentIntegration.totalAgents')}: ${num(total)}
+    ? html`<p class="adm-agi-note">${S('readyEmpty')}</p>`
+    : html`
+        <div class="adm-agi-rows adm-agi-rows--ready">
+          <div class="adm-agi-hrow">
+            <span>${S('colLevel')}</span>
+            <span class="r">${S('colAgents')}</span>
+            <span class="r">${S('colShareShort')}</span>
+            <span>${S('colShareOfFinished', { total: num(total) })}</span>
           </div>
-        `
-      }
-    </div>
+          ${levels.map(level => {
+    const count = dist[level] || 0;
+    return html`
+            <div class="adm-agi-row ${count === 0 ? 'is-none' : ''}" key=${level}>
+              <span class="adm-agi-name">${t('agentOnboarding.readiness.' + level)}<em>${S('band.' + level)}</em></span>
+              <span class="adm-agi-n r">${num(count)}</span>
+              <span class="adm-agi-pct r">${share(count, total)}</span>
+              <span class="adm-agi-bar" data-level=${level}>${count > 0
+    ? html`<i style="width: ${count / total * 100}%"></i>`
+    : null}</span>
+            </div>`;
+  })}
+        </div>
+        <p class="adm-agi-foot-note">${S('readyFoot', { total: num(total) })}</p>
+      `}
+    </section>
   `;
 }
 
-/* ── F21: Added "Current version" column to skill bundle table ── */
-function renderSkillBundles(bundles, onRegenerate, regenerating, session) {
-  if (!bundles) return '';
-  const entries = Object.entries(bundles);
+/* ── 04 · Skill bundles ──────────────────────────────────────────────────────────────────────── */
 
-  const handleNotify = async (platform) => {
-    try {
-      await api.notifyOutdatedAgents(session, platform);
-      window.dispatchEvent(new CustomEvent('aimeat-toast', { detail: { message: t('admin.agentIntegration.notifySuccess') } }));
-    } catch (err) { swallowed('agent-integration-tab: handleNotify', err); }
-  };
-
-  return html`
-    <div class="adm-agi-section">
-      <div class="adm-agi-section-title">${t('admin.agentIntegration.skillBundles')}</div>
-      ${entries.length === 0
-        ? html`<div class="adm-agi-empty-text">${t('common.noData')}</div>`
-        : html`
-          <table class="adm-agi-table">
-            <thead><tr>
-              <th>${t('admin.agentIntegration.platform')}</th>
-              <th>${t('admin.agentIntegration.agentCount')}</th>
-              <th>${t('admin.agentIntegration.currentVersion')}</th>
-              <th>${t('admin.agentIntegration.outdated')}</th>
-              <th></th>
-            </tr></thead>
-            <tbody>
-              ${entries.map(([platform, info]) => html`
-                <tr>
-                  <td>${platform}</td>
-                  <td>${num(info.agents)}</td>
-                  <td class="adm-agi-mono-sm">${info.version || info.currentVersion || '--'}</td>
-                  <td>${info.outdated > 0
-                    ? html`<span class="adm-agi-outdated">${num(info.outdated)}</span>`
-                    : html`<span class="adm-agi-zero">0</span>`
-                  }</td>
-                  <td>${info.outdated > 0 ? html`
-                    <button class="adm-btn-action adm-agi-notify-btn" onClick=${() => handleNotify(platform)}>
-                      ${t('admin.agentIntegration.notifyOutdated')}
-                    </button>
-                  ` : ''}</td>
-                </tr>
-              `)}
-            </tbody>
-          </table>
-        `
-      }
-      <button class="adm-btn-action adm-agi-regen-btn" onClick=${onRegenerate} disabled=${regenerating}>
-        ${regenerating ? t('common.loading') : t('admin.agentIntegration.regenerateAll')}
-      </button>
-    </div>
-  `;
-}
-
-/* ── Bundle Templates (Phase C stub) ── */
-function renderBundleTemplates() {
-  const handleComingSoon = () => {
-    window.dispatchEvent(new CustomEvent('aimeat-toast', { detail: { message: t('admin.agentIntegration.comingSoon') } }));
-  };
+function Bundles({ platforms, totalAgents }) {
+  // One row per bundle, not per platform: the generic bundle is what `other` and every
+  // self-reported platform is handed, and those are three rows of the table above.
+  const rows = useMemo(() => {
+    const byBundle = new Map();
+    for (const p of platforms) {
+      const count = p.agent_count || 0;
+      if (count === 0) continue;
+      const generic = p.id === 'other' || !!p.self_reported;
+      const cur = byBundle.get(p.bundle_name) || { bundle: p.bundle_name, agents: 0, generic: false, from: [] };
+      cur.agents += count;
+      cur.generic = cur.generic || generic;
+      cur.from.push(p.display_name);
+      byBundle.set(p.bundle_name, cur);
+    }
+    return [...byBundle.values()].sort((a, b) => b.agents - a.agents);
+  }, [platforms]);
 
   return html`
-    <div class="adm-agi-section">
-      <div class="adm-agi-section-title">${t('admin.agentIntegration.bundleTemplates')}</div>
-      <${StatsGrid} items=${[
-        { label: t('admin.agentIntegration.customReferences'), value: 0 },
-        { label: t('admin.agentIntegration.customScripts'), value: 0 },
-        { label: t('admin.agentIntegration.lastGenerated'), value: '--' },
-      ]} />
-      <div class="adm-agi-btn-row">
-        <button class="adm-btn-action" onClick=${handleComingSoon}>
-          ${t('admin.agentIntegration.customizeBundle')}
-        </button>
-        <button class="adm-btn-action" onClick=${handleComingSoon}>
-          ${t('admin.agentIntegration.previewBundle')}
-        </button>
-      </div>
-    </div>
+    <section class="og-sec">
+      <div class="og-sec-h"><h2>${S('bundlesTitle')}<small>04</small></h2></div>
+      <p class="adm-agi-lead">${S('bundlesLead')}</p>
+      ${rows.length === 0
+    ? html`<p class="adm-agi-note">${S('bundlesEmpty')}</p>`
+    : html`
+        <div class="adm-agi-brows">
+          <div class="adm-agi-bhrow">
+            <span>${S('colBundle')}</span>
+            <span class="r">${S('colAgents')}</span>
+            <span>${S('colWhoGetsIt')}</span>
+          </div>
+          ${rows.map(r => html`
+            <div class="adm-agi-brow" key=${r.bundle}>
+              <span class="adm-agi-bname">${r.bundle}</span>
+              <span class="adm-agi-n r">${num(r.agents)}</span>
+              <span class="adm-agi-bwhat">${r.generic ? S('bundleGeneric') : S('bundleFor', { name: r.from[0] })}</span>
+            </div>`)}
+        </div>
+        <p class="adm-agi-foot-note">${S('bundlesFoot', { total: num(totalAgents) })}</p>
+      `}
+    </section>
   `;
 }

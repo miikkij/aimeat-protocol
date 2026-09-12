@@ -1,0 +1,131 @@
+/* ── Admin Scheduler page, in the poster face ──
+ * @file admin-scheduler.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's scheduler page (design canvas "AIMEAT Admin Scheduler"): the failing
+ *   jobs with the sentence each failed with, the agenda of what fires next, the register with its
+ *   search and six chips, and the run log. The sections, the numeral strip and the doors come from
+ *   admin.css and organism.css; only what this page adds lives here, and every value is a
+ *   theme.css token.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial. Replaces the two bordered tables and the four stat cards.
+ */
+
+.adm-sch-lead { margin: 0 0 18px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
+.adm-sch-note { margin: 8px 0 0; font-size: .88rem; line-height: 1.55; color: var(--text-dim); max-width: 86ch; }
+.adm-sch .og-strip { margin-top: 0; margin-bottom: 1.6rem; }
+.adm-sch .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+/* The one number an operator acts on is the one in coral. */
+.adm-sch .og-strip .adm-sch-bad b { color: var(--accent); }
+.adm-sch-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 13px 2px 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+
+/* ── 01 · what broke ── */
+.adm-sch-top { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 0 48px; align-items: start; }
+.adm-sch-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+.adm-sch-hero { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3.2rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); color: var(--text); }
+.adm-sch-hero-sub { margin: .7rem 0 0; font-size: .88rem; line-height: 1.6; color: var(--text-dim); }
+.adm-sch-fails { border-top: 2px solid var(--text); margin-top: 1.5rem; }
+.adm-sch-frow { display: grid; grid-template-columns: 300px minmax(0, 1fr) 200px; gap: 0 24px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.adm-sch-frow:last-child { border-bottom: 0; }
+.adm-sch-fname { font-weight: var(--font-poster-strong-weight); font-size: .92rem; color: var(--text); }
+.adm-sch-fname em { display: block; font-style: normal; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--text-dim); margin-top: 3px; overflow-wrap: anywhere; }
+/* The error is the node's own words: monospace, and allowed to wrap wherever it must. */
+.adm-sch-ferr { font-family: var(--font-mono); font-size: .78rem; line-height: 1.55; color: var(--text); overflow-wrap: anywhere; }
+.adm-sch-fwhen { display: block; font-family: var(--font); font-size: .78rem; color: var(--text-dim); margin-top: 5px; }
+.adm-sch-facts { display: flex; gap: 16px; justify-content: flex-end; align-items: baseline; }
+.adm .adm-sch-door { background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; padding: 0 0 1px; font: inherit; font-size: .78rem; font-weight: 700; color: var(--text); cursor: pointer; white-space: nowrap; }
+.adm .adm-sch-door:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── 02 · what fires next ── */
+.adm-sch-agenda { border-top: 2px solid var(--text); }
+.adm-sch-ahrow, .adm-sch-arow { display: grid; grid-template-columns: 140px minmax(0, 1fr) 170px 200px; gap: 0 24px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.adm-sch-ahrow { padding: 8px 0; border-bottom: 2px solid var(--text); font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); }
+.adm-sch-arow:last-child { border-bottom: 0; }
+.adm-sch-at { font-family: var(--font-mono); font-size: .88rem; font-weight: 500; color: var(--text); }
+.adm-sch-at i { display: block; font-style: normal; font-size: .7rem; color: var(--text-dim); margin-top: 2px; }
+.adm-sch-aname { font-weight: var(--font-poster-strong-weight); font-size: .9rem; color: var(--text); }
+.adm-sch-aname em { display: block; font-style: normal; font-family: var(--font-mono); font-size: .71rem; font-weight: 400; color: var(--text-dim); margin-top: 2px; }
+.adm-sch-akind { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
+.adm-sch-awho { font-size: .8rem; color: var(--text-dim); }
+.adm-sch-awho b { font-weight: 700; color: var(--text); }
+
+/* ── The search and the chips, above both lists ── */
+.adm-sch-tools { display: flex; align-items: flex-end; gap: 28px; }
+.adm-sch-find { flex: 1 1 auto; display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 4px 2px 6px; }
+.adm-sch-find:focus-within { border-bottom-color: var(--accent); }
+.adm .adm-sch-find input[type="text"] { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .95rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-sch-find input[type="text"]::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm-sch-find svg { width: 16px; height: 16px; flex: none; stroke: var(--text); fill: none; stroke-width: 2.5; }
+.adm-sch-chips { display: flex; gap: 8px; align-items: center; padding-bottom: 6px; flex-wrap: wrap; }
+.adm-sch-chips--log { padding-bottom: 0; margin-bottom: 16px; }
+.adm .adm-sch-chip { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 10px; border: 2px solid var(--border); border-radius: 0; background: none; color: var(--text-dim); cursor: pointer; }
+.adm .adm-sch-chip:hover { border-color: var(--text); color: var(--text); }
+.adm .adm-sch-chip.bad { border-color: var(--accent); color: var(--accent); }
+.adm .adm-sch-chip.on { background: var(--sun); border-color: var(--text); color: var(--on-sun); box-shadow: 0 2px 0 var(--text); }
+
+/* ── 03 · the register ── */
+.adm-sch-rows { border-top: 2px solid var(--text); margin-top: 16px; }
+.adm-sch-hrow, .adm-sch-row { display: grid; grid-template-columns: 280px 170px 150px 160px 120px 150px; gap: 0 18px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border); }
+.adm-sch-hrow { padding: 8px 0; border-bottom: 2px solid var(--text); font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); }
+.adm-sch-row:hover { background: var(--bg-surface); }
+.adm-sch-name { font-weight: var(--font-poster-strong-weight); font-size: .9rem; color: var(--text); }
+.adm-sch-name em { display: block; font-style: normal; font-family: var(--font-mono); font-size: .71rem; font-weight: 400; color: var(--text-dim); margin-top: 3px; overflow-wrap: anywhere; }
+.adm-sch-when { font-size: .82rem; color: var(--text); }
+.adm-sch-when em { display: block; font-style: normal; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: 3px; overflow-wrap: anywhere; }
+.adm-sch-who { font-size: .82rem; color: var(--text-dim); }
+.adm-sch-who b { display: block; font-weight: 700; color: var(--text); }
+.adm-sch-ran { font-size: .82rem; color: var(--text); }
+.adm-sch-ran em { display: block; font-style: normal; font-size: .74rem; color: var(--text-dim); margin-top: 3px; }
+.adm-sch-ran.err { color: var(--accent); font-weight: 700; }
+.adm-sch-next { font-family: var(--font-mono); font-size: .78rem; color: var(--text); }
+.adm-sch-next.none { color: var(--text-dim); }
+.adm-sch-acts { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
+/* The state chip IS the switch. */
+.adm .adm-sch-state { font-family: var(--font-mono); font-size: .68rem; font-weight: 500; text-transform: uppercase; padding: 2px 8px; border: 2px solid var(--text); border-radius: 0; background: var(--sun); color: var(--on-sun); cursor: pointer; }
+.adm .adm-sch-state.off { background: none; border-color: var(--border); color: var(--text-dim); }
+.adm .adm-sch-state:hover { border-color: var(--text); }
+.adm .adm-sch-run, .adm .adm-sch-kill { background: none; border: 0; border-bottom: 2px solid var(--border); border-radius: 0; padding: 0 0 1px; font: inherit; font-size: .76rem; font-weight: 700; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
+.adm .adm-sch-run:hover, .adm .adm-sch-kill:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.adm-sch-row.is-off .adm-sch-name, .adm-sch-row.is-off .adm-sch-when { color: var(--text-dim); }
+
+/* ── 04 · the run log ── */
+.adm-sch-lrows { border-top: 2px solid var(--text); }
+.adm-sch-lhrow, .adm-sch-lrow { display: grid; grid-template-columns: 150px minmax(0, 1fr) 120px 130px 90px 230px; gap: 0 18px; align-items: baseline; padding: 11px 0; border-bottom: 1px solid var(--border); }
+.adm-sch-lhrow { padding: 8px 0; border-bottom: 2px solid var(--text); font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); }
+.adm-sch-lhrow .r, .adm-sch-lrow .r { text-align: right; }
+.adm-sch-lrow:last-child { border-bottom: 0; }
+.adm-sch-t { font-family: var(--font-mono); font-size: .78rem; color: var(--text); }
+.adm-sch-t i { display: block; font-style: normal; font-size: .7rem; color: var(--text-dim); margin-top: 2px; }
+.adm-sch-ljob { font-weight: var(--font-poster-strong-weight); font-size: .86rem; color: var(--text); }
+.adm-sch-ljob em { display: block; font-style: normal; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); margin-top: 2px; overflow-wrap: anywhere; }
+.adm-sch-trig { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
+.adm-sch-res { font-size: .82rem; font-weight: 700; color: var(--text); }
+.adm-sch-res.err { color: var(--accent); }
+.adm-sch-res.skip { color: var(--text-dim); font-weight: 400; }
+.adm-sch-ms { font-family: var(--font-mono); font-size: .78rem; color: var(--text); }
+.adm-sch-did { font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-sch-did b { font-weight: 700; color: var(--text); }
+.adm-sch-did em { display: block; font-style: normal; font-family: var(--font-mono); font-size: .7rem; margin-top: 2px; overflow-wrap: anywhere; }
+
+@media (max-width: 1100px) {
+  .adm-sch-hrow, .adm-sch-row { grid-template-columns: 240px 150px 130px 140px 100px 130px; gap: 0 12px; }
+  .adm-sch-lhrow, .adm-sch-lrow { grid-template-columns: 130px minmax(0, 1fr) 100px 110px 80px 180px; gap: 0 12px; }
+}
+
+@media (max-width: 900px) {
+  .adm-sch-top { grid-template-columns: 1fr; gap: 1.2rem; }
+  .adm-sch-hero { font-size: 2.3rem; }
+  .adm-sch-frow { grid-template-columns: 1fr; gap: 8px 0; }
+  .adm-sch-facts { justify-content: flex-start; }
+  .adm-sch-tools { flex-direction: column; align-items: stretch; gap: 14px; }
+  .adm-sch-ahrow, .adm-sch-hrow, .adm-sch-lhrow { display: none; }
+  .adm-sch-arow { grid-template-columns: 100px minmax(0, 1fr); gap: 3px 12px; }
+  .adm-sch-akind, .adm-sch-awho { grid-column: 2; }
+  .adm-sch-row { grid-template-columns: minmax(0, 1fr) auto; gap: 5px 12px; }
+  .adm-sch-when, .adm-sch-who, .adm-sch-acts { grid-column: 1 / -1; }
+  .adm-sch-acts { justify-content: flex-start; }
+  .adm-sch-lrow { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
+  .adm-sch-ljob, .adm-sch-did { grid-column: 1 / -1; }
+  .adm-sch-ms.r { text-align: left; }
+  .adm-sch-foot { flex-direction: column; gap: 6px; }
+}

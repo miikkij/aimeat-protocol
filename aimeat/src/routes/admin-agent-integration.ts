@@ -16,6 +16,11 @@
  *   - POST /v1/admin/agents/:gaii/remind    -- Send reminder to stuck agent
  *   - POST /v1/admin/agents/:gaii/onboarding/skip -- Skip onboarding step
  * @version-history
+ *   v1.2.0 -- 2026-09-12 -- The registry emits a row for every platform value that has agents, not
+ *     only the ones it knows, and returns total_agents: the page used to add up the rows it drew
+ *     and call that the agent count, which silently dropped every self-reported platform id. A
+ *     stuck row carries current_step_id (Skip step looked a step up by its title and answered 404
+ *     every time) and never_moved (stuck_since falls back to startedAt, which is not a step).
  *   v1.1.0 -- 2026-05-24 -- Add registerPlatform, sendReminder, skipOnboardingStep, notifyOutdatedAgents
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Governance Phase C
  */
@@ -36,6 +41,17 @@ interface CustomPlatform {
   detect_pattern: string;
 }
 
+/** One row of the platform registry as the admin page reads it. */
+interface PlatformRow {
+  id: string;
+  display_name: string;
+  bundle_name: string;
+  detect_pattern: string;
+  agent_count: number;
+  /** True for a platform id no registry knows: the agent typed it during the identify step. */
+  self_reported?: boolean;
+}
+
 const customPlatforms: CustomPlatform[] = [];
 
 export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Storage): Router {
@@ -52,7 +68,7 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
       platformCounts[p] = (platformCounts[p] || 0) + 1;
     }
 
-    const result = platforms.map(p => ({
+    const result: PlatformRow[] = platforms.map(p => ({
       id: p.id,
       display_name: p.displayName,
       bundle_name: p.bundleName,
@@ -75,7 +91,25 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
       });
     }
 
-    res.json(success(config.nodeId, { platforms: result }));
+    // An agent's platform is also SELF-REPORTED, as free text, through
+    // aimeat_onboarding_identify_platform — "claude", "vscode", "generic". Those ids are in no
+    // registry, so their agents used to be counted into a bucket that was never rendered: they
+    // vanished from the table AND from the total the page added up from these rows. Emitting them
+    // is what makes the page's own arithmetic true.
+    const listed = new Set(result.map(r => r.id));
+    for (const [id, count] of Object.entries(platformCounts)) {
+      if (listed.has(id) || count === 0) continue;
+      result.push({
+        id,
+        display_name: id,
+        bundle_name: 'aimeat-agent',
+        detect_pattern: '',
+        agent_count: count,
+        self_reported: true,
+      });
+    }
+
+    res.json(success(config.nodeId, { platforms: result, total_agents: agents.length }));
   });
 
   /* ── GET /v1/admin/agents/onboarding ── */
@@ -99,12 +133,22 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
       completed: completed.length,
       in_progress: inProgress.length,
       pending: pending.length,
-      stuck: stuck.map(o => ({
-        agent_gaii: o.agentGaii,
-        current_step: o.steps.find(s => s.status === 'pending')?.title ?? 'Unknown',
-        stuck_since: o.steps.filter(s => s.validatedAt)
-          .sort((a, b) => (b.validatedAt! > a.validatedAt! ? 1 : -1))[0]?.validatedAt ?? o.startedAt,
-      })),
+      stuck: stuck.map(o => {
+        const waitingAt = o.steps.find(s => s.status === 'pending');
+        const lastMove = o.steps.filter(s => s.validatedAt)
+          .sort((a, b) => (b.validatedAt! > a.validatedAt! ? 1 : -1))[0]?.validatedAt;
+        return {
+          agent_gaii: o.agentGaii,
+          current_step: waitingAt?.title ?? 'Unknown',
+          // The TITLE is what a person reads; the ID is what POST .../onboarding/skip looks the
+          // step up by. Sending only the title made Skip step answer 404 on every row it was
+          // pressed on, because no step has its own title for an id.
+          current_step_id: waitingAt?.id ?? null,
+          stuck_since: lastMove ?? o.startedAt,
+          // Without it the page would date the last step of an agent that never took one.
+          never_moved: !lastMove,
+        };
+      }),
     }));
   });
 
