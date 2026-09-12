@@ -7605,7 +7605,7 @@
       "statusPackages": "{n} packages",
       "statusPackagesOne": "one package",
       "lineNone": "Nothing is published here yet. Seeding the example packages in section 06 gives you something to look at.",
-      "lineSome": "{published} are published and {listed} have a store listing. {installed} of them have been installed at least once here.",
+      "lineSome": "{published} published, {listed} with a store listing, {installed} installed at least once here.",
       "oldest": "oldest published {when}",
       "rowPublished": "Published",
       "rowPublishedWhy": "Anyone browsing can find these. A draft is visible only to whoever published it, and an archived version stays installable for people who already took it.",
