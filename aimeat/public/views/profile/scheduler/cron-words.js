@@ -13,6 +13,7 @@
  */
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
+import { resolvedTimeZone } from '/js/display-prefs.js';
 
 const w = (key, vars) => t('profile.scheduler.words.' + key, vars);
 // The loc() helper here derived the FORMAT from the LANGUAGE; /js/format.js reads the
@@ -35,6 +36,24 @@ function dowLabel(f) {
 }
 function dateLabel(d, m) {
   return fmtDate(new Date(2024, m - 1, d), { day: 'numeric', month: 'short' });
+}
+
+/**
+ * The cadence in words, WITH THE ZONE IT IS WRITTEN IN when that is not the reader's own.
+ *
+ * A cron expression's hour belongs to the schedule's own zone: `0 23 * * 1` means eleven at night
+ * where the schedule lives, whatever clock the person reading it keeps. Converting it would be
+ * wrong — a daily 23:00 in Helsinki is the next morning in Tokyo, and there is no honest weekday to
+ * label that with. So the words stay literal and the zone is named instead, because the row beside
+ * them shows the same run on the READER'S clock and the two would otherwise simply disagree: one
+ * line saying Monday 23:00 and the next saying Tuesday 05:00, with nothing to explain either.
+ * @param {string} cron @param {string} [timezone] the schedule's own zone, when it has one
+ */
+export function cronWordsIn(cron, timezone) {
+  const words = cronWords(cron);
+  if (!words || !timezone || timezone === resolvedTimeZone()) return words;
+  // The city, not the whole path: "Europe/Helsinki" reads as a file name in the middle of a phrase.
+  return `${words} ${timezone.split('/').pop().replace(/_/g, ' ')}`;
 }
 
 /** @param {string} cron @returns {string} the cadence in words, or the cron itself when it has no plain reading */
