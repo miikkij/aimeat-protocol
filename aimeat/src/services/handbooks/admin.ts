@@ -6,6 +6,9 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — most tools require operator role and
  *   are runtime-gated (a non-operator caller will get "Operator role required").
  * @version-history
+ *   v1.4.0 -- 2026-09-12 -- The organisation sign-in order is six steps, and the sixth is a node
+ *     setting no tool here can reach. An AI that stops at five reports a finished setup behind a
+ *     shut door.
  *   v1.3.0 -- 2026-09-12 -- aimeat_admin_usage, with the two things an AI reporting a bill has to
  *     say out loud: which of the three totals is the operator's, and that none of them contains the
  *     chat agent's key.
@@ -62,11 +65,15 @@ existing accounts the organisation may adopt; optional organism its people join 
 \`aimeat_admin_sso_scim_token\` (the provisioning bearer — returned ONCE, tell the operator to
 paste it into the IdP now) · \`aimeat_admin_sso_update\` (domains, visibility in the sign-in modal,
 IdP-initiated acceptance, organism binding) · \`aimeat_admin_sso_delete\` (removes the door only;
-accounts and their knowledge remain). The setup order that works: create → hand the SP values to
-the IdP console → read the metadata back → test one sign-in → mint the SCIM token → watch
-last-login and last-SCIM-call turn real in \`aimeat_admin_sso_get\`. Refused with SEALED_CONFIG
-while the host has locked connection management (sso.connections_locked); the public doors answer
-503 until sso.enabled is on.
+accounts and their knowledge remain). The setup order that works, in SIX steps and not five: create
+→ hand the SP values to the IdP console → read the metadata back → decide listed or hidden → mint
+the SCIM token → **have the operator turn on sso.enabled**, which is a node setting and none of
+your tools. Only then can a sign-in happen, so only then do last-login and last-SCIM-call turn real
+in \`aimeat_admin_sso_get\`. Read \`node.enabled\` and each connection's \`state\` from
+\`aimeat_admin_sso_list\` and report them: \`blocked_by_switch\` means the work is finished and the
+door is shut, and telling an operator the setup is complete in that state sends them to find out
+from a colleague who could not sign in. \`node.locked\` (sso.connections_locked) means every write
+above is refused with SEALED_CONFIG.
 
 **Account lifecycle (operator).** \`aimeat_admin_owner_disable\` — deactivate an account: every
 credential acting in its name (sessions, its agents' tokens, access keys, app permissions) stops
