@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.52.0 -- 2026-09-13 -- Add e2e-ai-provider-allowlist.ts to ALL_SUITES: the operator's provider
+ *            allowlist on the model picker and on the settings write, each proved against a node
+ *            booted with a list. Own node on 40420, so it lands in lane 0. Not in the guard tier.
  *   v1.51.0 -- 2026-09-12 -- Add e2e-dm-read-as-owner.ts to ALL_SUITES: the four owner-mailbox reads
  *            for an app on messages:read and an agent on messages:read-as-owner. Not in the guard tier.
  *   v1.50.0 -- 2026-09-12 -- Add e2e-display-prefs.ts to ALL_SUITES: language, format and time zone
@@ -475,6 +478,10 @@ const ALL_SUITES = [
     // The AI paths BEHIND the gate. Spawns its own node on 40314 with a scriptable OpenAI-compatible
     // provider on 40315, because every other AI suite stops at the door for want of one.
     'test/e2e-ai-provider-stub.ts',
+    // The operator's provider allowlist, on the two doors that were outside it. Spawns its own node
+    // on 40420 with AIMEAT_AI_PROVIDER_ALLOWLIST set, because the list is read from the environment
+    // at boot: on a node with no list every host is allowed and there is nothing to prove.
+    'test/e2e-ai-provider-allowlist.ts',
     'test/e2e-ai-usage-history.ts',
     'test/e2e-ai-provenance.ts',
     'test/e2e-ai-provenance-surfaces.ts',
