@@ -10,6 +10,10 @@
  *   admin.css and organism.css; only what this page adds lives here. Every value is a theme.css
  *   token, so the page flips with the theme.
  * @version-history
+ *   v1.1.0 — 2026-09-12 — Measured with the 64 rows production carries rather than a sandbox's
+ *     dozen: the row stacks at 1180 instead of 900, because that is the first width the seven
+ *     columns fit and at 1000 the row was overflowing its own box by 34px into a page that clips.
+ *     Stacked, the values flow and wrap instead of taking a line each (224px of row became 145px).
  *   v1.0.0 — 2026-09-12 — Initial. The page had no rules of its own before: it was two .adm-card
  *     blocks, a StatsGrid and an eight-column table in a sideways-scrolling box.
  */
