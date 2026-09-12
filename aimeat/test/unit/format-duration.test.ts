@@ -52,14 +52,22 @@ beforeAll(async () => {
 });
 
 describe('duration: a span in the reader\'s own words', () => {
-    it('writes the short form by default, with the units in words rather than in English letters', () => {
+    it('writes the short form by default, and the platform spells the units', () => {
         const out = duration(1 * DAY + 23 * HOUR + 26 * MINUTE);
-        // The units are spelled by the platform; what this pins is that the numbers are all there
-        // and that nothing reads as the hand-built `1d 23h 26min` this replaced.
         expect(out).toContain('1');
         expect(out).toContain('23');
         expect(out).toContain('26');
-        expect(out).not.toMatch(/\d\s*d\s+\d+\s*h\b/);
+        // What must hold is that CLDR wrote this and no table did. Comparing against Intl itself
+        // says exactly that, in any language, and stays true when ICU respells an abbreviation.
+        //
+        // The assertion here until 2026-09-13 was `not.toMatch(/\d\s*d\s+\d+\s*h\b/)`, meaning
+        // "nothing reads as the hand-built 1d 23h 26min this replaced". It passed for whoever
+        // wrote it and was red on every CI run for a day, because in English CLDR's own narrow
+        // form IS `1d 23h 26m`. The regex could not tell the platform's English from the hand-built
+        // English, so it only ever passed on a machine whose default locale was something else.
+        // A test that encodes one machine's environment fails on every other one.
+        expect(out).toBe(new Intl.DurationFormat(undefined, { style: 'narrow' })
+            .format({ days: 1, hours: 23, minutes: 26 }));
     });
 
     it('a caller that wants the long form asks for it, and gets whole words', () => {
