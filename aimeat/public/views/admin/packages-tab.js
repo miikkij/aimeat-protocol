@@ -36,7 +36,7 @@ import { useViewCSS } from '/components/useViewCSS.js';
 import { num, when, Row, Badge, Spinner, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as pkgService from '/js/services/packages.js';
-import { seedExamples, listPendingTemplates, suspendTemplate } from '/js/services/admin.js';
+import { seedExamples, listPendingTemplates, suspendTemplate, relistTemplate } from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
 import { ReviewBoard } from './packages-tab.review.js';
 
@@ -57,6 +57,8 @@ function partChips(components) {
  *  The card-face page filtered its published list on approved|published|active, none of which a
  *  listing has ever had, so that section was empty on every node and looked like an empty store. */
 const LISTED = 'listed';
+/** The three the store section can show. pending_review is section 05's, not this one's. */
+const STORE_FILTERS = ['listed', 'suspended', 'rejected'];
 
 export default function PackagesAdminTab() {
   // A no-op these days: the sheet is a <link> in spa.html. The call stays because every other
@@ -76,6 +78,11 @@ export default function PackagesAdminTab() {
   const [said, setSaid] = useState(null);
   const [suspendId, setSuspendId] = useState(null);
   const [suspendReason, setSuspendReason] = useState('');
+  // Section 04 shows one status at a time. A suspended listing used to be invisible at every door,
+  // so the counts are fetched for all three and the chips say how many there are before you press.
+  const [storeStatus, setStoreStatus] = useState(LISTED);
+  const [storeRows, setStoreRows] = useState([]);
+  const [storeCounts, setStoreCounts] = useState({ listed: 0, suspended: 0, rejected: 0 });
   const { confirm, ConfirmUI } = useConfirm();
   const [toast, showErr, showOk, clearToast] = useToast();
 
@@ -104,6 +111,14 @@ export default function PackagesAdminTab() {
         setTemplates(rows);
         next.templates = tplRes.data?.total ?? rows.length;
       }
+      // One request per status, limit 1, read for the total alone. Three cheap reads buy chips
+      // that say what is behind them rather than making the operator press to find out.
+      const counts = { listed: next.templates, suspended: 0, rejected: 0 };
+      for (const status of ['suspended', 'rejected']) {
+        const r = await pkgService.listTemplates({ limit: 1, status }).catch(() => ({ ok: false }));
+        if (r.ok !== false) counts[status] = r.data?.total ?? 0;
+      }
+      setStoreCounts(counts);
       setTotals(next);
       if (pendRes.ok !== false) {
         setPending(pendRes.data?.pending ?? pendRes.data?.templates ?? []);
@@ -124,6 +139,7 @@ export default function PackagesAdminTab() {
   const listedCount = templates.filter((tpl) => tpl.status === LISTED).length;
   const installedPackages = new Set(instances.map((i) => i.packageGroupId).filter(Boolean)).size;
   const oldest = packages.reduce((min, p) => (!min || String(p.createdAt) < min ? String(p.createdAt) : min), '');
+  const shownListings = storeStatus === LISTED ? templates : storeRows;
 
   /** Re-seeding is a write that throws things away, so it says what and asks first. */
   function askSeed() {
@@ -150,12 +166,30 @@ export default function PackagesAdminTab() {
     setSeeding(false);
   }
 
+  /** Show one status in section 04. `listed` is already loaded; the other two are their own read,
+   *  which is the door that did not exist before and is why a suspended listing was invisible. */
+  async function showStore(status) {
+    setStoreStatus(status);
+    setSuspendId(null);
+    if (status === LISTED) { setStoreRows([]); return; }
+    const r = await pkgService.listTemplates({ limit: 50, status }).catch(() => ({ ok: false }));
+    setStoreRows(r.ok === false ? [] : (r.data?.listings ?? r.data?.templates ?? []));
+  }
+
   async function doSuspend(id) {
     if (!suspendReason.trim()) { showErr(P('reasonRequired')); return; }
     try {
       const res = await suspendTemplate(id, suspendReason);
       if (res.ok === false) showErr(res.error?.message || P('failed'));
-      else { setSuspendId(null); setSuspendReason(''); showOk(P('suspended')); loadData(); }
+      else { setSuspendId(null); setSuspendReason(''); showOk(P('suspended')); loadData(); showStore(storeStatus); }
+    } catch (e) { showErr(e.message); }
+  }
+
+  async function doRelist(id) {
+    try {
+      const res = await relistTemplate(id);
+      if (res.ok === false) showErr(res.error?.message || P('failed'));
+      else { showOk(P('relisted')); loadData(); showStore(storeStatus); }
     } catch (e) { showErr(e.message); }
   }
 
@@ -251,16 +285,25 @@ export default function PackagesAdminTab() {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${P('store')}<small>04</small></h2></div>
-        ${!templates.length
-    ? html`<p class="adm-pk-quiet">${P('noListings')}</p>`
+        <div class="og-sec-h">
+          <h2>${P('store')}<small>04</small></h2>
+          <div class="og-doors">
+            <span class="adm-pk-chips">
+              ${STORE_FILTERS.map((s) => html`<button type="button" class="adm-pk-chip ${storeStatus === s ? 'on' : ''}"
+                disabled=${storeCounts[s] === 0 && s !== LISTED} onClick=${() => showStore(s)}>
+                ${P('filter_' + s)} · ${num(storeCounts[s] ?? 0)}</button>`)}
+            </span>
+          </div>
+        </div>
+        ${!shownListings.length
+    ? html`<p class="adm-pk-quiet">${storeStatus === LISTED ? P('noListings') : P('noneInStatus')}</p>`
     : html`
-        <p class="adm-pk-lead">${P('storeLead')}</p>
+        <p class="adm-pk-lead">${storeStatus === LISTED ? P('storeLead') : P('storeLeadOther')}</p>
         <div class="adm-pk-lhead">
           <span>${P('colListing')}</span><span>${P('colPackage')}</span><span>${P('colRating')}</span>
           <span>${P('colInstalls')}</span><span>${P('colFeatured')}</span><span></span>
         </div>
-        ${templates.map((tpl) => html`
+        ${shownListings.map((tpl) => html`
           <div key=${tpl.id}>
             <div class="adm-pk-lrow">
               <span><b>${tpl.title || tpl.name || '–'}</b>
@@ -274,7 +317,9 @@ export default function PackagesAdminTab() {
       ? html`<button type="button" class="og-door og-door--quiet og-door--danger"
                     onClick=${() => { setSuspendId(suspendId === tpl.id ? null : tpl.id); setSuspendReason(''); }}>
                     ${suspendId === tpl.id ? P('cancel') : P('suspendBtn')}</button>`
-      : null}
+      : (tpl.status === 'suspended'
+        ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => doRelist(tpl.id)}>${P('relistBtn')}</button>`
+        : null)}
               </span>
             </div>
             ${suspendId === tpl.id && html`
