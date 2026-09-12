@@ -440,6 +440,7 @@ export const reviewTemplate        = (id)         => apiGet(`/v1/templates/${enc
 export const approveTemplate       = (id, comment) => apiPost(`/v1/templates/${encodeURIComponent(id)}/approve`, { comment });
 export const rejectTemplate        = (id, reason) => apiPost(`/v1/templates/${encodeURIComponent(id)}/reject`, { reason });
 export const suspendTemplate       = (id, reason) => apiPost(`/v1/templates/${encodeURIComponent(id)}/suspend`, { reason });
+export const relistTemplate        = (id, comment) => apiPost(`/v1/templates/${encodeURIComponent(id)}/relist`, { comment });
 
 // ── System Prompts ──
 export const getSystemPrompts     = (group) => apiGet('/v1/admin/prompts' + (group ? '?group=' + encodeURIComponent(group) : ''));
