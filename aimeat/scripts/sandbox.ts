@@ -46,6 +46,9 @@
  *   cd aimeat && pnpm sandbox --stop       # stop the node, keep the data
  *   cd aimeat && pnpm sandbox --status      # is it up, on which port, with what in it
  * @version-history
+ *   v1.1.0 — 2026-09-12 — The free-port probe binds the wildcard the node binds, and a port that
+ *     answers counts as taken. A loopback probe called 40600 free while another session's sandbox
+ *     held 0.0.0.0 there, so this script started a second node on it and seeded into the peer's.
  *   v1.0.0 — 2026-09-05 — Initial. Written the day the pipeline analysis found that standing the
  *     world up cost more than the work: "a sandbox a session gets up fast, with its own test data,
  *     its own port, so it can iterate undisturbed".
@@ -179,13 +182,25 @@ function writeState(s: SandboxState): void {
     writeFileSync(STATE_FILE, JSON.stringify(s, null, 2) + '\n', 'utf8');
 }
 
-function canBind(port: number): Promise<boolean> {
-    return new Promise((settle) => {
+/**
+ * Is this port free for a node of ours?
+ *
+ * The probe binds the SAME address the node does — the wildcard, not 127.0.0.1. Windows lets a
+ * loopback bind succeed while another process holds 0.0.0.0 on that port, so a loopback probe
+ * answered "free" for a port another session's sandbox was already listening on: this script then
+ * started a second node there, `waitUntilUp` got its 200 from the FIRST one, and the seeding ran
+ * against a peer's sandbox. It failed on a name that was taken, which is luck, not a guard.
+ * Answering on the port is taken too, whoever holds it.
+ */
+async function canBind(port: number): Promise<boolean> {
+    const bound = await new Promise<boolean>((settle) => {
         const probe = createServer();
         probe.once('error', () => settle(false));
         probe.once('listening', () => probe.close(() => settle(true)));
-        probe.listen(port, '127.0.0.1');
+        probe.listen(port);
     });
+    if (!bound) return false;
+    return !(await isUp(`http://localhost:${port}`));
 }
 
 async function isUp(baseUrl: string): Promise<boolean> {
