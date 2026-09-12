@@ -89,6 +89,23 @@ export function isValidTimeZone(zone: unknown): zone is string {
 }
 
 /**
+ * The zone this node's own clock runs in, as a real IANA name.
+ *
+ * Not a person's setting: it is where the machine thinks it is. A cron with no zone of its own runs
+ * on this clock, and until 2026-09-13 nothing could say which clock that was — so a reader in Tokyo
+ * saw "Mon at 23:00" beside a run the same screen correctly called Tuesday 05:00, with nothing to
+ * reconcile them. Naming it is not a preference, it is a fact the node already had.
+ */
+export function nodeTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch (err) {
+    logger.warn('nodeTimeZone: the runtime would not name its own zone, saying UTC', { error: String(err) });
+    return 'UTC';
+  }
+}
+
+/**
  * What one person's surfaces should use, by GHII or by bare owner name.
  *
  * Every field can be null, and a person with no GHII record at all reads as three nulls rather

@@ -48,6 +48,21 @@ function cellDay(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function sameDay(a, b) { return cellDay(a) === cellDay(b); }
+
+/**
+ * TODAY, as the reader's clock has it, expressed as a cell the grid can enumerate from.
+ *
+ * The grid walks local Dates, which is right — a cell is a date. Where it starts is not a matter of
+ * local arithmetic though: a reader keeping a clock seven hours ahead is already on tomorrow, and
+ * the grid opened on the browser's yesterday and highlighted the wrong square. The day comes from
+ * their zone and is then carried into a local Date so the walk is unchanged.
+ */
+function readerToday() {
+  const key = dayKey(new Date());
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (!parts) return startOfDay(new Date());
+  return new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
+}
 /** Whether a moment falls on a given cell's date, in the reader's own clock. */
 function fallsOn(at, cell) { return dayKey(at) === cellDay(cell); }
 function fmtTime(d) { return time(d, { hour: '2-digit', minute: '2-digit' }); }
@@ -74,7 +89,7 @@ const HOUR_END = 22;
 
 export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJumpTo }) {
   const [mode, setMode] = useState('week');
-  const [anchorMs, setAnchorMs] = useState(() => startOfDay(new Date()).getTime());
+  const [anchorMs, setAnchorMs] = useState(() => readerToday().getTime());
   const [occ, setOcc] = useState([]);            // [{ scheduleId, at: Date }]
   const [freq, setFreq] = useState([]);          // [{ scheduleId, cron, intervalMinutes, approxPerDay }] — continuous/high-frequency
   const [foldFreq, setFoldFreq] = useState(false); // also render continuous schedules inside the grid (aggregated)
@@ -83,7 +98,9 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
   const [loading, setLoading] = useState(true);
 
   const anchor = useMemo(() => new Date(anchorMs), [anchorMs]);
-  const now = new Date();
+  // The square to mark as today is the READER'S today, not the browser's: seven hours ahead they
+  // are already on tomorrow, and the highlight sat on the wrong cell.
+  const now = readerToday();
 
   const byId = useMemo(() => {
     const m = new Map();
@@ -175,7 +192,7 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
     if (mode === 'month') { d.setMonth(d.getMonth() + dir); return startOfDay(d).getTime(); }
     return addDays(d, dir * (mode === 'week' ? 7 : 1)).getTime();
   }), [mode]);
-  const goToday = useCallback(() => setAnchorMs(startOfDay(new Date()).getTime()), []);
+  const goToday = useCallback(() => setAnchorMs(readerToday().getTime()), []);
 
   const onEv = (e) => (ev) => { ev.stopPropagation(); onJumpTo?.(e.scheduleId); };
   const evClass = (e) => `sch-cal-ev sch-cal-ev--${kindClass(e.type)}${e.past ? ' sch-cal-ev--past' : ''}`;

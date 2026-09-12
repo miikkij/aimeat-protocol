@@ -29,7 +29,7 @@ import { useSession } from '/js/use-session.js';
 import { Spinner } from '/components/Spinner.js';
 import { swallowed } from '/js/swallowed.js';
 import { FeedRow, line } from '/views/home/feed.js';
-import { date as fmtDate } from '/js/format.js';
+import { calendar, dayKey, dayWord } from '/js/format.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -60,17 +60,19 @@ function byDay(items) {
   return groups;
 }
 
-/** A day heading a person reads, not an ISO date. Today and yesterday are named. */
+/**
+ * A day heading a person reads, not an ISO date. Today and yesterday are named.
+ *
+ * The two names come from CLDR rather than from a key pair with an English fallback: it already
+ * holds "tänään" and "eilen" for every language, and a key that falls back to English is a key that
+ * shows English on a page nobody has translated yet. The day itself is matched in the READER'S zone,
+ * so the heading agrees with the rows under it.
+ */
 function dayLabel(day) {
-  const today = new Date();
-  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  if (day === iso(today)) return tr('home.history.today', 'Today');
-  const yesterday = new Date(today.getTime() - 86400000);
-  if (day === iso(yesterday)) return tr('home.history.yesterday', 'Yesterday');
-  const parsed = new Date(`${day}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return day;
-  // The browser's own locale formatting: this page is read, not parsed.
-  return fmtDate(parsed, { day: 'numeric', month: 'long', year: 'numeric' });
+  if (dayKey(new Date()) === day) return dayWord(0);
+  if (dayKey(new Date(Date.now() - 86400000)) === day) return dayWord(-1);
+  // A calendar square rather than a moment: pinned, so no zone can label it the day before.
+  return calendar(day, { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 /** One day of rows, under its heading. */

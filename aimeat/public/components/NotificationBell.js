@@ -35,7 +35,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { getJwt } from '/js/services/auth.js';
 import { titleOf, bodyOf, sourceName } from '/js/services/notifications.js';
-import { date as fmtDate } from '/js/format.js';
+import { ago } from '/js/format.js';
 const html = htm.bind(h);
 
 async function api(path, opts = {}) {
@@ -58,14 +58,15 @@ function syncAppBadge(count) {
   call.catch((err) => swallowed('NotificationBell: app badge', err));
 }
 
+/**
+ * How long ago a notification arrived, giving way to the date after a day.
+ *
+ * The three branches above the date used to be `'just now'`, `` `${n}m ago` `` and `` `${n}h ago` ``
+ * — English written into the bell, so a Finnish reader got it too. `ago()` asks CLDR, which also
+ * knows to say "juuri nyt" and "eilen" where a hand-built branch could only count.
+ */
 function relTime(iso) {
-  try {
-    const d = new Date(iso), now = new Date(), s = Math.round((+now - +d) / 1000);
-    if (s < 60) return 'just now';
-    if (s < 3600) return Math.floor(s / 60) + 'm ago';
-    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
-    return fmtDate(d);
-  } catch (err) { swallowed('NotificationBell: relTime', err); return ''; }
+  return ago(iso, { horizonDays: 1 });
 }
 
 // Action id → i18n key (falls back to the server-provided English label) and → button class.

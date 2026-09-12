@@ -190,6 +190,24 @@ export function dayKey(s) {
   }
 }
 
+/**
+ * The word for a calendar day near today: "tänään", "eilen", "huomenna".
+ *
+ * CLDR carries these for every language, so a day heading needs no key pair with an English
+ * fallback — and a key that falls back to English is a key that shows English on a page nobody has
+ * translated yet. A day far enough out has no word and comes back counted ("3 päivän päästä"),
+ * which is why a caller that wants a date past a day or two asks `calendar()` instead.
+ * @param {number} offsetDays 0 for today, -1 for yesterday, 1 for tomorrow
+ */
+export function dayWord(offsetDays) {
+  try {
+    return new Intl.RelativeTimeFormat(wordTag(), { numeric: 'auto' }).format(offsetDays, 'day');
+  } catch (err) {
+    swallowed('format: dayWord has no phrase for this language', err);
+    return '';
+  }
+}
+
 /** Whether two instants fall on the same calendar day in the reader's own zone. */
 export function sameDay(a, b) {
   const ka = dayKey(a);

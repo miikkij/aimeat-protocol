@@ -47,7 +47,19 @@ function dateLabel(d, m) {
  * label that with. So the words stay literal and the zone is named instead, because the row beside
  * them shows the same run on the READER'S clock and the two would otherwise simply disagree: one
  * line saying Monday 23:00 and the next saying Tuesday 05:00, with nothing to explain either.
- * @param {string} cron @param {string} [timezone] the schedule's own zone, when it has one
+ * THE ZONE IS ALWAYS KNOWN. A schedule created without one runs on the NODE's clock, and the server
+ * fills that in as `effectiveTimezone` on every read — a fact about the machine rather than a
+ * preference, so `timezone` still says only what the person chose. Before that, a schedule with no
+ * stored zone had an hour belonging to nothing this page could name.
+ *
+ * @param {object} s the schedule record; reads `cron`, `effectiveTimezone`, `timezone`
+ */
+export function cronWordsFor(s) {
+  return cronWordsIn(s?.cron, s?.effectiveTimezone || s?.timezone);
+}
+
+/**
+ * @param {string} cron @param {string} [timezone] the zone the cron's hour belongs to
  */
 export function cronWordsIn(cron, timezone) {
   const words = cronWords(cron);
