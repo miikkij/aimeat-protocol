@@ -15,6 +15,10 @@
  *   gate); POST /v1/contacts/resolve (email → GHII exact match, or invite fallback signal).
  * @usage app.use(contactsRouter(config, storage))
  * @version-history
+ *   v1.3.0 — 2026-09-13 — Every door here takes requireLocalSession(). A session signed in from
+ *     another node carries the local part of its home GHII as `owner`, so the address book each door
+ *     reached was the local account sharing that name, invitations included. Same fix, same reason
+ *     and same suite as routes/messages.ts v1.12.0.
  *   v1.2.1 — 2026-09-06 — `contactKind` is `identityKind` and comes from services/local-identity.ts,
  *     which the DM send path now shares. No behaviour.
  *   v1.2.0 — 2026-08-30 — The Contacts page in the poster face: GET takes ?include=together,invites
@@ -34,7 +38,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ContactConsentRecord } from '../storage/interface.js';
 import type { OutboundContactLink } from '../models/outbound-schemas.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope, requireLocalSession } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
@@ -89,7 +93,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
    * people), enriched with kind + display name. ?state= narrows to one consent state (default
    * hides blocked, and excludes people, who have no consent state); ?q= filters on id, display
    * name, saved name or email. ── */
-  router.get('/v1/contacts', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.get('/v1/contacts', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const { contacts, truncated } = await listContactsMerged(storage, resolve(req), {
       state: typeof req.query.state === 'string' ? req.query.state as ContactConsentRecord['state'] : undefined,
       q: typeof req.query.q === 'string' ? req.query.q : undefined,
@@ -102,7 +106,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
    * organisms both are active members of, the workspaces in them both may read, and the person's
    * agents here with the last message each exchanged with the owner. A person with an account
    * only; an agent's or an app's "together" is its owner's. ── */
-  router.get('/v1/contacts/:contactId/together', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.get('/v1/contacts/:contactId/together', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const contactId = decodeURIComponent(req.params.contactId as string);
     if (identityKind(contactId) !== 'ghii') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Together is read for a person with an account here: pass their owner@node id, or the owner of the agent or app'));
@@ -117,7 +121,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
   /* ── POST /v1/contacts/invite — invite a person to join this AIMEAT, no organism behind it. The
    * email goes out in the owner's name with their message; the accept link comes back so it can
    * be handed over when mail is off. Same throttle as the organism email invite. ── */
-  router.post('/v1/contacts/invite', requireAuth(), requireRole('owner'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+  router.post('/v1/contacts/invite', requireAuth(), requireLocalSession(), requireRole('owner'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     try {
       const { invitation, acceptUrl, emailSent } = await createContactInvitation(storage, config, {
@@ -147,7 +151,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
    *   { contact_id }              a bare local owner name, GHII, GAII or GEAI
    *   { name, email, … }          a person, who may have no identity on this node
    * A blocked contact stays blocked (409) — lift the block via Messages first. ── */
-  router.post('/v1/contacts', requireAuth(), requireRole('owner'), limitPersonSaves, async (req, res) => {
+  router.post('/v1/contacts', requireAuth(), requireLocalSession(), requireRole('owner'), limitPersonSaves, async (req, res) => {
     const input = parseAddInput((req.body ?? {}) as Record<string, unknown>);
     if (!input) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -167,7 +171,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
   /* ── PATCH /v1/contacts/:contactId — what the OWNER knows about a saved person (name, note,
    * tags, links, relation). Never touches opt-out, bounce or suppression: that is the recipient's
    * state, not the owner's note about them. ── */
-  router.patch('/v1/contacts/:contactId', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.patch('/v1/contacts/:contactId', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const contactId = decodeURIComponent(req.params.contactId as string);
     const b = (req.body ?? {}) as Record<string, unknown>;
     try {
@@ -184,7 +188,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
 
   /* ── DELETE /v1/contacts/:contactId — remove from the address book WITHOUT resetting the DM
    * first-contact gate (a row with message history keeps its gate state as origin 'message'). ── */
-  router.delete('/v1/contacts/:contactId', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.delete('/v1/contacts/:contactId', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const contactId = decodeURIComponent(req.params.contactId as string);
     try {
       await removeContact(storage, resolve(req), contactId);
@@ -200,7 +204,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
    * contact is re-read from this owner's own address book, so a handle cannot be minted for a
    * contact they do not have. What comes back is a handle plus the little the app is allowed to
    * know — never the address. ── */
-  router.post('/v1/contacts/handles', requireAuth(), requireRole('owner'), rateLimit({ max: 60, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+  router.post('/v1/contacts/handles', requireAuth(), requireLocalSession(), requireRole('owner'), rateLimit({ max: 60, windowMs: 10 * 60 * 1000 }), async (req, res) => {
     const ownerGhii = resolve(req);
     const contactId = String((req.body ?? {}).contact_id ?? '');
     const appOrigin = String((req.body ?? {}).app_origin ?? '');
@@ -252,7 +256,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
    * outbound door already enforces (opt-out, suppression, the daily ceiling, the append-only log)
    * applies unchanged, because this is that door with a handle in front of it rather than a second
    * way out. `outbound:send` is the word, because that is exactly the favour being asked. ── */
-  router.post('/v1/contacts/handle/send', requireAuth(), requireScope('outbound:send'), async (req, res) => {
+  router.post('/v1/contacts/handle/send', requireAuth(), requireLocalSession(), requireScope('outbound:send'), async (req, res) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
     // Both bindings are proven inside resolveContactHandle: this owner, and this app. A handle that
@@ -274,7 +278,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
 
   /* ── POST /v1/contacts/resolve — EXACT-match email → local owner. Authenticated + rate-limited
    * hash equality (no enumeration; the invite flow already discloses the same fact). ── */
-  router.post('/v1/contacts/resolve', requireAuth(), requireRole('owner'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+  router.post('/v1/contacts/resolve', requireAuth(), requireLocalSession(), requireRole('owner'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
     try {
       const result = await resolveContactEmail(storage, ((req.body ?? {}).email ?? '').toString());
       res.json(success(config.nodeId, result));
