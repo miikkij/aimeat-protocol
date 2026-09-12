@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.47.0 -- 2026-09-12 -- Add e2e-admin-knowledge-page.ts to ALL_SUITES: the count that was
+ *            returned and never read, and the privileged import that wrote past its own schema.
  *   v1.46.0 -- 2026-09-12 -- Add e2e-admin-work-page.ts to ALL_SUITES: the shape of a row in
  *            GET /v1/admin/work, which was only ever asserted on an empty node, and the escrow
  *            inside its cost object. Not in the guard tier yet.
@@ -598,6 +600,9 @@ const ALL_SUITES = [
     // The Organisation sign-in page's read: that a connection can be complete and still reach
     // nobody, because the node-wide switch is off and both public doors answer 503.
     'test/e2e-admin-sso-page.ts',
+    // The Knowledge page's read: that the count survives the paging, and that the OPERATOR's import
+    // now passes the same schema the agent's always did.
+    'test/e2e-admin-knowledge-page.ts',
     'test/e2e-living-pulse.ts',
     // Every core scheduled job fired through the operator's trigger door, on a node of its own
     // (40310) with an SMTP sink, short windows and the flags the seeding keys on. Lane 0.

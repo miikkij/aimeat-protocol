@@ -11,6 +11,9 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.23.0 — 2026-09-12 — registerAdminKnowledgeTools: the operator's whole knowledge collection,
+ *     its shape and its review trail. aimeat_knowledge_list is the catalogue — what a caller may
+ *     read — so an operator asking their AI what is on the node got a subset and no way to tell.
  *   v1.22.0 — 2026-09-12 — registerAdminStatisticsTools: the counters, their day tallies and the
  *     live gauges, which no MCP tool could read. aimeat_admin_stats answers a different question
  *     (agents, actions, boards, morsels) and keeps it.
@@ -122,6 +125,7 @@ import { registerAdminSecurityTools } from './admin-security.js';
 import { registerAdminCorsTools } from './admin-cors.js';
 import { registerAdminHooksTools } from './admin-hooks.js';
 import { registerAdminStatisticsTools } from './admin-statistics.js';
+import { registerAdminKnowledgeTools } from './admin-knowledge.js';
 import { registerCoreStorageTools } from './core-storage.js';
 import { registerCoreDataPackageTools } from './core-datapackage.js';
 import { logger } from '../utils/logger.js';
@@ -752,4 +756,6 @@ export function registerCoreTools(
     registerAdminHooksTools(mcp, storage, config, getAgentGaii);
     // The Statistics page in one read: the counters, their day tallies, and the live gauges.
     registerAdminStatisticsTools(mcp, storage, config, getAgentGaii);
+    // The Knowledge page in one read: the whole collection, its shape, and who has already looked.
+    registerAdminKnowledgeTools(mcp, storage, config, getAgentGaii);
 }

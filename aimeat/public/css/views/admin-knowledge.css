@@ -1,0 +1,142 @@
+/* ── Admin Knowledge page, in the poster face ──
+ * @file admin-knowledge.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's Knowledge page (design canvas "AIMEAT Admin Knowledge"): the
+ *   moderation state, the shape of the collection as facets with a bar each, the packages as a
+ *   table with search and paging, and the review panel with its trail. The frame, the sections, the
+ *   metric rows, the numeral strip, the dashed box and the doors come from admin.css and
+ *   organism.css; only what this page adds lives here.
+ *
+ *   NO SERIES COLOURS. There is no chart: a facet bar's LENGTH is the encoding, which is why this
+ *   page reads the same with four authors or forty. The only colour that carries meaning is the
+ *   warning ink on a part the node cannot vouch for — an author under two spellings, a maturity
+ *   word that is not one of ours — and that is a status, so it wears the status token.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial. Replaces the card grid and its inline rgba badges.
+ */
+
+.adm-kn .adm-mrow--last { border-bottom: 0; }
+.adm-kn .adm-mrow .adm-mval { overflow-wrap: anywhere; }
+.adm-kn .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-kn .og-strip b.adm-kn-coral { color: var(--accent); }
+.adm-kn .og-strip b.adm-kn-dim { color: var(--text-muted); }
+.adm-kn .og-box { max-width: none; }
+.adm-kn .og-door:disabled { opacity: .5; cursor: default; }
+
+.adm-kn-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 90ch; }
+.adm-kn-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+.adm-kn-note { margin: 14px 0 0; font-size: .78rem; line-height: 1.55; color: var(--text-dim); max-width: 92ch; }
+.adm-kn-acts { display: flex; gap: 22px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+.adm-kn-empty { padding: 26px; text-align: center; color: var(--text-dim); font-size: .9rem; border: 2px dashed var(--border); background: var(--bg); }
+.adm-kn-when { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+
+/* 02: one cut of the collection, and its parts. A bar's length is the whole encoding. */
+.adm-kn-cut { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 0 24px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.adm-kn-cut--last { border-bottom: 0; }
+.adm-kn-cut > span > b { font-weight: 700; font-size: .9rem; }
+.adm-kn-parts { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.adm-kn-part { display: grid; grid-template-columns: minmax(0, 330px) minmax(0, 1fr) 64px; gap: 0 14px; align-items: center; font-size: .84rem; }
+.adm-kn-part-l { display: flex; gap: 8px; align-items: baseline; min-width: 0; overflow-wrap: break-word; }
+.adm-kn-part-n { font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); text-align: right; font-variant-numeric: tabular-nums; }
+.adm-kn-track { height: 11px; background: var(--bg-surface); min-width: 0; }
+.adm-kn-fill { display: block; height: 100%; background: var(--text); }
+/* A part the node cannot vouch for: a second spelling of one person, a word it never defined. */
+.adm-kn-fill--warn { background: var(--warn-fg); }
+.adm-kn-flagword { font-weight: 700; font-size: .72rem; color: var(--warn-fg); white-space: nowrap; }
+.adm-kn-pick { background: none; border: 0; border-bottom: 1px dotted var(--text-dim); padding: 0; cursor: pointer; font: inherit; color: var(--text); text-align: left; }
+.adm-kn-pick:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* 03: search, the questions an operator has, and the table. */
+.adm-kn-filters { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-bottom: 16px; }
+.adm-kn-search { display: flex; align-items: center; gap: 9px; border-bottom: 3px solid var(--text); padding: 3px 2px 4px; min-width: 280px; flex: 0 1 340px; }
+.adm-kn-search svg { width: 15px; height: 15px; stroke: var(--text); fill: none; stroke-width: 2.5; stroke-linecap: round; flex: none; }
+.adm .adm-kn-search input { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .88rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-kn-search input::placeholder { color: var(--text-muted); font-weight: 400; }
+.adm-kn-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+/* What is narrowing the list, each one removable. It exists because an author picked in section 02
+   set a filter nothing showed and nothing cleared. */
+.adm-kn-applied { flex-basis: 100%; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 4px; }
+.adm-kn-applied-l { font-size: .78rem; color: var(--text-dim); }
+.adm-kn-drop { display: inline-flex; align-items: center; gap: 8px; padding: 3px 8px; border: 2px solid var(--text); background: var(--sun); color: var(--on-sun); font-family: var(--font-mono); font-size: .72rem; font-weight: 500; cursor: pointer; border-radius: 0; }
+.adm-kn-drop svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; flex: none; }
+.adm-kn-drop:hover { border-color: var(--accent); }
+.adm-kn-fchip { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 9px; border: 2px solid var(--border); background: none; color: var(--text-dim); cursor: pointer; border-radius: 0; }
+.adm-kn-fchip:hover { border-color: var(--text); color: var(--text); }
+.adm-kn-fchip.on { border-color: var(--text); background: var(--sun); color: var(--on-sun); }
+
+.adm-kn-scroll { overflow-x: auto; }
+.adm-kn-tbl { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.adm-kn-tbl th { text-align: left; color: var(--text-dim); font-weight: 600; padding: 8px 12px 8px 0; border-bottom: 2px solid var(--text); white-space: nowrap; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; }
+.adm-kn-tbl td { padding: 11px 12px 11px 0; border-bottom: 1px solid var(--border); color: var(--text-dim); vertical-align: top; }
+.adm-kn-tbl td b { display: block; color: var(--text); font-weight: 700; }
+.adm-kn-tbl td.mono { font-family: var(--font-mono); font-size: .74rem; overflow-wrap: break-word; word-break: normal; }
+.adm-kn-tbl td.num { text-align: right; font-family: var(--font-mono); font-size: .76rem; font-variant-numeric: tabular-nums; }
+.adm-kn-tbl td.acts { text-align: right; white-space: nowrap; }
+/* A reported package is the reason to be here in a hurry; the sort already put it first. */
+.adm-kn-tbl tr.adm-kn-row--flagged td { background: var(--danger-bg); }
+.adm-kn-flags { display: inline-block; margin-top: 4px; }
+.adm-kn-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+.adm-kn-tag { display: inline-block; padding: 1px 6px; font-family: var(--font-mono); font-size: .66rem; background: var(--bg-surface); color: var(--text-dim); white-space: nowrap; }
+.adm-kn-sys { display: inline-block; margin-left: 6px; padding: 1px 6px; font-family: var(--font-mono); font-size: .64rem; text-transform: uppercase; background: var(--info-bg); color: var(--info-fg); }
+.adm-kn-mat { display: block; margin-top: 4px; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.adm-kn-mat--odd { color: var(--warn-fg); font-weight: 500; }
+.adm-kn-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; margin-top: 16px; flex-wrap: wrap; }
+.adm-kn-count { font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); }
+.adm-kn-pages { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.adm-kn-next { margin-left: 6px; }
+
+/* 04: the five outcomes, the form, and the trail. */
+.adm-kn-two { display: grid; grid-template-columns: minmax(0, 1fr) 480px; gap: 0 44px; align-items: start; margin-top: 22px; }
+.adm-kn-ai { display: grid; grid-template-columns: minmax(0, 1fr) 560px; gap: 0 44px; align-items: start; }
+.adm-kn-two > *, .adm-kn-ai > * { min-width: 0; }
+.adm-kn-paste { white-space: pre-wrap; font-size: .85rem; line-height: 1.55; color: var(--text); }
+.adm-kn-choice { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 0 12px; align-items: start; padding: 11px 0; border-bottom: 1px solid var(--border); cursor: pointer; font-size: .9rem; }
+.adm-kn-choice:last-of-type { border-bottom: 0; }
+.adm-kn-choice.on b { color: var(--accent); }
+.adm-kn-choice input { margin-top: 3px; }
+.adm-kn-choice b { font-weight: 700; }
+.adm-kn-trail { display: flex; flex-direction: column; }
+.adm-kn-trail-row { padding: 11px 0; border-bottom: 1px solid var(--border); }
+.adm-kn-trail-row:last-child { border-bottom: 0; }
+.adm-kn-trail-head { display: flex; gap: 10px; align-items: baseline; font-size: .86rem; flex-wrap: wrap; }
+
+/* The forms: underlined fields, like the Hooks bind form and the sign-in page. */
+.adm-kn-newbox { margin-top: 24px; padding: 16px 18px; border: 3px dashed var(--accent); background: var(--card-bg); }
+.adm-kn-newlabel { display: block; margin-bottom: 12px; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .75rem; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+.adm-kn-form { display: flex; flex-direction: column; gap: 16px; max-width: 640px; }
+.adm-kn-fld { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
+.adm-kn-fld:first-child { margin-top: 0; }
+.adm-kn-fld label { font-size: .78rem; font-weight: 700; color: var(--text); }
+.adm-kn-fld-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 22px; }
+.adm .adm-kn-fld input[type="text"],
+.adm .adm-kn-fld select,
+.adm .adm-kn-fld textarea { border: 0; border-bottom: 3px solid var(--text); border-radius: 0; background: none; padding: 4px 2px 5px; font: inherit; font-size: .9rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; width: 100%; }
+.adm .adm-kn-fld textarea { font-family: var(--font-mono); font-size: .78rem; font-weight: 400; resize: vertical; }
+.adm .adm-kn-fld input:focus, .adm .adm-kn-fld select:focus, .adm .adm-kn-fld textarea:focus { border-bottom-color: var(--accent); }
+.adm-kn-check { display: flex; align-items: flex-start; gap: 10px; font-size: .88rem; margin-top: 14px; }
+.adm-kn-check input { margin-top: 3px; flex: none; }
+.adm-kn-entries { margin-top: 18px; padding-top: 14px; border-top: 2px solid var(--text); }
+.adm-kn-entry { padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+
+@media (max-width: 1100px) {
+  .adm-kn .og-strip { flex-wrap: wrap; }
+  .adm-kn .og-strip > div { flex: 1 1 50%; border-right: 0; border-bottom: 1px solid var(--border); }
+  .adm-kn-two, .adm-kn-ai { grid-template-columns: 1fr; gap: 22px 0; }
+  .adm-kn-cut { grid-template-columns: 1fr; gap: 10px 0; }
+  .adm-kn-part { grid-template-columns: minmax(0, 1fr) 60px; }
+  .adm-kn-track { grid-column: 1 / -1; }
+}
+
+/* A phone: a metric row keeps its name readable, a facet part stacks its bar under its label, and
+   the table scrolls sideways inside its own box rather than pushing the page. */
+@media (max-width: 768px) {
+  .adm-kn .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; }
+  .adm-kn .adm-mrow > :nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+  .adm-kn .adm-mrow > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .adm-kn .adm-mrow > :nth-child(3) { grid-column: 2; grid-row: 2; max-width: 11rem; white-space: normal; text-align: right; }
+  .adm-kn-search { min-width: 0; flex: 1 1 100%; }
+  .adm-kn-fld-row { grid-template-columns: 1fr; gap: 0; }
+  .adm-kn-choice { grid-template-columns: 20px minmax(0, 1fr); }
+  .adm-kn-choice > :nth-child(3) { grid-column: 2; margin-top: 4px; }
+}

@@ -36483,9 +36483,43 @@ paths:
     get:
       operationId: adminListKnowledge
       summary: List all knowledge packages (admin)
+      description: >-
+        The operator's moderation view: a page of packages, the count of the whole match, and the
+        shape of the collection by author, kind, maturity and visibility. The facets are counted
+        over everything that matched rather than over the page, and a facet does not narrow its own
+        counts.
       tags: [Admin, Knowledge]
       security:
         - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+          description: A page past the end comes back as the last page rather than empty.
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Free text over the name, the author and the tags.
+        - name: author
+          in: query
+          schema: { type: string }
+          description: >-
+            An exact author string as stored. This node writes the same person two ways, so prefer
+            author_key.
+        - name: author_key
+          in: query
+          schema: { type: string }
+          description: One author, collapsed across the spellings of their name.
+        - name: content_type
+          in: query
+          schema: { type: string }
+        - name: flagged
+          in: query
+          schema: { type: boolean }
+          description: Only packages somebody has reported.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -36494,6 +36528,9 @@ paths:
     post:
       operationId: adminImportKnowledge
       summary: Admin import knowledge package
+      description: >-
+        The manifest is validated against the knowledge-package schema, the same one the agent's
+        import door uses. A refusal names the field in error.details.
       tags: [Admin, Knowledge]
       security:
         - BearerAuth: []
@@ -36506,6 +36543,8 @@ paths:
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
 
   /v1/admin/knowledge/{id}:
     delete:

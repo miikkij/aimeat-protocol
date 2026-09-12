@@ -401,14 +401,29 @@ export async function fetchSchedulerExecutionLog(params = {}) {
 }
 
 // ── Knowledge Management ──
+/**
+ * The operator's package list, plus `paging` (number, per_page, total, pages) and `facets` — the
+ * shape of the whole collection by author, kind, how finished and who can see it.
+ *
+ * `page` and `limit` were always accepted and never sent, so the page showed the first twenty of
+ * however many there were. `author_key` collapses one person's spellings, which the exact-match
+ * `author` filter cannot: this node writes both `alice@node-id` and `alice` for the same person.
+ */
 export const getKnowledgePackages = (opts = {}) => {
   const params = new URLSearchParams();
   if (opts.flagged) params.set('flagged', 'true');
   if (opts.author) params.set('author', opts.author);
+  if (opts.author_key) params.set('author_key', opts.author_key);
   if (opts.content_type) params.set('content_type', opts.content_type);
+  if (opts.q) params.set('q', opts.q);
   if (opts.page) params.set('page', String(opts.page));
+  if (opts.limit) params.set('limit', String(opts.limit));
   return apiGet(`/v1/admin/knowledge?${params.toString()}`);
 };
+
+/** The moderation trail on one package: who looked, when, why, and what they decided. */
+export const getKnowledgeReviews = (packageId) =>
+  apiGet(`/v1/knowledge/${encodeURIComponent(packageId)}/reviews`);
 export const createSystemKnowledge = (data) =>
   apiPost('/v1/admin/knowledge/import', data);
 export const deleteKnowledgePackage = (packageId) =>
