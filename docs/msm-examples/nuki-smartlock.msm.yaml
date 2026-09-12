@@ -1,11 +1,10 @@
-# MEAT Service Manifest v1.0 — Nuki Smart Lock
-# Käyttö: 09-service-ecosystem.md → Airbnb-korvaaja (KEY→LOCK integraatio)
-# Majoitusagentti hallinnoi etälukkoja vieraiden sisäänkirjautumista varten.
+# An AIMEAT machine service manifest, version 1.0. Nuki smart lock.
+# What it shows: an accommodation agent letting a guest in, and taking that back, with nobody there.
 
 msm: "1.0"
 service:
   name: "Nuki Smart Lock Control"
-  description: "Remote smart lock management for AIMEAT accommodation agents — grant/revoke guest access"
+  description: "Remote smart lock management for AIMEAT accommodation agents: granting a guest access, and taking it back"
   homepage: "https://developer.nuki.io"
   category: "utility"
   tags: ["smartlock", "iot", "access-control", "accommodation", "airbnb", "nuki", "key-management"]

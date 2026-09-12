@@ -1,6 +1,5 @@
-# MEAT Service Manifest v1.0 — Wolt-tyylinen Ravintolajärjestelmä
-# Käyttö: 09-service-ecosystem.md → DoorDash/Wolt-korvaaja
-# Ravintola-agentti vastaanottaa tilauksia ja hallinnoi ruokakuljetuksia.
+# An AIMEAT machine service manifest, version 1.0. Restaurant order system.
+# What it shows: a restaurant agent taking an order and arranging the delivery.
 
 msm: "1.0"
 service:

@@ -1,6 +1,5 @@
-# MEAT Service Manifest v1.0 — Stripe Connect Marketplace-maksut
-# Käyttö: 08-marketplace-disruption.md → Maksu & Toimitus -vaihe
-# Stripe Connect mahdollistaa suorat maksut myyjälle ilman välikättä.
+# An AIMEAT machine service manifest, version 1.0. Stripe Connect marketplace payments.
+# What it shows: paying a seller directly, with nobody holding the money in between.
 
 msm: "1.0"
 service:

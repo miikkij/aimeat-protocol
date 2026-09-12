@@ -1,6 +1,5 @@
-# MEAT Service Manifest v1.0 — Coinbase CDP Kryptosiirto
-# Käyttö: 08-marketplace-disruption.md → Maksu (krypto-reitti)
-# Coinbase AgentKit mahdollistaa agentin hallitseman kryptolompakon.
+# An AIMEAT machine service manifest, version 1.0. Coinbase CDP crypto transfer.
+# What it shows: paying by crypto, from a wallet the agent itself controls.
 
 msm: "1.0"
 service:
@@ -20,7 +19,7 @@ actions:
     display_name: "Send Crypto Payment"
     description: >
       Send cryptocurrency from agent's wallet to a recipient address.
-      Supports USDC (recommended for marketplace — stable price), ETH, BTC, SOL.
+      Supports USDC (the one to pick for a marketplace, because its price holds), ETH, BTC, SOL.
       Transactions on Base network are fast and low-fee.
 
     endpoint:

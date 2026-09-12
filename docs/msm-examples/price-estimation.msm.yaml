@@ -1,6 +1,5 @@
-# MEAT Service Manifest v1.0 — Hinta-arvio Käytetyille Tuotteille
-# Käyttö: 08-marketplace-disruption.md → Myyjän agentti arvioi markkinahinnan
-# Perustuu hakutuloksiin + historiadataan. Vaihtoehtoisesti voi käyttää mm. PriceRunner-dataa.
+# An AIMEAT machine service manifest, version 1.0. Price estimate for a used product.
+# What it shows: a seller's agent asking what the market pays, from search results and past sales.
 
 msm: "1.0"
 service:

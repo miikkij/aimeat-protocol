@@ -1,6 +1,5 @@
-# MEAT Service Manifest v1.0 — Posti SmartShip Pakettilähetys
-# Käyttö: 08-marketplace-disruption.md → Maksu & Toimitus -vaihe
-# Myyjän agentti luo lähetyksen ja saa seurantakoodin automaattisesti.
+# An AIMEAT machine service manifest, version 1.0. Posti SmartShip parcels.
+# What it shows: a seller's agent creating a shipment and getting its tracking code in the same call.
 
 msm: "1.0"
 service:
