@@ -15,6 +15,12 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-09-13 — ADDITIVE (permission granted 2026-09-13): one section after the Auth Pattern block,
+ *     "Calling the node: read `ok` before `data`". session.fetch resolves the envelope and never
+ *     throws, so a refusal is a VALUE and an app that reads `.data` off it renders an empty state
+ *     instead of a problem. Reported from the field 2026-09-11 by a published app whose mailbox view
+ *     showed zero conversations while its owner saw forty; every session.fetch example in this
+ *     prompt used the value directly, so the trap was being taught. Nothing existing changed.
  *   2026-09-08 — ADDITIVE (permission granted 2026-09-08): two paragraphs at the end of the memory
  *     SHAPE rules in Data Storage — say what a record IS with a standard type when one fits (and
  *     leave it out when none does, because a wrong type is believed), and keep a user's own tags as
@@ -124,6 +130,7 @@ import { APP_GRANTABLE_SCOPES } from '../routes/app-grants.js';
 // lists can never drift from /v1/libs, /v1/library-packs, bootstrap or llms.txt (Phase 1
 // of the Library Acceleration Program killed the 4-way hardcoded-list drift).
 import { buildPromptLibrarySections } from '../data/library-packs.js';
+import { buildPromptSessionSections } from './build-app-prompt-session.js';
 import { buildResearchStep, buildFinishChecklist } from './appdev-flow-constants.js';
 
 export interface BuildAppPromptOptions {
@@ -175,33 +182,9 @@ function composeAppPrompt(
   // prompt can never drift from GET /v1/libs, GET /v1/library-packs, bootstrap or llms.txt.
   body += buildPromptLibrarySections(nodeUrl);
 
-  // Auth pattern
-  body += '### Auth Pattern\n';
-  body += 'Handle BOTH login paths: a fresh sign-in click (the onLogin callback) AND a page that loads already signed in (restore the session yourself). `onLogin` fires ONLY on a fresh sign-in — it does NOT fire on reload when a session already exists, so a page that relies on onLogin alone shows nothing to an already-logged-in returning user.\n';
-  body += 'The login bar is the ONLY interactive sign-in path: on an app origin `AIMEAT.auth.login()` is silent-only (it restores an existing session and returns null otherwise). Never hand-roll a sign-in button that calls login() — mount the login bar; a custom button must delegate its click to the login bar\'s own button.\n';
-  body += '```html\n';
-  body += '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"></' + 'script>\n';
-  body += '<script>\n';
-  body += 'function showApp(session) { /* session.owner, session.jwt, session.fetch() */ }\n';
-  body += 'function hideApp() { /* hide content, show a "Sign in" message */ }\n';
-  body += '\n';
-  body += '// Path 1 — fresh sign-in / sign-out via the login button:\n';
-  body += 'AIMEAT.auth.mountLoginButton("#login", {\n';
-  body += '  onLogin: showApp,   // fires ONLY on a fresh sign-in click, NOT on reload\n';
-  body += '  onLogout: hideApp\n';
-  body += '});\n';
-  body += '\n';
-  body += '// Path 2 — already signed in when the page loads. Restore the stored session\n';
-  body += '// explicitly; login() returns the session (or null if not signed in).\n';
-  body += 'AIMEAT.auth.login().then(function (session) { if (session) showApp(session); });\n';
-  body += '\n';
-  body += '// Path 3 — ASYNC logins (app-subdomain silent SSO, consent-popup return): these\n';
-  body += '// fire neither onLogin nor the login() promise above. The login EVENT covers every\n';
-  body += "// path — always add it, or a published app stays hidden after the user grants access.\n";
-  body += "AIMEAT.auth.on('login', showApp);\n";
-  body += "AIMEAT.auth.on('logout', hideApp);\n";
-  body += '</' + 'script>\n';
-  body += '```\n\n';
+  // The session: signing a person in, and calling the node once they are. Both sections moved to
+  // services/build-app-prompt-session.ts verbatim when this file passed 800 lines.
+  body += buildPromptSessionSections(nodeUrl);
 
   // App permissions — the scope vocabulary, generated from the authorize endpoint's own constant
   // The language control. Every app used to hand-roll its own EN/FI switch — a text button here, a
