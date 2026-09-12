@@ -29,7 +29,7 @@
  *   DATE — a heat-map square, a month rail, the day a usage row was counted into — must not, or it
  *   slides a day for anyone west of the node. `calendar()` is for those.
  *
- *   THE SEED IS FOUR FILES, and it is four rather than a backlog because the sweep finished first.
+ *   THE SEED IS SIX FILES, and it is six rather than a backlog because the sweep finished first.
  *   A seeded list here would forgive exactly the thing the rule exists to catch.
  * @structure ALLOWED — the four files that may hold a raw call · noRawLocaleFormat: the rule module
  * @usage 'aimeat/no-raw-locale-format': 'error'
