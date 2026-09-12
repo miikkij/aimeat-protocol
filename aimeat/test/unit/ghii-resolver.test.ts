@@ -18,8 +18,7 @@
  *   v1.0.0 — 2026-09-12 — Initial. wish-identity-gate-sees-resolveghii, acceptance criterion 4.
  */
 import { describe, it, expect } from 'vitest';
-import type { Storage } from '../../src/storage/interface.js';
-import type { GHIIRecord } from '../../src/models/types.js';
+import type { Storage, GHIIRecord } from '../../src/storage/interface.js';
 import { resolveGhii } from '../../src/utils/ghii-resolver.js';
 
 const NODE = { nodeId: 'aimeat-test-001' };
