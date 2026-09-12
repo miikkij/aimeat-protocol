@@ -21,6 +21,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { createSchedule } from '/js/services/schedules.js';
 import { cronWords, timeOfCron, withTime } from './cron-words.js';
+import { resolvedTimeZone } from '/js/display-prefs.js';
 
 const html = htm.bind(h);
 
@@ -39,8 +40,13 @@ const c = (key, vars) => t('profile.scheduler.cover.' + key, vars);
 export function CreateForm({ agents = [], showToast, onCreated, onCancel = null, lockedAgent }) {
   const [kind, setKind] = useState(lockedAgent ? 'agent_task' : 'ai');
   const [preset, setPreset] = useState('morning');
+  // The zone starts as the CREATOR'S OWN, because "every day at seven" means seven where the
+  // person saying it is. Left empty it went to the server unset, the cron then ran on whatever the
+  // node's process zone happened to be, and nothing anywhere could say which zone the hour belonged
+  // to: a reader on another clock saw "Mon at 23:00" beside a run the same screen called Tuesday
+  // 05:00, with nothing to reconcile them. It is still a plain field and still editable.
   const [form, setForm] = useState({
-    display_name: '', cron: '0 7 * * *', timezone: '', purpose: '',
+    display_name: '', cron: '0 7 * * *', timezone: resolvedTimeZone(), purpose: '',
     agent_name: lockedAgent || '', prompt: '', input_keys: '', output_key: '',
     task_title: '', task_description: '', extension_name: '', action_id: '',
   });
