@@ -2,80 +2,155 @@
  * @file portal-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin dashboard Portal tab — landing-page template editor,
- *   site memory keys, KV pairs, AI prompt, and changelog (with LB-mode banner).
- * @structure PortalTab (default)
+ * @description Admin Portal page in the poster face (design canvas "AIMEAT Admin Portal"): what a
+ *   visitor sees right now, the parts of the page beside a preview, which version wins, the links
+ *   in the top menu, the operator's own HTML page, the saved texts, the paste for their own AI, and
+ *   what changed.
+ *
+ *   THE PAGE ANSWERS IN THE ORDER SOMEONE ASKS. Section 01 says what visitors get and whether it is
+ *   the default, the operator's arrangement or their own HTML, before anything can be changed. The
+ *   seven cards this page used to be were all the same size and told the operator nothing about
+ *   which of them mattered.
+ *
+ *   THE WORDS ARE PLAIN, ON PURPOSE. "Default", "your own layout", "your own HTML page", "texts you
+ *   have saved". Someone who runs a node once a month should not have to work out what a sentence
+ *   means (Jouni, 2026-09-12: "miksei toi voi puhua normaalia").
+ *
+ *   ONE DARK BUTTON, AND IT FOLLOWS YOU. The arrangement waits for Save, and the pinned row keeps
+ *   the count of unsaved changes and the button itself under the topbar wherever you have scrolled.
+ *   Every other save on this page belongs to something else and says so: a text is written the
+ *   moment you press Add, and the menu has its own button.
+ * @structure PortalTab (default) · RightNow · Strip · the section components from
+ *   portal-tab.sections.js · PartsList/AddPart from portal-tab.parts.js · PagePreview
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
- *   v1.2.0 — 2026-09-05 — The eleven emoji on headings and buttons go: no emoji anywhere in the interface.
- *   v1.1.0 — 2026-06-02 — Admin design unification: raw template textarea →
- *     adm-textarea adm-input-full (drop inline mono/border/background styles).
- *   v1.2.0 — 2026-06-03 — Active-source status (custom template vs built-in SPA)
- *     + "Load current page" button that seeds the editor with the live / HTML.
- *   v1.3.0 — 2026-06-03 — Fix portal memory keys writing to the wrong namespace
- *     (now /v1/site/memory → __site__ so {{memory:portal/*}} resolves); add AI
- *     bundle import (/v1/site/import) so the AI-Assisted result no longer 422s in
- *     the template box; reload the preview iframe after every change + Clear Cache.
- *   v1.4.0 — 2026-06-19 — Add Header Navigation section: operator show/hide + reorder
- *     of the public header links (persisted via /v1/site/header-nav).
- *   v1.5.0 — 2026-08-29 — `exchange` leaves the configurable header links: the EXCHANGE app is a
- *     site-footer link now, like the store.
- *   v1.6.0 — 2026-08-31 — The preview shows the page being edited. It pointed at `/`, which
- *     forwards a signed-in person to their own home, so an operator looking at this tab saw their
- *     home and concluded the front page was something else entirely. Without a custom template it
- *     points at /v1/portal (the front page itself, which forwards nobody); with one it goes back to
- *     `/`, because a template IS what the root sends everyone. A line under it says why the header
- *     shows a signed-in session, and links the page out to a tab of its own.
+ *   v2.0.0 — 2026-09-12 — The poster face: eight numbered sections in the order an operator asks,
+ *     the parts beside the page with the same numbers on both, the precedence ladder on screen for
+ *     the first time, the pinned save row, and plain words throughout.
+ *   v1.6.0 — 2026-08-31 — The preview shows the page being edited, not the operator's own home.
+ *   v1.5.0 — 2026-08-29 — `exchange` leaves the configurable header links.
+ *   v1.4.0 — 2026-06-19 — Header navigation section.
+ *   v1.3.0 — 2026-06-03 — Portal memory keys write to the site namespace; AI bundle import.
+ *   v1.2.0 — 2026-06-03 — Active-source status and "Load current page".
+ *   v1.1.0 — 2026-06-02 — Admin design unification.
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
-const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
-import { dt, Badge, ExpandableHelp, useToast, Toast } from './shared.js';
+import { useViewCSS } from '/components/useViewCSS.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
+import { num, dt, Badge, Spinner, useToast, Toast } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
+import { swallowed } from '/js/swallowed.js';
 import {
   saveSiteTemplate, deleteSiteTemplate, clearSiteCache,
   getSiteMemoryKeys, getSitePrompt, setSiteMemory, deleteSiteMemory,
   importSiteBundle, triggerLbSync, getHeaderNav, saveHeaderNav,
+  getSurfaceLayout, saveSurfaceLayout, revertSurfaceLayout, resetSurfaceLayout,
+  listLayoutVersions, restoreLayout, getSurfaceBlocks, getLayoutPrompt, importSurfaceLayout,
 } from '/js/services/admin.js';
-import { useConfirm } from '/components/Modal.js';
-import { SurfaceLayoutEditor } from './surfaces-layout.js';
-import { swallowed } from '/js/swallowed.js';
+import { PartsList, AddPart, freeKey } from './portal-tab.parts.js';
+import { PagePreview } from './portal-tab.preview.js';
+import { WhichVersion, MenuLinks, OwnHtml, SavedTexts, AskAi, WhatChanged } from './portal-tab.sections.js';
 
-// Public header link ids → their nav i18n label key (mirror of PUBLIC_NAV_LINKS in spa.html
-// and PUBLIC_NAV_LINK_IDS in src/services/site.ts). Gated links are not configurable.
-// These are the LOGGED-OUT bar (plus Help, which shows in both states). A signed-in person's
-// links — Apps, Profile, Admin — are forced by the session and role, and the pages that left
-// the header (For Developers and Members on 2026-08-09, EXCHANGE on 2026-08-29) are site-footer
-// links now, so neither set appears here.
+const html = htm.bind(h);
+const P = (key, params) => t('admin.portal.' + key, params);
+
+/**
+ * The three pages an operator can arrange. The front page is the one this tab always had; the two
+ * member pages arrived with the layout engine, and they live here rather than in a tab of their own
+ * because the editor, the preview, the prompt and the change log are the same for all three.
+ */
+const SURFACES = ['portal', 'home', 'home-onboarding'];
+
+/**
+ * Public header link ids → their nav i18n label key (mirror of PUBLIC_NAV_LINKS in spa.html and
+ * PUBLIC_NAV_LINK_IDS in src/services/site.ts). Gated links are not configurable. These are the
+ * LOGGED-OUT bar (plus Help, which shows in both states); a signed-in person's links are forced by
+ * the session and the role.
+ */
 const HEADER_LINK_LABELS = {
   howItWorks: 'nav.howItWorks',
-  // learn renders only when this node configured AIMEAT_SITE_LEARN_URL; hiding it here is a
-  // second, independent switch.
   learn: 'nav.learn',
   business: 'nav.business',
   help: 'nav.help',
 };
 
-/**
- * The three pages an operator can arrange. The front page is the one this tab always had; the two
- * member pages arrived with the layout engine, and they live here rather than in a tab of their own
- * because the editor, the prompt, the history and the change log are byte-identical between them.
- * Two tabs would be one component rendered twice with a prop, and an operator wondering which one
- * the change log belonged to.
- */
-const SURFACES = [
-  { id: 'portal', key: 'dashboard.surfaceTabPortal', fallback: 'Front page' },
-  { id: 'home', key: 'dashboard.surfaceTabHome', fallback: 'Member home' },
-  { id: 'home-onboarding', key: 'dashboard.surfaceTabOnboarding', fallback: 'Home (setting up)' },
-];
-
-const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+/** Section 01: the word, the sentence, and the five rows behind it. */
+function RightNow({ facts, number, onOpenPage, onClearCache }) {
+  const { hasCustom, source, parts, hidden, texts, navTotal, navHidden, baseUrl, lastChange, cacheTtl } = facts;
+  const word = hasCustom ? P('now.wordHtml') : source === 'stored' ? P('now.wordYours') : P('now.wordDefault');
+  // "and 0 of them are hidden" is a sentence nobody would write, and neither is "1 of them are",
+  // so nothing-hidden and one-hidden each get their own line rather than a number dropped into one.
+  const suffix = hidden === 0 ? 'None' : hidden === 1 ? 'One' : '';
+  const key = (hasCustom ? 'lineHtml' : source === 'stored' ? 'lineYours' : 'lineDefault') + suffix;
+  const line = P('now.' + key, { n: num(parts), hidden: num(hidden) });
+  const row = (title, why, chip, value, last) => html`
+    <div class=${'adm-mrow' + (last ? ' adm-mrow--last' : '')}>
+      <span><b>${title}</b><span class="adm-why">${why}</span></span>
+      <span>${chip}</span>
+      <span class="adm-mval">${value}</span>
+    </div>`;
+  return html`
+    <section class="og-sec og-sec--first" id="adm-pt-now">
+      <div class="og-sec-h"><h2>${P('now.title')}<small>${number}</small></h2>
+        <div class="og-doors">
+          <button type="button" class="og-door og-door--quiet" onClick=${onOpenPage}>${P('now.openPage')}</button>
+          <button type="button" class="og-door og-door--quiet" onClick=${onClearCache}>${P('now.clearCache')}</button>
+        </div></div>
+      <div class="adm-ov-grid">
+        <div>
+          <div class="adm-ov-status">${word}</div>
+          <p class="adm-alert-line">${line}</p>
+          <div class="adm-ov-up">${baseUrl}<br />${lastChange}</div>
+        </div>
+        <div>
+          ${row(P('now.pageRow'), P('now.pageWhy'),
+            hasCustom
+              ? html`<${Badge} type="info" label=${P('now.badgeHtml')} />`
+              : source === 'stored'
+                ? html`<${Badge} type="healthy" label=${P('now.badgeYours')} />`
+                : html`<${Badge} type="info" label=${P('now.badgeDefault')} />`,
+            baseUrl)}
+          ${row(P('now.layoutRow'), source === 'stored' ? P('now.layoutWhyYours') : P('now.layoutWhyDefault'),
+            source === 'stored'
+              ? html`<${Badge} type="healthy" label=${P('now.badgeSaved')} />`
+              : html`<${Badge} type="muted" label=${P('now.badgeNotSaved')} />`,
+            P('now.partsValue', { n: num(parts) }))}
+          ${row(P('now.htmlRow'), hasCustom ? P('now.htmlWhyYes') : P('now.htmlWhyNo'),
+            hasCustom
+              ? html`<${Badge} type="healthy" label=${P('now.badgeHtml')} />`
+              : html`<${Badge} type="muted" label=${P('now.badgeNone')} />`,
+            '__site_template__')}
+          ${row(P('now.menuRow'), P('now.menuWhy'),
+            navHidden > 0
+              ? html`<${Badge} type="info" label=${P('now.badgeHidden', { n: num(navHidden) })} />`
+              : html`<${Badge} type="healthy" label=${P('now.badgeAllShown')} />`,
+            P('now.menuValue', { n: num(navTotal) }))}
+          ${row(P('now.textsRow'), P('now.textsWhy'),
+            texts > 0
+              ? html`<${Badge} type="info" label=${P('now.badgeTexts', { n: num(texts) })} />`
+              : html`<${Badge} type="muted" label=${P('now.badgeNone')} />`,
+            'portal/*', true)}
+        </div>
+      </div>
+      <div class="og-strip">
+        <div><b>${num(parts)}</b><span>${P('strip.parts')}</span><small>${P('strip.partsSub')}</small></div>
+        <div><b>${num(hidden)}</b><span>${P('strip.hidden')}</span><small>${P('strip.hiddenSub')}</small></div>
+        <div><b>${num(texts)}</b><span>${P('strip.texts')}</span><small>${P('strip.textsSub')}</small></div>
+        <div><b>${cacheTtl} s</b><span>${P('strip.delay')}</span><small>${P('strip.delaySub')}</small></div>
+      </div>
+    </section>`;
+}
 
 export default function PortalTab({ data, reload }) {
+  useViewCSS('/css/views/admin-portal.css');
   const [surface, setSurface] = useState('portal');
   const [toast, showErr, showOk, clearToast] = useToast();
+  const { confirm, ConfirmUI } = useConfirm();
+
   const p = data.portal || {};
   const meta = p.meta || {};
   const tmpl = p.template || {};
@@ -83,386 +158,380 @@ export default function PortalTab({ data, reload }) {
   const isLb = meta.lb_mode?.enabled;
   const hasCustom = !!meta.has_custom_template;
 
-  const { confirm, ConfirmUI } = useConfirm();
+  // The layout of the page being arranged, and what this node can put on it.
+  const [blocks, setBlocks] = useState(null);
+  const [catalog, setCatalog] = useState([]);
+  const [passages, setPassages] = useState({});
+  const [source, setSource] = useState('default');
+  const [problems, setProblems] = useState([]);
+  const [openPart, setOpenPart] = useState(null);
+  // How many changes are waiting. A count of edits rather than a diff: the operator asked for
+  // "three unsaved changes", and three moves that happen to end where they started are still three
+  // things this page did and the node has not been told about.
+  const [pending, setPending] = useState(0);
+  const [touched, setTouched] = useState(() => new Set());
+  const unsaved = pending + touched.size;
+  const dirty = unsaved > 0;
+  const [saving, setSaving] = useState(false);
+  const [showPending, setShowPending] = useState(false);
+  const [versions, setVersions] = useState(null);
+
   const [template, setTemplate] = useState(tmpl.template || '');
   const [memKeys, setMemKeys] = useState(null);
   const [newKey, setNewKey] = useState('');
   const [newVal, setNewVal] = useState('');
-  const [aiBundle, setAiBundle] = useState('');
-  // Header nav: ordered list of { id, visible }. null while loading.
+  const [paste, setPaste] = useState('');
   const [navLinks, setNavLinks] = useState(null);
   const [navSaving, setNavSaving] = useState(false);
-  // Bumped after any change so the preview iframe re-fetches `/` (busts browser cache).
+  // Bumped after any change so the preview re-fetches the page instead of showing a cached copy.
   const [previewNonce, setPreviewNonce] = useState(0);
   const bumpPreview = () => setPreviewNonce(n => n + 1);
 
-  useEffect(() => { loadMemKeys(); loadNav(); }, []);
+  const loadLayout = useCallback(async () => {
+    try {
+      const [layoutRes, blocksRes] = await Promise.all([getSurfaceLayout(surface), getSurfaceBlocks(surface)]);
+      setBlocks(layoutRes.data?.layout?.blocks ?? []);
+      setPassages(layoutRes.data?.freeform ?? {});
+      setSource(layoutRes.data?.source ?? 'default');
+      setProblems(layoutRes.data?.problems ?? []);
+      setCatalog(blocksRes.data?.blocks ?? []);
+      setPending(0);
+      setTouched(new Set());
+      setVersions(null);
+    } catch (err) {
+      swallowed('portal-tab: layout', err);
+      showErr(err.message);
+      setBlocks([]);
+    }
+    // showErr comes from useToast and is stable for the life of this component; listing it would
+    // re-create the loader on every toast and re-fetch the page underneath the operator.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [surface]);
 
-  async function loadMemKeys() {
+  const loadMemKeys = useCallback(async () => {
     try {
       const res = await getSiteMemoryKeys();
       setMemKeys(res.data?.keys || []);
-    } catch (err) { swallowed('portal-tab', err); setMemKeys([]); }
-  }
+    } catch (err) { swallowed('portal-tab: texts', err); setMemKeys([]); }
+  }, []);
 
-  async function loadNav() {
+  const loadNav = useCallback(async () => {
     try {
       const res = await getHeaderNav();
       const order = res.data?.order || Object.keys(HEADER_LINK_LABELS);
       const hidden = new Set(res.data?.hidden || []);
-      setNavLinks(order
-        .filter(id => HEADER_LINK_LABELS[id])
-        .map(id => ({ id, visible: !hidden.has(id) })));
-    } catch (err) { swallowed('portal-tab', err); setNavLinks([]); }
+      setNavLinks(order.filter(id => HEADER_LINK_LABELS[id]).map(id => ({ id, visible: !hidden.has(id) })));
+    } catch (err) { swallowed('portal-tab: menu', err); setNavLinks([]); }
+  }, []);
+
+  useEffect(() => { loadLayout(); }, [loadLayout]);
+  useEffect(() => { loadMemKeys(); loadNav(); }, [loadMemKeys, loadNav]);
+  useEffect(() => onLiveUpdate(['config', 'features'], () => { loadMemKeys(); }), [loadMemKeys]);
+
+  // ── the arrangement: everything here is local until Save ──
+  const edit = (fn) => { setBlocks(bs => fn(bs.slice())); setPending(c => c + 1); };
+  const move = (idx, dir) => edit(bs => {
+    const j = idx + dir;
+    if (j < 0 || j >= bs.length) return bs;
+    [bs[idx], bs[j]] = [bs[j], bs[idx]];
+    return bs;
+  });
+  const toggleHidden = (idx) => edit(bs => { bs[idx] = { ...bs[idx], hidden: !bs[idx].hidden }; return bs; });
+  const removePart = (idx) => edit(bs => { bs.splice(idx, 1); return bs; });
+  const setProp = (idx, name, value) => edit(bs => {
+    const props = { ...(bs[idx].props ?? {}) };
+    if (value === undefined) delete props[name]; else props[name] = value;
+    bs[idx] = { ...bs[idx], ...(Object.keys(props).length ? { props } : { props: undefined }) };
+    return bs;
+  });
+  const addPart = (id) => edit(bs => [...bs, { id, key: freeKey(bs, id) }]);
+  // Typing counts as ONE waiting change however many keys are pressed: a per-keystroke count would
+  // read as a runaway number and say nothing.
+  const setPassage = (key, value) => {
+    setPassages(ps => ({ ...ps, [key]: value }));
+    setTouched(prev => (prev.has(key) ? prev : new Set(prev).add(key)));
+  };
+
+  async function saveLayout() {
+    setSaving(true);
+    try {
+      // Passages travel inline on their part; the node splits them out to their own records.
+      const payload = blocks.map(b => (b.id === 'common.freeform' && passages[b.key] !== undefined
+        ? { ...b, body: passages[b.key] }
+        : b));
+      await saveSurfaceLayout(surface, { v: 1, blocks: payload });
+      showOk(P('saved'));
+      setPending(0);
+      setTouched(new Set());
+      setShowPending(false);
+      await loadLayout();
+      bumpPreview();
+    } catch (e) { showErr(e.message); }
+    finally { setSaving(false); }
   }
 
-  function toggleNav(id) {
-    setNavLinks(links => links.map(l => l.id === id ? { ...l, visible: !l.visible } : l));
+  const undoAll = () => confirm(P('undoAsk'), async () => { await loadLayout(); bumpPreview(); });
+
+  const startFromDefault = () => confirm(P('resetAsk'), async () => {
+    try { await resetSurfaceLayout(surface); await loadLayout(); bumpPreview(); showOk(P('resetDone')); }
+    catch (e) { showErr(e.message); }
+  });
+
+  const backToDefault = () => confirm(P('revertAsk'), async () => {
+    try { await revertSurfaceLayout(surface); await loadLayout(); bumpPreview(); showOk(P('revertDone')); }
+    catch (e) { showErr(e.message); }
+  }, { danger: true });
+
+  async function showVersions() {
+    try { const r = await listLayoutVersions(surface); setVersions(r.data?.versions ?? []); }
+    catch (e) { showErr(e.message); }
   }
 
-  function moveNav(idx, dir) {
-    setNavLinks(links => {
-      const next = links.slice();
-      const j = idx + dir;
-      if (j < 0 || j >= next.length) return next;
-      [next[idx], next[j]] = [next[j], next[idx]];
-      return next;
-    });
-  }
+  const goBackTo = (version) => confirm(P('log.restoreAsk'), async () => {
+    try { await restoreLayout(surface, version); await loadLayout(); bumpPreview(); showOk(P('log.restoreDone')); }
+    catch (e) { showErr(e.message); }
+  });
 
+  // ── the menu above the page: its own list, its own button ──
+  const toggleNav = (id) => setNavLinks(links => links.map(l => (l.id === id ? { ...l, visible: !l.visible } : l)));
+  const moveNav = (idx, dir) => setNavLinks(links => {
+    const next = links.slice();
+    const j = idx + dir;
+    if (j < 0 || j >= next.length) return next;
+    [next[idx], next[j]] = [next[j], next[idx]];
+    return next;
+  });
   async function saveNav() {
     if (!navLinks) return;
     setNavSaving(true);
     try {
-      const order = navLinks.map(l => l.id);
-      const hidden = navLinks.filter(l => !l.visible).map(l => l.id);
-      await saveHeaderNav(order, hidden);
-      showOk(t('dashboard.portalNavSaved'));
+      await saveHeaderNav(navLinks.map(l => l.id), navLinks.filter(l => !l.visible).map(l => l.id));
+      showOk(P('menu.saved'));
       bumpPreview();
     } catch (e) { showErr(e.message); }
     finally { setNavSaving(false); }
   }
 
+  // ── the operator's own HTML page ──
   async function saveTemplate() {
-    // The AI-Assisted prompt produces a JSON import bundle, not raw HTML. If the
-    // user pasted that here, the template route would 422 — point them to Import.
-    if (template.trimStart().startsWith('{')) {
-      showErr(t('dashboard.portalSaveLooksLikeJson'));
-      return;
-    }
-    try { await saveSiteTemplate(template); bumpPreview(); reload(); }
+    // The AI paste produces a JSON bundle, not raw HTML. If that was pasted here, the template
+    // route would answer 422 — point at the section that takes it instead.
+    if (template.trimStart().startsWith('{')) { showErr(P('html.looksLikeJson')); return; }
+    try { await saveSiteTemplate(template); bumpPreview(); reload(); showOk(P('html.saved')); }
     catch (e) { showErr(e.message); }
   }
-
-  async function importAiBundle() {
-    let bundle;
-    try { bundle = JSON.parse(aiBundle); }
-    catch { showErr(t('dashboard.portalImportInvalid')); return; }
-    if (!bundle || typeof bundle !== 'object' || (!bundle.template && !bundle.memory && !bundle.kv)) {
-      showErr(t('dashboard.portalImportInvalid'));
-      return;
-    }
-    try {
-      const res = await importSiteBundle(bundle);
-      const d = res.data || {};
-      const parts = [];
-      if (d.template_stored) parts.push('template');
-      if (d.memory_keys_written) parts.push(d.memory_keys_written + ' memory');
-      if (d.kv_pairs_updated) parts.push(d.kv_pairs_updated + ' KV');
-      showOk(t('dashboard.portalImportDone').replace('{summary}', parts.join(', ') || '—'));
-      if (typeof bundle.template === 'string') setTemplate(bundle.template);
-      setAiBundle('');
-      loadMemKeys();
-      bumpPreview();
-      reload();
-    } catch (e) { showErr(e.message); }
-  }
-
   async function loadCurrentAsTemplate() {
     const run = async () => {
       try {
         const resp = await fetch('/', { headers: { Accept: 'text/html' }, cache: 'no-store' });
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         setTemplate(await resp.text());
-        showOk(t('dashboard.portalLoadedCurrent'));
+        showOk(P('html.loaded'));
       } catch (e) { showErr(e.message); }
     };
-    if (template && template.trim()) {
-      confirm(t('dashboard.portalLoadCurrentConfirm'), run);
-    } else {
-      run();
-    }
+    if (template && template.trim()) confirm(P('html.loadAsk'), run); else run();
   }
-
   function downloadTemplate() {
     if (!template) return;
     const blob = new Blob([template], { type: 'text/html' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = 'portal-template.html'; a.click();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'portal-template.html';
+    a.click();
   }
+  const deleteTemplate = () => confirm(P('html.deleteAsk'), async () => {
+    try { await deleteSiteTemplate(); setTemplate(''); bumpPreview(); reload(); showOk(P('html.deleted')); }
+    catch (e) { showErr(e.message); }
+  }, { danger: true });
 
-  function resetTemplate() {
-    confirm(t('dashboard.portalResetDefault') + '?', async () => {
-      try { await deleteSiteTemplate(); setTemplate(''); bumpPreview(); reload(); }
-      catch (e) { showErr(e.message); }
-    }, { danger: true });
-  }
-
-  async function doClearCache() {
-    try { await clearSiteCache(); bumpPreview(); } catch (e) { showErr(e.message); }
-  }
-
-  async function addMem() {
+  // ── the saved texts ──
+  async function addText() {
     if (!newKey.trim()) return;
     try {
       await setSiteMemory(newKey.trim(), newVal);
       setNewKey(''); setNewVal('');
-      showOk(t('dashboard.portalMemorySaved'));
+      showOk(P('texts.saved'));
       loadMemKeys(); bumpPreview();
     } catch (e) { showErr(e.message); }
   }
+  const deleteText = (key) => confirm(P('texts.deleteAsk', { key }), async () => {
+    try { await deleteSiteMemory(key); loadMemKeys(); bumpPreview(); }
+    catch (e) { showErr(e.message); }
+  }, { danger: true });
 
-  function delMem(key) {
-    confirm(t('dashboard.portalDeleteKeyConfirm').replace('{key}', key), async () => {
-      try { await deleteSiteMemory(key); loadMemKeys(); bumpPreview(); }
-      catch (e) { showErr(e.message); }
-    }, { danger: true });
+  // ── the paste for an operator whose AI cannot reach this node ──
+  async function copyLayoutPrompt() {
+    try { await copyToClipboard(await getLayoutPrompt(surface)); showOk(P('ai.copied')); }
+    catch (e) { showErr(e.message); }
   }
-
-  async function copyPrompt() {
+  async function copySitePrompt() {
     try {
       const res = await getSitePrompt();
-      const prompt = res.data?.prompt || 'No prompt available';
-      await copyToClipboard(prompt);
-      showOk(t('dashboard.portalAiCopied'));
+      await copyToClipboard(res.data?.prompt || '');
+      showOk(P('ai.copied'));
+    } catch (e) { showErr(e.message); }
+  }
+  async function applyPaste() {
+    let bundle;
+    try { bundle = JSON.parse(paste); }
+    catch { showErr(P('ai.invalid')); return; }
+    if (!bundle || typeof bundle !== 'object') { showErr(P('ai.invalid')); return; }
+    try {
+      if (bundle.layout) {
+        await importSurfaceLayout(bundle);
+        await loadLayout();
+      } else if (bundle.template || bundle.memory || bundle.kv) {
+        const res = await importSiteBundle(bundle);
+        const d = res.data || {};
+        if (typeof bundle.template === 'string') setTemplate(bundle.template);
+        showOk(P('ai.appliedBundle', {
+          template: d.template_stored ? 1 : 0,
+          memory: d.memory_keys_written || 0,
+          kv: d.kv_pairs_updated || 0,
+        }));
+        loadMemKeys();
+        reload();
+      } else { showErr(P('ai.invalid')); return; }
+      setPaste('');
+      bumpPreview();
+      if (bundle.layout) showOk(P('ai.applied'));
     } catch (e) { showErr(e.message); }
   }
 
+  async function doClearCache() {
+    try { await clearSiteCache(); bumpPreview(); showOk(P('now.cacheCleared')); }
+    catch (e) { showErr(e.message); }
+  }
   async function doLbSync() {
     try {
       const res = await triggerLbSync();
       const d = res.data || {};
-      showOk(t('dashboard.portalLbSyncDone') + ' (template: ' + (d.template_updated ? 'yes' : 'no') + ', memory: ' + (d.memory_keys_synced || 0) + ')');
+      showOk(P('lb.synced', { template: d.template_updated ? 1 : 0, memory: d.memory_keys_synced || 0 }));
       reload();
     } catch (e) { showErr(e.message); }
   }
 
-  const kv = meta.kv || {};
-  const kvKeys = Object.keys(kv);
+  if (blocks === null) {
+    return html`
+      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+      <${Spinner} text=${t('dashboard.loading')} />`;
+  }
+
+  const hiddenCount = blocks.filter(b => b.hidden).length;
+  const facts = {
+    hasCustom,
+    source,
+    parts: blocks.length,
+    hidden: hiddenCount,
+    texts: (memKeys ?? []).length,
+    navTotal: (navLinks ?? []).length,
+    navHidden: (navLinks ?? []).filter(l => !l.visible).length,
+    baseUrl: meta.base_url || '/',
+    cacheTtl: meta.cache_ttl_seconds ?? 0,
+    lastChange: changes[0]
+      ? P('now.lastChange', { when: dt(changes[0].changed_at || changes[0].changedAt), who: changes[0].changed_by || changes[0].changedBy || '-' })
+      : P('now.noChange'),
+  };
+
+  // The numbers run in the order the sections are rendered, so a page with fewer sections (a member
+  // page has no menu, no HTML of its own and no texts) still counts 01, 02, 03 rather than skipping.
+  let counter = 0;
+  const n = () => String(++counter).padStart(2, '0');
+  const isPortal = surface === 'portal';
+  const openPage = () => window.open(hasCustom ? '/' : '/v1/portal', '_blank', 'noopener');
 
   return html`
-    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-    <p class="adm-text-dim adm-mb-lg">${t('dashboard.portalDesc')}</p>
+    <div class="adm-pt">
+      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+      <p class="adm-pt-intro">${P('intro', { url: meta.base_url || '/' })}</p>
 
-    <!-- Which page. The front page keeps everything this tab always had; the member pages get the
-         layout editor alone, because a template, header links and KV pairs are the front page's own
-         furniture and mean nothing on a page only members see. -->
-    <div class="adm-flex adm-mb-lg">
-      ${SURFACES.map(s => html`
-        <button key=${s.id}
-          class=${surface === s.id ? 'adm-btn-action' : 'adm-btn-sm'}
-          onClick=${() => setSurface(s.id)}>
-          ${tr(s.key, s.fallback)}
-        </button>`)}
-    </div>
-
-    <${SurfaceLayoutEditor} surface=${surface} onChanged=${bumpPreview} />
-
-    ${surface !== 'portal' && html`
-      <div class="adm-card">
-        <h3>${tr('dashboard.surfacePreviewTitle', 'Seeing it')}</h3>
-        <p class="adm-text-dim adm-text-base">
-          ${tr('dashboard.surfacePreviewMember', 'This is a page members see once they have signed in. Open your own home in another tab to look at it.')}
-        </p>
-      </div>`}
-
-    <!-- LB mode banner -->
-    ${surface === 'portal' && isLb && html`
-      <div class="adm-card adm-mb-lg" style="border:1px solid #eab308">
-        <h3>${t('dashboard.portalLbMode')}</h3>
-        <p class="adm-text-dim adm-mb-sm">${t('dashboard.portalLbReadOnly')}</p>
-        <div class="adm-erow"><span class="adm-elabel">${t('dashboard.portalLbOrigin')}</span><span class="adm-eval">${escHtml(meta.lb_mode.origin_url || '-')}</span></div>
-        <div class="adm-erow"><span class="adm-elabel">${t('dashboard.portalLbLastSync')}</span><span class="adm-eval">${meta.lb_mode.last_sync ? dt(meta.lb_mode.last_sync) : '-'}</span></div>
-        ${meta.lb_mode.last_error && html`<div class="adm-erow"><span class="adm-elabel">${t('dashboard.portalLbError')}</span><span class="adm-text-error">${escHtml(meta.lb_mode.last_error)}</span></div>`}
-        <button class="adm-btn-action adm-mt-sm" onClick=${doLbSync}>${t('dashboard.portalLbSyncNow')}</button>
-      </div>
-    `}
-
-    <!-- Everything below belongs to the FRONT PAGE and to nothing else: its preview, the public
-         header links, the raw HTML template, the portal records that template reads, and the KV
-         pairs. A member's home has none of those, so the switch hides them rather than showing an
-         operator controls that would do nothing where they are standing. -->
-    ${surface === 'portal' && html`
-    <!-- Preview. WHICH page this shows is not obvious and got it wrong for months: the site's root
-         forwards a signed-in person to their own home (views/landing.js), so an operator standing
-         here saw their home in the frame and had no way to tell it was not the page they were about
-         to edit. /v1/portal is the front page itself and forwards nobody. A custom template has no
-         such forward: it IS what the root hands every visitor, so once one is saved the frame goes
-         back to the root, which is then the only place the template can be seen. -->
-    <div class="adm-card">
-      <h3>${t('dashboard.portalPreview')}</h3>
-      <iframe src=${(hasCustom ? '/?_preview=' : '/v1/portal?_preview=') + previewNonce} style="width:100%;height:400px;border:1px solid var(--glass-border);border-radius:8px;background:#fff" sandbox="allow-same-origin allow-scripts"></iframe>
-      <p class="adm-text-dim adm-text-base adm-mt-sm">
-        ${t('dashboard.portalPreviewNote')}
-        ${' '}
-        <a href=${hasCustom ? '/' : '/v1/portal'} target="_blank" rel="noopener">${t('dashboard.portalPreviewOpen')}</a>
-      </p>
-      <div class="adm-flex adm-mt-sm">
-        <button class="adm-btn-action" onClick=${doClearCache}>${t('dashboard.portalClearCache')}</button>
-      </div>
-    </div>
-
-    <!-- Header navigation -->
-    <div class="adm-card">
-      <h3>${t('dashboard.portalNavTitle')}</h3>
-      <p class="adm-text-dim adm-text-base adm-mb-sm">${t('dashboard.portalNavExplain')}</p>
-      ${navLinks === null
-        ? html`<div class="adm-text-dim">${t('dashboard.loading')}...</div>`
-        : html`
-          <table>
-            <thead><tr>
-              <th>${t('dashboard.portalNavLink')}</th>
-              <th>${t('dashboard.portalNavVisible')}</th>
-              <th>${t('dashboard.portalNavOrder')}</th>
-            </tr></thead>
-            <tbody>
-              ${navLinks.map((l, idx) => html`<tr key=${l.id}>
-                <td>${t(HEADER_LINK_LABELS[l.id]) || l.id}</td>
-                <td>
-                  <label class="adm-flex-center">
-                    <input type="checkbox" checked=${l.visible} onChange=${() => toggleNav(l.id)} />
-                    <span class="adm-text-dim">${l.visible ? t('dashboard.portalNavShown') : t('dashboard.portalNavHidden')}</span>
-                  </label>
-                </td>
-                <td>
-                  <button class="adm-btn-sm" disabled=${idx === 0} onClick=${() => moveNav(idx, -1)} title=${t('dashboard.portalNavMoveUp')}>↑</button>
-                  <button class="adm-btn-sm" disabled=${idx === navLinks.length - 1} onClick=${() => moveNav(idx, 1)} title=${t('dashboard.portalNavMoveDown')}>↓</button>
-                </td>
-              </tr>`)}
-            </tbody>
-          </table>
-          <div class="adm-flex adm-mt-sm">
-            <button class="adm-btn-action" disabled=${navSaving} onClick=${saveNav}>${t('dashboard.portalNavSave')}</button>
+      ${isLb && html`
+        <div class="og-box" style="margin-bottom: 16px">
+          <span class="og-box-label">${P('lb.title')}</span>
+          ${P('lb.lead', { origin: escHtml(meta.lb_mode.origin_url || '-') })}
+          <div class="og-doors" style="margin-top: 10px">
+            <button type="button" class="og-door og-door--quiet" onClick=${doLbSync}>${P('lb.sync')}</button>
+            <span class="adm-pt-note">${meta.lb_mode.last_sync ? P('lb.lastSync', { when: dt(meta.lb_mode.last_sync) }) : P('lb.never')}</span>
           </div>
-        `}
-    </div>
+        </div>`}
 
-    <!-- Template editor -->
-    <div class="adm-card">
-      <h3>${t('dashboard.portalTemplate')}</h3>
-      <div class="adm-erow">
-        <span class="adm-elabel">${t('dashboard.portalActiveSource')}</span>
-        <span class="adm-eval">
-          ${hasCustom
-            ? html`<span class="adm-badge adm-badge-active">${t('dashboard.portalCustomActive')}</span>${tmpl.updated_at ? html` · ${dt(tmpl.updated_at)}` : ''}`
-            : html`<span class="adm-badge adm-badge-info">${t('dashboard.portalDefaultActive')}</span>`}
-        </span>
+      <div class="adm-pt-pin">
+        <button type="button" class="adm-btn" disabled=${saving || !dirty} onClick=${saveLayout}>
+          ${saving ? P('saving') : P('save')}
+        </button>
+        ${dirty
+          ? html`
+            <span class="adm-pt-pin-count">${unsaved === 1 ? P('unsavedOne') : P('unsaved', { n: num(unsaved) })}</span>
+            <button type="button" class="og-door og-door--quiet" onClick=${() => setShowPending(s => !s)}>
+              ${showPending ? P('hideWhat') : P('seeWhat')}
+            </button>
+            <button type="button" class="og-door og-door--quiet" onClick=${undoAll}>${P('undo')}</button>`
+          : html`<span class="adm-pt-pin-note">${P('nothingUnsaved')}</span>`}
+        ${dirty && html`<span class="adm-pt-pin-note">${P('unsavedNote')}</span>`}
       </div>
-      <p class="adm-text-dim adm-text-base adm-mb-sm">
-        ${hasCustom
-          ? t('dashboard.portalCustomExplain')
-          : t('dashboard.portalDefaultExplain').replace('{action}', t('dashboard.portalLoadCurrent'))}
-      </p>
-      <div class="adm-mb-sm">
-        <button class="adm-btn-action" onClick=${loadCurrentAsTemplate}>${t('dashboard.portalLoadCurrent')}</button>
-      </div>
-      <${ExpandableHelp} title=${t('dashboard.portalTagHelpTitle')}>
-        <p>${t('dashboard.portalTagHelpDetail')}</p>
-        <table>
-          <thead><tr><th>Tag</th><th>${t('dashboard.details')}</th></tr></thead>
-          <tbody>
-            <tr><td><code>\{\{config:node_id\}\}</code></td><td>${t('dashboard.tagExConfig')}</td></tr>
-            <tr><td><code>\{\{memory:portal/welcome\}\}</code></td><td>${t('dashboard.tagExMemory')}</td></tr>
-            <tr><td><code>\{\{storage:type\}\}</code></td><td>${t('dashboard.tagExStorage')}</td></tr>
-            <tr><td><code>\{\{kv:site_name\}\}</code></td><td>${t('dashboard.tagExKv')}</td></tr>
-            <tr><td><code>\{\{board:general\}\}</code></td><td>${t('dashboard.tagExBoard')}</td></tr>
-          </tbody>
-        </table>
-      </${ExpandableHelp}>
-      <textarea class="adm-textarea adm-input-full" rows="20" value=${template} onInput=${e => setTemplate(e.target.value)}
-        style="font-size:13px"></textarea>
-      <div class="adm-flex adm-mt-sm">
-        <button class="adm-btn-action" onClick=${saveTemplate}>${t('dashboard.portalSaveTemplate')}</button>
-        <button class="adm-btn-action" onClick=${downloadTemplate}>${t('dashboard.portalDownload')}</button>
-        <button class="adm-btn-action" onClick=${resetTemplate}>${t('dashboard.portalResetDefault')}</button>
-      </div>
-    </div>
 
-    <!-- Memory keys -->
-    <div class="adm-card">
-      <h3>${t('dashboard.portalMemoryKeys')}</h3>
-      <p class="adm-text-dim adm-text-base adm-mb-sm">${t('dashboard.portalMemoryKeysExplain')}</p>
-      ${memKeys === null
-        ? html`<div class="adm-text-dim">${t('dashboard.loading')}...</div>`
-        : memKeys.length === 0
-          ? html`<div class="adm-text-dim">${t('dashboard.portalNoMemoryKeys')}</div>`
-          : html`<table>
-            <thead><tr><th>${t('dashboard.portalKeyLabel')}</th><th>${t('dashboard.portalValueLabel')}</th><th></th></tr></thead>
-            <tbody>
-              ${memKeys.map(k => html`<tr>
-                <td><code>${escHtml(k.key)}</code></td>
-                <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${escHtml(String(k.value || ''))}</td>
-                <td><button class="adm-btn-sm" onClick=${() => delMem(k.key)}>\u2717</button></td>
-              </tr>`)}
-            </tbody>
-          </table>`
-      }
-      <div class="adm-flex-center adm-mt-sm">
-        <input class="adm-input" value=${newKey} onInput=${e => setNewKey(e.target.value)} placeholder="portal/key" style="flex:1" />
-        <input class="adm-input" value=${newVal} onInput=${e => setNewVal(e.target.value)} placeholder="value" style="flex:2" />
-        <button class="adm-btn-action" onClick=${addMem}>+ ${t('dashboard.portalUpload')}</button>
-      </div>
-    </div>
+      ${showPending && dirty && html`
+        <div class="adm-pt-pin-list">
+          <ul>
+            ${blocks.map((b, i) => html`<li key=${b.key}>${i + 1}. ${b.id}${b.hidden ? ` · ${P('parts.chipHidden')}` : ''}</li>`)}
+          </ul>
+        </div>`}
 
-    <!-- KV pairs -->
-    <div class="adm-card">
-      <h3>${t('dashboard.portalKvPairs')}</h3>
-      <p class="adm-text-dim adm-text-base adm-mb-sm">${t('dashboard.portalKvExplain')}</p>
-      ${kvKeys.length === 0
-        ? html`<div class="adm-text-dim">${t('dashboard.portalNoKvPairs')}</div>`
-        : html`<table>
-          <thead><tr><th>${t('dashboard.portalKeyLabel')}</th><th>${t('dashboard.portalValueLabel')}</th></tr></thead>
-          <tbody>${kvKeys.map(k => html`<tr><td><code>${escHtml(k)}</code></td><td class="adm-eval">${escHtml(kv[k])}</td></tr>`)}</tbody>
-        </table>`
-      }
-    </div>
+      <${RightNow} facts=${facts} number=${n()} onOpenPage=${openPage} onClearCache=${doClearCache} />
 
-    <!-- AI Chat -->
-    <div class="adm-card">
-      <h3>${t('dashboard.portalAiChat')}</h3>
-      <p class="adm-text-dim adm-text-base">${t('dashboard.portalAiExplain')}</p>
-      <div class="adm-mt-sm adm-mb-sm">
-        <button class="adm-btn-action" onClick=${copyPrompt}>${t('dashboard.portalAiLoadPrompt')}</button>
-      </div>
-      <p class="adm-text-dim adm-text-base adm-mb-sm">${t('dashboard.portalAiBundleExplain')}</p>
-      <textarea class="adm-textarea adm-input-full" rows="6" value=${aiBundle}
-        onInput=${e => setAiBundle(e.target.value)}
-        placeholder=${t('dashboard.portalAiBundlePlaceholder')} style="font-size:13px"></textarea>
-      <div class="adm-flex adm-mt-sm">
-        <button class="adm-btn-action" onClick=${importAiBundle}>${t('dashboard.portalAiImport')}</button>
-      </div>
-    </div>
+      <section class="og-sec" id="adm-pt-parts">
+        <div class="og-sec-h"><h2>${P('parts.title')}<small>${n()}</small></h2>
+          <div class="og-doors">
+            <button type="button" class="og-door og-door--quiet" onClick=${startFromDefault}>${P('parts.startDefault')}</button>
+            ${source === 'stored' && html`
+              <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${backToDefault}>${P('parts.backDefault')}</button>`}
+          </div></div>
 
-    `}
+        <div class="adm-pt-tabs">
+          ${SURFACES.map(s => html`
+            <button type="button" key=${s} class=${'adm-pt-tab' + (surface === s ? ' on' : '')}
+              onClick=${() => { setSurface(s); setOpenPart(null); }}>${P('surface.' + s)}</button>`)}
+        </div>
+        <p class="adm-pt-tabnote">${P('surface.' + surface + 'Note')}</p>
 
-    <!-- The change log is the NODE's, not the front page's: arranging a member home writes to it
-         too, so it stays visible whichever page the switch is on. -->
-    <div class="adm-card">
-      <h3>${t('dashboard.portalChangelog')}</h3>
-      ${changes.length === 0
-        ? html`<div class="adm-text-dim">${t('dashboard.portalNoChanges')}</div>`
-        : html`<table>
-          <thead><tr><th>${t('dashboard.action')}</th><th>${t('dashboard.by')}</th><th>${t('dashboard.created')}</th></tr></thead>
-          <tbody>
-            ${changes.slice(0, 20).map(c => html`<tr>
-              <td><${Badge} type=${c.action} /></td>
-              <td class="mono" style="font-size:.75rem">${escHtml(c.changed_by || c.changedBy || '-')}</td>
-              <td class="adm-text-dim">${dt(c.changed_at || c.changedAt)}</td>
-            </tr>`)}
-          </tbody>
-        </table>`
-      }
-    </div>
-    <${ConfirmUI} />
-  `;
+        ${problems.length > 0 && html`
+          <div class="og-box" style="margin-bottom: 14px">
+            <span class="og-box-label">${P('parts.leftOut')}</span>
+            <ul style="margin: 0; padding-left: 18px">
+              ${problems.map((pr, i) => html`<li key=${i}>${pr}</li>`)}
+            </ul>
+          </div>`}
+
+        <div class="adm-pt-bench">
+          <div>
+            <${PartsList} blocks=${blocks} catalog=${catalog} passages=${passages} open=${openPart}
+              onOpen=${setOpenPart} onMove=${move} onToggle=${toggleHidden} onRemove=${removePart}
+              onProp=${setProp} onPassage=${setPassage} />
+            <${AddPart} catalog=${catalog} blocks=${blocks} onAdd=${addPart} />
+          </div>
+          <div class="adm-pt-side">
+            <${PagePreview} surface=${surface} hasCustom=${hasCustom} nonce=${previewNonce}
+              unsaved=${unsaved} shown=${blocks.filter(b => !b.hidden).length} />
+          </div>
+        </div>
+      </section>
+
+      ${isPortal && html`
+        <${WhichVersion} hasCustom=${hasCustom} source=${source} parts=${blocks.length} number=${n()} />
+        <${MenuLinks} links=${navLinks} labels=${HEADER_LINK_LABELS} saving=${navSaving}
+          onToggle=${toggleNav} onMove=${moveNav} onSave=${saveNav} number=${n()} />
+        <${OwnHtml} hasCustom=${hasCustom} updatedAt=${tmpl.updated_at} template=${template}
+          onTemplate=${setTemplate} onSave=${saveTemplate} onLoadCurrent=${loadCurrentAsTemplate}
+          onDownload=${downloadTemplate} onDelete=${deleteTemplate} number=${n()} />
+        <${SavedTexts} memKeys=${memKeys} kv=${meta.kv} newKey=${newKey} newVal=${newVal}
+          onKey=${setNewKey} onVal=${setNewVal} onAdd=${addText} onDelete=${deleteText} number=${n()} />`}
+
+      <${AskAi} paste=${paste} onPaste=${setPaste} onCopyLayout=${copyLayoutPrompt}
+        onCopySite=${copySitePrompt} onApply=${applyPaste} busy=${saving} number=${n()} />
+
+      <${WhatChanged} changes=${changes} versions=${versions} onVersions=${showVersions}
+        onRestore=${goBackTo} number=${n()} />
+
+      <${ConfirmUI} />
+    </div>`;
 }

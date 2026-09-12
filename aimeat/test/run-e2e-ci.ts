@@ -552,6 +552,9 @@ const ALL_SUITES = [
     // The Hooks page's doors: which moments decide, binding one to a published action, the
     // reference nothing is published under, and clearing.
     'test/e2e-admin-hooks-page.ts',
+    // The Portal page's reads: the facts its first section states, the parts with the words under
+    // their names, the save that makes the page the operator's own, and every refusal for a member.
+    'test/e2e-admin-portal-page.ts',
     'test/e2e-living-pulse.ts',
     // Every core scheduled job fired through the operator's trigger door, on a node of its own
     // (40310) with an SMTP sink, short windows and the flags the seeding keys on. Lane 0.

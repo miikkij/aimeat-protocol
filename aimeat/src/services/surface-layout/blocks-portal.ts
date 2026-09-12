@@ -19,7 +19,17 @@
  * @structure PORTAL_BLOCKS
  * @usage
  *   import { PORTAL_BLOCKS } from './blocks-portal.js';
+ *   THE SUMMARY HAS A TRANSLATION BESIDE IT. `summary` here is the English every node sends and the
+ *   AI prompt is generated from; the operator's page prefers locales/<lang> surface.blocks.<id>.summary
+ *   and falls back to this one. A new block, or a rewritten sentence, moves both: the locale key is
+ *   what a Finnish operator actually reads.
  * @version-history
+ *   v1.2.0 — 2026-09-12 — The summaries an operator reads say what the part is, in plain words.
+ *     Eleven of them described the part the way the front page pitches itself ("Loved the demo?
+ *     Take one home", "Safe is a list, not a word"), which reads as a slogan rather than as an
+ *     answer to "what is this row". The blocks, their ids and their props are unchanged; only the
+ *     sentence the admin page and the AI prompt print. The operator-facing LABELS move with them,
+ *     in locales/en|fi|es surface.blocks.portal.*.
  *   v1.1.0 — 2026-08-28 — The showroom: six blocks for the front page as a demo floor for the
  *     store (showroom-hero, wall-intro, store, trust, rooms, close). portal.store is the first
  *     portal block gated on config: it exists only when the node has a store to send people to.
@@ -47,7 +57,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'One line saying what this node is, above everything that asks the visitor to do something.',
+        summary: 'One line saying what this site is, above everything that asks the visitor to do something.',
     },
     {
         id: 'portal.wish',
@@ -93,7 +103,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: ['site'],
         props: {},
         maxPerSurface: 1,
-        summary: 'What shipped here lately, folded to one line.',
+        summary: 'The newest entries from this site\'s change log, folded to one line.',
     },
     {
         id: 'portal.gallery',
@@ -117,7 +127,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
             },
         },
         maxPerSurface: 1,
-        summary: 'The wall of apps people published here, with a search and a sort.',
+        summary: 'Every app people have published here, with a search box and a sort order.',
     },
     {
         id: 'portal.totals',
@@ -127,7 +137,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: ['apps', 'organisms', 'agents'],
         props: {},
         maxPerSurface: 1,
-        summary: 'Cumulative counters: how many apps, spaces and agents this node holds.',
+        summary: 'How many apps, spaces and agents this site has.',
     },
     {
         id: 'portal.hero',
@@ -137,7 +147,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'The ownership question — owner or tenant — and the three ways to answer it.',
+        summary: 'Asks whether the visitor wants to own this or rent it, and offers three ways to answer.',
     },
     {
         id: 'portal.agent-prompt',
@@ -167,7 +177,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'What this node did today, and the line offering the same to the visitor.',
+        summary: 'What this site did today, and the line offering the same to the visitor.',
     },
     {
         id: 'portal.transparency',
@@ -177,7 +187,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'One line on how this node marks what a model wrote, and a link to the page that states it properly.',
+        summary: 'One line on how this site marks what a model wrote, and a link to the page that states it properly.',
     },
     {
         id: 'portal.text',
@@ -193,7 +203,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
             },
         },
         maxPerSurface: 8,
-        summary: 'A passage the operator wrote, stored as a portal record and shown here.',
+        summary: 'A text you saved, shown here by name.',
     },
     {
         id: 'portal.board',
@@ -235,7 +245,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
             },
         },
         maxPerSurface: 1,
-        summary: 'The showroom hero: the claim, the wish box as the one action, and the three quieter doors (get your own, connect your AI, let your AI register you).',
+        summary: 'The big headline at the top, the box a visitor types a wish into, and three smaller links under it: get your own, connect your AI, let your AI register you.',
     },
     {
         id: 'portal.wall-intro',
@@ -247,11 +257,11 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
             money: {
                 type: 'boolean',
                 default: true,
-                description: 'Whether the payment-rails passage renders under the introduction: cards through Stripe, agents paying agents through x402, and the live proof link when this node has one.',
+                description: 'Whether the payment-rails passage renders under the introduction: cards through Stripe, agents paying agents through x402, and the live proof link when this site has one.',
             },
         },
         maxPerSurface: 1,
-        summary: 'What the wall below is: whole systems built in an hour by chatting, several of which earn their keep. Sits directly above the wall.',
+        summary: 'A few lines above the app list saying what the apps are: whole systems built in an hour by chatting, several of which earn money.',
     },
     {
         id: 'portal.store',
@@ -274,7 +284,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
             },
         },
         maxPerSurface: 1,
-        summary: 'Loved the demo? Take one home. The store door, the three reasons, and the price ladder read from the store itself. Offered only when this node has a store (AIMEAT_SITE_STORE_URL).',
+        summary: 'A link to the shop with its price list, read from the shop itself, and three reasons to buy. Shown only when this site has a shop set up (AIMEAT_SITE_STORE_URL).',
     },
     {
         id: 'portal.trust',
@@ -284,7 +294,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'Safe is a list, not a word: every action signed, AI content labeled, consent you can revoke, GDPR as buttons, and the link to how this node marks AI content.',
+        summary: 'What this site promises: every action signed, AI content labelled, consent you can withdraw, GDPR requests as buttons, and a link to how AI content is marked.',
     },
     {
         id: 'portal.rooms',
@@ -294,7 +304,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'Two cards: adopt agents from the incubator (its door when this node has one), and nobody in it but you.',
+        summary: 'Two cards: agents a visitor can take into use from the incubator, and a space only they can see.',
     },
     {
         id: 'portal.close',
@@ -304,6 +314,6 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'The last word: the demo is free and does not mind being poked, with the way back up to the wish box and, when there is one, the store.',
+        summary: 'The closing words: this is free to try, with the way back up to the wish box and, when there is one, the shop.',
     },
 ];

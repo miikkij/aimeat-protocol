@@ -17,6 +17,10 @@
  * @usage  pnpm check:locales           (exit 1 on any violation)
  *         pnpm check:locales --list    (coverage only, always exit 0)
  * @version-history
+ *   v1.4.0 — 2026-09-12 — missingBlockWords(): the Portal page prints a name and a sentence for
+ *     every part a page can be built from, so each block id in the surface-layout registry needs
+ *     surface.blocks.<id>.label and .summary in en.json. Before this, the summary had no locale key
+ *     at all: a Finnish operator read a fully Finnish page with twenty English sentences in it.
  *   v1.0.0 — 2026-08-12 — Initial, with the arrival of Spanish as the third language.
  *   v1.1.0 — 2026-08-13 — Rules moved into lib/locale-files.ts, shared with locale:extract and
  *     locale:merge so the three tools cannot disagree about what a valid translation is.
@@ -67,6 +71,31 @@ function missingScopeLabels(en: Record<string, unknown>): string[] {
     }
   }
   return out;
+}
+
+/**
+ * The Portal page prints one sentence under every part it offers, and an operator reads it in their
+ * own language. The registry's English `summary` is the fallback and the AI prompt's source; the
+ * page prefers surface.blocks.<id>.summary, beside the label it already reads. A block added
+ * without those two words shows a Finnish operator an English sentence, or a raw id.
+ *
+ * The source of truth is the three registry files, read the way the other two checks read theirs.
+ */
+function missingBlockWords(en: Record<string, unknown>): string[] {
+  const base = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'services', 'surface-layout');
+  const out: string[] = [];
+  for (const file of ['blocks-portal.ts', 'blocks-home.ts', 'registry.ts']) {
+    let src: string;
+    try { src = readFileSync(join(base, file), 'utf-8'); } catch { continue; }
+    for (const m of src.matchAll(/^\s{8}id: '([a-z-]+\.[a-z-]+)',$/gm)) {
+      const id = m[1];
+      for (const word of ['label', 'summary']) {
+        const key = `surface.blocks.${id}.${word}`;
+        if (!(key in en)) out.push(`${key} — the ${word === 'label' ? 'name' : 'sentence'} an operator reads for the "${id}" part`);
+      }
+    }
+  }
+  return [...new Set(out)];
 }
 
 /**
@@ -158,6 +187,11 @@ if (listOnly) process.exit(0);
 // rather than falling back to English. en.json cannot notice a key nobody ever wrote; the code can.
 for (const missing of missingScopeLabels(en)) {
   failures.push(`✖ [en] the agent permission editor will render a raw key: ${missing}\n      → add it to locales/en.json (and fi/es), beside the other scopeUi labels`);
+}
+
+// The Portal page's part list is key-derived the same way: a block with no words is an id on screen.
+for (const missing of missingBlockWords(en)) {
+  failures.push(`✖ [en] the Portal page has no words for a part: ${missing}\n      → add it to locales/en.json (and fi/es), beside the other surface.blocks entries`);
 }
 
 // The app-grant consent screen has the same key-derived contract against a different code source.
