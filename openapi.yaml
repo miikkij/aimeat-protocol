@@ -54698,7 +54698,15 @@ paths:
       operationId: getAdminWork
       tags: [Work Queue, Admin]
       summary: List all work items
-      description: Operator only. Lists every work item across all providers and requesters.
+      description: |
+        Operator only. Lists every work item across all providers and requesters.
+
+        `cost` is an OBJECT, and has been since work was priced: it was declared here as a number,
+        which is what the admin page believed when it printed it with a number formatter. The
+        `in_escrow` inside it is the money currently out of the asking agent's OWNER's balance —
+        agents hold none of their own — and it is what an operator surface sums to say how much is
+        held. `ttl_expires_at` on an item still in `pending`, `accepted` or `in_progress` says
+        whether the hourly expiry sweep is behind.
       security:
         - BearerAuth: []
       responses:
@@ -54724,7 +54732,17 @@ paths:
                                 action_id: { type: string }
                                 provider_gaii: { type: string }
                                 requester_gaii: { type: string }
-                                cost: { type: number }
+                                cost:
+                                  type: object
+                                  properties:
+                                    base_price: { type: integer, description: What the provider is paid on delivery. }
+                                    network_fee: { type: integer, description: Split between the nodes and the registry, part of it burned. }
+                                    total: { type: integer, description: base_price plus network_fee, the whole price of the job. }
+                                    in_escrow:
+                                      type: integer
+                                      description: >-
+                                        Held out of the asking agent's owner's balance while the item is open.
+                                        Returned in full on expiry; paid out on delivery.
                                 created_at: { type: string }
                                 updated_at: { type: string }
                                 ttl_expires_at: { type: string }

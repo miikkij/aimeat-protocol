@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.46.0 -- 2026-09-12 -- Add e2e-admin-work-page.ts to ALL_SUITES: the shape of a row in
+ *            GET /v1/admin/work, which was only ever asserted on an empty node, and the escrow
+ *            inside its cost object. Not in the guard tier yet.
  *   v1.45.0 -- 2026-09-12 -- Add e2e-admin-organisms-page.ts to ALL_SUITES: GET /v1/admin/organisms,
  *            which is new, and the repair behind it. Not in the guard tier yet.
  *   v1.44.0 -- 2026-09-12 -- Add e2e-admin-sso-page.ts to ALL_SUITES: a connection can be complete
@@ -566,6 +569,9 @@ const ALL_SUITES = [
     // The Portal page's reads: the facts its first section states, the parts with the words under
     // their names, the save that makes the page the operator's own, and every refusal for a member.
     'test/e2e-admin-portal-page.ts',
+    // The one read the Work page is folded from: the shape of a row, which nothing has ever held,
+    // and the escrow inside cost that "morsels held" sums.
+    'test/e2e-admin-work-page.ts',
     // The one read the Owners page is folded from: the field set every figure, chip and filter is
     // counted from, and the two lifecycle writes moving the two fields the page draws.
     'test/e2e-admin-owners-page.ts',
