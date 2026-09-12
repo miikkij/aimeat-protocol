@@ -7,6 +7,11 @@
  *   modules, holds its own module state, has no back-dependency on the entry module. Carved from main.js.
  * @usage import { loadCortexExtensions, openCortexEditor, openPromptBuilder, getCortexOwnerToken } from './cortex.js'
  * @version-history
+ *   v1.2.0 — 2026-09-13 — The extension popup and the extension editor wear the dialog frame the
+ *     rest of the catalog's dialogs wear: markup with classes instead of inline styles, the title
+ *     on the dialog slab, copy and remove as underlined words, save as the one loud slab, the
+ *     status line as one class that turns coral on an error, every word through t() (they were
+ *     English in every language, with emoji), and the overlays toggled by `hidden`.
  *   v1.1.0 — 2026-08-27 — The prompt builder gains the TRACK choice (TARGET-074): Classic or
  *     Atelier as the first decision, each fetching its own node-served guide, never mixed.
  *     Improving an app inherits its recorded track and hides the picker.
@@ -82,14 +87,19 @@ function loadCortexExtensions() {
     .catch(function(e) { console.warn('Cortex bar load failed:', e); });
 }
 
+/** A copy word for a block of text: the underlined action every dialog uses. */
+function cortexCopyBtn(text, labelKey) {
+  return '<button type="button" class="modal-btn secondary cx-copy" onclick="cortexCopy(\'' + cortexArg(text) + '\',this)">' + cortexEsc(t(labelKey)) + '</button>';
+}
+
 function showCortexPopup(encodedName) {
   var config = loadConfig();
   var url = config.aimeatUrl.replace(/\/+$/, '');
   var el = document.getElementById('cortex-popup-content');
-  el.innerHTML = '<p>Loading...</p>';
-  document.getElementById('cortex-popup-overlay').style.display = 'flex';
+  el.innerHTML = '<p class="cx-sub">' + cortexEsc(t('cortex.loading')) + '</p>';
+  document.getElementById('cortex-popup-overlay').hidden = false;
 
-  if (!cortexToken) { el.innerHTML = '<p>No auth token available</p>'; return; }
+  if (!cortexToken) { el.innerHTML = '<p class="cx-sub">' + cortexEsc(t('cortex.noToken')) + '</p>'; return; }
 
   fetch(url + '/v1/cortex/' + encodedName, {
     headers: { 'Authorization': 'Bearer ' + cortexToken }
@@ -98,38 +108,38 @@ function showCortexPopup(encodedName) {
     .then(function(data) {
       var ext = data.data;
       var comps = ext.components || [];
-      var html = '<h2 style="margin-top:0">' + cortexEsc(ext.name) + '</h2>';
-      html += '<p style="color:var(--text-muted)">' + cortexEsc(ext.description || '') + '</p>';
-      html += '<h3 style="font-size:.9rem">Available for your apps:</h3>';
+      var html = '<h2>' + cortexEsc(ext.name) + '</h2>';
+      if (ext.description) html += '<p class="cx-desc">' + cortexEsc(ext.description) + '</p>';
+      html += '<div class="cx-label">' + cortexEsc(t('cortex.forApps')) + '</div>';
 
-      // Libs
+      // Libs: the script tag an app loads, and what the library offers once loaded.
       comps.filter(function(c) { return c.type === 'lib'; }).forEach(function(lib) {
         var scriptUrl = url + '/v1/cortex/' + encodedName + '/libs/' + encodeURIComponent(lib.filename);
         var tag = '<script src="' + scriptUrl + '"><\/script>';
-        html += '<div style="margin-bottom:1rem">'
-          + '<div style="font-weight:600;font-size:.85rem">&#x1F4E6; Lib: ' + cortexEsc(lib.filename) + '</div>'
-          + '<div style="font-family:monospace;font-size:.75rem;background:var(--hover);padding:8px;border-radius:6px;margin-top:4px;word-break:break-all">' + cortexEsc(tag) + '</div>'
-          + '<button onclick="cortexCopy(\'' + cortexArg(tag) + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy</button>';
+        html += '<div class="cx-part">'
+          + '<div class="cx-part-name">' + cortexEsc(t('cortex.lib')) + ' <code>' + cortexEsc(lib.filename) + '</code></div>'
+          + '<pre class="cx-code">' + cortexEsc(tag) + '</pre>'
+          + cortexCopyBtn(tag, 'cortex.copy');
         if (lib.api_surface) {
-          html += '<div style="font-size:.8rem;font-weight:600;margin-top:8px">API Surface:</div>'
-            + '<div style="font-family:monospace;font-size:.75rem;background:var(--hover);padding:8px;border-radius:6px;margin-top:4px;white-space:pre-wrap">' + cortexEsc(lib.api_surface) + '</div>'
-            + '<button onclick="cortexCopy(\'' + cortexArg(lib.api_surface) + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy API</button>';
+          html += '<div class="cx-part-name">' + cortexEsc(t('cortex.apiSurface')) + '</div>'
+            + '<pre class="cx-code cx-code--api">' + cortexEsc(lib.api_surface) + '</pre>'
+            + cortexCopyBtn(lib.api_surface, 'cortex.copyApi');
         }
         html += '</div>';
       });
 
       // Schemas
       comps.filter(function(c) { return c.type === 'schema'; }).forEach(function(s) {
-        html += '<div style="margin-bottom:.5rem;font-size:.85rem">&#x1F4D0; Schema: <code>' + cortexEsc(s.key_pattern) + '</code> &mdash; data validated automatically</div>';
+        html += '<div class="cx-part cx-part--line">' + cortexEsc(t('cortex.schema')) + ' <code>' + cortexEsc(s.key_pattern) + '</code>: ' + cortexEsc(t('cortex.schemaNote')) + '</div>';
       });
 
       // Prompts
       comps.filter(function(c) { return c.type === 'prompt'; }).forEach(function(p) {
         var preview = (p.content || '').substring(0, 150);
-        html += '<div style="margin-bottom:.5rem">'
-          + '<div style="font-size:.85rem">&#x1F4AC; Prompt: ' + cortexEsc(p.name) + '</div>'
-          + '<div style="font-size:.75rem;color:var(--text-muted)">&ldquo;' + cortexEsc(preview) + '...&rdquo;</div>'
-          + '<button onclick="cortexCopy(\'' + cortexArg(p.content) + '\',this)" style="font-size:.7rem;margin-top:2px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy Prompt</button>'
+        html += '<div class="cx-part">'
+          + '<div class="cx-part-name">' + cortexEsc(t('cortex.prompt')) + ' ' + cortexEsc(p.name) + '</div>'
+          + '<div class="cx-sub">&ldquo;' + cortexEsc(preview) + '&hellip;&rdquo;</div>'
+          + cortexCopyBtn(p.content, 'cortex.copyPrompt')
           + '</div>';
       });
 
@@ -138,24 +148,31 @@ function showCortexPopup(encodedName) {
       var isOwner = false;
       try { var _me = currentOwnerName(); isOwner = !!_me && ext.installed_by === _me; } catch(e) {}
       if (isOwner) {
-        html += '<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border-subtle)">'
-          + '<button onclick="window._launcher.openCortexEditor(\'' + encodedName + '\')" style="padding:6px 16px;border-radius:8px;border:1px solid var(--accent,#34d399);background:transparent;color:var(--accent,#34d399);cursor:pointer;font-size:.85rem">&#x1F6E0;&#xFE0F; Edit Extension</button>'
+        html += '<div class="cx-owner">'
+          + '<button type="button" class="modal-btn secondary" onclick="window._launcher.openCortexEditor(\'' + encodedName + '\')">' + cortexEsc(t('cortex.edit')) + '</button>'
           + '</div>';
       }
 
       el.innerHTML = html;
     })
     .catch(function(e) {
-      el.innerHTML = '<p>Error: ' + cortexEsc(e.message) + '</p>';
+      el.innerHTML = '<p class="cx-status cx-status--err">' + cortexEsc(t('cortex.loadFailed').replace('{msg}', e.message)) + '</p>';
     });
 }
 
 function cortexCopy(text, btn) {
   navigator.clipboard.writeText(text.replace(/\\n/g, '\n')).then(function() {
     var orig = btn.textContent;
-    btn.textContent = 'Copied!';
+    btn.textContent = t('cortex.copied');
     setTimeout(function() { btn.textContent = orig; }, 1500);
   });
+}
+
+/** The editor's one status line: what is happening, and whether it went wrong. */
+function cortexEditorStatus(text, isError) {
+  var el = document.getElementById('cortex-editor-status');
+  el.textContent = text;
+  el.className = 'cx-status' + (isError ? ' cx-status--err' : '');
 }
 
 // ── Cortex Extension Editor ───────────────────────
@@ -182,30 +199,32 @@ function openCortexEditor(encodedName) {
   var config = loadConfig();
   var url = config.aimeatUrl.replace(/\/+$/, '');
   var token = getCortexOwnerToken();
-  if (!token) { showNotice('You must be logged in as an owner to edit extensions.'); return; }
+  if (!token) { showNotice(t('cortex.needOwner')); return; }
 
-  var statusEl = document.getElementById('cortex-editor-status');
-  statusEl.textContent = 'Loading extension data...';
-  statusEl.style.color = '#34d399';
+  cortexEditorStatus(t('cortex.loadingData'), false);
   document.getElementById('cortex-editor-manifest').value = '';
   document.getElementById('cortex-editor-libs').innerHTML = '';
   document.getElementById('cortex-editor-name').textContent = '';
   cortexEditorLibCounter = 0;
 
   // Close the detail popup
-  document.getElementById('cortex-popup-overlay').style.display = 'none';
-  document.getElementById('cortex-editor-overlay').style.display = 'flex';
+  document.getElementById('cortex-popup-overlay').hidden = true;
+  document.getElementById('cortex-editor-overlay').hidden = false;
 
   fetch(url + '/v1/cortex/' + encodedName + '/export', {
     headers: { 'Authorization': 'Bearer ' + token }
   })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (!data.data) { statusEl.textContent = 'Error: ' + (data.error || 'Unknown error'); statusEl.style.color = 'var(--accent,#e74c6f)'; return; }
+      if (!data.data) {
+        var why = (data.error && (data.error.message || data.error.code)) || data.error || '';
+        cortexEditorStatus(t('cortex.loadFailed').replace('{msg}', String(why)), true);
+        return;
+      }
       var ext = data.data;
       cortexEditorExtName = ext.name;
       cortexEditorWasActive = (ext.status === 'active');
-      document.getElementById('cortex-editor-name').textContent = ext.name + (cortexEditorWasActive ? ' (active)' : ' (inactive)');
+      document.getElementById('cortex-editor-name').textContent = ext.name + ' · ' + t(cortexEditorWasActive ? 'cortex.stateActive' : 'cortex.stateInactive');
       document.getElementById('cortex-editor-manifest').value = ext.manifest || '';
 
       // Render lib editors
@@ -218,21 +237,21 @@ function openCortexEditor(encodedName) {
         libsHtml += cortexEditorLibSection(cortexEditorLibCounter, fname, libs[fname]);
       }
       document.getElementById('cortex-editor-libs').innerHTML = libsHtml;
-      statusEl.textContent = 'Loaded. ' + filenames.length + ' lib file' + (filenames.length !== 1 ? 's' : '') + '.';
+      cortexEditorStatus(t('cortex.loaded').replace('{n}', String(filenames.length)), false);
     })
     .catch(function(e) {
-      statusEl.textContent = 'Error loading: ' + e.message;
-      statusEl.style.color = 'var(--accent,#e74c6f)';
+      cortexEditorStatus(t('cortex.loadFailed').replace('{msg}', e.message), true);
     });
 }
 
+/** One library file in the editor: its name as a field, its source as the code box, and Remove. */
 function cortexEditorLibSection(id, filename, content) {
-  return '<div id="cortex-lib-' + id + '" style="margin-bottom:1rem;border:1px solid var(--border-subtle);border-radius:8px;padding:12px">'
-    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'
-    + '<label style="font-size:.85rem;font-weight:600">Lib: <input type="text" value="' + cortexEsc(filename) + '" data-lib-name="' + id + '" style="background:var(--bg-subtle);border:1px solid var(--border-subtle);border-radius:4px;padding:2px 6px;color:var(--text);font-family:monospace;font-size:.8rem;width:200px" /></label>'
-    + '<button onclick="document.getElementById(\'cortex-lib-' + id + '\').remove()" style="font-size:.7rem;padding:2px 8px;border-radius:4px;border:1px solid rgba(232,86,74,.3);background:transparent;color:#E8564A;cursor:pointer">Remove</button>'
+  return '<div id="cortex-lib-' + id + '" class="cx-lib">'
+    + '<div class="cx-lib-head">'
+    + '<label class="cx-lib-name">' + cortexEsc(t('cortex.libName')) + ' <input type="text" class="modal-input" value="' + cortexEsc(filename) + '" data-lib-name="' + id + '" /></label>'
+    + '<button type="button" class="modal-btn danger" onclick="document.getElementById(\'cortex-lib-' + id + '\').remove()">' + cortexEsc(t('cortex.remove')) + '</button>'
     + '</div>'
-    + '<textarea data-lib-content="' + id + '" spellcheck="false" style="width:100%;min-height:150px;background:var(--bg-subtle);color:var(--text);border:1px solid var(--border-subtle);border-radius:8px;padding:10px;font-family:monospace;font-size:.78rem;resize:vertical;tab-size:2">' + cortexEsc(content || '') + '</textarea>'
+    + '<textarea data-lib-content="' + id + '" class="cx-code cx-code--lib" spellcheck="false">' + cortexEsc(content || '') + '</textarea>'
     + '</div>';
 }
 
@@ -261,18 +280,16 @@ function cortexEditorSave() {
   var config = loadConfig();
   var url = config.aimeatUrl.replace(/\/+$/, '');
   var token = getCortexOwnerToken();
-  if (!token) { showNotice('No auth token available.'); return; }
+  if (!token) { showNotice(t('cortex.needOwner')); return; }
 
   var manifest = document.getElementById('cortex-editor-manifest').value;
-  if (!manifest.trim()) { showNotice('Manifest cannot be empty.'); return; }
+  if (!manifest.trim()) { showNotice(t('cortex.manifestEmpty')); return; }
 
   var libs = cortexEditorCollectLibs();
-  var statusEl = document.getElementById('cortex-editor-status');
   var saveBtn = document.getElementById('cortex-editor-save-btn');
   var name = cortexEditorExtName;
 
-  statusEl.textContent = 'Saving...';
-  statusEl.style.color = '#34d399';
+  cortexEditorStatus(t('cortex.saving'), false);
   saveBtn.disabled = true;
 
   // Atomic in-place replace: PUT swaps the manifest + libs and PRESERVES lifecycle fields
@@ -292,22 +309,19 @@ function cortexEditorSave() {
     var data = res.data || {};
     if (!res.ok || data.ok === false) {
       var err = data.error || {};
-      var msg = err.message || err.code || 'Save failed';
+      var msg = err.message || err.code || '';
       if (err.details && err.details.errors) msg += ': ' + err.details.errors.join('; ');
-      statusEl.textContent = 'Error: ' + msg;
-      statusEl.style.color = '#E8564A';
+      cortexEditorStatus(t('cortex.saveFailed').replace('{msg}', msg), true);
       return;
     }
     if (data.data && data.data.name) cortexEditorExtName = data.data.name;
-    statusEl.textContent = 'Saved successfully!';
-    statusEl.style.color = '#34d399';
+    cortexEditorStatus(t('cortex.saved'), false);
     // Refresh the cortex bar
     loadCortexExtensions();
   })
   .catch(function(e) {
     saveBtn.disabled = false;
-    statusEl.textContent = 'Error: ' + e.message;
-    statusEl.style.color = '#E8564A';
+    cortexEditorStatus(t('cortex.saveFailed').replace('{msg}', e.message), true);
   });
 }
 
@@ -337,7 +351,7 @@ function cortexEditorExport() {
 }
 
 function closeCortexEditor() {
-  document.getElementById('cortex-editor-overlay').style.display = 'none';
+  document.getElementById('cortex-editor-overlay').hidden = true;
   cortexEditorExtName = null;
 }
 

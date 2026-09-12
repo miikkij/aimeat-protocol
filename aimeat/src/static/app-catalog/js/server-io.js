@@ -17,6 +17,8 @@
  *     and when there is no node to ask — so the grid can show a wait instead of an empty answer.
  *   v2.3.0 — 2026-09-13 — The consents dialog's title is an h2, so it wears the dialog slab like
  *     every other dialog title; its target line takes a class instead of an inline style.
+ *   v2.3.1 — 2026-09-13 — The consents overlay's layout moves to the stylesheet (#consents-overlay),
+ *     so it scrolls like every other dialog instead of centring past the top of a short screen.
  *   v2.0.0 — 2026-08-28 — The showroom skin: community and favourites render as rows (rows.js),
  *     favourites is a third view of its own, the header's sort order applies to both lists, and
  *     the rail reads getCommunityApps / getFavoriteServerApps for its tag counts.
@@ -465,7 +467,6 @@ function openConsents(owner, filename, appName) {
   closeConsents();
   var ov = document.createElement('div');
   ov.id = 'consents-overlay';
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999';
   ov.onclick = function (e) { if (e.target === ov) closeConsents(); };
   var box = document.createElement('div');
   box.className = 'modal';
