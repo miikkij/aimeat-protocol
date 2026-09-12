@@ -411,6 +411,22 @@ await test('GET /v1/admin/push \u2192 200, has enabled field', async () => {
     assert(Array.isArray(body.data?.subscriptions), 'has subscriptions array');
 });
 
+// The Push page draws its trigger list from this field. Without it the page falls back to showing
+// four event types as though all four were live, which is what it did before and is wrong on any
+// node running the default of two.
+await test('GET /v1/admin/push → carries the trigger list the page reads', async () => {
+    const { body } = await json('/v1/admin/push', authed());
+    const types = body.data?.push_notify_types;
+    assert(Array.isArray(types), `push_notify_types is ${typeof types}`);
+    assert(types.length > 0, 'push_notify_types is empty, so the page would say nothing sends');
+    assert(types.every((x: unknown) => typeof x === 'string' && x.length > 0), `not all strings: ${JSON.stringify(types)}`);
+    assert('vapid_public_key' in body.data, 'vapid_public_key is absent, so the page cannot tell one deployed key pair from another');
+    // The switch and the effective state are separate fields on purpose: with the switch on and no
+    // keys, `enabled` is false, and a page with only that field tells the operator their config
+    // says false when it says true.
+    assert(typeof body.data?.push_enabled === 'boolean', `push_enabled is ${typeof body.data?.push_enabled}`);
+});
+
 // ─── CSM ───
 console.log('\nCSM');
 

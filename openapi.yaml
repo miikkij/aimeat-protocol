@@ -50647,8 +50647,14 @@ paths:
                       data:
                         type: object
                         properties:
-                          enabled: { type: boolean }
+                          enabled: { type: boolean, description: 'Effective state: the switch AND the keys AND the web-push module.' }
+                          push_enabled: { type: boolean, description: 'The AIMEAT_PUSH_ENABLED switch on its own, so a page can tell a switched-off service from a keyless one.' }
                           vapid_configured: { type: boolean }
+                          vapid_public_key: { type: string, nullable: true, description: 'The public half of the VAPID pair, already public (served at /v1/push/vapid-key). Null when unset.' }
+                          push_notify_types:
+                            description: 'The mailbox event types that actually trigger a push, from AIMEAT_PUSH_NOTIFY_TYPES.'
+                            type: array
+                            items: { type: string }
                           locales:
                             type: array
                             items: { type: string }
