@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The organism's settings as a page of its own (design canvas "AIMEAT Organismin sivu",
  *   direction A): its own breadcrumb, the metadata as the title's small print, then four sections
- *   under ink rules. Name and description (name, description, interests, the type as preset chips
+ *   with shared B1 headlines. Name and description (name, description, interests, the type as preset chips
  *   plus a free word), who gets in (join policy), who sees (organism visibility, member list), and
  *   archive and delete as one section where the reversible act sits in a dashed box and the
  *   irreversible one in a solid box. A member who did not create the organism gets the leave row.
@@ -17,6 +17,7 @@
  *   import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
  *   <OrganismSettings org ghii isCreator isMember canEdit showToast confirm onBack onChanged onLeave onDeleted />
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose section headlines with poster-section-title.
  *   v1.0.1 — 2026-08-29 — The rail scrolls the content region only (poster-parts scrollTo), never the window.
  *   v1.0.0 — 2026-08-29 — Extracted from home.js and redrawn on the canvas; the type is a preset or any
  *     word of the owner's own.
@@ -198,7 +199,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
         <div class="og-main">
           ${canEdit ? html`
             <section class="og-sec og-sec--first" id="og-set-name">
-              <div class="og-sec-h"><h2>${label('setNameDesc', 'Name and description')}<small>01</small></h2></div>
+              <div class="og-sec-h"><h2 class="poster-section-title">${label('setNameDesc', 'Name and description')}<small>01</small></h2></div>
               <div class="og-fields">
                 <label class="og-field"><span class="og-label">${label('fieldName', 'Name')}</span>
                   <input type="text" class="og-input" value=${form.name} onInput=${(e) => setForm(f => ({ ...f, name: e.target.value }))} /></label>
@@ -215,7 +216,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
             </section>
 
             <section class="og-sec" id="og-set-access">
-              <div class="og-sec-h"><h2>${label('setAccess', 'Who gets in')}<small>02</small></h2></div>
+              <div class="og-sec-h"><h2 class="poster-section-title">${label('setAccess', 'Who gets in')}<small>02</small></h2></div>
               <div class="og-field"><span class="og-label">${label('setJoin', 'Joining')}</span>
                 <${Choice} label=${label('setJoin', 'Joining')} value=${form.join_policy} onPick=${(id) => setForm(f => ({ ...f, join_policy: id }))}
                   options=${JOIN.map(id => ({ id, label: t(`organisms.policyShort.${id}`) || id }))} />
@@ -224,7 +225,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
             </section>
 
             <section class="og-sec" id="og-set-vis">
-              <div class="og-sec-h"><h2>${label('setVisibility', 'Who sees')}<small>03</small></h2></div>
+              <div class="og-sec-h"><h2 class="poster-section-title">${label('setVisibility', 'Who sees')}<small>03</small></h2></div>
               <div class="og-fields og-fields--2">
                 <div class="og-field"><span class="og-label">${label('setOrganismVis', 'Organism')}</span>
                   <${Choice} label=${label('setOrganismVis', 'Organism')} value=${form.visibility} onPick=${(id) => setForm(f => ({ ...f, visibility: id }))}
@@ -247,7 +248,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
             </div>
 
             <section class="og-sec" id="og-set-danger">
-              <div class="og-sec-h"><h2>${label('setDanger', 'Archive and delete')}<small>04</small></h2></div>
+              <div class="og-sec-h"><h2 class="poster-section-title">${label('setDanger', 'Archive and delete')}<small>04</small></h2></div>
               <div class="og-box">
                 <span class="og-box-label">${label('reversible', 'Reversible')}</span>
                 <div class="og-box-row">
