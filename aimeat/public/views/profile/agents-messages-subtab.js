@@ -30,6 +30,7 @@ import { timeAgo } from '/js/utils.js';
 import { sendMessage, listMessages, listThreads } from '/js/services/agent-messages.js';
 import { createTask } from '/js/services/agent-tasks.js';
 import { swallowed } from '/js/swallowed.js';
+import { time as fmtTime } from '/js/format.js';
 
 function ProposedTask({ task, agentName, showToast }) {
   const [creating, setCreating] = useState(false);
@@ -111,7 +112,7 @@ function MessageBubble({ msg, agentName, showToast, locked, answeredChoice, onAn
         ${msg.content}
       </div>
       <div class="agd-msg-meta ${isInbound ? 'agd-msg-meta-right' : ''}">
-        ${msg.createdAt ? html`<span class="agd-msg-time">${new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> ${timeAgo(msg.createdAt)}` : ''}
+        ${msg.createdAt ? html`<span class="agd-msg-time">${fmtTime(msg.createdAt, { hour: '2-digit', minute: '2-digit' })}</span> ${timeAgo(msg.createdAt)}` : ''}
         ${msg.metadata?.tokensUsed ? html` · ${msg.metadata.tokensUsed} ${t('profile.agents.messages.tokensUsed')}` : ''}
       </div>
       ${proposedTask && html`

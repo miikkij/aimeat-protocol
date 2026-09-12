@@ -23,6 +23,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { getLedgerUsage, getLedgerRuns, getLedgerUsageOverview } from '/js/services/ledger.js';
 import { swallowed } from '/js/swallowed.js';
+import { num } from '/js/format.js';
 
 const html = htm.bind(h);
 
@@ -33,7 +34,7 @@ function fmtUsd(v) {
   return `$${n.toFixed(n > 0 && n < 1 ? 4 : 2)}`;
 }
 function fmtNum(v) {
-  return Number(v || 0).toLocaleString();
+  return num(Number(v || 0));
 }
 
 export default function TabUsage({ agent, agentName }) {

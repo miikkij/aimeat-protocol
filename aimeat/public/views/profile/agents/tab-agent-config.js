@@ -29,6 +29,7 @@ import { t } from '/js/i18n.js';
 import { copyToClipboard } from '/js/utils.js';
 import { apiGet, apiPut, apiPatch } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { date as fmtDate } from '/js/format.js';
 
 const html = htm.bind(h);
 
@@ -256,7 +257,7 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
             ${file.active !== false && html`<span class="pf-agd-status-dot pf-agd-status-dot--active"></span>`}
             <span class="pf-agd-config-name">${file.filename}</span>
             ${file.description && html`<span class="pf-agd-config-desc">${file.description}</span>`}
-            ${!file.description && html`<span class="pf-agd-config-desc">${file.updatedAt ? `${t('profile.agents.tasks.updated')}: ${new Date(file.updatedAt).toLocaleDateString()}` : ''}</span>`}
+            ${!file.description && html`<span class="pf-agd-config-desc">${file.updatedAt ? `${t('profile.agents.tasks.updated')}: ${fmtDate(file.updatedAt)}` : ''}</span>`}
             ${file.platform && html`<span class="pf-agd-config-platform">${file.platform}</span>`}
           </div>
         `)}

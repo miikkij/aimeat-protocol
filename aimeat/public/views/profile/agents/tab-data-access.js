@@ -41,6 +41,7 @@ import { updateMemoryFull, deleteMemory, createMemory } from '/js/services/memor
 import * as skillsService from '/js/services/skills.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
+import { dateTime as fmtDateTime } from '/js/format.js';
 
 const html = htm.bind(h);
 
@@ -652,8 +653,8 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
                 <span class="pf-agd-expand-icon">${expandedKey === mk.key ? '▼' : '▶'}</span>
                 <span class="pf-agd-area-key">${mk.key}</span>
                 <span class="pf-agd-key-meta">
-                  ${mk.createdAt ? html`<span title=${new Date(mk.createdAt).toLocaleString()}>${t('profile.agents.detail.data_access.created')}: ${timeAgo(mk.createdAt)}</span>` : ''}
-                  ${mk.updatedAt ? html`<span title=${new Date(mk.updatedAt).toLocaleString()}>${t('profile.agents.detail.data_access.updated')}: ${timeAgo(mk.updatedAt)}</span>` : ''}
+                  ${mk.createdAt ? html`<span title=${fmtDateTime(mk.createdAt)}>${t('profile.agents.detail.data_access.created')}: ${timeAgo(mk.createdAt)}</span>` : ''}
+                  ${mk.updatedAt ? html`<span title=${fmtDateTime(mk.updatedAt)}>${t('profile.agents.detail.data_access.updated')}: ${timeAgo(mk.updatedAt)}</span>` : ''}
                 </span>
                 <span class="pf-agd-area-perm pf-agd-area-perm--${mk.visibility === 'public' ? 'rw' : 'ro'}">${mk.visibility}</span>
               </div>

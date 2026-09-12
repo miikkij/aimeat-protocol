@@ -18,6 +18,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { getOwnerDefaults, upsertOwnerDefaults } from '/js/services/agent-directives.js';
 import { swallowed } from '/js/swallowed.js';
+import { num } from '/js/format.js';
 
 export function AgentDefaultsSection({ showToast, initial }) {
   const [defaults, setDefaults] = useState(initial?.defaults ?? null);   // seeded from /v1/access/overview; else self-loads
@@ -121,7 +122,7 @@ export function AgentDefaultsSection({ showToast, initial }) {
         <div class="mem-item">
           <span class="mem-key">${t('profile.access.adTokenBudget') || 'Token Budget'}</span>
           <button class="pj-linklike" title=${t('profile.access.adEdit') || 'Edit'} onClick=${startEdit}>
-            ${budget != null ? budget.toLocaleString() : (t('profile.access.adUnlimited') || 'Unlimited')} ✎
+            ${budget != null ? num(budget) : (t('profile.access.adUnlimited') || 'Unlimited')} ✎
           </button>
         </div>
       </div>

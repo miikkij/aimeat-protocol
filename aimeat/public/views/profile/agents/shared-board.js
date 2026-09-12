@@ -41,6 +41,7 @@ import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { agentState, agentBucket, agentRank, getStateColor } from './state-detector.js';
 import { agentGaii, matchesAgentQuery } from './tab-helpers.js';
+import { date as fmtDate, num } from '/js/format.js';
 
 const html = htm.bind(h);
 
@@ -174,12 +175,10 @@ function formatTimeAgo(isoDate) {
   return `${Math.floor(diff / 86400)}d`;
 }
 
-// Absolute "issued" date for the ID card (browser locale, day-precision).
+// Absolute "issued" date for the ID card, day-precision, in the reader's own format.
 function formatIssued(isoDate) {
   if (!isoDate) return '—';
-  const d = new Date(isoDate);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return fmtDate(isoDate, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 // ── ID-card face (revealed on hover/focus of a board mini-card) ──
@@ -246,7 +245,7 @@ function renderIdCard(agent) {
         ${stat(t('profile.agents.idcard.failed'), failed, failed > 0 ? 'pf-agd-idcard-stat--failed' : '')}
         ${stat(t('profile.agents.idcard.messages'), msgTotal)}
         ${stat(t('profile.agents.idcard.trust'), trust)}
-        ${stat(t('profile.agents.idcard.morsels'), typeof morsels === 'number' ? morsels.toLocaleString() : morsels)}
+        ${stat(t('profile.agents.idcard.morsels'), typeof morsels === 'number' ? num(morsels) : morsels)}
       </div>
 
       <div class="pf-agd-idcard-foot">

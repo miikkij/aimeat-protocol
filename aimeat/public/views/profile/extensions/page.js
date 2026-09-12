@@ -20,6 +20,8 @@ import { CopyButton } from '/components/CopyButton.js';
 import { Section, scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { x, kindOf, crumb, pageLinks } from './frame.js';
 import { extRow, cortexRow } from './rows.js';
+// Aliased: `num` is already the name of this page's section-number parameter.
+import { num as fmtNum } from '/js/format.js';
 
 const PAGE = 20;
 
@@ -178,7 +180,7 @@ function secNew(ctx, num, first) {
   return html`
     <${Section} id="ex-new" num=${num} title=${x('secNew')} count=${null} first=${first}>
       <div class="ex-kv ex-kv--wide">
-        <div class="ex-k">${x('newAi')}</div><div class="ex-v">${x('newAiBody')}<small>${x('newAiSub', { ext: (ctx.extPrompt || '').length.toLocaleString(), cx: (ctx.cortexPrompt || '').length.toLocaleString() })} · <${CopyButton} text=${ctx.extPrompt} className="og-crumb-link" label=${x('copyExtPrompt')} copiedLabel=${x('copied')} disabled=${!ctx.extPrompt} /> · <${CopyButton} text=${ctx.cortexPrompt} className="og-crumb-link" label=${x('copyCortexPrompt')} copiedLabel=${x('copied')} disabled=${!ctx.cortexPrompt} /> · <button type="button" class="og-crumb-link ex-linkbtn" onClick=${() => ctx.toggleShow('ext')}>${ctx.shown === 'ext' ? x('hide') : x('showExtPrompt')}</button> · <button type="button" class="og-crumb-link ex-linkbtn" onClick=${() => ctx.toggleShow('cortex')}>${ctx.shown === 'cortex' ? x('hide') : x('showCortexPrompt')}</button></small></div>
+        <div class="ex-k">${x('newAi')}</div><div class="ex-v">${x('newAiBody')}<small>${x('newAiSub', { ext: fmtNum((ctx.extPrompt || '').length), cx: fmtNum((ctx.cortexPrompt || '').length) })} · <${CopyButton} text=${ctx.extPrompt} className="og-crumb-link" label=${x('copyExtPrompt')} copiedLabel=${x('copied')} disabled=${!ctx.extPrompt} /> · <${CopyButton} text=${ctx.cortexPrompt} className="og-crumb-link" label=${x('copyCortexPrompt')} copiedLabel=${x('copied')} disabled=${!ctx.cortexPrompt} /> · <button type="button" class="og-crumb-link ex-linkbtn" onClick=${() => ctx.toggleShow('ext')}>${ctx.shown === 'ext' ? x('hide') : x('showExtPrompt')}</button> · <button type="button" class="og-crumb-link ex-linkbtn" onClick=${() => ctx.toggleShow('cortex')}>${ctx.shown === 'cortex' ? x('hide') : x('showCortexPrompt')}</button></small></div>
         ${ctx.shown ? html`<div class="ex-k"></div><div class="ex-v"><pre class="ex-out ex-out--tall">${ctx.shown === 'ext' ? ctx.extPrompt : ctx.cortexPrompt}</pre></div>` : null}
         <div class="ex-k">${x('newFiles')}</div><div class="ex-v">${x('newFilesBody')}</div>
       </div>

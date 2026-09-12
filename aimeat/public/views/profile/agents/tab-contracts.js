@@ -21,10 +21,11 @@ import { t } from '/js/i18n.js';
 import { getAgentEngagements, contractNamesOf, offersWorkspaceContract, adoptContractTask } from '/js/services/agents.js';
 import { retireEngagement, activateEngagement } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
+import { date as fmtDate } from '/js/format.js';
 
 const html = htm.bind(h);
 
-const fmtDay = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleDateString(); };
+const fmtDay = (iso) => (iso ? fmtDate(iso) : '');
 const engKey = (e) => `${e.organism_id}:${e.ws}:${e.contract || ''}`;
 
 export default function TabContracts({ agent, agentName, showToast }) {

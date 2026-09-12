@@ -23,6 +23,7 @@ import { Markdown } from '/components/Markdown.js';
 import { detectImage, ImageView, DeliverableBody } from '/components/ImageDeliverable.js';
 import RateModal from './rate-modal.js';
 import { swallowed } from '/js/swallowed.js';
+import { date as fmtDate, time as fmtTime } from '/js/format.js';
 
 // Per-browser "blur the title" preference. Used when screen-recording the tab
 // so sensitive task titles can be hidden without affecting other viewers or
@@ -454,9 +455,8 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
 
   function formatDateTime(iso) {
     if (!iso) return '';
-    const d = new Date(iso);
-    return d.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' ' +
-           d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return fmtDate(iso, { day: 'numeric', month: 'short' }) + ' '
+      + fmtTime(iso, { hour: '2-digit', minute: '2-digit' });
   }
 
   return html`

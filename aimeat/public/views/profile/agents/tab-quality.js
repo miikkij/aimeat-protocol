@@ -36,6 +36,7 @@ import { t } from '/js/i18n.js';
 import { getAgentStatistics, getQualityOverview, listTasks, rateTask } from '/js/services/agent-tasks.js';
 import RateModal from './rate-modal.js';
 import { swallowed } from '/js/swallowed.js';
+import { num, dateTime as fmtDateTime } from '/js/format.js';
 
 const html = htm.bind(h);
 
@@ -53,15 +54,13 @@ function ctxLabel(ctx) {
 }
 
 function fmtSeconds(secs) {
-  return `${Number(secs || 0).toLocaleString()}${t('profile.agents.detail.quality.seconds')}`;
+  return `${num(Number(secs || 0))}${t('profile.agents.detail.quality.seconds')}`;
 }
 
 /** Date + time for a deliverable row — four identical "Iltakirjoitus" rows must be tellable apart. */
 function fmtWhen(s) {
   if (!s) return '';
-  const d = new Date(s);
-  if (!Number.isFinite(d.getTime())) return '';
-  return d.toLocaleString(undefined, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return fmtDateTime(s, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 /** Inline 1–5 star picker — hovering previews, clicking submits right in the row (no modal hop).

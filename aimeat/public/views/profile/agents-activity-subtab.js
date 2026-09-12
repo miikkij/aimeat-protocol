@@ -24,6 +24,7 @@ import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { getActivity, getActivityLog } from '/js/services/agent-activity.js';
 import { swallowed } from '/js/swallowed.js';
+import { calendar } from '/js/format.js';
 
 const RANGE_OPTIONS = [
   { days: 7, label: '7d' },
@@ -93,7 +94,10 @@ function ActivityChart({ history, selectedDays, onRangeChange }) {
         ${dates.map(date => {
           const count = dailyTotals[date] || 0;
           const pct = Math.round((count / maxTasks) * 100);
-          const dateStr = new Date(date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+          // A day BUCKET, not a moment: the server counted these into a day, so the label must be
+          // that day for every reader. calendar() pins it; date() would slide it for anyone whose
+          // clock sits west of the node and make the heading disagree with its own rows.
+          const dateStr = calendar(date, { month: 'short', day: 'numeric' });
           return html`
             <div class="agd-chart-row" key=${date}>
               <span class="agd-chart-date">${dateStr}</span>
