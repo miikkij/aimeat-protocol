@@ -1117,6 +1117,15 @@ await test('Maintenance — toggle on and off', async () => {
     const { status: memStatus } = await json('/v1/memory/test');
     assert(memStatus === 503 || memStatus === 401, `expected 503 or 401 during maintenance, got ${memStatus}`);
 
+    // A browser asks for HTML and gets the house page, carrying the operator's own line — the
+    // same line the admin page previews. An API client keeps getting the JSON envelope above.
+    const pageRes = await fetch(`${BASE}/v1/memory/test`, { headers: { Accept: 'text/html' } });
+    const pageHtml = await pageRes.text();
+    assert(pageRes.status === 503, `html visitor expects 503, got ${pageRes.status}`);
+    assert((pageRes.headers.get('content-type') || '').includes('text/html'), 'html visitor gets text/html');
+    assert(pageHtml.includes('Down for work'), 'the maintenance page says what is happening');
+    assert(pageHtml.includes('E2E test maintenance'), "the maintenance page carries the operator's line");
+
     // Federation introduce should still work during maintenance (bypass)
     // Generate a fresh keypair for this introduce
     const maintPrivKey = crypto.getRandomValues(new Uint8Array(32));
