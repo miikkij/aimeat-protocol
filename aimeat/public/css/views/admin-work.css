@@ -1,0 +1,137 @@
+/* ── Admin Work page, in the poster face ──
+ * @file admin-work.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's Work page (design canvas "AIMEAT Admin Work"): the items as poster
+ *   rows with the status in its own colour and the held cost in the waiting colour, the row past its
+ *   deadline with a coral edge, the find field and its five filter chips, the lifecycle strip inside
+ *   the closing box, and the empty state that says what is true. The frame, the sections, the metric
+ *   rows, the numeral strip, the dashed box and the doors come from admin.css and organism.css; only
+ *   what this page adds lives here. Every value is a theme.css token, so the page flips with the
+ *   theme.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial (the Work page in the poster face).
+ */
+
+.adm-work .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-work .adm-mrow--last { border-bottom: 0; }
+
+/* ── 02: the items ────────────────────────────────────────────────────────────────────────── */
+.adm-work-row {
+  display: grid;
+  grid-template-columns: 2.2rem 11.5rem 6.5rem minmax(0, 1fr) 14rem 5rem 7rem;
+  gap: 0 16px;
+  align-items: center;
+  padding: 8px 7px;
+  margin: 0 -7px;
+  border-bottom: 1px solid var(--border);
+  min-height: 44px;
+  box-sizing: border-box;
+}
+.adm-work-row--head { border-bottom: 0; padding-bottom: 5px; min-height: 0; }
+.adm-work-row--head div { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.adm-work-row--head .adm-work-n, .adm-work-row--head .adm-work-cost { text-align: right; }
+
+.adm-work-n {
+  font-family: var(--font-poster);
+  font-weight: var(--font-poster-weight, 400);
+  font-size: 1.35rem;
+  line-height: var(--font-poster-leading, 1);
+  text-align: right;
+  color: var(--text);
+}
+.adm-work-tc { font-family: var(--font-mono); font-size: .72rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The status word is the machine's own and is never translated, so it is set in the machine's face. */
+.adm-work-st {
+  font-family: var(--font-mono); font-size: .66rem; font-weight: 500; padding: 1px 6px;
+  justify-self: start; white-space: nowrap;
+}
+.adm-work-st--open { background: var(--warn-bg); color: var(--warn-fg); }
+.adm-work-st--done { background: var(--success-bg); color: var(--success-fg); }
+.adm-work-st--bad { background: var(--danger-bg); color: var(--danger-fg); }
+.adm-work-st--gone { background: var(--bg-surface); color: var(--text-dim); }
+.adm-work-act { font-size: .92rem; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-work-who { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); display: flex; align-items: center; gap: 5px; min-width: 0; }
+.adm-work-who b { font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* An agent that is not on this node: the work crossed a federation hop to get done. */
+.adm-work-who b.is-far { color: var(--accent); }
+.adm-work-cost { font-family: var(--font-mono); font-size: .8rem; font-weight: 500; color: var(--text); text-align: right; }
+/* Money that is out of somebody's balance right now wears the waiting colour. */
+.adm-work-cost.is-held { color: var(--warn-fg); }
+.adm-work-left { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+.adm-work-left.is-over { color: var(--accent); }
+/* The one row that gets an edge: it cannot exist while the hourly sweep runs. */
+.adm-work-row.is-over { background: var(--card-bg); box-shadow: inset 3px 0 0 var(--accent); }
+.adm-work-row:hover { background: var(--card-bg); }
+
+.adm-work-find { display: flex; align-items: flex-end; gap: 32px; margin-bottom: 16px; flex-wrap: wrap; }
+.adm-work-fld { flex: 0 1 400px; min-width: 220px; }
+.adm-work-lbl { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 5px; }
+.adm-work-input {
+  width: 100%; box-sizing: border-box; background: transparent; border: 0; border-bottom: 3px solid var(--text);
+  padding: 6px 0; font-family: inherit; font-size: 1rem; font-weight: 600; color: var(--text); outline: none;
+}
+.adm-work-input::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm-work-input:focus { border-bottom-color: var(--accent); }
+.adm-work-chips { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 6px; }
+.adm-work-fchip {
+  background: none; border: 2px solid var(--border); padding: 2px 8px; cursor: pointer;
+  font-family: var(--font-mono); font-weight: 500; font-size: .68rem; line-height: 1.6; color: var(--text-dim);
+}
+.adm-work-fchip:hover { border-color: var(--text); color: var(--text); }
+.adm-work-fchip.on { background: var(--sun); border-color: var(--on-sun); color: var(--on-sun); }
+.adm-work-more { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; padding-top: 14px; }
+.adm-work-more span { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
+
+/* ── 03: what a work item is ──────────────────────────────────────────────────────────────── */
+.adm-work-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 22px; }
+.adm-work-two .og-box p { margin: 0 0 8px; }
+.adm-work-two .og-box p:last-child { margin-bottom: 0; }
+.adm-work-rule { font-weight: 700; color: var(--text); }
+.adm-work-flow { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 2px 0 10px; font-family: var(--font-mono); font-size: .72rem; }
+.adm-work-flow i { font-style: normal; padding: 2px 7px; border: 2px solid var(--border); color: var(--text-dim); }
+.adm-work-flow i.on { border-color: var(--text); color: var(--text); }
+.adm-work-flow s { text-decoration: none; color: var(--text-dim); }
+
+/* ── The empty state, which used to contradict the count beside its own name ──────────────── */
+.adm-work-empty { border: 3px solid var(--text); background: var(--card-bg); padding: 18px 22px; max-width: 640px; margin-top: 8px; }
+.adm-work-empty h3 {
+  margin: 0 0 5px; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400);
+  font-size: 1.2rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em);
+  text-transform: uppercase; color: var(--text);
+}
+.adm-work-empty p { margin: 0; font-size: .9rem; line-height: 1.55; color: var(--text-dim); }
+
+@media (max-width: 1100px) {
+  .adm-work-row { grid-template-columns: 2.2rem 10rem 6rem minmax(0, 1fr) 4.5rem 6rem; gap: 0 12px; }
+  .adm-work-who { grid-column: 2 / -1; padding-top: 3px; }
+  .adm-work-row--head div:nth-child(5) { display: none; }
+}
+
+@media (max-width: 700px) {
+  /* Seven cells do not fold into three columns by themselves: auto-placement scatters them and the
+     action name ends up clipped in a 3.5rem slot. Each one is named instead, and the row becomes
+     three lines: what was asked with its status, the code with its price, and the two agents with
+     the deadline. The column headings go, because nothing is in a column any more. */
+  .adm-work-row {
+    grid-template-columns: 2rem minmax(0, 1fr) auto;
+    grid-template-areas:
+      "n act st"
+      "n tc cost"
+      "n who left";
+    gap: 3px 10px;
+    padding: 10px 7px;
+  }
+  .adm-work-row--head { display: none; }
+  .adm-work-n { grid-area: n; align-self: start; }
+  .adm-work-act { grid-area: act; white-space: normal; }
+  .adm-work-st { grid-area: st; justify-self: end; }
+  .adm-work-tc { grid-area: tc; }
+  .adm-work-cost { grid-area: cost; }
+  .adm-work-who { grid-area: who; }
+  .adm-work-left { grid-area: left; text-align: right; }
+  .adm-work-fld { flex-basis: 100%; }
+  /* A metric row gives its sentence the whole width; the value follows on its own line. */
+  .adm-work .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; }
+  .adm-work .adm-mrow .adm-mval { grid-column: 1 / -1; text-align: left; margin-top: 4px; }
+}

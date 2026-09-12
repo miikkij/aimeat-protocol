@@ -62,7 +62,16 @@ export function adminMonitoringRouter(
                 action_id: w.actionId,
                 provider_gaii: w.providerGaii,
                 requester_gaii: w.requesterGaii,
-                cost: w.cost,
+                // Spelled the way every other field on the row is, and the way GET /v1/work/:tc
+                // already spells the same object. It went out as the raw record, so one object in
+                // the middle of a snake_case row answered in camelCase and a reader folding
+                // `in_escrow` over it silently counted nothing.
+                cost: {
+                    base_price: w.cost?.basePrice ?? 0,
+                    network_fee: w.cost?.networkFee ?? 0,
+                    total: w.cost?.total ?? 0,
+                    in_escrow: w.cost?.inEscrow ?? 0,
+                },
                 created_at: w.createdAt,
                 updated_at: w.updatedAt,
                 ttl_expires_at: w.ttlExpiresAt,
