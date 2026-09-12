@@ -14,6 +14,7 @@
  * @structure monthKey · monthLabel · entryId · default export Changelog({ navigate })
  * @usage routed at /v1/changelog by spa.html; listed in routes/portal.ts spaRoutes
  * @version-history
+ *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.0.0 — 2026-08-28 — Initial, built to the design canvas "Changelog and Build Story".
  */
 import { h } from 'preact';
@@ -125,7 +126,7 @@ export default function Changelog({ navigate }) {
               onClick=${(e) => { e.preventDefault(); document.getElementById('m-' + k)?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }}>
               ${monthLabel(k)} · ${n}
             </a>`)}
-          <div class="ld-sh-box chg-rail-json">
+          <div class="ld-sh-box poster-aside chg-rail-json">
             <span class="ld-sh-box-label">${tr('changelog.machinesLabel', 'For machines:')}</span>
             ${' '}${tr('changelog.machines', 'the same log as JSON, one entry per change, in both languages:')}${' '}
             <a href="/changelog.json">/changelog.json</a>

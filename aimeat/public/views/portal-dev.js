@@ -6,6 +6,7 @@
  *   platform → variant → connection type → share app). Composes the panels and
  *   upload sub-modules (extracted to satisfy max-file-lines).
  * @version-history
+ *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.1.0 — 2026-06-02 — Component unification (#11): node-badge dot uses
  *     canonical <StatusDot status="online" /> instead of bespoke .dv-dot
  *     (which had a hardcoded #22c55e — now tokenized via the component).
@@ -146,8 +147,8 @@ export default function PortalDevView({ locale }) {
         <p class="ld-sh-sub">${dt('subtitle', locale)}</p>
         <!-- Source repos: the protocol/node and the local agent fleet, both on GitHub -->
         <div class="ld-sh-doors">
-          <a class="ld-sh-door" href="https://github.com/miikkij/aimeat-protocol" target="_blank" rel="noopener">${GH_MARK}${dt('repos.protocol', locale)} →</a>
-          <a class="ld-sh-door" href="https://github.com/miikkij/crewaimeat" target="_blank" rel="noopener">${GH_MARK}${dt('repos.crew', locale)} →</a>
+          <a class="ld-sh-door showroom-door" href="https://github.com/miikkij/aimeat-protocol" target="_blank" rel="noopener">${GH_MARK}${dt('repos.protocol', locale)} →</a>
+          <a class="ld-sh-door showroom-door" href="https://github.com/miikkij/crewaimeat" target="_blank" rel="noopener">${GH_MARK}${dt('repos.crew', locale)} →</a>
         </div>
       </section>
 
@@ -164,10 +165,10 @@ export default function PortalDevView({ locale }) {
 
       <!-- Signed in or not. The signed-out box carries the door to the sign-in dialog. -->
       ${isLoggedIn
-        ? html`<div class="ld-sh-box dv-mode"><p><strong>${dt('mode.loggedIn', locale)} ${session?.ghii || session?.owner || ''}.</strong> ${dt('mode.loggedInDesc', locale)}</p></div>`
-        : html`<div class="ld-sh-box dv-mode">
+        ? html`<div class="ld-sh-box poster-aside dv-mode"><p><strong>${dt('mode.loggedIn', locale)} ${session?.ghii || session?.owner || ''}.</strong> ${dt('mode.loggedInDesc', locale)}</p></div>`
+        : html`<div class="ld-sh-box poster-aside dv-mode">
             <p><strong>${dt('mode.anonymous', locale)}.</strong> ${dt('mode.anonymousDesc', locale)} ${dt('mode.anonymousNote', locale)}</p>
-            <button class="ld-sh-door dv-mode-door" type="button" onClick=${() => showLoginModal({ tab: 'login' })}>${dt('mode.signUp', locale)} →</button>
+            <button class="ld-sh-door showroom-door dv-mode-door" type="button" onClick=${() => showLoginModal({ tab: 'login' })}>${dt('mode.signUp', locale)} →</button>
           </div>`
       }
 
@@ -180,7 +181,7 @@ export default function PortalDevView({ locale }) {
           <p>${dt('quickStart.mcpDesc', locale)}</p>
           <div class="dv-cmd">
             <code>${MCP_ADD_COMMAND}</code>
-            <${CopyButton} text=${MCP_ADD_COMMAND} className="ld-sh-btn ld-sh-btn--hot" label=${t('common.copy')} />
+            <${CopyButton} text=${MCP_ADD_COMMAND} className="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" label=${t('common.copy')} />
           </div>
           <p class="dv-note">${dt('quickStart.mcpNote', locale)}</p>
           <p>${dt('quickStart.desc', locale)}</p>
@@ -203,7 +204,7 @@ export default function PortalDevView({ locale }) {
             <${CopyDoor} text=${STAY_SYNC_LINE} />
           </div>
           <p class="dv-note">${dt('staySync.prefilledNote', locale)}${' '}
-            <a class="ld-sh-door" href="/v1/profile?tab=mcp">${dt('staySync.prefilledLink', locale)}</a></p>
+            <a class="ld-sh-door showroom-door" href="/v1/profile?tab=mcp">${dt('staySync.prefilledLink', locale)}</a></p>
         </div>
       </section>
 
