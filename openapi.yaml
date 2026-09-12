@@ -50307,6 +50307,33 @@ paths:
                           confirmation_required: { type: boolean }
                           smtp_user_configured: { type: boolean }
                           smtp_pass_configured: { type: boolean }
+                          recipients:
+                            type: object
+                            description: |
+                              How many people a group send would reach, counted the same way the
+                              send itself counts them. A person is reachable only through the
+                              notification address on their GHII record.
+                            properties:
+                              accounts: { type: integer }
+                              with_address: { type: integer }
+                              operators: { type: integer }
+                              operators_with_address: { type: integer }
+                          sent:
+                            type: object
+                            description: |
+                              What the node has sent, from the counters the email service writes.
+                              The messages themselves are not stored. `by_type` carries only the
+                              types that have ever been sent; `counted` is false when the stats
+                              collector is not running, which is not the same as nothing sent.
+                            properties:
+                              total: { type: integer }
+                              failed: { type: integer }
+                              retried: { type: integer }
+                              last_7_days: { type: integer }
+                              counted: { type: boolean }
+                              by_type:
+                                type: object
+                                additionalProperties: { type: integer }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

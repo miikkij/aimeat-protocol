@@ -27,6 +27,8 @@ import { emitChange } from '../services/event-bus.js';
 import { setCorsList } from '../services/cors-overview.js';
 import type { EmailService } from '../services/email.js';
 import { verificationEmailHtml, magicLinkEmailHtml, notificationEmailHtml } from '../services/email-templates.js';
+import { emailReach } from '../services/email-recipients.js';
+import { getStats } from '../services/stats.js';
 import type { DirectoryService } from '../services/directory.js';
 import type { PushService } from '../services/push.js';
 import type { GenesisPeeringService } from '../services/genesis-peering.js';
@@ -159,7 +161,41 @@ export function adminFeaturesRouter(
 
     // ── Email Status ────────────────────────────────────────
 
+    /**
+     * What the node has actually sent, from the counters services/email.ts already writes.
+     *
+     * The messages themselves are not kept, but every send, failure and retry is counted by type
+     * (email_sent:verification and so on), and the Email page is the one screen where an operator
+     * asks the question those counters answer. A type that has never been sent is absent from the
+     * snapshot rather than zero, which is why `by_type` is passed through as it comes.
+     */
+    function emailCounts() {
+        const snap = getStats()?.snapshot() as Record<string, unknown> | undefined;
+        if (!snap) return { total: 0, failed: 0, retried: 0, last_7_days: 0, by_type: {}, counted: false };
+
+        const daily = (snap.daily_history ?? {}) as Record<string, Record<string, number>>;
+        const from = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+        let last7 = 0;
+        for (const [day, counters] of Object.entries(daily)) {
+            if (day < from) continue;
+            for (const [key, value] of Object.entries(counters)) {
+                if (key === 'email_sent' || key.startsWith('email_sent:')) last7 += value;
+            }
+        }
+        return {
+            total: Number(snap.email_sent ?? 0),
+            failed: Number(snap.email_failed ?? 0),
+            retried: Number(snap.email_retried ?? 0),
+            last_7_days: last7,
+            by_type: (snap.email_sent_by_type ?? {}) as Record<string, number>,
+            counted: true,
+        };
+    }
+
     router.get('/v1/admin/email/status', ...auth, handle(async (_req, res) => {
+        // The reach is read here so the page can say how many people a group send would go to
+        // BEFORE it is pressed; the send itself uses the same function (services/email-recipients).
+        const reach = await emailReach(storage);
         res.json(success(config.nodeId, {
             enabled: config.emailEnabled,
             smtp_host: config.smtpHost,
@@ -170,6 +206,13 @@ export function adminFeaturesRouter(
             confirmation_required: config.emailConfirmationRequired,
             smtp_user_configured: !!config.smtpUser,
             smtp_pass_configured: !!config.smtpPass,
+            recipients: {
+                accounts: reach.accounts,
+                with_address: reach.all.length,
+                operators: reach.operatorAccounts,
+                operators_with_address: reach.operators.length,
+            },
+            sent: emailCounts(),
         }));
     }));
 
@@ -212,29 +255,20 @@ export function adminFeaturesRouter(
             res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'subject and body are required'));
             return;
         }
+        // The request is judged before the service state: a group that does not exist is a bad
+        // request whether or not this node can send, and answering EMAIL_DISABLED to it sends the
+        // caller to fix the wrong thing.
+        if (group !== 'operators' && group !== 'all') {
+            res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'group must be "operators" or "all"'));
+            return;
+        }
         if (!services.emailService.enabled) {
             res.status(400).json(error(config.nodeId, 'EMAIL_DISABLED', 'Email service is not configured'));
             return;
         }
-        const recipients: string[] = [];
-        if (group === 'operators') {
-            const owners = await storage.listOwners();
-            const ghiis = await storage.listGHIIs();
-            const operatorNames = new Set(owners.filter(o => o.roles.includes('operator')).map(o => o.name));
-            for (const g of ghiis) {
-                if (g.notificationEmail && operatorNames.has(g.ownerName ?? '')) {
-                    recipients.push(g.notificationEmail);
-                }
-            }
-        } else if (group === 'all') {
-            const ghiis = await storage.listGHIIs();
-            for (const g of ghiis) {
-                if (g.notificationEmail) recipients.push(g.notificationEmail);
-            }
-        } else {
-            res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'group must be "operators" or "all"'));
-            return;
-        }
+        // The same count the status route prints on the button, from the same function.
+        const reach = await emailReach(storage);
+        const recipients = group === 'operators' ? reach.operators : reach.all;
         const { html: mailHtml, text: mailText } = notificationEmailHtml(subject as string, body as string);
         let sent = 0;
         for (const addr of recipients) {
