@@ -11,6 +11,10 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.4.0 — 2026-09-13 — The work-expiry webhook goes through fireWebhook() like the two route
+ *     paths, instead of a third hand-rolled fetch. work.callbackUrl is caller-supplied, so it
+ *     needs safeFetch and its redirect re-validation; the copy here had neither that, nor the
+ *     retry, nor the delivery log. Found reviewing the outbound-fetch backlog.
  *   v1.3.0 — 2026-08-17 — Memory trace: the memory-TTL sweep reads the meta projection, and the
  *     board-post TTL sweep is one cross-board DELETE (it used to page 10,000 full posts per board
  *     for a side-effect delete only SQLite performed — Postgres never pruned).
@@ -150,7 +154,7 @@ async function runDailyAllowanceJob(config: AimeatConfig, storage: Storage): Pro
   logger.info(`Daily allowance credited to ${agents.length} agents`);
 }
 
-async function runWorkTimeoutJob(_config: AimeatConfig, storage: Storage): Promise<void> {
+async function runWorkTimeoutJob(config: AimeatConfig, storage: Storage): Promise<void> {
   const allWork = await storage.listAllWork();
   const now = Date.now();
   for (const work of allWork) {
@@ -164,18 +168,20 @@ async function runWorkTimeoutJob(_config: AimeatConfig, storage: Storage): Promi
         });
 
         if (work.callbackUrl) {
-          const body = JSON.stringify({
+          // THE SAME WEBHOOK THE ROUTES FIRE, through the same function. work.callbackUrl is
+          // whatever the principal that created the work item put in `callback_url`, so it is
+          // caller-supplied and belongs behind safeFetch, which re-validates every redirect hop:
+          // an allowed host can 3xx-bounce to loopback or to a cloud metadata address, and this
+          // job runs on the node's own timer with nobody watching. fireWebhook already does that,
+          // and it also retries with backoff and records the delivery in the webhook log that the
+          // admin surface reads. The hand-rolled copy that stood here did none of the three.
+          const { fireWebhook } = await import('./work-lifecycle.js');
+          fireWebhook(work.callbackUrl, {
             event: 'work.expired',
             tracking_code: work.trackingCode,
             status: 'expired',
             timestamp: new Date().toISOString(),
-          });
-          fetch(work.callbackUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body,
-            signal: AbortSignal.timeout(10_000),
-          }).catch(err => { logger.warn('runWorkTimeoutJob: fire and forget', { error: String(err) }); });
+          }, config.webhookMaxRetries);
         }
 
         logger.info(`Work ${work.trackingCode} expired (TTL exceeded)`);
