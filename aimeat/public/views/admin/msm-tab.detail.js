@@ -21,7 +21,7 @@
  */
 import { h } from 'preact';
 import htm from 'htm';
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { num, dt, Badge } from './shared.js';
 import { hostsOf } from './msm-tab.groups.js';
 
@@ -72,7 +72,10 @@ export default function MsmDetail({ msm, row, busy, editing, draft, onBack, onEd
       <p class="adm-msm-meta">${M('detail.meta', {
         when: dt(msm.registered_at),
         who: msm.registered_by || '?',
-        category: msm.category || '?',
+        // The category is a word from a closed set, so it is said in the reader's language. tOr and
+        // not t, because t answers a miss with the key itself, and a new category would then print
+        // as "admin.msm.category.whatever" instead of as the word the manifest stored.
+        category: msm.category ? tOr('admin.msm.category.' + msm.category, msm.category) : '?',
         version: def.version || '?',
       })}${msm.updated_at && msm.updated_at !== msm.registered_at
         ? html` ${M('detail.editedAt', { when: dt(msm.updated_at) })}`

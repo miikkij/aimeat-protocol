@@ -35,8 +35,8 @@ import { DataTable as GenericDataTable } from '/components/DataTable.js';
 // Display formatters now live in the shared /js/format.js. Import them into local
 // scope (StatCard etc. call num() directly) AND re-export so the existing admin
 // importers (`import { num, dt, fmtUp, fmtBytes } from './shared.js'`) keep working.
-import { num, dt, fmtUp, fmtBytes } from '/js/format.js';
-export { num, dt, fmtUp, fmtBytes };
+import { num, dt, day, fmtUp, fmtBytes } from '/js/format.js';
+export { num, dt, day, fmtUp, fmtBytes };
 
 /**
  * "16 Mar", or "16 Mar 2025" once it is not this year.

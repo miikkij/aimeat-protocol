@@ -26,7 +26,7 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { getSession, onAuthChange } from '/js/services/auth.js';
@@ -332,7 +332,10 @@ export default function Admin({ navigate, locale }) {
       if (mountRef.current) {
         setData(d);
         setCounts(newCounts);
-        setLastUpdate(new Date().toLocaleTimeString());
+        // The MOMENT, not a formatted string: the clock is formatted where it is drawn, so a
+        // language switch re-reads it. Stored formatted, it kept the old language's shape beside a
+        // button that had already changed, until the next fetch.
+        setLastUpdate(Date.now());
       }
     } catch (e) {
       if (!mountRef.current) return;
@@ -446,7 +449,7 @@ export default function Admin({ navigate, locale }) {
             <button class="adm-refresh" onClick=${loadAll} disabled=${loading}>
               ${loading ? t('dashboard.loading') : t('dashboard.refresh')}
             </button>
-            ${lastUpdate && html`<span class="adm-time">${lastUpdate}</span>`}
+            ${lastUpdate && html`<span class="adm-time">${new Date(lastUpdate).toLocaleTimeString(getLocale())}</span>`}
           </div>
         </div>
 
