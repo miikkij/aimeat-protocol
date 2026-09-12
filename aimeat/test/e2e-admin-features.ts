@@ -726,13 +726,16 @@ await test('DELETE /v1/msm/{name} (operator) → 200, deleted', async () => {
 // ─── Admin Translations (new MSM-related keys) ───
 console.log('\nAdmin Translations (MSM keys)');
 
-await test('GET /v1/admin/translations?lang=en → has navServices, msmLabel, navIntegrations', async () => {
+// The MSM label this asserts is `msmManagement`, which is what the sidebar renders. It used to
+// name `msmLabel`, a second spelling no surface ever read: it was pinned here the day the keys were
+// added and nothing noticed when the interface settled on the other one. 2026-09-12.
+await test('GET /v1/admin/translations?lang=en → has navServices, msmManagement, navIntegrations', async () => {
     const { status, body } = await json('/v1/admin/translations?lang=en', authed());
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
     assert(typeof body.data.translations === 'object', 'has translations');
     assert(typeof body.data.translations.navServices === 'string', 'has navServices');
-    assert(typeof body.data.translations.msmLabel === 'string', 'has msmLabel');
+    assert(typeof body.data.translations.msmManagement === 'string', 'has msmManagement');
     assert(typeof body.data.translations.navIntegrations === 'string', 'has navIntegrations');
 });
 

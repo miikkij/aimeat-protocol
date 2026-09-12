@@ -38,6 +38,7 @@ import type { GenesisPeeringService } from '../services/genesis-peering.js';
 import { TEMPLATE_IDS, SUPPORTED_LOCALES, getDefaultTemplate, seedDefaultTemplates } from '../services/notification-templates.js';
 import type { TemplateId } from '../services/notification-templates.js';
 import { LOCALES } from '../i18n.js';
+import { msmHosts, msmActionIds } from '../services/msm-parser.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -594,19 +595,32 @@ export function adminFeaturesRouter(
 
     // ── MSM Integrations ────────────────────────────────────
 
+    // The operator's listing carries WHERE each manifest points and WHAT it offers, which the
+    // record already holds: `listMsms()` reads the whole definition and the answer used to throw it
+    // away, so five manifests describing one RSS feed read as five separate integrations. Both are
+    // derived from the definition in memory, so this costs no extra read.
     router.get('/v1/admin/msm', ...auth, handle(async (_req, res) => {
         const msms = await storage.listMsms();
         res.json(success(config.nodeId, {
-            integrations: msms.map(m => ({
-                name: m.name,
-                category: m.category,
-                auth_type: m.authType,
-                actions_count: m.actionsCount,
-                registered_by: m.registeredBy,
-                registered_at: m.registeredAt,
-                updated_at: m.updatedAt,
-                federate: m.federate ?? false,
-            })),
+            integrations: msms.map(m => {
+                const service = (m.definition as Record<string, unknown>)?.service;
+                const description = service && typeof service === 'object'
+                    ? (service as Record<string, unknown>).description
+                    : undefined;
+                return {
+                    name: m.name,
+                    description: typeof description === 'string' ? description : '',
+                    category: m.category,
+                    auth_type: m.authType,
+                    actions_count: m.actionsCount,
+                    actions: msmActionIds(m.definition),
+                    hosts: msmHosts(m.definition),
+                    registered_by: m.registeredBy,
+                    registered_at: m.registeredAt,
+                    updated_at: m.updatedAt,
+                    federate: m.federate ?? false,
+                };
+            }),
             total: msms.length,
         }));
     }));

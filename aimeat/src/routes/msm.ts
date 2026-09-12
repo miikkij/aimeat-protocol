@@ -13,6 +13,11 @@
  *   - POST /v1/msm: parse (YAML or JSON), validate, and register an MSM integration
  *
  * @version-history
+ *   v1.1.0 — 2026-09-12 — The public read really does strip the auth env var name. The filter named
+ *     the snake_case keys the YAML is written in, while parseMsm normalises them to camelCase
+ *     before storage, so it matched nothing and every unauthenticated read of a manifest carried
+ *     auth.envVar. Found by an E2E written for the admin MSM page, which asserted what the route's
+ *     own comment already claimed; confirmed against aimeat.io the same day.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -27,6 +32,18 @@ import { parseMsm, validateMsm } from '../services/msm-parser.js';
 import { emitChange } from '../services/event-bus.js';
 import type { MsmDefinition } from '../services/msm-parser.js';
 import { logger } from '../utils/logger.js';
+
+/**
+ * The auth keys the public read must not carry, in BOTH spellings.
+ *
+ * The filter listed only the snake_case names the YAML uses, and parseMsm normalises those into
+ * camelCase before anything is stored, so it removed keys that were never in the object and every
+ * unauthenticated read of a manifest handed out the name of an environment variable on the machine
+ * this site runs on. Measured on aimeat.io 2026-09-12: GET /v1/msm/<a real manifest> answered with
+ * auth.envVar. Not the key itself, which is never stored here at all, but the shape of somebody's
+ * infrastructure, and the route's own comment had said for months that it was taken out.
+ */
+const SECRET_AUTH_KEYS = new Set(['env_var', 'env_var_secret', 'envVar', 'envVarSecret']);
 
 // Load MSM templates at startup
 interface MsmTemplateMeta {
@@ -252,7 +269,7 @@ export function msmRouter(config: AimeatConfig, storage: Storage): Router {
     if (safeDef.auth && typeof safeDef.auth === 'object') {
       const authObj = safeDef.auth as Record<string, unknown>;
       safeDef.auth = Object.fromEntries(
-        Object.entries(authObj).filter(([k]) => k !== 'env_var' && k !== 'env_var_secret'),
+        Object.entries(authObj).filter(([k]) => !SECRET_AUTH_KEYS.has(k)),
       );
     }
 
