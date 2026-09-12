@@ -58,6 +58,22 @@ where the line falls on a page whose reader is technical.
 adverbs, and once asking of each sentence whether deleting it would lose information. Most
 first-draft closing paragraphs lose nothing.
 
+## Before any language but English: read the language context
+
+`references/language-context.md` carries what the writer needs and the text itself cannot supply:
+what each thing in this product actually is, in one sentence, and the word this product has already
+settled on for it in English, Finnish and Spanish. Read it before composing, and add the row when
+you name something it does not cover.
+
+It exists because a word gets chosen twice for one concept otherwise, six weeks apart, by writers
+who cannot see each other. Measured on 2026-09-12, it prevented three terminology defects in one
+45-key screen and changed nothing else; the file's own last section says what it does and does not
+reach, and that section is honest about the half it cannot help with.
+
+**Do not give it to a cold reader.** The reader simulation below works because the reader has no
+context. Brief them and the only check that catches "a first-time user will not understand this"
+stops working.
+
 ## Finnish
 
 **Compose in Finnish. Do not write English and translate it.** A translated sentence reads as
