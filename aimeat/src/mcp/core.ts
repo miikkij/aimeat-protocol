@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.21.0 — 2026-09-12 — registerAdminHooksTools: the Hooks page in one read and the bind write,
+ *     through the same service the HTTP doors call. Hooks had no MCP door at all.
  *   v1.20.0 — 2026-09-08 — registerAdminCorsTools: the CORS page in one read and the one write it
  *     has, through the same service the HTTP doors call.
  *   v1.19.0 — 2026-09-05 — registerAdminSecurityTools: the Security page in one read and the
@@ -115,6 +117,7 @@ import { registerCoreAdminTools } from './core-admin.js';
 import { registerAdminSsoTools } from './admin-sso.js';
 import { registerAdminSecurityTools } from './admin-security.js';
 import { registerAdminCorsTools } from './admin-cors.js';
+import { registerAdminHooksTools } from './admin-hooks.js';
 import { registerCoreStorageTools } from './core-storage.js';
 import { registerCoreDataPackageTools } from './core-datapackage.js';
 import { logger } from '../utils/logger.js';
@@ -741,4 +744,6 @@ export function registerCoreTools(
     registerAdminSecurityTools(mcp, storage, config, getAgentGaii);
     // The CORS page in one read, and the write that sets a person's or an agent's list.
     registerAdminCorsTools(mcp, storage, config, getAgentGaii);
+    // The Hooks page in one read, and the write that binds a moment to an address.
+    registerAdminHooksTools(mcp, storage, config, getAgentGaii);
 }

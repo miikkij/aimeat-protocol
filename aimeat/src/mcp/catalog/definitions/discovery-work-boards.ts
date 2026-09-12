@@ -6,6 +6,8 @@
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
  *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
+ *   v1.5.0 — 2026-09-12 — aimeat_admin_hooks (the Hooks page in one read) and aimeat_admin_hook_set,
+ *     beside the CORS pair. Hooks had no MCP door at all.
  *   v1.4.0 — 2026-09-08 — aimeat_admin_cors_overview (the CORS page in one read) and
  *     aimeat_admin_cors_set, beside the Security pair.
  *   v1.3.0 — 2026-09-05 — aimeat_admin_security_overview (the Security page in one read) and
@@ -354,6 +356,23 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
         caller: 'operator',
         visibility: agentEverywhere,
         input: {},
+    },
+    {
+        name: 'aimeat_admin_hooks',
+        description: 'Operator-only. The Hooks page in one read: the eleven moments in this node\'s life where it can call out to somebody\'s own code, which four of them DECIDE whether the thing happens (a pre_ hook can refuse a registration, a work request, a board post or a new federation peer) and which seven are only told afterwards, what is bound to each and whether that action is still published and still carries an address, which actions could be bound, and every call the node has made with what came back. Read this before advising anyone about hooks: a bound gate whose address stops answering refuses everything it guards, and `failing` names any gate in that state. The same data as GET /v1/admin/hooks. Returns an operator-role error for non-operators.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {},
+    },
+    {
+        name: 'aimeat_admin_hook_set',
+        description: 'Operator-only. Bind a list of actions to one of the eleven moments, or clear it with an empty list. The actions are called in the order given, each after the last has answered. A gate (any hook whose name starts with pre_) WAITS for them and refuses the thing when one answers no, returns a non-2xx, or does not answer within ten seconds, so binding an address that is not reachable stops everything that moment guards; the other seven are told afterwards and stop nothing. An action reference is a published action\'s id, or its id with its provider (id#provider). An action that is not published here is accepted and named back in `unknown` rather than refused, because binding before publishing is a legitimate order of work. Read aimeat_admin_hooks first.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            hook: { type: 'string', required: true, description: 'The moment, e.g. "pre_owner_registration".' },
+            actions: { type: 'array', required: true, description: 'Action references to call, in order. An empty list clears the moment.' },
+        },
     },
     {
         name: 'aimeat_admin_cors_set',

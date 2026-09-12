@@ -13,6 +13,8 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   v1.8.0 — 2026-09-12 — setHook: binding a hook from the page, which the PUT route has always
+ *     allowed and no frontend function reached.
  *   v1.7.0 — 2026-09-11 — getIndexNowPlan and announceIndexNow: the whole site to IndexNow, and its plan.
  *   v1.6.0 — 2026-09-09 — getMarketplaceStats removed: its route was deleted (a table nothing writes).
  *   v1.5.0 — 2026-09-08 — getCorsOverview: the CORS page in one read.
@@ -112,7 +114,13 @@ export const pullFederationBook = () => apiPost('/v1/federation/book/pull', {});
 export const joinGenesisNetwork = (genesisUrl, role) => apiPost('/v1/admin/federation/join', { genesis_url: genesisUrl, role: role || 'contributor' });
 
 // ── Hooks ──
+// One read for the whole page: the eleven moments, which of them decide rather than notify, what is
+// bound and whether it still works, what could be bound, and every call the node has made.
 export const getHooks        = ()       => apiGet('/v1/admin/hooks');
+// Bind a moment to a list of actions, called in the order given. An empty list clears it, which is
+// what deleteHook does through its own door.
+export const setHook         = (name, actions) =>
+  apiPut(`/v1/admin/hooks/${encodeURIComponent(name)}`, { actions });
 export const deleteHook      = (name)   => apiDelete(`/v1/admin/hooks/${encodeURIComponent(name)}`);
 
 // ── Economy ──

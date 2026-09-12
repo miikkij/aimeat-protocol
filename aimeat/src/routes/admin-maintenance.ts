@@ -13,6 +13,10 @@
  *   - POST /v1/admin/maintenance/compact-workspace-versions: one-shot version-history compaction
  *
  * @version-history
+ *   v1.2.0 — 2026-09-12 — The hook doors call services/hooks-overview.ts: GET answers the whole page
+ *     in one read (which moments decide, what is bound and whether it still works, what could be
+ *     bound, every call made), and PUT/DELETE share one write. The third copy of the eleven hook
+ *     names, which lived inline here, is gone: HOOK_NAMES in services/hooks.ts is the list.
  *   v1.1.0 — 2026-07-16 — compact-workspace-versions: operator-triggered one-shot sweep applying the
  *     workspace version-retention window to existing `.version.N` bloat (P2).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -21,10 +25,10 @@ import { Router } from 'express';
 import { logger } from '../utils/logger.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import type { HookName } from '../config.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { listHooks } from '../services/hooks.js';
+import { buildHooksOverview, setHookActions } from '../services/hooks-overview.js';
 import { emitChange } from '../services/event-bus.js';
 
 export function adminMaintenanceRouter(
@@ -37,45 +41,32 @@ export function adminMaintenanceRouter(
 ): Router {
     const router = Router();
 
-    // GET /v1/admin/hooks — list all extension hooks
-    router.get('/v1/admin/hooks', requireAuth(), requireRole('operator'), (_req, res) => {
+    /**
+     * GET /v1/admin/hooks — the Hooks page in one read.
+     *
+     * `extension_hooks` is what it always was, so anything reading the old shape still reads. The
+     * rest is what the page and the aimeat_admin_hooks tool need in one call: which moments decide
+     * rather than notify, whether each bound action still exists and still carries an address, what
+     * could be bound, and every call that has been made.
+     */
+    router.get('/v1/admin/hooks', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const overview = await buildHooksOverview(config, storage);
         res.json(success(config.nodeId, {
             extension_hooks: listHooks(config),
-        }));
+            ...overview,
+        }, [
+            { description: 'Bind an action to a moment', method: 'PUT', url: '/v1/admin/hooks/{hook}' },
+        ]));
     });
 
-    // PUT /v1/admin/hooks/:hookName — set actions for a hook
+    // PUT /v1/admin/hooks/:hookName — bind actions to a moment (an empty list clears it)
     router.put('/v1/admin/hooks/:hookName', requireAuth(), requireRole('operator'), async (req, res) => {
-        const hookName = req.params.hookName as string;
-        const validHooks: HookName[] = [
-            'pre_owner_registration', 'post_owner_registration',
-            'pre_agent_registration', 'post_agent_registration',
-            'owner_recovery', 'agent_rekey',
-            'pre_work_request', 'post_work_delivery', 'post_settlement',
-            'pre_board_post', 'pre_federation_peer',
-        ];
-
-        if (!validHooks.includes(hookName as HookName)) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid hook name. Valid hooks: ${validHooks.join(', ')}`));
+        const out = await setHookActions(config, storage, req.params.hookName as string, (req.body ?? {}).actions);
+        if (!out.ok) {
+            res.status(400).json(error(config.nodeId, out.code, out.message));
             return;
         }
-
-        const { actions } = req.body ?? {};
-        if (!Array.isArray(actions) || !actions.every((a: unknown) => typeof a === 'string')) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'actions must be an array of action reference strings'));
-            return;
-        }
-
-        config.extensionHooks[hookName as HookName] = actions;
-
-        // Persist to database
-        await storage.setConfigValue(`hooks.${hookName}`, JSON.stringify(actions));
-
-        res.json(success(config.nodeId, {
-            hook: hookName,
-            actions: config.extensionHooks[hookName as HookName],
-            updated: true,
-        }));
+        res.json(success(config.nodeId, { ...out, updated: true }));
         emitChange('config');
     });
 
@@ -86,17 +77,12 @@ export function adminMaintenanceRouter(
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Hook "${hookName}" not found`));
             return;
         }
-
-        config.extensionHooks[hookName as HookName] = [];
-
-        // Remove from database
-        await storage.deleteConfigValue(`hooks.${hookName}`);
-
-        res.json(success(config.nodeId, {
-            hook: hookName,
-            actions: [],
-            cleared: true,
-        }));
+        const out = await setHookActions(config, storage, hookName, []);
+        if (!out.ok) {
+            res.status(400).json(error(config.nodeId, out.code, out.message));
+            return;
+        }
+        res.json(success(config.nodeId, { ...out, updated: true }));
         emitChange('config');
     });
 

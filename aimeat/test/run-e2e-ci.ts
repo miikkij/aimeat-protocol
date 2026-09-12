@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.40.0 -- 2026-09-12 -- Add e2e-admin-hooks-page.ts to ALL_SUITES: the Hooks page's read, the
+ *            binding the page could not make before, and the refusals. Not in the guard tier yet.
  *   v1.39.0 -- 2026-09-11 -- Add e2e-admin-discovery-page.ts to ALL_SUITES: the Discovery page's
  *            doors, the whole-site instant update's plan, and the send refused without a key.
  *            Not in the guard tier yet; it earns that with three identical green runs.
@@ -547,6 +549,9 @@ const ALL_SUITES = [
     // The Discovery page's doors: the status with the key check and the notice log, the plan of a
     // whole-site instant update, and the send refused by name on a node with no key.
     'test/e2e-admin-discovery-page.ts',
+    // The Hooks page's doors: which moments decide, binding one to a published action, the
+    // reference nothing is published under, and clearing.
+    'test/e2e-admin-hooks-page.ts',
     'test/e2e-living-pulse.ts',
     // Every core scheduled job fired through the operator's trigger door, on a node of its own
     // (40310) with an SMTP sink, short windows and the flags the seeding keys on. Lane 0.

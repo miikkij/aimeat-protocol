@@ -16,7 +16,8 @@
  * @structure
  *   DiscoveryTab (default) — load, the front-page tag check, RightNow (01) and the strip, then the
  *     sections from the sibling files: engines (02), instant (03), identity (04), apps (05), and
- *     Checks (06) here. The row, the stamp and the base come from discovery-tab.shared.js.
+ *     Checks (06) here. The row and the stamp come from ./shared.js, the base address from
+ *     discovery-tab.shared.js.
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
  *   v2.0.0 — 2026-09-11 — The poster face: the status word, the metric rows, the strip, six numbered
@@ -32,7 +33,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
-import { Spinner, ErrorBox, Badge, useToast, Toast } from './shared.js';
+import { Spinner, ErrorBox, Badge, useToast, Toast, Row, when } from './shared.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import * as adminService from '/js/services/admin.js';
@@ -41,7 +42,7 @@ import { DiscoveryInstant } from './discovery-tab.indexnow.js';
 import { DiscoveryIdentity } from './discovery-tab.identity.js';
 import { DiscoveryApps } from './discovery-tab.apps.js';
 import { buildDiscoveryPrompt } from './discovery-tab.prompt.js';
-import { Row, when, baseOf } from './discovery-tab.shared.js';
+import { baseOf } from './discovery-tab.shared.js';
 
 const S = (key, params) => t('dashboard.seo.' + key, params);
 

@@ -9,6 +9,8 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-12 -- aimeat_admin_hooks (GET /v1/admin/hooks) and aimeat_admin_hook_set
+ *     (PUT /v1/admin/hooks/:hook), on the third surface in the same change as the other two.
  *   v1.0.0 -- 2026-09-08 -- Initial: aimeat_admin_cors_overview (GET /v1/admin/cors/overview) and
  *     aimeat_admin_cors_set (the two PUT cors routes, chosen by the `#` in `who`).
  */
@@ -19,6 +21,18 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_admin_cors_overview',
         handler: ({ client }) => client.get('/v1/admin/cors/overview'),
+    },
+    {
+        name: 'aimeat_admin_hooks',
+        handler: ({ client }) => client.get('/v1/admin/hooks'),
+    },
+    {
+        // THE THIRD SURFACE forwards both parameters: `hook` picks the moment and `actions` is the
+        // body, an empty list included, because that is how a moment is cleared.
+        name: 'aimeat_admin_hook_set',
+        handler: ({ client }, input) =>
+            client.put(`/v1/admin/hooks/${encodeURIComponent(requiredString(input, 'hook'))}`,
+                { actions: requiredValue(input, 'actions') }),
     },
     {
         // THE THIRD SURFACE forwards both parameters: `who` picks the door (an agent's address carries

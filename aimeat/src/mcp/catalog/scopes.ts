@@ -126,6 +126,9 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     // The CORS page's read and its one write: the same decision.
     'aimeat_admin_cors_overview',
     'aimeat_admin_cors_set',
+    // The Hooks page's read and its one write: the same decision again.
+    'aimeat_admin_hooks',
+    'aimeat_admin_hook_set',
     // Reading how a page is arranged, and the catalogue of blocks this node can serve. Gated in the
     // handler on the operator, like the admin tools above it, and there is nothing here to narrow:
     // a layout is a list of block names, and the front page's describes a page anyone can look at.
