@@ -3,6 +3,7 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: source band phone padding and the named coral section shadow cut.
  *   v1.0.0 -- 2026-09-13 -- V0: lift the existing shapes; section titles and panels use the locked B1 design.
  */
 
@@ -91,8 +92,11 @@
 /* Showroom: .ld-sh-trust, .ld-sh-room, .ld-sh-door and .ld-sh-btn.
    The sun band lives in landing.css (.ld-band--sun), not landing-showroom.css. */
 .showroom-band { padding: 3.5rem 3rem; background: var(--text); color: var(--bg); }
+@media (max-width: 600px) { .showroom-band { padding: 2rem 1.25rem; } }
 .showroom-band--sun { padding: 3rem; background: var(--sun); color: var(--on-sun); border-bottom: 3px solid var(--text); }
 .showroom-section { padding: 1.75rem; background: var(--card-bg); border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); }
+/* The design skill names sun, coral and ink shadows; the source rooms use the first two. */
+.showroom-section--coral { box-shadow: 8px 8px 0 var(--accent); }
 .showroom-door { font-family: var(--font-showroom-body); font-size: .95rem; font-weight: 800; color: var(--text); text-decoration: none; border-bottom: 3px solid var(--accent); }
 .showroom-door:hover { color: var(--accent); }
 .showroom-slab {
