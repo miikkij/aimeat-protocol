@@ -13,6 +13,10 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   v1.11.0 — 2026-09-12 — searchAdminMemory (the node-wide content search the FTS primitive has
+ *     always backed and no admin surface called), getAdminMemoryRecord (one record with its value)
+ *     and restoreAdminMemory (out of the bin). getAdminMemory gains the archive, bin and order
+ *     switches and no longer receives values.
  *   v1.10.0 — 2026-09-12 — setBoardVisibility, setBoardFederate and deleteBoard: three board doors
  *     the routes have always had and no frontend function reached.
  *   v1.9.0 — 2026-09-12 — updateSchedulerJob sends PATCH, the verb its route is registered under;
@@ -272,17 +276,43 @@ export const importSurfaceLayout = (bundle)     => apiPost('/v1/site/layout-impo
 export const addMemory       = (key, value) => apiPost('/v1/memory', { key, value, visibility: 'private' });
 export const deleteMemory    = (key)        => apiDelete(`/v1/memory/${encodeURIComponent(key)}`);
 
-// ── Admin Memory (all-owner memory browser) ──
+// ── Admin Memory (every owner's records) ──
+// A memory key may contain slashes (`activity/apps/2026-…`), so every key here is encoded into one
+// path segment. Express decodes it back whole, which the route's 404 message proves.
+const memPath = (owner, key) => `/v1/admin/memory/${encodeURIComponent(owner)}/${encodeURIComponent(key)}`;
+
+/** The listing: metadata and the audience, never values. `bin: true` reads one owner's bin instead. */
 export const getAdminMemory = (params = {}) => {
   const q = new URLSearchParams();
   if (params.prefix) q.set('prefix', params.prefix);
   if (params.owner) q.set('owner', params.owner);
   if (params.visibility) q.set('visibility', params.visibility);
+  if (params.archived) q.set('archived', params.archived);
+  if (params.bin) q.set('bin', '1');
+  if (params.oldest) q.set('oldest', '1');
+  if (params.counts) q.set('counts', '1');
   if (params.limit) q.set('limit', String(params.limit));
   if (params.offset) q.set('offset', String(params.offset));
   return apiGet('/v1/admin/memory?' + q.toString());
 };
-export const deleteAdminMemory = (owner, key) => apiDelete(`/v1/admin/memory/${encodeURIComponent(owner)}/${encodeURIComponent(key)}`);
+
+/** What is WRITTEN in memory, across every owner, ranked. Each hit carries the matched excerpt. */
+export const searchAdminMemory = (params = {}) => {
+  const q = new URLSearchParams();
+  q.set('q', params.q || '');
+  if (params.owner) q.set('owner', params.owner);
+  if (params.prefix) q.set('prefix', params.prefix);
+  if (params.visibility) q.set('visibility', params.visibility);
+  if (params.maxFlags !== undefined) q.set('max_flags', String(params.maxFlags));
+  if (params.archived) q.set('archived', params.archived);
+  if (params.limit) q.set('limit', String(params.limit));
+  return apiGet('/v1/admin/memory/search?' + q.toString());
+};
+
+/** One record whole: its value, every field, and the kept versions when the key is trackable. */
+export const getAdminMemoryRecord = (owner, key) => apiGet(memPath(owner, key));
+export const deleteAdminMemory    = (owner, key) => apiDelete(memPath(owner, key));
+export const restoreAdminMemory   = (owner, key) => apiPost(`${memPath(owner, key)}/restore`);
 
 // ── Stats ──
 export const getStats = (from, to) => {

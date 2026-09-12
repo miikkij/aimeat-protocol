@@ -53,6 +53,23 @@ export interface MemoryMetaRow {
   ttlHours?: number | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * WHO CAN ACTUALLY READ THIS, and where the value came from. `visibility` alone does not answer the
+   * first question: `group` and `workspace` name an audience the record carries but the word does not,
+   * and a per-key origin list narrows every one of the six further. A listing that shows the word and
+   * not the audience says "someone" where the record says who, which is the one thing an operator
+   * looking at somebody else's knowledge has to be able to see.
+   *
+   * All four are scalars or short arrays already on the row, so the projection stays value-free and
+   * the cost is the same JSON.parse `tags` has always paid.
+   */
+  groupId?: string | null;
+  workspaceRef?: string | null;
+  allowedOrigins?: string[] | null;
+  /** Absent means UNSTATED, never "a person wrote it" — the distinction the record itself insists on. */
+  aiProvenanceId?: string | null;
+  /** Kept and out of every default read. Not the same as deleted, which these projections never return. */
+  archived?: boolean;
 }
 
 /** A single ranked full-text hit from {@link MemoryRepository.searchText}. */

@@ -1,0 +1,156 @@
+/* ── Admin Memory page, in the poster face ──
+ * @file admin-memory.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's read across every owner's memory records (design canvas "Admin Memory
+ *   Page"): the search that is the page, the audience strip above it, one record shown whole, and
+ *   the reach view that sorts every record by how far it can be read. The slab, the doors and the
+ *   dashed aside come from admin.css; only what this page adds lives here, and every value is a
+ *   theme.css token.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial. Replaces the filter bar and the seven-column table.
+ */
+
+.adm-mem-page { padding-top: .2rem; }
+
+/* ── The word, and the sentence beside it ── */
+.adm-mem-top { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 0 48px; align-items: start; }
+.adm-mem-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+.adm-mem-hero { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3.1rem; line-height: 1.02; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text); }
+.adm-mem-lead { margin: 0; padding-top: 22px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
+
+/* ── Who can read what, before anything is asked ── */
+.adm-mem-strip { display: flex; border-top: 3px solid var(--text); border-bottom: 3px solid var(--text); margin-top: 20px; }
+.adm-mem-strip > div { flex: 1 1 0; box-sizing: border-box; display: flex; align-items: baseline; flex-wrap: wrap; gap: .5rem; padding: .85rem 1rem .85rem 0; border-right: 1px solid var(--border); min-width: 0; }
+.adm-mem-strip > div + div { padding-left: 1rem; }
+.adm-mem-strip > div:last-child { border-right: 0; align-items: center; }
+.adm-mem-strip b { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.9rem; line-height: 1; letter-spacing: var(--font-poster-tracking); color: var(--text); }
+.adm-mem-strip b.hot { color: var(--accent); }
+.adm-mem-strip span { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+
+/* ── The search: this is the page ── */
+.adm-mem-find { margin-top: 24px; }
+.adm-mem-findbar { display: flex; align-items: center; gap: 12px; border-bottom: 3px solid var(--text); padding: 4px 2px 8px; }
+.adm-mem-findbar:focus-within { border-bottom-color: var(--accent); }
+.adm-mem-findbar svg { width: 19px; height: 19px; flex: none; stroke: var(--text); fill: none; stroke-width: 2.5; }
+.adm .adm-mem-findbar input[type="text"] { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: 1.1rem; font-weight: 700; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-mem-findbar input[type="text"]::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm-mem-ranked { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+.adm-mem-findhint { margin: 9px 0 0; font-size: .8rem; line-height: 1.5; color: var(--text-dim); }
+
+/* ── Narrow it ── */
+.adm-mem-narrow { display: grid; grid-template-columns: 250px 250px minmax(0, 1fr); gap: 0 30px; align-items: end; margin-top: 20px; }
+.adm-mem-narrow label { display: block; min-width: 0; }
+.adm-mem-narrow .adm-mem-lbl { margin-bottom: 7px; }
+.adm .adm-mem-narrow input[type="text"] { display: block; width: 100%; box-sizing: border-box; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; background: none; padding: 3px 2px 6px; font: inherit; font-size: .9rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-mem-narrow input[type="text"]:focus { border-bottom-color: var(--accent); }
+.adm .adm-mem-narrow input[type="text"]::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm-mem-chips { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; padding-bottom: 6px; }
+.adm .adm-mem-chip { font-family: var(--font-mono); font-size: .68rem; font-weight: 500; padding: 3px 9px; border: 2px solid var(--border); border-radius: 0; background: none; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
+.adm .adm-mem-chip:hover { border-color: var(--text); color: var(--text); }
+.adm .adm-mem-chip.on { background: var(--sun); border-color: var(--text); color: var(--on-sun); box-shadow: 0 2px 0 var(--text); }
+.adm-mem-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+
+/* ── The thing said out loud, and the questions inside it ── */
+.adm-mem-say { border: 3px dashed var(--accent); background: var(--card-bg); padding: 14px 18px; margin-top: 22px; }
+.adm-mem-say p { margin: 0; font-size: .86rem; line-height: 1.6; }
+.adm-mem-qs { display: flex; gap: 24px; flex-wrap: wrap; align-items: baseline; }
+
+/* ── A door is an underlined word ── */
+.adm .adm-mem-door { background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; padding: 0 0 1px; font: inherit; font-size: .8rem; font-weight: 700; color: var(--text); cursor: pointer; white-space: nowrap; }
+.adm .adm-mem-door:hover:enabled { color: var(--accent); border-bottom-color: var(--accent); }
+.adm .adm-mem-door:disabled { color: var(--text-dim); border-bottom-color: var(--border); cursor: not-allowed; }
+.adm .adm-mem-door.is-quiet { color: var(--text-dim); border-bottom-color: var(--border); }
+
+/* ── Results ── */
+.adm-mem-results { border-top: 3px solid var(--text); margin-top: 26px; padding-top: 15px; }
+.adm-mem-rhead2 { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 4px; flex-wrap: wrap; }
+.adm .adm-mem-rhead2 h2 { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.6rem; line-height: 1.05; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text); }
+.adm .adm-mem-rhead2 h2 small { font-family: var(--font-mono); font-size: .8rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--accent); margin-left: .6rem; }
+.adm-mem-rhead2 > span { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+
+.adm-mem-row { padding: 14px 0 15px; border-bottom: 1px solid var(--border); }
+.adm-mem-row-top { display: grid; grid-template-columns: minmax(0, 1fr) 220px 120px; gap: 0 22px; align-items: baseline; }
+.adm-mem-key { font-family: var(--font-mono); font-size: .88rem; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
+.adm-mem-owner { font-size: .78rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.adm-mem-doors { display: flex; gap: 14px; justify-content: flex-end; align-items: baseline; }
+
+/* The matched text, which is why the row is here. */
+.adm-mem-cut { font-family: var(--font-mono); font-size: .76rem; line-height: 1.6; color: var(--text-dim); background: var(--bg-surface); border-left: 3px solid var(--accent); padding: 7px 11px; margin-top: 9px; overflow-wrap: anywhere; }
+/* --on-sun, never --text: the sun does not swap between themes, so ink-on-sun stays readable while
+   --text flips to paper and leaves the matched word invisible on its own highlight in the dark. */
+.adm-mem-cut b { color: var(--on-sun); background: var(--sun); padding: 0 2px; font-weight: 700; }
+
+.adm-mem-facts { display: flex; gap: 10px; align-items: center; margin-top: 9px; flex-wrap: wrap; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.adm-mem-tag { font-size: .66rem; font-weight: 500; text-transform: uppercase; letter-spacing: .03em; padding: 1px 7px; border: 2px solid var(--border); color: var(--text-dim); white-space: nowrap; }
+.adm-mem-tag.is-hot { border-color: var(--accent); color: var(--accent); }
+.adm-mem-who { font-size: .72rem; color: var(--text); font-weight: 500; overflow-wrap: anywhere; }
+
+.adm-mem-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 15px 2px 0; font-size: .78rem; color: var(--text-dim); flex-wrap: wrap; }
+.adm-mem-pager { display: flex; gap: 18px; align-items: baseline; }
+.adm-mem-pageno { font-family: var(--font-mono); font-size: .74rem; }
+
+/* ── One record, whole ── */
+.adm-mem-crumb { font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); margin-bottom: 15px; }
+.adm .adm-mem-crumb button { background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; padding: 0 0 1px; font: inherit; font-size: .74rem; font-weight: 500; color: var(--text); cursor: pointer; }
+.adm .adm-mem-crumb button:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.adm-mem-rhead { border-top: 3px solid var(--text); padding-top: 16px; }
+.adm-mem-rkey { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 700; line-height: 1.25; color: var(--text); overflow-wrap: anywhere; }
+.adm .adm-mem-rtitle { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 2.3rem; line-height: 1.04; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text); }
+.adm-mem-rlead { margin: .7rem 0 0; font-size: .88rem; line-height: 1.6; color: var(--text-dim); max-width: 92ch; }
+.adm-mem-two { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 0 44px; align-items: start; margin-top: 24px; }
+
+.adm-mem-vhead { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; border-bottom: 2px solid var(--text); padding-bottom: 7px; margin-bottom: 13px; font-family: var(--font-mono); font-size: .69rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); }
+.adm-mem-vhead--hist { margin-top: 26px; }
+.adm-mem-value { margin: 0; font-family: var(--font-mono); border: 2px solid var(--text); background: var(--bg-dim); color: var(--text); padding: 15px 17px; font-size: .75rem; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow: auto; border-radius: 0; }
+
+.adm-mem-hist { border-top: 0; }
+.adm-mem-hrow { display: grid; grid-template-columns: 60px 150px minmax(0, 1fr) 90px; gap: 0 16px; padding: 9px 0; border-bottom: 1px solid var(--border); align-items: baseline; font-family: var(--font-mono); font-size: .76rem; color: var(--text-dim); }
+.adm-mem-hrow b { color: var(--text); font-weight: 700; }
+.adm-mem-hrow .r { text-align: right; }
+
+/* Every field, and an empty one says it is empty. */
+.adm-mem-fields { margin: 0; }
+.adm-mem-f { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 0 14px; padding: 7px 0; border-bottom: 1px solid var(--border); align-items: baseline; }
+.adm-mem-f:last-child { border-bottom: 0; }
+.adm-mem-f dt { font-family: var(--font-mono); font-size: .69rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.adm-mem-f dd { margin: 0; font-family: var(--font-mono); font-size: .77rem; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
+.adm-mem-f dd em { display: block; font-style: normal; font-family: var(--font); font-size: .76rem; font-weight: 400; color: var(--text-dim); margin-top: 2px; }
+.adm-mem-f-none { font-style: italic; font-weight: 400; color: var(--text-muted); }
+
+.adm-mem-acts { display: flex; gap: 18px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
+.adm-mem-actnote { margin: 11px 0 0; font-size: .78rem; line-height: 1.55; color: var(--text-dim); }
+
+/* ── Who can read what ── */
+.adm-mem-ladder { border-top: 3px solid var(--text); margin-top: 24px; }
+.adm-mem-rung { display: grid; grid-template-columns: 128px 76px minmax(0, 1fr) 130px; gap: 0 24px; padding: 14px 0; border-bottom: 1px solid var(--border); align-items: baseline; }
+.adm-mem-rung-n { font-family: var(--font-mono); font-size: .84rem; font-weight: 700; color: var(--accent); }
+.adm-mem-rung-c { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.7rem; line-height: 1; letter-spacing: var(--font-poster-tracking); text-align: right; color: var(--accent); }
+.adm-mem-rung.is-none .adm-mem-rung-n, .adm-mem-rung.is-none .adm-mem-rung-c { color: var(--text-muted); }
+.adm-mem-rung-w { font-size: .88rem; line-height: 1.5; font-weight: 600; color: var(--text); }
+.adm-mem-rung-note { font-size: .8rem; line-height: 1.5; color: var(--text-dim); margin-top: 3px; }
+.adm-mem-rung .r { text-align: right; }
+
+.adm-mem-origins { margin-top: 30px; max-width: 60ch; }
+.adm-mem-origins-n { display: flex; align-items: baseline; gap: .7rem; }
+.adm-mem-origins-n b { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3rem; line-height: 1; letter-spacing: var(--font-poster-tracking); color: var(--text); }
+.adm-mem-origins-n span { font-weight: 800; font-size: .95rem; color: var(--text); }
+
+/* ── At phone width a row is a block, never a squeezed grid ── */
+@media (max-width: 900px) {
+  .adm-mem-top, .adm-mem-two { grid-template-columns: minmax(0, 1fr); gap: 1.2rem 0; }
+  .adm-mem-lead { padding-top: 0; }
+  .adm-mem-hero { font-size: 2.3rem; }
+  .adm-mem-strip { flex-wrap: wrap; }
+  .adm-mem-strip > div { flex: 1 1 42%; border-right: 0; border-bottom: 1px solid var(--border); padding-left: 0; }
+  .adm-mem-strip > div + div { padding-left: 0; }
+  .adm-mem-narrow { grid-template-columns: minmax(0, 1fr); gap: 16px 0; }
+  .adm-mem-row-top { grid-template-columns: minmax(0, 1fr); gap: 5px 0; }
+  .adm-mem-doors { justify-content: flex-start; margin-top: 6px; }
+  .adm-mem-rung { grid-template-columns: minmax(0, 1fr) 70px; gap: 4px 16px; }
+  .adm-mem-rung-w, .adm-mem-rung-note { grid-column: 1 / -1; }
+  .adm-mem-rung .r { grid-column: 1 / -1; text-align: left; }
+  .adm-mem-hrow { grid-template-columns: 55px minmax(0, 1fr) 80px; }
+  .adm-mem-hrow > span:nth-child(3) { display: none; }
+  .adm-mem-f { grid-template-columns: minmax(0, 1fr); gap: 2px 0; }
+}

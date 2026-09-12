@@ -70,7 +70,7 @@ export function rowToRecord(r: Selectable<Memory>): MemoryRecord {
 }
 
 /** The value-free META projection (`?include=meta`). */
-export function rowToMeta(r: Pick<Selectable<Memory>, 'key' | 'ownerGaii' | 'visibility' | 'tags' | 'version' | 'flagCount' | 'byteSize' | 'ttlHours' | 'createdAt' | 'updatedAt'>): MemoryMetaRow {
+export function rowToMeta(r: Pick<Selectable<Memory>, 'key' | 'ownerGaii' | 'visibility' | 'tags' | 'version' | 'flagCount' | 'byteSize' | 'ttlHours' | 'createdAt' | 'updatedAt' | 'groupId' | 'workspaceRef' | 'allowedOrigins' | 'aiProvenanceId' | 'archived'>): MemoryMetaRow {
   return {
     key: r.key,
     ownerGaii: r.ownerGaii,
@@ -82,6 +82,12 @@ export function rowToMeta(r: Pick<Selectable<Memory>, 'key' | 'ownerGaii' | 'vis
     ttlHours: r.ttlHours ?? null,
     createdAt: iso(r.createdAt),
     updatedAt: iso(r.updatedAt),
+    // The audience and the provenance — see MemoryMetaRow. `visibility` says "group"; groupId says which.
+    groupId: r.groupId ?? null,
+    workspaceRef: r.workspaceRef ?? null,
+    allowedOrigins: r.allowedOrigins ?? null,
+    aiProvenanceId: r.aiProvenanceId ?? null,
+    archived: !!r.archived,
   };
 }
 

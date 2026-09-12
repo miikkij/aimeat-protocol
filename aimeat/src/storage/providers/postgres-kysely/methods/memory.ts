@@ -17,6 +17,10 @@
  *     (new value, tombstone cleared), as setMemory already did. A DO NOTHING against a binned row
  *     answered null on every retry, so the workspace append could never seed a draft for a
  *     document whose draft a publish had just binned (VERSION_CONFLICT "at version 0", 2026-09-03).
+ *   v1.5.0 — 2026-09-12 — META_COLS carries the audience and the provenance: groupId, workspaceRef,
+ *     allowedOrigins, aiProvenanceId and archived. `visibility` alone says "group" without saying
+ *     which group, so a listing built on this projection could print the word and not the audience.
+ *     Still no `value` column, which is the whole point of META. (Admin memory page.)
  *   v1.4.0 — 2026-08-17 — listAllMemoryMeta: cross-owner enumeration with the META_COLS projection
  *     (no value column), for scheduled scans that only decide from keys + timestamps.
  *   v1.3.0 — 2026-08-11 — `groupId` is written on the UPDATE paths and on createMemoryIfAbsent, not
@@ -73,7 +77,8 @@ function applyList(q: any, opts?: ListOpts) {
   return q;
 }
 
-const META_COLS = ['key', 'ownerGaii', 'visibility', 'tags', 'version', 'flagCount', 'byteSize', 'ttlHours', 'createdAt', 'updatedAt'] as const;
+const META_COLS = ['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'allowedOrigins',
+  'aiProvenanceId', 'archived', 'tags', 'version', 'flagCount', 'byteSize', 'ttlHours', 'createdAt', 'updatedAt'] as const;
 
 export const memoryMethods = {
   /** Raw current row (any TTL/archive state) — for existence/version continuity on write. */
