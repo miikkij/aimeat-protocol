@@ -10,6 +10,7 @@
  * @structure OrganizePage({ org, showToast })
  * @usage <OrganizePage org=${org} showToast=${showToast} />
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose section headlines with poster-section-title.
  *   v1.0.0 — 2026-09-13 — Initial, with the Messages list's sections, rules and archive.
  */
 import { h } from 'preact';
@@ -75,7 +76,7 @@ export function OrganizePage({ org, showToast }) {
       <p class="og-desc">${t('inbox.org.pageLead')}</p>
 
       <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2>${t('inbox.org.autoTitle')}</h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${t('inbox.org.autoTitle')}</h2></div>
         <div class="inbox-org-line">
           <${Switch} on=${auto.enabled} disabled=${busy} label=${auto.enabled ? t('inbox.org.on') : t('inbox.org.off')}
             onToggle=${() => org.saveSettings({ auto_archive: { enabled: !auto.enabled } })} />
@@ -90,14 +91,14 @@ export function OrganizePage({ org, showToast }) {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${t('inbox.org.foldTitle')}</h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${t('inbox.org.foldTitle')}</h2></div>
         <${Switch} on=${s.fold_same_subject} disabled=${busy} label=${s.fold_same_subject ? t('inbox.org.on') : t('inbox.org.off')}
           onToggle=${() => org.saveSettings({ fold_same_subject: !s.fold_same_subject })} />
         <p class="og-hint">${t('inbox.org.foldHint')}</p>
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${t('inbox.org.rulesTitle')}${rules.length ? html` <small>${rules.length}</small>` : null}</h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${t('inbox.org.rulesTitle')}${rules.length ? html` <small>${rules.length}</small>` : null}</h2></div>
         <p class="og-hint">${t('inbox.org.rulesHint')}</p>
         <div class="inbox-org-rules">
           ${rules.length === 0 ? html`<p class="og-hint">${t('inbox.org.rulesEmpty')}</p>` : rules.map(r => html`

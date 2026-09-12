@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: MIT
  * @description The organism home and its settings page in the poster face (og- prefix; design canvas
  *   "AIMEAT Organismin sivu", direction A): the crumb in mono, the masthead with its chips and the hot
- *   slab, the strip of four figures between ink rules, sections under a 3px rule with a numbered
+ *   slab, the strip of four figures between ink rules, shared B1 sections with a numbered
  *   headline and doors on the right, folded rows that open in place, the sticky contents rail (the
  *   same ink slab the terms page uses), and the settings' choice rows, fields and the two danger
  *   boxes (dashed for the reversible act, solid for the irreversible one). Tokens only; loaded by
  *   views/profile/organisms/home.js and read by home-settings.js. The inner panels (workspace list,
  *   roster, agents, board, map, timeline) keep their own pj- rules; a few are quieted here.
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- Compose B1 section titles from poster.css; retain rules on folded rows.
  *   v1.2.0 — 2026-09-06 — The visibility chips in a table of spaces go to the far end of the name
  *     cell (.og-tbl-marks), so they line up against the size column down the whole table.
  *   v1.1.0 — 2026-08-29 — The workspace cover and its pages (design canvas "AIMEAT Työtilan sivu"): the
@@ -19,7 +20,7 @@
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 
-.og { font-family: var(--font-showroom-body); color: var(--text); }
+.og { --poster-section-size: 1.6rem; font-family: var(--font-showroom-body); color: var(--text); }
 .og-crumb { display: flex; gap: 8px; align-items: center; font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); }
 .og-crumb-link { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--accent); }
 .og-crumb-link:hover { color: var(--text); }
@@ -63,11 +64,11 @@
 /* ── Sections, folds, the rail ─────────────────────────────────────────────────────────────── */
 .og-grid { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 2.75rem; align-items: start; margin-top: .5rem; }
 .og-main { display: flex; flex-direction: column; gap: 1.4rem; min-width: 0; }
-.og-sec { border-top: 3px solid var(--text); padding: 1.4rem 0 .5rem; scroll-margin-top: 1rem; }
+.og-sec { padding: 1.4rem 0 .5rem; scroll-margin-top: 1rem; }
+/* Folded rows and not-yet-migrated headings retain their existing rule. */
+.og-sec:where(:not(:has(> .og-sec-h > .poster-section-title))) { border-top: 3px solid var(--text); }
 .og-sec--first { border-top: 0; padding-top: .9rem; }
 .og-sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: .9rem; flex-wrap: wrap; }
-/* `.pf .og` outranks the poster skin's own heading rules, which the shell applies to every h2. */
-.pf .og .og-sec h2 { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.6rem; line-height: 1.05; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text); }
 .pf .og .og-sec h2 small { font-family: var(--font-mono); font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--accent); margin-left: .6rem; }
 /* The shell prints "Organisms /" above every tab; the organism's own crumb carries that word, so
    the shell's line goes while an organism is open. */
