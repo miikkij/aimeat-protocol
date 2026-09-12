@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- V2: compose the avatar with the shared poster frame.
  *   2026-09-03 — The AI page's menu item is route id 'ai' (was 'generator'), and the usage card's
  *     own-key door goes there.
  *   2026-09-03 — "Your agents" heads the Automation group, above the Agents tab it feeds into.
@@ -502,7 +503,7 @@ export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) 
   return html`
     <div class="pf-lp-card">
       <div class="pf-lp-card-header">
-        <div class="pf-lp-avatar" role="button" tabindex="0" title=${t('profile.landing.editProfile')}
+        <div class="pf-lp-avatar poster-frame" role="button" tabindex="0" title=${t('profile.landing.editProfile')}
           onClick=${() => onEditProfile?.()} dangerouslySetInnerHTML=${{ __html: avatarSvg }}></div>
         <div class="pf-lp-info">
           <div class="pf-lp-name-row">
