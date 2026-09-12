@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Installs early request guards during server bootstrap: maintenance-mode gating
- *   (503 + a styled HTML page for browsers), node-type guards for relay/mirror nodes, and a
+ *   (503 + the house maintenance page for browsers), node-type guards for relay/mirror nodes, and a
  *   first-run redirect that serves the setup wizard when no owners exist yet.
  *
  * @structure
@@ -12,6 +12,11 @@
  *   - maintenancePageHtml(nodeId, message): renders the auto-refreshing maintenance page
  *
  * @version-history
+ *   v1.1.0 — 2026-09-12 — The maintenance page in the house face (design canvas "AIMEAT Admin
+ *     Maintenance"): the wordmark with its SVG heart, the ink headline, the operator's line, and
+ *     the theme's own paper and coral instead of the purple glass, the gradient text, the drifting
+ *     waves and the emoji hearts. The two font files it names pass the guard, or the one page a
+ *     visitor gets is the one page not set in the house faces.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import express from 'express';
@@ -67,10 +72,27 @@ export function setupGuards(
       p.startsWith('/v1/federation/peer/introduce') ||
       p.startsWith('/v1/federation/directory') ||
       p.startsWith('/favicon') ||
+      // The operator's dashboard is allowed above, and this is what it is MADE of: stylesheets,
+      // modules, served libs, strings, the build stamp and the header's own config. None of it is
+      // data — and without it the one page that can bring the node back loads blank, which turns a
+      // maintenance stop into a maintenance lock-in. The maintenance page below reads the same
+      // /lib/ for the house faces. Measured on 2026-09-12 in a sandbox: with the node down, the
+      // dashboard's auth lib answered 503 and the browser refused to run it.
+      p.startsWith('/css/') || p.startsWith('/js/') || p.startsWith('/components/') ||
+      p.startsWith('/views/') || p.startsWith('/lib/') || p.startsWith('/locales/') ||
+      p.startsWith('/assets/') || p.startsWith('/v1/libs/') ||
+      p === '/v1/site/header-nav' || p === '/v1/build' ||
+      // And the way IN: a token that expires mid-stop must be renewable, and an operator who is
+      // signed out must be able to sign back in, or the stop locks the person who called it out
+      // of the only screen that ends it. Both doors keep their own rate limit and tarpit, and
+      // everything a token could then reach is still refused below.
+      p.startsWith('/v1/auth/') || p === '/v1/ghii/login' ||
       req.method === 'OPTIONS'
     ) { next(); return; }
 
-    const msg = mc.message || 'This node is temporarily offline for maintenance.';
+    // The operator's own line when there is one; this is what the page and the JSON body carry,
+    // and the maintenance page's preview shows the same default back to them.
+    const msg = mc.message || 'Back shortly.';
 
     // Serve HTML for browsers, JSON for API clients
     if (req.accepts(['html', 'json']) === 'html') {
@@ -161,122 +183,48 @@ export function setupGuards(
   return { rejectForRelay, mirrorReadOnly, invalidateHasOwnersCache: wrappedInvalidate };
 }
 
+/**
+ * The page a visitor gets while the node is down: the wordmark, one ink headline, the line the
+ * operator wrote, and nothing else. Drawn in the house face with the theme's own values written
+ * out, because this page is served before anything a stylesheet could reach. It refreshes itself
+ * every 30 seconds, so the person who left it open sees the node come back on its own.
+ */
 function maintenancePageHtml(nodeId: string, message: string): string {
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <meta http-equiv="refresh" content="30"/>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<title>Maintenance — ${esc(nodeId)}</title>
+<link rel="stylesheet" href="/lib/aimeat-fonts.css">
+<title>Down for work — ${esc(nodeId)}</title>
 <style>
+:root{--text:#1A1A2E;--bg:#FAFAF8;--dim:#6B7280;--accent:#E8564A;--sun:#FFB52E;
+--headline:'Fjalla One','Arial Narrow',sans-serif;--body:'Archivo',system-ui,-apple-system,sans-serif;
+--wordmark:'Archivo Black','Archivo',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{--text:#EDEEF2;--bg:#14151A;--dim:#A4A9B6;--accent:#FF6F62}}
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#1a1025;color:#f0e6ff;font-family:system-ui,-apple-system,sans-serif;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;padding:20px;overflow:hidden}
-
-/* ── Warm ambient gradient base ── */
-body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 30% 20%,rgba(168,85,247,.12) 0%,transparent 50%),radial-gradient(ellipse at 70% 80%,rgba(236,72,153,.1) 0%,transparent 50%),radial-gradient(ellipse at 50% 50%,rgba(139,92,246,.06) 0%,transparent 70%);z-index:0}
-
-/* ── PS-style flowing waves — warm and bright ── */
-.waves{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
-.wave{position:absolute;width:200%;height:200%;border-radius:42%;animation:drift linear infinite}
-.wave:nth-child(1){background:linear-gradient(135deg,#c084fc,#f472b6,#fb923c);top:-60%;left:-50%;animation-duration:25s;opacity:.07}
-.wave:nth-child(2){background:linear-gradient(225deg,#a78bfa,#f9a8d4,#fdba74);top:-65%;left:-55%;animation-duration:30s;animation-delay:-5s;opacity:.06}
-.wave:nth-child(3){background:linear-gradient(315deg,#e879f9,#fb7185,#c084fc);top:-70%;left:-45%;animation-duration:35s;animation-delay:-10s;opacity:.05}
-.wave:nth-child(4){background:linear-gradient(45deg,#f0abfc,#fda4af,#d8b4fe);top:-55%;left:-60%;animation-duration:40s;animation-delay:-15s;opacity:.04}
-@keyframes drift{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-
-/* ── Floating hearts + particles ── */
-.particles{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
-.particle{position:absolute;opacity:0;animation:float linear infinite}
-.particle.dot{border-radius:50%}
-.particle.heart::before{content:'\\2665';font-size:inherit;color:inherit}
-.particle:nth-child(1){font-size:14px;color:rgba(244,114,182,.5);left:8%;animation-duration:14s;animation-delay:0s}
-.particle:nth-child(2){width:3px;height:3px;background:#c084fc;left:20%;animation-duration:16s;animation-delay:-2s}
-.particle:nth-child(3){font-size:10px;color:rgba(192,132,252,.4);left:35%;animation-duration:12s;animation-delay:-5s}
-.particle:nth-child(4){width:2px;height:2px;background:#f9a8d4;left:48%;animation-duration:18s;animation-delay:-3s}
-.particle:nth-child(5){font-size:16px;color:rgba(251,113,133,.4);left:62%;animation-duration:15s;animation-delay:-7s}
-.particle:nth-child(6){width:3px;height:3px;background:#fda4af;left:75%;animation-duration:13s;animation-delay:-1s}
-.particle:nth-child(7){font-size:12px;color:rgba(216,180,254,.4);left:88%;animation-duration:17s;animation-delay:-9s}
-.particle:nth-child(8){width:2px;height:2px;background:#f0abfc;left:50%;animation-duration:20s;animation-delay:-11s}
-.particle:nth-child(9){font-size:8px;color:rgba(249,168,212,.35);left:15%;animation-duration:19s;animation-delay:-6s}
-.particle:nth-child(10){width:4px;height:4px;background:rgba(244,114,182,.3);left:42%;animation-duration:11s;animation-delay:-4s}
-@keyframes float{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:.7}90%{opacity:.7}100%{transform:translateY(-10vh) scale(1);opacity:0}}
-
-/* ── Card ── */
-.card{position:relative;z-index:1;background:rgba(30,20,45,.65);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border:1px solid rgba(192,132,252,.2);border-radius:28px;padding:56px 48px;max-width:520px;width:100%;text-align:center;box-shadow:0 0 100px rgba(168,85,247,.1),0 0 40px rgba(236,72,153,.06),0 4px 32px rgba(0,0,0,.2);animation:cardIn .8s cubic-bezier(.16,1,.3,1)}
-@keyframes cardIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
-
-/* ── Heart-beat loader ── */
-.loader{position:relative;width:80px;height:80px;margin:0 auto 28px}
-.heart-icon{font-size:40px;line-height:80px;animation:heartbeat 1.6s ease-in-out infinite;filter:drop-shadow(0 0 12px rgba(244,114,182,.4))}
-@keyframes heartbeat{0%,100%{transform:scale(1)}14%{transform:scale(1.15)}28%{transform:scale(1)}42%{transform:scale(1.1)}56%{transform:scale(1)}}
-.loader-ring{position:absolute;inset:0;border-radius:50%;border:2px solid transparent}
-.loader-ring:nth-child(1){border-top-color:rgba(192,132,252,.5);animation:spin 3s linear infinite}
-.loader-ring:nth-child(2){inset:4px;border-right-color:rgba(244,114,182,.4);animation:spin 4s linear infinite reverse}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* ── Brand ── */
-.brand{font-size:.85rem;font-weight:600;letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px;color:rgba(216,180,254,.6)}
-h1{font-size:1.6rem;font-weight:700;margin-bottom:14px;background:linear-gradient(135deg,#f0abfc,#f9a8d4,#fda4af);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.01em}
-.msg{color:#c4b5d4;font-size:1rem;margin-bottom:28px;line-height:1.7}
-.reason{background:rgba(192,132,252,.08);border:1px solid rgba(192,132,252,.18);border-radius:12px;padding:14px 20px;color:#d8b4fe;font-size:.9rem;margin-bottom:28px;letter-spacing:.01em}
-.node-id{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 16px;margin-bottom:20px}
-.node-id code{color:#a78bfa;font-family:'SF Mono',Consolas,monospace;font-size:.75rem}
-.status-dot{width:7px;height:7px;border-radius:50%;background:#f472b6;animation:pulse 2s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(244,114,182,.5)}50%{opacity:.6;box-shadow:0 0 0 8px rgba(244,114,182,0)}}
-.footer{color:rgba(167,139,250,.4);font-size:.7rem;margin-top:8px;letter-spacing:.04em;text-transform:uppercase}
-
-/* ── Progress bar — warm gradient ── */
-.progress{width:100%;height:3px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:24px;overflow:hidden}
-.progress-bar{height:100%;width:100%;background:linear-gradient(90deg,#c084fc,#f472b6,#fb923c,#c084fc);background-size:300% 100%;border-radius:2px;animation:shimmer 2.5s linear infinite}
-@keyframes shimmer{from{background-position:300% 0}to{background-position:0 0}}
-
-/* ── Tagline ── */
-.tagline{position:relative;z-index:1;margin-top:24px;font-size:.75rem;color:rgba(216,180,254,.3);letter-spacing:.08em}
+body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:100vh;display:flex;flex-direction:column}
+.bar{display:flex;align-items:center;gap:14px;padding:18px 28px;border-bottom:3px solid var(--text)}
+.mark{display:inline-flex;align-items:center;font-family:var(--wordmark);font-size:1.3rem;letter-spacing:-.01em}
+.mark svg{width:.78em;height:.78em;margin:0 -.04em;fill:var(--accent)}
+.mark .at{color:var(--accent)}
+.crumb{font-family:var(--mono);font-size:.72rem;color:var(--dim)}
+main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:48px 28px 56px}
+h1{font-family:var(--headline);font-weight:400;font-size:clamp(2.6rem,7vw,4.2rem);line-height:1;letter-spacing:.01em;text-transform:uppercase;margin-bottom:22px}
+.msg{font-size:1.15rem;font-weight:600;line-height:1.5;max-width:34ch}
+.sub{margin-top:22px;font-size:.95rem;line-height:1.6;color:var(--dim);max-width:46ch}
+.rule{width:64px;height:4px;background:var(--sun);margin:26px auto 0}
+footer{display:flex;justify-content:center;gap:22px;flex-wrap:wrap;padding:14px 28px 22px;font-family:var(--mono);font-size:.72rem;color:var(--dim)}
 </style></head><body>
-
-<!-- PS-style flowing waves -->
-<div class="waves">
-<div class="wave"></div>
-<div class="wave"></div>
-<div class="wave"></div>
-<div class="wave"></div>
+<div class="bar">
+  <span class="mark">AIME<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5.1-8-10.4A4.6 4.6 0 0 1 12 7a4.6 4.6 0 0 1 8 3.6C20 15.9 12 21 12 21z"/></svg><span class="at">AT</span></span>
+  <span class="crumb">${esc(nodeId)}</span>
 </div>
-
-<!-- Floating hearts + particles -->
-<div class="particles">
-<div class="particle heart"></div>
-<div class="particle dot"></div>
-<div class="particle heart"></div>
-<div class="particle dot"></div>
-<div class="particle heart"></div>
-<div class="particle dot"></div>
-<div class="particle heart"></div>
-<div class="particle dot"></div>
-<div class="particle heart"></div>
-<div class="particle dot"></div>
-</div>
-
-<div class="card">
-  <!-- Heart-beat loader with orbiting rings -->
-  <div class="loader">
-    <div class="loader-ring"></div>
-    <div class="loader-ring"></div>
-    <div class="heart-icon">&#x2665;</div>
-  </div>
-
-  <p class="brand">AIME AT</p>
-  <h1>We'll Be Right Back</h1>
-  <p class="msg">Making things even better for you.<br>This won't take long.</p>
-  ${message ? `<div class="reason">${esc(message)}</div>` : ''}
-
-  <div class="node-id">
-    <span class="status-dot"></span>
-    <code>${esc(nodeId)}</code>
-  </div>
-
-  <div class="progress"><div class="progress-bar"></div></div>
-  <p class="footer">Auto-refreshes every 30 seconds</p>
-</div>
-
-<p class="tagline">AI Memory Exchange &amp; Action Transfer</p>
+<main>
+  <h1>Down for work</h1>
+  <p class="msg">${esc(message)}</p>
+  <p class="sub">Your data is untouched and you are still signed in. This page checks every 30 seconds and comes back on its own.</p>
+  <div class="rule"></div>
+</main>
+<footer><span>503 Service Unavailable</span><span>${esc(nodeId)}</span></footer>
 </body></html>`;
 }

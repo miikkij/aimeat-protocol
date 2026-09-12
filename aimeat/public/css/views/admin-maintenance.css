@@ -1,0 +1,85 @@
+/* ── Admin Maintenance page, in the poster face ──
+ * @file admin-maintenance.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's maintenance page (design canvas "AIMEAT Admin Maintenance"): the
+ *   underline field that writes the line people read, the preview that shows the 503 page as a
+ *   visitor gets it, the one ink slab that takes the node down or brings it back, and the dashed
+ *   box over restore. The sections, the metric rows, the numeral strip, the doors and the slab
+ *   come from admin.css and organism.css; only what this page adds lives here. Every value is a
+ *   theme.css token, so the page flips with the theme.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial.
+ */
+
+/* The last row of a section carries no rule under it; the section's own rule is the next one. */
+.adm-maint .adm-mrow--last { border-bottom: 0; }
+/* A row's value is a route or a file name with nowhere to break; on a narrow screen it breaks
+   anywhere rather than running under the edge. */
+.adm-maint .adm-mrow .adm-mval { overflow-wrap: anywhere; }
+.adm-maint .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+/* On a phone the three columns leave the row's name four words wide. The name keeps the line with
+   its chip, and the route drops under them instead of being squeezed beside them. */
+@media (max-width: 760px) {
+  .adm-maint .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; }
+  .adm-maint .adm-mrow .adm-mval { grid-column: 1 / -1; text-align: left; margin-top: 4px; }
+  /* Four numerals across a phone give each one four characters. Two by two instead. */
+  .adm-maint .og-strip { display: grid; grid-template-columns: 1fr 1fr; }
+  .adm-maint .og-strip > div, .adm .adm-maint .og-strip > button { padding: .8rem 0; }
+  .adm-maint .og-strip > :nth-child(odd) { border-right: 1px solid var(--border); padding-right: .9rem; }
+  .adm-maint .og-strip > :nth-child(even) { border-right: 0; padding-left: .9rem; }
+  .adm-maint .og-strip > :nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+}
+
+.adm-maint-lead { margin: 0 0 16px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 90ch; }
+.adm-maint-note { margin: 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-maint-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 7px; }
+
+/* The line the operator writes and the page a visitor gets, side by side. */
+.adm-maint-two { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 0 44px; align-items: start; }
+@media (max-width: 1100px) { .adm-maint-two { grid-template-columns: 1fr; gap: 26px 0; } }
+
+/* The page's one input shape: an underline that turns coral while you are in it. */
+.adm-maint-fld { display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 4px 2px 6px; }
+.adm-maint-fld:focus-within { border-bottom-color: var(--accent); }
+.adm .adm-maint-fld input[type="text"] { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .95rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-maint-fld input[type="text"]::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm-maint-hint { margin: .55rem 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+
+/* The action and the sentence beside it. One slab per page: it takes the node down, or brings
+   it back. Everything else on this page is an underlined word. */
+.adm-maint-act { display: flex; align-items: center; gap: 18px; margin-top: 22px; flex-wrap: wrap; }
+.adm-maint-act p { margin: 0; font-size: .8rem; line-height: 1.5; color: var(--text-dim); max-width: 30ch; }
+
+/* The preview: the same page a visitor gets, drawn small. */
+.adm-maint-prev { border: 2px solid var(--text); background: var(--bg-surface); }
+.adm-maint-prev-top { display: flex; justify-content: space-between; gap: 10px; border-bottom: 2px solid var(--text); padding: 6px 12px; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
+.adm-maint-prev-body { padding: 22px 20px 24px; text-align: center; background: var(--card-bg); }
+.adm-maint-prev-node { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.adm-maint-prev h3 { margin: 10px 0 12px; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 2rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); text-transform: uppercase; color: var(--text); }
+.adm-maint-prev-msg { margin: 0 auto; max-width: 30ch; font-size: .95rem; font-weight: 600; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.adm-maint-prev-sub { margin: 10px 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+/* A live preview says so: what is on the screen of everyone at the node right now. */
+.adm-maint-live { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 9px; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.adm-maint-live i { width: 9px; height: 9px; background: var(--accent); }
+
+/* Restore is the one action that cannot be undone, so it says so in the dashed box the house
+   keeps for exactly that. */
+.adm-maint-warn { border: 3px dashed var(--accent); background: var(--card-bg); padding: 1rem 1.2rem; margin: 0 0 12px; font-size: .92rem; line-height: 1.55; color: var(--text); max-width: 74ch; }
+.adm-maint-warn b { font-weight: 700; }
+
+/* What the backup said when it ran. */
+.adm-maint-said { margin: .8rem 0 0; font-size: .85rem; line-height: 1.5; font-weight: 600; }
+.adm-maint-said.is-ok { color: var(--success-fg); }
+.adm-maint-said.is-bad { color: var(--accent); }
+
+/* The confirm dialog's body: the line people will read, and the two doors that stay open. */
+.adm-maint-ask { display: block; }
+/* The label is a span inside the dialog's own paragraph, so it says out loud that it is a line
+   of its own; as an inline word it ran on into the end of the sentence above it. */
+.adm-maint-ask .adm-maint-lbl { display: block; margin-top: 16px; }
+.adm-maint-ask-msg { display: block; border: 2px solid var(--text); background: var(--bg-surface); padding: 10px 13px; font-size: .92rem; font-weight: 600; line-height: 1.5; }
+.adm-maint-ask-row { display: flex; align-items: baseline; gap: 10px; padding: .45rem 0; border-bottom: 1px solid var(--border); font-size: .84rem; }
+.adm-maint-ask-row:last-child { border-bottom: 0; }
+.adm-maint-ask-row code { margin-left: auto; font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); }
+.adm-maint-ask-rows { display: block; margin-top: 12px; }
