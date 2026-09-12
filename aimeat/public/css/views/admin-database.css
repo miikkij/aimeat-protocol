@@ -1,0 +1,92 @@
+/* ── Admin Database page, in the poster face ──
+ * @file admin-database.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's database page (design canvas "AIMEAT Admin Database"): the hero row
+ *   count beside the seven-day line the hourly snapshots were already carrying, the numeral strip,
+ *   and the tables with a share of all rows, a bar and a day's growth — sorted by size, by growth
+ *   or by name. The sections, the strip, the doors and the slab come from admin.css and
+ *   organism.css; only what this page adds lives here. Every value is a theme.css token.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial.
+ */
+
+.adm-db-top { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 0 48px; align-items: start; }
+.adm-db-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+.adm-db-hero { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 3.4rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); color: var(--text); }
+.adm-db-hero-sub { margin: .7rem 0 0; font-family: var(--font-mono); font-size: .75rem; line-height: 1.7; color: var(--text-dim); }
+.adm-db-hero-sub b { font-weight: 500; color: var(--text); }
+
+/* The line: one series, one hue, a recessive midline, and the newest point marked. */
+.adm-db-chart-h { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.adm-db-chart-h small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.adm-db-chart { position: relative; border-bottom: 2px solid var(--text); }
+.adm-db-chart svg { display: block; width: 100%; height: 160px; }
+.adm-db-line { fill: none; stroke: var(--text); stroke-width: 2; stroke-linejoin: round; }
+.adm-db-mid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 4 5; }
+/* The one gridline says what it marks, or it is a decoration. The box is scaled horizontally, so
+   the label keeps its own size rather than stretching with it. */
+.adm-db-midlabel { font-family: var(--font-mono); font-size: 11px; fill: var(--text-dim); }
+.adm-db-dot { stroke: var(--accent); stroke-width: 3; }
+.adm-db-cursor { stroke: var(--accent); stroke-width: 1; }
+.adm-db-hit { fill: transparent; cursor: crosshair; }
+.adm-db-read { position: absolute; top: 0; right: 0; font-family: var(--font-mono); font-size: .72rem; color: var(--text); background: var(--bg); padding: 2px 6px; border: 2px solid var(--text); }
+.adm-db-x { display: flex; justify-content: space-between; padding-top: 7px; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+
+/* Before the second snapshot there is nothing to subtract, and the page says so. */
+.adm-db-wait { border: 2px solid var(--text); background: var(--bg-surface); padding: 26px 28px; }
+.adm-db-wait h3 { margin: 0 0 10px; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.5rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); text-transform: uppercase; color: var(--text); }
+.adm-db-wait p { margin: 0 0 18px; font-size: .92rem; line-height: 1.6; color: var(--text); max-width: 56ch; }
+.adm-db-wait small { display: block; margin-top: 16px; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+/* A strip cell with nothing to measure yet reads as absent, not as a zero. */
+.adm-db .og-strip > div.adm-db-strip-dim b { color: var(--text-dim); }
+
+.adm-db .og-strip { margin-top: 1.6rem; }
+.adm-db .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-db-lead { margin: 0 0 16px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
+
+/* Search and the three orders. */
+.adm-db-tools { display: flex; align-items: flex-end; gap: 28px; }
+.adm-db-find { flex: 1 1 auto; display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 4px 2px 6px; }
+.adm-db-find:focus-within { border-bottom-color: var(--accent); }
+.adm .adm-db-find input[type="text"] { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .95rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-db-find input[type="text"]::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm-db-find svg { width: 16px; height: 16px; flex: none; stroke: var(--text); fill: none; stroke-width: 2.5; }
+.adm-db-chips { display: flex; gap: 8px; align-items: center; padding-bottom: 6px; flex-wrap: wrap; }
+.adm .adm-db-chip { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 10px; border: 2px solid var(--border); border-radius: 0; background: none; color: var(--text-dim); cursor: pointer; }
+.adm .adm-db-chip:hover { border-color: var(--text); color: var(--text); }
+.adm .adm-db-chip.on { background: var(--sun); border-color: var(--text); color: var(--on-sun); box-shadow: 0 2px 0 var(--text); }
+
+/* One table per row: what it is called, how many rows, what a day added, its share, the bar. */
+.adm-db-rows { border-top: 2px solid var(--text); margin-top: 14px; }
+.adm-db-hrow, .adm-db-row { display: grid; grid-template-columns: minmax(0, 1fr) 120px 96px 74px 200px; gap: 0 18px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.adm-db-hrow { padding: 8px 0; border-bottom: 2px solid var(--text); font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); }
+.adm-db-hrow .r, .adm-db-row .r { text-align: right; }
+.adm-db-name { font-family: var(--font-mono); font-size: .88rem; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
+.adm-db-n { font-family: var(--font-mono); font-size: .85rem; color: var(--text); }
+.adm-db-d { font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); }
+.adm-db-pct { font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); }
+.adm-db-bar { height: 10px; background: var(--bg-surface); }
+.adm-db-bar i { display: block; height: 100%; background: var(--text); }
+.adm-db-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 12px 2px 0; font-size: .78rem; color: var(--text-dim); }
+.adm-db-foot .adm-db-note { font-family: var(--font-mono); font-size: .72rem; }
+
+@media (max-width: 1100px) {
+  .adm-db-top { grid-template-columns: 1fr; gap: 30px 0; }
+}
+@media (max-width: 860px) {
+  .adm-db-tools { flex-direction: column; align-items: stretch; gap: 12px; }
+  .adm-db-chips { padding-bottom: 0; }
+  /* The five columns become a stack: the name and the count, then the two readings, then the bar. */
+  .adm-db-hrow { display: none; }
+  .adm-db-row { grid-template-columns: minmax(0, 1fr) auto; gap: 5px 10px; align-items: baseline; }
+  .adm-db-d, .adm-db-pct { grid-row: 2; }
+  .adm-db-pct { grid-column: 1; text-align: left; }
+  .adm-db-d { grid-column: 2; }
+  .adm-db-bar { grid-column: 1 / -1; height: 8px; margin-top: 2px; }
+  .adm-db .og-strip { display: grid; grid-template-columns: 1fr 1fr; }
+  .adm-db .og-strip > div { padding: .8rem 0; border-right: 0; }
+  .adm-db .og-strip > div:nth-child(odd) { border-right: 1px solid var(--border); padding-right: .9rem; }
+  .adm-db .og-strip > div:nth-child(even) { padding-left: .9rem; }
+  .adm-db .og-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+}
