@@ -31,6 +31,7 @@
  *   - main(): the table
  * @usage cd aimeat && pnpm debt
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Count copied poster shapes and their last fall.
  *   v1.0.0 — 2026-09-04 — Initial (quality plan stream E, the report half).
  */
 import { execFileSync } from 'node:child_process';
@@ -53,6 +54,13 @@ interface Ratchet {
 const exemptMap = (raw: string): number => Object.keys((JSON.parse(raw) as { exempt?: object }).exempt ?? {}).length;
 
 const RATCHETS: Ratchet[] = [
+    {
+        file: 'aimeat/security/poster-shapes-baseline.json',
+        label: 'Design-language shapes written in view sheets',
+        check: 'check:poster-shapes',
+        count: raw => Object.values((JSON.parse(raw) as { files: Record<string, Record<string, number>> }).files)
+            .reduce((total, counts) => total + Object.values(counts).reduce((sum, n) => sum + n, 0), 0),
+    },
     { file: 'aimeat/security/route-scope-exemptions.json', label: 'Ungated route handlers', check: 'check:route-scopes', count: exemptMap },
     { file: 'aimeat/security/trusted-key-exemptions.json', label: 'Server-trusted memory keys', check: 'check:trusted-keys', count: exemptMap },
     { file: 'aimeat/security/config-coverage-exemptions.json', label: 'Settings not in the Config tab', check: 'check:config-coverage', count: exemptMap },
