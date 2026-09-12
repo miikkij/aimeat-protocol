@@ -94,7 +94,11 @@ function Period({ period, custom, onPick, onCustom, onApply }) {
  * something is happening to you rather than by you.
  */
 function RightNow({ rows, live, days, from, to, control }) {
-  const ranked = [...rows].filter(r => r.state === 'live').sort((a, b) => b.total - a.total);
+  // `lead !== false` keeps the denominators out. See COUNTERS in stats-tab.data.js: a counter that
+  // counts a superset of the others wins this sort on every node and names nothing.
+  const ranked = [...rows]
+    .filter(r => r.state === 'live' && r.lead !== false)
+    .sort((a, b) => b.total - a.total);
   const lead = ranked[0] || null;
   const perDay = lead && days.length ? Math.round(lead.total / days.length) : 0;
   const alarming = !!lead && lead.role === 'critical';
