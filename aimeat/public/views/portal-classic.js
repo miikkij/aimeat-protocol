@@ -30,6 +30,7 @@ import htm from 'htm';
 import { CopyButton } from '/components/CopyButton.js';
 import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
 import { t as globalT } from '/js/i18n.js';
+import { relative } from '/js/format.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -46,15 +47,14 @@ function ct(key) {
 /* ══════════════════════════════════════════════
    HELPERS
    ══════════════════════════════════════════════ */
-function timeAgo(iso) {
-  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (sec < 60) return sec + 's';
-  const min = Math.floor(sec / 60);
-  if (min < 60) return min + 'm';
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return hr + 'h';
-  return Math.floor(hr / 24) + 'd';
-}
+/**
+ * How long ago a board message arrived. This page kept its own copy of the four-branch English
+ * builder; /js/format.js reads the reader's language through CLDR instead.
+ *
+ * `relative` says "3 days ago" where the copy said "3d". The board row has space for the longer
+ * form, and a bare "3d" was never a word in any language.
+ */
+const timeAgo = (iso) => relative(iso);
 
 /* ══════════════════════════════════════════════
    MEGA-PROMPT BUILDERS

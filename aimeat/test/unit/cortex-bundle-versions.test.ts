@@ -56,7 +56,7 @@ const KNOWN: Record<string, { version: string; sha256: string }> = {
     'aimeat-charts': { version: '1.1.2', sha256: '691ad8f365372b03' },
     'aimeat-dag': { version: '1.1.4', sha256: '56fff8df06d77259' },
     'aimeat-flow': { version: '1.0.1', sha256: '1634ee00cbb0099d' },
-    'aimeat-i18n': { version: '1.2.0', sha256: 'f0dd408335bfc45d' },
+    'aimeat-i18n': { version: '1.3.0', sha256: '569dd2ee1025fc8b' },
     'aimeat-input': { version: '1.0.0', sha256: '5968dddac74e78aa' },
     'aimeat-surface': { version: '1.1.1', sha256: '367836dc60ac1981' },
     'aimeat-ui-dialogs': { version: '1.0.1', sha256: '70a017c3b69a64ce' },

@@ -1,4 +1,7 @@
 import { swallowed } from '/js/swallowed.js';
+// Safe against a cycle: format.js reaches display-prefs.js and swallowed.js, and neither of those
+// reaches back here.
+import { relative } from '/js/format.js';
 /**
  * @file public/js/utils.js
  * @author Jouni Miikki
@@ -74,18 +77,19 @@ export function escAttr(s) {
     .replace(/'/g, '&#39;');
 }
 
-/** Format an ISO timestamp as a relative time string (e.g., "3m ago"). */
+/**
+ * How long ago, in the reader's own language.
+ *
+ * It used to build the string itself out of `'s ago'`, `'m ago'`, `'h ago'` and `'d ago'`, which is
+ * plain English hardcoded into fifty-odd screens: a fully Finnish page read "10h ago". The obvious
+ * repair is four translation keys, and it is a trap — one `{n}` cannot carry a language whose noun
+ * changes with the number, and no key can produce "eilen" for a day. CLDR holds those rules and
+ * `Intl.RelativeTimeFormat` reads them, which is what /js/format.js does here.
+ *
+ * The signature is unchanged, so the fifty-nine call sites did not move.
+ */
 export function timeAgo(iso) {
-  if (!iso) return '';
-  const diff = Date.now() - new Date(iso).getTime();
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
+  return iso ? relative(iso) : '';
 }
 
 /** Format bytes to human-readable size. */

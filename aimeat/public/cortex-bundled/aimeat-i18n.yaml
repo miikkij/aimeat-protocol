@@ -3,7 +3,7 @@ kind: Extension
 metadata:
   name: aimeat-i18n
   namespace: aimeat
-  description: "Localization in two independent halves. AIMEAT.i18n is the WORDS: translations (inline or from the user's own memory), flat-key-first t() with {var} interpolation, locale switching, a LanguageSwitcher. AIMEAT.fmt is HOW THINGS ARE WRITTEN: dates, times, numbers, money and morsels in the reader's own format and clock, read from their profile. Language, regional format and time zone are three separate settings and a person may mix them — never derive one from another."
+  description: "Localization in two independent halves. AIMEAT.i18n is the WORDS: translations (inline or from the user's own memory), flat-key-first t() with {var} interpolation, locale switching, a LanguageSwitcher. AIMEAT.fmt is HOW THINGS ARE WRITTEN: dates, times, numbers, money, morsels and durations in the reader's own format and clock, read from their profile. Language, regional format and time zone are three separate settings and a person may mix them — never derive one from another. A length of time goes through fmt.duration rather than a {n} translation key, because CLDR knows the plural rules a key cannot carry."
   author: AIMEAT
   tags: [i18n, localization, translation, locale, multilanguage, components, format, dates, timezone, currency, numbers]
   labels:
@@ -11,10 +11,12 @@ metadata:
   visibility: public
 
 spec:
-  # 1.2.0 — AIMEAT.fmt. The version is what makes an ALREADY-INSTALLED cortex refresh: the seeder
-  # skips one whose stored version matches the bundled manifest, so shipping new library code
-  # without moving this line leaves every existing node serving the old file forever.
-  version: "1.2.0"
+  # 1.3.0 — AIMEAT.fmt.duration, and `num` as a name beside `number` (three callers were asking for
+  # `num` against a surface that only had `number`, so the person's setting was quietly ignored).
+  # The version is what makes an ALREADY-INSTALLED cortex refresh: the seeder skips one whose stored
+  # version matches the bundled manifest, so shipping new library code without moving this line
+  # leaves every existing node serving the old file forever.
+  version: "1.3.0"
   license: MIT
   components:
     - type: prompt
@@ -63,8 +65,9 @@ spec:
 
         Format:
           AIMEAT.fmt.date(iso)          AIMEAT.fmt.time(iso)        AIMEAT.fmt.dateTime(iso)
-          AIMEAT.fmt.relative(iso)      // "3 days ago"
-          AIMEAT.fmt.number(1234567.89) // "1 234 567,89" in fi-FI
+          AIMEAT.fmt.relative(iso)      // "3 days ago" — a POINT in the past
+          AIMEAT.fmt.duration(ms)       // "1pv 23t 26min" — a LENGTH of time
+          AIMEAT.fmt.num(1234567.89)    // "1 234 567,89" in fi-FI  (also .number)
           AIMEAT.fmt.money(12.5, 'EUR') // "12,50 €"
           AIMEAT.fmt.zoneLabel(iso)     // "EET" — null while the reader follows their browser
           Each takes the same options bag as toLocaleString: fmt.date(iso, { day: 'numeric', month: 'long' }).
@@ -104,7 +107,8 @@ spec:
         AIMEAT.fmt.region() → string|null      AIMEAT.fmt.timezone() → string|null
         AIMEAT.fmt.date(v, opts?) → string     AIMEAT.fmt.time(v, opts?) → string     AIMEAT.fmt.dateTime(v, opts?) → string
         AIMEAT.fmt.relative(v) → string        ("3 days ago"; words follow the format tag, not the UI language)
-        AIMEAT.fmt.number(n, opts?) → string
+        AIMEAT.fmt.duration(ms, opts?) → string ("1pv 23t 26min"; opts.max caps the units, style:'long' spells them)
+        AIMEAT.fmt.num(n, opts?) → string       (AIMEAT.fmt.number is the same function under its older name)
         AIMEAT.fmt.money(n, currency, opts?) → string  (THROWS on MORSEL/MORSELS/MRSL — a morsel is a pacer, not a currency)
         AIMEAT.fmt.morsels(n, word?) → string  (a count; never a currency symbol)
         AIMEAT.fmt.resolvedTimeZone() → string (the zone in force, always a real IANA name)

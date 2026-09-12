@@ -18,9 +18,12 @@
  *   A DATE IS NOT ALWAYS A MOMENT. A calendar square — a chart's day column, a heat map, the day a
  *   row was counted into — must not be re-read in the reader's zone, or it labels itself the day
  *   before for anyone west of the node. `calendar()` pins those.
- * @structure fmt() · num · money · date · time · dateTime · calendar
+ * @structure fmt() · num · money · duration · relative · date · time · dateTime · calendar
  * @usage import { num, dateTime } from '../_core/format.js';
  * @version-history
+ *   v1.1.0 — 2026-09-13 — duration() and relative(): a LENGTH of time and a POINT in the past, both
+ *     in the reader's words. Four surfaces built the first by hand out of 'd', 'h' and 'min', which
+ *     is plain English hardcoded into a page that may be Finnish.
  *   v1.0.0 — 2026-09-12 — Initial, with the sweep that gave the SDK one formatter instead of twelve.
  */
 
@@ -90,6 +93,75 @@ export function dateTime(v, opts) {
   const d = new Date(v);
   if (!Number.isFinite(d.getTime())) return String(v == null ? '' : v);
   try { return d.toLocaleString(undefined, opts); } catch { return String(v); }
+}
+
+/**
+ * The units a span is broken into, biggest first, with how many milliseconds each holds.
+ * @type {Array<[keyof Intl.DurationInput, number]>}
+ */
+const SPAN_UNITS = [['days', 86400000], ['hours', 3600000], ['minutes', 60000], ['seconds', 1000]];
+
+/**
+ * A LENGTH OF TIME — "1pv 23t 26min" — in the reader's own language and their own shorthand.
+ *
+ * A different question from `relative()`, which says how long AGO something was. This is a span.
+ *
+ * NOT A TRANSLATION KEY, and the reason is worth carrying into every app: `{n} pv` survives Finnish
+ * only because `pv` does not inflect, one `{n}` cannot carry a language whose noun changes with the
+ * number, and no key can produce "eilen". CLDR holds those rules already.
+ *
+ * @param {number} ms how long, in milliseconds; a negative span is read as its length
+ * @param {Object} [opts] `max` is how many units may appear (default 3); the rest goes to Intl.
+ */
+export function duration(ms, opts) {
+  const n = Math.abs(Number(ms));
+  if (!Number.isFinite(n)) return '—';
+  const f = fmt();
+  if (f && typeof f.duration === 'function') return f.duration(ms, opts);
+  const { max = 3, ...rest } = opts || {};
+  const parts = {};
+  let left = Math.round(n / 1000) * 1000;
+  let used = 0;
+  for (const [unit, size] of SPAN_UNITS) {
+    const v = Math.floor(left / size);
+    if (v > 0 || used > 0) {
+      if (v > 0) { parts[unit] = v; used++; }
+      if (used >= max) break;
+    }
+    left -= v * size;
+  }
+  const zero = used === 0;
+  if (zero) parts.seconds = 0;
+  try {
+    return new Intl.DurationFormat(undefined, {
+      style: 'narrow', ...(zero ? { secondsDisplay: 'always' } : {}), ...rest,
+    }).format(parts);
+  } catch {
+    // Intl.DurationFormat is Baseline since March 2025; an older browser lands here.
+    return Object.entries(parts).map(([u, v]) => `${v}${u[0]}`).join(' ');
+  }
+}
+
+/** How long ago, in words. "3 days ago", "eilen" — never a hand-built "3d". */
+export function relative(v) {
+  const f = fmt();
+  if (f && typeof f.relative === 'function') return f.relative(v);
+  const d = new Date(v);
+  if (!Number.isFinite(d.getTime())) return String(v == null ? '' : v);
+  let value = Math.round((d.getTime() - Date.now()) / 1000);
+  /** @type {Array<[Intl.RelativeTimeFormatUnit, number]>} */
+  const steps = [['second', 60], ['minute', 60], ['hour', 24], ['day', 7], ['week', 4.345], ['month', 12], ['year', Infinity]];
+  let unit = steps[0][0];
+  for (const [u, span] of steps) {
+    unit = u;
+    if (Math.abs(value) < span) break;
+    value = Math.round(value / span);
+  }
+  try {
+    return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(value, unit);
+  } catch {
+    return dateTime(d);
+  }
 }
 
 /**

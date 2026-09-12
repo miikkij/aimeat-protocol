@@ -9,8 +9,7 @@
  * @version-history
  *   v1.0.0 — 2026-06-21 — Extracted from notebook-tab.js when the tab was split into tab + card.
  */
-import { t } from '/js/i18n.js';
-import { date as fmtDate } from '/js/format.js';
+import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 
 /** Placement sentinel: "create a new organism/workspace" choice in the suggest dropdowns. */
 export const NEW = '__new__';
@@ -21,18 +20,13 @@ export const NB_STEPS = ['profile.notebook.step1', 'profile.notebook.step2'];
 /** Memory key prefix for captured (unfiled) notebook notes. */
 export const INBOX_PREFIX = 'notebook.inbox.';
 
-/** Relative-time label for an ISO timestamp (just now / Nm / Nh / Nd / locale date). */
-export function relTime(iso) {
-  if (!iso) return '';
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return t('profile.memory.timeJustNow') || 'just now';
-  if (mins < 60) return (t('profile.memory.timeMinsAgo') || '{n}m ago').replace('{n}', String(mins));
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return (t('profile.memory.timeHoursAgo') || '{n}h ago').replace('{n}', String(hrs));
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return (t('profile.memory.timeDaysAgo') || '{n}d ago').replace('{n}', String(days));
-  return fmtDate(iso);
-}
+/**
+ * Relative-time label for an ISO timestamp: how long ago, or the date once that stops helping.
+ *
+ * This was a second copy of the memory tab's helper, down to the same keys and the same thirty-day
+ * horizon, and the two had to be kept in step by hand. One of them is the rule now.
+ */
+export const relTime = formatRelativeTime;
 
 /** First non-empty line of a note (markdown heading marks stripped), for the collapsed one-line view. */
 export function firstLine(text) {

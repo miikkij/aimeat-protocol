@@ -21,6 +21,8 @@
     "forceConsistentCasingInFileNames": true,
     "types": []
   },
-  "include": ["src/static/sdk-libs/**/*.js", "src/static/sdk-libs/**/*.d.ts"],
+  // types/ holds the ambient declarations this program shares with tsconfig.frontend.json — today
+  // Intl.DurationFormat, which is ES2025 and beyond this config's `lib`.
+  "include": ["src/static/sdk-libs/**/*.js", "src/static/sdk-libs/**/*.d.ts", "types/**/*.d.ts"],
   "exclude": ["node_modules", "src/static/sdk-libs/dist/**"]
 }
