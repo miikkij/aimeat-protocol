@@ -328,6 +328,26 @@ export const getUsageHouse = (from, to) => {
   return apiGet('/v1/admin/usage/house' + (qs ? '?' + qs : ''));
 };
 
+/**
+ * The Usage page in one read, organised by whose money paid rather than by which system counted it.
+ * Replaces the page's four separate fetches; the three above stay for the callers that want one
+ * system on its own.
+ */
+export const getUsagePage = (from, to) => {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const qs = params.toString();
+  return apiGet('/v1/admin/usage/page' + (qs ? '?' + qs : ''));
+};
+
+/**
+ * What the PROVIDER says this node's own two keys have spent — the only money figure here that the
+ * node did not count itself. One outbound call per key, so it happens when an operator asks and
+ * never on a page load.
+ */
+export const getUsageKeys = () => apiGet('/v1/admin/usage/keys');
+
 // ── Extensions & Instances ──
 export const getAvailableExtensions   = ()              => apiGet('/v1/admin/extensions/available');
 export const installBundledExtension  = (name)          => apiPost(`/v1/admin/extensions/available/${encodeURIComponent(name)}/install`);

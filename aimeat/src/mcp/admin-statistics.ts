@@ -19,9 +19,15 @@
  *   came to mean three different things on three surfaces.
  *   IT HONOURS THE SAME SWITCH as the route. `statsEnabled: false` means an operator turned these
  *   numbers off on this node, and a door that ignores that is a door the switch does not cover.
- * @structure registerAdminStatisticsTools(mcp, storage, config, getAgentGaii) — one read.
+ *   THE USAGE READ IS HERE TOO, for the same reason and with the same fault behind it: the Usage
+ *   page tells an operator to hand its numbers to their AI, and no tool could read them. Two reads
+ *   of the same shape — a period of numbers about this node, operator-gated, calling the one service
+ *   the HTTP route calls — so they share a file rather than each having one.
+ * @structure registerAdminStatisticsTools(mcp, storage, config, getAgentGaii) — two reads.
  * @usage registerAdminStatisticsTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.1.0 — 2026-09-12 — aimeat_admin_usage: what AI costs here and whose money paid, including
+ *     the key the node cannot meter and, on request, what the provider says it spent.
  *   v1.0.0 — 2026-09-12 — Initial: aimeat_admin_statistics.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -33,6 +39,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { resolveOperatorName } from '../services/owner-lifecycle.js';
 import { buildStatsSnapshot } from '../services/stats-page.js';
+import { buildUsagePage } from '../services/usage-page.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
@@ -75,5 +82,31 @@ export function registerAdminStatisticsTools(
 
       const range = from && to ? { from, to } : undefined;
       return text(await buildStatsSnapshot(config, storage, stats, range));
+    });
+
+  mcp.tool('aimeat_admin_usage', descriptionFor('aimeat_admin_usage'),
+    {
+      from: z.string().optional().describe('First day of the period, inclusive, as YYYY-MM-DD. Give `to` as well, or neither is used and you get the trailing thirty days.'),
+      to: z.string().optional().describe('Last day of the period, inclusive, as YYYY-MM-DD. Give `from` as well, or neither is used.'),
+      ask_provider: z.boolean().optional().describe('Ask the provider what this node\'s own house and chat keys have actually spent. One outbound call per key, cached for a minute. Off by default, because it reaches a third party.'),
+    },
+    annotationsFor('aimeat_admin_usage'),
+    async ({ from, to, ask_provider }) => {
+      if (!(await operatorName())) return refuse('Operator role required');
+
+      for (const [label, value] of [['from', from], ['to', to]] as const) {
+        if (value !== undefined && !ISO_DAY.test(value)) {
+          return refuse(`\`${label}\` must be a day as YYYY-MM-DD; got "${value}".`);
+        }
+      }
+      if ((from === undefined) !== (to === undefined)) {
+        return refuse('Give both `from` and `to` for a period, or neither for the trailing thirty days.');
+      }
+      if (from && to && from > to) return refuse(`\`from\` (${from}) is after \`to\` (${to}).`);
+
+      return text(await buildUsagePage(config, storage, {
+        ...(from && to ? { from, to } : {}),
+        includeKeySpend: ask_provider === true,
+      }));
     });
 }
