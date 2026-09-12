@@ -28,6 +28,7 @@ import { useConfirm } from '/components/Modal.js';
 import * as securityService from '/js/services/security.js';
 import { passkeySupported, addPasskey } from '/js/services/auth.js';
 import { swallowed } from '/js/swallowed.js';
+import { date as fmtDate } from '/js/format.js';
 
 /** What the device is, in the person's words rather than the protocol's. */
 function whereItLives(p) {
@@ -122,7 +123,7 @@ export function PasskeysSection({ showToast }) {
                     ${whereItLives(p)}
                     ${' · '}
                     ${p.last_used_at
-                      ? t('profile.security.passkeys.lastUsed').replace('{when}', new Date(p.last_used_at).toLocaleDateString())
+                      ? t('profile.security.passkeys.lastUsed').replace('{when}', fmtDate(p.last_used_at))
                       : t('profile.security.passkeys.neverUsed')}
                   </div>
                 </div>

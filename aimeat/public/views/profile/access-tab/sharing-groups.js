@@ -23,6 +23,7 @@ import { ContactPicker } from '/components/ContactPicker.js';
 import * as groupsApi from '/js/services/sharing-groups.js';
 import * as sharesApi from '/js/services/shares.js';
 import { swallowed } from '/js/swallowed.js';
+import { date as fmtDate } from '/js/format.js';
 
 export function SharingGroupsSection({ showToast, initial }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -311,7 +312,7 @@ export function SharingGroupsSection({ showToast, initial }) {
               ${group.createdAt && html`
                 <div class="detail-item">
                   <span class="detail-label">${t('profile.access.sgCreatedAt') || 'Created'}</span>
-                  <span class="detail-value">${new Date(group.createdAt).toLocaleDateString()}</span>
+                  <span class="detail-value">${fmtDate(group.createdAt)}</span>
                 </div>
               `}
             </div>

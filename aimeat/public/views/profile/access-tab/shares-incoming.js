@@ -19,6 +19,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import * as sharesApi from '/js/services/shares.js';
 import { swallowed } from '/js/swallowed.js';
+import { date as fmtDate } from '/js/format.js';
 
 export function SharesIncomingSection() {
   const [shares, setShares] = useState(null);
@@ -57,7 +58,7 @@ export function SharesIncomingSection() {
         <div class="mem-item" key=${s.id}>
           <span class="mem-key" title=${s.key_pattern}>${escHtml(s.key_pattern)}</span>
           <span class="text-meta-sm">${t('profile.access.shIncomingFrom')} ${escHtml(s.owner_gaii)}</span>
-          ${s.expires_at && html`<span class="badge badge-muted">${new Date(s.expires_at).toLocaleDateString()}</span>`}
+          ${s.expires_at && html`<span class="badge badge-muted">${fmtDate(s.expires_at)}</span>`}
         </div>
       `)
     }

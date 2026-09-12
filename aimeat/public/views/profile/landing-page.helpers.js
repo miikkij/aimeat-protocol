@@ -6,8 +6,8 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/landing-page.js (max-file-lines)
  */
-import { t, getLocale } from "/js/i18n.js";
-import { date as fmtDate } from '/js/format.js';
+import { t } from "/js/i18n.js";
+import { date as fmtDate, time as fmtTime, dateTime as fmtDateTime, sameDay } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
 
 /* ───── Small time helpers (reuse the organisms rel-time keys) ───── */
@@ -29,10 +29,9 @@ export function relTime(s) {
 export function fmtClock(s) {
   const d = new Date(s);
   if (!Number.isFinite(d.getTime())) return '';
-  const loc = getLocale() === 'fi' ? 'fi-FI' : undefined;
-  return d.toDateString() === new Date().toDateString()
-    ? d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' })
-    : d.toLocaleString(loc, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return sameDay(d, new Date())
+    ? fmtTime(d, { hour: '2-digit', minute: '2-digit' })
+    : fmtDateTime(d, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 /* ───── Home-card navigation: prime the organisms tab's sessionStorage, then open it ───── */

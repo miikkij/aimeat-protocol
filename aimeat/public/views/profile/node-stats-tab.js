@@ -18,6 +18,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner } from './shared.js';
 import { getNodeStats } from '/js/services/stats.js';
+import { num, dateTime as fmtDateTime } from '/js/format.js';
 
 function fmtUptime(s) {
   const d = Math.floor(s / 86400);
@@ -78,11 +79,11 @@ export default function NodeStatsTab() {
 
     <div class="stat-grid">
       <${StatCard} label=${t('profile.nodeStats.uptime')} value=${fmtUptime(s.uptime_seconds)} tone="accent" />
-      <${StatCard} label=${t('profile.nodeStats.requests')} value=${(s.requests_total || 0).toLocaleString()} tone="accent" />
+      <${StatCard} label=${t('profile.nodeStats.requests')} value=${num(s.requests_total || 0)} tone="accent" />
       <${StatCard} label=${t('profile.nodeStats.owners')} value=${s.active_owners || 0} tone="success" />
       <${StatCard} label=${t('profile.nodeStats.agents')} value=${s.active_agents || 0} tone="success" />
-      <${StatCard} label=${t('profile.nodeStats.memoryWrites')} value=${(s.memory_writes || 0).toLocaleString()} tone="purple" />
-      <${StatCard} label=${t('profile.nodeStats.memoryReads')} value=${(s.memory_reads || 0).toLocaleString()} tone="purple" />
+      <${StatCard} label=${t('profile.nodeStats.memoryWrites')} value=${num(s.memory_writes || 0)} tone="purple" />
+      <${StatCard} label=${t('profile.nodeStats.memoryReads')} value=${num(s.memory_reads || 0)} tone="purple" />
     </div>
 
     <div class="stat-two-col">
@@ -91,7 +92,7 @@ export default function NodeStatsTab() {
         ${s.requests_by_method ? Object.entries(s.requests_by_method).map(([m, c]) => html`
           <div class="stat-row">
             <span class="stat-row-label">${m}</span>
-            <span class="stat-row-value">${c.toLocaleString()}</span>
+            <span class="stat-row-value">${num(c)}</span>
           </div>`) : null}
       </div>
       <div class="card p-1">
@@ -100,7 +101,7 @@ export default function NodeStatsTab() {
           const tone = code.startsWith('2') ? 'success' : code.startsWith('4') ? 'warn' : code.startsWith('5') ? 'danger' : '';
           return html`<div class="stat-row">
             <span class="stat-row-label ${tone}">${code}</span>
-            <span class="stat-row-value">${c.toLocaleString()}</span>
+            <span class="stat-row-value">${num(c)}</span>
           </div>`;
         }) : null}
       </div>
@@ -111,8 +112,8 @@ export default function NodeStatsTab() {
       <div class="stat-grid-sm">
         <${StatCard} label=${t('profile.nodeStats.tunnelActive')} value=${s.tunnel.connections_active} tone="success" />
         <${StatCard} label=${t('profile.nodeStats.tunnelTotal')} value=${s.tunnel.connections_total} tone="accent" />
-        <${StatCard} label=${t('profile.nodeStats.msgSent')} value=${(s.tunnel.messages_sent_total || 0).toLocaleString()} tone="blue" />
-        <${StatCard} label=${t('profile.nodeStats.msgReceived')} value=${(s.tunnel.messages_received_total || 0).toLocaleString()} tone="blue" />
+        <${StatCard} label=${t('profile.nodeStats.msgSent')} value=${num(s.tunnel.messages_sent_total || 0)} tone="blue" />
+        <${StatCard} label=${t('profile.nodeStats.msgReceived')} value=${num(s.tunnel.messages_received_total || 0)} tone="blue" />
         <${StatCard} label=${t('profile.nodeStats.deliveryFails')} value=${s.tunnel.delivery_failures_total} tone=${s.tunnel.delivery_failures_total > 0 ? 'danger' : 'success'} />
         <${StatCard} label=${t('profile.nodeStats.latencyAvg')} value=${(s.tunnel.delivery_latency_avg_ms || 0).toFixed(0) + ' ms'} tone="accent" />
         <${StatCard} label=${t('profile.nodeStats.latencyP95')} value=${(s.tunnel.delivery_latency_p95_ms || 0).toFixed(0) + ' ms'} tone=${(s.tunnel.delivery_latency_p95_ms || 0) > 200 ? 'warn' : 'accent'} />
@@ -123,7 +124,7 @@ export default function NodeStatsTab() {
       <div class="stat-grid-sm">
         <${StatCard} label=${t('profile.nodeStats.mailboxItems')} value=${s.mailbox.items_total} tone="accent" />
         <${StatCard} label=${t('profile.nodeStats.mailboxBytes')} value=${fmtBytes(s.mailbox.bytes_total)} tone="accent" />
-        <${StatCard} label=${t('profile.nodeStats.mailboxDelivered')} value=${(s.mailbox.delivered_total || 0).toLocaleString()} tone="success" />
+        <${StatCard} label=${t('profile.nodeStats.mailboxDelivered')} value=${num(s.mailbox.delivered_total || 0)} tone="success" />
         <${StatCard} label=${t('profile.nodeStats.mailboxExpired')} value=${s.mailbox.expired_total} tone=${s.mailbox.expired_total > 0 ? 'warn' : 'success'} />
       </div>` : null}
 
@@ -134,6 +135,6 @@ export default function NodeStatsTab() {
       <${StatCard} label=${t('profile.nodeStats.scopeDenials')} value=${s.scope_denials_total || 0} tone=${(s.scope_denials_total || 0) > 0 ? 'warn' : 'success'} />
     </div>
 
-    <p class="stat-footer">${t('profile.nodeStats.startedAt')}: ${new Date(s.started_at).toLocaleString()}</p>
+    <p class="stat-footer">${t('profile.nodeStats.startedAt')}: ${fmtDateTime(s.started_at)}</p>
   `;
 }

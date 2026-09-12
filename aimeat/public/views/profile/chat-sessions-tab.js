@@ -29,6 +29,7 @@ import { useConfirm } from '/components/Modal.js';
 import { listChatSessions, deleteAgent } from '/js/services/agents.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { dateTime as fmtDateTime } from '/js/format.js';
 
 export default function ChatSessionsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -168,7 +169,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
                     ${s.created_at ? html`
                       <div class="detail-item">
                         <span class="detail-label">${t('profile.chatSessions.created')}</span>
-                        <span class="detail-value">${new Date(s.created_at).toLocaleString()}</span>
+                        <span class="detail-value">${fmtDateTime(s.created_at)}</span>
                       </div>
                     ` : null}
                   </div>

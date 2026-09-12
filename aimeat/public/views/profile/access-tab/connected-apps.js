@@ -27,6 +27,7 @@ import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { apiGet, apiDelete, apiPatch } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { date as fmtDate, dateTime as fmtDateTime } from '/js/format.js';
 
 // A grant untouched for this long is offered for bulk revoke. Long enough that a seasonal app
 // (something used a few times a year) is not swept away without the owner meaning to.
@@ -213,8 +214,8 @@ export function ConnectedAppsSection({ showToast, initial }) {
               </div>
               <div class="card-subtitle access-mono">${escHtml(g.app_origin || '')}</div>
               <div class="detail-grid">
-                <div class="detail-item"><span class="detail-label">${t('profile.access.agGrantedAt') || 'Granted'}</span><span class="detail-value">${g.granted_at ? new Date(g.granted_at).toLocaleDateString() : '-'}</span></div>
-                <div class="detail-item"><span class="detail-label">${t('profile.access.agLastUsed') || 'Last used'}</span><span class="detail-value">${g.last_used_at ? new Date(g.last_used_at).toLocaleString() : (t('profile.access.agNever') || 'never')}</span></div>
+                <div class="detail-item"><span class="detail-label">${t('profile.access.agGrantedAt') || 'Granted'}</span><span class="detail-value">${g.granted_at ? fmtDate(g.granted_at) : '-'}</span></div>
+                <div class="detail-item"><span class="detail-label">${t('profile.access.agLastUsed') || 'Last used'}</span><span class="detail-value">${g.last_used_at ? fmtDateTime(g.last_used_at) : (t('profile.access.agNever') || 'never')}</span></div>
               </div>
               ${expanded.has(g.grant_id) && (g.scopes || []).length > 0 && html`
                 <div class="flex-row-wrap mt-half">

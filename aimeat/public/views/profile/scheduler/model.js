@@ -13,6 +13,8 @@
  *   v1.0.0 — 2026-08-30 — Initial, for the scheduler in the poster face.
  */
 
+import { date as fmtDate } from '/js/format.js';
+
 const DAY = 864e5;
 export const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const two = (n) => String(n).padStart(2, '0');
@@ -87,7 +89,7 @@ export function buildModel({ managed = [], extensions = [], occurrences = [], fr
   return { all, byId, agenda, rhythm, continuous, rare, paused, failed, agentMade, next, todayLeft, latest, days, occ };
 }
 
-/** "ma 31.8." in the reader's language. */
-export function dayLabel(d, locale) {
-  return d.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'numeric' });
+/** "ma 31.8." in the reader's own format, on the reader's own clock. */
+export function dayLabel(d) {
+  return fmtDate(d, { weekday: 'short', day: 'numeric', month: 'numeric' });
 }

@@ -20,6 +20,7 @@ import { t } from '/js/i18n.js';
 import { dt } from '/js/format.js';
 import * as orgService from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
+import { calendar } from '/js/format.js';
 
 /* Build a GitHub-style contribution calendar from activity events. Each day holds FOUR counters —
  * documents draft/published and records (schema'd) draft/published — so a cell can be drawn as a 2×2
@@ -34,7 +35,7 @@ function buildHeatmap(byDay, today) {
   const cols = []; const monthLabels = [];
   let cur = new Date(start); let prevMonth = -1;
   while (cur <= today) {
-    monthLabels.push(cur.getMonth() !== prevMonth ? cur.toLocaleString(undefined, { month: 'short' }) : '');
+    monthLabels.push(cur.getMonth() !== prevMonth ? calendar(cur, { month: 'short' }) : '');
     prevMonth = cur.getMonth();
     const col = [];
     for (let dow = 0; dow < 7; dow++) {
