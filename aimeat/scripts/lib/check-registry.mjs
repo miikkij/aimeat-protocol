@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.1.0 (2026-09-13): Refuse new copies of the shared poster shapes.
  *  - 1.0.0 (2026-09-08): A4: share the CI check registry with audit consumers.
  */
 export const FAST_CHECKS = [
@@ -21,6 +22,7 @@ export const FAST_CHECKS = [
     { script: 'check:mcp-tools', label: 'MCP tool surface/handler parity' },
     { script: 'check:mcp-schemas', label: 'MCP tool input-schema parity' },
     { script: 'check:plain-language', label: 'Plain language for the messages a person hears' },
+    { script: 'check:poster-shapes', label: 'Design-language shapes live in poster.css, not in view sheets' },
     { script: 'check:viewport', label: 'Cortex pack integrity: embed + VERSION constants' },
     { script: 'check:ai-disclosure', label: 'AI disclosure gates: one LLM path, one publish path, labels intact' },
     { script: 'check:locales', label: 'Language files agree with en.json' },
