@@ -33,6 +33,23 @@
     return ns;
   }
 
+  // src/static/sdk-libs/_core/format.js
+  function fmt() {
+    const ns = typeof window !== "undefined" ? window.AIMEAT : null;
+    return ns && ns.fmt ? ns.fmt : null;
+  }
+  function dateTime(v, opts) {
+    const f = fmt();
+    if (f && typeof f.dateTime === "function") return f.dateTime(v, opts);
+    const d = new Date(v);
+    if (!Number.isFinite(d.getTime())) return String(v == null ? "" : v);
+    try {
+      return d.toLocaleString(void 0, opts);
+    } catch {
+      return String(v);
+    }
+  }
+
   // src/static/sdk-libs/wallet/index.js
   var { authFetch: authFetch2 } = makeSession("aimeat-wallet.js");
   var wallet = {
@@ -94,7 +111,7 @@
         try {
           const txData = await wallet.transactions({ limit: 10 });
           const txList = (txData.transactions || []).map(
-            (tx) => '<div style="padding:4px 0;border-bottom:1px solid #334155;font-size:12px"><span style="color:' + (tx.amount >= 0 ? "#4ade80" : "#f87171") + '">' + (tx.amount >= 0 ? "+" : "") + tx.amount + "</span> " + (tx.type || "") + ' <span style="color:#94a3b8">' + new Date(tx.timestamp).toLocaleString() + "</span></div>"
+            (tx) => '<div style="padding:4px 0;border-bottom:1px solid #334155;font-size:12px"><span style="color:' + (tx.amount >= 0 ? "#4ade80" : "#f87171") + '">' + (tx.amount >= 0 ? "+" : "") + tx.amount + "</span> " + (tx.type || "") + ' <span style="color:#94a3b8">' + dateTime(tx.timestamp) + "</span></div>"
           ).join("");
           const popup = document.createElement("div");
           popup.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:99999";

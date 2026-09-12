@@ -1200,6 +1200,33 @@
     }
   }
 
+  // src/static/sdk-libs/_core/format.js
+  function fmt() {
+    const ns = typeof window !== "undefined" ? window.AIMEAT : null;
+    return ns && ns.fmt ? ns.fmt : null;
+  }
+  function num2(n, opts) {
+    if (typeof n !== "number" || !Number.isFinite(n)) return String(n == null ? "" : n);
+    const f = fmt();
+    if (f && typeof f.num === "function") return f.num(n, opts);
+    try {
+      return n.toLocaleString(void 0, opts);
+    } catch {
+      return String(n);
+    }
+  }
+  function date(v, opts) {
+    const f = fmt();
+    if (f && typeof f.date === "function") return f.date(v, opts);
+    const d2 = new Date(v);
+    if (!Number.isFinite(d2.getTime())) return String(v == null ? "" : v);
+    try {
+      return d2.toLocaleDateString(void 0, opts);
+    } catch {
+      return String(v);
+    }
+  }
+
   // src/static/sdk-libs/living/format.js
   var FORMATS = ["unit", "plain", "int", "percent", "upper", "lower", "text", "<digits>"];
   var PLACES = ["after", "before", "none"];
@@ -1241,11 +1268,10 @@
   function needsIntl(f) {
     return f.group === true || f.locale != null || f.style === "currency";
   }
-  function localeOf(f, lang) {
-    if (f.locale === "auto") return lang ? String(lang) : void 0;
-    return f.locale || void 0;
+  function localeOf(f) {
+    return f.locale && f.locale !== "auto" ? String(f.locale) : void 0;
   }
-  function formatNumber(n, spec, lang) {
+  function formatNumber(n, spec, _lang) {
     const f = parseFormat(spec) || {};
     if (!Number.isFinite(n)) return String(n);
     const scaled = f.style === "percent" ? n * 100 : n;
@@ -1264,8 +1290,9 @@
         opts.style = "currency";
         opts.currency = f.currency;
       }
+      const named = localeOf(f);
       try {
-        body = new Intl.NumberFormat(localeOf(f, lang), opts).format(scaled);
+        body = named ? new Intl.NumberFormat(named, opts).format(scaled) : num2(scaled, opts);
       } catch {
         body = trimNumber(scaled);
       }
@@ -5152,7 +5179,7 @@
     if (!iso) return say("agent.unseen", langs);
     const when = new Date(iso);
     if (Number.isNaN(when.getTime())) return say("agent.unseen", langs);
-    return fill(say("agent.seen", langs), { date: when.toLocaleDateString() });
+    return fill(say("agent.seen", langs), { date: date(when) });
   }
   function openOutward(spec) {
     const langs = typeof spec.langs === "function" ? spec.langs : function() {

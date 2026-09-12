@@ -34,6 +34,7 @@
 import { el, clear, resolve, enter, reducedMotion } from './dom.js';
 import { svg } from './chart-core.js';
 import { NODE_URL } from '../_core/config.js';
+import { num, money as fmtMoney } from '../_core/format.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
 
@@ -304,9 +305,9 @@ function money(value, currency) {
   const code = currencyCode(currency);
   if (typeof Intl !== 'undefined' && typeof Intl.NumberFormat === 'function') {
     if (code) {
-      return new Intl.NumberFormat(undefined, { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(whole);
+      return fmtMoney(whole, code, { maximumFractionDigits: 0, minimumFractionDigits: 0 });
     }
-    return String(currency) + new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(whole);
+    return String(currency) + num(whole, { maximumFractionDigits: 0 });
   }
   return String(currency) + whole;
 }

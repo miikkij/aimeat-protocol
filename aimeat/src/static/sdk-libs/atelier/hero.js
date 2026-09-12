@@ -63,6 +63,7 @@
  */
 import { el, clear, resolve, uid, enter, kinetic, countUp } from './dom.js';
 import { i18n } from './i18n.js';
+import { num } from '../_core/format.js';
 import { partEl, slotInto, applyVariant, hasPart, partValue, fillPart } from './parts-model.js';
 
 const HERO_VARIANTS = ['tall', 'compact', 'center'];
@@ -455,13 +456,13 @@ export function rating(spec) {
 
   function paint() {
     const frac = Math.min(Math.max(state.value / state.max, 0), 1);
-    number.textContent = (Math.round(state.value * 10) / 10).toLocaleString();
+    number.textContent = num(Math.round(state.value * 10) / 10);
     fill.style.width = (frac * 100).toFixed(1) + '%';
     if (hasPart(spec, 'words')) { clear(words); fillPart(words, partValue(spec, 'words', state)); }
     else {
       words.textContent = [
         spec.label || '',
-        state.count != null ? '(' + Number(state.count).toLocaleString() + ')' : '',
+        state.count != null ? '(' + num(Number(state.count)) + ')' : '',
       ].filter(Boolean).join(' ');
     }
     root.setAttribute('aria-label', `${state.value} / ${state.max}` + (state.count != null ? ` · ${state.count}` : ''));

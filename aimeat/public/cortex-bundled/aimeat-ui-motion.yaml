@@ -10,7 +10,10 @@ metadata:
     domain: ui
 
 spec:
-  version: "1.0.0"
+  # 1.0.1 — a rolling counter reads the person's own number format when aimeat-i18n is installed.
+  # The version is what makes an ALREADY-INSTALLED cortex refresh: the seeder skips one whose
+  # stored version matches, so new code behind an unchanged line reaches no existing node.
+  version: "1.0.1"
   license: MIT
   components:
     - type: prompt

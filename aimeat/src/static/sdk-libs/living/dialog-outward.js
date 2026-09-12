@@ -42,6 +42,7 @@
  */
 import { el, kit } from './dom.js';
 import { say, fill } from './hooks-words.js';
+import { date as fmtDate } from '../_core/format.js';
 import { outwardShape } from './hooks-shapes.js';
 import { group, fields, copyBlock, statusLine, vocabularyNote, ownerRead, pickOrWords, headerEditor, apexPage } from './dialog-parts.js';
 
@@ -50,7 +51,7 @@ function seenWord(iso, langs) {
   if (!iso) return say('agent.unseen', langs);
   const when = new Date(iso);
   if (Number.isNaN(when.getTime())) return say('agent.unseen', langs);
-  return fill(say('agent.seen', langs), { date: when.toLocaleDateString() });
+  return fill(say('agent.seen', langs), { date: fmtDate(when) });
 }
 
 /**

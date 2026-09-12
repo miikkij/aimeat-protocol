@@ -22,6 +22,7 @@
  */
 import { el, clear, whileBusy } from './dom.js';
 import { t, i18n } from './i18n.js';
+import { date } from '../_core/format.js';
 
 /**
  * An earned marker.
@@ -51,7 +52,8 @@ export function badge(spec) {
     if (!state.earned) return t('notEarned');
     if (state.earnedAt == null) return t('earned');
     const d = state.earnedAt instanceof Date ? state.earnedAt : new Date(state.earnedAt);
-    const shown = Number.isNaN(d.getTime()) ? String(state.earnedAt) : d.toLocaleDateString(i18n.lang());
+    // Was `i18n.lang()`: the LANGUAGE decided the date format, which is a separate setting.
+    const shown = Number.isNaN(d.getTime()) ? String(state.earnedAt) : date(d);
     return t('earnedOn', { when: shown });
   }
 

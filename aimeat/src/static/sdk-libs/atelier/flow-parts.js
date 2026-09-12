@@ -32,6 +32,7 @@ import { el, clear, resolve, enter, reducedMotion } from './dom.js';
 import { emptyState } from './state.js';
 import { spring, stagger, drag } from './motion.js';
 import { odometer } from './materials.js';
+import { num, money as fmtMoney, date, time } from '../_core/format.js';
 
 /** The hand's spring: quick enough to feel attached to the pointer, soft enough to read. */
 const CARRY = { stiffness: 320, damping: 28 };
@@ -255,10 +256,10 @@ function money(amount, currency) {
   const n = Number(amount) || 0;
   const hasIntl = typeof Intl === 'object' && Intl && typeof Intl.NumberFormat === 'function';
   if (hasIntl && /^[A-Za-z]{3}$/.test(unit)) {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: unit.toUpperCase() }).format(n);
+    return fmtMoney(n, unit, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
   if (hasIntl) {
-    return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' ' + unit;
+    return num(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + unit;
   }
   return n.toFixed(2) + ' ' + unit;
 }
@@ -456,7 +457,7 @@ function dayLabel(when) {
   if (days === 1) return 'Yesterday';
   if (typeof when.toLocaleDateString !== 'function') return when.toISOString().slice(0, 10);
   const sameYear = when.getFullYear() === new Date().getFullYear();
-  return when.toLocaleDateString(undefined, sameYear
+  return date(when, sameYear
     ? { day: 'numeric', month: 'short' }
     : { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -464,7 +465,7 @@ function dayLabel(when) {
 function clockOf(when) {
   if (!when) return '';
   if (typeof when.toLocaleTimeString !== 'function') return when.toISOString().slice(11, 16);
-  return when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return time(when, { hour: '2-digit', minute: '2-digit' });
 }
 
 /**

@@ -312,11 +312,11 @@
   }
   function countUp(node, from, to, opts) {
     if (!node) return;
-    const fmt = opts && opts.format || function(n) {
+    const fmt2 = opts && opts.format || function(n) {
       return String(Math.round(n));
     };
     if (reducedMotion() || from === to || typeof requestAnimationFrame !== "function") {
-      node.textContent = fmt(to);
+      node.textContent = fmt2(to);
       return;
     }
     const span = opts && opts.ms || 600;
@@ -324,7 +324,7 @@
     const tick = function(now2) {
       const p = Math.min(1, (now2 - t0) / span);
       const eased = 1 - (1 - p) * (1 - p);
-      node.textContent = fmt(from + (to - from) * eased);
+      node.textContent = fmt2(from + (to - from) * eased);
       if (p < 1) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
@@ -760,17 +760,17 @@
     } catch {
       cs = null;
     }
-    const num = function(name, floor) {
+    const num2 = function(name, floor) {
       if (!cs) return floor;
       const v = parseFloat(cs.getPropertyValue(name));
       return isFinite(v) ? v : floor;
     };
     const ease = cs ? (cs.getPropertyValue("--ak-ease") || "").trim() : "";
     return {
-      span: num("--ak-motion", 200) || 200,
+      span: num2("--ak-motion", 200) || 200,
       ease: ease || "cubic-bezier(0.2, 0.7, 0.3, 1)",
-      dist: num("--ak-enter-distance", 14),
-      step: num("--ak-enter-stagger", 40)
+      dist: num2("--ak-enter-distance", 14),
+      step: num2("--ak-enter-stagger", 40)
     };
   }
   function still(node) {
@@ -3960,6 +3960,92 @@
     };
   }
 
+  // src/static/sdk-libs/_core/format.js
+  function fmt() {
+    const ns = typeof window !== "undefined" ? window.AIMEAT : null;
+    return ns && ns.fmt ? ns.fmt : null;
+  }
+  function num(n, opts) {
+    if (typeof n !== "number" || !Number.isFinite(n)) return String(n == null ? "" : n);
+    const f = fmt();
+    if (f && typeof f.num === "function") return f.num(n, opts);
+    try {
+      return n.toLocaleString(void 0, opts);
+    } catch {
+      return String(n);
+    }
+  }
+  function money(n, currency, opts) {
+    const f = fmt();
+    if (f && typeof f.money === "function") return f.money(n, currency, opts);
+    if (typeof n !== "number" || !Number.isFinite(n)) return String(n == null ? "" : n);
+    const code = String(currency || "USD").toUpperCase();
+    const digits = n !== 0 && Math.abs(n) < 0.01 ? 4 : 2;
+    const o = Object.assign(
+      { style: "currency", currency: code, minimumFractionDigits: digits, maximumFractionDigits: digits },
+      opts
+    );
+    try {
+      return n.toLocaleString(void 0, o);
+    } catch {
+      return num(n) + " " + code;
+    }
+  }
+  function date(v, opts) {
+    const f = fmt();
+    if (f && typeof f.date === "function") return f.date(v, opts);
+    const d = new Date(v);
+    if (!Number.isFinite(d.getTime())) return String(v == null ? "" : v);
+    try {
+      return d.toLocaleDateString(void 0, opts);
+    } catch {
+      return String(v);
+    }
+  }
+  function time(v, opts) {
+    const f = fmt();
+    if (f && typeof f.time === "function") return f.time(v, opts);
+    const d = new Date(v);
+    if (!Number.isFinite(d.getTime())) return String(v == null ? "" : v);
+    try {
+      return d.toLocaleTimeString(void 0, opts);
+    } catch {
+      return String(v);
+    }
+  }
+  function dateTime(v, opts) {
+    const f = fmt();
+    if (f && typeof f.dateTime === "function") return f.dateTime(v, opts);
+    const d = new Date(v);
+    if (!Number.isFinite(d.getTime())) return String(v == null ? "" : v);
+    try {
+      return d.toLocaleString(void 0, opts);
+    } catch {
+      return String(v);
+    }
+  }
+  function calendar(v, opts) {
+    if (v == null || v === "") return "";
+    let y, m, d;
+    if (v instanceof Date) {
+      if (!Number.isFinite(v.getTime())) return String(v);
+      [y, m, d] = [v.getFullYear(), v.getMonth(), v.getDate()];
+    } else {
+      const parts = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v));
+      if (!parts) return String(v);
+      [y, m, d] = [Number(parts[1]), Number(parts[2]) - 1, Number(parts[3])];
+    }
+    const at = new Date(Date.UTC(y, m, d, 12));
+    const f = fmt();
+    const withUtc = Object.assign({}, opts, { timeZone: "UTC" });
+    if (f && typeof f.date === "function") return f.date(at, withUtc);
+    try {
+      return at.toLocaleDateString(void 0, withUtc);
+    } catch {
+      return String(v);
+    }
+  }
+
   // src/static/sdk-libs/atelier/hero.js
   var HERO_VARIANTS = ["tall", "compact", "center"];
   var STAT_VARIANTS = ["compact", "trend", "plain"];
@@ -4119,12 +4205,12 @@
       const seen = /* @__PURE__ */ new Set();
       for (const tile of tiles) {
         seen.add(tile.id);
-        const fmt = tile.format || function(n) {
+        const fmt2 = tile.format || function(n) {
           return String(Math.round(n));
         };
         let entry = shown.get(tile.id);
         if (!entry) {
-          const value = el("span", { class: "ak-statrow__value", "data-ak-part": "value", text: fmt(first ? tile.value : 0) });
+          const value = el("span", { class: "ak-statrow__value", "data-ak-part": "value", text: fmt2(first ? tile.value : 0) });
           const figureRow = el("div", { class: "ak-statrow__figure", "data-ak-part": "figure" }, value);
           const label = el("span", { class: "ak-statrow__label", "data-ak-part": "label", text: tile.label });
           const hint = el("span", { class: "ak-statrow__hint", "data-ak-part": "hint", text: tile.hint || "" });
@@ -4153,10 +4239,10 @@
         }
         drawTrend(entry, tile.trend);
         if (entry.value !== tile.value) {
-          countUp(entry.node, entry.value, tile.value, { format: fmt });
+          countUp(entry.node, entry.value, tile.value, { format: fmt2 });
           entry.value = tile.value;
         } else if (first) {
-          entry.node.textContent = fmt(tile.value);
+          entry.node.textContent = fmt2(tile.value);
         }
       }
       for (const [id, entry] of shown) {
@@ -4185,11 +4271,11 @@
   }
   function figure(spec) {
     const state = { value: spec.value || 0, label: spec.label || "", sub: spec.sub, delta: spec.delta };
-    const fmt = spec.format || function(n) {
+    const fmt2 = spec.format || function(n) {
       return String(Math.round(n));
     };
     const label = el("span", { class: "ak-figure__label", "data-ak-part": "label", text: state.label });
-    const value = el("span", { class: "ak-figure__value", "data-ak-part": "value", text: fmt(state.value) });
+    const value = el("span", { class: "ak-figure__value", "data-ak-part": "value", text: fmt2(state.value) });
     const dir = DIRECTION_MARK[spec.direction] ? spec.direction : null;
     const delta = el("span", {
       class: "ak-figure__delta",
@@ -4228,7 +4314,7 @@
           delta.hidden = !state.delta && !dir;
         }
         if (patch.value != null && patch.value !== state.value) {
-          countUp(value, state.value, patch.value, { format: fmt });
+          countUp(value, state.value, patch.value, { format: fmt2 });
           state.value = patch.value;
         }
       },
@@ -4269,7 +4355,7 @@
     root.appendChild(words);
     function paint() {
       const frac = Math.min(Math.max(state.value / state.max, 0), 1);
-      number.textContent = (Math.round(state.value * 10) / 10).toLocaleString();
+      number.textContent = num(Math.round(state.value * 10) / 10);
       fill.style.width = (frac * 100).toFixed(1) + "%";
       if (hasPart(spec, "words")) {
         clear(words);
@@ -4277,7 +4363,7 @@
       } else {
         words.textContent = [
           spec.label || "",
-          state.count != null ? "(" + Number(state.count).toLocaleString() + ")" : ""
+          state.count != null ? "(" + num(Number(state.count)) + ")" : ""
         ].filter(Boolean).join(" ");
       }
       root.setAttribute("aria-label", `${state.value} / ${state.max}` + (state.count != null ? ` · ${state.count}` : ""));
@@ -4537,15 +4623,13 @@
 
   // src/static/sdk-libs/atelier/timeline.js
   function fmtTs(ts) {
-    if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ts)) {
-      return (/* @__PURE__ */ new Date(ts + "T12:00:00")).toLocaleDateString(void 0, { dateStyle: "medium" });
-    }
+    if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ts)) return calendar(ts, { dateStyle: "medium" });
     const d = ts instanceof Date ? ts : new Date(ts);
     if (Number.isNaN(d.getTime())) return String(ts);
-    return d.toLocaleString(void 0, { dateStyle: "medium", timeStyle: "short" });
+    return dateTime(d, { dateStyle: "medium", timeStyle: "short" });
   }
   function timeline(spec) {
-    const fmt = spec.format || fmtTs;
+    const fmt2 = spec.format || fmtTs;
     const root = el("ol", { class: "ak-root ak-timeline", "data-ak-part": "root" });
     applyVariant(root, spec, ["dense", "plain"]);
     if (spec.target) resolve(spec.target).appendChild(root);
@@ -4559,7 +4643,7 @@
       }
       node.appendChild(partEl("span", "ak-timeline__dot ak-timeline__dot--" + (item.tone || "plain"), "dot", { "aria-hidden": "true" }));
       const body = partEl("div", "ak-timeline__body", "body");
-      slotInto(body, spec, "when", fmt(item.ts), { cls: "ak-timeline__when", args: [item] });
+      slotInto(body, spec, "when", fmt2(item.ts), { cls: "ak-timeline__when", args: [item] });
       slotInto(body, spec, "title", item.title, { cls: "ak-timeline__title", args: [item] });
       slotInto(body, spec, "sub", item.sub == null ? null : item.sub, { cls: "ak-timeline__sub", args: [item] });
       slotInto(body, spec, "extra", null, { cls: "ak-timeline__extra", args: [item] });
@@ -5594,8 +5678,8 @@
     return 10 * pow;
   }
   function fmtTick(v) {
-    if (Math.abs(v) >= 1e3) return (v / 1e3).toLocaleString(void 0, { maximumFractionDigits: 1 }) + "k";
-    return v.toLocaleString(void 0, { maximumFractionDigits: 2 });
+    if (Math.abs(v) >= 1e3) return num(v / 1e3, { maximumFractionDigits: 1 }) + "k";
+    return num(v, { maximumFractionDigits: 2 });
   }
   function smoothPath(pts) {
     if (pts.length < 2) return pts.length ? `M ${pts[0].x} ${pts[0].y}` : "";
@@ -8089,11 +8173,11 @@
       return {};
     }
     if (!cs) return {};
-    const num = function(name) {
+    const num2 = function(name) {
       const v = parseFloat(cs.getPropertyValue(name));
       return isFinite(v) && v > 0 ? v : void 0;
     };
-    return { stiffness: num("--ak-spring-stiffness"), damping: num("--ak-spring-damping"), mass: num("--ak-spring-mass") };
+    return { stiffness: num2("--ak-spring-stiffness"), damping: num2("--ak-spring-damping"), mass: num2("--ak-spring-mass") };
   }
   function springFrames(opts) {
     const o = opts || {};
@@ -8773,15 +8857,15 @@
     }
     return 'url("' + v.replace(/"/g, "%22") + '")';
   }
-  function money(amount2, currency) {
+  function money2(amount2, currency) {
     const unit = currency || "€";
     const n = Number(amount2) || 0;
     const hasIntl = typeof Intl === "object" && Intl && typeof Intl.NumberFormat === "function";
     if (hasIntl && /^[A-Za-z]{3}$/.test(unit)) {
-      return new Intl.NumberFormat(void 0, { style: "currency", currency: unit.toUpperCase() }).format(n);
+      return money(n, unit, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
     if (hasIntl) {
-      return new Intl.NumberFormat(void 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + " " + unit;
+      return num(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + unit;
     }
     return n.toFixed(2) + " " + unit;
   }
@@ -8817,7 +8901,7 @@
       }, 0);
     }
     function rollTotal() {
-      odometer(totalValue, money(totalOf(), unit));
+      odometer(totalValue, money2(totalOf(), unit));
     }
     function setQty(line, next) {
       const q = Math.max(1, Math.round(Number(next) || 1));
@@ -8826,7 +8910,7 @@
       const rec = shown.get(String(line.id));
       if (rec) {
         rec.count.textContent = String(q);
-        rec.price.textContent = money((Number(line.price) || 0) * q, unit);
+        rec.price.textContent = money2((Number(line.price) || 0) * q, unit);
       }
       rollTotal();
       if (s.onChange) s.onChange(line.id, q);
@@ -8913,7 +8997,7 @@
       rec.sub.textContent = line.sub != null ? String(line.sub) : "";
       rec.sub.hidden = line.sub == null || line.sub === "";
       rec.count.textContent = String(qty);
-      rec.price.textContent = money((Number(line.price) || 0) * qty, unit);
+      rec.price.textContent = money2((Number(line.price) || 0) * qty, unit);
       const mono = rec.art.querySelector(".ak-cart__monogram");
       if (mono) mono.textContent = (Array.from(String(line.title || "?"))[0] || "?").toUpperCase();
     }
@@ -8991,12 +9075,12 @@
     if (days === 1) return "Yesterday";
     if (typeof when.toLocaleDateString !== "function") return when.toISOString().slice(0, 10);
     const sameYear = when.getFullYear() === (/* @__PURE__ */ new Date()).getFullYear();
-    return when.toLocaleDateString(void 0, sameYear ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" });
+    return date(when, sameYear ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" });
   }
   function clockOf(when) {
     if (!when) return "";
     if (typeof when.toLocaleTimeString !== "function") return when.toISOString().slice(11, 16);
-    return when.toLocaleTimeString(void 0, { hour: "2-digit", minute: "2-digit" });
+    return time(when, { hour: "2-digit", minute: "2-digit" });
   }
   function notices(spec) {
     const s = spec || {};
@@ -9672,7 +9756,7 @@
     if (ts == null) return "";
     const d = ts instanceof Date ? ts : new Date(ts);
     if (isNaN(d.getTime())) return String(ts);
-    return d.toLocaleTimeString(void 0, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return time(d, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   }
   function konsole(spec) {
     const cap = typeof spec.cap === "number" && spec.cap > 0 ? Math.min(spec.cap, 2e3) : CAP_DEFAULT;
@@ -10819,7 +10903,7 @@
     const back = new Date(now2.getTime() - 864e5);
     if (key === dayKeyOf(back)) return "Yesterday";
     if (typeof Intl === "object" && Intl.DateTimeFormat) {
-      return new Intl.DateTimeFormat(void 0, { weekday: "short", day: "numeric", month: "short" }).format(d);
+      return date(d, { weekday: "short", day: "numeric", month: "short" });
     }
     return d.toDateString();
   }
@@ -10827,7 +10911,7 @@
     const d = dateOf(at);
     if (!d) return "";
     if (typeof Intl === "object" && Intl.DateTimeFormat) {
-      return new Intl.DateTimeFormat(void 0, { hour: "2-digit", minute: "2-digit" }).format(d);
+      return time(d, { hour: "2-digit", minute: "2-digit" });
     }
     return d.toTimeString().slice(0, 5);
   }
@@ -10991,17 +11075,17 @@
     { name: "city", label: "City", type: "text", required: true },
     { name: "country", label: "Country", type: "text" }
   ];
-  function money2(value, currency) {
+  function money3(value, currency) {
     const v = Math.round((Number(value) || 0) * 100) / 100;
     const cur = currency || "€";
     if (typeof Intl === "object" && Intl.NumberFormat) {
       if (/^[A-Za-z]{3}$/.test(cur)) {
         try {
-          return new Intl.NumberFormat(void 0, { style: "currency", currency: cur.toUpperCase() }).format(v);
+          return money(v, cur, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         } catch {
         }
       }
-      return new Intl.NumberFormat(void 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) + " " + cur;
+      return num(v, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + cur;
     }
     return v.toFixed(2) + " " + cur;
   }
@@ -11136,12 +11220,12 @@
       const carriage = ship ? Number(ship.price) || 0 : 0;
       clear(itemsSum);
       itemsSum.appendChild(el("span", {}, "Items"));
-      itemsSum.appendChild(el("span", { class: "ak-checkout__figure" }, money2(items, cur)));
+      itemsSum.appendChild(el("span", { class: "ak-checkout__figure" }, money3(items, cur)));
       clear(totals);
       [
-        ["Items", money2(items, cur), ""],
-        ["Delivery", ship ? money2(carriage, cur) : "Chosen after the order", ""],
-        ["Total", money2(items + carriage, cur), " ak-checkout__total--grand"]
+        ["Items", money3(items, cur), ""],
+        ["Delivery", ship ? money3(carriage, cur) : "Chosen after the order", ""],
+        ["Total", money3(items + carriage, cur), " ak-checkout__total--grand"]
       ].forEach(function(row) {
         totals.appendChild(el("div", { class: "ak-checkout__total" + row[2] }, [
           el("span", {}, row[0]),
@@ -11164,7 +11248,7 @@
             l.sub ? el("span", { class: "ak-checkout__line-sub" }, String(l.sub)) : null
           ].filter(Boolean)),
           el("span", { class: "ak-checkout__qty" }, String(Number(l.qty) || 0) + " ×"),
-          el("span", { class: "ak-checkout__figure" }, money2((Number(l.price) || 0) * (Number(l.qty) || 0), cur))
+          el("span", { class: "ak-checkout__figure" }, money3((Number(l.price) || 0) * (Number(l.qty) || 0), cur))
         ]));
       });
       stagger(Array.prototype.slice.call(lineList.children), { from: "up" });
@@ -11200,7 +11284,7 @@
         shipList.appendChild(el("label", { class: "ak-checkout__ship" }, [
           radio,
           el("span", { class: "ak-checkout__ship-label" }, String(o.label || o.id)),
-          el("span", { class: "ak-checkout__figure" }, money2(o.price, cur))
+          el("span", { class: "ak-checkout__figure" }, money3(o.price, cur))
         ]));
       });
     }
@@ -11339,7 +11423,7 @@
     }));
     return node;
   }
-  function calendar(spec) {
+  function calendar2(spec) {
     const s = spec || {};
     const root = el("div", { class: "ak-root ak-calendar" });
     if (s.target) resolve(s.target).appendChild(root);
@@ -11494,14 +11578,14 @@
   function currencyCode(value) {
     return /^[A-Z]{3}$/.test(String(value == null ? "" : value)) ? String(value) : null;
   }
-  function money3(value, currency) {
+  function money4(value, currency) {
     const whole = Math.round(Number(value) || 0);
     const code = currencyCode(currency);
     if (typeof Intl !== "undefined" && typeof Intl.NumberFormat === "function") {
       if (code) {
-        return new Intl.NumberFormat(void 0, { style: "currency", currency: code, maximumFractionDigits: 0 }).format(whole);
+        return money(whole, code, { maximumFractionDigits: 0, minimumFractionDigits: 0 });
       }
-      return String(currency) + new Intl.NumberFormat(void 0, { maximumFractionDigits: 0 }).format(whole);
+      return String(currency) + num(whole, { maximumFractionDigits: 0 });
     }
     return String(currency) + whole;
   }
@@ -11542,7 +11626,7 @@
         const from = f.shown;
         f.shown = to;
         if (!engine || from === to) {
-          f.amount.textContent = money3(to, currency);
+          f.amount.textContent = money4(to, currency);
           return;
         }
         const box = { v: from };
@@ -11551,10 +11635,10 @@
           duration: 520,
           ease: "outQuad",
           onUpdate: function() {
-            f.amount.textContent = money3(box.v, currency);
+            f.amount.textContent = money4(box.v, currency);
           },
           onComplete: function() {
-            f.amount.textContent = money3(to, currency);
+            f.amount.textContent = money4(to, currency);
           }
         });
       });
@@ -11587,7 +11671,7 @@
     }
     function card(plan2) {
       const value = Math.round(priceFor(plan2, period));
-      const amount2 = el("span", { class: "ak-price__amount" }, money3(value, currency));
+      const amount2 = el("span", { class: "ak-price__amount" }, money4(value, currency));
       const per = el("span", { class: "ak-price__per" }, "/" + period);
       figures.push({ plan: plan2, amount: amount2, per, shown: value });
       const features = el("ul", { class: "ak-price__features" });
@@ -12682,7 +12766,7 @@
           });
         case "calendar":
           return bound("calendar", function(data) {
-            return calendar({
+            return calendar2({
               target: into,
               data: patchFor("calendar", data).data,
               title: p.title,
@@ -16452,7 +16536,7 @@
     //    priceTable), Lenis (thread, checkout) — each lazy-loads its pack from this node ──
     carousel,
     lightbox,
-    calendar,
+    calendar: calendar2,
     priceTable,
     thread,
     checkout,

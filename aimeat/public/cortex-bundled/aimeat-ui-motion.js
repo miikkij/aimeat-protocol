@@ -95,7 +95,12 @@
   }
 
   var defaultFormat = function (v, decimals) {
-    try { return Number(v).toLocaleString(undefined, { maximumFractionDigits: decimals != null ? decimals : (Math.abs(v) < 10 && v % 1 !== 0 ? 1 : 0) }); }
+    var opts = { maximumFractionDigits: decimals != null ? decimals : (Math.abs(v) < 10 && v % 1 !== 0 ? 1 : 0) };
+    // The reader's own number format when aimeat-i18n is installed beside this pack; the browser's
+    // otherwise, which is what a counter rolling up has always used here.
+    var fmt = (typeof AIMEAT !== 'undefined') && AIMEAT.fmt;
+    if (fmt && typeof fmt.num === 'function') return fmt.num(Number(v), opts);
+    try { return Number(v).toLocaleString(undefined, opts); }
     catch (e) { return String(v); }
   };
 

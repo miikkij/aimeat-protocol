@@ -27,6 +27,7 @@
 import { el, clear, resolve } from './dom.js';
 import { keyedRows } from './arrive.js';
 import { t } from './i18n.js';
+import { calendar, dateTime } from '../_core/format.js';
 import { emptyState } from './state.js';
 import { partEl, slotInto, applyVariant, partValue, fillPart } from './parts-model.js';
 
@@ -43,12 +44,12 @@ import { partEl, slotInto, applyVariant, partValue, fillPart } from './parts-mod
  *  renders as a date. A bare "2026-08-26" parsed as a moment lands on midnight UTC and told
  *  every reader something happened at 3:00 AM (the first design review's finding). */
 function fmtTs(ts) {
-  if (typeof ts === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ts)) {
-    return new Date(ts + 'T12:00:00').toLocaleDateString(undefined, { dateStyle: 'medium' });
-  }
+  // The distinction this file found on its own is what calendar() is for: a bare date is a day on
+  // a calendar and must not be re-read in anyone's zone; everything else is a moment and is.
+  if (typeof ts === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ts)) return calendar(ts, { dateStyle: 'medium' });
   const d = ts instanceof Date ? ts : new Date(ts);
   if (Number.isNaN(d.getTime())) return String(ts);
-  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  return dateTime(d, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 /**

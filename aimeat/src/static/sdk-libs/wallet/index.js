@@ -15,6 +15,7 @@
 import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-wallet.js');
 import { attach } from '../_core/namespace.js';
+import { dateTime } from '../_core/format.js';
 
 const wallet = {
   // Get current balance
@@ -90,7 +91,7 @@ const wallet = {
           + '<span style="color:' + (tx.amount >= 0 ? '#4ade80' : '#f87171') + '">'
           + (tx.amount >= 0 ? '+' : '') + tx.amount + '</span> '
           + (tx.type || '') + ' '
-          + '<span style="color:#94a3b8">' + new Date(tx.timestamp).toLocaleString() + '</span>'
+          + '<span style="color:#94a3b8">' + dateTime(tx.timestamp) + '</span>'
           + '</div>',
         ).join('');
 
