@@ -2,7 +2,6 @@
   "admin": {
     "database": {
       "title": "Database",
-      "desc": "Live row counts per table and how storage is growing over time. Snapshots are captured hourly; the deltas show change over the last hour, day, and week.",
       "loading": "Loading storage stats…",
       "empty": "No storage stats yet.",
       "captureNow": "Capture now",
@@ -10,18 +9,41 @@
       "captured": "Snapshot captured.",
       "totalRows": "Total rows",
       "tables": "tables",
-      "memoryVersionRows": "version history rows",
-      "memoryArchivedRows": "archived rows",
-      "lastHour": "Last hour",
-      "last24h": "Last 24h",
-      "last7d": "Last 7 days",
-      "rowsDelta": "rows changed",
-      "noBaseline": "no baseline yet",
+      "noBaseline": "no snapshot that old",
       "snapshots": "snapshots",
       "table": "Table",
       "rows": "Rows",
-      "delta24h": "Δ 24h",
-      "relSize": "Relative size"
+      "sizeTitle": "How much is in here",
+      "whereTitle": "Where the rows are",
+      "heroLabel": "Rows, all tables",
+      "chartLabel": "Every row here, hour by hour",
+      "chartRange": "7 days · {n} snapshots",
+      "chartNow": "now",
+      "lastHour": "last hour",
+      "lastDay": "last day",
+      "lastWeek": "last week",
+      "subHour": "one snapshot ago",
+      "subDay": "24 snapshots ago",
+      "subWeek": "{pct} % more than a week ago",
+      "sinceFirst": "so far",
+      "subSinceFirst": "the oldest reading is from {when}",
+      "subSnapshots": "one an hour, the last seven days",
+      "memoryComposition": "in Memory: {v} version history, {a} archived",
+      "waitTitle": "Nothing to compare with yet",
+      "waitBody": "Counting happens live, but growth needs two readings. One snapshot is taken at the top of every hour and kept for a month.",
+      "waitHourly": "the first one goes in when this starts up",
+      "leadSize": "The share is of all rows here, and the bar draws it against the biggest table so the small ones stay readable.",
+      "leadGrowth": "Ordered by what arrived in the last day. The share is of that day's growth rather than of the whole database.",
+      "findPlaceholder": "Find a table",
+      "orderBiggest": "biggest",
+      "orderGrowth": "fastest growing",
+      "orderAz": "a-z",
+      "colDay": "Last day",
+      "colShare": "Share",
+      "shown": "{n} of {total} shown",
+      "stillCount": "{n} of them did not move.",
+      "noteSize": "share of every row in the database",
+      "noteGrowth": "measured against the snapshot 24 hours back"
     },
     "metrics": {
       "title": "Metrics",
@@ -182,7 +204,12 @@
       "now": {
         "title": "Right now",
         "toMetrics": "To Metrics",
-        "word": {"quiet":"Quiet","watch":"Watch","open":"Open","unknown":"Limited history"},
+        "word": {
+          "quiet": "Quiet",
+          "watch": "Watch",
+          "open": "Open",
+          "unknown": "Limited history"
+        },
         "lineQuiet": "No open incidents or unusual levels were detected in the readable sample.",
         "lineWatch": "Nothing is open, but one number sits above its usual level; the rows say which.",
         "lineUnknown": "There is not enough readable history to assess the refusal rate.",
@@ -235,7 +262,12 @@
         "moreSources": "{n} more addresses",
         "fingerprint": "One fingerprint, {digest}, is {count} of the {total} refusals with a {kind}: a script somewhere still holds a credential that no longer works.",
         "fingerprint403": "One fingerprint, {digest}, is {count} of the {total} refusals with a {kind}: a real credential reaching for doors it may not open, which is a misconfigured integration or somebody testing the fence.",
-        "kind": { "none": "none presented", "cookie": "cookie", "pat": "personal token", "jwt": "signed token" },
+        "kind": {
+          "none": "none presented",
+          "cookie": "cookie",
+          "pat": "personal token",
+          "jwt": "signed token"
+        },
         "filter24": "24 h",
         "filterAll": "all {n}",
         "walled": "walled",
@@ -255,9 +287,18 @@
         "none": "Nothing has been refused and kept.",
         "noneOpen": "Nothing is open. The last incident was resolved on {date}.",
         "noneOpenPlain": "Nothing is open.",
-        "status": { "open": "open", "resolved": "resolved" },
-        "type": { "zip_import": "ZIP import refused" },
-        "source": { "workspace_import": "workspace import", "organism_import": "organism import", "app_backup": "app backup" },
+        "status": {
+          "open": "open",
+          "resolved": "resolved"
+        },
+        "type": {
+          "zip_import": "ZIP import refused"
+        },
+        "source": {
+          "workspace_import": "workspace import",
+          "organism_import": "organism import",
+          "app_backup": "app backup"
+        },
         "kept": "{size} kept",
         "notKept": "not kept, too large",
         "resolvedOn": "resolved {date}",
@@ -280,7 +321,12 @@
         "ssoOnWhy": "A connected directory can create accounts here and end them.",
         "ssoOff": "Organisation sign-in is off",
         "ssoOffWhy": "No directory is connected, so accounts are made here. Turning it on lets a company's own directory create and end them.",
-        "registration": { "open": "Registration is open", "oauth": "Registration through sign-in providers only", "invite": "Registration by invitation only", "closed": "Registration is closed" },
+        "registration": {
+          "open": "Registration is open",
+          "oauth": "Registration through sign-in providers only",
+          "invite": "Registration by invitation only",
+          "closed": "Registration is closed"
+        },
         "registrationWhy": "The modes are open, sign-in providers only, invitation only, and closed."
       },
       "settings": {
@@ -306,7 +352,11 @@
         "passkeysWhy": "A passkey is a way in of its own, beside the password.",
         "cors": "Allowed origins: {n}",
         "corsWhy": "Browsers on other origins are refused before any door is asked.",
-        "federation": { "disabled": "Federated sign-in: disabled", "all_peers": "Federated sign-in: any peer's people", "specific_peers": "Federated sign-in: the peers you name" },
+        "federation": {
+          "disabled": "Federated sign-in: disabled",
+          "all_peers": "Federated sign-in: any peer's people",
+          "specific_peers": "Federated sign-in: the peers you name"
+        },
         "federationWhy": "Whether people from peer instances can sign in here, and which peers count.",
         "body": "Request bodies: {mb} MB, {large} MB for apps and extensions",
         "bodyWhy": "A larger body is refused before it is read.",
@@ -314,7 +364,10 @@
         "logOff": "Refusal log: off",
         "logWhy": "{path}, {bytes} of {max}; rotates past that and keeps one older generation.",
         "logOffWhy": "Nothing is written when somebody is turned away. Set a file path to keep the story.",
-        "doors": { "security": "Settings · Security", "totp": "Settings · TOTP" }
+        "doors": {
+          "security": "Settings · Security",
+          "totp": "Settings · TOTP"
+        }
       },
       "ai": {
         "title": "Ask your AI",

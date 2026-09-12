@@ -2,7 +2,6 @@
   "admin": {
     "database": {
       "title": "Base de datos",
-      "desc": "Filas por tabla en vivo y cómo crece el almacenamiento con el tiempo. Se toma una instantánea cada hora; las diferencias enseñan el cambio de la última hora, del último día y de la última semana.",
       "loading": "Cargando las estadísticas de almacenamiento…",
       "empty": "Todavía no hay estadísticas de almacenamiento.",
       "captureNow": "Tomar una ahora",
@@ -10,18 +9,13 @@
       "captured": "Instantánea tomada.",
       "totalRows": "Filas en total",
       "tables": "tablas",
-      "memoryVersionRows": "filas de historial de versiones",
-      "memoryArchivedRows": "filas archivadas",
-      "lastHour": "Última hora",
-      "last24h": "Últimas 24 h",
-      "last7d": "Últimos 7 días",
-      "rowsDelta": "filas cambiadas",
-      "noBaseline": "todavía no hay referencia",
+      "noBaseline": "no hay una instantánea tan antigua",
       "snapshots": "instantáneas",
       "table": "Tabla",
       "rows": "Filas",
-      "delta24h": "Δ 24 h",
-      "relSize": "Tamaño relativo"
+      "lastHour": "última hora",
+      "lastDay": "último día",
+      "lastWeek": "última semana"
     },
     "metrics": {
       "title": "Métricas",
