@@ -29,6 +29,7 @@ import { useSession } from '/js/use-session.js';
 import { Spinner } from '/components/Spinner.js';
 import { swallowed } from '/js/swallowed.js';
 import { FeedRow, line } from '/views/home/feed.js';
+import { date as fmtDate } from '/js/format.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -69,7 +70,7 @@ function dayLabel(day) {
   const parsed = new Date(`${day}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return day;
   // The browser's own locale formatting: this page is read, not parsed.
-  return parsed.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+  return fmtDate(parsed, { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 /** One day of rows, under its heading. */

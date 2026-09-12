@@ -25,6 +25,7 @@ import TagCloud from '/js/components/tag-cloud.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { NODE_URL, tr, stampCspNonce } from './shared.js';
 import { buildPortfolioPrompt } from './prompt.js';
+import { num } from '/js/format.js';
 
 /* ── Portfolio Types ── */
 const PORTFOLIO_TYPES = [
@@ -548,7 +549,7 @@ export function PortfolioBuilder({ session, navigate }) {
 
           ${generatedPrompt && html`
             <div class="portfolio-prompt-output">${generatedPrompt}</div>
-            <div class="portfolio-prompt-meta">${tr('portfolio.builder.charCount', '{n} characters').replace('{n}', generatedPrompt.length.toLocaleString())}</div>
+            <div class="portfolio-prompt-meta">${tr('portfolio.builder.charCount', '{n} characters').replace('{n}', num(generatedPrompt.length))}</div>
             <div class="portfolio-prompt-actions">
               <${CopyButton} text=${generatedPrompt} className="btn-primary"
                 label=${t('portfolio.builder.copyPrompt')} copiedLabel=${t('common.copied')} />

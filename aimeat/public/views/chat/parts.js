@@ -38,6 +38,7 @@ import { CopyButton } from '/components/CopyButton.js';
 import { AiInteractionNotice } from '/components/ai-label.js';
 import { Modal } from '/components/Modal.js';
 import { ImageView } from '/components/ImageDeliverable.js';
+import { time as fmtTime } from '/js/format.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -46,7 +47,7 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 function timeShort(iso) {
     if (!iso) return '';
     const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return Number.isNaN(d.getTime()) ? '' : fmtTime(d, { hour: '2-digit', minute: '2-digit' });
 }
 
 /**

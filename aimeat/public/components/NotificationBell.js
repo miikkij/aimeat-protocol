@@ -35,6 +35,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { getJwt } from '/js/services/auth.js';
 import { titleOf, bodyOf, sourceName } from '/js/services/notifications.js';
+import { date as fmtDate } from '/js/format.js';
 const html = htm.bind(h);
 
 async function api(path, opts = {}) {
@@ -63,7 +64,7 @@ function relTime(iso) {
     if (s < 60) return 'just now';
     if (s < 3600) return Math.floor(s / 60) + 'm ago';
     if (s < 86400) return Math.floor(s / 3600) + 'h ago';
-    return d.toLocaleDateString();
+    return fmtDate(d);
   } catch (err) { swallowed('NotificationBell: relTime', err); return ''; }
 }
 

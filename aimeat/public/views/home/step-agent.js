@@ -45,6 +45,7 @@ import { PromptCard } from '/components/PromptCard.js';
 import { AgentConsent } from '/components/AgentConsent.js';
 import { swallowed } from '/js/swallowed.js';
 import { useSession } from '/js/use-session.js';
+import { dateTime as fmtDateTime } from '/js/format.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -293,7 +294,7 @@ export function AgentCard({ agent }) {
           <dd class="koti-agent-gaii">${agent.gaii}</dd>
           ${agent.connectedAt && html`
             <dt>${tr('home.agent.dtSince', 'Connected')}</dt>
-            <dd>${new Date(agent.connectedAt).toLocaleString()}</dd>`}
+            <dd>${fmtDateTime(agent.connectedAt)}</dd>`}
         </dl>
         <a class="btn-outline koti-agent-manage" href="/v1/profile?tab=agents">
           ${tr('home.agent.manage', 'Manage what it may do')}

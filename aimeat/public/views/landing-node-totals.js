@@ -23,9 +23,10 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
+import { num as fmtNum } from '/js/format.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
-const num = (n) => (Number(n) || 0).toLocaleString();
+const num = (n) => fmtNum(Number(n) || 0);
 
 export default function NodeTotals() {
   const [totals, setTotals] = useState(null);
