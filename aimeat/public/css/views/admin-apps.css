@@ -1,0 +1,115 @@
+/* ── Admin Applications page, in the poster face ──
+ * @file admin-apps.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's moderation page (design canvas "AIMEAT Admin Applications",
+ *   direction A): the table of every app with the facts the node already sends, the row menu that
+ *   the one irreversible action moved into, and the copy scan as a section that puts a suspected
+ *   copy beside the original. The frame, the sections, the metric rows, the numeral strip and the
+ *   badges come from admin.css and organism.css; only what this page adds lives here. Every value
+ *   is a theme.css token, so the page flips with the theme.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial.
+ */
+
+.adm-ap-intro { margin: 0 0 .9rem; font-size: .88rem; line-height: 1.55; color: var(--text-dim); max-width: 76ch; }
+.adm-ap-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
+.adm-ap-note { margin: 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-ap .adm-mrow--last { border-bottom: 0; }
+.adm-ap .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-ap .og-strip b.adm-ap-coral { color: var(--accent); }
+
+/* ── search, filters ── */
+.adm-ap-tools { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; padding: 2px 0 10px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.adm-ap-find { flex: 1; min-width: 260px; display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 2px 2px 4px; }
+.adm-ap-find:focus-within { border-bottom-color: var(--accent); }
+.adm-ap-find svg { width: 16px; height: 16px; flex: none; stroke: var(--text); fill: none; stroke-width: 2.5; stroke-linecap: square; }
+.adm .adm-ap-find input[type="text"] { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .92rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-ap-find input[type="text"]::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm-ap-filter { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 0 0 1px; font-family: inherit; font-size: .78rem; font-weight: 700; color: var(--text-dim); cursor: pointer; }
+.adm-ap-filter:hover { color: var(--text); }
+.adm-ap-filter.on { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── the table: one row is one app ── */
+.adm-ap-scroll { overflow-x: auto; }
+.adm .adm-ap-tbl { width: 100%; border-collapse: collapse; font-size: .86rem; }
+.adm .adm-ap-tbl th {
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .72rem;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim);
+  text-align: left; padding: 0 12px 7px 0; border-bottom: 2px solid var(--text); white-space: nowrap;
+}
+.adm .adm-ap-tbl th.r { text-align: right; }
+.adm .adm-ap-tbl th button { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.adm .adm-ap-tbl th button:hover { color: var(--text); }
+.adm .adm-ap-tbl th .adm-ap-sorted { color: var(--accent); }
+.adm .adm-ap-tbl td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text); }
+.adm .adm-ap-tbl td.r { text-align: right; font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); white-space: nowrap; }
+.adm .adm-ap-tbl tr:hover td { background: none; }
+.adm-ap-row--down td { opacity: .55; }
+.adm-ap-name { display: block; font-weight: 700; line-height: 1.3; }
+.adm-ap-file { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: 2px; overflow-wrap: anywhere; }
+.adm-ap-chips { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+.adm-ap-owner { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.adm-ap-reason { display: block; margin-top: 5px; font-size: .76rem; line-height: 1.45; color: var(--text-dim); }
+.adm-ap-acts { display: flex; gap: 12px; align-items: center; justify-content: flex-end; white-space: nowrap; }
+
+/* The one irreversible action lives in here, not on the row. */
+.adm-ap-menuwrap { position: relative; display: inline-block; }
+.adm-ap-kebab { background: none; border: 0; border-radius: 0; padding: 0 2px; color: var(--text-dim); cursor: pointer; line-height: 0; }
+.adm-ap-kebab:hover { color: var(--text); }
+.adm-ap-kebab svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; }
+.adm-ap-menu { position: absolute; right: 0; top: 100%; z-index: 30; min-width: 230px; padding: 4px 0; background: var(--card-bg); border: 2px solid var(--text); box-shadow: 4px 4px 0 var(--sun); }
+.adm-ap-menu button { display: block; width: 100%; text-align: left; background: none; border: 0; border-radius: 0; padding: 7px 12px; font: inherit; font-size: .85rem; color: var(--text); cursor: pointer; }
+.adm-ap-menu button:hover { background: var(--bg-surface); }
+.adm-ap-menu button.adm-ap-danger { color: var(--accent); }
+.adm-ap-menu-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+/* ── the copy scan: the picture pair is the whole point ── */
+.adm-ap-scan { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 34px; align-items: start; }
+.adm-ap-hit { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 16px; align-items: baseline; padding: .55rem 0; border-bottom: 1px solid var(--border); font-size: .86rem; }
+.adm-ap-hit--last { border-bottom: 0; }
+.adm-ap-hit b { font-weight: 700; }
+.adm-ap-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 12px 0 0; }
+.adm-ap-shot { border: 2px solid var(--text); background: var(--card-bg); }
+.adm-ap-shot img { display: block; width: 100%; height: 150px; object-fit: cover; object-position: top center; border-bottom: 2px solid var(--text); background: var(--bg-surface); }
+.adm-ap-shot-none { display: flex; align-items: center; justify-content: center; height: 150px; border-bottom: 2px solid var(--text); font-family: var(--font-mono); font-size: .72rem; color: var(--text-muted); background: var(--bg-surface); }
+.adm-ap-shot-cap { display: block; padding: 7px 10px; font-size: .8rem; }
+.adm-ap-shot-cap span { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: 2px; overflow-wrap: anywhere; }
+
+/* ── the four states ── */
+.adm-ap-step { display: grid; grid-template-columns: 44px minmax(0, 1fr) minmax(190px, auto); gap: 0 19px; align-items: baseline; padding: .7rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text); }
+.adm-ap-step--last { border-bottom: 0; }
+.adm-ap-step b { font-weight: 700; }
+.adm-ap-stepn { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.5rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); color: var(--accent); }
+
+/* ── the two dialogs ── */
+.adm-ap-field { display: block; margin-top: 12px; }
+.adm-ap-field > span { display: block; font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+.adm .adm-ap-field input[type="text"] { width: 100%; box-sizing: border-box; }
+.adm-ap-dialog-acts { display: flex; gap: 16px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+
+@media (max-width: 1100px) {
+  .adm-ap-scan { grid-template-columns: 1fr; gap: 18px 0; }
+}
+
+@media (max-width: 860px) {
+  .adm-ap-step { grid-template-columns: 36px minmax(0, 1fr); gap: 4px 12px; }
+  .adm-ap-step > .adm-mval { grid-column: 2; text-align: left; }
+}
+
+/* A phone: the table becomes a stack of rows, which is the card layout the other direction drew.
+   Every cell keeps its heading through a data attribute rather than a second markup. */
+@media (max-width: 768px) {
+  .adm .adm-ap-tbl thead { display: none; }
+  .adm .adm-ap-tbl, .adm .adm-ap-tbl tbody, .adm .adm-ap-tbl tr, .adm .adm-ap-tbl td { display: block; width: 100%; }
+  .adm .adm-ap-tbl tr { border-bottom: 2px solid var(--text); padding: 8px 0; }
+  .adm .adm-ap-tbl td { border-bottom: 0; padding: 2px 0; }
+  .adm .adm-ap-tbl td.r { text-align: left; }
+  .adm .adm-ap-tbl td[data-label]::before { content: attr(data-label) ": "; font-family: var(--font-mono); font-size: .68rem; color: var(--text-muted); text-transform: uppercase; }
+  .adm-ap-acts { justify-content: flex-start; margin-top: 6px; }
+  .adm-ap-pair { grid-template-columns: 1fr; }
+  .adm-ap .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; }
+  .adm-ap .adm-mrow > :nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+  .adm-ap .adm-mrow > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .adm-ap .adm-mrow > :nth-child(3) { grid-column: 2; grid-row: 2; max-width: 11rem; white-space: normal; }
+}
