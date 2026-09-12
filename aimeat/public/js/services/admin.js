@@ -13,6 +13,8 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   v1.9.0 — 2026-09-12 — updateSchedulerJob sends PATCH, the verb its route is registered under;
+ *     it sent PUT, so switching a scheduled job on or off answered 404. pruneSchedulerLog added.
  *   v1.8.0 — 2026-09-12 — setHook: binding a hook from the page, which the PUT route has always
  *     allowed and no frontend function reached.
  *   v1.7.0 — 2026-09-11 — getIndexNowPlan and announceIndexNow: the whole site to IndexNow, and its plan.
@@ -369,8 +371,11 @@ export const reinstallExtension      = (name)           => apiPost(`/v1/admin/ex
 // ── Scheduler ──
 export const getSchedulerJobs    = ()              => apiGet('/v1/admin/scheduler/jobs');
 export const triggerSchedulerJob = (id)            => apiPost(`/v1/admin/scheduler/jobs/${encodeURIComponent(id)}/trigger`);
-export const updateSchedulerJob  = (id, updates)   => apiPut(`/v1/admin/scheduler/jobs/${encodeURIComponent(id)}`, updates);
+// PATCH, which is the verb the route is registered under. This sent PUT, so switching a job on or
+// off answered 404 and the checkbox on the page did nothing but spring back.
+export const updateSchedulerJob  = (id, updates)   => apiPatch(`/v1/admin/scheduler/jobs/${encodeURIComponent(id)}`, updates);
 export const deleteSchedulerJob  = (id)            => apiDelete(`/v1/admin/scheduler/jobs/${encodeURIComponent(id)}`);
+export const pruneSchedulerLog   = (days)          => apiDelete(`/v1/admin/scheduler/execution-log?olderThanDays=${encodeURIComponent(days)}`);
 export async function fetchSchedulerExecutionLog(params = {}) {
   const qs = new URLSearchParams();
   if (params.jobId) qs.set('jobId', params.jobId);
