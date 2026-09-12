@@ -33,7 +33,8 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
-import { createRegistrationInvitation, InvitationError } from '../services/invitations.js';
+import { InvitationError } from '../services/invitations.js';
+import { createRegistrationInvitation } from '../services/invitations-agent-door.js';
 import { registrationRefusal } from '../services/owner-provisioning.js';
 import { resolveAiClient } from '../services/ai-tool-setup.js';
 

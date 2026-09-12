@@ -8,6 +8,9 @@
  * @structure notificationDigestEmail
  * @usage const { subject, html, text } = notificationDigestEmail({ count, items, pageUrl }, locale);
  * @version-history
+ *   v1.1.0 — 2026-09-12 — Each line carries the time it arrived, in the recipient's own format and
+ *     clock. The timestamp had been passed in since the first version and never rendered, so a
+ *     message whose whole premise is "these arrived while you were away" said nothing about when.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import { wrapHtml, esc, emailText } from './email-templates.js';
@@ -42,13 +45,23 @@ const s = (locale: string | undefined, key: string): string => {
 
 export interface DigestEmailArgs {
   count: number;
-  items: Array<{ title: string; body?: string; at: string }>;
+  /**
+   * `atLabel` is the arrival time ALREADY WRITTEN in the recipient's own format and clock, the way
+   * every other template here takes its dates. A template has no storage and no recipient record,
+   * so it cannot look a preference up; the caller reads it with `displayPrefsFor` and writes it
+   * with `formatForPerson`. Absent means the caller had nothing worth printing, and the line
+   * simply carries no time — which is what EVERY line did until 2026-09-12, although `at` was
+   * being passed in and dropped.
+   */
+  items: Array<{ title: string; body?: string; at: string; atLabel?: string }>;
   pageUrl: string;
 }
 
 export function notificationDigestEmail(args: DigestEmailArgs, locale?: string): { subject: string; html: string; text: string } {
   const subject = s(locale, 'subject').replace('{n}', String(args.count));
-  const rows = args.items.map(i => `<li style="margin:0 0 10px;"><strong>${esc(i.title)}</strong>${i.body ? `<br><span style="color:#555;">${esc(i.body.split('\n')[0].slice(0, 200))}</span>` : ''}</li>`).join('\n');
+  const when = (i: DigestEmailArgs['items'][number]) =>
+    i.atLabel ? `<span style="color:#999;font-size:12px;"> · ${esc(i.atLabel)}</span>` : '';
+  const rows = args.items.map(i => `<li style="margin:0 0 10px;"><strong>${esc(i.title)}</strong>${when(i)}${i.body ? `<br><span style="color:#555;">${esc(i.body.split('\n')[0].slice(0, 200))}</span>` : ''}</li>`).join('\n');
   const html = wrapHtml(s(locale, 'heading'), `
     <p>${s(locale, 'intro')}</p>
     <ul style="padding-left:18px;font-size:14px;line-height:1.5;">${rows}</ul>
@@ -57,7 +70,7 @@ export function notificationDigestEmail(args: DigestEmailArgs, locale?: string):
   `, locale);
   const text = [
     s(locale, 'heading'), '', s(locale, 'intro'), '',
-    ...args.items.map(i => `- ${i.title}${i.body ? `: ${i.body.split('\n')[0].slice(0, 200)}` : ''}`),
+    ...args.items.map(i => `- ${i.title}${i.atLabel ? ` (${i.atLabel})` : ''}${i.body ? `: ${i.body.split('\n')[0].slice(0, 200)}` : ''}`),
     '', args.pageUrl, '', s(locale, 'why'), '', `-- ${emailText(locale, 'footer')}`,
   ].join('\n');
   return { subject, html, text };

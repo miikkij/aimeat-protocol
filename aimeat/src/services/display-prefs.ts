@@ -116,8 +116,16 @@ export async function displayPrefsFor(storage: Storage, who: string): Promise<Di
  * One ISO timestamp, written the way this person writes timestamps.
  *
  * For the surfaces that have no browser to ask — an email, a notification, a report the node
- * generates. A null region or timezone falls through to the runtime's own default, which on a
- * server is UTC and the C locale, and that is the honest answer when nobody has said otherwise.
+ * generates. A null region falls through to the runtime's own format, which is the honest answer
+ * when nobody has said otherwise.
+ *
+ * A NULL ZONE IS NAMED, and this is the one place the function adds something of its own. Leaving
+ * the zone to the runtime would print the HOST's clock — whatever the container happens to be set
+ * to — with nothing to say so, and a time that looks local and is not is worse than an ISO string.
+ * So an unchosen zone is UTC and the line says UTC. A zone the person did choose needs no marker:
+ * it is their own clock, and stamping it would only add noise to every line. The marker appears
+ * only when the options actually render a CLOCK; on a date alone it would be noise of a second
+ * kind, since nobody reads "19 September 2026 UTC" as anything but a typo.
  */
 export function formatForPerson(
   prefs: DisplayPrefs,
@@ -126,16 +134,24 @@ export function formatForPerson(
 ): string {
   const at = new Date(iso);
   if (!Number.isFinite(at.getTime())) return iso;
+  const chosen = prefs.timezone ?? null;
+  const showsAClock = !!(opts.timeStyle || opts.hour || opts.minute || opts.second || opts.timeZoneName);
+  const mark = chosen || !showsAClock ? '' : ' UTC';
   try {
-    return new Intl.DateTimeFormat(prefs.region ?? undefined, {
-      ...opts,
-      ...(prefs.timezone ? { timeZone: prefs.timezone } : {}),
-    }).format(at);
+    return new Intl.DateTimeFormat(prefs.region ?? undefined, { ...opts, timeZone: chosen ?? 'UTC' }).format(at) + mark;
   } catch (err) {
-    // A stored preference the runtime later refuses must not take the whole message down.
+    // A stored preference the runtime later refuses must not take the whole message down: fall back
+    // one step at a time rather than all the way to an ISO string, so a bad ZONE does not also cost
+    // the person the date format they asked for.
     logger.warn('formatForPerson: the stored preference did not format', {
       region: prefs.region, timezone: prefs.timezone, error: String(err),
     });
-    return at.toISOString();
+    try {
+      return new Intl.DateTimeFormat(prefs.region ?? undefined, { ...opts, timeZone: 'UTC' }).format(at)
+        + (showsAClock ? ' UTC' : '');
+    } catch {
+      // Both the region and the zone were refused. The timestamp itself is still worth sending.
+      return at.toISOString();
+    }
   }
 }
