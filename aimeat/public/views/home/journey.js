@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Choose useful work, connect an AI, copy the task and see the saved note at home.
  * @version-history
+ *   v1.1.0 — 2026-09-12 — The lines the chosen task governs (hint, connection, prompt, links, result)
+ *     sit in one .koti-journey-panel; the optional webpage stays outside it.
  *   v1.0.1 — 2026-09-09 — Reuse the home's fold choices and underlined actions.
  *   v1.0.0 — 2026-09-09 — Shared journey for new and returning owners; optional personal webpage.
  */
@@ -66,6 +68,7 @@ export function HomeJourney() {
           ${t('homeJourney.' + id)}
         </button>`)}
       </div>
+      <div class="koti-journey-panel">
       <p class="koti-hint">${t('homeJourney.' + action + 'Hint')}</p>
       <div class="koti-journey-status" role="status">
         <span>${t(connected ? 'homeJourney.connected' : 'homeJourney.notConnected')}</span>
@@ -105,6 +108,7 @@ export function HomeJourney() {
           <p class="koti-hint">${t('homeJourney.noteLifecycle')}</p>
         </div>`}
         ${copied && action === 'note' && ready && !saved && html`<p>${t('homeJourney.waiting')}</p>`}
+      </div>
       </div>
       <details class="koti-journey-details"><summary>${t('homeJourney.optionalPage')}</summary>
         <p>${t('homeJourney.optionalPageHint')}</p>
