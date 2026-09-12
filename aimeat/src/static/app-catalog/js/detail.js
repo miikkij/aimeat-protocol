@@ -8,6 +8,8 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-09-13 — The About and Promote headlines lose their inline flex styles: the headline is a
+ *     slab now (app-catalog-poster.css) and lays out its own words and doors.
  *   2026-09-13 — Opening an app clears the rail's pinned section (resetDetailRail).
  *   2026-09-12 — The sections sit beside an "On this page" rail (detail-rail.js): one numbered link
  *     per section, kept in view while the page scrolls.
@@ -456,9 +458,9 @@ function renderDetailView() {
   // server-only cutover so it isn't shown here anymore.
   var favBtn = '';
   var aboutHeader =
-    '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px">' +
+    '<h3>' +
       '<span>' + t('detail.about') + '</span>' +
-      '<span style="display:flex;align-items:center;gap:8px">' +
+      '<span class="dtl-h3-doors">' +
         favBtn +
         ((canEditAbout && !detailEditingAbout) ? dtlBtn(t('detail.editDetails'), 'window._launcher.detailAboutEdit()') : '') +
       '</span>' +
@@ -945,7 +947,7 @@ function buildPromoteSection(app) {
   var cur = getPromotion(ref) || {};
   var on = !!(cur.en || cur.fi);
   return '<div class="dtl-section" id="detail-promote">' +
-      '<h3 style="display:flex;align-items:center;gap:8px">' + t('promote.title') +
+      '<h3>' + t('promote.title') +
         (on ? ' <span class="dtl-badge-on">' + t('promote.on') + '</span>' : '') + '</h3>' +
       '<p class="dtl-desc">' + t('promote.hint') + '</p>' +
       '<label class="dtl-stat-label" for="detail-promo-en">' + t('promote.en') + '</label>' +

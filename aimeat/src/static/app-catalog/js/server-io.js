@@ -15,6 +15,8 @@
  *     the card menu can route their Delete here instead of dropping a page-session record.
  *   v2.2.0 — 2026-08-19 — loadPublishedApps reports when the first listing has finished — on success, on failure,
  *     and when there is no node to ask — so the grid can show a wait instead of an empty answer.
+ *   v2.3.0 — 2026-09-13 — The consents dialog's title is an h2, so it wears the dialog slab like
+ *     every other dialog title; its target line takes a class instead of an inline style.
  *   v2.0.0 — 2026-08-28 — The showroom skin: community and favourites render as rows (rows.js),
  *     favourites is a third view of its own, the header's sort order applies to both lists, and
  *     the rail reads getCommunityApps / getFavoriteServerApps for its tag counts.
@@ -467,8 +469,8 @@ function openConsents(owner, filename, appName) {
   ov.onclick = function (e) { if (e.target === ov) closeConsents(); };
   var box = document.createElement('div');
   box.className = 'modal';
-  box.innerHTML = '<div style="font-size:1.05rem;font-weight:700;margin-bottom:4px">' + t('consents.title') + '</div>'
-    + '<div style="font-size:.8rem;color:var(--text-muted);margin-bottom:12px">' + escapeHtml(appName || filename) + ' · ' + escapeHtml(target) + '</div>'
+  box.innerHTML = '<h2>' + t('consents.title') + '</h2>'
+    + '<div class="consents-target">' + escapeHtml(appName || filename) + ' · ' + escapeHtml(target) + '</div>'
     + '<div id="consents-body" style="font-size:.9rem;color:var(--text-muted)">' + t('common.loading') + '</div>'
     + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">'
     + '<button type="button" class="modal-btn secondary" onclick="window._launcher.closeConsents()">' + t('common.close') + '</button></div>';
