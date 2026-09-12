@@ -330,7 +330,10 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
   // GET /v1/work/inbox — pending work items for provider (agent or owner auth)
   router.get('/v1/work/inbox', requireAuth(), requireExternalPrincipal(), requireScope('work:read'), async (req, res) => {
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    // Not a federated session: the fan-out below resolves agents from the owner NAME, which for a
+    // visitor from another node is the local part of their own name and names the local namesake.
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
+      && !req.auth!.federated;
     let items: Awaited<ReturnType<typeof storage.listWorkByProvider>>;
     if (isOwnerSession) {
       // Owner sees work across all their agents — ONE providerGaii IN (…) query, not one per agent.
@@ -387,7 +390,9 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   // MUST be registered before /v1/work/:tc (a literal 'overview' would otherwise match the :tc capture).
   const workTabDb = createWorkTabService(storage);
   router.get('/v1/work/overview', requireAuth(), requireExternalPrincipal(), requireScope('work:read'), async (req, res) => {
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    // Same reason as /v1/work/inbox above: an owner-name fan-out is not a visitor's own work.
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
+      && !req.auth!.federated;
     const data = await workTabDb.overview(isOwnerSession, req.auth!.owner as string, req.auth!.sub as string);
     res.json(success(config.nodeId, data));
   });

@@ -193,7 +193,31 @@ export function agentGaiiFromIdentifier(identifier: string, owner: string, nodeI
     return identifier.includes('#') ? identifier : buildGAII(identifier, owner, nodeId);
 }
 
-export function resolveIdentity(auth: { sub: string; owner: string; roles: string[] }, nodeId: string): string {
+export function resolveIdentity(
+  auth: { sub: string; owner: string; roles: string[]; federated?: boolean; homeNode?: string },
+  nodeId: string,
+): string {
+  // A FEDERATED session is an account that lives on ANOTHER node, signed in here. Its `owner` claim
+  // is the LOCAL PART of that account's name (routes/ghii/register-login.ts), and its `node` claim is
+  // this node, because this node minted the session. Composing `${owner}@${nodeId}` from those two
+  // therefore does not name the visitor at all: it names whichever LOCAL account happens to share
+  // the name, and hands the visitor that person's identity.
+  //
+  // Measured on 2026-09-13 against a local account and a visitor of the same name (the suite is
+  // test/e2e-federated-namesake.ts): the visitor read the local account's PRIVATE memory, wrote into
+  // its namespace, and GET /v1/ghii/me answered with the local account's GHII. A peer node's
+  // operator can create any account name on their own node, so this was impersonation of any local
+  // account by name, from any peer whose federated sign-in an operator had switched on.
+  //
+  // The visitor's identity is their HOME GHII, which is what RFC v4.0 Core §31 means by acting
+  // "under their own identity", and it is the composition routes/memory/federation.ts has always
+  // used to address them (`${req.auth!.owner}@${homeNode}`). That name cannot collide with a local
+  // one: the suffix is a different node.
+  //
+  // A federated session whose token carries no homeNode gets a name that resolves to nothing rather
+  // than falling through to the local composition. There is no such mint today, and if one appears,
+  // it reads nobody's data instead of reading the namesake's.
+  if (auth.federated) return `${auth.owner}@${auth.homeNode ?? 'unknown-home-node'}`;
   const isOwnerSession = auth.roles.includes('owner') &&
     !auth.roles.includes('agent') && !auth.roles.includes('ecosystem');
   return isOwnerSession ? `${auth.owner}@${nodeId}` : auth.sub;

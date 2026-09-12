@@ -21,6 +21,12 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   v1.12.0 -- 2026-09-13 -- Every door here takes requireLocalSession(). A session signed in from
+ *     another node carries roles:['owner'] and the LOCAL PART of its home GHII as `owner`, so the
+ *     mailbox each door derived was whichever local account shares that name: a visitor read its
+ *     contact requests and address book, accepted and blocked contacts, and marked its messages read
+ *     (test/e2e-federated-namesake.ts, red against the previous source). A visitor has no mailbox on
+ *     this node; their messages are addressed to their home GHII.
  *   v1.11.0 -- 2026-09-12 -- The four mailbox reads (inbox, conversations, one thread, overview) take
  *     requireOwnerMailboxRead instead of requireRole('owner'): an app holding messages:read and an
  *     agent holding the new messages:read-as-owner read the owner's own mailbox, through the same
@@ -66,7 +72,7 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, DirectMessageRecord } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
-import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope, requireExternalPrincipal, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { conversationIdFor, messagePreview, deliveryTargetFor, isAddressableRecipient } from '../utils/messaging.js';
@@ -95,7 +101,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
   /* ── POST /v1/messages — send ── */
-  router.post('/v1/messages', requireAuth(), requireExternalPrincipal(), requireScope('messages:send'), async (req, res) => {
+  router.post('/v1/messages', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('messages:send'), async (req, res) => {
     const parsed = MessageSendSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -265,7 +271,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   });
 
   /* ── POST /v1/messages/broadcast — send one message to MANY (announcement / broadcast / poll) ── */
-  router.post('/v1/messages/broadcast', requireAuth(), requireExternalPrincipal(), requireScope('messages:send'), async (req, res) => {
+  router.post('/v1/messages/broadcast', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('messages:send'), async (req, res) => {
     const parsed = BroadcastSendSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -314,7 +320,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   });
 
   /* ── GET /v1/messages/broadcast/:id — aggregated results (recipients + delivery/poll answers) ── */
-  router.get('/v1/messages/broadcast/:id', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.get('/v1/messages/broadcast/:id', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const senderGhii = resolve(req);
     const broadcastId = req.params.id as string;
     const copies = (await storage.listDmsByBroadcast(broadcastId, senderGhii)).filter(m => m.direction === 'outbound');
@@ -356,7 +362,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   const readerOf = (req: Express.Request) => mailboxReaderOf(req.auth!, config.nodeId)!;
 
   /* ── GET /v1/messages/inbox — inbound from accepted contacts ── */
-  router.get('/v1/messages/inbox', requireAuth(), requireOwnerMailboxRead(config.nodeId), async (req, res) => {
+  router.get('/v1/messages/inbox', requireAuth(), requireLocalSession(), requireOwnerMailboxRead(config.nodeId), async (req, res) => {
     const unreadOnly = req.query.unread === 'true';
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
     const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string || '20', 10)));
@@ -371,7 +377,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
    * contacts hidden, internal own-owner peers skipped) is composed in MessagingDbService, which resolves
    * the agent fleet once and batches the owner + per-agent conversations read into ONE call (was one
    * listConversations per agent). Owner is server-derived → only this owner's agents (no cross-owner leak). */
-  router.get('/v1/messages/conversations', requireAuth(), requireOwnerMailboxRead(config.nodeId), async (req, res) => {
+  router.get('/v1/messages/conversations', requireAuth(), requireLocalSession(), requireOwnerMailboxRead(config.nodeId), async (req, res) => {
     const { conversations } = await readOwnerConversations(storage, readerOf(req));
     res.json(success(config.nodeId, { conversations }));
   });
@@ -380,7 +386,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
    * important-flags + tracked-responses + agents + groups), composed in one read scope by
    * MessagesInboxService. The individual list endpoints stay for interactive re-fetches.
    * `?unread=true` and `?limit=` narrow the conversation list for a chat; without them it is whole. ── */
-  router.get('/v1/messages/overview', requireAuth(), requireOwnerMailboxRead(config.nodeId), async (req, res) => {
+  router.get('/v1/messages/overview', requireAuth(), requireLocalSession(), requireOwnerMailboxRead(config.nodeId), async (req, res) => {
     const limitRaw = parseInt(String(req.query.limit ?? ''), 10);
     res.json(success(config.nodeId, await readOwnerOverview(storage, readerOf(req), {
       unreadOnly: req.query.unread === 'true',
@@ -391,7 +397,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   /* ── GET /v1/messages/conversations/:conversationId — full thread ──
    * `?agent=<gaii>` reads one of the owner's OWN agents' threads (the read-only "via <agent>" rows),
    * for the owner in person only; ownership is verified before anything is read under that identity. */
-  router.get('/v1/messages/conversations/:conversationId', requireAuth(), requireOwnerMailboxRead(config.nodeId), async (req, res) => {
+  router.get('/v1/messages/conversations/:conversationId', requireAuth(), requireLocalSession(), requireOwnerMailboxRead(config.nodeId), async (req, res) => {
     const conversationId = req.params.conversationId as string;
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
     const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string || '50', 10)));
@@ -413,7 +419,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   /* ── GET /v1/messages/agent-inbox — federated DMs ADDRESSED TO the calling agent ──
      A reply to an agent is delivered to its owner's mailbox (recipientGhii = the agent), so the agent
      can't see it via the owner-only inbox routes. This exposes those messages to the agent itself. */
-  router.get('/v1/messages/agent-inbox', requireAuth(), requireExternalPrincipal(), requireScope('messages:read'), async (req, res) => {
+  router.get('/v1/messages/agent-inbox', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('messages:read'), async (req, res) => {
     const agentGhii = resolve(req);
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
     const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string || '20', 10)));
@@ -422,7 +428,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   });
 
   /* ── GET /v1/messages/agent-thread/:conversationId — full DM thread as the calling agent sees it ── */
-  router.get('/v1/messages/agent-thread/:conversationId', requireAuth(), requireExternalPrincipal(), requireScope('messages:read'), async (req, res) => {
+  router.get('/v1/messages/agent-thread/:conversationId', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('messages:read'), async (req, res) => {
     const agentGhii = resolve(req);
     const conversationId = req.params.conversationId as string;
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
@@ -432,7 +438,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   });
 
   /* ── POST /v1/messages/conversations/:conversationId/read — mark thread read ── */
-  router.post('/v1/messages/conversations/:conversationId/read', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/messages/conversations/:conversationId/read', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const ghii = resolve(req);
     const conversationId = req.params.conversationId as string;
     // Capture unread inbound messages first so we can fire read receipts (local or cross-node).
@@ -450,7 +456,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   });
 
   /* ── PATCH /v1/messages/:id/read — mark one message read ── */
-  router.patch('/v1/messages/:id/read', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.patch('/v1/messages/:id/read', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const ghii = resolve(req);
     const id = req.params.id as string;
     const updated = await storage.markMessageRead(id, ghii);
@@ -474,7 +480,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
    * provider, because the second click on a button is not a request to be charged twice; `force: true`
    * re-runs it (a different model, or a bad first result).
    */
-  router.post('/v1/messages/:id/attachments/:attId/transcribe', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/messages/:id/attachments/:attId/transcribe', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const ghii = resolve(req);
     const id = req.params.id as string;
     const attId = req.params.attId as string;
@@ -564,7 +570,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   //
   // An owner session still passes untouched: requireScope lets an owner-role principal through
   // without looking at the word, which is the same admission requireRole('owner') gave it.
-  router.delete('/v1/messages/:id', requireAuth(), requireScope('messages:delete-as-owner'), async (req, res) => {
+  router.delete('/v1/messages/:id', requireAuth(), requireLocalSession(), requireScope('messages:delete-as-owner'), async (req, res) => {
     // The mailbox and the emit both live in services/direct-message-delete.ts, so this door and the
     // MCP tool cannot come to different answers about whose messages are being removed.
     const id = req.params.id as string;
@@ -577,7 +583,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   });
 
   /* ── GET /v1/messages/requests — pending first-contact requests ── */
-  router.get('/v1/messages/requests', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.get('/v1/messages/requests', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const ghii = resolve(req);
     const pending = await storage.listContacts(ghii, { state: 'pending' });
     // Each request's preview comes from its first message — fetch them all in ONE batched read (was
@@ -603,7 +609,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   });
 
   /* ── POST /v1/messages/requests/:contactId/accept — accept a contact ── */
-  router.post('/v1/messages/requests/:contactId/accept', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/messages/requests/:contactId/accept', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const ghii = resolve(req);
     const contactId = req.params.contactId as string;
     const contact = await storage.getContact(ghii, contactId);
@@ -629,7 +635,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   });
 
   /* ── POST /v1/messages/contacts/:contactId/block — block (or proactive hard block) ── */
-  router.post('/v1/messages/contacts/:contactId/block', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/messages/contacts/:contactId/block', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const ghii = resolve(req);
     const contactId = req.params.contactId as string;
     const updated = await storage.setContactState(ghii, contactId, 'blocked');
@@ -638,7 +644,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   });
 
   /* ── GET /v1/messages/contacts — list contacts + states ── */
-  router.get('/v1/messages/contacts', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.get('/v1/messages/contacts', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const ghii = resolve(req);
     const state = req.query.state as 'pending' | 'accepted' | 'blocked' | undefined;
     const contacts = await storage.listContacts(ghii, state ? { state } : undefined);

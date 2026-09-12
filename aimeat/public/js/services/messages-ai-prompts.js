@@ -38,6 +38,9 @@
  *   v1.3.0 -- 2026-07-19 -- buildConversationSummaryPrompt: distill a whole thread into a knowledge note
  *     (summary/decisions/open-questions/actions/ideas). One prompt, two deliveries — the server-side
  *     /v1/ai/complete summary AND the copy-paste "run it in my own chat" mode of the Notebook capture.
+ *   v1.4.0 -- 2026-09-13 -- Both MCP reply prompts open by reading the thread with
+ *     aimeat_dm_thread_as_owner (messages:read-as-owner), and fall back to the quoted text when that
+ *     tool is not granted. Additive: the research, draft, approval and send steps are unchanged.
  */
 
 export const MODES = { COPY: 'copy', MCP: 'mcp' };
@@ -93,6 +96,21 @@ function enrichmentBlock() {
   ].join('\n');
 }
 
+/* Step 1 of both MCP reply prompts: read the thread as the owner sees it before anything else. The
+ * quoted text is what the owner had on screen when they pressed the button; the thread may have moved
+ * on since, and a single-message prompt carries none of what came before. `aimeat_dm_thread` is named
+ * because it is the tool an agent reaches for first, and it reads the agent's OWN mailbox, where this
+ * conversation is not: it answers with zero messages and the reply is written blind. */
+function readThreadStep(conversationId, quoted) {
+  return [
+    `1. Read the whole thread first with \`aimeat_dm_thread_as_owner\` (conversation_id: "${conversationId || ''}"), so you`,
+    `   see every message in it as I do, including anything newer than ${quoted}. Reading marks nothing`,
+    '   as read. `aimeat_dm_thread` reads your own agent mailbox and shows none of this conversation.',
+    '   If `aimeat_dm_thread_as_owner` is not available, I have not granted "read my mailbox" yet; work',
+    `   from ${quoted}.`,
+  ].join('\n');
+}
+
 /**
  * @typedef {Object} ReplyMsg
  * @property {string} [direction]
@@ -135,12 +153,13 @@ export function buildConversationReplyPrompt({ peerGhii, subject, conversationId
       'agent identity) into this same thread.',
       '',
       '## Steps',
-      '1. Research before answering:',
+      readThreadStep(conversationId, 'the conversation below'),
+      '2. Research before answering:',
       enrichmentBlock().split('\n').map((l) => `   ${l}`).join('\n'),
-      '2. Draft a reply in the SAME language as the conversation, grounded in what you found, with links',
+      '3. Draft a reply in the SAME language as the conversation, grounded in what you found, with links',
       '   to the specific place (AIMEAT Pages, a workspace document, a URL) where useful.',
-      '3. Show me the draft and WAIT for my approval. Do not send anything until I say yes.',
-      `4. After I approve, send it AS ME with \`aimeat_dm_send_as_owner\` (to: "${peerGhii || ''}", conversation_id: "${conversationId || ''}", body: <the reply>) — this posts it from me, in this thread.`,
+      '4. Show me the draft and WAIT for my approval. Do not send anything until I say yes.',
+      `5. After I approve, send it AS ME with \`aimeat_dm_send_as_owner\` (to: "${peerGhii || ''}", conversation_id: "${conversationId || ''}", body: <the reply>) — this posts it from me, in this thread.`,
       '   If `aimeat_dm_send_as_owner` is not available, it means I have not granted the "reply as me"',
       '   permission yet — then just give me the finished reply and I will send it from the AIMEAT UI myself.',
       '   Do NOT use `aimeat_dm_send`: that sends under your own agent identity into a separate thread.',
@@ -228,12 +247,13 @@ export function buildMessageReplyPrompt({ peerGhii, subject, conversationId, mes
       one,
       '',
       '## Steps',
-      '1. Research before answering:',
+      readThreadStep(conversationId, 'the message above'),
+      '2. Research before answering:',
       enrichmentBlock().split('\n').map((l) => `   ${l}`).join('\n'),
-      '2. Draft a reply in the SAME language as the message, grounded in what you found, with links to the',
+      '3. Draft a reply in the SAME language as the message, grounded in what you found, with links to the',
       '   specific place (AIMEAT Pages, a workspace document, a URL) where useful.',
-      '3. Show me the draft and WAIT for my approval. Do not send anything until I say yes.',
-      `4. After I approve, send it AS ME with \`aimeat_dm_send_as_owner\` (to: "${peerGhii || ''}", conversation_id: "${conversationId || ''}", body: <the reply>) — this posts it from me, in this thread.`,
+      '4. Show me the draft and WAIT for my approval. Do not send anything until I say yes.',
+      `5. After I approve, send it AS ME with \`aimeat_dm_send_as_owner\` (to: "${peerGhii || ''}", conversation_id: "${conversationId || ''}", body: <the reply>) — this posts it from me, in this thread.`,
       '   If `aimeat_dm_send_as_owner` is not available, I have not granted the "reply as me" permission yet',
       '   — then just give me the finished reply and I will send it from the AIMEAT UI myself.',
       '   Do NOT use `aimeat_dm_send`: that sends under your own agent identity into a separate thread.',
