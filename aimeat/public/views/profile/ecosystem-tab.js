@@ -10,6 +10,7 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v3.2.0 — 2026-07-13 — Split for max-file-lines: MOVED sub-components/helpers into relative sibling
  *     modules (ecosystem-tab.helpers.js — pure helpers/consts; ecosystem-tab.automation.js —
  *     EcoScheduleLog/EcoStatusChip/EcoAgentPicker/EcoAutomationSection; ecosystem-tab.cards.js —
@@ -231,7 +232,7 @@ export default function EcosystemTab({ onStats, showToast }) {
   return html`
     <div class="pf-eco">
       <div class="pf-eco-head">
-        <h3 class="section-title">
+        <h3 class="poster-page-title">
           ${t('profile.ecosystem.title')} <span class="pf-eco-count-badge">${apps.length}</span>
         </h3>
       </div>

@@ -6,6 +6,7 @@
  *   Shows active sessions, allows creating new ones via prompt copy, and
  *   removing existing sessions.
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-03-16 — Initial chat sessions tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes; fix fallback strings
  *   v1.2.0 — 2026-06-02 — Component unification (#1): "Copy GAII" uses canonical
@@ -96,7 +97,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
 
   if (!chatSessions) return html`<${Spinner} text=${t('profile.chatSessions.loading')} />`;
   return html`
-    <div class="section-title">${t('profile.chatSessions.title')}</div>
+    <div class="poster-page-title">${t('profile.chatSessions.title')}</div>
     <div class="section-desc">${t('profile.chatSessions.desc')}</div>
 
     <div class="card mb-1">
@@ -126,7 +127,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
     ${chatSessions.length === 0
       ? html`<div class="empty">${t('profile.chatSessions.empty')}</div>`
       : html`
-        <div class="section-title cs-section-sub">${t('profile.chatSessions.startedByYou')}</div>
+        <div class="poster-section-title cs-section-sub">${t('profile.chatSessions.startedByYou')}</div>
         <div class="section-desc">${t('profile.chatSessions.startedByYouDesc')}</div>
         ${chatSessions.map(s => {
           const isExpanded = expanded === s.name;

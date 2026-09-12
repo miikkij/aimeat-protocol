@@ -5,6 +5,7 @@
  * @description Profile tab showing real-time node statistics including uptime,
  *   request counts, tunnel metrics, mailbox stats, and security counters.
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-03-16 — Initial node stats tab
  *   v1.1.0 — 2026-03-17 — Replace all inline styles with CSS classes
  *   v1.2.0 — 2026-07-17 — StatCard drops the inline style=color (+ hardcoded #8b5cf6/#3b82f6)
@@ -69,12 +70,12 @@ export default function NodeStatsTab() {
     } catch { setError(true); }
   }
 
-  if (error) return html`<div class="section-title">${t('profile.nodeStats.title')}</div>
+  if (error) return html`<div class="poster-page-title">${t('profile.nodeStats.title')}</div>
     <p class="text-meta">${t('profile.nodeStats.error')}</p>`;
   if (!data) return html`<${Spinner} text=${t('profile.nodeStats.loading')} />`;
   const s = data;
   return html`
-    <div class="section-title">${t('profile.nodeStats.title')}</div>
+    <div class="poster-page-title">${t('profile.nodeStats.title')}</div>
     <div class="section-desc">${t('profile.nodeStats.desc')}</div>
 
     <div class="stat-grid">

@@ -6,6 +6,7 @@
  *   grouped agent-card renderer (none / custom groups / mode / tag). Extracted from
  *   ../agents-tab.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.2.0 — 2026-09-06 — AgentSearch: one field above the board that narrows the board and the
  *     list together, on the agent's name or its GAII. Seventy-one agents on one account is past
  *     the point where scrolling finds anything, and the person looking already knows which one
@@ -124,7 +125,7 @@ export function ActiveTasksPanel({ activeTasksMap, agents, onOpen }) {
   return html`
     <div class="pf-agd-active">
       <div class="pf-agd-active-head">
-        <span class="section-title">${t('profile.agents.active.title')}${rows.length > 0 ? html` <span class="pf-agd-count-badge">(${rows.length})</span>` : ''}</span>
+        <span class="poster-section-title">${t('profile.agents.active.title')}${rows.length > 0 ? html` <span class="pf-agd-count-badge">(${rows.length})</span>` : ''}</span>
       </div>
       ${rows.length === 0
         ? html`<div class="pf-agd-active-empty">${t('profile.agents.active.empty')}</div>`

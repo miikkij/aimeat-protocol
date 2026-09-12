@@ -10,6 +10,7 @@
  * @structure PRIMARY_FIELD (const), Workspace
  * @usage import { Workspace } from '/views/profile/organisms/workspace.js';
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v2.0.0 — 2026-08-29 — The poster face (design canvas "AIMEAT Työtilan sivu", direction A). The render
  *     is one call into workspace/cover.js: the cover with its tables, the adaptive "New for you"
  *     section, the folds and the rail (or the tree, a home.prefs choice), and every space, panel and
@@ -652,7 +653,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     return html`
       <div class="pj-ws">
         ${back}
-        <div class="section-title">${(org.name || 'Organism')}</div>
+        <div class="poster-section-title">${(org.name || 'Organism')}</div>
         <div class="section-desc">${t('organisms.noWorkspace') || 'The workspace is created, but it is still empty. Give it a structure: the one-click project template covers goals, plans, deliverables and decisions, or describe below what this workspace is for and an AI designs the structure.'}</div>
         <button class="btn-primary" onClick=${setup} disabled=${busy || genBusy}>${busy ? '...' : (t('organisms.setupWorkspace') || 'Set up workspace (project template)')}</button>
         <${WorkspaceGenerator} orgId=${orgId} wsId=${wsId} showToast=${showToast}

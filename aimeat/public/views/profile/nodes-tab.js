@@ -5,6 +5,7 @@
  * @description Profile tab for managing personal node registrations, visibility,
  *   agent assignments, tunnel URLs, and mailbox status.
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-03-16 — Initial nodes tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
  *   v1.2.0 — 2026-06-02 — Component unification (#1): tunnel-URL copy button uses
@@ -92,7 +93,7 @@ function NodesList({ session, showToast, onStats }) {
   }
 
   return html`
-    <div class="section-title">${t('profile.nodes.title')}</div>
+    <div class="poster-section-title">${t('profile.nodes.title')}</div>
     <div class="section-desc">${t('profile.nodes.desc')}</div>
     <button class="btn-primary mb-1" onClick=${() => setShowNodeForm(!showNodeForm)}>${t('profile.nodes.addBtn')}</button>
     ${showNodeForm && html`<${NodeForm} onRegister=${handleRegister} onCancel=${() => setShowNodeForm(false)} />`}
@@ -194,7 +195,7 @@ function NodeForm({ onRegister, onCancel }) {
   const [gaiis, setGaiis] = useState('');
   return html`
     <div class="create-form">
-      <div class="section-title">${t('profile.nodes.addTitle')}</div>
+      <div class="poster-section-title">${t('profile.nodes.addTitle')}</div>
       <div class="form-row"><label>${t('profile.nodes.nodeIdLabel')}</label><input class="input-field" placeholder=${t('profile.nodes.nodeIdPlaceholder')} value=${nodeId} onInput=${e => setNodeId(e.target.value)} /></div>
       <div class="form-row"><label>${t('profile.nodes.visLabel')}</label>
         <div class="radio-row">

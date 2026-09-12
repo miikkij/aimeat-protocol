@@ -24,6 +24,7 @@
  *   import { ComplianceCard } from './compliance-card.js';
  *   html`<${ComplianceCard} />`
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-08-23 — BR-02, the per-owner slice.
  */
 import { h } from 'preact';
@@ -86,7 +87,7 @@ export function ComplianceCard() {
     <div class="pf-card pf-cmp">
       <button type="button" class="pf-cmp-head" onClick=${() => setCollapsed(c => !c)}
               aria-expanded=${!collapsed}>
-        <span class="section-title">${t('complianceMine.title')}</span>
+        <span class="poster-section-title">${t('complianceMine.title')}</span>
         <span class="pf-cmp-chevron">${collapsed ? '+' : '−'}</span>
       </button>
       <p class="section-desc">${t('complianceMine.desc')}</p>

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab showing federated peer nodes and their online/offline status.
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-03-16 — Initial federation tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
  *   v1.2.0 — 2026-06-02 — Component unification (#11): peer online/offline dot
@@ -43,11 +44,11 @@ export default function FederationTab() {
   useEffect(() => onLiveUpdate(['federation'], () => loadRef.current()), []);
 
   return html`
-    <div class="section-title">${t('profile.federation.title')}</div>
+    <div class="poster-page-title">${t('profile.federation.title')}</div>
     <div class="section-desc">${t('profile.federation.desc')}</div>
     ${!federation ? html`<${Spinner} text=${t('profile.federation.loading')} />`
       : federation.length === 0 ? html`<div class="empty">${t('profile.federation.empty')}</div>`
-      : html`<div class="section-title">${t('profile.federation.peers')}</div>
+      : html`<div class="poster-section-title">${t('profile.federation.peers')}</div>
           ${federation.map(p => {
             const alive = p.status === 'active' || p.alive;
             return html`

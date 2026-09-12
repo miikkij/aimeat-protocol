@@ -26,6 +26,7 @@
  *   - UsageTab (default) — fetch + render
  * @usage Registered in views/profile.js as the `usage` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-08-15 — House styles: .stat-grid/.stat-card and .seg/.seg-btn instead of a local
  *     clone; own classes renamed off the colliding pf-usage-* prefix.
  *   v1.0.0 — 2026-08-14 — Initial: the owner-facing usage reports.
@@ -162,7 +163,7 @@ export default function UsageTab() {
 
   return html`
     <div class="pf-ureport">
-      <h2 class="section-title">${t('profile.usage.title')}</h2>
+      <h2 class="poster-page-title">${t('profile.usage.title')}</h2>
       <p class="section-desc">${t('profile.usage.intro')}</p>
 
       <div class="pf-ureport-controls">
