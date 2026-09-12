@@ -1,0 +1,135 @@
+/* ── Admin Skills page, in the poster face ──
+ * @file admin-skills.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's skills page (design canvas "AIMEAT Admin Skills"): the headline over
+ *   what any federated installation can read, the search and five chips that make forty-seven
+ *   skills findable, one row per skill with its description clamped to two lines, the reading view
+ *   with the facts an operator decides on, and the writing view that reads a file's frontmatter
+ *   back. The sections, the numeral strip and the slab come from admin.css and organism.css; only
+ *   what this page adds lives here, and every value is a theme.css token.
+ * @version-history
+ *   v1.0.0 — 2026-09-12 — Initial. Replaces the card per skill and the bare textarea.
+ */
+
+.adm-sk-lead { margin: 0; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
+.adm-sk-note { margin: 18px 0 0; font-size: .8rem; line-height: 1.55; color: var(--text-dim); }
+.adm-sk .og-strip { margin-top: 0; margin-bottom: 1.6rem; }
+.adm-sk .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-sk-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 13px 2px 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+
+/* ── The headline beside the sentence that explains it ── */
+.adm-sk-top { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 0 48px; align-items: start; }
+.adm-sk-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+.adm-sk-hero { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3.2rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); color: var(--text); }
+.adm-sk-hero-sub { margin: .7rem 0 0; font-size: .88rem; line-height: 1.6; color: var(--text-dim); }
+
+/* ── Search and the five chips ── */
+.adm-sk-tools { display: flex; align-items: flex-end; gap: 28px; margin-top: 1.6rem; }
+.adm-sk-find { flex: 1 1 auto; display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 4px 2px 6px; }
+.adm-sk-find:focus-within { border-bottom-color: var(--accent); }
+.adm .adm-sk-find input[type="text"] { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .95rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-sk-find input[type="text"]::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm-sk-find svg { width: 16px; height: 16px; flex: none; stroke: var(--text); fill: none; stroke-width: 2.5; }
+.adm-sk-chips { display: flex; gap: 8px; align-items: center; padding-bottom: 6px; flex-wrap: wrap; }
+.adm .adm-sk-chip { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 10px; border: 2px solid var(--border); border-radius: 0; background: none; color: var(--text-dim); cursor: pointer; }
+.adm .adm-sk-chip:hover { border-color: var(--text); color: var(--text); }
+.adm .adm-sk-chip.on { background: var(--sun); border-color: var(--text); color: var(--on-sun); box-shadow: 0 2px 0 var(--text); }
+
+/* ── One skill: what it is, then what it says ── */
+.adm-sk-rows { border-top: 2px solid var(--text); margin-top: 16px; }
+.adm-sk-row { padding: 13px 0 14px; border-bottom: 1px solid var(--border); }
+.adm-sk-row:hover { background: var(--bg-surface); }
+.adm-sk-rtop { display: grid; grid-template-columns: minmax(0, 1fr) 260px 90px 186px; gap: 0 20px; align-items: baseline; }
+.adm-sk-name { font-weight: 700; font-size: .95rem; color: var(--text); overflow-wrap: anywhere; }
+.adm-sk-name i { font-style: normal; font-family: var(--font-mono); font-size: .74rem; font-weight: 400; color: var(--text-dim); margin-left: 8px; }
+.adm-sk-marks { display: flex; gap: 7px; flex-wrap: wrap; }
+.adm-sk-mark { font-family: var(--font-mono); font-size: .66rem; font-weight: 500; text-transform: uppercase; letter-spacing: .03em; padding: 1px 7px; border: 2px solid var(--border); color: var(--text-dim); white-space: nowrap; }
+.adm-sk-mark.is-open { border-color: var(--accent); color: var(--accent); }
+.adm-sk-mark.is-app { border-color: var(--text); color: var(--text); }
+.adm-sk-when { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); text-align: right; }
+.adm-sk-doors { display: flex; gap: 14px; justify-content: flex-end; align-items: baseline; }
+.adm .adm-sk-door { background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; padding: 0 0 1px; font: inherit; font-size: .78rem; font-weight: 700; color: var(--text); cursor: pointer; white-space: nowrap; }
+.adm .adm-sk-door:hover:enabled { color: var(--accent); border-bottom-color: var(--accent); }
+.adm .adm-sk-door.is-quiet { color: var(--text-dim); border-bottom-color: var(--border); }
+.adm .adm-sk-door:disabled { color: var(--text-dim); border-bottom-color: var(--border); cursor: default; }
+/* The description says WHEN to load the skill, so it keeps its own line; at a median of 371
+   characters it cannot keep all of them. */
+.adm-sk-desc { margin: 7px 0 0; font-size: .84rem; line-height: 1.55; color: var(--text-dim); max-width: 104ch;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ── One skill open, and the writing view: both are a page under the crumb ── */
+.adm-sk-page { padding-top: .2rem; }
+.adm-sk-crumb { font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); margin-bottom: 14px; }
+.adm .adm-sk-crumb button { background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; padding: 0 0 1px; font: inherit; font-size: .74rem; font-weight: 500; color: var(--text); cursor: pointer; }
+.adm .adm-sk-crumb button:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.adm-sk-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1.5rem; border-top: 3px solid var(--text); padding-top: 1.3rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
+.adm-sk-head h2 { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.9rem; line-height: 1.05; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text); }
+.adm-sk-head h2 i { font-style: normal; font-family: var(--font-mono); font-size: .8rem; font-weight: 400; color: var(--text-dim); margin-left: 12px; text-transform: none; letter-spacing: 0; overflow-wrap: anywhere; }
+.adm-sk-head h2 small { font-family: var(--font-mono); font-size: .8rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--accent); margin-left: .6rem; }
+
+.adm-sk-two { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0 48px; align-items: start; margin-top: 1.3rem; }
+.adm-sk-two--write { grid-template-columns: minmax(0, 1fr) 370px; gap: 0 44px; }
+.adm-sk-what { font-size: .95rem; line-height: 1.6; margin: 0 0 22px; color: var(--text); }
+.adm-sk-bodyhead { font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); border-bottom: 2px solid var(--text); padding-bottom: 6px; margin-bottom: 14px; }
+.adm-sk-md { font-size: .88rem; line-height: 1.6; color: var(--text); }
+.adm-sk-md h1, .adm-sk-md h2, .adm-sk-md h3, .adm-sk-md h4 { font-family: var(--font-poster); font-weight: var(--font-poster-weight); letter-spacing: var(--font-poster-tracking); text-transform: uppercase; margin: 20px 0 8px; }
+.adm-sk-md h1 { font-size: 1.3rem; } .adm-sk-md h2 { font-size: 1.15rem; } .adm-sk-md h3 { font-size: 1.02rem; } .adm-sk-md h4 { font-size: .94rem; }
+.adm-sk-md p, .adm-sk-md li { font-size: .88rem; line-height: 1.6; }
+.adm-sk-md code { font-family: var(--font-mono); font-size: .8rem; background: var(--bg-surface); padding: 1px 5px; }
+.adm-sk-md pre { border: 2px solid var(--text); background: var(--bg-surface); padding: 12px 14px; overflow-x: auto; }
+.adm-sk-md pre code { background: none; padding: 0; }
+.adm-sk-md table { border-collapse: collapse; width: 100%; font-size: .82rem; }
+.adm-sk-md th, .adm-sk-md td { border-bottom: 1px solid var(--border); padding: 6px 10px 6px 0; text-align: left; }
+
+/* ── The facts an operator decides on ── */
+.adm-sk-facts { border-top: 2px solid var(--text); margin: 0; }
+.adm-sk-fact { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 0 14px; padding: 10px 0; border-bottom: 1px solid var(--border); align-items: baseline; }
+.adm-sk-fact dt { font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); }
+.adm-sk-fact dd { margin: 0; font-size: .84rem; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.adm-sk-fact dd em { display: block; font-style: normal; font-size: .76rem; line-height: 1.45; color: var(--text-dim); margin-top: 3px; }
+.adm-sk-fact dd code { font-family: var(--font-mono); font-size: .78rem; }
+.adm-sk-vis { display: inline-flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.adm-sk-visnow { font-family: var(--font-mono); font-size: .68rem; font-weight: 500; text-transform: uppercase; padding: 2px 8px; border: 2px solid var(--text); background: var(--sun); color: var(--on-sun); }
+.adm .adm-sk-visgo { background: none; border: 0; border-bottom: 2px solid var(--border); border-radius: 0; padding: 0 0 1px; font: inherit; font-size: .78rem; font-weight: 700; color: var(--text-dim); cursor: pointer; }
+.adm .adm-sk-visgo:hover:enabled { color: var(--accent); border-bottom-color: var(--accent); }
+.adm .adm-sk-visgo:disabled { cursor: default; }
+
+/* ── The writing view ── */
+.adm .adm-sk-editor { width: 100%; border: 2px solid var(--text); border-radius: 0; background: var(--bg-surface); color: var(--text); padding: 16px 18px; font-family: var(--font-mono); font-size: .8rem; line-height: 1.75; resize: vertical; outline: none; box-shadow: none; }
+.adm .adm-sk-editor:focus { border-color: var(--accent); }
+.adm-sk-act { display: flex; align-items: center; gap: 20px; margin-top: 22px; flex-wrap: wrap; }
+.adm-sk-hint { font-size: .8rem; line-height: 1.5; color: var(--text-dim); }
+.adm-sk-prev { border: 2px solid var(--text); background: var(--bg-surface); padding: 15px 17px; }
+.adm-sk-prev-l { font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); margin-bottom: 11px; }
+.adm-sk-prev dl { margin: 0; }
+.adm-sk-prow { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 0 12px; padding: 7px 0; border-top: 1px solid var(--border); align-items: baseline; }
+.adm-sk-prow:first-of-type { border-top: 0; padding-top: 0; }
+.adm-sk-prow dt { font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); }
+.adm-sk-prow dd { margin: 0; font-size: .82rem; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+.adm-sk-prow dd b { font-family: var(--font-mono); font-weight: 500; }
+/* The dashed coral box is what this face uses to say a thing out loud. */
+.adm-sk-warn { margin: 14px 0 0; padding: 12px 14px; border: 3px dashed var(--accent); font-size: .82rem; line-height: 1.55; color: var(--text); }
+.adm-sk-warn b { display: block; font-weight: 800; margin-bottom: 4px; }
+.adm-sk-field { margin-top: 26px; }
+.adm-sk-choice { display: flex; gap: 10px; }
+.adm .adm-sk-opt { flex: 1 1 0; border: 2px solid var(--border); border-radius: 0; background: none; padding: 9px 12px; font: inherit; font-size: .8rem; line-height: 1.45; text-align: left; color: var(--text-dim); cursor: pointer; }
+.adm .adm-sk-opt.on { border-color: var(--text); color: var(--text); box-shadow: 0 2px 0 var(--text); }
+.adm .adm-sk-opt b { display: block; font-family: var(--font-mono); font-size: .72rem; font-weight: 500; text-transform: uppercase; margin-bottom: 4px; color: var(--text); }
+
+@media (max-width: 1100px) {
+  .adm-sk-rtop { grid-template-columns: minmax(0, 1fr) 220px 80px 170px; gap: 0 14px; }
+  .adm-sk-two, .adm-sk-two--write { grid-template-columns: minmax(0, 1fr) 300px; gap: 0 32px; }
+}
+
+@media (max-width: 900px) {
+  .adm-sk-top { grid-template-columns: 1fr; gap: 1.2rem; }
+  .adm-sk-hero { font-size: 2.3rem; }
+  .adm-sk-tools { flex-direction: column; align-items: stretch; gap: 14px; }
+  .adm-sk-rtop { grid-template-columns: minmax(0, 1fr); gap: 7px 0; }
+  .adm-sk-when { text-align: left; }
+  .adm-sk-doors { justify-content: flex-start; }
+  .adm-sk-two, .adm-sk-two--write { grid-template-columns: 1fr; gap: 1.8rem 0; }
+  .adm-sk-choice { flex-direction: column; }
+  .adm-sk-foot { flex-direction: column; gap: 6px; }
+}

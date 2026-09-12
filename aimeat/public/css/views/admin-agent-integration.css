@@ -1,275 +1,98 @@
-/**
+/* ── Admin Agent integration page, in the poster face ──
  * @file admin-agent-integration.css
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin Agent Integration tab styles (adm-agi-* prefix).
+ * @description The operator's agent-integration page (design canvas "AIMEAT Admin Agent
+ *   integration"): the unrecognised headline over the platform registry, the four onboarding
+ *   counters and the stuck runs with their two actions, the readiness bands over the runs that
+ *   finished, and one row per skill bundle. The sections, the numeral strip and the doors come
+ *   from admin.css and organism.css; only what this page adds lives here, and every value is a
+ *   theme.css token.
+ *
+ *   The registry table spans the page rather than sitting beside the headline: its patterns are
+ *   regular expressions, which have no spaces to break at, and a narrow cell sets one character
+ *   to a line.
  * @version-history
- *   v1.0.0 -- 2026-05-24 -- Initial creation for Governance Phase C
- *   v1.1.0 -- 2026-05-24 -- Fix M8 M9 F19 F20 F21 audit findings
+ *   v2.0.0 — 2026-09-12 — Rewritten for the poster face. The rounded cards, the bordered table,
+ *     the stat cards and the coloured pills of the classic shell are gone.
  *   v1.2.0 -- 2026-05-24 -- Add subsection, button row, notify button styles
+ *   v1.1.0 -- 2026-05-24 -- Fix M8 M9 F19 F20 F21 audit findings
+ *   v1.0.0 -- 2026-05-24 -- Initial creation for Governance Phase C
  */
 
-/* ── Section containers ── */
-.adm-agi-section {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px;
-  margin-bottom: 16px;
-}
+.adm-agi-lead { margin: 0 0 18px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
+.adm-agi-note { margin: 14px 0 0; font-size: .84rem; line-height: 1.55; color: var(--text-dim); max-width: 86ch; }
+.adm-agi .og-strip { margin-top: 0; margin-bottom: 1.4rem; }
+.adm-agi .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+/* Stuck is a subset of partway, not a fourth peer: it is counted in coral, not in ink. */
+.adm-agi .og-strip .adm-agi-cnt-stuck b { color: var(--accent); }
 
-.adm-agi-section-title {
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-dim);
-  margin-bottom: 14px;
-}
+/* ── 01 · the headline beside the sentence that explains it ── */
+.adm-agi-top { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 0 48px; align-items: start; }
+.adm-agi-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+.adm-agi-hero { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3.2rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); color: var(--text); }
+.adm-agi-hero-sub { margin: .7rem 0 0; font-size: .88rem; line-height: 1.6; color: var(--text-dim); }
 
-/* ── Stats row ── the bespoke .adm-agi-stat-* cards were removed; this tab now
-   renders its stat rows via the canonical <StatsGrid> (.adm-stat tones). ── */
+/* ── The registry rows ── */
+.adm-agi-rows { border-top: 2px solid var(--text); margin-top: 1.5rem; }
+.adm-agi-hrow, .adm-agi-row { display: grid; grid-template-columns: 250px 80px 170px minmax(220px, 1fr) 180px; gap: 0 22px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border); }
+.adm-agi-hrow { padding: 8px 0; border-bottom: 2px solid var(--text); font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); }
+.adm-agi-hrow .r, .adm-agi-row .r { text-align: right; }
+.adm-agi-row:hover { background: var(--bg-surface); }
+.adm-agi-name { font-weight: var(--font-poster-strong-weight); font-size: .92rem; color: var(--text); }
+.adm-agi-name em { display: block; font-style: normal; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--text-dim); margin-top: 2px; }
+.adm-agi-n { font-family: var(--font-mono); font-size: .88rem; color: var(--text); }
+.adm-agi-pct { font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); }
+/* A regular expression breaks between characters or not at all: give it room and let it wrap. */
+.adm-agi-mono { font-family: var(--font-mono); font-size: .78rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: break-word; word-break: normal; }
+.adm-agi-bar { height: 12px; background: var(--bg-surface); }
+.adm-agi-bar i { display: block; height: 100%; background: var(--sun); }
+.adm-agi-row.is-none .adm-agi-name, .adm-agi-row.is-none .adm-agi-n { color: var(--text-dim); }
+.adm-agi-row.is-none .adm-agi-bar { background: none; border-bottom: 1px solid var(--border); height: 1px; align-self: center; }
+.adm-agi-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 12px 2px 0; font-size: .78rem; color: var(--text-dim); }
+.adm-agi-foot-note { margin: 12px 0 0; font-size: .78rem; line-height: 1.55; color: var(--text-dim); max-width: 86ch; }
 
-/* ── Tables ── */
-.adm-agi-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.82rem;
-}
+/* ── 03 · the readiness bands ── */
+.adm-agi-rows--ready .adm-agi-hrow, .adm-agi-rows--ready .adm-agi-row { grid-template-columns: 260px 90px 80px minmax(0, 1fr); }
+/* The four bands run from the coolest to the loudest so the row reads as a ladder. */
+.adm-agi-bar[data-level="expert"] i { background: var(--accent); }
+.adm-agi-bar[data-level="full"] i { background: var(--sun); }
+.adm-agi-bar[data-level="standard"] i { background: var(--text); }
+.adm-agi-bar[data-level="basic"] i { background: var(--text-dim); }
 
-.adm-agi-table th {
-  text-align: left;
-  padding: 8px 10px;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-dim);
-  border-bottom: 1px solid var(--border);
-}
+/* ── 02 · one stuck run ── */
+.adm-agi-stuck { border-top: 2px solid var(--text); }
+.adm-agi-srow { display: grid; grid-template-columns: 280px minmax(0, 1fr) 220px; gap: 0 22px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--border); }
+.adm-agi-srow:last-child { border-bottom: 0; }
+.adm-agi-sname { font-family: var(--font-mono); font-size: .85rem; color: var(--text); overflow-wrap: anywhere; }
+.adm-agi-sstep { display: block; font-family: var(--font); font-size: .8rem; color: var(--text-dim); margin-top: 3px; }
+.adm-agi-swhy { font-size: .84rem; line-height: 1.5; color: var(--text); }
+.adm-agi-swhen { display: block; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); margin-top: 4px; }
+.adm-agi-serr { display: block; font-size: .78rem; font-weight: 600; line-height: 1.45; color: var(--accent); margin-top: 5px; }
+.adm-agi-sacts { display: flex; gap: 18px; justify-content: flex-end; align-items: baseline; }
+.adm .adm-agi-sdoor { background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; padding: 0 0 1px; font: inherit; font-size: .78rem; font-weight: 700; color: var(--text); cursor: pointer; white-space: nowrap; }
+.adm .adm-agi-sdoor:hover:enabled { color: var(--accent); border-bottom-color: var(--accent); }
+.adm .adm-agi-sdoor:disabled { color: var(--text-dim); border-bottom-color: var(--border); cursor: default; }
 
-.adm-agi-table td {
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-}
+/* ── 04 · the bundles ── */
+.adm-agi-brows { border-top: 2px solid var(--text); }
+.adm-agi-bhrow, .adm-agi-brow { display: grid; grid-template-columns: 260px 110px minmax(0, 1fr); gap: 0 22px; align-items: baseline; padding: 11px 0; border-bottom: 1px solid var(--border); }
+.adm-agi-bhrow { padding: 8px 0; border-bottom: 2px solid var(--text); font-family: var(--font-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); }
+.adm-agi-bhrow .r, .adm-agi-brow .r { text-align: right; }
+.adm-agi-bname { font-family: var(--font-mono); font-size: .85rem; color: var(--text); overflow-wrap: anywhere; }
+.adm-agi-bwhat { font-size: .84rem; line-height: 1.5; color: var(--text-dim); }
 
-.adm-agi-table tr:last-child td {
-  border-bottom: none;
-}
-
-/* ── Stuck agent highlight ── */
-.adm-agi-stuck {
-  background: color-mix(in srgb, var(--warning) 8%, transparent);
-  border-radius: 6px;
-  padding: 10px 14px;
-  margin-top: 8px;
-  font-size: 0.8rem;
-}
-
-.adm-agi-stuck-agent {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.adm-agi-stuck-agent:last-child {
-  border-bottom: none;
-}
-
-/* ── Readiness distribution bars ── */
-.adm-agi-readiness-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.adm-agi-readiness-level {
-  width: 70px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-
-.adm-agi-readiness-track {
-  flex: 1;
-  height: 8px;
-  background: var(--bg-dim);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.adm-agi-readiness-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s ease;
-}
-.adm-agi-readiness-fill[data-level="expert"] { background: var(--success); }
-.adm-agi-readiness-fill[data-level="full"] { background: var(--accent); }
-.adm-agi-readiness-fill[data-level="standard"] { background: var(--warning); }
-.adm-agi-readiness-fill[data-level="basic"] { background: var(--text-dim); }
-
-.adm-agi-readiness-count {
-  width: 30px;
-  text-align: right;
-  font-size: 0.75rem;
-  color: var(--text-dim);
-}
-
-/* ── Mono cell (platform ID, adapter) ── */
-.adm-agi-mono-sm {
-  font-size: 0.75rem;
-  font-family: var(--font-mono);
-}
-
-/* ── Section footer (totals line) ── */
-.adm-agi-footer {
-  margin-top: 8px;
-  font-size: 0.75rem;
-  color: var(--text-dim);
-}
-
-/* ── Stuck agent detail text ── */
-.adm-agi-stuck-name {
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.adm-agi-stuck-detail {
-  font-size: 0.72rem;
-  color: var(--text-dim);
-}
-
-/* ── Outdated highlight ── */
-.adm-agi-outdated {
-  color: var(--warning);
-  font-weight: 600;
-}
-
-.adm-agi-zero {
-  color: var(--text-dim);
-}
-
-/* ── Empty state text ── */
-.adm-agi-empty-text {
-  font-size: 0.8rem;
-  color: var(--text-dim);
-}
-
-/* ── Regenerate button ── */
-.adm-agi-regen-btn {
-  margin-top: 12px;
-}
-
-/* ── M8: Platform ID secondary text ── */
-.adm-agi-platform-id {
-  font-size: 0.7rem;
-  font-family: var(--font-mono);
-  color: var(--text-dim);
-  margin-top: 1px;
-}
-
-/* ── M9: Stuck agents sub-section title ── */
-.adm-agi-stuck-title {
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--text-dim);
-  margin-bottom: 6px;
-}
-
-/* ── F19: Add platform form ── */
-.adm-agi-add-btn {
-  margin-top: 12px;
-}
-
-.adm-agi-add-form {
-  margin-top: 12px;
-  padding: 14px;
-  background: var(--bg-dim);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.adm-agi-add-form-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.adm-agi-add-form-label {
-  width: 130px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-dim);
-  flex-shrink: 0;
-}
-
-.adm-agi-add-form-input {
-  flex: 1;
-  padding: 6px 10px;
-  font-size: 0.8rem;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-}
-
-.adm-agi-add-form-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.adm-agi-add-form-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-/* ── F20: Stuck agent layout with suggestion + actions ── */
-.adm-agi-stuck-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.adm-agi-stuck-suggestion {
-  font-size: 0.72rem;
-  font-style: italic;
-  color: var(--warning);
-  margin-top: 3px;
-}
-
-.adm-agi-stuck-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-  align-items: center;
-}
-
-.adm-agi-stuck-btn {
-  font-size: 0.7rem;
-  padding: 4px 10px;
-}
-
-/* ── Subsection (nested inside a section, e.g. readiness inside onboarding) ── */
-.adm-agi-subsection {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-}
-
-/* ── Button row (side-by-side action buttons) ── */
-.adm-agi-btn-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-/* ── Per-row notify button ── */
-.adm-agi-notify-btn {
-  font-size: 0.7rem;
-  padding: 3px 10px;
+@media (max-width: 900px) {
+  .adm-agi-top { grid-template-columns: 1fr; gap: 1.2rem; }
+  .adm-agi-hero { font-size: 2.4rem; }
+  .adm-agi-hrow, .adm-agi-bhrow { display: none; }
+  .adm-agi-row { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
+  .adm-agi-rows--ready .adm-agi-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .adm-agi-mono, .adm-agi-bar, .adm-agi-pct { grid-column: 1 / -1; }
+  .adm-agi-pct { text-align: left; }
+  .adm-agi-bar { height: 10px; margin-top: 3px; }
+  .adm-agi-srow { grid-template-columns: 1fr; gap: 8px 0; }
+  .adm-agi-sacts { justify-content: flex-start; }
+  .adm-agi-brow { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
+  .adm-agi-bwhat { grid-column: 1 / -1; }
 }
