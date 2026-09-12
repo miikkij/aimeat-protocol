@@ -53,7 +53,9 @@ const pct = (share) => Math.round((Number(share) || 0) * 100);
 
 /** One model, or the folded tail. `tail` greys the bar: it is many models, not one. */
 function ModelRow({ name, why, cost, calls, unpriced, share, widest, tail, last }) {
-  const width = widest > 0 ? Math.max(2, Math.round((cost / widest) * 100)) : 0;
+  // A floor, but only above zero: `Math.max(2, …)` on its own drew a visible bar for a row that
+  // spent nothing, which is the same lie as a chart drawing axes over no data.
+  const width = cost > 0 && widest > 0 ? Math.max(2, Math.round((cost / widest) * 100)) : 0;
   return html`
     <div class="adm-us-brow ${last ? 'adm-us-brow--last' : ''}">
       <span>${tail ? html`<b>${name}</b>` : html`<span class="adm-us-mono">${name}</span>`}
