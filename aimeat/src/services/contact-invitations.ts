@@ -129,6 +129,10 @@ export async function createContactInvitation(
   if (emailSvc?.enabled) {
     const { subject, html, text } = contactInviteEmail({
       inviterName, acceptUrl, message,
+      // Deliberately NOT formatForPerson, and the refusal above is the reason: this door answers
+      // ALREADY_HERE to any address with a verified account, so by the time a message is built the
+      // recipient provably has no account here and therefore no stored preference. The ISO date is
+      // the one form that is unambiguous to a reader we know nothing about.
       expiresLabel: invitation.expiresAt.slice(0, 10),
     }, input.locale);
     emailSent = await emailSvc.sendRaw(cleanEmail, subject, html, text);

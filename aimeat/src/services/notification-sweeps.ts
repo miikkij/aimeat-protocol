@@ -12,6 +12,8 @@
  * @structure sweepHeldPushes · sweepNotificationDigests · listOwnerNotifications (shared read)
  * @usage setInterval(() => sweepHeldPushes(storage, config, push), 5 * 60_000)
  * @version-history
+ *   v1.1.0 — 2026-09-12 — The digest says WHEN each notification arrived, in the recipient's own
+ *     regional format and their own clock, read from the record this sweep already holds.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Ilmoitusten sivu", direction A).
  */
 import type { AimeatConfig } from '../config.js';
@@ -21,6 +23,7 @@ import { NOTIF_PREFIX, notifLinkToUrl } from './notify.js';
 import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, writeNotificationSettings, appendMailLog, type NotificationSettings } from './notification-settings.js';
 import { getActiveEmailService } from './email.js';
 import { notificationDigestEmail } from './email-templates-digest.js';
+import { formatForPerson, type DisplayPrefs } from './display-prefs.js';
 import { logger } from '../utils/logger.js';
 
 export interface StoredNotif { id: string; type: string; title: string; body: string; link: string; read: boolean; held?: boolean; createdAt: string }
@@ -94,11 +97,17 @@ export async function sweepNotificationDigests(storage: Storage, config: AimeatC
         .map(n => n.value)
         .filter(n => !n.read && new Date(n.createdAt).getTime() <= cutoff && new Date(n.createdAt).getTime() > since);
       if (!due.length) continue;
+      // The recipient's own format and clock. `g` is the whole record, so this costs no second
+      // read; the digest went out with no time at all until 2026-09-12 for want of these two lines.
+      const prefs: DisplayPrefs = { locale: g.locale ?? null, region: g.region ?? null, timezone: g.timezone ?? null };
       const { subject, html, text } = notificationDigestEmail({
         count: due.length,
-        items: due.slice(0, 20).map(n => ({ title: n.title, body: n.body, at: n.createdAt })),
+        items: due.slice(0, 20).map(n => ({
+          title: n.title, body: n.body, at: n.createdAt,
+          atLabel: formatForPerson(prefs, n.createdAt, { dateStyle: 'short', timeStyle: 'short' }),
+        })),
         pageUrl: `${config.baseUrl}/v1/profile?tab=notifications`,
-      }, (g as { locale?: string }).locale);
+      }, prefs.locale ?? undefined);
       const ok = await email.sendRaw(g.notificationEmail, subject, html, text);
       if (ok) {
         sent++;
