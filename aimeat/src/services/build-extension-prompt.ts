@@ -18,6 +18,9 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.5.1 — 2026-09-13 — ADDITIVE: an action always needs a signed-in caller (public_access does
+ *     nothing; serve public data through a public key and ?soft=1), and a workflow signal needs
+ *     result_to_key to see an action's result. Two appdev pitfalls carried these and the prompt did not.
  *   v1.5.0 — 2026-09-13 — The ctx table rewritten against the contract, the guest object and the
  *     roads, after four appdev pitfalls turned out to be this table being wrong. It gains the members
  *     it never had (memory.getVersioned, datapackage, ai.start, buy, wallet, consent, trust,
@@ -134,6 +137,13 @@ function sandboxSection(): string {
     '',
     'To show something to the extension\'s owner and nobody else, keep it private and serve it through',
     'an action that compares `ctx.extension.owner` with `ctx.caller.owner`.',
+    '',
+    'Every action needs a signed-in caller; `config.public_access` in a manifest does nothing. To serve',
+    'data to visitors without an account, write it with `{ visibility: \'public\' }` and read it from the',
+    'browser with `GET /v1/memory/ext:{name}/{key}?soft=1` (null for a key that does not exist yet).',
+    'A workflow signal reads the OWNER\'s namespace, so it cannot see what an action wrote to',
+    '`ext:{name}`: declare `result_to_key` on the extension step, and the engine writes the action\'s',
+    'return value there for the signal to read.',
     '',
     '### Which runs get which members',
     '',

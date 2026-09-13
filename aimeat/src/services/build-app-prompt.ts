@@ -15,6 +15,8 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-09-13 — ADDITIVE, one sentence before Design Guidelines: a library that uses eval() or new
+ *     Function() fails under the app CSP (appdev pitfall app/vendor-lib-eval-vs-app-csp).
  *   2026-09-13 — CORRECTION (the developer's UNDECLARED_SPACE decision): the heal step's first two
  *     sentences said a record written to a space an older manifest does not declare is stored and
  *     listed by nothing, with no error. The node now refuses that write with 422 UNDECLARED_SPACE and
@@ -537,6 +539,7 @@ function composeAppPrompt(
   body += 'Pass { app: "my-app.html" } (your published filename) explicitly — on per-app subdomain origins the filename cannot be derived from the URL (alternatively add <meta name="aimeat-app" content="my-app.html"> to the page). publish() requires a signed-in session (aimeat-auth), and the node serves ONLY the record written by the APP OWNER — a visitor\'s publish lands in their own namespace and is never served, so it is safe to call on every save.\n\n';
 
   // Design guidelines
+  body += 'A third-party library that runs `eval()` or `new Function()` (spreadsheet formula engines, some template libraries) fails silently here: the app origin\'s Content-Security-Policy has no `unsafe-eval`. Turn its eval path off (Jspreadsheet: `parseFormulas: false`) or pick another library.\n\n';
   body += '### Design Guidelines\n';
   body += 'For rich UIs use the self-hosted styling stack (the same one the app-shell templates use) instead of hand-rolling a CSS framework: the `styling` capability pack — daisyUI v5 components + Tailwind v4 utilities + the AIMEAT daisyUI theme + the cortex theme bridge, all loaded from this node (see the capability packs list above). For minimal pages plain CSS variables are fine.\n';
   body += '**The brand is a token, never a hex.** The theme sets `--color-primary` to the AIMEAT coral (#E8564A light, #FF6F62 dark, each with the right readable text colour on top). Write `btn-primary`, `text-primary`, `border-primary` and the brand appears correctly in BOTH modes and under EVERY palette. If you find yourself typing a brand hex into an app, you are creating something that will be wrong the moment the user switches look.\n';
