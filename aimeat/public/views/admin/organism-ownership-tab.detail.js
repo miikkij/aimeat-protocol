@@ -13,6 +13,7 @@
  * @structure OrganismDetail({ row, ownership, owners, busy, onClose, onAdd })
  * @usage imported by organism-ownership-tab.js
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose the shared poster detail heading.
  *   v1.0.0 — 2026-09-12 — Initial (the Organism ownership page in the poster face).
  */
 import { h } from 'preact';
@@ -61,7 +62,7 @@ export default function OrganismDetail({ row, ownership, owners, busy, onClose, 
   return html`
     <section class="og-sec adm-oo-detail">
       <div class="og-sec-h">
-        <h2>${row.name}<small>03</small></h2>
+        <h2 class="poster-section-title">${row.name}<small>03</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${onClose}>${O('close')}</button>
         </div>
