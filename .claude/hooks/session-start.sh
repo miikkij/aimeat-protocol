@@ -32,8 +32,9 @@ case "$toplevel" in
     if [ "$common" = ".git" ] || [ "$common" = "$toplevel/.git" ]; then
       printf 'Worktree: THE SHARED CHECKOUT (%s).\n' "$toplevel"
       printf '  That one is the developer'"'"'s. Before editing anything:\n'
-      printf '    git worktree add .worktrees/<session> origin/main && cd .worktrees/<session> && pnpm install\n'
-      printf '  then copy aimeat/.env.test.* into it.\n'
+      printf '    git worktree add .worktrees/<session> origin/main\n'
+      printf '    cd .worktrees/<session>/aimeat && pnpm install && pnpm test:env:init\n'
+      printf '  (a root install does not populate aimeat/, and .env.test.* are never copied by hand).\n'
     else
       printf 'Worktree: %s\n' "$toplevel"
     fi
@@ -44,8 +45,11 @@ printf '\nShared checkout right now:\n'
 git -C "${toplevel:-.}" log --oneline -1 2>/dev/null | sed 's/^/  HEAD  /'
 dirty=$(git -C "${toplevel:-.}" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
 printf '  %s uncommitted path(s)\n' "$dirty"
-printf '  worktrees:\n'
-git -C "${toplevel:-.}" worktree list 2>/dev/null | sed 's/^/    /'
+# A count, not the list: the list was two thirds of this output (36 lines on 2026-09-13) and
+# grew with every worktree left behind, while who works where is the claims board's to say.
+wt_all=$(git -C "${toplevel:-.}" worktree list --porcelain 2>/dev/null | grep -c '^worktree ')
+wt_repo=$(git -C "${toplevel:-.}" worktree list --porcelain 2>/dev/null | grep '^worktree ' | grep -c '/\.worktrees/')
+printf '  %s worktrees, %s of them under .worktrees/ (git worktree list names them; the claims board says whose)\n' "$wt_all" "$wt_repo"
 
 cat <<'RITUAL'
 

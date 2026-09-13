@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.2.0 (2026-09-13): Hold the always-loaded instruction size and every path rule's globs.
  *  - 1.1.0 (2026-09-13): Refuse new copies of the shared poster shapes.
  *  - 1.0.0 (2026-09-08): A4: share the CI check registry with audit consumers.
  */
@@ -44,6 +45,7 @@ export const FAST_CHECKS = [
     { script: 'check:imports-tracked', label: 'Every relative import points at a tracked file' },
     { script: 'check:copied-logic', label: 'No decision is written out on two sides' },
     { script: 'check:doc-counts -- --strict', label: 'The counts this project states about itself' },
+    { script: 'check:instructions', label: 'What every session loads stays small, and every path rule names real files' },
     { script: 'check:scope-parity', label: 'One permission word, every door' },
     { script: 'check:liaison-surface', label: 'Published surfaces match, and neither needs a release' },
     // The whole-tree silent-exception pass, which until 2026-09-13 ran nowhere: the hook sees only
