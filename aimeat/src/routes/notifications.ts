@@ -17,6 +17,10 @@
  *   - DELETE /v1/notifications          — clear notifications (all, or a given { ids }) — the bell's "Clear all"
  * @usage app.use(notificationsRouter(config, storage));
  * @version-history
+ *   v1.6.0 -- 2026-09-13 -- The settings and senders doors answer 503 SETTINGS_UNAVAILABLE when the
+ *     record cannot be read, instead of defaults the page would have saved over the owner's real
+ *     settings; PUT writes through updateNotificationSettings, which keeps the digest bookmark from
+ *     the record as it is when writing (docs/pitfalls.md §84).
  *   v1.4.0 -- 2026-08-30 -- The Notifications page in the poster face: rows carry their source and
  *     group (derived for older rows), the list takes ?limit and ?unread, the owner's settings have
  *     their own GET/PUT, and /senders says who may notify the owner. POST is the shared service call.
@@ -32,7 +36,7 @@
  *   v1.2.0 -- 2026-07-18 -- Notifications carry inline actions[] (server-set only); the public
  *     create route rejects a client-supplied actions field to keep reply/api actions trusted.
  */
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
@@ -41,10 +45,11 @@ import { NOTIF_PREFIX, type NotifAction } from '../services/notify.js';
 import { emitChange } from '../services/event-bus.js';
 import { createPrincipalNotification, NotificationCreateError } from '../services/notification-create.js';
 import {
-  readNotificationSettings, writeNotificationSettings, normalizeSettings, sourceOf, groupOfType, senderKey, prefsFor, readMailLog,
-  NOTIF_GROUPS, type NotifSource,
+  readNotificationSettingsStrict, updateNotificationSettings, normalizeSettings, sourceOf, groupOfType, senderKey, prefsFor, readMailLog,
+  NOTIF_GROUPS, type NotifSource, type NotificationSettings,
 } from '../services/notification-settings.js';
 import { listOwnerNotifications } from '../services/notification-sweeps.js';
+import { logger } from '../utils/logger.js';
 
 interface NotifValue { id: string; type: string; title: string; body: string; link: string; actions?: NotifAction[]; read: boolean; createdAt: string; source?: NotifSource; i18n?: unknown; held?: boolean }
 
@@ -80,9 +85,21 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
     res.json(success(config.nodeId, { notifications: list, unread, total: mine.length }));
   });
 
+  /**
+   * The settings could not be read, so neither shown nor saved. Defaults in their place would look
+   * exactly like the owner's record to the page, which saves the whole record: one toggle would have
+   * erased every muted sender and the quiet hours.
+   */
+  const unavailable = (res: Response, err: unknown) => {
+    logger.warn('notification settings: storage read failed, refusing rather than serving defaults', { error: String(err) });
+    res.status(503).json(error(config.nodeId, 'SETTINGS_UNAVAILABLE', 'Your notification settings could not be read just now, so nothing was shown or saved. Try again in a moment.'));
+  };
+
   /* ── GET /v1/notifications/settings — what the owner decided (defaults when nothing was written) ── */
   router.get('/v1/notifications/settings', requireAuth(), requireRole('owner'), async (req, res) => {
-    res.json(success(config.nodeId, { settings: await readNotificationSettings(storage, ownerGhii(req)), groups: NOTIF_GROUPS }));
+    try {
+      res.json(success(config.nodeId, { settings: await readNotificationSettingsStrict(storage, ownerGhii(req)), groups: NOTIF_GROUPS }));
+    } catch (err) { unavailable(res, err); }
   });
 
   /* ── PUT /v1/notifications/settings — the whole record; unknown fields dropped, bad values defaulted.
@@ -91,11 +108,13 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
   router.put('/v1/notifications/settings', requireAuth(), requireRole('owner'), async (req, res) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
     const incoming = normalizeSettings(body.settings ?? body);
-    const current = await readNotificationSettings(storage, ownerGhii(req));
-    // The digest bookkeeping is the node's, not the client's: keep what the sweep wrote.
-    const saved = await writeNotificationSettings(storage, ownerGhii(req), { ...incoming, lastDigestAt: current.lastDigestAt });
-    emitChange('notifications', ownerGhii(req));
-    res.json(success(config.nodeId, { settings: saved }));
+    try {
+      // The digest bookkeeping is the node's, not the client's: keep what the sweep wrote, read from
+      // the record as it is at the moment of writing and never from a read that fell back to defaults.
+      const saved = await updateNotificationSettings(storage, ownerGhii(req), current => ({ ...incoming, lastDigestAt: current.lastDigestAt }));
+      emitChange('notifications', ownerGhii(req));
+      res.json(success(config.nodeId, { settings: saved }));
+    } catch (err) { unavailable(res, err); }
   });
 
   /* ── GET /v1/notifications/mail — the last emails the node sent to the owner's own address: what
@@ -112,7 +131,9 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
   router.get('/v1/notifications/senders', requireAuth(), requireRole('owner'), async (req, res) => {
     const ghii = ownerGhii(req);
     const owner = req.auth!.owner as string;
-    const settings = await readNotificationSettings(storage, ghii);
+    // The page edits from what this door returns, so it gets the record or a refusal, never defaults.
+    let settings: NotificationSettings;
+    try { settings = await readNotificationSettingsStrict(storage, ghii); } catch (err) { unavailable(res, err); return; }
     const since = Date.now() - 30 * 864e5;
     const rows = (await listOwnerNotifications(storage, ghii)).map(n => n.value);
     const stat = new Map<string, { count: number; last_at: string | null }>();

@@ -11,6 +11,9 @@
  * @structure EmailTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'email'.
  * @version-history
+ *   v2.1.0 — 2026-09-13 — The letters' switches save nothing while the notification settings are not
+ *     loaded: the save is the whole record, and one built from defaults erased the owner's muted
+ *     senders and quiet hours (docs/pitfalls.md §84).
  *   v2.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Sähköpostin sivu", direction A).
  *     The page says what the address is for, brings the mail connections here from the Access
  *     page, shows what left through the node and what the node sent, and makes the node's own
@@ -156,6 +159,9 @@ export default function EmailTab({ showToast }) {
 
   /* ── the letters ── */
   async function saveSettings(next) {
+    // The same whole notification-settings record the Notifications page saves: without the owner's
+    // record loaded, `next` was built from defaults and would erase their muted senders and quiet hours.
+    if (!settings) { showToast?.(t('notifpage.settingsUnavailable'), true); return; }
     setBusy(true);
     try {
       const saved = await notif.putSettings(next);

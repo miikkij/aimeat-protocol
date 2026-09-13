@@ -7640,6 +7640,7 @@
   "notifpage.save": "Save",
   "notifpage.saved": "Saved.",
   "notifpage.saveFailed": "The settings could not be saved: try again in a moment.",
+  "notifpage.settingsUnavailable": "Your notification settings did not load, so nothing was saved. Reload the page and try again.",
   "notifpage.howTitle": "How a notification is born",
   "notifpage.howSub": "for an app's builder · an extension · an agent · in a chat",
   "notifpage.how.appK": "for an app's builder",

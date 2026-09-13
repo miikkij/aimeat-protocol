@@ -32225,6 +32225,7 @@ paths:
         '200': { description: "{ settings, groups }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not an owner session }
+        '503': { description: "SETTINGS_UNAVAILABLE: the record could not be read. Never answered with defaults, which a client editing the settings would save over the real record." }
     put:
       operationId: putNotificationSettings
       summary: Replace the owner's notification settings
@@ -32266,6 +32267,7 @@ paths:
         '200': { description: "{ settings }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not an owner session }
+        '503': { description: "SETTINGS_UNAVAILABLE: the record could not be read immediately before writing, so nothing was written." }
 
   /v1/notifications/mail:
     get:
@@ -32296,6 +32298,7 @@ paths:
         '200': { description: "{ groups: [{ group, count, last_at, prefs }], senders: [{ kind, id, name, key, count, last_at, prefs, grant_id?, granted_at?, last_seen? }], settings }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not an owner session }
+        '503': { description: "SETTINGS_UNAVAILABLE: the owner's settings could not be read, so the decision per sender cannot be shown truthfully." }
 
   /v1/notifications/read:
     post:

@@ -21,6 +21,8 @@
  *   readInboxOrganize · archiveConversations · updateInboxOrganize · organizeView
  * @usage const rec = await readInboxOrganize(storage, ghii); await archiveConversations(storage, ghii, ids, false);
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- The per-owner write queue moved to utils/serial-by-key.ts, shared with the
+ *     notification settings record. Behaviour unchanged.
  *   v1.0.0 -- 2026-09-13 -- Initial, with the Messages list's sections, rules and archive.
  */
 import { randomUUID } from 'node:crypto';
@@ -28,6 +30,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { InboxOrganizePatch, InboxRuleInput } from '../../models/inbox-organize-schemas.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
+import { serialByKey } from '../../utils/serial-by-key.js';
 
 /** Under the reserved `messages.organize.` prefix (utils/reserved-keys.ts). */
 export const INBOX_ORGANIZE_KEY = 'messages.organize.settings';
@@ -150,16 +153,7 @@ export async function readInboxOrganize(storage: Storage, ownerGhii: string): Pr
  * Writes for one owner run one after another in this process, so two archive clicks in quick
  * succession cannot read the same record and overwrite each other's mark.
  */
-const pending = new Map<string, Promise<unknown>>();
-function serialized<T>(ownerGhii: string, work: () => Promise<T>): Promise<T> {
-  const prev = pending.get(ownerGhii) ?? Promise.resolve();
-  // The previous write's failure already went to ITS caller; this one runs either way.
-  const next = prev.then(work, work);
-  pending.set(ownerGhii, next);
-  const settle = () => { if (pending.get(ownerGhii) === next) pending.delete(ownerGhii); };
-  next.then(settle, settle);
-  return next;
-}
+const serialized = <T>(ownerGhii: string, work: () => Promise<T>): Promise<T> => serialByKey(`inbox-organize ${ownerGhii}`, work);
 
 async function writeInboxOrganize(storage: Storage, ownerGhii: string, rec: InboxOrganize): Promise<InboxOrganize> {
   const clean = normalizeOrganize(rec);
