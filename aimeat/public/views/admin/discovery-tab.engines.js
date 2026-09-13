@@ -16,6 +16,7 @@
  * @structure DiscoveryEngines({ status, served, onRecheck, onChanged }) — Bing, Google, the rest
  * @usage <${DiscoveryEngines} status=${status} served=${served} onRecheck=${checkServed} onChanged=${load} />
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.0 — 2026-09-11 — Initial (the Discovery page in the poster face). Replaces
  *     discovery-tab.steps.js.
  */
@@ -98,7 +99,7 @@ export function DiscoveryEngines({ status, served, onRecheck, onChanged }) {
   return html`
     <section class="og-sec" id="adm-disc-02">
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <div class="og-sec-h"><h2>${S('engines.title')}<small>02</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('engines.title')}<small>02</small></h2>
         <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${onRecheck}>${S('engines.recheck')}</button></div></div>
       <p class="adm-disc-lead">${S('engines.lead')}</p>
 

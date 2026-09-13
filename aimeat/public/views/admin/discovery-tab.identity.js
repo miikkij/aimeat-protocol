@@ -10,6 +10,7 @@
  * @structure DiscoveryIdentity({ status, onChanged }) — the seven fields, Save, the two previews
  * @usage <${DiscoveryIdentity} status=${status} onChanged=${load} />
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.0 — 2026-09-11 — Initial (the Discovery page in the poster face). The fields and the
  *     previews lived in discovery-tab.js before.
  */
@@ -115,7 +116,7 @@ export function DiscoveryIdentity({ status, onChanged }) {
   return html`
     <section class="og-sec" id="adm-disc-04">
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <div class="og-sec-h"><h2>${S('identity.title')}<small>04</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('identity.title')}<small>04</small></h2>
         <div class="og-doors">
           ${dirty ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => setEdits({})}>${S('identity.discard')}</button>` : null}
         </div></div>

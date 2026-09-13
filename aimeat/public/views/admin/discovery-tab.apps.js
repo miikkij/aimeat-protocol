@@ -18,6 +18,7 @@
  * @structure DiscoveryApps({ status, onChanged }) — mode chips, tally filters, search, table, block dialog
  * @usage <${DiscoveryApps} status=${status} onChanged=${load} />
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.1 — 2026-09-13 — The block dialog's actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-11 — The poster face: mode and tally as chips, the search as an underline
  *     field, the address and last-told columns (the address from the notice plan, the stamp from
@@ -135,7 +136,7 @@ export function DiscoveryApps({ status, onChanged }) {
   return html`
     <section class="og-sec" id="adm-disc-05">
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <div class="og-sec-h"><h2>${S('apps.title')}<small>05</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('apps.title')}<small>05</small></h2>
         <div class="adm-disc-chips">
           <span class="adm-disc-chips-lbl">${S('apps.who')}</span>
           <button type="button" class="adm-disc-fchip ${review ? '' : 'on'}" disabled=${busy} onClick=${() => setMode('owner')}>${S('apps.modeOwner')}</button>
