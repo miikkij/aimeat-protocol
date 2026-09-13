@@ -6506,6 +6506,7 @@
   "notifpage.save": "Guardar",
   "notifpage.saved": "Guardado.",
   "notifpage.saveFailed": "No se pudo guardar la configuración: inténtalo de nuevo en un momento.",
+  "notifpage.settingsUnavailable": "Tu configuración de notificaciones no se cargó, así que no se guardó nada. Vuelve a cargar la página e inténtalo de nuevo.",
   "notifpage.howTitle": "Cómo nace una notificación",
   "notifpage.howSub": "para quien construye una aplicación · una extensión · un agente · en un chat",
   "notifpage.how.appK": "para quien construye una aplicación",

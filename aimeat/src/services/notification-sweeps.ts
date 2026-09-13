@@ -12,6 +12,9 @@
  * @structure sweepHeldPushes · sweepNotificationDigests · listOwnerNotifications (shared read)
  * @usage setInterval(() => sweepHeldPushes(storage, config, push), 5 * 60_000)
  * @version-history
+ *   v1.2.0 — 2026-09-13 — The digest writes only its bookmark, on the record as it is when writing
+ *     (updateNotificationSettings). It wrote back the whole record it read before sending the email,
+ *     which undid a save the owner made while the email went out (docs/pitfalls.md §84).
  *   v1.1.0 — 2026-09-12 — The digest says WHEN each notification arrived, in the recipient's own
  *     regional format and their own clock, read from the record this sweep already holds.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Ilmoitusten sivu", direction A).
@@ -20,7 +23,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PushService } from './push.js';
 import { NOTIF_PREFIX, notifLinkToUrl } from './notify.js';
-import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, writeNotificationSettings, appendMailLog, type NotificationSettings } from './notification-settings.js';
+import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, updateNotificationSettings, appendMailLog, type NotificationSettings } from './notification-settings.js';
 import { getActiveEmailService } from './email.js';
 import { notificationDigestEmail } from './email-templates-digest.js';
 import { formatForPerson, type DisplayPrefs } from './display-prefs.js';
@@ -111,7 +114,10 @@ export async function sweepNotificationDigests(storage: Storage, config: AimeatC
       const ok = await email.sendRaw(g.notificationEmail, subject, html, text);
       if (ok) {
         sent++;
-        await writeNotificationSettings(storage, ghii, { ...settings, lastDigestAt: new Date(now).toISOString() });
+        // Only the bookmark, on top of the record as it is NOW. `settings` was read before the email
+        // went out, and writing it back would undo whatever the owner saved in the meantime.
+        const lastDigestAt = new Date(now).toISOString();
+        await updateNotificationSettings(storage, ghii, current => ({ ...current, lastDigestAt }));
         await appendMailLog(storage, ghii, { kind: 'digest', subject });
       }
     } catch (err) { logger.warn('notification sweep: digest is best-effort', { ghii, error: String(err) }); }

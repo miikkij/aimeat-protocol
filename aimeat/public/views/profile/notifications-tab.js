@@ -10,6 +10,9 @@
  * @structure NotificationsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'notifications'.
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Nothing is saved while the owner's settings are not loaded. The page saves
+ *     the whole record, and a save built from defaults after a failed load erased the owner's muted
+ *     senders and quiet hours (docs/pitfalls.md §84).
  *   v2.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Ilmoitusten sivu", direction A).
  *     The page shows the notifications themselves with their senders, says who may notify the
  *     owner and lets them decide per sender, lists every device, and replaces three email choices
@@ -127,6 +130,9 @@ export default function NotificationsTab({ session, showToast }) {
 
   /* ── settings ── */
   async function saveSettings(next) {
+    // The page saves the WHOLE record. Without the owner's record loaded, `next` was built from
+    // defaults, and saving it would erase every muted sender and the quiet hours they had set.
+    if (!settings) { showToast?.(c('settingsUnavailable'), true); return; }
     setBusy(true);
     try {
       const saved = await notif.putSettings(next);
@@ -138,7 +144,8 @@ export default function NotificationsTab({ session, showToast }) {
     finally { setBusy(false); }
   }
   const setPref = (r, patch) => {
-    const s = settings || { groups: {}, senders: {}, quiet: null, throttleMinutes: 10, emailDigest: { enabled: false, afterHours: 8 } };
+    if (!settings) { showToast?.(c('settingsUnavailable'), true); return null; }
+    const s = settings;
     if (r.kind === 'aimeat' && r.group) return saveSettings({ ...s, groups: { ...(s.groups || {}), [r.group]: { ...((s.groups || {})[r.group] || {}), ...patch } } });
     const key = senderKeyOf(r);
     if (!key) return null;
