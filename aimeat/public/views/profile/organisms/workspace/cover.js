@@ -15,6 +15,7 @@
  * @structure renderWorkspaceView (cover or page) · renderCover · renderPage · renderRail · renderTree
  * @usage import { renderWorkspaceView } from './workspace/cover.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-29 — Initial. Replaces the tab block (21 tabs in three rows), the overview
  *     accordion and the README/map/toc stack that stood above every space.
@@ -87,7 +88,7 @@ function renderTree(ctx, current) {
   const { isDocSpace, mergedDocs, setActiveDoc, unseenOf } = ctx;
   const MAX = 8;
   return html`
-    <nav class="og-tree" aria-label=${tr('organisms.ws.railTitle', 'In this workspace')}>
+    <nav class="og-tree poster-row--thing" aria-label=${tr('organisms.ws.railTitle', 'In this workspace')}>
       ${stacked(ctx).map(g => html`
         <div class="og-tree-group" key=${g.id}>
           <span class="og-tree-label">${g.label}<em>${g.count ?? ''}</em></span>
@@ -329,7 +330,7 @@ function renderPage(ctx, { id, last, title, sub, doors = null, children }) {
         ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
       </div>
       <div class="og-grid">
-        <div class="og-main">${children}</div>
+        <div class="og-main poster-row--thing">${children}</div>
         ${railTree ? renderTree(ctx, id) : html`
           <nav class="og-rail" aria-label=${tr('organisms.ws.railTitle', 'In this workspace')}>
             <span class="og-rail-label">${tr('organisms.ws.railTitle', 'In this workspace')}</span>
