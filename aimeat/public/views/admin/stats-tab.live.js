@@ -16,6 +16,7 @@
  *   - DidItArrive (05) — email, push and mailbox as one table with a landing rate
  * @usage Imported by stats-tab.js.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Statistics page in the poster face).
  */
 import { h } from 'preact';
@@ -56,7 +57,7 @@ export function LiveNow({ live, gauges }) {
   return html`
     <section class="og-sec" id="adm-st-04">
       <div class="og-sec-h">
-        <h2>${S('live.title')}<small>04</small></h2>
+        <h2 class="poster-section-title">${S('live.title')}<small>04</small></h2>
       </div>
       <p class="adm-st-lead">${S('live.lead')}</p>
 
@@ -114,7 +115,7 @@ export function DidItArrive({ period }) {
   return html`
     <section class="og-sec" id="adm-st-05">
       <div class="og-sec-h">
-        <h2>${S('arrive.title')}<small>05</small></h2>
+        <h2 class="poster-section-title">${S('arrive.title')}<small>05</small></h2>
       </div>
       <p class="adm-st-lead">${S('arrive.lead')}</p>
 

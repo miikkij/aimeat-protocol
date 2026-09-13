@@ -20,6 +20,7 @@
  *   - WhatWasCalled (05) — the surfaces, and what was refused
  * @usage Imported by views/admin/usage-tab.js.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Usage page in the poster face).
  */
 import { h } from 'preact';
@@ -54,7 +55,7 @@ export function WhoSpent({ people, houseSpenders }) {
   if (!list.length) {
     return html`
       <section class="og-sec" id="adm-us-04">
-        <div class="og-sec-h"><h2>${S('who.title')}<small>04</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${S('who.title')}<small>04</small></h2></div>
         <div class="adm-us-empty">${S('who.empty')}</div>
       </section>`;
   }
@@ -79,7 +80,7 @@ export function WhoSpent({ people, houseSpenders }) {
   return html`
     <section class="og-sec" id="adm-us-04">
       <div class="og-sec-h">
-        <h2>${S('who.title')}<small>04</small></h2>
+        <h2 class="poster-section-title">${S('who.title')}<small>04</small></h2>
         ${rest.length ? html`<div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${() => setAll(true)}>
             ${S('who.showAll', { n: list.length })}
@@ -137,7 +138,7 @@ export function WhatWasCalled({ calls }) {
   if (!totals || (totals.calls || 0) === 0) {
     return html`
       <section class="og-sec" id="adm-us-05">
-        <div class="og-sec-h"><h2>${S('called.title')}<small>05</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${S('called.title')}<small>05</small></h2></div>
         <div class="adm-us-empty">${S('called.empty')}</div>
       </section>`;
   }
@@ -155,7 +156,7 @@ export function WhatWasCalled({ calls }) {
   return html`
     <section class="og-sec" id="adm-us-05">
       <div class="og-sec-h">
-        <h2>${S('called.title')}<small>05</small></h2>
+        <h2 class="poster-section-title">${S('called.title')}<small>05</small></h2>
       </div>
       <p class="adm-us-lead">${S('called.lead')}</p>
 
