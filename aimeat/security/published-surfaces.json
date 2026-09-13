@@ -1,13 +1,13 @@
 {
   "npm": {
     "package": "aimeat",
-    "version": "3.2.0",
-    "fingerprint": "7187b2a872228480",
-    "toolCount": 218
+    "version": "3.14.3",
+    "fingerprint": "4073a6f67abba8a5",
+    "toolCount": 337
   },
   "pypi": {
     "package": "aimeat-crewai",
-    "version": "0.19.1",
+    "version": "0.26.0",
     "fingerprint": "d3448ba5685107ca",
     "toolCount": 24
   }
