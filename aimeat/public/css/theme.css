@@ -12,6 +12,10 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.40.0 — 2026-09-14 — The toast wears the poster face: square, 3px ink frame on the card ground, a solid
+       6px offset shadow (sun, coral for a failure, ink under the warning's sun ground) and a ✓ or ✗ in front.
+       The green, red and blue pill tokens (--toast-*) leave; nothing else read them. .toast-hold keeps a
+       message up for six seconds.
      v1.39.0 — 2026-09-13 — .toast undoes the browser's popover box (inset, margin, border), because the
        pill now enters the top layer as a manual popover to show above an open dialog.
      v1.38.0 — 2026-09-13 — The classic .modal-overlay / .modal / .modal-header / .modal-close / .modal-footer
@@ -186,20 +190,6 @@
   --badge-node-bg:     #6B7280;         /* invariant gray (≠ --text-dim, which flips dark) */
   --badge-gaii-bg:     var(--blue);     /* #3B82F6 */
   --badge-fg:          #FFFFFF;          /* white text on every saturated swatch */
-
-  /* Toast palette (floating notification pill). Theme-INVARIANT on purpose,
-     same rationale as the badge palette above: saturated solid fills carrying
-     white text read correctly on any background in both themes, so they are
-     defined only here and NOT re-overridden in [data-theme="dark"].
-     NOTE: --toast-success-bg is green-500 (#22C55E), the legacy toast green —
-     it is deliberately NOT --success (emerald #10B981); swapping would shift
-     the hue. --toast-danger-bg equals --danger at the legacy 0.95 alpha. */
-  --toast-success-bg: rgba(34, 197, 94, 0.95);
-  --toast-danger-bg:  rgba(239, 68, 68, 0.95);  /* = --danger #EF4444 @ .95 */
-  --toast-info-bg:    rgba(59, 130, 246, 0.95); /* = --blue #3B82F6 @ .95 */
-  --toast-warn-bg:    rgba(245, 158, 11, 0.95); /* amber-500; pairs with dark fg */
-  --toast-fg:         #FFFFFF;
-  --toast-warn-fg:    #1A1A2E;                  /* white fails contrast on amber */
 
   /* Borders */
   --border: #E5E7EB;
@@ -1716,28 +1706,38 @@ select.input-field { cursor: pointer; }
 .alert-warn { background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-border); }
 .alert-info { background: var(--info-bg); color: var(--info-fg); border: 1px solid var(--info-border); }
 
-/* ── Toast ── */
+/* ── Toast ── the poster's box for a passing word: square, a 3px ink frame on the card ground and a
+   solid offset shadow, the way a dialog and an opened record are drawn. The kind is said by the
+   shadow and one mark in front of the words: sun and a ✓ for done, coral and a ✗ for failed, sun
+   ground for a warning, sun and no mark for plain information. */
 .toast {
   /* width: max-content (NOT fit-content/auto): a fixed box anchored at left:50%
-     shrink-to-fits against the remaining 50vw, capping the pill at half the
+     shrink-to-fits against the remaining 50vw, capping the box at half the
      viewport — a tall skinny tower on phones. max-width does the real capping. */
   position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
   z-index: 9999; max-width: min(92vw, 40rem); width: max-content;
-  padding: 0.7rem 1.15rem; border-radius: var(--radius-sm);
-  font-size: 0.9rem; font-weight: 600; line-height: 1.45;
-  text-align: center; text-wrap: pretty; overflow-wrap: anywhere; white-space: normal;
-  background: var(--toast-success-bg); color: var(--toast-fg);
-  box-shadow: var(--shadow-xl);
+  padding: 0.75rem 1.1rem;
+  font-family: var(--font-poster-section); font-size: 0.92rem;
+  font-weight: var(--font-poster-strong-weight); line-height: 1.45;
+  text-align: left; text-wrap: pretty; overflow-wrap: anywhere; white-space: normal;
+  background: var(--card-bg); color: var(--text);
+  box-shadow: 6px 6px 0 var(--sun);
   animation: toastIn 0.3s ease, toastOut 0.4s ease 2.4s forwards;
   pointer-events: auto; box-sizing: border-box;
-  /* The pill is a manual popover so it can show above an open dialog (raiseAboveDialogs in
-     /js/dialog.js); these undo the browser's own popover box, which is centred and framed. */
-  top: auto; right: auto; margin: 0; border: 0; overflow: visible;
+  /* The box is a manual popover so it can show above an open dialog (raiseAboveDialogs in
+     /js/dialog.js); these undo the browser's own popover box, which is centred, and set the frame
+     over the one it draws. No display here: an author display would beat the browser's
+     display:none on a popover that is not open. */
+  top: auto; right: auto; margin: 0; overflow: visible;
+  border: 3px solid var(--text); border-radius: 0;
 }
-.toast.error, .toast-error { background: var(--toast-danger-bg); color: var(--toast-fg); }
-.toast-success { background: var(--toast-success-bg); color: var(--toast-fg); }
-.toast-info { background: var(--toast-info-bg); color: var(--toast-fg); }
-.toast-warn { background: var(--toast-warn-bg); color: var(--toast-warn-fg); }
+.toast::before { font-weight: 800; margin-right: 0.55em; }
+.toast-success::before { content: '✓'; color: var(--success-fg); }
+.toast.error, .toast-error { box-shadow: 6px 6px 0 var(--accent); }
+.toast.error::before, .toast-error::before { content: '✗'; color: var(--accent); }
+.toast-warn { background: var(--sun); color: var(--on-sun); border-color: var(--on-sun); box-shadow: 6px 6px 0 var(--text); }
+/* A message that has to be read, not glanced at, stays up longer: the view holds it for six seconds. */
+.toast-hold { animation: toastIn 0.3s ease, toastOut 0.4s ease 5.6s forwards; }
 @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(16px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 @keyframes toastOut { from { opacity: 1; } to { opacity: 0; pointer-events: none; } }
 

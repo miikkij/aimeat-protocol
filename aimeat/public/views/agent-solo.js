@@ -10,6 +10,7 @@
  *   connection so the card live-updates independently.
  * @structure AgentSolo (default export)
  * @version-history
+ *   2026-09-14 -- The window's toast is the site's shared one (theme.css .toast).
  *   v1.0.0 -- 2026-05-31 -- Initial creation for the agent pop-out window
  */
 
@@ -124,7 +125,7 @@ export default function AgentSolo() {
         showToast=${showToast}
         allAgents=${allAgents}
       />
-      ${toast && html`<div class="pf-agd-solo-toast ${toast.isErr ? 'pf-agd-solo-toast--err' : ''}">${toast.msg}</div>`}
+      ${toast && html`<div class=${`toast ${toast.isErr ? 'toast-error' : 'toast-success'}`}>${toast.msg}</div>`}
     </div>
   `;
 }
