@@ -292,6 +292,90 @@ async function run() {
         const r = await json('/v1/messages/requests', as(fedToken));
         assert(r.body?.error?.code === 'FORBIDDEN', `code: ${JSON.stringify(r.body?.error)}`);
     });
+
+    // THE WORK DOORS DO NOT REFUSE — THEY ANSWER, AND THE ANSWER WAS THE NAMESAKE'S. Three of them
+    // decide "is this an owner session" and then fan out over `getAgentsByOwner(req.auth.owner)`,
+    // which for a visitor is the local part of THEIR name and so names the local account. inbox and
+    // overview were given `&& !req.auth.federated` when that was found; /v1/work/sent was missed.
+    // So this is asserted on CONTENT and not on a status code: the door answers 200 either way.
+    await test("The visitor's sent work is their own, never the local namesake's", async () => {
+        // An agent of alice's asks an agent of bob's for something. Both are needed: a work request
+        // to yourself is refused (SELF_WORK). Without a row to find, an empty list proves nothing.
+        const newAgent = async (ownerName: string, ownerTok: string, label: string) => {
+            const made = await json('/v1/agents', as(ownerTok, {
+                method: 'POST', body: JSON.stringify({ name: label, owner: ownerName, capabilities: ['*'], model: 'test' }),
+            }));
+            assert(made.status === 201, `agent ${label}: ${made.status} ${JSON.stringify(made.body?.error)}`);
+            const g = made.body.data.agent.gaii as string;
+            const ts = new Date().toISOString();
+            const tok = await json('/v1/auth/token', {
+                method: 'POST',
+                body: JSON.stringify({ gaii: g, timestamp: ts, signature: await signMsg(made.body.data.private_key, g + ts) }),
+            });
+            assert(tok.status === 200, `agent token ${label}: ${tok.status} ${JSON.stringify(tok.body?.error)}`);
+            return { gaii: g, token: tok.body.data.token as string };
+        };
+        const asker = await newAgent(namesake, alice.token, `fedask${stamp}`);
+        const doer = await newAgent(bobName, bob.token, `feddo${stamp}`);
+
+        const action = `fedwork-probe-${stamp}`;
+        const pub = await json('/v1/actions', as(doer.token, {
+            method: 'POST',
+            body: JSON.stringify({
+                id: action, display_name: 'Federated namesake probe', description: 'Gives /v1/work/sent a row to find',
+                input_schema: { type: 'object', properties: { text: { type: 'string' } } },
+                output_schema: { type: 'object', properties: { result: { type: 'string' } } },
+                pricing: { base_morsels: 1 },
+            }),
+        }));
+        assert(pub.status === 201, `publish action: ${pub.status} ${JSON.stringify(pub.body?.error)}`);
+
+        const mint = await json('/v1/admin/mint', as(operator.token, {
+            method: 'POST', body: JSON.stringify({ gaii: asker.gaii, amount: 100 }),
+        }));
+        assert(mint.status === 200, `mint: ${mint.status} ${JSON.stringify(mint.body?.error)}`);
+
+        const work = await json('/v1/work', as(asker.token, {
+            method: 'POST',
+            body: JSON.stringify({ action_id: action, provider_gaii: doer.gaii, input: { text: 'probe' }, ttl_hours: 24 }),
+        }));
+        assert(work.status === 201, `work submit: ${work.status} ${JSON.stringify(work.body?.error)}`);
+        const tc = work.body.data.tracking_code as string;
+
+        // The reach of a federated session is the LOCAL operator's decision, never the home node's:
+        // register-login.ts takes the scopes from this peer's row. The default set has no
+        // `work:read`, so the door refuses before the handler runs and the hole is unreachable — on
+        // a node whose operator never granted it. Granting it here is what puts the handler in
+        // front of the visitor, which is the configuration the finding is about.
+        const scoped = await json(`/v1/federation/peers/${homeNodeId}`, as(operator.token, {
+            method: 'PUT', body: JSON.stringify({ federation_auth_scopes: ['memory:read', 'catalogue:read', 'work:read'] }),
+        }));
+        assert(scoped.status === 200, `granting the peer work:read: ${scoped.status} ${JSON.stringify(scoped.body?.error)}`);
+        const relogin = await json('/v1/ghii/login', {
+            method: 'POST', body: JSON.stringify({ username: `${namesake}@${homeNodeId}`, password: 'the-home-node-decides' }),
+        });
+        assert(relogin.status === 200, `federated re-login: ${relogin.status}`);
+        const workToken = relogin.body.data.token as string;
+
+        // The namesake sees their own, or the door would be broken in the other direction.
+        const own = await json('/v1/work/sent', as(alice.token));
+        assert(own.status === 200, `the namesake's own sent: ${own.status}`);
+        assert((own.body.data.items as any[]).some(w => w.tracking_code === tc),
+            `the namesake lost their own sent work: ${JSON.stringify(own.body.data.items).slice(0, 300)}`);
+
+        // The visitor gets theirs, which is none.
+        const seen = await json('/v1/work/sent', as(workToken));
+        assert(seen.status === 200, `the visitor's sent: ${seen.status} ${JSON.stringify(seen.body?.error)}`);
+        const codes = (seen.body.data.items as any[]).map(w => w.tracking_code);
+        assert(!codes.includes(tc), `the visitor was handed the local namesake's sent work: ${JSON.stringify(codes)}`);
+
+        // And the two doors that were fixed first stay fixed.
+        for (const path of ['/v1/work/inbox', '/v1/work/overview']) {
+            const r = await json(path, as(workToken));
+            assert(r.status === 200, `${path}: ${r.status}`);
+            assert(!JSON.stringify(r.body.data).includes(tc), `${path} handed the visitor the namesake's work`);
+        }
+    });
 }
 
 try {

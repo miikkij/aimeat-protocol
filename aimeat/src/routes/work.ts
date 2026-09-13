@@ -360,7 +360,14 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
   // GET /v1/work/sent — work items sent by requester (agent or owner auth)
   router.get('/v1/work/sent', requireAuth(), requireExternalPrincipal(), requireScope('work:read'), async (req, res) => {
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    // Same reason as /v1/work/inbox and /v1/work/overview, and this door was the one that missed it
+    // when the other two were fixed: the fan-out below resolves agents from the owner NAME, which
+    // for a session signed in from another node is the local part of THEIR name — so a visitor
+    // called `alice` was handed the work sent by the local `alice`'s agents. requireExternalPrincipal
+    // admits the `owner` role and asks nothing about where the session came from, so it does not
+    // cover this. Found by the AI triage of 2026-09-13.
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
+      && !req.auth!.federated;
     let items: Awaited<ReturnType<typeof storage.listWorkByRequester>>;
     if (isOwnerSession) {
       // ONE requesterGaii IN (…) query across the owner's agents, not one per agent.
