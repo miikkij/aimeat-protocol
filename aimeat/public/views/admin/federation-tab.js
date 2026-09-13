@@ -23,6 +23,7 @@
  *   - FederationTab (default) — one read, six sections, and the actions
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-12 — The poster face. One read (GET /v1/admin/federation/overview) that carries
  *     the standing, what waits on a person, the sign-in reach, what this node offers and the book's
  *     age, in place of five calls and arithmetic in the browser.
@@ -68,7 +69,7 @@ function AskAi({ overview }) {
   return html`
     <section class="og-sec" id="adm-fed-07">
       <div class="og-sec-h">
-        <h2>${S('ai.title')}<small>07</small></h2>
+        <h2 class="poster-section-title">${S('ai.title')}<small>07</small></h2>
         <div class="og-doors">
           <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
         </div>
