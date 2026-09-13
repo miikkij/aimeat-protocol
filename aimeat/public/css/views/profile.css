@@ -6,6 +6,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.14.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   v3.13.0 — 2026-09-13 — The account and presence dialogs' own overlay, frame, header, X and footer
  *     rules leave: they open in the site's one dialog (/css/dialog.css). Their fields stay.
  *   v3.12.0 -- 2026-09-13 -- V2: shared poster classes own the crumb and avatar frame.
@@ -1599,7 +1600,7 @@
 .pf .pf-device-auth-row   { align-items: flex-end; gap: .75rem; }
 .pf .pf-device-auth-field { flex: 1; }
 .pf .pf-device-code       { font-size: 2rem; font-weight: 700; font-family: var(--font-mono); letter-spacing: .15em; }
-.pf .pf-agent-divider     { margin-top: 1.25rem; border-top: 1px solid var(--border); padding-top: 1.25rem; }
+.pf .pf-agent-divider     { margin-top: 1.25rem; padding-top: 1.25rem; }
 .pf .pf-task-runner-input { width: 100%; max-width: 320px; padding: 0.4rem 0.6rem; font-family: var(--font-mono); font-size: 0.85rem; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--text); }
 .pf .pf-gh-link { display: inline-flex; align-items: center; gap: .4rem; color: var(--accent); text-decoration: none; font-size: .85rem; }
 .pf .pf-gh-link:hover { text-decoration: underline; }

@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.9.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   v1.8.0 — 2026-09-13 — The dialog frame, header and footer rules leave for /css/dialog.css, the one
  *     dialog every page uses; only the account dialogs' field rules stay.
  *   v1.7.0 -- 2026-09-13 -- V2: profile markup selects the shared crumb shape.
@@ -170,8 +171,6 @@
 .pf .tab.active, .pf .sub-tab.active, .pf .platform-tab.active, .pf .pf-agd-tab--active, .pj-org-tab.active {
   background: var(--sun); color: var(--on-sun); border-bottom-color: var(--text); font-weight: var(--font-poster-strong-weight);
 }
-.pj-org-group-cap { font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); letter-spacing: 0.1em; color: var(--accent); }
-.pj-org-group + .pj-org-group { border-left: 2px solid var(--text); }
 .pf .pf-agd-tab-content { padding: 1rem 0; }
 
 /* ── Lists: one rule per row, the row's own words in bold ───────────────────────────────── */
@@ -181,7 +180,7 @@
   padding: 0.75rem 0; font-weight: var(--font-poster-text-weight);
 }
 .pf .mem-item:hover, .pf .tx-item:hover, .pf .mem-group-header:hover, .pf .pf-agd-collapsed:hover, .pj-search-hit:hover { background: none; color: var(--accent); }
-.pj-org-list, .pf .tx-list, .pf .mem-list, .pf .pf-agd-list { gap: 0; border-top: 3px solid var(--text); }
+.pj-org-list { gap: 0; }
 .pj-org-row, .pj-ws-card, .pf .pf-agd-collapsed { border-bottom: 2px solid var(--text); padding: 0.75rem 0; }
 .pf .pf-agd-collapsed-name, .pf .pf-agd-zone1-name, .pj-ws-card-name, .pj-search-hit-title { font-weight: var(--font-poster-strong-weight); font-size: 1.02rem; }
 .pf .mem-key, .pf .mem-group-name, .pf .tx-amount, .pf .access-mono, .pf .tx-detail-value { font-family: var(--font-mono); }
@@ -199,7 +198,6 @@
 .pf .pf-agd-zone2--problem { border-left: 6px solid var(--accent); background: none; }
 .pf .pf-agd-zone2-title { font-weight: var(--font-poster-strong-weight); letter-spacing: 0.08em; }
 .pf .pf-agd-card-footer { border-top: 2px solid var(--text); }
-.pf .pf-agent-divider { border-top: 3px solid var(--text); }
 .pf .agent-prompt-box { font-family: var(--font-mono); }
 
 /* ── The fleet board above the agent list: a ruled grid of names, the state as a left stripe ── */
@@ -219,13 +217,11 @@
 .pf .pf-agd-gaii { border-radius: 0; }
 .pf .pf-agd-gaii:hover, .pf .pf-agd-gaii:focus-visible { background: var(--sun); color: var(--on-sun); }
 .pf .pf-agd-active-row { border-radius: 0; border-bottom: 1px solid var(--border); }
-.pf .mem-tools-bar { background: none; border: 0; border-top: 3px solid var(--text); border-bottom: 2px solid var(--text); border-radius: 0; padding: 0.6rem 0; }
 /* The attach-this-agent box (components/McpInstall) inside an agent: an ink frame, a mono command. */
 .pf .mcpi--quick, .mcpi--tool { border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); }
 .mcpi-cmd-text { border: 2px solid var(--text); border-radius: 0; }
 
 /* ── Knowledge packages, and the raw fields the older tabs still use ────────────────────── */
-.kpkg-section, .kpkg-action-bar, .kpkg-import-box { background: none; border: 0; border-top: 3px solid var(--text); border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem; margin-bottom: 1.25rem; }
 .kpkg-card { border-top-width: 2px; padding: 0.9rem 0; margin-bottom: 0; }
 .kpkg-card-expanded { border-top-color: var(--accent); }
 .pf .btn-danger-solid { background: none; border: 0; border-bottom: 2px solid var(--accent); border-radius: 0; box-shadow: none; padding: 0 0 1px; color: var(--accent); font-weight: var(--font-poster-strong-weight); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -371,7 +367,6 @@
   transform: none; box-shadow: none; border-color: var(--accent); background: none;
 }
 .pf .of-card--open, .pf .pf-agd-crew-template.selected, .pf .pf-agd-crew-template--on { border-bottom-color: var(--accent); }
-.pf .sch-card-list, .pf .wf-card-list, .pf .of-group-body { border-top: 3px solid var(--text); }
 .pf .sch-card-title, .pf .wf-card-title, .pf .of-card-title, .pf .of-offer-title, .pf .cap-item-name, .pf .pf-agd-crew-template-name, .pf .mbr-card-name { font-weight: var(--font-poster-strong-weight); font-size: 1.02rem; }
 /* Boxes: the ink frame for a thing that must read as one object (a preview, a sample, a schema) */
 .pf .of-req, .pf .of-conseq, .pf .of-sample, .pf .of-result, .pf .of-md, .pf .of-prereq, .pf .pf-nb-enrich-preview-body, .pf .pf-agd-memory-preview,
