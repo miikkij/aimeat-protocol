@@ -20,6 +20,7 @@
  *   - WorkTab({ data, switchPage }) — the three sections
  *   - dur / deadlineWords — the countdown a row prints instead of a timestamp
  * @version-history
+ *   v2.1.0 -- 2026-09-13 -- Compose the empty state's frame and B1 heading from poster.css.
  *   v2.0.0 — 2026-09-12 — The poster face, and the table drawing at all: the key it read has never
  *     existed on the shell's data. The cost object is read as an object (it was printed with a
  *     number formatter, which would have rendered [object Object] had a row ever appeared), the
@@ -94,8 +95,8 @@ export default function WorkTab({ data, switchPage }) {
   if (!rows.length) {
     return html`
       <div class="og adm-work">
-        <div class="adm-work-empty">
-          <h3>${W('emptyTitle')}</h3>
+        <div class="adm-work-empty poster-frame">
+          <h3 class="poster-section-title">${W('emptyTitle')}</h3>
           <p>${W('emptyWhy')}</p>
         </div>
       </div>`;
