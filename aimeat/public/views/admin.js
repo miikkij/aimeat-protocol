@@ -6,6 +6,7 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.8.0 -- 2026-09-13 -- Compose the existing page title with poster-page-title.
  *   v1.9.0 — 2026-09-09 — The marketplace stats fetch goes: its route was deleted, and nothing here
  *     ever rendered the value it loaded.
  *   v1.8.0 — 2026-09-05 — The sign-in card's lock emoji goes: no emoji anywhere in the interface.
@@ -443,7 +444,7 @@ export default function Admin({ navigate, locale }) {
       <!-- Main content -->
       <div class="adm-main">
         <div class="adm-topbar">
-          <div class="adm-page-title">
+          <div class="adm-page-title poster-page-title">
             ${t(pageInfo.key)}
           </div>
           <div class="adm-topbar-right">
