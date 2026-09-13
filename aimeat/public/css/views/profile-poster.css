@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.14.0 -- 2026-09-13 -- Retire selectors whose profile views no longer render.
  *   v1.13.0 -- 2026-09-13 -- Compose portfolio page and B1 section headlines.
  *   v1.12.0 -- 2026-09-13 -- Compose portfolio section and flow rules from poster.css.
@@ -79,13 +80,13 @@
 .pf .card-subtitle { font-weight: 600; }
 
 /* ── Cards become sections: a rule on top, the page behind them ────────────────────────── */
-.pf .card, .pf .card.card-glass, .pf .pf-agd-card, .pj-section, .kpkg-card, .pf .key-rules-box,
+.pf .card, .pf .card.card-glass, .pf .pf-agd-card, .pj-section, .pf .key-rules-box,
 .portfolio-step, .portfolio-instructions, .pf .pf-agd-webhook-form {
   background: none; border-radius: 0; box-shadow: none;
   padding: 1.1rem 0 1.5rem; margin-bottom: 2rem;
 }
-.pf .card, .pf .card.card-glass, .pf .pf-agd-card, .pj-section, .kpkg-card, .pf .key-rules-box, .pf .pf-agd-webhook-form {
-  border: 0; border-top: 3px solid var(--text);
+.pf .card, .pf .card.card-glass, .pf .pf-agd-card, .pj-section, .pf .key-rules-box, .pf .pf-agd-webhook-form {
+  border-right: 0; border-bottom: 0; border-left: 0;
 }
 .pf .card:hover, .pf .card.card-glass:hover { border-color: var(--text); box-shadow: none; transform: none; }
 .pf .card-expanded { border-top-color: var(--accent); }

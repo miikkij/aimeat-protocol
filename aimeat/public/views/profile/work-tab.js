@@ -6,6 +6,7 @@
  *   Displays inbox (received) and sent work items with accept/decline/deliver actions
  *   and a rating modal for completed deliveries.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — The rate and deliver dialogs' actions sit in their footers, Cancel first.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.3.0 — 2026-07-16 — Mount folds inbox + sent into GET /v1/work/overview (getWorkOverview); individual reads kept as fallback.
@@ -152,7 +153,7 @@ export default function WorkTab({ session, showToast, onStats }) {
       const isActive = status === 'accepted' || status === 'in_progress';
 
       return html`
-        <div class="card">
+        <div class="card poster-row--thing">
           <div class="card-header">
             <div class="card-title">${escHtml(w.description || w.action_name || '-')}</div>
             <span class="badge ${statusBadgeClass(status)}">${status}</span>

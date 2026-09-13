@@ -10,6 +10,7 @@
  *   kpiMeets, firstLine, shortActor, cap, isMobileView, renderSpaceNotice
  * @usage import { PRIMARY_FIELD, groupDocs } from '/views/profile/organisms/workspace/helpers.js';
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
  */
 import { h } from 'preact';
@@ -98,7 +99,7 @@ export const isMobileView = () => window.matchMedia('(max-width: 640px)').matche
 
 // A declared space whose backing isn't memory — never silently hidden, its tab shows a notice.
 export const renderSpaceNotice = (ot) => html`
-  <div class="pj-section" key=${ot.name}>
+  <div class="pj-section poster-row--thing" key=${ot.name}>
     <div class="pj-section-head">
       <span class="pj-section-title">${(ot.name)}</span>
       <span class="badge badge-warn">${(String(ot.backing))}</span>

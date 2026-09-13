@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab showing federated peer nodes and their online/offline status.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-03-16 — Initial federation tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
@@ -52,7 +53,7 @@ export default function FederationTab() {
           ${federation.map(p => {
             const alive = p.status === 'active' || p.alive;
             return html`
-              <div class="card">
+              <div class="card poster-row--thing">
                 <div class="peer-card">
                   <div>
                     <div class="card-title">${escHtml(p.node_id || p.nodeId || p.url)}</div>
