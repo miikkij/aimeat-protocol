@@ -33,6 +33,7 @@
  *   - QuestionnaireSection — section 05
  * @usage imported by compliance-tab.js
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-05 — The poster face: the table with filters, the framed sheet, the segmented
  *     choice, the who-answered column, the three ways to start in the empty state.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
@@ -268,7 +269,7 @@ export function RegisterSection({ usecases, questions, draft, setDraft, openId, 
   return html`
     <section class="og-sec adm-cmp-no-print" id="adm-cmp-04">
       <${ConfirmUI} />
-      <div class="og-sec-h"><h2>${C('registerTitle')}<small>04</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('registerTitle')}<small>04</small></h2>
         ${list.length > 0 ? html`<div class="og-doors">
           ${draftDoor('og-door og-door--quiet')}
           <button type="button" class="og-door og-door--quiet" onClick=${addOne}>${C('ucAdd')}</button>
@@ -305,7 +306,7 @@ export function QuestionnaireSection({ questionnaire }) {
     </div>`);
   return html`
     <section class="og-sec adm-cmp-no-print" id="adm-cmp-05">
-      <div class="og-sec-h"><h2>${C('qsTitle')}<small>05</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('qsTitle')}<small>05</small></h2>
         <div class="og-doors"><span class="adm-cmp-mono">${C('qsVersion', { v: questionnaire.version || '' })}</span></div></div>
       <p class="adm-cmp-lead">${C('qsNote')}</p>
       <div class="adm-two">
