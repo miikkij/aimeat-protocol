@@ -16,6 +16,7 @@
  * @structure CopyScan
  * @usage html`<${CopyScan} result=${scan} apps=${apps} scanning=${false} onScan=${fn} />`
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose the shared scan heading and external footer spacing.
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
 import { h } from 'preact';
@@ -48,7 +49,7 @@ export function CopyScan({ result, apps, scanning, onScan, number }) {
 
   return html`
     <section class="og-sec" id="adm-ap-scan">
-      <div class="og-sec-h"><h2>${A('scan.title')}<small>${number}</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${A('scan.title')}<small>${number}</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" disabled=${scanning} onClick=${onScan}>
             ${scanning ? A('scan.scanning') : A('scan.run', { n: num((apps || []).length) })}
@@ -95,7 +96,7 @@ export function CopyScan({ result, apps, scanning, onScan, number }) {
             })}
           </div>
         </div>
-        <p class="adm-ap-note" style="margin-top: 12px">
+        <p class="adm-ap-note adm-ap-note--spaced">
           ${A('scan.footer', { n: num(result.scanned || 0) })}
         </p>`}
     </section>`;
