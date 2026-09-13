@@ -17,6 +17,7 @@
  *
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   2026-09-13 -- V2z: compose the welcome section heading with the shared B1 class.
  *   v2.1.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
  *   v2.0.3 — 2026-08-29 — body overflow: clip (was hidden) on a phone, the same reason as theme.css v1.37.0: a
  *     hidden body is still a scroll container a scrollIntoView() can move; clip is not.
@@ -237,12 +238,7 @@
   font-weight: 600;
 }
 
-.chat-welcome h2 {
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 2rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
-  margin: 0 0 10px;
-  color: var(--text);
-}
+.chat-welcome { --poster-section-size: 2rem; }
 
 .chat-welcome p { margin: 0; line-height: 1.6; font-size: 0.95rem; }
 .chat-welcome .chat-welcome-trust { color: var(--text-dim); margin-top: 6px; }
