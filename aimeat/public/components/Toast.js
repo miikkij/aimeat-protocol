@@ -2,14 +2,15 @@
  * @file Toast.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Canonical toast hook — floating auto-dismissing notification pill
+ * @description Canonical toast hook — floating auto-dismissing notification box
  *   rendered bottom-center. Styling lives in theme.css (.toast + .toast-success/
- *   -error/-info/-warn, tokens --toast-*).
+ *   -error/-info/-warn, drawn in the poster face).
  * @usage const { showToast, ToastContainer } = useToast();
  *   showToast(msg) / showToast(msg, true) / showToast(msg, 'error'|'info'|'warning')
  *   then render <${ToastContainer} /> at the view root (NOT inside any element
  *   with transform/filter — those trap the fixed-position pill).
  * @version-history
+ *   2026-09-14 — Header follows theme.css: the toast is drawn in the poster face, not as a coloured pill.
  *   v1.2.0 — 2026-09-13 — The pill shows above an open dialog (raiseAboveDialogs): a dialog is in
  *     the browser's top layer, and a toast raised from inside one sat under its dimmed backdrop.
  *   v1.1.0 — 2026-07-06 — Accept string kinds: call sites across the codebase pass

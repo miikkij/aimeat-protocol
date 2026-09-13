@@ -10,6 +10,7 @@
  *   live-updates on its own (profile.js, which normally bridges SSE, is not mounted here).
  * @structure DocSolo (default export)
  * @version-history
+ *   2026-09-14 — The window's toast is the site's shared one (theme.css .toast).
  *   v1.0.0 — 2026-06-09 — Initial: pop-out document window.
  *   v1.0.1 — 2026-06-19 — Import DocumentView/DocumentEditor from their new home
  *     (./profile/organisms/document.js) after the organisms-tab module split.
@@ -103,6 +104,6 @@ export default function DocSolo() {
       ${mode === 'edit'
         ? html`<${DocumentEditor} key=${'ed-' + doc.id} orgId=${org} page=${doc} busy=${busy} onSave=${save} onCancel=${() => setMode('view')} />`
         : html`<${DocumentView} key=${'view-' + doc.id} page=${doc} busy=${busy} onEdit=${() => setMode('edit')} onPublish=${publish} onWikiLink=${() => { }} />`}
-      ${toast ? html`<div class="pj-doc-solo-toast">${toast}</div>` : null}
+      ${toast ? html`<div class="toast toast-info">${toast}</div>` : null}
     </div>`;
 }

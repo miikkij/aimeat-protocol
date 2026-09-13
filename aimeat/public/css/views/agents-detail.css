@@ -6,6 +6,7 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   2026-09-14 -- .pf-agd-solo-toast leaves; the pop-out window uses the shared .toast in theme.css.
  *   2026-09-13 -- V2y: shared B1 class owns the agent setup panel headline.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
@@ -1833,25 +1834,6 @@
   max-width: 860px; /* card gets ≈828px — same usable width as the list view */
   margin: 0 auto;
 }
-.pf .pf-agd-solo-toast {
-  position: fixed;
-  bottom: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--text, #1A1A2E);
-  color: #FFFFFF;
-  padding: 0.5rem 0.9rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  z-index: 1000;
-  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,0.18));
-  width: max-content;
-  max-width: min(92vw, 40rem);
-  text-align: center;
-  overflow-wrap: anywhere;
-  box-sizing: border-box;
-}
-.pf .pf-agd-solo-toast--err { background: var(--danger, #EF4444); }
 
 /* ── Badges (platform, readiness, federation) ── */
 

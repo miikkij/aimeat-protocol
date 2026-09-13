@@ -17,6 +17,7 @@
  *   one section ended. The rule now means a row; the slab means a section. The onboarding steps
  *   keep their plain card shape: one job at a time, nothing pulling the eye away from the open step.
  * @version-history
+ *   2026-09-14: .koti-toast leaves; the home's failure line is the shared .toast in theme.css.
  *   2026-09-13: Compose the existing home shapes with shared poster classes.
  *   v3.4.0 — 2026-09-13 — The settings dialog is sized by the site's one dialog, and its door out is a
  *     row under the ink rule instead of a rounded grey card.
@@ -297,18 +298,6 @@ body:has(.koti) .page-content { background: var(--bg); }
 .koti-agent-details dd { margin: 0; font-size: 0.9rem; }
 .koti-agent-gaii { font-family: var(--font-mono); word-break: break-all; }
 .koti-agent-manage { display: inline-block; margin-top: 0.9rem; }
-
-/* One line of feedback, only for things that went wrong. */
-.koti-toast {
-  position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%);
-  max-width: min(90vw, 30rem);
-  padding: 0.7rem 1rem;
-  border: 2px solid var(--danger);
-  background: var(--card);
-  color: var(--text);
-  font-size: 0.92rem;
-  z-index: 50;
-}
 
 @media (max-width: 560px) {
   .koti { padding: 1.25rem 1rem 0; }
