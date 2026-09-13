@@ -11,6 +11,7 @@
  *   views/profile/organisms/home.js and read by home-settings.js. The inner panels (workspace list,
  *   roster, agents, board, map, timeline) keep their own pj- rules; a few are quieted here.
  * @version-history
+ *   v1.5.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.4.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.3.0 -- 2026-09-13 -- Compose B1 section titles from poster.css; retain rules on folded rows.
  *   v1.2.0 — 2026-09-06 — The visibility chips in a table of spaces go to the far end of the name
@@ -151,7 +152,7 @@
 .og-apps { margin-top: 1.2rem; }
 
 /* ── The tree, when the rail is asked to show the whole structure ─────────────────────────── */
-.og-tree { position: sticky; top: 1rem; max-height: calc(100vh - 6rem); overflow-y: auto; display: flex; flex-direction: column; gap: .2rem; padding: .2rem 0 0; border-top: 3px solid var(--text); }
+.og-tree { position: sticky; top: 1rem; max-height: calc(100vh - 6rem); overflow-y: auto; display: flex; flex-direction: column; gap: .2rem; padding: .2rem 0 0; }
 .og-tree-group { display: flex; flex-direction: column; margin-bottom: .8rem; }
 .og-tree-label { display: flex; align-items: baseline; gap: .6rem; padding: .6rem 0 .35rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .78rem; letter-spacing: .05em; text-transform: uppercase; color: var(--text); }
 .og-tree-label em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); }
@@ -173,7 +174,7 @@
 .og-mast--page { align-items: flex-end; }
 .og-mast--page .og-mast-actions { padding-top: 0; }
 .og-desc--page { margin-top: .6rem; }
-.og-page .og-main { padding-top: .9rem; border-top: 3px solid var(--text); }
+.og-page .og-main { padding-top: .9rem; }
 /* The space panels carry their own head (title + buttons); the page head already says both. */
 .og-page .pj-section > .pj-section-head { display: none; }
 .og-page .pj-section > .section-desc:first-of-type { display: none; }
