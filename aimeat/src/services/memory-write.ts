@@ -29,6 +29,12 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.7.0 — 2026-09-13 — UNDECLARED_SPACE is a refusal, decided by the developer on 2026-09-13: a
+ *     workspace record whose space the manifest does not declare answers 422 and nothing is written,
+ *     no provenance record included. It was a warning on a stored record. The decision and its words
+ *     are services/workspace-write-items.ts undeclaredSpaceRefusal(), the same one the MCP workspace
+ *     write and the publish paths answer with. An ecosystem app is refused too, without the manifest's
+ *     declared spaces, which it may have no right to read.
  *   v1.6.0 — 2026-09-13 — A successful write carries `warnings`, worded here once for every door.
  *     SHADOWED_BY_OWNER_COPY now runs on every write into an agent namespace, keyed on the target:
  *     it ran only on an agent's FIRST write of a key, so an agent that created a key the owner then
@@ -77,7 +83,8 @@ import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { misdirectedCrewKey } from './crew-def-store.js';
 import { parseGAII } from '../utils/gaii.js';
-import { undeclaredSpaceForKey, type UndeclaredSpaceWarning } from './workspace-write-items.js';
+import { undeclaredSpaceForKey } from './workspace-write-items.js';
+import { odpsWriteRefusal } from './exchange-odps-write.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
 export interface MemoryWriteFanout {
@@ -157,7 +164,7 @@ export type ExchangeReconcileReport =
 
 /** A warning a successful write carries: the record was stored, and something about it needs a person. */
 export interface MemoryWriteWarning {
-    code: 'SHADOWED_BY_OWNER_COPY' | 'UNDECLARED_SPACE';
+    code: 'SHADOWED_BY_OWNER_COPY';
     message: string;
     [detail: string]: unknown;
 }
@@ -175,9 +182,6 @@ export type MemoryWriteResult =
          *  owner-scope reads will resolve to theirs and this one is invisible. A warning, not a
          *  refusal: writing your own copy is legitimate, it just does not update somebody else's. */
         shadowedBy: string | null;
-        /** Set when the key is a workspace record in a namespace the workspace manifest does not
-         *  declare. Stored, and no workspace read lists it. */
-        undeclaredSpace?: UndeclaredSpaceWarning;
         /** Every warning above in one list, worded once, for a door to hand back as it is. */
         warnings: MemoryWriteWarning[];
         /** The EXCHANGE projection's report, when this key is a listing source and it made one. */
@@ -190,7 +194,11 @@ export type MemoryWriteResult =
             | 'ACCESS_DENIED' | 'ARCHIVED' | 'QUOTA_EXCEEDED'
             // From the organism namespace rule, which answers with the same codes the HTTP door
             // has always sent for these three cases.
-            | 'AUTH_REQUIRED' | 'NOT_FOUND' | 'CONSENT_REQUIRED';
+            | 'AUTH_REQUIRED' | 'NOT_FOUND' | 'CONSENT_REQUIRED'
+            // A workspace record whose space the workspace manifest does not declare.
+            | 'UNDECLARED_SPACE'
+            // An EXCHANGE listing source whose changed text would break an ODPS length cap.
+            | 'ODPS_FIELD_TOO_LONG';
         message: string;
         details?: unknown;
     };
@@ -311,7 +319,28 @@ export async function writeMemoryRecord(
                 message: `This ${guard.level} is archived (read-only). Unarchive it before writing.`,
             };
         }
+        // A workspace record whose space the workspace manifest does not declare is refused, and
+        // nothing below runs: no quota alarm, no provenance record, no write (the developer's
+        // decision, 2026-09-13). A workspace read builds its spaces from the manifest, so such a
+        // record was stored, answered as a success and listed by nothing. Only
+        // `organism.{id}.w.{ws}.{namespace}.{id}.draft|latest|version.N` keys pay the manifest read.
+        // After the archive guard, so an archived workspace is told it is archived. An ecosystem
+        // app may hold a write area without the read area the manifest needs, so it is refused
+        // without being shown what the manifest declares (services/ecosystem-access.ts).
+        const undeclared = await undeclaredSpaceForKey(storage, input.key, {
+            audience: caller.roles.includes('ecosystem') ? 'writer' : 'member',
+        });
+        if (undeclared) {
+            return { ok: false, status: undeclared.status, code: undeclared.code, message: undeclared.message, details: undeclared.details };
+        }
     }
+
+    // An EXCHANGE listing source (an app-tool manifest, an agent's offers document) whose CHANGED text
+    // would publish an ODPS document past a schema cap is refused here, before the ceilings and the
+    // write (the developer's decision, 2026-09-13). Compared with the stored record, so text already
+    // stored keeps publishing. Any other key returns null at once.
+    const odpsRefusal = odpsWriteRefusal(input.key, input.value, existing?.value);
+    if (odpsRefusal) return odpsRefusal;
 
     // The three memory ceilings — value size, key count, byte budget — from the one place that
     // holds them (services/memory-ceilings.ts). A single write is a set of one; the workspace batch
@@ -403,24 +432,11 @@ export async function writeMemoryRecord(
     //    queue; a tool call has no HTTP response) simply omits it, and the rest still happens.
     const after = await afterMemoryWrite(deps, caller.targetGaii, input.key, !!existing, caller.principal);
 
-    // 8. A workspace record whose space the workspace manifest does not declare. Stored, answered as
-    //    a success, and never listed, because the workspace read builds its spaces from the manifest.
-    //    The MCP workspace door refuses that write; this door warns instead, because live apps may
-    //    keep keys there today (the 2026-09-13 default; refusing is the developer's call). Only `organism.*.w.*` record keys pay the read.
-    //    The warning lists the workspace's declared spaces, which is manifest content, and an
-    //    ecosystem app may hold a write area without the read area the manifest needs, so it is not
-    //    told (services/ecosystem-access.ts: a GEAI reads organism data only through a read area).
-    const undeclaredSpace = input.key.startsWith('organism.') && !caller.roles.includes('ecosystem')
-        ? await undeclaredSpaceForKey(storage, input.key)
-        : null;
-
     const warnings: MemoryWriteWarning[] = [];
     if (shadowedBy) warnings.push(shadowWarning(input.key, caller.targetGaii, shadowedBy));
-    if (undeclaredSpace) warnings.push({ ...undeclaredSpace });
 
     return {
         ok: true, record, shadowedBy, warnings,
-        ...(undeclaredSpace ? { undeclaredSpace } : {}),
         ...(after.exchange !== undefined ? { exchange: after.exchange } : {}),
     };
 }

@@ -29,14 +29,24 @@
  *   authoritative at accept time and captured into the entitlement). Reconcile only writes offering
  *   records, and adopts a legacy listing by keeping its `offeringId` so `contractRef: offering:{id}`
  *   on existing entitlements keeps resolving.
- * @structure ReconcileChange · ReconcileReport · reconcileOwnerOfferings · migrateLegacyOfferings ·
- *   desiredFromAppTools · desiredFromExtActions · desiredFromAgentOffers · moneyPricesOf ·
- *   warnAlsoListed · warnOdpsOverruns · exchangeOutcome
+ *
+ *   LIST ONCE: a flagged app-tool that calls a flagged extension action as it is lists alone, and the
+ *   action is skipped as its duplicate (listOnce below). Types live in exchange-projection-types.ts and
+ *   the source-reading helpers in exchange-source-terms.ts.
+ * @structure reconcileOwnerOfferings · migrateLegacyOfferings · desiredFromAppTools · desiredFromExtActions ·
+ *   desiredFromAgentOffers · listOnce · warnAlsoListed · warnOdpsOverruns · exchangeOutcome
+ *   (re-exports ReconcileChange · ReconcileReport)
  * @usage
  *   const report = await reconcileOwnerOfferings(storage, ownerGhii, { dryRun: true });
  *   await reconcileOwnerOfferings(storage, ownerGhii, { appId: 'prh.html' });
  *   res.json({ ..., exchange: exchangeOutcome(await reconcileAfterSourceWrite(storage, gaii, key), ask) });
  * @version-history
+ *   v1.6.0 — 2026-09-13 — List once, as the developer decided: when a flagged app-tool binds a flagged
+ *     extension action without lockedInput, only the tool is listed and the action is skipped with
+ *     DUPLICATE_OF {app}/{tool} (a listing it had is delisted; its contracts keep their price). Tools of
+ *     every app count on a scoped pass, and an app pass settles the actions its tools released or took.
+ *     ALSO_LISTED_AS remains for a narrowing tool and a hand-made listing. Types and source helpers
+ *     moved to two sibling files (pure extraction) to stay under the line limit.
  *   v1.5.0 — 2026-09-13 — The report reaches the writer and says more. reconcileAfterSourceWrite returns
  *     it (it was dropped, so a skipped tool read exactly like a listed one), exchangeOutcome() is the
  *     shape a door answers with, and two warning rows join it: ALSO_LISTED_AS when a bound app-tool and
@@ -52,120 +62,26 @@
  *     authoring block) project from the manifest/action/offer onto the listing and into its sourceHash.
  *   v1.0.0 — 2026-07-25 — Initial projection + reconcile + legacy adoption (TARGET-050 slices 1 & 3).
  */
-import { createHash } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import { AppToolsDocSchema, appToolsKey, type AppTool } from '../models/app-tool-schemas.js';
 import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
 import { ensureInterfaceVersion, getLatestInterface } from './app-tool-interfaces.js';
 import {
   appToolCoordinate, agentWorkCoordinate, listAllOfferings, newOfferingId, putOffering,
-  type Offering, type OfferingPlan, type UsageTerms,
+  type Offering, type OfferingPlan,
 } from './exchange-market.js';
-import type { EntitlementUnit } from './metered-entitlements.js';
-import type { Provenance, OdpsExtras } from '../models/odps-schemas.js';
-import { ODPS_VERSION, mergeOdpsExtras, mergeProvenance, inheritAiProvenance, offeringOdpsOverruns } from './exchange-odps.js';
+import { mergeOdpsExtras, mergeProvenance, inheritAiProvenance, offeringOdpsOverruns } from './exchange-odps.js';
+import { hasSchema, usageTermsOf, provenanceOf, moneyPricesOf, contentHash, prices, pacingTollOf } from './exchange-source-terms.js';
+import type { ReconcileChange, ReconcileReport, DesiredListing } from './exchange-projection-types.js';
 import { logger } from '../utils/logger.js';
 
-/** One outcome line of a reconcile — the dry-run report is exactly this list. */
-export interface ReconcileChange {
-  action: 'created' | 'updated' | 'adopted' | 'delisted' | 'unchanged' | 'skipped' | 'warning';
-  offeringId: string | null;
-  kind: Offering['kind'];
-  label: string;                 // human coordinate, e.g. "prh.html/getStatistics"
-  unit: EntitlementUnit | null;
-  currency: string | null;
-  reason?: string;               // why it was skipped, or which warning: ALSO_LISTED_AS {label} / ODPS_FIELD_TOO_LONG {path}
-  /** A warning row's sentence for the owner: what is wrong, and what they can do about it. */
-  message?: string;
-  /** ALSO_LISTED_AS: the other listing that sells the same call. */
-  otherListing?: { kind: Offering['kind']; label: string; offeringId: string | null };
-  /** ODPS_FIELD_TOO_LONG: the field of the listing's ODPS document, its length and the schema's cap. */
-  odpsField?: { path: string; length: number; maxLength: number };
-}
-
-export interface ReconcileReport {
-  owner: string;
-  dryRun: boolean;
-  changes: ReconcileChange[];
-  created: number; updated: number; adopted: number; delisted: number; unchanged: number; skipped: number; warnings: number;
-}
-
-/** A listing the sources say SHOULD exist. `key` is its identity — price is deliberately not part of it. */
-interface DesiredListing {
-  key: string;
-  kind: Offering['kind'];
-  ext: string;
-  action: string;
-  surface: Offering['surface'];
-  title: string;
-  description: string;
-  unit: EntitlementUnit;
-  basePrice: number;
-  currency: string | null;
-  plans: OfferingPlan[];
-  taskSpec?: Offering['taskSpec'];
-  usageTerms: UsageTerms;
-  /** Provider descriptor data carried from the source onto the listing + its ODPS document. */
-  provenance: Provenance | null;
-  odps: OdpsExtras | null;
-  /**
-   * What the provider states about how much of this capability's OUTPUT a model wrote (TARGET-058).
-   * Optional on the interface as well as on the manifest: a source that predates the field, and one
-   * whose block failed to parse, look identical here — absent — and both still list.
-   */
-  aiProvenance?: Record<string, unknown> | null;
-  /** The provider's declared pacing burn, projected so a contract can capture it at accept. */
-  tollMorsels: number | null;
-  tags: string[];
-  sourceHash: string;
-  /** A bound app-tool's `action_id` (`ext:{name}:{action}`): how the ext-action listing of the same call is found. */
-  binding?: string;
-  /** The tool pins part of its input, which can make it a different product from the raw action. */
-  lockedInput?: boolean;
-}
+export type { ReconcileChange, ReconcileReport } from './exchange-projection-types.js';
 
 /** The dedupe identity of a listing: one per (kind, coordinate, unit, currency) — never one per relist. */
 const listingKey = (kind: string, ext: string, action: string, unit: string, currency: string | null): string =>
   `${kind}|${ext}|${action}|${unit}|${currency ?? ''}`;
 
 const offeringKey = (o: Offering): string => listingKey(o.kind, o.ext, o.action, o.unit, o.currency);
-
-const hasSchema = (v: unknown): boolean => !!v && typeof v === 'object' && Object.keys(v as Record<string, unknown>).length > 0;
-
-/** Same permissive-but-attributed defaults the manual listing route applies when a field is omitted. */
-function usageTermsOf(src: { derivatives?: boolean; resale?: boolean; attribution?: boolean; note?: string } | undefined): UsageTerms {
-  return {
-    derivatives: src?.derivatives !== false,
-    resale: src?.resale === true,
-    attribution: src?.attribution !== false,
-    ...(src?.note ? { note: src.note } : {}),
-  };
-}
-
-/** Stamp the ODPS version onto a source-declared provenance, so every descriptor says which version it follows. */
-function provenanceOf(src: Provenance | undefined): Provenance | null {
-  if (!src || !Object.keys(src).length) return null;
-  return { ...src, odpsVersion: src.odpsVersion ?? ODPS_VERSION };
-}
-
-/** Every money price a source declares, `priceMoney` first, de-duplicated by currency. */
-function moneyPricesOf(
-  primary: { amount: number; currency: string } | null | undefined,
-  extra: Array<{ amount: number; currency: string }> | undefined,
-): Array<{ amount: number; currency: string }> {
-  const out: Array<{ amount: number; currency: string }> = [];
-  const seen = new Set<string>();
-  for (const p of [primary, ...(extra ?? [])]) {
-    if (!p || typeof p.amount !== 'number' || !Number.isInteger(p.amount) || p.amount <= 0 || !p.currency) continue;
-    if (seen.has(p.currency)) continue;
-    seen.add(p.currency); out.push({ amount: p.amount, currency: p.currency });
-  }
-  return out;
-}
-
-function contentHash(parts: unknown): string {
-  return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 24);
-}
 
 /**
  * The OWNER GHII behind any principal: `agent#owner@node` and `owner@node` both resolve to
@@ -381,34 +297,6 @@ async function desiredFromAgentOffers(
   return out;
 }
 
-/** One price row per sellable unit: morsels (when priced) plus every declared money currency. */
-function prices(morsels: number, money: Array<{ amount: number; currency: string }>):
-  Array<{ unit: EntitlementUnit; basePrice: number; currency: string | null }> {
-  const rows: Array<{ unit: EntitlementUnit; basePrice: number; currency: string | null }> = [];
-  // A source that declares BOTH a money price and a morsel figure is stating ONE combined price:
-  // "1 morsel · 0.01 EUR". The money is what the provider is paid; the morsels pace the call
-  // (see pacingTollOf below, which carries them onto the listing as the toll). This used to emit
-  // a separate morsel listing beside the money one, which turned one product into two purchasable
-  // alternatives — and a buyer who took the morsel one got the whole thing for pacing tokens,
-  // which the platform itself says are not a currency. Nobody ever declared that second product.
-  // Morsels WITHOUT money stay a listing of their own: that is a deliberate no-money offer.
-  if (morsels > 0 && money.length === 0) rows.push({ unit: 'morsels', basePrice: morsels, currency: null });
-  for (const m of money) rows.push({ unit: 'money', basePrice: m.amount, currency: m.currency });
-  return rows;
-}
-
-/**
- * The pacing toll a listing carries. An explicit `tollMorsels` always wins — it is the declared
- * one. Otherwise, when a source prices in money AND names a morsel figure, that figure IS the
- * pacing half of the combined price and rides along as the toll, so a call costs the money to the
- * provider and burns the morsels. Money-only stays untolled; morsels-only is priced in morsels
- * already and must not be charged twice for the same number.
- */
-function pacingTollOf(declared: number | null | undefined, morsels: number, hasMoney: boolean): number | null {
-  if (declared != null) return declared;
-  return hasMoney && morsels > 0 ? morsels : null;
-}
-
 // ── RECONCILE ────────────────────────────────────────────────────────────────
 
 /**
@@ -441,7 +329,7 @@ export async function reconcileOwnerOfferings(
      pre-existing offerings, so a duplicate key would mint two rival cards — the exact defect this
      projection exists to prevent. First source wins, and the loser is REPORTED rather than dropped
      quietly: a capability that silently failed to list is worse than one that says why. */
-  const desired: DesiredListing[] = [];
+  const unique: DesiredListing[] = [];
   const claimed = new Map<string, DesiredListing>();
   for (const d of sourced) {
     const held = claimed.get(d.key);
@@ -450,7 +338,7 @@ export async function reconcileOwnerOfferings(
       continue;
     }
     claimed.set(d.key, d);
-    desired.push(d);
+    unique.push(d);
   }
 
   const mine = (await listAllOfferings(storage)).filter(o => o.providerOwner === ownerName);
@@ -461,6 +349,9 @@ export async function reconcileOwnerOfferings(
     // Prefer an already-projected listing, then a listed one, then whatever is oldest — so adoption is stable.
     if (!prev || (o.auto && !prev.auto) || (o.state === 'listed' && prev.state !== 'listed')) byKey.set(k, o);
   }
+  const { desired, settles, narrowing } = await listOnce(storage, ownerGhii, ownerName, opts, unique, mine, changes);
+  /** In this pass's hands: its own source, plus the extension actions list-once handed it. */
+  const inPass = (o: Offering): boolean => !scoped || inScope(o, opts) || (o.kind === 'ext-action' && settles.has(`${o.ext}|${o.action}`));
 
   const now = new Date().toISOString();
   const wanted = new Set<string>();
@@ -525,13 +416,13 @@ export async function reconcileOwnerOfferings(
   for (const o of mine) {
     if (!o.auto || o.state !== 'listed') continue;
     if (wanted.has(offeringKey(o))) continue;
-    if (scoped && !inScope(o, opts)) continue;
+    if (!inPass(o)) continue;
     if (!dryRun) await putOffering(storage, { ...o, state: 'delisted', updatedAt: now });
     changes.push({ action: 'delisted', offeringId: o.offeringId, kind: o.kind, label: `${o.ext}/${o.action}`, unit: o.unit, currency: o.currency });
   }
 
-  await warnAlsoListed(storage, ownerGhii, changes, resolved, mine.filter(o =>
-    o.state === 'listed' && !wanted.has(offeringKey(o)) && !(o.auto && (!scoped || inScope(o, opts)))));
+  await warnAlsoListed(storage, ownerGhii, changes, resolved, narrowing, mine.filter(o =>
+    o.state === 'listed' && !wanted.has(offeringKey(o)) && !(o.auto && inPass(o))));
   warnOdpsOverruns(changes, resolved);
   return summarise(ownerName, dryRun, changes);
 }
@@ -539,21 +430,85 @@ export async function reconcileOwnerOfferings(
 type Resolved = { d: DesiredListing; offering: Offering };
 
 /**
- * ALSO_LISTED_AS. A bound app-tool and the extension action it calls sit on different coordinates, so
- * DUPLICATE_OF (which compares keys) never sees them, and an owner who flagged both got two listings for
- * one call with nothing said. The default chosen on 2026-09-13, because delisting either would take a
- * live listing off the market (whether they should list once is the developer's decision): both stay
- * listed and the report names the pair, on each
- * side this pass is about. `others` are the owner's listings this pass leaves listed without touching, so
- * a scoped pass still sees the half that lives in another source.
+ * LIST ONCE, decided by the developer on 2026-09-13. A flagged app-tool whose `action_id` binds an
+ * extension action, and which does not fix part of its input, sells the very call the action sells. The
+ * tool is listed and the action is skipped with `DUPLICATE_OF {app}/{tool}`: the tool is the product a
+ * buyer contracts, and the action's own listing is a second card for the same call. A tool with
+ * `lockedInput` is a different product and changes nothing here. Only the LISTING goes: the raw route
+ * onto the action still honours its own `commercial` terms (routes/extensions/paywall.ts), untouched.
+ *
+ * Delisting takes nothing from a buyer. A contract is an entitlement keyed on (consumer, ext, action)
+ * with its price captured at accept, and no metered call reads the offering, so a contract signed
+ * against the action's listing keeps resolving at its agreed price; an extension action has no pinned
+ * interface to lose. Re-listing revives the same offering id. A listing made by hand is never delisted.
+ *
+ * Tools of EVERY app count, whatever the pass is scoped to (a scoped pass reads the other manifests
+ * without pinning anything). An app pass also takes on the owner's extension actions whose state its
+ * tools may have changed: one still listed that a tool now sells, and one flagged but not listed that no
+ * tool sells any more (the tool was switched off, rebound or removed). `settles` names them for the delist
+ * loop; `narrowing` names the tools that fix part of their input, for ALSO_LISTED_AS.
+ */
+async function listOnce(
+  storage: Storage, ownerGhii: string, ownerName: string, opts: { appId?: string; extName?: string; agentName?: string } | undefined,
+  unique: DesiredListing[], mine: Offering[], changes: ReconcileChange[],
+): Promise<{ desired: DesiredListing[]; settles: Set<string>; narrowing: Set<string> }> {
+  const settles = new Set<string>(), narrowing = new Set<string>();
+  if (opts?.agentName) return { desired: unique, settles, narrowing };
+  const tools = opts?.appId || opts?.extName
+    ? [...unique, ...(await desiredFromAppTools(storage, ownerGhii, ownerName, undefined, [], true)).filter(d => d.surface?.kind === 'app-tool' && d.surface.appId !== opts.appId)]
+    : unique;
+  const sellers = new Map<string, string[]>();
+  for (const t of tools) {
+    const m = t.kind === 'app-tool' && t.binding ? /^ext:([^:]+):(.+)$/.exec(t.binding) : null;
+    if (!m) continue;
+    if (t.lockedInput) { narrowing.add(labelOf(t)); continue; }
+    const k = `${m[1]}|${m[2]}`, list = sellers.get(k) ?? [];
+    if (!list.includes(labelOf(t))) sellers.set(k, [...list, labelOf(t)].sort());
+  }
+  let actions = unique.filter(d => d.kind === 'ext-action');
+  if (opts?.appId) {
+    const listed = new Set(mine.filter(o => o.kind === 'ext-action' && o.state === 'listed').map(o => `${o.ext}|${o.action}`));
+    actions = (await desiredFromExtActions(storage, ownerName, undefined, [])).filter(d => {
+      const k = `${d.ext}|${d.action}`, sold = sellers.get(k);
+      const mineSells = !!sold?.some(l => l.startsWith(`${opts.appId}/`));
+      return (sold && (listed.has(k) || mineSells)) || (!sold && !listed.has(k));
+    });
+    for (const d of actions) settles.add(`${d.ext}|${d.action}`);
+  }
+  const said = new Set<string>();
+  const keep = actions.filter(d => {
+    const sold = sellers.get(`${d.ext}|${d.action}`);
+    if (!sold) return true;
+    if (!said.has(labelOf(d))) {
+      said.add(labelOf(d));
+      changes.push({
+        action: 'skipped', offeringId: null, kind: d.kind, label: labelOf(d), unit: null, currency: null, reason: `DUPLICATE_OF ${sold[0]}`,
+        message: `${labelOf(d)} is not listed on its own: the app-tool ${sold.join(', ')} sells this same call, so EXCHANGE lists the tool`
+          + ' and not a second card for it. Contracts already signed on the action keep working at their agreed price.'
+          + ' To list both, make the tool a different product with lockedInput, or turn exchange off on the tool.',
+      });
+    }
+    return false;
+  });
+  const kept = new Set(keep);   // an app pass brought its actions in from outside `unique`; the others keep their place
+  return { desired: [...unique.filter(d => d.kind !== 'ext-action' || kept.has(d)), ...(opts?.appId ? keep : [])], settles, narrowing };
+}
+
+/**
+ * ALSO_LISTED_AS. A bound app-tool and the extension action it calls sit on different coordinates, so the
+ * key-based DUPLICATE_OF never sees them. After list-once, a pair is still listed twice in two cases: the
+ * tool fixes part of its input (a different product, so both stay), or one of the two was made by hand
+ * and the projection does not retire it. The report names the pair on each side this pass is about.
+ * `others` are the owner's listings this pass leaves listed without touching, so a scoped pass still sees
+ * the half that lives in another source; `narrowing` says which of those tools fix part of their input.
  */
 async function warnAlsoListed(
-  storage: Storage, ownerGhii: string, changes: ReconcileChange[], resolved: Resolved[], others: Offering[],
+  storage: Storage, ownerGhii: string, changes: ReconcileChange[], resolved: Resolved[], narrowing: Set<string>, others: Offering[],
 ): Promise<void> {
   type Live = { o: Offering; label: string; binding: string | null; lockedInput: boolean; inPass: boolean };
   const live: Live[] = [
     ...resolved.map(({ d, offering }) => ({ o: offering, label: labelOf(d), binding: d.binding ?? null, lockedInput: d.lockedInput === true, inPass: true })),
-    ...others.map(o => ({ o, label: labelOf(o), binding: o.capabilityBinding ?? null, lockedInput: false, inPass: false })),
+    ...others.map(o => ({ o, label: labelOf(o), binding: o.capabilityBinding ?? null, lockedInput: narrowing.has(labelOf(o)), inPass: false })),
   ];
   const actions = live.filter(l => l.o.kind === 'ext-action');
   if (!actions.length) return;
@@ -563,13 +518,15 @@ async function warnAlsoListed(
     if (!self.inPass || said.has(pair)) return;
     said.add(pair);
     const [tool, act] = self.o.kind === 'app-tool' ? [self, other] : [other, self];
+    const byHand = [tool, act].find(l => !l.o.auto);
     changes.push({
       action: 'warning', offeringId: self.o.offeringId, kind: self.o.kind, label: self.label, unit: null, currency: null,
       reason: `ALSO_LISTED_AS ${other.label}`,
       otherListing: { kind: other.o.kind, label: other.label, offeringId: other.o.offeringId },
-      message: `${self.label} is also listed as ${other.label}: the app-tool ${tool.label} calls the extension action ${act.label}`
-        + ' and both are flagged for EXCHANGE, so buyers see two listings for one call. Both stay listed; turn exchange off on the one you do not mean to sell.'
-        + (tool.lockedInput ? ' The tool fixes part of its input (lockedInput), so the two can be different products and both can be right.' : ''),
+      message: `${self.label} is also listed as ${other.label}: the app-tool ${tool.label} calls the extension action ${act.label}. `
+        + (tool.lockedInput ? 'The tool fixes part of its input (lockedInput), so the two are different products and both stay listed.'
+          : byHand ? `Buyers see two listings for one call, and the listing of ${byHand.label} was made by hand, which the projection never retires: delist it with DELETE /v1/exchange/offerings/${byHand.o.offeringId}.`
+            : 'Buyers see two listings for one call; turn exchange off on the one you do not mean to sell.'),
     });
   };
   for (const tool of live.filter(l => l.o.kind === 'app-tool')) {
@@ -582,7 +539,11 @@ async function warnAlsoListed(
   }
 }
 
-/** ODPS_FIELD_TOO_LONG: a warning, never a refusal and never a truncation (the 2026-09-13 default, open for the developer). One row per field of a label. */
+/**
+ * ODPS_FIELD_TOO_LONG on a listing: a warning, never a truncation. The developer decided on 2026-09-13
+ * that a write CHANGING such text is refused before it is stored (services/exchange-odps-write.ts), so
+ * what reaches this row is text a stored source already carried, which keeps publishing. One row per field of a label.
+ */
 function warnOdpsOverruns(changes: ReconcileChange[], resolved: Resolved[]): void {
   const said = new Set<string>();
   for (const { d, offering } of resolved) {
@@ -635,7 +596,7 @@ type OutcomeRow = Pick<ReconcileChange, 'label' | 'kind' | 'offeringId'>;
 /** What a door answers about the listings a source write produced: the report, sorted the way an owner reads it. */
 export type ExchangeOutcome =
   | { known: true; listed: Array<OutcomeRow & Pick<ReconcileChange, 'unit' | 'currency'> & { change: ReconcileChange['action'] }>;
-      delisted: OutcomeRow[]; skipped: Array<Pick<ReconcileChange, 'label' | 'kind'> & { reason: string }>;
+      delisted: OutcomeRow[]; skipped: Array<Pick<ReconcileChange, 'label' | 'kind' | 'message'> & { reason: string }>;
       warnings: Array<OutcomeRow & Pick<ReconcileChange, 'reason' | 'message' | 'otherListing' | 'odpsField'>> }
   | { known: false; note: string };
 
@@ -653,7 +614,7 @@ export function exchangeOutcome(report: ReconcileReport | null, ask: string): Ex
     listed: rows.filter(c => ['created', 'updated', 'adopted', 'unchanged'].includes(c.action))
       .map(c => ({ ...base(c), unit: c.unit, currency: c.currency, change: c.action })),
     delisted: rows.filter(c => c.action === 'delisted').map(base),
-    skipped: rows.filter(c => c.action === 'skipped').map(c => ({ label: c.label, kind: c.kind, reason: c.reason ?? '' })),
+    skipped: rows.filter(c => c.action === 'skipped').map(c => ({ label: c.label, kind: c.kind, reason: c.reason ?? '', ...(c.message ? { message: c.message } : {}) })),
     warnings: rows.filter(c => c.action === 'warning').map(c => ({
       ...base(c), reason: c.reason, message: c.message,
       ...(c.otherListing ? { otherListing: c.otherListing } : {}), ...(c.odpsField ? { odpsField: c.odpsField } : {}),

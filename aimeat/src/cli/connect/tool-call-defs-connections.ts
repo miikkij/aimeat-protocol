@@ -10,6 +10,10 @@
  *   resource allowlist and the whole outbound policy chain are the node's answer here too. Nothing
  *   in this file decides anything.
  * @version-history
+ *   v1.2.0 — 2026-09-13 — refuseUnsentSend() reads the SEND_FAILED error a current node answers
+ *     (502 or 503, the send-log row in error.details) as well as an older node's 200 'failed', and
+ *     returns both as the same error with message_id and reason at the top. The route's contract
+ *     changed that day by the developer's decision; the connector still meets older nodes.
  *   v1.1.0 — 2026-09-13 — aimeat_mail_send answers ok:false with SEND_FAILED when the node says the
  *     send did not go out. The 200 envelope used to pass through, so a refused send read as success.
  *     refuseUnsentSend() is shared with the connector MCP door.
@@ -24,17 +28,37 @@ const readPath = (connectionId: string, resource: string) =>
     `/v1/connections/${encodeURIComponent(connectionId)}/read/${encodeURIComponent(resource)}`;
 
 /**
- * A send that did not go out, turned from the REST answer into a refusal.
+ * A send that did not go out, as one refusal whatever node answered it.
  *
- * POST /v1/outbound/send answers 200 for every attempt that reached channel selection and says what
- * happened in `data.status`; that contract stays, because its callers read the field. A tool caller
- * reads `ok` instead, so a provider refusal passed through as a 200 was reported as a sent message
- * (appdev pitfall send-200-is-not-a-delivery). Both connector doors, this dispatch and the connector
- * MCP, answer through here, and the node MCP says the same thing from the service result.
- * Anything other than a non-sent outcome is handed back untouched.
+ * A tool caller reads `ok`, and a provider refusal passed through as a success was reported as a sent
+ * message (appdev pitfall send-200-is-not-a-delivery). Both connector doors, this dispatch and the
+ * connector MCP, answer through here; the node MCP says the same thing from the service's error.
+ *
+ * TWO SHAPES ARRIVE, because this connector is installed on its own and talks to nodes of other
+ * releases:
+ *   - a node from 2026-09-13 on answers SEND_FAILED (HTTP 502 or 503) with the send-log id and the
+ *     reason in `error.details`;
+ *   - an older node answers 200 with `data.status` 'failed' and the reason in `data.message.error`.
+ * Both come out as the same error, with `message_id`, `reason`, `status` and `channel` beside the code
+ * and the sentence, so an agent reads one shape. Anything else, a sent outcome or a refusal that is
+ * not about delivery, is handed back untouched.
  */
 export function refuseUnsentSend(resp: ApiResponse): ApiResponse {
-    const data = resp.ok ? resp.data as { status?: unknown; channel?: unknown; message?: { id?: unknown; error?: unknown } } | undefined : undefined;
+    if (!resp.ok) {
+        const err = resp.error as { code?: unknown; message?: unknown; details?: unknown } | undefined;
+        const details = err?.details as { message_id?: unknown; status?: unknown; channel?: unknown; reason?: unknown } | undefined;
+        if (err?.code !== 'SEND_FAILED' || !details || typeof details !== 'object') return resp;
+        const refusal = {
+            code: 'SEND_FAILED',
+            message: typeof err.message === 'string' ? err.message : 'Not sent. Nothing reached the recipient.',
+            status: details.status,
+            channel: details.channel,
+            message_id: typeof details.message_id === 'string' ? details.message_id : null,
+            reason: details.reason,
+        };
+        return { ok: false, error: refusal };
+    }
+    const data = resp.data as { status?: unknown; channel?: unknown; message?: { id?: unknown; error?: unknown } } | undefined;
     if (!data || typeof data.status !== 'string' || data.status === 'sent') return resp;
     const messageId = typeof data.message?.id === 'string' ? data.message.id : null;
     const reason = typeof data.message?.error === 'string' && data.message.error ? data.message.error : data.status;
@@ -101,7 +125,8 @@ export const connectionCliTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.post(readPath(requiredString(input, 'connection_id'), 'sendAs'), {}),
     },
     {
-        // → POST /v1/outbound/send — the policied door, not around it.
+        // → POST /v1/outbound/send: the policied door, not around it. A send that did not go out
+        //   comes back as SEND_FAILED from either node generation, through refuseUnsentSend.
         name: 'aimeat_mail_send',
         handler: async ({ client }, input) => {
             const body: Record<string, unknown> = {

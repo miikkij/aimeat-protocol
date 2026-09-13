@@ -5,11 +5,14 @@
  *   while the authoring schemas accept far more. `license.scope.restrictions` is the one that bit: it is
  *   the node's own usage sentences (0 to 120 characters) joined with the provider's usageTerms.note and
  *   odps.license.restrictions, capped at 255, and an outside validator refused the document while the
- *   node said nothing. The 2026-09-13 default, open for the developer: warn, never refuse and never truncate. These tests hold the
- *   limits table to the vendored schema, the check to what a real JSON Schema validator refuses, and the
- *   warning to the reconcile report a publish reads.
+ *   node said nothing. The developer decided on 2026-09-13 that a write CHANGING such text is refused
+ *   (test/unit/exchange-odps-write.test.ts); a listing whose stored source already carries it is warned
+ *   and never truncated. These tests hold the limits table to the vendored schema, the check to what a
+ *   real JSON Schema validator refuses, and the warning to the reconcile report a publish reads.
  * @usage cd aimeat && pnpm exec vitest run test/unit/exchange-odps-length.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-13 — The listing warning is for text a stored source already carries; the refusal
+ *     of changed text lives in exchange-odps-write.test.ts. The message says a changing write is refused.
  *   v1.0.0 — 2026-09-13 — Initial (appdev pitfall usageterms-note-caps-at-156-not-255).
  */
 import { describe, it, expect } from 'vitest';
@@ -92,6 +95,7 @@ describe('odpsLengthOverruns', () => {
     expect(overruns[0].message).toContain('255');
     expect(overruns[0].message).toContain('usageTerms.note');
     expect(overruns[0].message).toContain('99');
+    expect(overruns[0].message).toContain('write that changes this text is refused');
   });
 
   it('agrees with a real JSON Schema validator on which fields are too long', () => {

@@ -10,6 +10,14 @@
  *   projection-aware delist guard.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange-projection.ts
  * @version-history
+ *   v1.3.0 — 2026-09-13 — The developer's two decisions. LIST ONCE: a tool and the flagged extension
+ *     action it calls list once (the action is skipped DUPLICATE_OF and its listing withdrawn, a contract
+ *     on it keeps settling at 3), a lockedInput tool brings the action back under the same id with
+ *     ALSO_LISTED_AS on both sides, and another owner's tool takes nothing off this owner's market.
+ *     ODPS_FIELD_TOO_LONG at the write: refused 422 with field, length, cap and room on MCP
+ *     app_tools_publish, POST, PUT and PATCH /v1/memory, PUT offers (another owner hears 403 first)
+ *     and the extension install, with nothing written; text a stored record already carries still
+ *     publishes with the warning until one character of it changes.
  *   v1.2.0 — 2026-09-13 — What a publish says back: aimeat_app_tools_publish over MCP and PUT
  *     /v1/agents/:name/offers name what listed, what was skipped and why, and the warnings
  *     (ALSO_LISTED_AS for a tool that duplicates a flagged extension action, ODPS_FIELD_TOO_LONG for a
@@ -625,10 +633,21 @@ await test('An EXTENSION ACTION carries its own ODPS descriptor from the manifes
 // ── What a publish says back (2026-09-13). The shared write reconciled the listings and dropped the
 // report, so a tool flagged and priced but skipped answered `priced: true` like one that listed; a tool
 // bound to an extension action that was itself flagged made two listings and said nothing; and a long
-// usage note produced an ODPS document outside the schema without a word.
-await test('MCP app_tools_publish names what listed, what was skipped and why, and the warnings', async () => {
-  const XDUP = `xdup${Date.now()}`;
-  const DUP_APP = `dup-${Date.now()}.html`;
+// usage note produced an ODPS document outside the schema without a word. The developer then decided
+// both open questions the same day: a tool and the extension action it calls LIST ONCE (unless the tool
+// fixes part of its input), and a write that makes an ODPS field too long is REFUSED unless that text
+// was already stored.
+const XDUP = `xdup${Date.now()}`;
+const DUP_APP = `dup-${Date.now()}.html`;
+const DUP_TOOLS = (over: Record<string, unknown> = {}) => [
+  { name: 'find', action_id: `ext:${XDUP}:search`, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, price: { morsels: 5 }, exchange: true,
+    usageTerms: TERMS, ...over },
+  { name: 'noout', action_id: `ext:${XDUP}:search`, inputSchema: IN_SCHEMA, price: { morsels: 5 }, exchange: true },
+];
+let sellerMcp: Awaited<ReturnType<typeof mcpSession>>;
+let dupActionId = '';
+
+await test('MCP app_tools_publish lists a tool and the extension action it calls ONCE, and says what it skipped and why', async () => {
   const ins = await json('/v1/extensions', {
     method: 'POST', headers: auth(provider.token),
     body: JSON.stringify({
@@ -642,56 +661,164 @@ await test('MCP app_tools_publish names what listed, what was skipped and why, a
   });
   assert(ins.status === 201, `a new extension installs with 201, got ${ins.status}: ${JSON.stringify(ins.body?.error)}`);
   await json(`/v1/extensions/${XDUP}/activate`, { method: 'POST', headers: auth(provider.token) });
-  assert((await myOfferings(provider.token)).some(o => o.ext === XDUP && o.action === 'search' && o.state === 'listed'),
-    'the flagged extension action is listed before the tool is published');
+  const before = (await myOfferings(provider.token)).find(o => o.ext === XDUP && o.action === 'search' && o.state === 'listed');
+  assert(!!before, 'the flagged extension action is listed before the tool is published');
+  dupActionId = before.offeringId;
+
+  // A buyer contracts the action's own listing while it is the only one.
+  const acc = await json('/v1/exchange/entitlements', {
+    method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ offering_id: dupActionId, cap_units: 100 }),
+  });
+  assert(acc.status === 201 && acc.body.data.entitlement.price_per_call === 3, `contract on the action at 3: ${acc.status} ${JSON.stringify(acc.body?.error ?? acc.body.data.entitlement)}`);
 
   const reg = await json('/v1/agents', {
     method: 'POST', headers: auth(provider.token),
     body: JSON.stringify({ name: `seller${Date.now()}`.slice(0, 28), owner: provider.name, capabilities: ['commerce'], scopes: ['commerce:sell', 'memory:read', 'memory:write'] }),
   });
   assert(reg.status === 201, `register seller agent ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-  const mcp = await mcpSession(reg.body.data.agent.gaii, reg.body.data.private_key);
-  const note = 'n'.repeat(200);
-  const r = await mcp.call('aimeat_app_tools_publish', {
-    app_id: DUP_APP,
-    tools: [
-      { name: 'find', action_id: `ext:${XDUP}:search`, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, price: { morsels: 5 }, exchange: true,
-        usageTerms: { derivatives: true, resale: false, attribution: true, note } },
-      { name: 'noout', action_id: `ext:${XDUP}:search`, inputSchema: IN_SCHEMA, price: { morsels: 5 }, exchange: true },
-    ],
-  });
+  sellerMcp = await mcpSession(reg.body.data.agent.gaii, reg.body.data.private_key);
+  const r = await sellerMcp.call('aimeat_app_tools_publish', { app_id: DUP_APP, tools: DUP_TOOLS() });
   assert(!r.isError, `publish: ${r.text.slice(0, 300)}`);
   const ex = r.data?.exchange;
   assert(ex?.known === true, `the answer carries the projection's outcome: ${JSON.stringify(ex).slice(0, 300)}`);
   const listed = (ex.listed as any[]).find(l => l.label === `${DUP_APP}/find`);
   assert(!!listed && typeof listed.offeringId === 'string', `the listed tool is named with its offering: ${JSON.stringify(ex.listed)}`);
-  assert((ex.skipped as any[]).some(s => s.label === `${DUP_APP}/noout` && s.reason === 'SCHEMA_REQUIRED'),
-    `the skipped tool is named with its reason: ${JSON.stringify(ex.skipped)}`);
-  const warns = ex.warnings as any[];
-  assert(warns.some(w => w.label === `${DUP_APP}/find` && w.reason === `ALSO_LISTED_AS ${XDUP}/search` && w.otherListing?.kind === 'ext-action'),
-    `the duplicate of the flagged extension action is named: ${JSON.stringify(warns)}`);
-  const long = warns.find(w => w.reason === 'ODPS_FIELD_TOO_LONG product.license.scope.restrictions');
-  assert(!!long && long.odpsField?.maxLength === 255 && long.odpsField?.length === 299 && String(long.message).includes('usageTerms.note'),
-    `the ODPS overrun is named with its numbers: ${JSON.stringify(warns)}`);
+  assert(!(ex.listed as any[]).some(l => l.label === `${XDUP}/search`), `the extension action is not listed beside it: ${JSON.stringify(ex.listed)}`);
+  const skipped = ex.skipped as any[];
+  assert(skipped.some(s => s.label === `${DUP_APP}/noout` && s.reason === 'SCHEMA_REQUIRED'), `the skipped tool is named with its reason: ${JSON.stringify(skipped)}`);
+  const dup = skipped.find(s => s.label === `${XDUP}/search`);
+  assert(dup?.reason === `DUPLICATE_OF ${DUP_APP}/find` && String(dup.message).includes('agreed price'),
+    `the action is skipped as the tool's duplicate, with a sentence: ${JSON.stringify(skipped)}`);
+  assert((ex.delisted as any[]).some(d => d.offeringId === dupActionId), `the action's listing is withdrawn, and said: ${JSON.stringify(ex.delisted)}`);
+  assert(!(ex.warnings as any[]).some(w => String(w.reason).startsWith('ALSO_LISTED_AS')), `nothing is listed twice: ${JSON.stringify(ex.warnings)}`);
 
-  // Warned, never delisted: both listings stay on the market.
-  const mine = await myOfferings(provider.token);
-  assert(mine.filter(o => o.ext === XDUP && o.action === 'search' && o.state === 'listed').length === 1, 'the extension action is still listed');
-  assert(mine.filter(o => o.ext === `apptool:${provider.name}/${DUP_APP}` && o.action === 'find' && o.state === 'listed').length === 1, 'and so is the tool');
-
-  // The full reconcile report says it on both sides.
+  // Read by id: the market list reconciles first and could hide what the publish itself did.
+  const byId = await json(`/v1/exchange/offerings/${dupActionId}`);
+  assert(byId.status === 200 && byId.body.data.offering.state === 'delisted', `the same offering id, delisted: ${JSON.stringify(byId.body.data?.offering?.state)}`);
   const dry = await json('/v1/exchange/reconcile', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ dry_run: true }) });
   assert(dry.status === 200, `dry run ${dry.status}`);
+  const changes = dry.body.data.changes as any[];
+  assert(changes.some(c => c.action === 'skipped' && c.label === `${XDUP}/search` && c.reason === `DUPLICATE_OF ${DUP_APP}/find`)
+    && !changes.some(c => String(c.reason).startsWith('ALSO_LISTED_AS') && (c.label === `${XDUP}/search` || c.label === `${DUP_APP}/find`)),
+    `a full reconcile agrees: ${JSON.stringify(changes.filter(c => c.label === `${XDUP}/search`))}`);
+});
+
+await test('…and the contract signed on the withdrawn action keeps settling at its agreed price', async () => {
+  const ent = async () => ((await json('/v1/exchange/entitlements', { headers: auth(consumer.token) })).body.data.entitlements as any[])
+    .find(e => e.ext === XDUP && e.action === 'search');
+  const was = await ent();
+  assert(was?.state === 'active' && was.price_per_call === 3 && was.contract_ref === `offering:${dupActionId}`, `the contract is intact: ${JSON.stringify(was)}`);
+  const call = await json(`/v1/ext/${XDUP}/search`, { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ q: 'x' }) });
+  assert(call.status === 200, `the holder still gets through on the raw route, got ${call.status}: ${JSON.stringify(call.body?.error)}`);
+  const now = await ent();
+  assert(now.budget.calls === was.budget.calls + 1 && now.budget.spent_units === was.budget.spent_units + 3,
+    `one call, charged the 3 signed: ${JSON.stringify(was.budget)} → ${JSON.stringify(now.budget)}`);
+});
+
+await test('A tool that fixes part of the input is a different product: the action comes back, and both carry ALSO_LISTED_AS', async () => {
+  const r = await sellerMcp.call('aimeat_app_tools_publish', { app_id: DUP_APP, tools: DUP_TOOLS({ lockedInput: { businessId: 'budget' } }) });
+  assert(!r.isError, `publish: ${r.text.slice(0, 300)}`);
+  const ex = r.data.exchange;
+  assert((ex.listed as any[]).some(l => l.label === `${XDUP}/search` && l.offeringId === dupActionId),
+    `the action lists again under the SAME offering id: ${JSON.stringify(ex.listed)}`);
+  const w = (ex.warnings as any[]).find(x => x.label === `${DUP_APP}/find` && x.reason === `ALSO_LISTED_AS ${XDUP}/search`);
+  assert(!!w && String(w.message).includes('lockedInput') && w.otherListing?.offeringId === dupActionId, `the pair is named: ${JSON.stringify(ex.warnings)}`);
+  const dry = await json('/v1/exchange/reconcile', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ dry_run: true }) });
   const rows = (dry.body.data.changes as any[]).filter(c => c.action === 'warning' && String(c.reason).startsWith('ALSO_LISTED_AS'));
   assert(rows.some(c => c.label === `${XDUP}/search` && c.reason === `ALSO_LISTED_AS ${DUP_APP}/find`)
-    && rows.some(c => c.label === `${DUP_APP}/find` && c.reason === `ALSO_LISTED_AS ${XDUP}/search`),
-    `both sides are warned: ${JSON.stringify(rows)}`);
-  assert(typeof dry.body.data.warnings === 'number' && dry.body.data.warnings >= 3, `the warning count: ${dry.body.data.warnings}`);
+    && rows.some(c => c.label === `${DUP_APP}/find` && c.reason === `ALSO_LISTED_AS ${XDUP}/search`), `both sides are warned: ${JSON.stringify(rows)}`);
+});
 
-  // Never truncated: the published document keeps the note whole.
-  const doc = await json(`/v1/exchange/offerings/${listed.offeringId}/odps`);
-  const restrictions = String(doc.body.data?.odps?.product?.license?.scope?.restrictions ?? '');
-  assert(restrictions.length === 299 && restrictions.endsWith(note), `the restriction text is published as written (${restrictions.length})`);
+await test("Another owner's tool naming this owner's extension action takes nothing off this owner's market", async () => {
+  const other = await setupOwner('lo');
+  const w = await json('/v1/memory', {
+    method: 'POST', headers: auth(other.token),
+    body: JSON.stringify({ key: `apps.theirs-${Date.now()}.html.tools`, visibility: 'public', value: { version: 1, tools: [
+      { name: 'grab', action_id: `ext:${XDUP}:search`, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, price: { morsels: 1 }, exchange: true, usageTerms: TERMS },
+    ] } }),
+  });
+  assert(w.status === 201, `their manifest ${w.status}: ${JSON.stringify(w.body?.error)}`);
+  const byId = await json(`/v1/exchange/offerings/${dupActionId}`);
+  assert(byId.body.data.offering.state === 'listed', `still listed after a stranger's publish: ${byId.body.data.offering.state}`);
+  // Nor does this owner's own full reconcile count a stranger's tool as the seller of their action.
+  const dry = await json('/v1/exchange/reconcile', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ dry_run: true }) });
+  assert(!(dry.body.data.changes as any[]).some(c => c.label === `${XDUP}/search` && c.action === 'skipped'),
+    `the action is not skipped for a tool of another owner: ${JSON.stringify((dry.body.data.changes as any[]).filter(c => c.label === `${XDUP}/search`))}`);
+});
+
+await test('ODPS_FIELD_TOO_LONG: a changed text past the cap is refused on every door, before anything is written', async () => {
+  const note = 'n'.repeat(200);                     // 98 characters of node sentences + a space + 200 = 299 > 255
+  const long = { usageTerms: { ...TERMS, note } };
+  const room156 = (fields: any[]) => fields?.some(f => f.source_field.endsWith('usageTerms.note') && f.odps_field === 'product.license.scope.restrictions'
+    && f.length === 299 && f.max_length === 255 && f.room === 156);
+
+  // MCP: the manifest keeps its stored version.
+  const stored = (await sellerMcp.call('aimeat_app_tools_get', { app_id: DUP_APP })).data.manifest;
+  const m = await sellerMcp.call('aimeat_app_tools_publish', { app_id: DUP_APP, tools: DUP_TOOLS(long) });
+  assert(m.isError && m.text.startsWith('ODPS_FIELD_TOO_LONG') && m.text.includes('tools[find].usageTerms.note') && m.text.includes('"room":156'),
+    `the MCP door refuses and names the field and the room: ${m.text.slice(0, 400)}`);
+  const after = (await sellerMcp.call('aimeat_app_tools_get', { app_id: DUP_APP })).data.manifest;
+  assert(after.version === stored.version && !JSON.stringify(after).includes(note), 'nothing was written');
+
+  // POST /v1/memory (the door the connector and the CLI publish through): a new key is not created.
+  const NEW_APP = `long-${Date.now()}.html`;
+  const post = await json('/v1/memory', {
+    method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ key: `apps.${NEW_APP}.tools`, visibility: 'public', value: { version: 1, tools: DUP_TOOLS(long) } }),
+  });
+  assert(post.status === 422 && post.body.error?.code === 'ODPS_FIELD_TOO_LONG' && room156(post.body.error?.details?.fields),
+    `POST /v1/memory refuses with the numbers: ${post.status} ${JSON.stringify(post.body?.error)}`);
+  assert((await json(`/v1/memory/${encodeURIComponent(`apps.${NEW_APP}.tools`)}`, { headers: auth(provider.token) })).status === 404, 'and creates nothing');
+
+  // PUT and PATCH /v1/memory/:key on the stored manifest.
+  const key = encodeURIComponent(`apps.${DUP_APP}.tools`);
+  const rec = await json(`/v1/memory/${key}`, { headers: auth(provider.token) });
+  const put = await json(`/v1/memory/${key}`, { method: 'PUT', headers: auth(provider.token), body: JSON.stringify({ value: { ...rec.body.data.value, tools: DUP_TOOLS(long) }, version: rec.body.data.version }) });
+  assert(put.status === 422 && put.body.error?.code === 'ODPS_FIELD_TOO_LONG' && room156(put.body.error?.details?.fields), `PUT refuses: ${put.status} ${JSON.stringify(put.body?.error)}`);
+  const patch = await json(`/v1/memory/${key}`, { method: 'PATCH', headers: auth(provider.token), body: JSON.stringify({ patch: { tools: DUP_TOOLS(long) } }) });
+  assert(patch.status === 422 && patch.body.error?.code === 'ODPS_FIELD_TOO_LONG', `PATCH refuses: ${patch.status} ${JSON.stringify(patch.body?.error)}`);
+  const unchanged = await json(`/v1/memory/${key}`, { headers: auth(provider.token) });
+  assert(unchanged.body.data.version === rec.body.data.version, `the record is where it was: v${rec.body.data.version} → v${unchanged.body.data.version}`);
+
+  // An extension install whose flagged action carries the note.
+  const XLONG = `xlong${Date.now()}`;
+  const ext = await json('/v1/extensions', {
+    method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({
+      manifest: JSON.stringify({
+        metadata: { name: XLONG, version: '1.0.0', description: 'long note', author: 'e2e' },
+        actions: [{ id: 'search', method: 'POST', path: '/search', script: 'echo', input: IN_SCHEMA, output: OUT_SCHEMA,
+          commercial: { payMorsels: 3, exchange: true, usageTerms: { ...TERMS, note } } }],
+      }),
+      scripts: { echo: 'export default async function(ctx, input){ return { echo: input }; }' },
+    }),
+  });
+  assert(ext.status === 422 && ext.body.error?.code === 'ODPS_FIELD_TOO_LONG' && room156(ext.body.error?.details?.fields),
+    `the extension install refuses: ${ext.status} ${JSON.stringify(ext.body?.error)}`);
+  assert((await json(`/v1/extensions/${XLONG}`, { headers: auth(provider.token) })).status === 404, 'and installs nothing');
+});
+
+await test('ODPS_FIELD_TOO_LONG: text a stored record already carries keeps publishing, with the warning, until it changes', async () => {
+  // Stored while the tool was not for sale, which no rule refuses, then flagged without touching the text.
+  const note = 'n'.repeat(200);
+  const APPX = `kept-${Date.now()}.html`;
+  const write = (over: Record<string, unknown>) => json('/v1/memory', {
+    method: 'POST', headers: auth(provider.token),
+    // Bound to the unpriced `free` action, so this listing takes no extension action off the market.
+    body: JSON.stringify({ key: `apps.${APPX}.tools`, visibility: 'public', value: { version: 1, tools: DUP_TOOLS({ action_id: capId, usageTerms: { ...TERMS, note }, ...over }).slice(0, 1) } }),
+  });
+  const off = await write({ exchange: false });
+  assert(off.status === 201, `an unflagged tool with a long note is stored: ${off.status} ${JSON.stringify(off.body?.error)}`);
+  const on = await write({});
+  assert(on.status === 200, `flagging it leaves the stored text as it was, so it is not refused: ${on.status} ${JSON.stringify(on.body?.error)}`);
+  const warn = (on.body.data.exchange?.warnings as any[] ?? []).find(w => w.reason === 'ODPS_FIELD_TOO_LONG product.license.scope.restrictions');
+  assert(!!warn && warn.odpsField?.length === 299, `it lists with the warning: ${JSON.stringify(on.body.data.exchange)}`);
+  const repriced = await write({ price: { morsels: 6 } });
+  assert(repriced.status === 200, `republishing for a price change still passes: ${repriced.status} ${JSON.stringify(repriced.body?.error)}`);
+  const doc = await json(`/v1/exchange/offerings/${(on.body.data.exchange.listed as any[])[0].offeringId}/odps`);
+  assert(String(doc.body.data?.odps?.product?.license?.scope?.restrictions ?? '').endsWith(note), 'and the text is published whole, never cut');
+  const edited = await write({ usageTerms: { ...TERMS, note: `${note}!` } });
+  assert(edited.status === 422 && edited.body.error?.details?.fields?.[0]?.length === 300, `changing the text by one character is refused: ${edited.status} ${JSON.stringify(edited.body?.error)}`);
 });
 
 await test('Adopting a hand-authored listing never erases an attestation its source cannot express', async () => {
@@ -788,6 +915,24 @@ await test('PUT offers answers which offers listed, and names the skipped ones w
   const clear = await json(`/v1/agents/${encodeURIComponent(AGENT)}/offers`, { method: 'PUT', headers: auth(provider.token), body: JSON.stringify({ offers: [] }) });
   assert(clear.status === 200 && (clear.body.data.exchange?.delisted as any[])?.some(d => d.offeringId),
     `clearing the offers delists the one that sold, and says so: ${JSON.stringify(clear.body.data.exchange)}`);
+});
+
+await test('PUT offers refuses ODPS_FIELD_TOO_LONG before the write, and another owner hears 403 before the length is read', async () => {
+  const note = 'n'.repeat(200);
+  const offer = { id: 'longnote', title: 'Long note', ask: 'Send an id.', deliverable: { format: 'document', sample: 'untested' },
+    inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, price: { morsels: 4 }, exchange: true, visibility: 'public', usageTerms: { ...TERMS, note } };
+  const r = await json(`/v1/agents/${encodeURIComponent(AGENT)}/offers`, { method: 'PUT', headers: auth(provider.token), body: JSON.stringify({ offers: [offer] }) });
+  const f = r.body.error?.details?.fields?.[0];
+  assert(r.status === 422 && r.body.error?.code === 'ODPS_FIELD_TOO_LONG'
+    && f?.entry === `${AGENT}:longnote` && f.source_field === 'offers[longnote].usageTerms.note' && f.length === 299 && f.max_length === 255 && f.room === 156,
+    `PUT offers refuses with the numbers: ${r.status} ${JSON.stringify(r.body?.error)}`);
+  const stored = await json(`/v1/agents/${encodeURIComponent(AGENT)}/offers`, { headers: auth(provider.token) });
+  assert((stored.body.data.offers as any[]).length === 0, `nothing was written: ${JSON.stringify(stored.body.data.offers)}`);
+  const stranger = await setupOwner('ol');
+  const foreign = await json(`/v1/agents/${encodeURIComponent(`${AGENT}#${provider.name}@${NODE_ID}`)}/offers`, {
+    method: 'PUT', headers: auth(stranger.token), body: JSON.stringify({ offers: [offer] }),
+  });
+  assert(foreign.status === 403 && foreign.body.error?.code === 'ACCESS_DENIED', `another owner hears 403, not the length rule: ${foreign.status} ${JSON.stringify(foreign.body?.error)}`);
 });
 
 await test('An unbound tool with a named agent lists as AGENT-WORK carrying its taskSpec', async () => {

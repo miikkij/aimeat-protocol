@@ -127,10 +127,19 @@ The connection is resolved and authorised **before the first gate**, so a refuse
 with the sender who attempted it. It must be the caller's own and must carry `send-mail`; otherwise
 the refusal names the repair. Scopes: `outbound:send` and `connections:use`, both.
 
-A send the provider refused, or one the node had no transport for, comes back from the tool as an
-error carrying the reason; over REST it is a 200 with `data.status` "failed". A success means the
-message was handed over, which is still **not a delivery**: a bounce shows up on the contact
-afterwards.
+A send that did not go out is an error on every door, and it is still in the send log. Over REST
+it is `SEND_FAILED`, with the log row and the reason in `error.details`
+(`{ message_id, status, channel, reason }`); a tool answers the same fields as an error result.
+The HTTP status says which of two things happened:
+
+| Status | What happened | Reasons you will see |
+|---|---|---|
+| **502** | The channel refused or failed the message: the node's SMTP server, the company's own server, the connected mailbox's provider, or the recipient's AIMEAT inbox | `SMTP_SEND_FAILED`; `MAILBOX_NOT_PERMITTED`, `MAILBOX_RATE_LIMITED`, `MAILBOX_NEEDS_REAUTH`, `MAILBOX_UNREACHABLE`, `MAILBOX_HTTP_<status>`; `BLOCKED`, `RECIPIENT_NOT_FOUND`; or the company server's own words |
+| **503** | The node had nothing to send through: no shared transport, and no mailbox or company server was named | `EMAIL_DISABLED` |
+
+Until 2026-09-13 the REST answer was a 200 with `data.status` "failed", which a caller reading the
+status took for a sent message. A 200 now means the message was handed over, which is still **not a
+delivery**: a bounce shows up on the contact afterwards.
 
 ### The Google alias, which is the button people mean
 

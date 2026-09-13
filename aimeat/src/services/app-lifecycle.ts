@@ -44,6 +44,9 @@
  *     routes/apps/fork-manage.ts, mcp/apps.ts and mcp/apps-fork.ts, which held two copies of each of
  *     these four acts.
  *   v1.1.0 — 2026-09-03 — A fork refreshes the dependency map for the new app; a delete forgets its edges.
+ *   v1.2.0 — 2026-09-13 — stageAppDraft removes the node's serve marks from a served copy before the
+ *     slot is written (stripServedMarks, the function publishApp uses) and names them in
+ *     servedMarksRemoved, so every draft door stores the source rather than the served page.
  */
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -57,6 +60,7 @@ import { emitChange } from './event-bus.js';
 import { recordPublicActivity } from './public-activity.js';
 import { appQuotaRefusal } from './install-quotas.js';
 import { lintAppAiDisclosure } from './app-ai-posture.js';
+import { stripServedMarks, type ServedMarkRemoval } from './app-serve-marks-strip.js';
 import { publishApp, type PublishAppRefusal, type PublishAppResult } from './app-publish.js';
 import type { DeclaredProvenance } from './ai-provenance.js';
 import { refreshAppDependencies, forgetDependencies, appRef as depAppRef } from './dependency-map.js';
@@ -165,6 +169,8 @@ export interface StagedAppDraft {
   updatedAt: string;
   hasLiveVersion: boolean;
   liveVersionNumber: number;
+  /** The node's serve marks a served copy carried, removed before the slot was written. */
+  servedMarksRemoved: ServedMarkRemoval[];
 }
 
 /**
@@ -175,17 +181,17 @@ export interface StagedAppDraft {
 export async function stageAppDraft(
   storage: Storage, config: AimeatConfig, input: StageAppDraftInput,
 ): Promise<StagedAppDraft | PublishAppRefusal> {
-  const { ownerName, ownerGhii, filename, data, requested } = input;
+  const { ownerName, ownerGhii, filename, requested } = input;
 
   const badName = appFilenameRefusal(filename);
   if (badName) return badName;
 
   const maxBytes = config.appMaxSizeMb * 1024 * 1024;
-  if (data.length > maxBytes) {
+  if (input.data.length > maxBytes) {
     return {
       refusal: {
         status: 413, code: 'TOO_LARGE',
-        message: `Draft exceeds ${config.appMaxSizeMb}MB limit (${data.length} bytes)`,
+        message: `Draft exceeds ${config.appMaxSizeMb}MB limit (${input.data.length} bytes)`,
       },
     };
   }
@@ -215,6 +221,10 @@ export async function stageAppDraft(
   if (base?.cortex?.agents?.length) manifest.cortex = base.cortex;
 
   const mimeType = requested.mimeType ?? live?.mimeType ?? 'text/html';
+  // A served copy is staged as its source, by the same function the publish uses.
+  const { data, removed: servedMarksRemoved } = /html/i.test(mimeType)
+    ? stripServedMarks(input.data)
+    : { data: Buffer.from(input.data), removed: [] as ServedMarkRemoval[] };
   const updatedAt = new Date().toISOString();
   await storage.saveAppDraft({
     ownerGaii: ownerGhii, ownerName, filename, manifest,
@@ -227,6 +237,7 @@ export async function stageAppDraft(
     updatedAt,
     hasLiveVersion: !!live,
     liveVersionNumber: live?.versionNumber ?? 0,
+    servedMarksRemoved,
   };
 }
 

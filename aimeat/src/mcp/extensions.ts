@@ -11,6 +11,8 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v2.4.1 — 2026-09-13 — An install refusal carries its details (ODPS_FIELD_TOO_LONG names the field,
+ *     its length, the cap and the room left).
  *   v2.4.0 — 2026-09-13 — aimeat_extension_get takes include_source and returns each action's
  *     script_content past the installer check GET /v1/extensions/:name?full=true applies. The scripts
  *     were readable over HTTP only, so an agent extending its own installed extension had to rebuild
@@ -506,7 +508,7 @@ export function registerExtensionsTools(
                     isOperator: caller.roles.includes('operator'),
                 });
                 if (!written.ok) {
-                    return { content: [{ type: 'text' as const, text: `${written.code}: ${written.message}` }], isError: true };
+                    return { content: [{ type: 'text' as const, text: `${written.code}: ${written.message}${written.details ? `\n${JSON.stringify(written.details)}` : ''}` }], isError: true };
                 }
                 const result = written.record;
                 logger.info(`Extension ${written.action} via MCP: ${result.name}`, {

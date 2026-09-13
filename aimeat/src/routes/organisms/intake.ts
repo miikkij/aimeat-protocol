@@ -22,6 +22,11 @@
  *   v1.0.0 — 2026-07-16 — Initial: generic Public Intake capability (forms CRUD + anon submit).
  *   v1.1.0 — 2026-07-16 — Server-computed default tokens ({{now}}/{{today}}/{{uuid}}) resolved per
  *     submission, so a form can stamp a schema-required created-at/id without the node knowing field names.
+ *   v1.3.0 — 2026-09-13 — UNDECLARED_SPACE (the developer's decision): a form whose destination
+ *     namespace the workspace manifest does not declare is refused when it is defined, 422, and a
+ *     submission to such a form is refused before anything is written, draft or published, with the
+ *     public wording that names neither the namespace nor the workspace's spaces. The published
+ *     submit ignored what publishDraftsBatch answered; it now answers that refusal too.
  *   v1.2.0 — 2026-09-13 — POST /v1/intake/forms refuses a form its destination cannot hold: 422
  *     INTAKE_SCHEMA_MISMATCH naming every property ("id", an allowed field, a default) the space's
  *     closed schema does not list. The definition used to succeed and every anonymous submission then
@@ -36,6 +41,7 @@ import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
+import { readPublishSpace, undeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import type { OrganismHelpers } from './shared.js';
@@ -142,6 +148,10 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
     if (namespace.startsWith('meta.')) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'namespace cannot be a meta.* namespace')); return; }
     const ownerGhii = await requireWsOwner(req, res, org, ws);
     if (!ownerGhii) return;
+    // A destination the workspace manifest does not declare would refuse every submission (the
+    // developer's decision, 2026-09-13), so the form is refused here, where its owner is the one told.
+    const { refusal } = await readPublishSpace(storage, org, ws, namespace);
+    if (refusal) { res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message, refusal.status, refusal.details)); return; }
 
     let formId = typeof b.form_id === 'string' ? b.form_id.trim().toLowerCase() : '';
     if (formId) {
@@ -259,6 +269,12 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
       }
       if (Object.keys(body).length > MAX_BODY_FIELDS) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Too many fields')); return; }
 
+      // A form defined before its destination stopped being declared (or before the 2026-09-13
+      // decision) is refused before anything is written. The submitter is anonymous, so the refusal
+      // names neither the namespace nor the workspace's spaces.
+      const undeclared = (await readPublishSpace(storage, org, ws, cfg.namespace, { audience: 'public' })).refusal;
+      if (undeclared) { res.status(undeclared.status).json(error(config.nodeId, undeclared.code, undeclared.message, undeclared.status, undeclared.details)); return; }
+
       // Build the record from the ALLOW-LIST only (defaults first — with server tokens resolved — then
       // the permitted submitter values).
       const record: Record<string, unknown> = { ...resolveDefaultTokens(cfg.defaults) };
@@ -301,7 +317,14 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
           version: 1, createdAt: now, updatedAt: now,
         } as MemoryRecord);
       } else {
-        await publishDraftsBatch(org, ws, cfg.namespace, [id], cfg.ownerGhii, undefined, { [id]: { value: record, visibility: 'owner' } });
+        // The batch reads the manifest again and refuses by itself if the space went undeclared
+        // since the check above. Answering success then would tell the submitter something false,
+        // and its own refusal is worded for a member, so the anonymous caller gets the public one.
+        const out = await publishDraftsBatch(org, ws, cfg.namespace, [id], cfg.ownerGhii, undefined, { [id]: { value: record, visibility: 'owner' } });
+        if (out.refusal) {
+          const pub = undeclaredSpaceRefusal(cfg.namespace, [], { organismId: org, ws, audience: 'public' }) ?? out.refusal;
+          res.status(pub.status).json(error(config.nodeId, pub.code, pub.message, pub.status, pub.details)); return;
+        }
       }
       emitChange('organisms');
       // Write-only: return only the new id. NEVER any other record.

@@ -7,6 +7,8 @@
  *   with an empty template pulses to completion without one, which is exactly what makes the scan
  *   path testable.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Setup no longer matched production: the living config was written into a
+ *     workspace with no manifest, which UNDECLARED_SPACE now refuses. Setup declares the living space first.
  *   v1.0.0 -- 2026-08-17 -- Initial: scheduler scan finds + pulses a due config; cadence guard holds.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=living-pulse
@@ -57,6 +59,17 @@ await test('Setup: first owner (auto-operator) + organism + a DUE living-config'
     const o = await json('/v1/organisms', { method: 'POST', headers: auth(token), body: JSON.stringify({ name: 'Pulse Org', type: 'project', join_policy: 'open', visibility: 'public' }) });
     assert(o.status === 201, `organism: ${o.status}`);
     orgId = o.body.data.organism.id;
+
+    // The workspace declares the space first: a workspace record in a space its manifest does not
+    // declare is refused with 422 UNDECLARED_SPACE (services/workspace-write-items.ts), and production's
+    // living deploy writes the manifest before the config (public/js/services/living.js). The manifest
+    // key contains `.meta.`, so the pulse does not count it as workspace activity.
+    const m = await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({
+        key: `organism.${orgId}.w.${WS}.meta.manifest`, visibility: 'private',
+        value: { manifestVersion: '1.0', id: orgId, name: 'Pulse workspace', kind: 'project', status: 'active',
+            objectTypes: [{ name: 'Living', namespace: 'living', mode: 'document', schemaRef: 'schema:living@1', backing: 'memory', writeRole: 'member' }] },
+    }) });
+    assert(m.status === 201, `manifest write: ${m.status}: ${JSON.stringify(m.body.error)}`);
 
     // No status.last_pulse yet + hourly cadence ⇒ due on the very next scan. Empty template ⇒ the
     // pulse completes without an AI key (nothing to derive; the status write still happens).

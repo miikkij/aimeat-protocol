@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-09-13 — import lists a workspace record in a space the manifest does not declare
+ *     under failed[] with UNDECLARED_SPACE instead of writing it, as every other write door refuses it.
+ *     bulk, import and copy refuse an EXCHANGE listing source whose changed text breaks an ODPS cap.
  *   v1.2.0 — 2026-09-08 — export with ?agent is an owner-session door like its three neighbours;
  *     an agent could export a sibling's keyspace by naming it.
  *   v1.1.0 — 2026-08-10 — Security audit H-11: export and bundle enforce memory:read, matching the
@@ -22,6 +25,8 @@ import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
+import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
+import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import type { BulkWriteItem } from '../../services/db/memory-db-service.js';
 import { type MemoryRouteCtx, isAnonymousGaii } from './shared.js';
 import { logger } from '../../utils/logger.js';
@@ -81,6 +86,11 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       if (key.startsWith('organism.')) { preFailed.push({ key, status: 'failed', reason: 'organism.* keys use the workspace publish path' }); continue; }
       if (!appMayWriteKey(req.auth!.roles, key)) { preFailed.push({ key, status: 'failed', reason: 'reserved key — managed by the account owner' }); continue; }
       if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) { preFailed.push({ key, status: 'failed', reason: 'anonymous agents can only write anonymous.* keys' }); continue; }
+      // An EXCHANGE listing source past an ODPS cap, compared with what is stored (2026-09-13).
+      if (odpsWriteRefusal(key, e.value, undefined)) {
+        const odps = odpsWriteRefusal(key, e.value, (await storage.getMemory(gaii, key))?.value);
+        if (odps) { preFailed.push({ key, status: 'failed', reason: `${odps.code}: ${odps.message}` }); continue; }
+      }
       // storage_ref integrity (parity with the single POST /v1/memory): a value pointing at a stored file
       // must name an existing one. The getStorageFile lookup runs ONLY for storage_ref entries, so a
       // normal bulk write (no storage_refs) pays nothing.
@@ -222,6 +232,14 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       if (typeof key !== 'string' || !key) { failed.push({ key: String(key), reason: 'missing key' }); continue; }
       if (!appMayWriteKey(req.auth!.roles, key)) { failed.push({ key, reason: 'reserved key — managed by the account owner' }); continue; }
       if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) { failed.push({ key, reason: 'anonymous agents can only write anonymous.* keys' }); continue; }
+      if (key.startsWith('organism.')) {
+        const undeclared = await undeclaredSpaceForKey(storage, key);
+        if (undeclared) { failed.push({ key, reason: `UNDECLARED_SPACE: ${undeclared.message}` }); continue; }
+      }
+      if (odpsWriteRefusal(key, (entry as { value?: unknown }).value, undefined)) {
+        const odps = odpsWriteRefusal(key, (entry as { value?: unknown }).value, (await storage.getMemory(gaii, key))?.value);
+        if (odps) { failed.push({ key, reason: `${odps.code}: ${odps.message}` }); continue; }
+      }
       survivors.push({ key, entry });
     }
 
@@ -483,6 +501,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     const now = new Date().toISOString();
     const existing = await storage.getMemory(callerGaii, key);
+    const odps = odpsWriteRefusal(key, sourceRecord.value, existing?.value);
+    if (odps) { res.status(odps.status).json(error(config.nodeId, odps.code, odps.message, odps.status, odps.details)); return; }
     const newVersion = existing ? existing.version + 1 : 1;
 
     await storage.setMemory({

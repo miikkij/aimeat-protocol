@@ -32,6 +32,13 @@
  *   SERVE TIME ONLY. Nothing here is ever written back to storage. `app.data` is what the author
  *   uploaded, which is what keeps the content hash in a provenance record meaningful, and this
  *   codebase has published from a served copy before.
+ *
+ *   AND TAKEN BACK OUT ON THE WAY IN. A publish that receives a served copy removes every block
+ *   this pass writes before it stores the bytes (services/app-serve-marks-strip.ts, the developer's
+ *   decision of 2026-09-13), recognising each by the exact opening tag written below. A new mark
+ *   added here needs its rule there: the round trip in test/unit/app-serve-marks-strip.test.ts
+ *   serves a document, strips it and expects the author's bytes back, and goes red until it has one.
+ *   The head metadata is the exception, because applyAppHeadMeta writes its tags with no marker.
  * @structure
  *   - ServeMarksSpec — which marks the calling route wants
  *   - applyServeMarks(bytes, spec) — the single pass, returns a Buffer
@@ -39,6 +46,8 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   v1.4.1 — 2026-09-13 — Comment only: the publish now strips what this pass writes
+ *     (services/app-serve-marks-strip.ts), and a new mark here needs its rule there. Output unchanged.
  *   v1.4.0 — 2026-09-13 — The `#aimeat-app-ref` identity block is written at the start of the head
  *     (headStart(): past the doctype and the `<html>` and `<head>` opening tags, never into
  *     content) instead of at the end of the body, so an app's inline script can read it at parse

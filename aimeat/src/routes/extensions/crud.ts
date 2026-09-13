@@ -16,6 +16,9 @@
  *                         schedule bookkeeping and the memory cleanup are one implementation.
  *   v1.3.0 — 2026-09-03 — GET /v1/extensions is optionalAuth and carries installedBy, used_by and the manifest schedules; the detail carries versions; GET /:name/versions.
  *   v1.4.0 — 2026-09-05 — The list and the detail carry `workspace`, the manifest's `workspace:` declaration (or null).
+ *   v1.5.0 — 2026-09-13 — POST and PUT hand back a refused write's details, so an install refused with
+ *                         ODPS_FIELD_TOO_LONG (services/extension-lifecycle.ts) names the field, its
+ *                         length, the cap and the room left.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -168,7 +171,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         isOperator,
       });
       if (!written.ok) {
-        res.status(written.status).json(error(config.nodeId, written.code, written.message));
+        // A refusal may carry details, and ODPS_FIELD_TOO_LONG does: which field, how long, the cap, the room.
+        res.status(written.status).json(error(config.nodeId, written.code, written.message, written.status, 'details' in written ? written.details : undefined));
         return;
       }
       const created = written.record;
@@ -241,7 +245,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         isOperator: req.auth!.roles.includes('operator'),
       });
       if (!written.ok) {
-        res.status(written.status).json(error(config.nodeId, written.code, written.message));
+        res.status(written.status).json(error(config.nodeId, written.code, written.message, written.status, 'details' in written ? written.details : undefined));
         return;
       }
       const warned = built.warnings?.length ? { warnings: built.warnings } : {};

@@ -25,12 +25,16 @@
  * @structure ODPS_VERSION/ODPS_SCHEMA_URL · OdpsDocument types · offeringToOdps() · odpsToYaml() ·
  *   mergeOdpsExtras/mergeProvenance (app-level defaults → tool) ·
  *   helpers (product type · price plans · licence rights · data access · payment gateway) ·
- *   ODPS_TEXT_LIMITS · odpsLengthOverruns() · offeringOdpsOverruns()
+ *   ODPS_TEXT_LIMITS · odpsCappedTexts() · odpsLengthOverruns() · offeringOdpsOverruns()
  * @usage
  *   const doc = offeringToOdps({ offering, iface, callRecipe, stats, rakePercent, baseUrl, nodeId });
  *   res.type('text/yaml').send(odpsToYaml(doc));
- *   const tooLong = odpsLengthOverruns(doc);   // warnings, never a refusal
+ *   const tooLong = odpsLengthOverruns(doc);   // listing warnings; the write refusal is exchange-odps-write.ts
  * @version-history
+ *   v1.3.0 — 2026-09-13 — The developer decided that a write which makes a generated document break a
+ *     cap is refused, so ODPS_TEXT_LIMITS names the authoring fields behind each cap (`fields`) and
+ *     odpsCappedTexts() hands the texts to services/exchange-odps-write.ts. The listing warning stays
+ *     for text a stored source already carried, and its message says a changing write is refused.
  *   v1.2.0 — 2026-09-13 — Length check against the schema's maxLength values. The authoring schemas
  *     accept far more text than ODPS allows in a few fields, so a long usageTerms.note produced a
  *     document an outside validator refused (restrictions is capped at 255, and the node's own usage
@@ -499,6 +503,12 @@ export interface OdpsTextLimit {
   maxLength: number;
   /** What fills it: the authoring field a provider writes, or the node itself. */
   source: string;
+  /**
+   * The authoring fields a provider writes into it, as paths into one listing source's own terms
+   * (`usageTerms.*`, `odps.*`). Empty when only the node writes the field. The write check
+   * (services/exchange-odps-write.ts) names these when it refuses.
+   */
+  fields: readonly string[];
 }
 
 /**
@@ -507,21 +517,21 @@ export interface OdpsTextLimit {
  * vendored schema and fails when the two disagree, so a schema update cannot add a cap this list misses.
  */
 export const ODPS_TEXT_LIMITS: readonly OdpsTextLimit[] = [
-  { path: 'product.details.*.valueProposition', maxLength: 512, source: 'odps.valueProposition' },
-  { path: 'product.license.scope.definition', maxLength: 512, source: 'the node, from the three usage flags' },
-  { path: 'product.license.scope.restrictions', maxLength: 255, source: 'the node\'s usage-terms sentences, usageTerms.note and odps.license.restrictions, joined with spaces' },
-  { path: 'product.license.termination.terminationConditions', maxLength: 512, source: 'odps.license.terminationConditions' },
-  { path: 'product.license.termination.continuityConditions', maxLength: 512, source: 'odps.license.continuityConditions' },
-  { path: 'product.license.governance.ownership', maxLength: 512, source: 'the node, from the provider\'s identity' },
-  { path: 'product.license.governance.audit', maxLength: 512, source: 'the node' },
-  { path: 'product.license.governance.warranties', maxLength: 512, source: 'odps.license.warranties' },
-  { path: 'product.license.governance.damages', maxLength: 512, source: 'odps.license.damages' },
-  { path: 'product.license.governance.confidentiality', maxLength: 512, source: 'odps.license.confidentiality' },
-  { path: 'product.license.governance.applicableLaws', maxLength: 512, source: 'odps.license.applicableLaws' },
-  { path: 'product.license.governance.forceMajeure', maxLength: 512, source: 'odps.license.forceMajeure' },
-  { path: 'product.dataHolder.legalName', maxLength: 256, source: 'odps.dataHolder.legalName (the account name when none is declared)' },
-  { path: 'product.dataHolder.description', maxLength: 512, source: 'odps.dataHolder.description' },
-  { path: 'product.dataHolder.slogan', maxLength: 256, source: 'odps.dataHolder.slogan' },
+  { path: 'product.details.*.valueProposition', maxLength: 512, source: 'odps.valueProposition', fields: ['odps.valueProposition'] },
+  { path: 'product.license.scope.definition', maxLength: 512, source: 'the node, from the three usage flags', fields: [] },
+  { path: 'product.license.scope.restrictions', maxLength: 255, source: 'the node\'s usage-terms sentences, usageTerms.note and odps.license.restrictions, joined with spaces', fields: ['usageTerms.note', 'odps.license.restrictions'] },
+  { path: 'product.license.termination.terminationConditions', maxLength: 512, source: 'odps.license.terminationConditions', fields: ['odps.license.terminationConditions'] },
+  { path: 'product.license.termination.continuityConditions', maxLength: 512, source: 'odps.license.continuityConditions', fields: ['odps.license.continuityConditions'] },
+  { path: 'product.license.governance.ownership', maxLength: 512, source: 'the node, from the provider\'s identity', fields: [] },
+  { path: 'product.license.governance.audit', maxLength: 512, source: 'the node', fields: [] },
+  { path: 'product.license.governance.warranties', maxLength: 512, source: 'odps.license.warranties', fields: ['odps.license.warranties'] },
+  { path: 'product.license.governance.damages', maxLength: 512, source: 'odps.license.damages', fields: ['odps.license.damages'] },
+  { path: 'product.license.governance.confidentiality', maxLength: 512, source: 'odps.license.confidentiality', fields: ['odps.license.confidentiality'] },
+  { path: 'product.license.governance.applicableLaws', maxLength: 512, source: 'odps.license.applicableLaws', fields: ['odps.license.applicableLaws'] },
+  { path: 'product.license.governance.forceMajeure', maxLength: 512, source: 'odps.license.forceMajeure', fields: ['odps.license.forceMajeure'] },
+  { path: 'product.dataHolder.legalName', maxLength: 256, source: 'odps.dataHolder.legalName (the account name when none is declared)', fields: ['odps.dataHolder.legalName'] },
+  { path: 'product.dataHolder.description', maxLength: 512, source: 'odps.dataHolder.description', fields: ['odps.dataHolder.description'] },
+  { path: 'product.dataHolder.slogan', maxLength: 256, source: 'odps.dataHolder.slogan', fields: ['odps.dataHolder.slogan'] },
 ];
 
 /** A field of a generated document that is longer than the ODPS schema allows. */
@@ -535,7 +545,8 @@ export interface OdpsLengthOverrun {
   message: string;
 }
 
-const charLength = (s: string): number => [...s].length;
+/** Characters, counted the way JSON Schema counts them: Unicode code points, not UTF-16 units. */
+export const charLength = (s: string): number => [...s].length;
 
 /** Every value at a dotted path, with `*` matching each key of an object at that level. */
 function valuesAt(node: unknown, segments: string[], trail: string[]): Array<[string, unknown]> {
@@ -549,7 +560,8 @@ function valuesAt(node: unknown, segments: string[], trail: string[]): Array<[st
 
 function overrunMessage(doc: OdpsDocument, limit: OdpsTextLimit, path: string, length: number): string {
   const head = `${path} is ${length} characters and ODPS v${ODPS_VERSION} allows ${limit.maxLength}.`;
-  const tail = ' The listing is published with the text as written, and a catalogue that validates against the ODPS schema will refuse the document until it is shortened.';
+  const tail = ' The listing is published with the text as written, and a catalogue that validates against the ODPS schema will refuse the document until it is shortened.'
+    + ' The next write that changes this text is refused until it fits.';
   if (limit.path !== 'product.license.scope.restrictions') return `${head} It comes from ${limit.source}.${tail}`;
   // The one field a provider cannot see whole: the node writes its own sentences in front of theirs.
   const terms = (doc.product['x-aimeat'] as Json | undefined)?.usage_terms as Offering['usageTerms'] | undefined;
@@ -559,23 +571,29 @@ function overrunMessage(doc: OdpsDocument, limit: OdpsTextLimit, path: string, l
     + ` so usageTerms.note and odps.license.restrictions share the remaining ${Math.max(0, limit.maxLength - taken)}.${tail}`;
 }
 
-/**
- * The fields of a generated ODPS document that are longer than the schema allows. A WARNING (the
- * default chosen on 2026-09-13, open for the developer): the authoring schemas accept more than ODPS
- * does in these fields, and the node neither
- * refuses the listing nor shortens the text, because a truncated legal restriction states something the
- * provider never wrote. What it owes the provider is being told, which is what this is for.
- */
-export function odpsLengthOverruns(doc: OdpsDocument): OdpsLengthOverrun[] {
-  const out: OdpsLengthOverrun[] = [];
+/** Every capped text field present in a generated document: its limit, its concrete path and its text. */
+export function odpsCappedTexts(doc: OdpsDocument): Array<{ limit: OdpsTextLimit; path: string; text: string }> {
+  const out: Array<{ limit: OdpsTextLimit; path: string; text: string }> = [];
   for (const limit of ODPS_TEXT_LIMITS) {
     for (const [path, value] of valuesAt(doc, limit.path.split('.'), [])) {
-      if (typeof value !== 'string') continue;
-      const length = charLength(value);
-      if (length > limit.maxLength) out.push({ path, length, maxLength: limit.maxLength, message: overrunMessage(doc, limit, path, length) });
+      if (typeof value === 'string') out.push({ limit, path, text: value });
     }
   }
   return out;
+}
+
+/**
+ * The fields of a generated ODPS document that are longer than the schema allows. On a listing this is
+ * a WARNING, and the node never shortens the text, because a truncated legal restriction states
+ * something the provider never wrote. The developer decided on 2026-09-13 that the WRITE which changes
+ * such text is refused instead (services/exchange-odps-write.ts), so a listing reaches this with text
+ * its stored source already carried, and the provider is told here.
+ */
+export function odpsLengthOverruns(doc: OdpsDocument): OdpsLengthOverrun[] {
+  return odpsCappedTexts(doc)
+    .map(({ limit, path, text }) => ({ limit, path, length: charLength(text) }))
+    .filter(f => f.length > f.limit.maxLength)
+    .map(({ limit, path, length }) => ({ path, length, maxLength: limit.maxLength, message: overrunMessage(doc, limit, path, length) }));
 }
 
 /**

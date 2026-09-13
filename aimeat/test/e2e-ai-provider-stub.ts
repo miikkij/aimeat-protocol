@@ -39,6 +39,10 @@
  *   - phase 9: the living-document pulse's derive loop, its gate, its stop and its guards
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-provider-stub.ts
  * @version-history
+ *   v1.3.0 — 2026-09-13 — Setup no longer matched production: phase 9 wrote living configs, sources
+ *     and a note into workspaces with no manifest, which UNDECLARED_SPACE now refuses. Each workspace
+ *     declares living, living-src and notes first, and the source and note writes are asserted, so a
+ *     refused seed fails here instead of as a missing pulse in 9a-9c.
  *   v1.2.0 — 2026-09-13 — 6b3: a completion cut at a length limit answers finish_reason length and
  *     truncated true; a finished one stop and false.
  *   v1.1.0 — 2026-09-09 — 6b asserted the defect: an empty completion answered as '' at 200. It now
@@ -806,12 +810,35 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
     const slotOf = (ws: string, doc: string, slot: string) => `organism.${ORG}.w.${ws}.living-slot.${doc}__${slot}.latest`;
     const pendingOf = (ws: string, doc: string, slot: string) => `organism.${ORG}.w.${ws}.living-pending.${doc}__${slot}.latest`;
 
+    // A workspace record in a space its manifest does not declare is refused with 422 UNDECLARED_SPACE
+    // (services/workspace-write-items.ts, 2026-09-13), and production's living deploy declares its
+    // spaces before writing (public/js/services/living.js livingObjectTypes). So each workspace declares
+    // the three spaces this seeding writes through POST /v1/memory, first. living-slot, living-pending,
+    // living-ledger and living-hist are left out: the pulse writes those straight through storage.
+    // The manifest key contains `.meta.`, which the pulse's workspaceActivity() skips, so writing it is
+    // not workspace activity and 9c's activity trigger and quiet-workspace guard see what they saw.
+    async function declareLivingSpaces(ws: string) {
+        const r = await writeMemory(a, `organism.${ORG}.w.${ws}.meta.manifest`, {
+            manifestVersion: '1.0', id: ORG, name: ws, kind: 'project', status: 'active',
+            objectTypes: [
+                { name: 'Living', namespace: 'living', mode: 'document', schemaRef: 'schema:living@1', backing: 'memory', writeRole: 'member' },
+                { name: 'Living Sources', namespace: 'living-src', mode: 'records', schemaRef: 'schema:living-source@1', backing: 'memory', writeRole: 'member' },
+                { name: 'Notes', namespace: 'notes', mode: 'document', schemaRef: 'free', backing: 'memory', writeRole: 'member' },
+            ],
+        });
+        assert(r.status === 201, `manifest ${ws} ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    }
+
+    async function seedSource(ws: string, doc: string) {
+        const src = await writeMemory(a, `organism.${ORG}.w.${ws}.living-src.${doc}__intro.latest`, {
+            id: 'seed', slot: 'intro', text: 'The council voted 7-2.', origin: 'minutes', active: true,
+        });
+        assert(src.status === 201, `living source ${src.status}: ${JSON.stringify(src.body?.error)}`);
+    }
+
     async function seedLiving(ws: string, doc: string, cfg: Record<string, unknown>, withSource = false) {
-        if (withSource) {
-            await writeMemory(a, `organism.${ORG}.w.${ws}.living-src.${doc}__intro.latest`, {
-                id: 'seed', slot: 'intro', text: 'The council voted 7-2.', origin: 'minutes', active: true,
-            });
-        }
+        await declareLivingSpaces(ws);
+        if (withSource) await seedSource(ws, doc);
         const r = await writeMemory(a, livingKey(ws, doc), { type: 'living-config', title: `Living ${doc}`, ...cfg });
         assert(r.status === 201, `living config ${r.status}: ${JSON.stringify(r.body?.error)}`);
     }
@@ -823,7 +850,8 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
     await seedLiving('ws-lv-a', 'da', { charter: { cadence: 'hourly', scope: 'the harbour', stop: [{ max_pulses: 1 }] }, template: TEMPLATE, status: {} }, true);
     await seedLiving('ws-lv-b', 'db', { charter: { cadence: 'hourly', scope: 'the harbour', trust: { derive: 'gated' }, stop_when: 'the summary is complete' }, template: TEMPLATE, status: {} }, true);
     await seedLiving('ws-lv-c', 'dc', { charter: { triggers: [{ kind: 'activity', changed_gte: 1 }] }, template: [], status: {} });
-    await writeMemory(a, `organism.${ORG}.w.ws-lv-c.notes.stir.latest`, { title: 'Something changed' });
+    const stir = await writeMemory(a, `organism.${ORG}.w.ws-lv-c.notes.stir.latest`, { title: 'Something changed' });
+    assert(stir.status === 201, `the activity record ${stir.status}: ${JSON.stringify(stir.body?.error)}`);
     await seedLiving('ws-lv-d', 'dd', { charter: { cadence: 'hourly', guards: [{ cadence_floor_h: 24 }] }, template: [], status: { last_pulse: new Date().toISOString(), pulses: 0 } });
     await seedLiving('ws-lv-e', 'de', { charter: { cadence: 'hourly', guards: [{ no_workspace_activity_for_h: 1 }] }, template: [], status: {} });
     await seedLiving('ws-lv-f', 'df', { charter: { cadence: 'hourly', triggers: [{ kind: 'schedule' }] }, template: [], status: {} });

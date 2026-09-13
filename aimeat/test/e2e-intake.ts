@@ -9,6 +9,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=intake
  * @version-history
+ *   v1.2.0 — 2026-09-13 — Setup no longer matched production: the no-schema-lock control defined a form
+ *     into crm.unlocked, a space the workspace never declared, which UNDECLARED_SPACE now refuses. The
+ *     manifest declares it, still without a schema.
  *   v1.1.0 — 2026-09-13 — A form whose destination's strict schema lacks "id", an allowed field or a
  *     default is refused at definition (422 INTAKE_SCHEMA_MISMATCH naming each), and re-locking the
  *     schema in place fixes it without recreating the workspace.
@@ -50,7 +53,12 @@ async function registerOwner(name: string): Promise<string> {
 
 const LEADS_MANIFEST = {
     manifestVersion: '1', name: 'Leads', kind: 'project',
-    objectTypes: [{ name: 'lead', namespace: 'crm.leads', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:lead@1' }],
+    objectTypes: [
+        { name: 'lead', namespace: 'crm.leads', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:lead@1' },
+        // Declared and deliberately given no schema in LEADS_SCHEMAS: the positive control for a form into
+        // a space with no lock. A form into an undeclared space is refused 422 UNDECLARED_SPACE instead.
+        { name: 'unlocked', namespace: 'crm.unlocked', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:unlocked@1' },
+    ],
 };
 const LEADS_SCHEMAS = {
     'crm.leads': {

@@ -10,6 +10,8 @@
  * @structure importWorkspace(storage, config, { orgId, importerGaii, importerOwner, zip }) -> result
  * @usage import { importWorkspace } from '../services/workspace-import.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- A record in a space the bundle's manifest does not declare is not written
+ *     and is named in `skipped_undeclared` (undeclaredSpaceRefusal decides, as on every write door).
  *   v1.0.0 -- 2026-06-09 -- Initial: ZIP import with id remap, schema re-lock, image dedup + URL rewrite.
  */
 import type { Storage } from '../storage/interface.js';
@@ -18,13 +20,19 @@ import type { WorkspaceExportJson, ExportObject, ExportImage } from './workspace
 import { WS_EXPORT_VERSION } from './workspace-export.js';
 import { safeUnzip, BACKUP_ZIP_LIMITS } from './safe-zip.js';
 import { logger } from '../utils/logger.js';
+import { undeclaredSpaceRefusal, isPlatformWorkspaceNamespace, type WriteObjectType } from './workspace-write-items.js';
 
 const STORAGE_URL_RE = /\/v1\/(?:storage|pub\/[^/)\s]+)\/([^\s)\]"'>]+)/g;
 
 /** Allowed entry layout for a single-workspace ZIP — anything else is rejected as a bad format. */
 const WORKSPACE_ALLOW = (n: string) => n === 'workspace.json' || /^images\/[A-Za-z0-9._-]+$/.test(n);
 
-export interface ImportResult { ws: string; objects: number; documents: number; images: number; images_deduped: number; schemas: number }
+export interface ImportResult {
+  ws: string; objects: number; documents: number; images: number; images_deduped: number; schemas: number;
+  /** Records the bundle carried in spaces its own manifest does not declare: not written, and named
+   *  here, because a write into an undeclared space is refused on every door (2026-09-13). */
+  skipped_undeclared?: Array<{ namespace: string; id: string; role: string }>;
+}
 
 /** Safely unzip a backup ZIP into a filename → Buffer map (hardened: bomb/traversal/format guards).
  *  Pass the format allowlist for the layout you expect; throws ZipSecurityError on a hostile/malformed
@@ -118,8 +126,19 @@ export async function restoreWorkspace(
   if (data.sources != null) await writeMem(`${newRoot}.meta.sources`, data.sources);
 
   // 4) Objects (records + documents) — preserve ids, rewrite image URLs in markdown.
+  // A record in a space the bundle's own manifest does not declare is not written: the refusal every
+  // write door applies (undeclaredSpaceRefusal) decides it here too. The import is not refused for it,
+  // because that would make a backup of a workspace holding one stray record unrestorable; the skipped
+  // records are named in the result instead.
+  const bundleTypes = ((data.manifest as { objectTypes?: WriteObjectType[] }).objectTypes ?? []);
+  const skippedUndeclared: Array<{ namespace: string; id: string; role: string }> = [];
   let objects = 0, documents = 0;
   for (const o of (data.objects || []) as ExportObject[]) {
+    if (!isPlatformWorkspaceNamespace(o.namespace)
+      && undeclaredSpaceRefusal(o.namespace, bundleTypes, { organismId: orgId, ws: newWs })) {
+      skippedUndeclared.push({ namespace: o.namespace, id: o.id, role: o.role });
+      continue;
+    }
     const suffix = o.role === '' ? '' : `.${o.role}`;
     const key = `${newRoot}.${o.namespace}.${o.id}${suffix}`;
     let value = o.value;
@@ -138,5 +157,8 @@ export async function restoreWorkspace(
   const list = ((regRec?.value as { workspaces?: unknown[] } | undefined)?.workspaces) ?? [];
   await writeMem(regKey, { workspaces: [...list, { id: newWs, name: data.name || newWs, createdAt: now, createdBy: importerOwner }] });
 
-  return { ws: newWs, objects, documents, images: imagesCreated, images_deduped: imagesDeduped, schemas };
+  return {
+    ws: newWs, objects, documents, images: imagesCreated, images_deduped: imagesDeduped, schemas,
+    ...(skippedUndeclared.length ? { skipped_undeclared: skippedUndeclared } : {}),
+  };
 }

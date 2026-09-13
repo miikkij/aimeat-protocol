@@ -39,6 +39,8 @@
  *     { existing, ownerName, actor, isOperator });
  *   if (!out.ok) return refuse(out.code, out.message);
  * @version-history
+ *   v1.3.0 — 2026-09-13 — writeExtensionRecord refuses a flagged action whose changed text would break
+ *     an ODPS length cap (422 ODPS_FIELD_TOO_LONG, with details) before anything is written.
  *   v1.2.0 — 2026-09-03 — writeExtensionRecord snapshots each version; uninstall forgets the kept versions.
  *   v1.1.0 — 2026-08-16 — Schedule registration moved to services/extension-schedules.ts, shared with
  *     the redeploy and the two install routes. The copy here stamped no `ownerScope`, and since
@@ -53,6 +55,7 @@ import { upsertExtensionInPlace } from './extension-upsert.js';
 import { recordAccountEvent } from './account-events.js';
 import { registerExtensionSchedules } from './extension-schedules.js';
 import { reconcileAfterExtensionWrite } from './exchange-projection.js';
+import { odpsWriteRefusal, extensionOdpsKey } from './exchange-odps-write.js';
 import { extensionInstallRefusal } from './install-quotas.js';
 import { prepareSecretConfigForWrite, decryptSecretFields, getExtSecretKeys } from './extension-secrets.js';
 import { getEncryptionKey } from './encryption.js';
@@ -85,7 +88,7 @@ export interface ExtensionWriteContext {
 
 export type ExtensionWriteOutcome =
     | { ok: true; record: ExtensionRecord; action: 'installed' | 'updated' | 'unchanged'; reinitialized: boolean }
-    | { ok: false; status: number; code: string; message: string };
+    | { ok: false; status: number; code: string; message: string; details?: unknown };
 
 /**
  * What the stored record MEANS, for deciding whether a redeploy changes anything.
@@ -124,6 +127,11 @@ export async function writeExtensionRecord(
     const { existing } = ctx;
     const name = record.name;
     const encKey = getEncryptionKey(config);
+
+    // A flagged action whose CHANGED text would publish an ODPS document past a schema cap is refused
+    // before the ceilings and the write (the developer's decision, 2026-09-13).
+    const odps = odpsWriteRefusal(extensionOdpsKey(name), record, existing);
+    if (odps) return odps;
 
     // The listing belongs to whoever installed the extension, not to whoever is redeploying it. On
     // every ordinary write those are the same principal, because managing an extension requires

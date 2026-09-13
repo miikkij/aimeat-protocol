@@ -2,16 +2,22 @@
  * @file test/unit/mail-send-failed-outcome.test.ts
  * @description aimeat_mail_send answers a send that did not go out as an ERROR, on all three doors.
  *
- *   POST /v1/outbound/send answers 200 for every attempt that reaches channel selection and puts the
- *   outcome in `data.status`, and that REST contract stays (callers read `data.status` today). The
- *   tool doors are a different reader: an agent takes a non-error tool result as "done", so a send
- *   the provider refused, or one this node had no transport for, was reported to the person as sent
- *   (appdev pitfall send-200-is-not-a-delivery). The node MCP said "Not sent" in a note inside a
- *   success result; both connector doors passed the 200 envelope through untouched.
+ *   An agent takes a non-error tool result as "done", so a send the provider refused, or one this node
+ *   had no transport for, was reported to the person as sent (appdev pitfall
+ *   send-200-is-not-a-delivery). The node MCP said "Not sent" in a note inside a success result; both
+ *   connector doors passed the route's 200 envelope through untouched.
+ *
+ *   Since 2026-09-13 the route itself answers such a send with SEND_FAILED (502 or 503, the send-log
+ *   id and the reason in error.details), so the connector doors meet two shapes: that error from a
+ *   current node, and the 200 with data.status 'failed' from a node older than the connector. Both
+ *   come out as the same error, carrying the same fields.
  *
  *   Each door is exercised with a sent outcome as well, so "everything is an error now" cannot pass.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mail-send-failed-outcome.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-13 — The connector doors are fed the SEND_FAILED error a current node answers,
+ *     beside the 200 'failed' envelope an older node still answers, and a refusal that is not about
+ *     delivery passes through untouched.
  *   v1.0.0 — 2026-09-13 — Initial.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -88,6 +94,9 @@ describe('node MCP aimeat_mail_send', () => {
         expect(logged).toHaveLength(1);
         expect(logged[0].status).toBe('failed');
         expect(out.content[0].text).toContain(logged[0].id);
+        // The same fields the REST error carries in details and the connector doors lift to the top.
+        const parsed = JSON.parse(out.content[0].text);
+        expect(parsed).toMatchObject({ code: 'SEND_FAILED', message_id: logged[0].id, reason: 'SMTP_SEND_FAILED', status: 'failed', channel: 'email' });
     });
 
     it('a send with no transport at all is an error result too', async () => {
@@ -95,6 +104,7 @@ describe('node MCP aimeat_mail_send', () => {
         const out = await send({ contact_id: contactId, subject: 'Hei', body: 'Viesti.' });
         expect(out.isError).toBe(true);
         expect(out.content[0].text).toContain('EMAIL_DISABLED');
+        expect(JSON.parse(out.content[0].text).code).toBe('SEND_FAILED');
     });
 
     it('a send the provider accepted stays a success', async () => {
@@ -105,10 +115,20 @@ describe('node MCP aimeat_mail_send', () => {
     });
 });
 
-/** The REST envelope POST /v1/outbound/send answers, as both connector doors receive it. */
+/** The 200 envelope a node from before 2026-09-13 answers, as both connector doors receive it. */
 const envelope = (status: 'sent' | 'failed', error: string | null): ApiResponse => ({
     ok: true,
     data: { message: { id: 'msg-1', status, error }, channel: 'email', status },
+});
+
+/** The error envelope a current node answers for a send that did not go out (HTTP 502 or 503). */
+const sendFailed = (reason: string): ApiResponse => ({
+    ok: false,
+    error: {
+        code: 'SEND_FAILED',
+        message: `Not sent (${reason}). Nothing reached the recipient; the attempt is in the send log as msg-2.`,
+        details: { message_id: 'msg-2', status: 'failed', channel: 'email', reason },
+    } as ApiResponse['error'],
 });
 
 describe('CLI dispatch aimeat_mail_send', () => {
@@ -118,12 +138,35 @@ describe('CLI dispatch aimeat_mail_send', () => {
         { contact_id: 'c1', subject: 'Hei', body: 'Viesti.' },
     );
 
-    it('a failed outcome is ok:false with SEND_FAILED and the provider reason', async () => {
+    it('a current node\'s SEND_FAILED is ok:false with the send-log id and the reason at the top of the error', async () => {
+        const out = await run(sendFailed('MAILBOX_HTTP_500'));
+        expect(out.ok).toBe(false);
+        const err = out.error as Record<string, unknown>;
+        expect(err.code).toBe('SEND_FAILED');
+        expect(err.message).toContain('MAILBOX_HTTP_500');
+        expect(err.message_id, `the send-log id stayed buried in details: ${JSON.stringify(err)}`).toBe('msg-2');
+        expect(err.reason).toBe('MAILBOX_HTTP_500');
+        expect(err.status).toBe('failed');
+        expect(err.channel).toBe('email');
+    });
+
+    it('an older node\'s 200 failed outcome is ok:false with SEND_FAILED and the provider reason', async () => {
         const out = await run(envelope('failed', 'MAILBOX_SEND_FAILED'));
         expect(out.ok, 'the 200 envelope of a failed send was passed through as success').toBe(false);
         expect(out.error?.code).toBe('SEND_FAILED');
         expect(out.error?.message).toContain('MAILBOX_SEND_FAILED');
         expect((out.error as Record<string, unknown>).message_id).toBe('msg-1');
+    });
+
+    it('both node generations come out as the same error shape', async () => {
+        const current = (await run(sendFailed('SMTP_SEND_FAILED'))).error as Record<string, unknown>;
+        const older = (await run(envelope('failed', 'SMTP_SEND_FAILED'))).error as Record<string, unknown>;
+        expect(Object.keys(current).sort()).toEqual(Object.keys(older).sort());
+    });
+
+    it('a refusal that is not about delivery is passed through unchanged', async () => {
+        const refusal: ApiResponse = { ok: false, error: { code: 'DAILY_LIMIT', message: 'Outbound daily limit reached (50/24h)' } };
+        expect(await run(refusal)).toEqual(refusal);
     });
 
     it('a sent outcome is passed through unchanged', async () => {
@@ -140,7 +183,15 @@ describe('connector MCP aimeat_mail_send', () => {
         return handlers.get('aimeat_mail_send')!;
     };
 
-    it('a failed outcome is an error result carrying the provider reason', async () => {
+    it('a current node\'s SEND_FAILED is an error result naming the reason and the send-log id', async () => {
+        const out = await handlerFor(sendFailed('SMTP_SEND_FAILED'))({ contact_id: 'c1', subject: 'Hei', body: 'Viesti.' });
+        expect(out.isError, `a refused send came back as a success: ${out.content[0].text}`).toBe(true);
+        const parsed = JSON.parse(out.content[0].text);
+        expect(parsed.error.reason).toBe('SMTP_SEND_FAILED');
+        expect(parsed.error.message_id).toBe('msg-2');
+    });
+
+    it('an older node\'s failed outcome is an error result carrying the provider reason', async () => {
         const out = await handlerFor(envelope('failed', 'SMTP_SEND_FAILED'))({ contact_id: 'c1', subject: 'Hei', body: 'Viesti.' });
         expect(out.isError, `a refused send came back as a success: ${out.content[0].text}`).toBe(true);
         expect(out.content[0].text).toContain('SMTP_SEND_FAILED');
