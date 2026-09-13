@@ -30,6 +30,7 @@
  * @usage routed at /v1/fleet by spa.html and routes/portal.ts, and embedded as the "Your agents"
  *   section of Settings & Controls via views/profile/fleet-tab.js, which passes `embedded`.
  * @version-history
+ *   v1.6.0 -- 2026-09-13 -- Compose state section headings from the shared B1 shape.
  *   v1.5.0 -- 2026-09-13 -- Compose the standalone page title from poster.css.
  *   v1.4.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   v1.3.0 — 2026-09-03 — A row opens the agent. The href is an address and was never an
@@ -434,10 +435,8 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
               ${/* The sentence, once. Every row under this header is in the same state AND of the
                     same credential kind, so the sentence is true of all of them — it would
                     otherwise be repeated verbatim, fifty-two times on this developer's account. */''}
-              ${/* The colour is on the STATE WORD, not the heading. `never` and `unknown` resolve to
-                    --text-muted, and as a heading colour that made "Never connected" — six agents'
-                    worth — the palest text on the page, paler than the body copy above it. */''}
-              <h2 class="flt-group-head">
+              ${/* State words and counts inherit the shared B1 slab's foreground. */''}
+              <h2 class="flt-group-head poster-section-title">
                 <span class="flt-group-state flt-state--${g.state}">${t(`fleet.state.${g.state}`)}</span>
                 ${showKind && html`<span class="flt-group-kind">${g.kind === 'key-and-card' ? t('fleet.kindKey') : t('fleet.kindToken')}</span>`}
                 <span class="flt-group-count">${g.rows.length === 1
