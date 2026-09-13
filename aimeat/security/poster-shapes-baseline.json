@@ -1,11 +1,11 @@
 {
   "_note": "Copied design-language declarations, recorded debt rather than approval. This files map may only shrink. After migration, lower the affected counts or remove cleared files. Only an explicit developer decision permits re-seeding with pnpm check:poster-shapes --record.",
   "_measured": {
-    "date": "2026-09-13T02:40:00.000Z",
+    "date": "2026-09-13T02:50:00.000Z",
     "files": 78,
-    "declarations": 703,
+    "declarations": 702,
     "patterns": {
-      "headline": 133,
+      "headline": 132,
       "sun": 129,
       "box2": 189,
       "frame3": 61,
@@ -453,7 +453,7 @@
       "aside": 1
     },
     "public/css/views/profile-poster.css": {
-      "headline": 5,
+      "headline": 4,
       "rule": 5,
       "action": 7,
       "sun": 12,

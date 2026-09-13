@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.13.0 -- 2026-09-13 -- Compose portfolio page and B1 section headlines.
  *   v1.12.0 -- 2026-09-13 -- Compose portfolio section and flow rules from poster.css.
  *   v1.11.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
  *   v1.10.0 -- 2026-09-13 -- Compose inbox top rules from poster.css.
@@ -61,12 +62,8 @@
 .pf-content, .portfolio-container, .portfolio-viewer-full { font-family: var(--font-showroom-body); }
 /* The crumb precedes a page title. Markup selects the shared page or B1 section class. */
 .pf-content-head { border-bottom: 0; padding-bottom: 0; margin-bottom: 0.2rem; }
-.portfolio-container h1 {
-  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
-  font-size: 1.9rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
-  color: var(--text); margin-bottom: 0.5rem;
-}
-.portfolio-container h1 { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3.4rem; letter-spacing: var(--font-poster-tracking); }
+.portfolio-container { --poster-page-size: 3.4rem; --poster-section-size: 1.8rem; }
+.portfolio-container .poster-page-title { margin-bottom: 0.5rem; }
 .pf .poster-section-title.section-title-spaced { margin-top: 2.6rem; }
 .pf .section-desc, .portfolio-subtitle-text { font-weight: 600; color: var(--text-dim); font-size: 0.92rem; }
 .pf .card-h3, .pf .card-title, .pf .pf-agd-section-label, .pf .pf-agd-section-title, .pf .pj-section-title,
@@ -288,10 +285,7 @@
 
 /* ── The portfolio builder and the viewer chrome (outside .pf) ──────────────────────────── */
 .portfolio-step { padding-top: 1.4rem; margin-bottom: 2.4rem; }
-.portfolio-step h3 {
-  display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1rem;
-  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); font-size: 1.8rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
-}
+.portfolio-step h3 { display: flex; align-items: baseline; gap: 1rem; }
 .portfolio-step-number { width: auto; height: auto; border-radius: 0; background: none; color: var(--accent); font-family: var(--font-mono); font-size: 0.85rem; font-weight: 400; margin: 0; }
 .portfolio-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 2rem; padding: 0; margin: 2rem 0 1.5rem; background: none; border-radius: 0; }
 .portfolio-flow-arrow { display: none; }
@@ -501,7 +495,7 @@
 
 @media (max-width: 700px) {
   .pf { --poster-page-size: 2rem; }
-  .portfolio-container h1 { font-size: 2.2rem; }
+  .portfolio-container { --poster-page-size: 2.2rem; }
   .portfolio-flow { grid-template-columns: 1fr; }
   .portfolio-viewer-bar { padding: 0 0.8rem; gap: 0.8rem; }
   .portfolio-promoted { padding: 0.4rem 0.8rem; }
