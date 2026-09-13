@@ -15,6 +15,7 @@
  *   import RateModal, { RATE_CONTEXTS } from './rate-modal.js';
  *   <RateModal open onClose onSubmit submitting existing=${task.rating} />
  * @version-history
+ *   v1.0.1 — 2026-09-13 — Cancel and Rate sit in the dialog's footer.
  *   v1.0.0 -- 2026-05-31 -- Extracted from agents-tasks-subtab.js so the Quality
  *     tab can reuse the same rating modal.
  */
@@ -54,7 +55,12 @@ export default function RateModal({ open, onClose, onSubmit, submitting, existin
     if (c) body.comment = c;
     onSubmit(body);
   }
-  return html`<${Modal} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.rate.title')}>
+  return html`<${Modal} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.rate.title')}
+    footer=${html`
+      <button class="btn-ghost" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
+      <button class="btn-primary" onClick=${handleSend} disabled=${submitting || !stars}>
+        ${submitting ? t('profile.agents.tasks.rate.submitting') : t('profile.agents.tasks.rate.submit')}
+      </button>`}>
     <p class="pf-agd-modal-help">${t('profile.agents.tasks.rate.help')}</p>
     <div class="pf-agd-rate-stars" role="radiogroup">
       ${[1, 2, 3, 4, 5].map(n => html`
@@ -82,11 +88,5 @@ export default function RateModal({ open, onClose, onSubmit, submitting, existin
       onInput=${e => setComment(e.target.value)}
       rows=${3}
     ></textarea>
-    <div class="modal-footer">
-      <button class="btn-ghost" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
-      <button class="btn-primary" onClick=${handleSend} disabled=${submitting || !stars}>
-        ${submitting ? t('profile.agents.tasks.rate.submitting') : t('profile.agents.tasks.rate.submit')}
-      </button>
-    </div>
   <//>`;
 }

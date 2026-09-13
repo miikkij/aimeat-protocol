@@ -23,6 +23,7 @@
  * @structure MsmTab (default) · RightNow · ReadyMade · WhatItTakes
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.0.1 — 2026-09-13 — The delete dialog's actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-12 — The poster face: five numbered sections, its own listing (the tab and the
  *     shell had disagreed on the key since the tab was written), where each manifest points, the
  *     sets that describe one service, the ready-made ones first on the writing screen, and an
@@ -283,7 +284,11 @@ export default function MsmTab() {
 
     const removeDialog = () => html`
       <${Modal} open=${!!removing} onClose=${() => setRemoving(null)}
-        title=${removing ? M('dialog.deleteTitle', { name: removing.name }) : ''}>
+        title=${removing ? M('dialog.deleteTitle', { name: removing.name }) : ''}
+        footer=${removing && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setRemoving(null)}>${t('common.cancel')}</button>
+          <button type="button" class="og-door og-door--quiet og-door--danger"
+            disabled=${busy || removing.typed !== removing.name} onClick=${doDelete}>${M('deleteIt')}</button>`}>
         ${removing && html`
           <div class="og-box">
             <span class="og-box-label">${M('dialog.deleteWarnLabel')}</span>
@@ -293,12 +298,7 @@ export default function MsmTab() {
             <span>${M('dialog.deleteTypeLabel', { name: removing.name })}</span>
             <input class="adm-input mono" type="text" value=${removing.typed} placeholder=${removing.name}
               onInput=${ev => setRemoving({ ...removing, typed: ev.target.value })} />
-          </label>
-          <div class="adm-msm-dialog-acts">
-            <button type="button" class="og-door og-door--quiet og-door--danger"
-              disabled=${busy || removing.typed !== removing.name} onClick=${doDelete}>${M('deleteIt')}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setRemoving(null)}>${t('common.cancel')}</button>
-          </div>`}
+          </label>`}
       <//>`;
 
     if (list === null) {
