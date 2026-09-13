@@ -35,6 +35,7 @@ logs/**
 # Claude Code (skills under .claude/skills/ ARE tracked)
 .claude/worktrees/
 .claude/settings.local.json
+.claude/evals/*/results/
 
 # Generated artifacts
 **/generated/
