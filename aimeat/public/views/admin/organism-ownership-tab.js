@@ -24,6 +24,7 @@
  *   - the opened organism is organism-ownership-tab.detail.js
  * @usage registered in views/admin.js under the Identity group
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose shared poster headings and externalize column alignment.
  *   v2.0.0 — 2026-09-12 — The poster face, and the listing that makes the page usable: sections
  *     that say whether anything is stuck, every organism with the state of each owner, filters, and
  *     a new owner picked from this node's own people rather than typed. The cross-account write
@@ -170,7 +171,7 @@ export default function OrganismOwnershipTab({ data, reload }) {
 
       <section class="og-sec og-sec--first">
         <div class="og-sec-h">
-          <h2>${O('stuckQ')}<small>01</small></h2>
+          <h2 class="poster-section-title">${O('stuckQ')}<small>01</small></h2>
           <div class="og-doors">
             <button type="button" class="og-door og-door--quiet" onClick=${() => {
     document.querySelector('.adm-oo-acts-sec')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -218,7 +219,7 @@ export default function OrganismOwnershipTab({ data, reload }) {
 
       <section class="og-sec">
         <div class="og-sec-h">
-          <h2>${O('every')}<small>02</small></h2>
+          <h2 class="poster-section-title">${O('every')}<small>02</small></h2>
           <div class="og-doors">
             <button type="button" class="og-door og-door--quiet" onClick=${() => setOldestFirst(v => !v)}>
               ${oldestFirst ? O('orderNewest') : O('orderOldest')}</button>
@@ -243,7 +244,7 @@ export default function OrganismOwnershipTab({ data, reload }) {
           <div class="adm-oo-n">#</div>
           <div>${O('colOrganism')}</div>
           <div>${O('colHeld')}</div>
-          <div style="text-align: right;">${O('colPeople')}</div>
+          <div class="adm-oo-people-head">${O('colPeople')}</div>
           <div>${O('colCreated')}</div>
           <div></div>
         </div>
@@ -287,7 +288,7 @@ export default function OrganismOwnershipTab({ data, reload }) {
           onAdd=${askAdd} />`}
 
       <section class="og-sec adm-oo-acts-sec">
-        <div class="og-sec-h"><h2>${O('actsTitle')}<small>${openRow ? '04' : '03'}</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${O('actsTitle')}<small>${openRow ? '04' : '03'}</small></h2></div>
         <div class="adm-oo-two">
           <div class="og-box">
             <span class="og-box-label">${O('crossLabel')}</span>
