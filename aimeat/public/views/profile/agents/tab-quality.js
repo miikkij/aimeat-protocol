@@ -12,6 +12,7 @@
  * @structure default export TabQuality({ agentName })
  * @usage rendered by agent-card.js renderTabContent() for the 'quality' tab
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.5.0 -- 2026-07-17 -- Card layout: performance full-width, reviews|rate side by
  *     side, custom metrics full-width (shared pf-agd-card-grid scheme).
@@ -164,23 +165,23 @@ export default function TabQuality({ agentName, showToast }) {
       <div class="pf-agd-section-title">${t('profile.agents.detail.quality.performanceTitle')}</div>
       <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.performanceDesc')}</div>
       <div class="stat-grid">
-        <div class="stat-card">
+        <div class="stat-card poster-row--thing">
           <div class="stat-card-value">${perf.tasks?.total ?? 0}</div>
           <div class="stat-card-label">${t('profile.agents.detail.quality.tasksTotal')}</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card poster-row--thing">
           <div class="stat-card-value">${perf.tasks?.completed ?? 0}</div>
           <div class="stat-card-label">${t('profile.agents.detail.quality.tasksCompleted')}</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card poster-row--thing">
           <div class="stat-card-value">${perf.tasks?.successRate != null ? `${Math.round(perf.tasks.successRate * 100)}%` : '-'}</div>
           <div class="stat-card-label">${t('profile.agents.detail.quality.successRate')}</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card poster-row--thing">
           <div class="stat-card-value">${fmtSeconds(perf.duration?.avgCompletionSeconds)}</div>
           <div class="stat-card-label">${t('profile.agents.detail.quality.avgTime')}</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card poster-row--thing">
           <div class="stat-card-value">${perf.events?.total ?? 0}</div>
           <div class="stat-card-label">${t('profile.agents.detail.quality.events')}</div>
         </div>

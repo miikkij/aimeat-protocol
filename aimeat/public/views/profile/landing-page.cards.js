@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.3.0 -- 2026-09-13 -- V2: compose the avatar with the shared poster frame.
  *   2026-09-03 — The AI page's menu item is route id 'ai' (was 'generator'), and the usage card's
  *     own-key door goes there.
@@ -273,7 +274,7 @@ export function UsageCard({ switchTab, initialUsage }) {
 
   const c = u.counts;
   return html`
-    <div class="pf-home-card pf-usage-card">
+    <div class="pf-home-card pf-usage-card poster-row--thing">
       <div class="pf-home-card-title">${t('profile.landing.usageTitle') || 'Usage & quotas'}</div>
       ${bar(t('profile.landing.usageMemory') || 'Memory', u.memory,
         `${u.memory.used_keys}/${u.memory.max_keys} ${t('profile.memory.keysWord') || 'keys'} · ${fmtBytes(u.memory.used_bytes)} / ${fmtBytes(u.memory.max_bytes)}`)}

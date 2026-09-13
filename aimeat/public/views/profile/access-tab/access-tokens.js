@@ -6,6 +6,7 @@
  *   tokens an agent can use to log in and test apps. Extracted from access-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-07-13 — Extracted from access-tab.js (max-file-lines)
  */
@@ -190,7 +191,7 @@ export function AccessTokensSection({ session, showToast, initial }) {
     ${!showCreate ? (tokens?.length > 0 && html`
       <div class="mb-1"><button class="btn-outline" onClick=${() => setShowCreate(true)}>${t('profile.access.patCreate') || 'New Token'}</button></div>
     `) : html`
-      <div class="create-form">
+      <div class="create-form poster-row--thing">
         <h4 class="card-h3 mb-half">${t('profile.access.patCreateTitle') || 'Create Access Token'}</h4>
         <div class="flex-col">
           <div class="form-row">

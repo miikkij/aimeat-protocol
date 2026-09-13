@@ -6,6 +6,7 @@
  *   grouped agent-card renderer (none / custom groups / mode / tag). Extracted from
  *   ../agents-tab.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.3.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.2.0 — 2026-09-06 — AgentSearch: one field above the board that narrows the board and the
@@ -272,7 +273,7 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
             <button class="pj-icon-btn" title=${t('profile.agents.groups.remove')} onClick=${() => removeGroup(g.id)}>✕</button>
           </div>
           ${!collapsed && (members.length === 0
-            ? html`<div class="pf-agd-cgroup-empty">${t('profile.agents.groups.emptyDrop')}</div>`
+            ? html`<div class="pf-agd-cgroup-empty poster-row--thing">${t('profile.agents.groups.emptyDrop')}</div>`
             : members.map(draggableCard))}
         </div>
       `;

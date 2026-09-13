@@ -6,6 +6,7 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.28.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
@@ -297,7 +298,7 @@
 .pf .agd-create-form ,
 .pf .pf-agd-create-form  {
   padding: 0.75rem;
-  border: 1px solid var(--border, #E5E7EB);
+
   border-radius: var(--radius-xs, 6px);
   margin-top: 0.5rem;
   background: var(--card-bg, #FFFFFF);
@@ -731,7 +732,7 @@
 .pf .agd-services-info ,
 .pf .pf-agd-services-info  {
   background: var(--bg-dim, #F9FAFB);
-  border: 1px solid var(--border, #E5E7EB);
+
   border-radius: 8px;
   padding: 0.75rem 1rem;
   font-size: 0.8rem;
@@ -855,7 +856,7 @@
 .pf .agd-msg-proposed-task ,
 .pf .pf-agd-msg-proposed-task  {
   background: var(--card, #FFFFFF);
-  border: 1px solid var(--accent, #E8564A);
+
   border-radius: 8px;
   padding: 0.625rem;
   margin-top: 0.5rem;
@@ -2336,7 +2337,7 @@
   color: var(--text-muted, #9CA3AF);
   font-style: italic;
   padding: 0.5rem 0.25rem;
-  border: 1px dashed var(--border, #E5E7EB);
+
   border-radius: 8px;
   margin-bottom: 0.5rem;
 }
@@ -3288,7 +3289,7 @@
   line-height: 1.6;
   padding: 12px 14px;
   background: var(--card);
-  border: 1px solid var(--border);
+
   border-radius: 8px;
   min-height: 80px;
   color: var(--text);
@@ -3609,7 +3610,7 @@
 .pf .agd-governance-section ,
 .pf .pf-agd-governance-section  {
   background: var(--card);
-  border: 1px solid var(--border);
+
   border-radius: 10px;
   padding: 14px 16px;
   margin-bottom: 12px;

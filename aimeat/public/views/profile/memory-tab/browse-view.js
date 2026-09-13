@@ -7,6 +7,7 @@
  *   public memories to copy. Extracted verbatim from memory-tab.js; handlers and the render function
  *   take the shared ctx so all state/handlers still live in the MemoryTab component.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
  *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
  *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
@@ -168,7 +169,7 @@ export function renderBrowsePanel(ctx) {
 
   if (browseMode === 'discover') {
     return html`
-      <div class="mem-browse-panel">
+      <div class="mem-browse-panel poster-row--thing">
         <div class="mem-browse-header">
           <div>
             <div class="section-desc">${t('profile.memory.discoverDesc')}</div>
@@ -232,7 +233,7 @@ export function renderBrowsePanel(ctx) {
   const desc = isHome ? t('profile.memory.browseHomeDesc') : t('profile.memory.browseRemoteDesc');
 
   return html`
-    <div class="mem-browse-panel">
+    <div class="mem-browse-panel poster-row--thing">
       <div class="mem-browse-header">
         <div>
           <div class="section-desc">${desc}</div>

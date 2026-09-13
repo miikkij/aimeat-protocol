@@ -11,6 +11,7 @@
  *   - ProposedTask -- task proposal from agent with create/adjust buttons
  *   - ThreadList -- horizontal thread selector
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.3.0 -- 2026-05-30 -- Add OptionPrompt: render an agent's single-select option-prompt
  *     (metadata.prompt) as clickable chips + an always-present "Other". Clicking sends the
  *     choice back as a prompt_answer. A prompt locks (read-only, chosen chip highlighted) once
@@ -51,7 +52,7 @@ function ProposedTask({ task, agentName, showToast }) {
   }
 
   return html`
-    <div class="agd-msg-proposed-task">
+    <div class="agd-msg-proposed-task poster-row--thing">
       <h5>${t('profile.agents.messages.proposedTask')}</h5>
       <div>${task.title || task.summary || ''}</div>
       ${task.description && html`<div class="agd-service-desc">${task.description}</div>`}

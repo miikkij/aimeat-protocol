@@ -5,6 +5,7 @@
  * @description Styles for the profile Notebook tab (pf-nb-* prefix): capture box, librarian hits,
  *   and inbox notes. Dark-theme only — all colors/spacing via theme.css variables.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 — 2026-06-19 — Initial: capture + librarian + inbox (slice A).
  *   v1.1.0 — 2026-06-21 — Enrich (plan) panel: plan steps, run controls, enriched preview.
  *   v1.2.0 — 2026-06-21 — Phase 3: trust-toggle settings strip + distribute (chunk) panel.
@@ -147,7 +148,7 @@
   margin-top: var(--space-sm, 0.75rem);
   padding: var(--space-md, 1rem);
   background: var(--surface, var(--card));
-  border: 1px solid var(--border);
+
   border-radius: var(--radius, 8px);
   display: flex;
   flex-direction: column;
@@ -203,7 +204,7 @@
   margin-top: var(--space-sm, 0.75rem);
   padding: var(--space-md, 1rem);
   background: var(--surface, var(--card));
-  border: 1px solid var(--border);
+
   border-radius: var(--radius, 8px);
   display: flex;
   flex-direction: column;
@@ -220,7 +221,7 @@
 }
 .pf-nb-plan-step {
   background: var(--card);
-  border: 1px solid var(--border);
+
   border-radius: var(--radius, 8px);
   padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
   display: flex;

@@ -5,6 +5,7 @@
  * @description Enhanced Activity tab with governance filter and category badges.
  *   Wraps the existing activity subtab with additional filter pills.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.8.0 -- 2026-09-06 -- The delivery line's dot counts a held connection, not just a sighting in
  *     the last 24 h, so an agent whose runtime starts per job stops reading as inactive between jobs.
  *   v1.7.0 -- 2026-07-16 -- Mount folds 5 agent-domain reads into GET /v1/agents/:name/activity/overview
@@ -194,15 +195,15 @@ export default function TabActivity({ agent, agentName }) {
       <!-- Stats summary -->
       ${stats && html`
         <div class="stat-grid">
-          <div class="stat-card">
+          <div class="stat-card poster-row--thing">
             <div class="stat-card-value">${stats.tasksCompleted ?? 0}</div>
             <div class="stat-card-label">${t('profile.agents.activity.tasksCompleted')}</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card poster-row--thing">
             <div class="stat-card-value">${ledgerTokens != null ? num(ledgerTokens) : (telemetryConnected ? (stats.tokensUsed30d ?? 0) : '—')}</div>
             <div class="stat-card-label">${t('profile.agents.activity.tokensUsed')}${telemetryConnected ? '' : ` (${t('profile.agents.detail.activity.notReported') || 'not reported'})`}</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card poster-row--thing">
             <div class="stat-card-value">${stats.successRate != null ? `${Math.round(stats.successRate)}%` : '-'}</div>
             <div class="stat-card-label">${t('profile.agents.activity.successRate')}</div>
           </div>
@@ -211,7 +212,7 @@ export default function TabActivity({ agent, agentName }) {
 
       <!-- Governance summary -->
       ${governance && html`
-        <div class="pf-agd-governance-section">
+        <div class="pf-agd-governance-section poster-row--thing">
           <div class="pf-agd-section-title">${t('profile.agents.detail.activity.governance.title')}</div>
           <div class="pf-agd-governance-grid">
             ${governance.budget ? html`
