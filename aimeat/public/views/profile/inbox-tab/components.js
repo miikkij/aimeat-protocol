@@ -8,6 +8,7 @@
  *   chat.commands), SchedulePanel (own-agent scheduler), and ReplyWithAiPopover (TARGET-031). Each is
  *   self-contained (owns its own hooks). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.16.0 -- 2026-09-13 -- Compose inbox top rules from poster.css.
  *   v1.15.0 — 2026-09-13 — The markdown viewer and the two AI popovers open in the site's one dialog
  *     (components/Modal.js) instead of overlays of their own; their modes are poster tabs, and what
  *     the chosen one decides sits under the sun bar.
@@ -86,7 +87,7 @@ import { swallowed } from '/js/swallowed.js';
 
 export function Avatar({ seed, size = 36 }) {
   const svg = minidenticon(typeof seed === 'string' && seed ? seed : 'user');
-  return html`<span class="inbox-avatar" style=${`width:${size}px;height:${size}px`}
+  return html`<span class=${`inbox-avatar inbox-avatar--${size}`}
     dangerouslySetInnerHTML=${{ __html: svg }}></span>`;
 }
 
@@ -511,7 +512,7 @@ export function Composer({
   });
 
   return html`
-    <div class="inbox-composer ${expanded ? 'inbox-composer--tall' : ''}">
+    <div class="inbox-composer poster-row--thing ${expanded ? 'inbox-composer--tall' : ''}">
       ${files.length > 0 ? html`<div class="inbox-file-chips">
         ${files.map((f, i) => {
           // A recording gets its own chip with a player: a bad take should be caught here, not in
