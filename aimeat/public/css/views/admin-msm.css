@@ -9,6 +9,7 @@
  *   strip and the badges come from admin.css and organism.css; only what this page adds lives here.
  *   Every value is a theme.css token, so the page flips with the theme.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Own the existing MSM spacing; section shapes compose poster.css.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 
@@ -102,6 +103,14 @@
 .adm .adm-msm-yaml:focus { border-color: var(--accent); }
 .adm-msm-pick { display: flex; align-items: center; gap: 12px; margin-top: 16px; font-size: .9rem; cursor: pointer; }
 .adm-msm-dialog-acts { display: flex; gap: 16px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+
+/* Existing layout, composed independently of the shared section shapes. */
+.adm-msm-takes-note { margin-top: 16px; }
+.adm-msm-name-column { width: 36%; }
+.adm-msm-tags, .adm-msm-yaml-field { margin-top: 0; }
+.adm-msm-edit-note { margin-top: 14px; }
+.adm-msm-write-intro, .adm-msm-write-error { margin-top: 12px; }
+.adm-msm-save-actions { margin-top: 20px; }
 
 @media (max-width: 1100px) {
   .adm-msm-tpls { grid-template-columns: minmax(0, 1fr); }
