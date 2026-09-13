@@ -6,6 +6,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.15.0 -- 2026-09-13 -- Remove the document index frame superseded by the shared poster rule.
  *   v3.14.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   v3.13.0 — 2026-09-13 — The account and presence dialogs' own overlay, frame, header, X and footer
  *     rules leave: they open in the site's one dialog (/css/dialog.css). Their fields stay.
@@ -2559,7 +2560,7 @@
 .pj-space-name { flex: 1; color: var(--text); font-size: 0.9rem; }
 .pj-docspace { display: flex; gap: 0.75rem; align-items: flex-start; }
 /* The left index/tree — white so a selected item's accent tint actually stands out against it. */
-.pj-doc-index { flex: 0 0 240px; min-width: 200px; border: 1px solid var(--border); border-radius: 10px; padding: 0.5rem; background: var(--card); max-height: 460px; overflow: auto; }
+.pj-doc-index { flex: 0 0 240px; min-width: 200px; border-radius: 10px; padding: 0.5rem; background: var(--card); max-height: 460px; overflow: auto; }
 .pj-doc-main { flex: 1; min-width: 0; }
 .pj-sec { margin-bottom: 0.25rem; }
 .pj-sec .pj-sec { margin-left: 0.85rem; border-left: 1px solid var(--border); padding-left: 0.4rem; }
