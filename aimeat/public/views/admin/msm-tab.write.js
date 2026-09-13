@@ -16,6 +16,7 @@
  * @structure MsmWrite (default export)
  * @usage <${MsmWrite} templates=${...} yaml=${...} onSave=${...} ... />
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose shared B1 headings; keep existing layout in the view sheet.
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
 import { h } from 'preact';
@@ -51,10 +52,10 @@ export default function MsmWrite({ templates, picked, yaml, federate, busy, err,
       <div class="adm-msm-head">
         <h2>${M('write.title')}</h2>
       </div>
-      <p class="adm-msm-intro" style="margin-top: 12px">${M('write.lead')}</p>
+      <p class="adm-msm-intro adm-msm-write-intro">${M('write.lead')}</p>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${M('write.startFrom')}<small>01</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('write.startFrom')}<small>01</small></h2>
           <div class="og-doors"><span class="adm-msm-note">${M('write.templateCount', { n: num(list.length) })}</span></div></div>
         ${list.length === 0
           ? html`<p class="adm-msm-note">${M('write.noTemplates')}</p>`
@@ -66,9 +67,9 @@ export default function MsmWrite({ templates, picked, yaml, federate, busy, err,
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${M('write.theManifest')}<small>02</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('write.theManifest')}<small>02</small></h2>
           ${picked && html`<div class="og-doors"><span class="adm-msm-note">${M('write.from', { name: picked })}</span></div>`}</div>
-        <label class="adm-msm-field" style="margin-top: 0">
+        <label class="adm-msm-field adm-msm-yaml-field">
           <span>${M('write.yamlLabel')}</span>
           <textarea class="adm-msm-yaml" rows="20" placeholder=${M('write.yamlPlaceholder')}
             value=${yaml} onInput=${ev => onYaml(ev.target.value)}></textarea>
@@ -77,15 +78,15 @@ export default function MsmWrite({ templates, picked, yaml, federate, busy, err,
           <input type="checkbox" checked=${federate} onChange=${ev => onFederate(ev.target.checked)} />
           <span>${M('write.federate')}</span>
         </label>
-        ${err && html`<div style="margin-top: 12px"><${ErrorBox} message=${err} /></div>`}
+        ${err && html`<div class="adm-msm-write-error"><${ErrorBox} message=${err} /></div>`}
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${M('write.whenYouSave')}<small>03</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('write.whenYouSave')}<small>03</small></h2></div>
         ${step(1, 'shapeChecked')}
         ${step(2, 'serviceNot')}
         ${step(3, 'goesPublic', true)}
-        <div class="adm-msm-dialog-acts" style="margin-top: 20px">
+        <div class="adm-msm-dialog-acts adm-msm-save-actions">
           <button type="button" class="og-slab" disabled=${busy || !yaml.trim()} onClick=${onSave}>
             ${busy ? M('write.saving') : M('write.save')}
           </button>

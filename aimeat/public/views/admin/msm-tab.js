@@ -23,6 +23,7 @@
  * @structure MsmTab (default) · RightNow · ReadyMade · WhatItTakes
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose shared B1 headings and stylesheet-owned layout.
  *   v2.0.1 — 2026-09-13 — The delete dialog's actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-12 — The poster face: five numbered sections, its own listing (the tab and the
  *     shell had disagreed on the key since the tab was written), where each manifest points, the
@@ -62,7 +63,7 @@ function daysSince(iso) {
 function RightNow({ facts, number, onWrite }) {
     return html`
     <section class="og-sec og-sec--first" id="adm-msm-now">
-      <div class="og-sec-h"><h2>${M('now.title')}<small>${number}</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${M('now.title')}<small>${number}</small></h2>
         <div class="og-doors"><button type="button" class="og-slab" onClick=${onWrite}>${M('writeNew')}</button></div></div>
       <div class="og-strip">
         <div><b>${num(facts.all)}</b><span>${M('strip.registered')}</span><small>${M('strip.registeredSub')}</small></div>
@@ -86,7 +87,7 @@ function ReadyMade({ templates, number, onPick }) {
       </div>`;
     return html`
     <section class="og-sec" id="adm-msm-ready">
-      <div class="og-sec-h"><h2>${M('ready.title')}<small>${number}</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${M('ready.title')}<small>${number}</small></h2>
         <div class="og-doors"><span class="adm-msm-note">${M('ready.count', { n: num(list.length) })}</span></div></div>
       <p class="adm-msm-lead">${M('ready.lead')}</p>
       ${list.length === 0
@@ -107,12 +108,12 @@ function WhatItTakes({ facts, number }) {
     </div>`;
     return html`
     <section class="og-sec" id="adm-msm-takes">
-      <div class="og-sec-h"><h2>${M('takes.title')}<small>${number}</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${M('takes.title')}<small>${number}</small></h2></div>
       ${row('key')}
       ${row('public')}
       ${row('write')}
       ${row('travel', true)}
-      <div class="og-box" style="margin-top: 16px">
+      <div class="og-box adm-msm-takes-note">
         <span class="og-box-label">${M('takes.boxLabel')}</span>
         ${M('takes.box', { days: num(facts.daysQuiet) })}
       </div>
@@ -360,7 +361,7 @@ export default function MsmTab() {
     <div class="adm-msm-scroll">
       <table class="adm-msm-tbl">
         <thead><tr>
-          <th style="width: 36%">${M('col.name')}</th>
+          <th class="adm-msm-name-column">${M('col.name')}</th>
           <th class="r">${M('col.calls')}</th>
           <th class="r">${M('col.actions')}</th>
           <th class="r">${M('col.by')}</th>
@@ -407,7 +408,7 @@ export default function MsmTab() {
       <${RightNow} facts=${facts} number=${n()} onWrite=${openWrite} />
 
       <section class="og-sec" id="adm-msm-list">
-        <div class="og-sec-h"><h2>${M('list.title')}<small>${n()}</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('list.title')}<small>${n()}</small></h2>
           <div class="og-doors"><span class="adm-msm-note">${M('list.count', { n: num(shown.length), total: num(facts.all) })}</span></div></div>
 
         <div class="adm-msm-tools">
@@ -424,7 +425,7 @@ export default function MsmTab() {
       </section>
 
       <section class="og-sec" id="adm-msm-sets">
-        <div class="og-sec-h"><h2>${M('sets.title')}<small>${n()}</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('sets.title')}<small>${n()}</small></h2>
           <div class="og-doors"><span class="adm-msm-note">${(() => {
             const copies = shownSets.reduce((s, x) => s + x.items.length - 1, 0);
             return copies === 0 ? M('sets.countNone')
