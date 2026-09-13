@@ -5,6 +5,7 @@
  * @description Sharing Groups section — CRUD for sharing groups with expandable
  *   member lists. Extracted from access-tab.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.2.0 — 2026-08-11 — Key-space shares: each group shows what it can actually reach, with add
  *     and revoke, and a count on the collapsed header. The group was only ever half the answer —
@@ -330,7 +331,7 @@ export function SharingGroupsSection({ showToast, initial }) {
               : groupShares.map(renderShareRow)
             }
             ${sharingIn === group.id ? html`
-              <div class="create-form" onClick=${(e) => e.stopPropagation()}>
+              <div class="create-form poster-row--thing" onClick=${(e) => e.stopPropagation()}>
                 <div class="form-row">
                   <label>${t('profile.access.shPattern')}</label>
                   <input type="text" class="input-field input-sm" placeholder="deliveries.abc.**"
@@ -362,7 +363,7 @@ export function SharingGroupsSection({ showToast, initial }) {
             `}
 
             ${addingTo === group.id ? html`
-              <div class="create-form">
+              <div class="create-form poster-row--thing">
                 <div class="form-row">
                   <label>${t('profile.access.sgMemberIdentifier') || 'Identifier (GHII or GAII)'}</label>
                   <${ContactPicker} value=${memberIdent} onChange=${setMemberIdent} valueMode="full"
@@ -473,7 +474,7 @@ export function SharingGroupsSection({ showToast, initial }) {
         </button>
       </div>
     `) : html`
-      <div class="create-form">
+      <div class="create-form poster-row--thing">
         <h4 class="card-h3 mb-half">${t('profile.access.sgCreateTitle') || 'Create Sharing Group'}</h4>
         <div class="flex-col">
           <div class="form-row">

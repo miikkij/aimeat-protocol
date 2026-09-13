@@ -6,6 +6,7 @@
  *   expandable agent cards with Two-Zone Header + 8-tab interface,
  *   device auth flow, scope management modal.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   v3.13.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
@@ -572,7 +573,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
                       `)}
                     </div>
                     ${/* SAFE: PLATFORMS is hardcoded developer constant, not user input */''}
-                    <div class="platform-content" dangerouslySetInnerHTML=${{ __html: PLATFORMS[activePlat] }}></div>
+                    <div class="platform-content poster-row--thing" dangerouslySetInnerHTML=${{ __html: PLATFORMS[activePlat] }}></div>
                   </div>
                 `}
               </div>

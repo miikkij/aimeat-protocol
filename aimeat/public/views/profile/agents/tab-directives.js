@@ -6,6 +6,7 @@
  *   View mode shows formatted text; edit mode uses a single textarea.
  *   Memory areas, knowledge packages, and config files live in their own tabs.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v2.2.0 -- 2026-07-17 -- Tab content wrapped in a single pf-agd-card.
  *   v2.0.0 -- 2026-05-24 -- C5: rewrite as full structured text editor; M6: no SSE listener (owner-initiated only)
@@ -139,7 +140,7 @@ export default function TabDirectives({ agentName, showToast }) {
 
         ${content ? html`
           <div class="pf-agd-directive-section">
-            <div class="pf-agd-directives-content">${content}</div>
+            <div class="pf-agd-directives-content poster-row--thing">${content}</div>
           </div>
         ` : ''}
 

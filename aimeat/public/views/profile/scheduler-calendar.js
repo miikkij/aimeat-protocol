@@ -14,6 +14,7 @@
  *   import SchedulerCalendar from './scheduler-calendar.js';
  *   <${SchedulerCalendar} schedules=${[...managed, ...extensions]} reloadKey=${tick} onJumpTo=${jump} />
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 -- 2026-07-03 -- Initial day/week/month scheduler calendar (server-projected cron cadence)
  *   v1.1.0 -- 2026-07-17 -- Continuous / high-frequency schedules (server `frequent` summary — per-minute /
  *     hourly crons) no longer flood the grid: they render once in a "Continuously running" strip above the
@@ -238,7 +239,7 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
 
   // ── "Continuously running" strip: high-frequency crons summarized (not one-chip-per-fire) ──
   const FREQ_PREVIEW = 6;
-  const frequentStrip = frequentList.length ? html`<div class="sch-cal-freq">
+  const frequentStrip = frequentList.length ? html`<div class="sch-cal-freq poster-row--thing">
     <div class="sch-cal-freq-head">
       <span class="sch-cal-freq-title">${t('profile.scheduler.cal.frequentTitle')} <span class="sch-cal-freq-count">${frequentList.length}</span></span>
       <button type="button" class="btn-ghost btn-sm" onClick=${() => setFoldFreq((v) => !v)}>

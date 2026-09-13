@@ -5,6 +5,7 @@
  * @description Profile tab for managing personal node registrations, visibility,
  *   agent assignments, tunnel URLs, and mailbox status.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-03-16 — Initial nodes tab
@@ -113,7 +114,7 @@ function NodesList({ session, showToast, onStats }) {
           const mbQuotaMB = ((node.mailbox?.quota_bytes || 0) / 1024 / 1024).toFixed(0);
 
           return html`
-            <div class="pn-card">
+            <div class="pn-card poster-row--thing">
               <div class="pn-header" onClick=${() => {
                 const s = new Set(expandedNodes);
                 if (s.has(idx)) s.delete(idx); else s.add(idx);
@@ -170,7 +171,7 @@ function NodesList({ session, showToast, onStats }) {
                       setExpandedSetups(s);
                     }}>${t('profile.nodes.setupTitle')} <span class="pn-setup-arrow ${setupOpen ? 'open' : ''}">\u25BC</span></button>
                     ${setupOpen && html`
-                      <div class="pn-setup open">
+                      <div class="pn-setup open poster-row--thing">
                         <ol>
                           <li>${t('profile.nodes.setupStep1')}</li>
                           <li>${t('profile.nodes.setupStep2')}</li>
@@ -195,7 +196,7 @@ function NodeForm({ onRegister, onCancel }) {
   const [vis, setVis] = useState('private');
   const [gaiis, setGaiis] = useState('');
   return html`
-    <div class="create-form">
+    <div class="create-form poster-row--thing">
       <div class="poster-section-title">${t('profile.nodes.addTitle')}</div>
       <div class="form-row"><label>${t('profile.nodes.nodeIdLabel')}</label><input class="input-field" placeholder=${t('profile.nodes.nodeIdPlaceholder')} value=${nodeId} onInput=${e => setNodeId(e.target.value)} /></div>
       <div class="form-row"><label>${t('profile.nodes.visLabel')}</label>

@@ -7,6 +7,7 @@
  *   universal file preview modal, the drag-and-drop upload form, and the edit-memory modal.
  *   Extracted from memory-tab.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.1.1 — 2026-09-13 — The file preview (extra large) and the edit dialog (large) keep their actions
  *     in the footer.
  *   v1.1.0 — 2026-08-11 — The create form and the edit modal no longer offer "group" as a
@@ -167,7 +168,7 @@ export function MemoryForm({ onSave, onCancel }) {
   const [vis, setVis] = useState('private');
   const [tags, setTags] = useState('');
   return html`
-    <div class="create-form">
+    <div class="create-form poster-row--thing">
       <div class="form-row"><label>${t('profile.memory.keyLabel')}</label><input class="input-field" placeholder=${t('profile.memory.keyPlaceholder')} value=${key} onInput=${e => setKey(e.target.value)} /></div>
       <div class="form-row"><label>${t('profile.memory.valueLabel')}</label><textarea class="input-field" rows="3" placeholder=${t('profile.memory.valuePlaceholder')} value=${value} onInput=${e => setValue(e.target.value)}></textarea></div>
       <div class="form-row"><label>${t('profile.memory.visLabel')}</label>
@@ -312,7 +313,7 @@ export function FileUploadForm({ onUpload, onCancel }) {
   };
 
   return html`
-    <div class="create-form">
+    <div class="create-form poster-row--thing">
       <div class="form-row">
         <div class="file-dropzone ${dragover ? 'dragover' : ''} ${fileItems.length > 0 ? 'has-file' : ''}"
           onClick=${() => fileRef.current?.click()}

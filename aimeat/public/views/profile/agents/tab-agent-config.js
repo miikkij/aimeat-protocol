@@ -6,6 +6,7 @@
  *   and two-way sync. Shows files pushed by the agent (soul.md, AGENTS.md, etc).
  *   Supports edit, copy, download, and upload actions.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  *   v1.1.0 -- 2026-05-24 -- Add edit/copy/download buttons (F8), edit mode (F9), upload (F10), file metadata (F11)
  *   v1.2.0 -- 2026-06-02 -- Component unification: route handleCopy through the shared
@@ -57,7 +58,7 @@ function ScheduleBudgetSection({ agent, agentName, showToast }) {
   };
 
   return html`
-    <div class="sch-form sch-budget-section">
+    <div class="sch-form sch-budget-section poster-row--thing">
       <div class="pf-agd-section-title">${t('profile.scheduler.budgetTitle')}</div>
       <div class="section-desc">${t('profile.scheduler.budgetDesc')}</div>
       <div class="sch-constraints">

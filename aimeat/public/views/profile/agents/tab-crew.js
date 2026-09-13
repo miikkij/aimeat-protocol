@@ -18,6 +18,7 @@
  *   - TabCrew — load, actions (validate / try / publish / draft / restore), the header and the
  *     form-or-JSON body; sections live in ./crew-editor.js, templates in ./crew-templates.js
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.1.0 -- 2026-08-28 -- A definition published from outside the tab (crewaimeat CLI) has no
  *     revision number; the live line says so instead of "revision 0", and the runtime line shows
  *     when it loaded rather than a timestamp in a number's place.
@@ -253,7 +254,7 @@ export default function TabCrew({ agentName, showToast }) {
       </div>
 
       ${published && html`
-        <div class="pf-agd-crew-live">
+        <div class="pf-agd-crew-live poster-row--thing">
           <div>${published.revision > 0
             ? t(`${K}.liveRevision`, { rev: published.revision, when: timeAgo(published.publishedAt) })
             : t(`${K}.liveUnnumbered`, { when: timeAgo(published.publishedAt) })}</div>
@@ -303,7 +304,7 @@ export default function TabCrew({ agentName, showToast }) {
         </div>
         ${status === 'draft' && html`<div class="pf-agd-help-text pf-agd-crew-note">${t(`${K}.needsValidation`)}${state?.draft || published ? ' ' + t(`${K}.unpublishedEdits`) : ''}</div>`}
         ${status === 'invalid' && html`
-          <div class="pf-agd-crew-problems">
+          <div class="pf-agd-crew-problems poster-row--thing">
             <div class="pf-agd-crew-problems-title">${t(`${K}.messages.problems`, { n: validation.errors.length })}</div>
             <${ErrorLines} lines=${errors.general} />
           </div>
