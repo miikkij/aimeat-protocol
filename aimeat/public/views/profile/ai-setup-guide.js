@@ -14,6 +14,8 @@
  * @structure McpSetupGuide({ installClassName }) · InstructionsDialog({ open, onClose })
  * @usage import { McpSetupGuide, InstructionsDialog } from '/views/profile/ai-setup-guide.js';
  * @version-history
+ *   2026-09-14 -- McpSetupGuide takes tabClass / activeClass for its tool tabs, so the agents page
+ *     can hand in the shared poster tab instead of restyling .ast-tool from outside.
  *   2026-09-13 -- Pass the caller's shared install-row shape to McpInstallRow.
  *   v2.2.0 — 2026-08-27 — The short way in (McpInstallRow) renders above the steps for the three
  *     clients that have one, and the module-level table cache moved to ai-tool-setup.js so the
@@ -48,12 +50,12 @@ const rememberedTool = () => {
 
 const pickTool = (tools, id) => tools.find(x => x.id === id) || tools[0];
 
-function ToolPicker({ tools, value, onPick }) {
+function ToolPicker({ tools, value, onPick, tabClass = 'ast-tool', activeClass = 'ast-tool--active' }) {
   return html`
     <div class="ast-tools" role="tablist">
       ${tools.map(tool => html`
         <button key=${tool.id} type="button" role="tab" aria-selected=${tool.id === value}
-          class=${'ast-tool' + (tool.id === value ? ' ast-tool--active' : '')}
+          class=${tabClass + (tool.id === value ? ' ' + activeClass : '')}
           onClick=${() => onPick(tool.id)}>${tool.label}${tool.recommended
             ? html` <span class="ast-tool-reco">${tr('setup.recommendedBadge', 'recommended')}</span>` : null}</button>`)}
     </div>`;
@@ -84,9 +86,12 @@ function Params({ params }) {
 
 /**
  * How to attach this node to one AI tool: the steps as things to click or type, every field value,
- * and the vendor's own page.
+ * and the vendor's own page. `tabClass` / `activeClass`: the tool tabs' classes, so a poster-face
+ * page can hand in its own shared tab (poster-tab / is-on) instead of restyling .ast-tool from
+ * outside.
+ * @param {{ installClassName?: string, tabClass?: string, activeClass?: string }} [props]
  */
-export function McpSetupGuide({ installClassName = '' } = {}) {
+export function McpSetupGuide({ installClassName = '', tabClass, activeClass } = {}) {
   const tools = useAiTools();
   const [toolId, setToolId] = useState(rememberedTool);
   const pick = (id) => {
@@ -102,7 +107,7 @@ export function McpSetupGuide({ installClassName = '' } = {}) {
   return html`
     <div class="ast">
       <p class="ast-lead">${tr('setup.pickTool', 'Which AI tool are you connecting? The steps differ enough that the general version is not usable.')}</p>
-      <${ToolPicker} tools=${tools} value=${tool.id} onPick=${pick} />
+      <${ToolPicker} tools=${tools} value=${tool.id} onPick=${pick} tabClass=${tabClass} activeClass=${activeClass} />
 
       <!-- The short way in comes first, and removes none of the steps below it: a one-click link is
            blocked on a managed machine and does nothing where the client is not installed. -->
