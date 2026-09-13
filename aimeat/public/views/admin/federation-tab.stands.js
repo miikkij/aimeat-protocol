@@ -26,6 +26,7 @@
  *   - WhoMaySignIn (02) — the policy, the scopes, and what this node offers
  * @usage Imported by views/admin/federation-tab.js.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.0 — 2026-09-12 — Initial (the Federation page in the poster face).
  */
 import { h } from 'preact';
@@ -75,7 +76,7 @@ export function WhereWeStand({ data, onGoPeers, onGoRequests }) {
   return html`
     <section class="og-sec og-sec--first" id="adm-fed-01">
       <div class="og-sec-h">
-        <h2>${S('now.title')}<small>01</small></h2>
+        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
       </div>
 
       <div class="adm-ov-grid">
@@ -156,7 +157,7 @@ export function WhoMaySignIn({ data, saving, onPolicy, onScope, onOpenJoin, onGo
   return html`
     <section class="og-sec" id="adm-fed-02">
       <div class="og-sec-h">
-        <h2>${S('signin.title')}<small>02</small></h2>
+        <h2 class="poster-section-title">${S('signin.title')}<small>02</small></h2>
       </div>
       <p class="adm-intro">${S('signin.lead')}</p>
 
