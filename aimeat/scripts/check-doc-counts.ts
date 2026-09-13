@@ -31,6 +31,8 @@
  *   cd aimeat && pnpm check:doc-counts --strict   # gate (pre-commit + CI)
  * @version-history
  *   v1.0.0 — 2026-09-04 — Initial (quality plan stream C: documentation truth).
+ *   v1.1.0 — 2026-09-13 — The two sentences moved verbatim out of CLAUDE.md into the path rules
+ *     .claude/rules/testing.md and .claude/rules/gates-ratchets.md; the claims read them there.
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -39,7 +41,10 @@ const ROOT = process.cwd();
 const REPO = join(ROOT, '..');
 const RUNNER = join(ROOT, 'test', 'run-e2e-ci.ts');
 const HOOK = join(REPO, '.githooks', 'pre-commit');
-const CLAUDE_MD = join(REPO, 'CLAUDE.md');
+// Both sentences were in CLAUDE.md until 2026-09-13 and now sit in the path rules that load
+// beside the code they describe. They are still read by every session that touches that code.
+const TESTING_RULE = join(REPO, '.claude', 'rules', 'testing.md');
+const GATES_RULE = join(REPO, '.claude', 'rules', 'gates-ratchets.md');
 const CI_YML = join(REPO, '.github', 'workflows', 'ci.yml');
 
 /** The guard tier's size, from the array that decides it. */
@@ -71,8 +76,8 @@ interface Claim {
 
 const CLAIMS: Claim[] = [
     {
-        file: CLAUDE_MD,
-        label: 'CLAUDE.md — guard tier size',
+        file: TESTING_RULE,
+        label: 'rules/testing.md — guard tier size',
         pattern: /run the (\d+) suites CI refuses to merge without/,
         expected: guardSuiteCount,
     },
@@ -83,8 +88,8 @@ const CLAIMS: Claim[] = [
         expected: guardSuiteCount,
     },
     {
-        file: CLAUDE_MD,
-        label: 'CLAUDE.md — pre-commit hook size',
+        file: GATES_RULE,
+        label: 'rules/gates-ratchets.md — pre-commit hook size',
         pattern: /`\.githooks\/pre-commit`\) runs (\d+) commands/,
         expected: hookCommandCount,
     },
@@ -95,17 +100,18 @@ const CLAIMS: Claim[] = [
  *
  * It would be the natural fourth row, and it is left out because the header is a hand-kept list
  * with sub-numbering (5b, 8c) that grew by insertion, and putting a machine-checked total inside it
- * invites a merge conflict on the one file two parallel sessions both add lines to. CLAUDE.md
- * carries the number instead, and it is checked against what the hook RUNS, which is the fact.
+ * invites a merge conflict on the one file two parallel sessions both add lines to. The path rule
+ * .claude/rules/gates-ratchets.md carries the number instead, and it is checked against what the
+ * hook RUNS, which is the fact.
  *
- * When this gate fails after somebody adds a check to the hook, the fix is the number in CLAUDE.md,
- * not this file. That failure is the gate working.
+ * When this gate fails after somebody adds a check to the hook, the fix is the number in that rule
+ * file, not this file. That failure is the gate working.
  */
 
 function main(): void {
     const strict = process.argv.includes('--strict');
 
-    for (const path of [RUNNER, HOOK, CLAUDE_MD, CI_YML]) {
+    for (const path of [RUNNER, HOOK, TESTING_RULE, GATES_RULE, CI_YML]) {
         if (!existsSync(path)) {
             console.error(`✖ missing ${relative(REPO, path)}`);
             process.exit(1);
@@ -147,7 +153,7 @@ function main(): void {
     }
     for (const p of problems) console.log(`    ${p}`);
     console.log('');
-    console.log('  A wrong number in CLAUDE.md is read as a fact by every session that opens it.');
+    console.log('  A wrong number in an instruction file is read as a fact by every session that loads it.');
     console.log('  Fix the prose, not this check, unless the code genuinely changed.');
     console.log('');
     if (strict) process.exit(1);
