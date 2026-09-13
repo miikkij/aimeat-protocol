@@ -8,11 +8,13 @@
     "SessionStart prints the ritual and the live board into the session's own context before its",
     "first tool call, so the claim is written from what the session already knows.",
     "",
-    "claudeMdExcludes (2026-09-13): a session starts in the main checkout and reads files in",
-    ".worktrees/<session>/, and every such read loaded that worktree's whole CLAUDE.md a second",
-    "time (load_reason nested_traversal, 19 times in 10 of 115 retained transcripts, measured again",
-    "on a live run). The patterns match only the top of a worktree, so one copy stays: the main",
-    "checkout's for a session started there, the ancestor's for a session started inside one.",
+    "No claudeMdExcludes here, on purpose (2026-09-13). A session started in the main checkout",
+    "that reads files in .worktrees/<session>/ loads that worktree's CLAUDE.md a second time",
+    "(load_reason nested_traversal). Excluding **/.worktrees/*/CLAUDE.md stopped that, and it also",
+    "left a session STARTED inside a worktree with no project CLAUDE.md and no rules at all: the",
+    "pattern matched its own files and the main checkout's copy above it did not load either,",
+    "measured on a live run the same day. A glob cannot tell the two apart, so the exclusion",
+    "belongs, if anywhere, in the main checkout's untracked .claude/settings.local.json.",
     "",
     "permissions.deny (2026-09-13): Read refused on files nobody edits by hand and nobody needs",
     "whole, so a Grep or a Read cannot pour megabytes into context: minified third-party libs,",
@@ -20,11 +22,6 @@
     ".claudeignore listed as 'may contain secrets'; Claude Code never read that file (the 2.1.226",
     "binary has no occurrence of the word), so this is the first time the list is enforced.",
     "Kept readable on purpose: openapi.yaml, locales/*.json, db-types.ts, aimeat/security/*.json."
-  ],
-  "claudeMdExcludes": [
-    "**/.worktrees/*/CLAUDE.md",
-    "**/.worktrees/*/.claude/rules/**",
-    "**/.claude/worktrees/**"
   ],
   "permissions": {
     "deny": [
