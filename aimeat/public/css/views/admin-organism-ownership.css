@@ -10,6 +10,7 @@
  *   organism.css; only what this page adds lives here. Every value is a theme.css token, so the page
  *   flips with the theme.
  * @version-history
+ *   v1.2.0 — 2026-09-13 — Own the existing people-column heading alignment.
  *   v1.1.0 — 2026-09-13 — The page's own copy of the poster dialog leaves; /css/dialog.css draws it for
  *     every dialog now.
  *   v1.0.0 — 2026-09-12 — Initial. Replaces the .adm-oo-row / .adm-oo-card rules that lived in
@@ -38,6 +39,7 @@
 .adm-oo-row--head { border-bottom: 0; padding-bottom: 5px; min-height: 0; }
 .adm-oo-row--head div { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .adm-oo-row--head .adm-oo-n { font-family: inherit; font-size: .66rem; color: var(--accent); }
+.adm-oo-people-head { text-align: right; }
 
 .adm-oo-n {
   font-family: var(--font-poster);
