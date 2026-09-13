@@ -85,6 +85,54 @@ describe('prepareSecretConfigForWrite', () => {
     });
 });
 
+/**
+ * An unset secret has to read as ABSENT in the sandbox. A manifest field declared `type: secret`
+ * with no `default` used to be stored as its own descriptor object, and a mask submitted on a first
+ * install was stored as the mask string, so `if (ctx.config.apiKey)` passed and the extension sent
+ * "Bearer [object Object]" or "Bearer ••••••••" upstream (appdev pitfall
+ * ext/unset-secret-config-reads-back-as-mask, 2026-09-13).
+ */
+describe('an unset secret reads as undefined', () => {
+    it('a descriptor with no default does not reach the sandbox as an object', () => {
+        const incoming = { apiKey: { type: 'secret', description: 'upstream key' }, [SECRET_KEYS_FIELD]: ['apiKey'] };
+        const stored = prepareSecretConfigForWrite(incoming, undefined, KEY)!;
+        expect(decryptSecretFields(stored, ['apiKey'], KEY).apiKey).toBeUndefined();
+        expect('apiKey' in decryptSecretFields(stored, ['apiKey'], KEY)).toBe(false);
+    });
+
+    it('the mask submitted on a first install is not stored as a value', () => {
+        const stored = prepareSecretConfigForWrite({ apiKey: SECRET_MASK, [SECRET_KEYS_FIELD]: ['apiKey'] }, undefined, KEY)!;
+        expect(stored.apiKey).toBeUndefined();
+        expect(decryptSecretFields(stored, ['apiKey'], KEY).apiKey).toBeUndefined();
+    });
+
+    it('a record already stored with a descriptor, the mask or an empty string reads as unset, with no migration', () => {
+        for (const bad of [{ type: 'secret' }, SECRET_MASK, '']) {
+            const forVm = decryptSecretFields({ apiKey: bad, other: 'kept', [SECRET_KEYS_FIELD]: ['apiKey'] }, ['apiKey'], KEY);
+            expect(forVm.apiKey, JSON.stringify(bad)).toBeUndefined();
+            expect(forVm.other).toBe('kept');
+        }
+    });
+
+    it('an encrypted secret on a node with no key reads as unset rather than as an empty string', () => {
+        const stored = prepareSecretConfigForWrite(builtConfig('super-secret-value'), undefined, KEY)!;
+        expect('api_key' in decryptSecretFields(stored, ['api_key'], null)).toBe(false);
+    });
+
+    it('a re-install that declares the field without a value still keeps the stored secret', () => {
+        const existing = prepareSecretConfigForWrite(builtConfig('original-value'), undefined, KEY)!;
+        const incoming = { base_url: 'https://example.invalid', api_key: { type: 'secret' }, [SECRET_KEYS_FIELD]: ['api_key'] };
+        const reinstalled = prepareSecretConfigForWrite(incoming, existing, KEY)!;
+        expect(decryptSecretFields(reinstalled, ['api_key'], KEY).api_key).toBe('original-value');
+    });
+
+    it('the record read shows an unset secret as absent, not as a mask that claims it is set', () => {
+        const shown = maskSecretFields({ apiKey: { type: 'secret' }, other: SECRET_MASK, [SECRET_KEYS_FIELD]: ['apiKey', 'other'] }, ['apiKey', 'other']);
+        expect('apiKey' in shown).toBe(false);
+        expect('other' in shown).toBe(false);
+    });
+});
+
 describe('maskSecretFields', () => {
     it('masks a stored secret for any API surface', () => {
         const stored = prepareSecretConfigForWrite(builtConfig('super-secret-value'), undefined, KEY)!;

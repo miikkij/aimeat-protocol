@@ -11,6 +11,9 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   v1.5.1 — 2026-09-13 — GET /v1/owners/:name no longer treats a federated session as the account
+ *     whose name it carries: a visitor from another node gets the public card, not the local
+ *     namesake's roles and agent roster, and is never read as this node's operator.
  *   v1.5.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): POST /v1/owners is a direct door, 403 REGISTRATION_CLOSED when the node is invite-only or closed.
  *   v1.4.0 — 2026-08-17 — Writes the account_created row at account creation, for the same reason
  *     v1.2.0 writes the track marker: an account made through this door opened on an empty feed,
@@ -199,8 +202,13 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const isSelf = !!req.auth && !req.auth.anonymous && req.auth.owner === owner.name;
-    const isOperator = !!req.auth && !req.auth.anonymous && req.auth.roles?.includes('operator');
+    // A session from another node carries the LOCAL PART of somebody else's account as `owner`, so
+    // the name alone made a visitor the local namesake here and showed them its roles and agent
+    // roster (docs/pitfalls.md §83, security-development-dna invariant 11c). A federated session is
+    // never this account and never this node's operator.
+    const local = !!req.auth && !req.auth.anonymous && req.auth.federated !== true;
+    const isSelf = local && req.auth!.owner === owner.name;
+    const isOperator = local && req.auth!.roles?.includes('operator');
     const privileged = isSelf || isOperator;
     const agents = privileged ? await storage.getAgentsByOwner(owner.name) : [];
 

@@ -20,6 +20,12 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.4.0 — 2026-09-13 — aimeat_app_tools_publish answers with an `exchange` block: which tools
+ *     listed, which were skipped and why (SCHEMA_REQUIRED, NOT_PRICED, NO_ASSIGNEE ...), and the
+ *     warnings (a tool that duplicates a flagged extension action, an ODPS field past its schema cap).
+ *     The shared write already reconciled the listings and the report was dropped, so a tool that was
+ *     priced and flagged but never listed answered exactly like one that did. aimeat_offer_price_set
+ *     carries the same block as soon as services/agent-offers-write.ts passes the write's report on.
  *   v1.3.0 — 2026-08-11 — The last three direct storage writes leave this file. Offer pricing goes
  *     through services/agent-offers-write.ts, the same publish PUT /v1/agents/:name/offers performs.
  *     psp_delete clears the card credentials by MERGING, the way DELETE /v1/commerce/payout/stripe
@@ -54,6 +60,7 @@ import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/ben
 import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
 import { issueJWT } from '../auth/jwt.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
+import { exchangeOutcome, type ReconcileReport } from '../services/exchange-projection.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 
@@ -139,11 +146,14 @@ export function registerCommerceTools(
      * manifest rides `commerce:sell`, exactly as the registration filter has them
      * (mcp/catalog/scopes.ts). Naming one for both meant an agent granted only `commerce:psp` had
      * psp_set registered and then had its write refused.
+     *
+     * Answers the refusal text, or null and the EXCHANGE projection's report when the key is a
+     * listing source (the app-tool manifest is; the PSP record is not).
      */
     async function putOwnerRecord(
         key: string, value: Record<string, unknown>, visibility: 'private' | 'public', tags: string[],
         authorisingScope: string,
-    ): Promise<string | null> {
+    ): Promise<{ refusal: string } | { refusal: null; exchange: ReconcileReport | null }> {
         const written = await writeMemoryRecord({ storage, config }, {
             principal: agentGaii, targetGaii: ownerGhii, scopes: sessionScopes, roles: ['agent'],
         }, {
@@ -152,7 +162,7 @@ export function registerCommerceTools(
             ownerScoped: true,
             authorisingScope,
         });
-        return written.ok ? null : `${written.code}: ${written.message}`;
+        return written.ok ? { refusal: null, exchange: written.exchange ?? null } : { refusal: `${written.code}: ${written.message}` };
     }
 
     // ── Seller: PSP credentials (secret in, masked status out — NEVER the secret) ──
@@ -176,7 +186,7 @@ export function registerCommerceTools(
             // MERGE: the same record also holds the seller's x402 USDC payout address. Replacing it
             // wholesale would silently delete the other rail's setting (and vice versa).
             const existing = (await storage.getMemory(ownerGhii, PSP_KEY))?.value as Record<string, unknown> | undefined;
-            const pspRefusal = await putOwnerRecord(PSP_KEY, { ...(existing ?? {}), provider, secretKey: key }, 'private', ['commerce'], 'commerce:psp');
+            const { refusal: pspRefusal } = await putOwnerRecord(PSP_KEY, { ...(existing ?? {}), provider, secretKey: key }, 'private', ['commerce'], 'commerce:psp');
             if (pspRefusal) return { content: [{ type: 'text' as const, text: pspRefusal }], isError: true };
             return ok({ configured: true, provider, key_hint: maskSecret(key), note: 'Stored server-side; money sales settle on this PSP account. The secret is never returned by any tool.' });
         },
@@ -217,7 +227,7 @@ export function registerCommerceTools(
             const next = { ...existing };
             delete next.secretKey;
             delete next.provider;
-            const clearRefusal = await putOwnerRecord(PSP_KEY, next, 'private', ['commerce'], 'commerce:psp');
+            const { refusal: clearRefusal } = await putOwnerRecord(PSP_KEY, next, 'private', ['commerce'], 'commerce:psp');
             if (clearRefusal) return { content: [{ type: 'text' as const, text: clearRefusal }], isError: true };
             return ok({
                 deleted: true,
@@ -250,11 +260,12 @@ export function registerCommerceTools(
                 ...(parsed.data.provenance ? { provenance: parsed.data.provenance } : {}),
                 tools: parsed.data.tools,
             };
-            const manifestRefusal = await putOwnerRecord(key, doc, 'public', ['commerce', 'app-tools'], 'commerce:sell');
-            if (manifestRefusal) return { content: [{ type: 'text' as const, text: manifestRefusal }], isError: true };
+            const written = await putOwnerRecord(key, doc, 'public', ['commerce', 'app-tools'], 'commerce:sell');
+            if (written.refusal !== null) return { content: [{ type: 'text' as const, text: written.refusal }], isError: true };
             // TARGET-050: the manifest is the source of truth for the EXCHANGE listing. The
             // projection is not called here any more — the shared write reconciles it, and calling
-            // it again did the same work twice.
+            // it again did the same work twice. What it did comes back on the write and is said
+            // here: `priced` alone could not tell a listed tool from one skipped for a missing schema.
             return ok({
                 app: `${owner}/${app_id}`,
                 version: doc.version,
@@ -264,6 +275,8 @@ export function registerCommerceTools(
                     fulfillment: t.action_id ? 'call' : 'task',
                     priced: !!((t.price && t.price.morsels > 0) || t.priceMoney),
                 })),
+                exchange: exchangeOutcome(written.exchange,
+                    `POST /v1/exchange/reconcile with {"dry_run": true, "app_id": "${app_id}"}`),
             });
         },
     );
@@ -352,6 +365,9 @@ export function registerCommerceTools(
                 agent: published.agentName, offer: offer_id,
                 price: offer.price ?? null, priceMoney: offer.priceMoney ?? null,
                 visibility: offer.visibility ?? 'private',
+                // Same block PUT /v1/agents/:name/offers answers, once the offers service hands the report on.
+                ...('exchange' in published ? { exchange: exchangeOutcome((published.exchange as ReconcileReport | null) ?? null,
+                    `POST /v1/exchange/reconcile with {"dry_run": true, "agent": "${published.agentName}"}`) } : {}),
             });
         },
     );

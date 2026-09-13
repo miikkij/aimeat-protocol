@@ -9,6 +9,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-agent-deploy
  * @version-history
+ *   v1.2.0 — 2026-09-13 — The presigned road carries cortex.agents: a valid crew-def survives mint
+ *     and PUT, a malformed one is refused at the mint with no upload URL.
  *   v1.1.0 — 2026-07-17 — Slice 2: hosted-instance discovery (instances endpoint, public-offer
  *     pricing, is_yours, cross-owner private-offer filter on GET /offers).
  *   v1.0.0 — 2026-07-16 — Initial (Agent-Bundled Apps Slice 1, node side).
@@ -165,6 +167,38 @@ async function main() {
             body: publishBody({ filename: 'bad4.html', cortex: { agents: [crewDef(), crewDef()] } }),
         });
         assert(r.status === 400 && r.body.error?.code === 'INVALID_CREW_DEF', `${r.status} ${r.body.error?.code}`);
+    });
+
+    // The presigned road is the one the docs recommend for any real app, and until 2026-09-13 it
+    // could not carry a crew-def: the mint accepted `cortex` and the token dropped it, so the app
+    // published with no agents and nothing said so.
+    await test('presigned mint carries cortex.agents through the token, and the PUT declares them', async () => {
+        const file = 'joker-presigned.html';
+        const minted = await json('/v1/apps', {
+            method: 'POST', headers: { Authorization: `Bearer ${owner1Token}` },
+            body: JSON.stringify({
+                mode: 'presigned', filename: file, name: 'Joker presigned', category: 'utility',
+                description: 'The joke app, through the upload road.',
+                cortex: { agents: [crewDef('presigned-joker')] },
+            }),
+        });
+        assert(minted.status === 200, `presigned mint: ${minted.status} ${JSON.stringify(minted.body)}`);
+        const url = minted.body.data?.upload_url as string;
+        assert(typeof url === 'string' && url.includes('/v1/upload/'), `upload_url: ${url}`);
+        const put = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: '<!DOCTYPE html><html><body>joker presigned</body></html>' });
+        assert(put.status === 200, `PUT: ${put.status} ${await put.text()}`);
+        const probe = await json(`/v1/apps/${owner1}/${file}/agents/presigned-joker/instances`, { headers: { Authorization: `Bearer ${owner1Token}` } });
+        assert(probe.status === 200, `the crew-def did not survive the upload road: ${probe.status} ${JSON.stringify(probe.body.error)}`);
+    });
+
+    await test('REJECT: presigned mint with a malformed crew-def → 400 INVALID_CREW_DEF, no upload URL', async () => {
+        const bad = crewDef('presigned-bad'); bad.tasks[0].description = 'No prompt injection here';
+        const r = await json('/v1/apps', {
+            method: 'POST', headers: { Authorization: `Bearer ${owner1Token}` },
+            body: JSON.stringify({ mode: 'presigned', filename: 'bad-presigned.html', name: 'Bad', cortex: { agents: [bad] } }),
+        });
+        assert(r.status === 400 && r.body.error?.code === 'INVALID_CREW_DEF', `${r.status} ${JSON.stringify(r.body)}`);
+        assert(!JSON.stringify(r.body).includes('/v1/upload/'), 'a refused mint still handed out an upload URL');
     });
 
     console.log('\nPhase 2: Deploy — pointer task on the OWNER\'S OWN fleet only');

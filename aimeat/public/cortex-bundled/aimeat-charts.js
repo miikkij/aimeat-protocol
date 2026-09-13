@@ -13,6 +13,12 @@
  *   AIMEAT.charts.ChartPanel({ elementId: 'my-chart', chartKey: 'chart:sales-2024', nodeUrl: '...' })
  *
  * @version-history
+ *   v1.1.3 — 2026-09-13 — elementId may name a <canvas>. The lib emptied the element and appended
+ *     its own wrapper and canvas, so a canvas id (the Chart.js habit) put a canvas inside a canvas:
+ *     a blank box, no error, nothing logged (appdev pitfall chartbuilder-wants-container-not-canvas).
+ *     A canvas target is now drawn into directly, a chart it already holds is destroyed first, and an
+ *     error or loading note lands beside it instead of inside it where nobody sees it. A container
+ *     id works exactly as before.
  *   v1.1.2 — 2026-07-25 — One observer, not two. This lib attached its own ResizeObserver that
  *     called `chart.resize()` with no arguments; Chart.js already watches the same container and
  *     already resizes from the observer entry's contentRect. The two disagree wherever an
@@ -151,19 +157,55 @@
   // ---------------------------------------------------------------------------
 
   /**
-   * Render an error message inside the target element.
-   * @param {HTMLElement} el  Target container.
+   * Whether the caller handed us a <canvas> rather than a container.
+   * @param {Element} el
+   * @returns {boolean}
+   */
+  function isCanvas(el) {
+    return !!el && String(el.tagName || '').toUpperCase() === 'CANVAS';
+  }
+
+  /**
+   * A note (error or loading) placed right AFTER a canvas target. Anything written inside a canvas
+   * is fallback content the browser never shows, so an error there would be as silent as no error.
+   * @param {HTMLCanvasElement} canvas
+   * @param {string} className
+   * @param {string} text
+   */
+  function noteBesideCanvas(canvas, className, text) {
+    clearCanvasNote(canvas);
+    if (!canvas.parentNode) return;
+    var note = document.createElement('div');
+    note.className = className;
+    note.setAttribute('data-aimeat-chart-note', '1');
+    note.textContent = text;
+    canvas.parentNode.insertBefore(note, canvas.nextSibling);
+  }
+
+  /** Remove a note this lib placed beside a canvas target, if there is one. */
+  function clearCanvasNote(canvas) {
+    var next = canvas.nextElementSibling;
+    if (next && next.hasAttribute && next.hasAttribute('data-aimeat-chart-note') && next.parentNode) {
+      next.parentNode.removeChild(next);
+    }
+  }
+
+  /**
+   * Render an error message inside the target element, or beside it when the target is a canvas.
+   * @param {HTMLElement} el  Target container or canvas.
    * @param {string}      msg Human-readable error text.
    */
   function showError(el, msg) {
+    if (isCanvas(el)) { noteBesideCanvas(el, 'aimeat-chart-error', msg); return; }
     el.innerHTML = '<div class="aimeat-chart-error">' + escapeHtml(msg) + '</div>';
   }
 
   /**
-   * Render a loading indicator inside the target element.
-   * @param {HTMLElement} el Target container.
+   * Render a loading indicator inside the target element, or beside it when the target is a canvas.
+   * @param {HTMLElement} el Target container or canvas.
    */
   function showLoading(el) {
+    if (isCanvas(el)) { noteBesideCanvas(el, 'aimeat-chart-loading', 'Loading chart…'); return; }
     el.innerHTML = '<div class="aimeat-chart-loading">Loading chart&hellip;</div>';
   }
 
@@ -286,13 +328,24 @@
   }
 
   /**
-   * Create a <canvas> inside the given container, wrapped in the standard
-   * .aimeat-chart-container div.
+   * The canvas a chart draws on: a new one inside the given container, wrapped in the standard
+   * .aimeat-chart-container div, or the element itself when the caller passed a <canvas>.
    *
-   * @param {HTMLElement} el Parent element (its contents will be replaced).
-   * @returns {HTMLCanvasElement} The newly created canvas.
+   * A canvas id is what most Chart.js examples use, and the lib used to empty that canvas and
+   * append a wrapper and a second canvas INSIDE it, where the browser draws nothing: a blank box, no
+   * error, nothing logged. Drawing into the caller's canvas is what they meant. A chart already on
+   * that canvas is destroyed first, because Chart.js refuses a canvas that is still in use.
+   *
+   * @param {HTMLElement} el Container (its contents will be replaced) or a canvas.
+   * @returns {HTMLCanvasElement} The canvas to hand Chart.js.
    */
   function createCanvas(el) {
+    if (isCanvas(el)) {
+      clearCanvasNote(el);
+      var held = window.Chart && typeof window.Chart.getChart === 'function' ? window.Chart.getChart(el) : null;
+      if (held) { try { held.destroy(); } catch (_e) { /* already destroyed */ } }
+      return el;
+    }
     el.innerHTML = '';
     var wrapper = document.createElement('div');
     wrapper.className = 'aimeat-chart-container';
@@ -337,7 +390,9 @@
       }
     });
 
-    observer.observe(el);
+    /* A canvas target is resized by this observer, so watching the canvas itself would feed its
+       own writes back in; its parent is the box that decides the size. */
+    observer.observe(isCanvas(el) && el.parentElement ? el.parentElement : el);
 
     // Store the observer reference so callers could disconnect later if needed.
     chart._aimeatResizeObserver = observer;
@@ -390,7 +445,7 @@
    * Render a Chart.js chart from inline data.
    *
    * @param {object}  opts
-   * @param {string}  opts.elementId  DOM id of the target container element.
+   * @param {string}  opts.elementId  DOM id of the container to draw in, or of a <canvas> to draw on.
    * @param {object}  opts.data       Chart.js data ({ labels, datasets }).
    * @param {string}  opts.type       Chart type (bar, line, pie, ...).
    * @param {string=} opts.title      Optional chart title.
@@ -468,7 +523,7 @@
    *   { type, title?, data: { labels, datasets }, options? }
    *
    * @param {object}  opts
-   * @param {string}  opts.elementId  DOM id of the target container element.
+   * @param {string}  opts.elementId  DOM id of the container to draw in, or of a <canvas> to draw on.
    * @param {string}  opts.chartKey   AIMEAT memory key (e.g. "chart:sales-2024").
    * @param {string}  opts.nodeUrl    AIMEAT node base URL (no trailing slash).
    * @param {string=} opts.token      Optional bearer token for authenticated requests.
@@ -587,7 +642,7 @@
     ChartPanel: ChartPanel,
     ChartBuilder: ChartBuilder,
     TYPES: TYPES,
-    VERSION: '1.1.2',
+    VERSION: '1.1.3',
     /** The palette a chart would draw with right now, for legends and non-canvas visuals. */
     palette: themePalette
   };

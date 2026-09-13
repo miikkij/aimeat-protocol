@@ -12,6 +12,13 @@
  *   scheduleAutoRefresh/createSession · refreshOnFocus · the `auth` object.
  * @usage import { auth, api, isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
  * @version-history
+ *   v1.4.0 — 2026-09-13 — Four appdev pitfalls. AIMEAT.auth.signIn(), the public interactive sign-in
+ *     (consent popup on an app origin, the modal elsewhere), so no app has to click the pill's
+ *     button by position. session.fetch merges headers by name (http.js sessionHeaders), so a
+ *     caller's lower-case content-type no longer doubles the header and empties req.body. An
+ *     invalid_scope answer from the silent bridge is named in a console error instead of a Sign In
+ *     that does nothing. And login() shares one stored-session restore between overlapping calls,
+ *     because the pill now restores off an app origin too.
  *   v1.0.0 — 2026-07-19 — Merged from src/routes/libs/auth-lib-part1/2/3.ts (SDK-libs migration Phase 3).
  *   v1.3.0 — 2026-09-04 — signInWithPasskey / addPasskey / passkeySupported, and the session
  *     builder both login doors share (sessionFromLogin). The app-origin helpers moved to
@@ -29,7 +36,7 @@ import { mountPill } from './pill.js';
 import { showLoginModal } from './modal.js';
 import { isAppOrigin, appScopeDrift, silentAppToken, apexLogout, requestConsentPopup } from './app-origin.js';
 import { passkeySupported, passkeySignIn, passkeyAdd } from './passkey.js';
-import { api, authApi } from './http.js';
+import { api, authApi, sessionHeaders } from './http.js';
 
 // The app-origin helpers moved to ./app-origin.js on 2026-09-04 (pure extraction, 800-line ceiling).
 // Re-exported from here because pill.js and the SDK's consumers import them from './session.js'.
@@ -41,6 +48,7 @@ export { isAppOrigin, apexLogout, requestConsentPopup };
 /** @type {any} */ let ownerRefreshInFlight = null; // shared promise so concurrent owner refreshes don't each rotate
 /** @type {any} */ let _appOriginLoginInFlight = null;
 /** @type {any} */ let focusRefreshInFlight = null;
+/** @type {any} */ let loginInFlight = null; // one stored-session restore shared by overlapping login() calls
 
 // ── API helpers ──
 //
@@ -120,6 +128,20 @@ export function _buildAppSession(accessToken, appId, own, displayName) {
   return session;
 }
 
+/**
+ * Say, in the console, why nobody can sign in to this app. The bridge names the app and the words
+ * (routes/app-grants.ts); an older node sends neither, and then the sentence says less but still
+ * says what to check.
+ * @param {{ app?: string, unknown?: string }} r
+ */
+function reportUngrantableScopes(r) {
+  try {
+    console.error('[aimeat-auth] Nobody can sign in to ' + (r.app || 'this app') + ': its <meta name="aimeat-scopes"> asks for '
+      + (r.unknown ? r.unknown : 'a word') + ', which this node cannot grant, and one such word refuses the whole sign-in. '
+      + 'Take the words from GET /v1/app-grants/scopes and publish the app again.');
+  } catch { /* no console */ }
+}
+
 // Shared in-flight promise so concurrent callers reuse a single silent bridge instead of two iframes.
 export function restoreSessionFromAppOrigin(interactive) {
   if (currentSession) return Promise.resolve(currentSession);
@@ -129,13 +151,20 @@ export function restoreSessionFromAppOrigin(interactive) {
     var grant = (r && r.ok && r.access_token) ? r : null;
     var appId = (r && r.app) || null;
     var own = !!(r && r.own);
-    // consent_required → not granted yet; login_required → not logged into the apex; invalid_scope
-    // → the app declares a scope the STORED grant lacks, which is what publishing a new
-    // <meta name="aimeat-scopes"> does. All three take the same visible popup, on a user gesture.
-    // invalid_scope was missing, and its absence locked an owner out of their OWN app: Sign In did
-    // nothing at all and the only escape was republishing without the scope. An upgrade must ASK.
+    // invalid_scope → the page's <meta name="aimeat-scopes"> names a word this node cannot grant,
+    // and the node refuses the WHOLE list for it: the visible authorize answers 400 INVALID_SCOPE
+    // too, so a popup could only show that refusal. None is opened; the words are named instead,
+    // because Sign In used to do nothing and say nothing. (This comment used to read invalid_scope
+    // as "the stored grant lacks a scope". The node answers that case with consent_required and
+    // reason app_updated, which the popup below does handle.)
+    if (!grant && r && r.error === 'invalid_scope') {
+      reportUngrantableScopes(r);
+      return null;
+    }
+    // consent_required → not granted yet, or the app now asks for more than was granted;
+    // login_required → not logged into the apex. Both take the same visible popup, on a user gesture.
     if (!grant && interactive && r && r.app
-      && (r.error === 'consent_required' || r.error === 'login_required' || r.error === 'invalid_scope')) {
+      && (r.error === 'consent_required' || r.error === 'login_required')) {
       appId = r.app;
       grant = await requestConsentPopup(r.app, r.scope);
       // login_required hits OWN apps too — the token exchange reports own/app itself, so trust it.
@@ -207,7 +236,9 @@ export function createSession(data) {
         await session.refresh();
       }
       const url = NODE_URL + path;
-      const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.jwt, ...(opts.headers || {}) };
+      // Merged by header NAME (http.js sessionHeaders): an object spread let a lower-case
+      // content-type become a second header and the route received an empty body.
+      const headers = sessionHeaders(opts.headers, session.jwt, opts.body);
       const resp = await fetch(url, { ...opts, headers });
       // Scope-drift self-heal (H-2): a 403 on an app-origin session whose token is missing scopes the
       // app now DECLARES → one silent bridge re-run upgrades the owner's own app in place; else emit
@@ -221,7 +252,9 @@ export function createSession(data) {
             session.jwt = t.access_token;
             persistSession(session);
             scheduleAutoRefresh(session);
-            var retry = await fetch(url, { ...opts, headers: { ...headers, 'Authorization': 'Bearer ' + session.jwt } });
+            var retryHeaders = new Headers(headers);
+            retryHeaders.set('Authorization', 'Bearer ' + session.jwt);
+            var retry = await fetch(url, { ...opts, headers: retryHeaders });
             return retry.json();
           }
           emit('scopes-stale', { app: session._app || null, missing: missing });
@@ -374,6 +407,47 @@ async function sessionFromLogin(data) {
   return session;
 }
 
+/**
+ * Restore the session this browser stored: its metadata plus the httpOnly refresh cookie, refreshed
+ * on the way in. The body of auth.login() off an app origin, unchanged; it moved here so login() can
+ * share one run between overlapping callers.
+ * @param {string} [username] Restore only if the stored session is this owner's.
+ */
+async function restoreStoredSession(username) {
+  const stored = load('session');
+  // No local metadata — but an httpOnly refresh cookie may exist. Restore from the cookie alone.
+  if (!stored) return await restoreSessionFromCookie();
+  if (username && stored.owner !== username) return null;
+
+  // SECURITY: Run one-time migration from localStorage to IndexedDB
+  await migrateKeysToIndexedDB();
+
+  // Migrate old agent sessions to owner sessions.
+  if (stored.gaii) {
+    stored.gaii = null;
+  }
+
+  const cryptoKey = stored.gaii ? await loadKey('agent_key') : await loadKey('owner_key');
+  const session = createSession({ ...stored, _cryptoKey: cryptoKey });
+
+  // Owner-local sessions ALWAYS refresh on boot (the httpOnly cookie is the source of truth).
+  const isOwnerLocal = !session.federated && !session.gaii;
+  if (isOwnerLocal || isExpired(session.jwt)) {
+    try {
+      await session.refresh();
+    } catch {
+      remove('session');
+      emit('expired');
+      return null;
+    }
+  }
+
+  currentSession = session;
+  scheduleAutoRefresh(session);
+  emit('login', session);
+  return session;
+}
+
 // ── Public API ──
 
 export const auth = {
@@ -459,38 +533,43 @@ export const auth = {
     // On an app origin the host-only cookie is unreachable; use the same-site silent bridge (H-2).
     // Non-interactive (no popup) — login() is commonly called on boot, not from a user gesture.
     if (isAppOrigin()) return await restoreSessionFromAppOrigin(false);
-    const stored = load('session');
-    // No local metadata — but an httpOnly refresh cookie may exist. Restore from the cookie alone.
-    if (!stored) return await restoreSessionFromCookie();
-    if (username && stored.owner !== username) return null;
-
-    // SECURITY: Run one-time migration from localStorage to IndexedDB
-    await migrateKeysToIndexedDB();
-
-    // Migrate old agent sessions to owner sessions.
-    if (stored.gaii) {
-      stored.gaii = null;
+    if (username) return restoreStoredSession(username);
+    // ONE restore at a time, as the app-origin bridge already does. mountLoginButton restores a
+    // stored session itself (pill.js, 2026-09-13), and a page that also calls login() on boot, as the
+    // docs tell it to, would otherwise run a second restore beside it: two session objects, the
+    // second holding the stale token (the owner refresh is single-flight and hands its result to the
+    // FIRST object only) and two 'login' events for one sign-in.
+    if (!loginInFlight) {
+      loginInFlight = (async () => {
+        try { return await restoreStoredSession(); } finally { loginInFlight = null; }
+      })();
     }
+    return loginInFlight;
+  },
 
-    const cryptoKey = stored.gaii ? await loadKey('agent_key') : await loadKey('owner_key');
-    const session = createSession({ ...stored, _cryptoKey: cryptoKey });
-
-    // Owner-local sessions ALWAYS refresh on boot (the httpOnly cookie is the source of truth).
-    const isOwnerLocal = !session.federated && !session.gaii;
-    if (isOwnerLocal || isExpired(session.jwt)) {
-      try {
-        await session.refresh();
-      } catch {
-        remove('session');
-        emit('expired');
-        return null;
-      }
-    }
-
-    currentSession = session;
-    scheduleAutoRefresh(session);
-    emit('login', session);
-    return session;
+  /**
+   * Sign in, interactively. Call it from a click handler: on an app origin it may open the consent
+   * popup, and a browser opens a popup only inside a user gesture.
+   *
+   * On an app origin this is the silent bridge with the visible consent step allowed; anywhere else
+   * it opens the sign-in modal, with `opts` passed to it ({ tab: 'register', onLogin, i18n }).
+   * Resolves to the session, or null when nobody signed in: the popup was closed or blocked, the
+   * modal was dismissed, or the app asks for a scope this node cannot grant. An existing session is
+   * returned as it is.
+   *
+   * Added 2026-09-13. Before it the login pill's own button was the only interactive road, and
+   * apps reached it by clicking `#login button`, which is the theme control that renders first.
+   * @param {object} [opts]
+   * @returns {Promise<object|null>}
+   */
+  signIn(opts) {
+    if (currentSession) return Promise.resolve(currentSession);
+    if (isAppOrigin()) return restoreSessionFromAppOrigin(true);
+    return new Promise(function (resolve) {
+      // The third argument hears the dialog leave the page, however it leaves; a finished sign-in
+      // has already set the session by then.
+      showLoginModal(opts || {}, function () {}, function () { resolve(currentSession); });
+    });
   },
 
   /**
@@ -663,7 +742,7 @@ export const auth = {
           get valid() { return jwt && !isExpired(jwt); },
           async fetch(path, opts = {}) {
             const url = effectiveNodeUrl + path;
-            const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt, ...(opts.headers || {}) };
+            const headers = sessionHeaders(opts.headers, jwt, opts.body);
             const resp = await fetch(url, { ...opts, headers });
             return resp.json();
           },

@@ -15,6 +15,14 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-09-13 — CORRECTIONS (asked for by the 2026-09-13 appdev pitfall triage), two sentences that
+ *     told builders something the code does not do. The workspace heal step said a plain member's
+ *     failed attempt may pass quietly and told the app to call PUT /v1/organisms/:id/workspace
+ *     itself: that route refuses an app grant (requireRole agent), and a catch that swallows every
+ *     answer hid a CRM workspace four spaces behind for a month. It now says who can run the heal,
+ *     that only NOT_CREATOR is the quiet refusal, and that every other answer is shown to someone who
+ *     can act. The mobile line said the compact pill happens "on an app origin"; it is the default
+ *     everywhere now, signed in or out (auth/pill.js v1.5.0).
  *   2026-09-13 — ADDITIVE (permission granted 2026-09-13): one section after the Auth Pattern block,
  *     "Calling the node: read `ok` before `data`". session.fetch resolves the envelope and never
  *     throws, so a refusal is a VALUE and an app that reads `.data` off it renders an empty state
@@ -284,7 +292,7 @@ function composeAppPrompt(
   body += '\n';
   body += '**Assume from day one that a person belongs to more than one.** The moment a second group exists, everything you left in owner memory bleeds between them. Ship the switcher with the app rather than after it, keep exactly ONE owner-level key — the pointer saying which group they are in — and put the group\'s NAME somewhere permanently visible. Somebody who has just switched must never have to guess whose data is on the screen; that is worse than not being able to switch at all.\n';
   body += '\n';
-  body += '**Declaring a space only helps workspaces created afterwards.** Adding an objectType to your manifest does nothing for the workspaces that already exist, and a write to a space an older manifest does not declare goes nowhere — silently. Ship a heal step that reads the manifest on load, adds what is missing (`PUT /v1/organisms/:id/workspace` with `add_object_types` + `schemas`) and is a no-op afterwards. It is creator/admin only, so let a plain member\'s attempt fail quietly.\n';
+  body += '**Declaring a space only helps workspaces created afterwards.** Adding an objectType to your manifest does nothing for the workspaces that already exist, and a record written to a space an older manifest does not declare is never listed by a workspace read, so the tab stays empty and nothing reports an error. The repair adds what is missing and is a no-op once done: `PUT /v1/organisms/:id/workspace` with `add_object_types` + `schemas`, or `aimeat_workspace_update` with `add_spaces` over MCP. Today that route takes an agent or owner session and refuses a published app\'s own sign-in grant with 403 `ACCESS_DENIED`, so the heal runs from the owner\'s agent or the owner\'s own session, not from inside the app. What the app does on load is read the workspace (`AIMEAT.organism.read`), compare its declared spaces with the ones the app ships, and name the missing ones where somebody who can run the heal will see them. Whoever runs it reads the answer\'s error code: only `NOT_CREATOR` (403, a member who is neither the creator nor an admin) is the expected refusal that may pass quietly. Anything else (a 400 for a schema the node rejects, a 404, a 5xx, a network error) means the workspace is still a version behind, so show it to someone who can act on it, and never let it share a catch with that one refusal.\n';
   body += '\n';
   body += '**If you move data between homes, carry it over ONCE, and only when the copy actually landed.** Stamp the old record when the new one is written; without the stamp the migration copies the first group\'s data into every group the person visits, which is the bleed you were fixing. And never stamp before checking the write succeeded — that turns a failed migration into permanent data loss. Copy rather than delete, so somebody moving between an updated and a not-yet-updated surface keeps working.\n';
   body += '\n';
@@ -566,7 +574,7 @@ function composeAppPrompt(
   body += '### Mobile safety checklist (do these — they prevent the #1 phone bug)\n';
   body += 'One element wider than the screen makes mobile browsers shrink-to-fit the WHOLE page, so every font renders tiny. Prevent it:\n';
   body += '- **`body { overflow-x: clip; }`** — a belt-and-braces guard against horizontal overflow. Use `clip`, NOT `hidden` (hidden makes body a scroll container and breaks `position: sticky` headers).\n';
-  body += '- **The login pill is already mobile-safe** — `mountLoginButton` renders a compact account button + popover on phones automatically on an app origin. Do NOT put other fixed-width widgets in the header row next to it; let header children shrink (`min-width: 0`).\n';
+  body += '- **The login pill folds itself on a phone, at any address the app is served from.** At 600px and below `mountLoginButton` shows one small button and puts the rest in a popover: signed in, the account button holds the whole pill; signed out, Sign In stays in the row and the language, light/dark and palette controls sit behind a settings button. Pass `compact: false` only if you lay out the full row yourself. Do NOT put other fixed-width widgets in the header row next to it; let header children shrink (`min-width: 0`).\n';
   body += '- **CSS grid: use `grid-template-columns: … minmax(0,1fr)` and `min-width: 0` on grid/flex children.** A plain `1fr` is `minmax(auto,1fr)`, so a wide non-wrapping child (a table, `<pre>`, long code) inflates the track and overflows the page even inside an `overflow-x:auto` wrapper. `minmax(0,…)` + `min-width:0` let it shrink so the wrapper actually scrolls.\n';
   body += '- **Wrap wide content** — put tables / code blocks / diagrams in a `overflow-x:auto` container, and `flex-wrap: wrap` any toolbar/nav row whose item count can grow (tabs, pager dots).\n';
   body += '- **Verify**: at 390px (portrait) AND ~844px (landscape), `document.documentElement.scrollWidth === clientWidth` (zero horizontal overflow) and body text stays ≥14px.\n';

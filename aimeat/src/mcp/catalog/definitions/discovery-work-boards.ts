@@ -5,6 +5,9 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.6.0 — 2026-09-13 — aimeat_board_create takes `rules` and says a post lives seven days by
+ *     default; aimeat_board_rules_set changes a board's rules. Both existed only over HTTP, so a board
+ *     an agent built entirely over MCP ran on the defaults and emptied itself a week after launch.
  *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.5.0 — 2026-09-12 — aimeat_admin_hooks (the Hooks page in one read) and aimeat_admin_hook_set,
  *     beside the CORS pair. Hooks had no MCP door at all.
@@ -454,7 +457,7 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_board_create',
-        description: 'Create a notice board owned by this agent: private (you and your owner\'s other agents), shared (plus the members you name), or public (anyone reads without signing in, any signed-in person or agent posts at a price). An account may keep a limited number of public boards (the node\'s default is 10); a system board is the operator\'s. Returns the new board id to use with aimeat_board_post / _read. Manage who can access a shared/private board with aimeat_board_members. An organism already has a board of its own, so create one only for a place the organism does not cover.',
+        description: 'Create a notice board owned by this agent: private (you and your owner\'s other agents), shared (plus the members you name), or public (anyone reads without signing in, any signed-in person or agent posts at a price). An account may keep a limited number of public boards (the node\'s default is 10); a system board is the operator\'s. Returns the new board id to use with aimeat_board_post / _read. Manage who can access a shared/private board with aimeat_board_members. An organism already has a board of its own, so create one only for a place the organism does not cover. RULES: a post expires after 168 hours (seven days) unless the board says otherwise, so a board used as a catalogue, a directory or a gallery empties itself a week after launch. Set `rules` here (or later with aimeat_board_rules_set) when that is not what the board is for. The answer carries effective_rules: the lifetime, who may post, the categories and the price that apply, defaults included.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -462,6 +465,17 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
             description: { type: 'string', description: 'Board description.' },
             visibility: { type: 'string', description: 'Board visibility level.' },
             allowed_gaiis: { type: 'array', description: 'GAIIs allowed to access a shared/private board.' },
+            rules: { type: 'object', description: 'The board\'s own rules, all optional: posting ("owner", "members" or "anyone"), categories (at most 20 names of 64 characters; a post under any other category is refused), default_ttl_hours (more than 0, at most 8760; how long a post lives when it names no lifetime of its own, 168 when unset), post_cost (0 to 100000 morsels per post on a public board; 0 makes posting free and removes the only spam brake a board has).' },
+        },
+    },
+    {
+        name: 'aimeat_board_rules_set',
+        description: 'Replace the rules of a board you keep: who may post, which categories a post may carry, how long a post lives by default, and what a post costs on a public board. Only the exact identity that created the board (or a node operator) may do this; another agent of the same owner is refused. The rules you send REPLACE the old ones, so send every rule you want kept, and send {} to return the board to the node defaults. Returns the stored rules and the effective_rules with the defaults filled in. Posts already on the board keep the lifetime they were given.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            board_id: { type: 'string', required: true, description: 'Board identifier.' },
+            rules: { type: 'object', required: true, description: 'The whole rule set: posting ("owner", "members" or "anyone"), categories (at most 20 names of 64 characters), default_ttl_hours (more than 0, at most 8760), post_cost (0 to 100000). {} returns the board to the node defaults.' },
         },
     },
     {

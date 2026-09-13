@@ -13,6 +13,8 @@
  * @structure zod schemas · sendErr mapper · outboundRouter
  * @usage app.use(outboundRouter(config, storage)) in routes-loader
  * @version-history
+ *   v1.2.1 — 2026-09-13 — The send handler says why a failed send still answers 200 and where the
+ *     tool doors turn that outcome into an error. No behaviour change.
  *   v1.2.0 — 2026-08-30 — The log read accepts ?company=<id>: one company's sends, resolved to
  *     its organism with the same resolveCompanyScope the finance reads use.
  *   v1.1.0 — 2026-08-07 — The send accepts company_id: the message then leaves through that
@@ -263,6 +265,11 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
         ...(disclosure ? { aiDisclosure: disclosure } : {}),
         links: b.links, signalStreamId: b.signal_stream_id, signalSubject: b.signal_subject,
       });
+      // 200 FOR EVERY OUTCOME, INCLUDING 'failed'. A send the provider refused, or one with no
+      // transport, is logged and answered here with data.status 'failed' and the reason in
+      // data.message.error; callers read that field, so the contract stays (decided 2026-09-13).
+      // The TOOL doors read differently and answer such a send as an error: aimeat_mail_send in
+      // mcp/connections.ts and refuseUnsentSend() in cli/connect/tool-call-defs-connections.ts.
       res.json(success(config.nodeId, {
         message: result.log, channel: result.channel, status: result.status,
       }));

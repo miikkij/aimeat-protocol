@@ -13,6 +13,9 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-organism.js"></script>
  *   const ws = await AIMEAT.organism.read(orgId, wsId); ws.spaces[0].items[0].value
  * @version-history
+ *   v1.1.0 — 2026-09-13 — writeDraft, publish and publishRecords log the node's warnings
+ *     (UNDECLARED_SPACE: stored, and no workspace read lists it) to the console; the value returned is
+ *     unchanged.
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-organism.ts (SDK-libs migration Phase 1).
  */
 import { attach } from '../_core/namespace.js';
@@ -35,6 +38,20 @@ function fail(res, fallback) {
   e.code = res && res.error && res.error.code;
   e.envelope = res;
   return e;
+}
+
+/**
+ * The answer's data, with any warnings the node attached said out loud in the console. A write into a
+ * space the workspace manifest does not declare is stored and listed by no read (UNDECLARED_SPACE);
+ * the node says so in `warnings`, and an app that only reads the value would never see it.
+ * @param {any} res
+ */
+function withWarnings(res) {
+  var d = res && res.data !== undefined ? res.data : res;
+  if (d && Array.isArray(d.warnings)) {
+    d.warnings.forEach(function (w) { console.warn('[AIMEAT.organism]', w && w.code, w && w.message); });
+  }
+  return d;
 }
 
 // ── field conventions (mirror the SPA + AIMEAT Pages) ──
@@ -270,7 +287,7 @@ var organism = {
     if (Array.isArray(opts.tags) && opts.tags.length) body.tags = opts.tags;
     var res = await authFetch('/v1/memory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (res.ok === false) throw fail(res, 'Failed to save draft');
-    return res.data !== undefined ? res.data : res;
+    return withWarnings(res);
   },
 
   // Publish a draft -> new .version.N + .latest (or a pending approval when the workspace gates publishes).
@@ -280,7 +297,7 @@ var organism = {
       body: JSON.stringify({ ws: wsId || undefined, namespace: namespace, id: id }),
     });
     if (res.ok === false) throw fail(res, 'Failed to publish');
-    return res.data !== undefined ? res.data : res;
+    return withWarnings(res);
   },
 
   // BULK publish MANY records in ONE request (data-access redesign). Two shapes:
@@ -298,7 +315,7 @@ var organism = {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     if (res.ok === false) throw fail(res, 'Failed to publish records');
-    return res.data !== undefined ? res.data : res;
+    return withWarnings(res);
   },
 
   // BULK delete MANY record families in ONE request (data-access redesign) — ids: [id,...]. Removes each

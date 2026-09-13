@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 -- 2026-09-13 -- POST /v1/memory answers `warnings` (and `shadowed_by`) from the shared
+ *     write. It passed ownerScoped:true for every caller, so an agent writing a key its owner also
+ *     held was never told its copy is hidden behind the owner's, on this door or on the connector and
+ *     CLI doors that post here. UNDECLARED_SPACE rides the same list, which is how
+ *     AIMEAT.organism.writeDraft learns its space is missing from an older workspace. A write to an
+ *     EXCHANGE listing source answers `exchange` (what listed, what was skipped and why).
  *   v1.4.0 -- 2026-09-08 -- The write caller carries `federated`, so memory-write can refuse a
  *     federated session the write scope its owner role used to bypass.
  *   v1.3.0 -- 2026-09-06 -- Review item 6.4: GET /v1/memory/search takes `include=meta` (snippet +
@@ -36,6 +42,7 @@ import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from './owner-target.js';
 import { resolveIdentity } from '../../utils/gaii.js';
+import { exchangeOutcome } from '../../services/exchange-projection.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, MEMORY_LIST_MAX_LIMIT } from './shared.js';
 import { isVersionKey, searchHitShape, matchesType } from '../../services/memory-search-shape.js';
 
@@ -157,9 +164,9 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       ...(vis === 'workspace' ? { workspaceRef: normalizeWorkspaceRefs(workspace_refs, workspace_ref) } : {}),
       declaredProvenanceId: ai_provenance_id,
       pipeline: 'memory.write',
-      // This route always writes to the caller's own resolved identity, so there is no owner copy to
-      // shadow and the check has nothing to find.
-      ownerScoped: true,
+      // No `ownerScoped`. This said "there is no owner copy to shadow", which is true for an owner
+      // session and false for an agent or an ecosystem app, whose own namespace is exactly where an
+      // owner copy shadows the write. The service reads the target and skips an owner GHII itself.
     });
     if (!written.ok) {
       res.status(written.status).json(error(config.nodeId, written.code, written.message, written.status, written.details));
@@ -179,6 +186,15 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       version: record.version,
       created_at: record.createdAt,
       updated_at: record.updatedAt,
+      // Stored, and something about it needs a person: an owner copy that owner-scope reads show
+      // instead of this one (SHADOWED_BY_OWNER_COPY), or a workspace space the manifest does not
+      // declare (UNDECLARED_SPACE). The status stays 200/201 because the write did happen; an agent,
+      // the connector and the CLI dispatch all post here, so this is where they learn it.
+      ...(written.shadowedBy ? { shadowed_by: written.shadowedBy } : {}),
+      ...(written.warnings.length ? { warnings: written.warnings } : {}),
+      // An app tool manifest or an offers document is an EXCHANGE listing source. The connector and
+      // CLI aimeat_app_tools_publish post here, so this is where they learn what listed and why not.
+      ...(written.exchange ? { exchange: exchangeOutcome(written.exchange, 'POST /v1/exchange/reconcile with {"dry_run": true}') } : {}),
     }, [
       { description: 'Read this memory entry', method: 'GET', url: `/v1/memory/${encodeURIComponent(key)}` },
       { description: 'List all memory keys', method: 'GET', url: '/v1/memory' },

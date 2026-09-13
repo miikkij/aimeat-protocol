@@ -16,7 +16,7 @@
  *   belong to the host app, which is why the same spec can be a card in one product and a frame
  *   on a canvas in another.
  * @structure
- *   - helpers: esc/uid/num/flatten/agg/fmtNum/autoColumns  (pure, exposed for hosts)
+ *   - helpers: esc/uid/parseAmount/num/flatten/agg/fmtNum/autoColumns  (pure, exposed for hosts)
  *   - BUILT_IN sources: memory (owner-scope prefix read), inline
  *   - create(opts) → engine: registerSource, resolve, renderBody, specHint, normalizeSpec,
  *     compose, reshape, refine, writeBrief
@@ -28,6 +28,12 @@
  *   const rows = await surface.resolve(spec, { session });
  *   surface.renderBody(boxEl, spec, rows);
  * @version-history
+ *   v1.2.0 — 2026-09-13 — A '12,000.00' cell sums as twelve thousand. num() replaced the first comma
+ *     with a dot, so '12,000.00' summed as 12 and '1,000,000' as 1 in every stats tile and chart
+ *     (appdev pitfall amount-parser-reads-thousands-separator-as-decimal). It reads through
+ *     parseAmount now, a copy of AIMEAT.commerce.parseAmount held equal by a unit test, and an
+ *     ambiguous cell ('1,000') counts as 0 instead of as a guess. AIMEAT.surface.parseAmount is
+ *     exposed for hosts.
  *   v1.1.0 — 2026-07-25 — Charts are left uncoloured so aimeat-charts can theme them: the engine
  *     hardcoded four Tailwind colours over the chart lib's palette, which pinned every surface
  *     chart to indigo no matter which of the five palettes the reader had chosen, or whether they
@@ -68,10 +74,96 @@
     return d.innerHTML;
   }
   function uid(p) { return (p || 'pnl') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6); }
+
+  /* ── parseAmount: A COPY of src/static/sdk-libs/commerce/amount.js (AIMEAT.commerce.parseAmount).
+        One parser was the ruling, and a cortex IIFE cannot import a served lib, so the copy is held
+        to the original by test/unit/cortex-surface-parse-amount.test.ts. Change both or neither.
+        The rules: spaces and apostrophes group; with both ',' and '.' the last is the decimal mark;
+        one mark repeated groups; one mark once is decimal unless exactly three digits follow it and
+        one to three digits not led by 0 precede it ('1,000'), which is ambiguous and returns null. ── */
+  var SPACE_GROUP = /[\s'’]/;
+  var SPACE_GROUPS = /[\s'’]+/;
+
+  function groupedDigits(str, mark) {
+    var g = str.split(mark);
+    if (!/^\d{1,3}$/.test(g[0]) || !/^\d{3}$/.test(g[g.length - 1])) return null;
+    var middle = g.slice(1, -1);
+    var western = middle.every(function (x) { return /^\d{3}$/.test(x); });
+    var indian = middle.length > 0 && middle.every(function (x) { return /^\d{2}$/.test(x); });
+    return western || indian ? g.join('') : null;
+  }
+
+  function parseAmount(input) {
+    if (typeof input === 'number') return Number.isFinite(input) ? input : null;
+    if (input == null) return null;
+    var s = String(input).replace(/−/g, '-').trim();
+    var first = s.search(/\d/);
+    if (first < 0) return null;
+    var last = s.length - 1;
+    while (!/\d/.test(s.charAt(last))) last--;
+
+    var prefix = s.slice(0, first);
+    var body = s.slice(first, last + 1);
+    var suffix = s.slice(last + 1);
+    if (/(^|[\s+\-(])[.,]$/.test(prefix)) { body = prefix.slice(-1) + body; prefix = prefix.slice(0, -1); }
+    if (/^[.,]/.test(suffix)) suffix = suffix.slice(1);
+    var negative = prefix.indexOf('-') >= 0 || (prefix.indexOf('(') >= 0 && suffix.indexOf(')') >= 0);
+
+    if (/[^\d.,\s'’]/.test(body)) return null;
+
+    var t = body;
+    var spaced = SPACE_GROUP.test(body);
+    if (spaced) {
+      var parts = body.split(SPACE_GROUPS);
+      for (var i = 0; i < parts.length; i++) {
+        var ok = i === 0 ? /^\d{1,3}$/.test(parts[i])
+          : i < parts.length - 1 ? /^\d{3}$/.test(parts[i])
+            : /^\d{3}([.,]\d*)?$/.test(parts[i]);
+        if (!ok) return null;
+      }
+      t = parts.join('');
+    }
+
+    var commas = t.split(',').length - 1;
+    var dots = t.split('.').length - 1;
+    var whole;
+    var fraction = '';
+    if (commas + dots === 0) {
+      whole = t;
+    } else if (spaced) {
+      var k = t.search(/[.,]/);
+      whole = t.slice(0, k);
+      fraction = t.slice(k + 1);
+    } else if (commas > 0 && dots > 0) {
+      var at = Math.max(t.lastIndexOf(','), t.lastIndexOf('.'));
+      var decimal = t.charAt(at);
+      if (t.split(decimal).length - 1 !== 1) return null;
+      whole = groupedDigits(t.slice(0, at), decimal === ',' ? '.' : ',');
+      if (whole === null) return null;
+      fraction = t.slice(at + 1);
+    } else if (commas + dots > 1) {
+      whole = groupedDigits(t, commas ? ',' : '.');
+      if (whole === null) return null;
+    } else {
+      var m = t.search(/[.,]/);
+      var before = t.slice(0, m);
+      var after = t.slice(m + 1);
+      if (after.length === 3 && /^[1-9]\d{0,2}$/.test(before)) return null;
+      whole = before;
+      fraction = after;
+    }
+
+    if (!/^\d*$/.test(whole) || !/^\d*$/.test(fraction) || (whole === '' && fraction === '')) return null;
+    var value = parseFloat((whole || '0') + '.' + (fraction || '0'));
+    if (!Number.isFinite(value)) return null;
+    return negative && value !== 0 ? -value : value;
+  }
+
+  /* A cell's number for sums, averages and charts. Unreadable and AMBIGUOUS cells count as 0: a
+     '1,000' cell has nobody to ask, and adding it as 1 or as 1000 is a guess either way. */
   function num(v) {
-    if (typeof v === 'number') return v;
-    var n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.,-]/g, '').replace(',', '.'));
-    return isFinite(n) ? n : 0;
+    var n = parseAmount(v);
+    return n === null ? 0 : n;
   }
   function agentOf(gaii) { return (gaii && String(gaii).indexOf('#') > 0) ? String(gaii).split('#')[0] : null; }
   async function unwrap(r) {
@@ -576,7 +668,8 @@
     autoColumns: autoColumns,
     agg: agg,
     num: num,
-    VERSION: '1.1.1',
+    parseAmount: parseAmount,
+    VERSION: '1.2.0',
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);

@@ -51,6 +51,83 @@
     return ns;
   }
 
+  // src/static/sdk-libs/commerce/amount.js
+  var SPACE_GROUP = /[\s'’]/;
+  var SPACE_GROUPS = /[\s'’]+/;
+  function groupedDigits(str, mark) {
+    var g = str.split(mark);
+    if (!/^\d{1,3}$/.test(g[0]) || !/^\d{3}$/.test(g[g.length - 1])) return null;
+    var middle = g.slice(1, -1);
+    var western = middle.every(function(x) {
+      return /^\d{3}$/.test(x);
+    });
+    var indian = middle.length > 0 && middle.every(function(x) {
+      return /^\d{2}$/.test(x);
+    });
+    return western || indian ? g.join("") : null;
+  }
+  function parseAmount(input) {
+    if (typeof input === "number") return Number.isFinite(input) ? input : null;
+    if (input == null) return null;
+    var s = String(input).replace(/−/g, "-").trim();
+    var first = s.search(/\d/);
+    if (first < 0) return null;
+    var last = s.length - 1;
+    while (!/\d/.test(s.charAt(last))) last--;
+    var prefix = s.slice(0, first);
+    var body = s.slice(first, last + 1);
+    var suffix = s.slice(last + 1);
+    if (/(^|[\s+\-(])[.,]$/.test(prefix)) {
+      body = prefix.slice(-1) + body;
+      prefix = prefix.slice(0, -1);
+    }
+    if (/^[.,]/.test(suffix)) suffix = suffix.slice(1);
+    var negative = prefix.indexOf("-") >= 0 || prefix.indexOf("(") >= 0 && suffix.indexOf(")") >= 0;
+    if (/[^\d.,\s'’]/.test(body)) return null;
+    var t = body;
+    var spaced = SPACE_GROUP.test(body);
+    if (spaced) {
+      var parts = body.split(SPACE_GROUPS);
+      for (var i = 0; i < parts.length; i++) {
+        var ok = i === 0 ? /^\d{1,3}$/.test(parts[i]) : i < parts.length - 1 ? /^\d{3}$/.test(parts[i]) : /^\d{3}([.,]\d*)?$/.test(parts[i]);
+        if (!ok) return null;
+      }
+      t = parts.join("");
+    }
+    var commas = t.split(",").length - 1;
+    var dots = t.split(".").length - 1;
+    var whole;
+    var fraction = "";
+    if (commas + dots === 0) {
+      whole = t;
+    } else if (spaced) {
+      var k = t.search(/[.,]/);
+      whole = t.slice(0, k);
+      fraction = t.slice(k + 1);
+    } else if (commas > 0 && dots > 0) {
+      var at = Math.max(t.lastIndexOf(","), t.lastIndexOf("."));
+      var decimal = t.charAt(at);
+      if (t.split(decimal).length - 1 !== 1) return null;
+      whole = groupedDigits(t.slice(0, at), decimal === "," ? "." : ",");
+      if (whole === null) return null;
+      fraction = t.slice(at + 1);
+    } else if (commas + dots > 1) {
+      whole = groupedDigits(t, commas ? "," : ".");
+      if (whole === null) return null;
+    } else {
+      var m = t.search(/[.,]/);
+      var before = t.slice(0, m);
+      var after = t.slice(m + 1);
+      if (after.length === 3 && /^[1-9]\d{0,2}$/.test(before)) return null;
+      whole = before;
+      fraction = after;
+    }
+    if (!/^\d*$/.test(whole) || !/^\d*$/.test(fraction) || whole === "" && fraction === "") return null;
+    var value = parseFloat((whole || "0") + "." + (fraction || "0"));
+    if (!Number.isFinite(value)) return null;
+    return negative && value !== 0 ? -value : value;
+  }
+
   // src/static/sdk-libs/commerce/index.js
   var { authFetch: authFetch2 } = makeSession("aimeat-commerce.js");
   var NODE_URL2 = APEX_URL;
@@ -100,10 +177,24 @@
       }
       return commerce.fmtMoney(amount, currency);
     },
-    /** Parse a major-unit input ("1.50", "0,002") into integer money micro-units; null if not positive. */
+    /**
+     * Parse an amount in any common notation into a number, or null. '12,000.00' → 12000,
+     * '1.234,56' → 1234.56, '0,002' → 0.002. An AMBIGUOUS amount returns null: '1,000' and '1.000'
+     * are a thousand apart under the two conventions, so the app asks the person again instead of
+     * guessing. Full rules in ./amount.js.
+     * @param {unknown} input
+     * @returns {number|null}
+     */
+    parseAmount,
+    /**
+     * Parse a major-unit input ("1.50", "0,002", "1,500.00") into integer money micro-units.
+     * Null when the amount is not positive, cannot be read, or is ambiguous ("1,000"): see parseAmount.
+     * @param {unknown} str
+     * @returns {number|null}
+     */
     microsFromInput(str) {
-      const n = parseFloat(String(str).replace(",", "."));
-      if (!Number.isFinite(n) || n <= 0) return null;
+      const n = parseAmount(str);
+      if (n === null || !(n > 0)) return null;
       return Math.round(n * MONEY_UNIT);
     },
     // ── Offer discovery + price reading ──

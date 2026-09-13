@@ -4622,8 +4622,11 @@
   }
 
   // src/static/sdk-libs/atelier/timeline.js
+  var MACHINE_MOMENT = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}|^(?:[A-Za-z]{3},? )?\d{1,2} [A-Za-z]{3} \d{4}\b|^[A-Za-z]{3} [A-Za-z]{3} \d{2} \d{4}\b/;
   function fmtTs(ts) {
+    if (ts == null || ts === "") return null;
     if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ts)) return calendar(ts, { dateStyle: "medium" });
+    if (typeof ts === "string" && !MACHINE_MOMENT.test(ts)) return ts;
     const d = ts instanceof Date ? ts : new Date(ts);
     if (Number.isNaN(d.getTime())) return String(ts);
     return dateTime(d, { dateStyle: "medium", timeStyle: "short" });
@@ -4643,7 +4646,7 @@
       }
       node.appendChild(partEl("span", "ak-timeline__dot ak-timeline__dot--" + (item.tone || "plain"), "dot", { "aria-hidden": "true" }));
       const body = partEl("div", "ak-timeline__body", "body");
-      slotInto(body, spec, "when", fmt2(item.ts), { cls: "ak-timeline__when", args: [item] });
+      slotInto(body, spec, "when", hasPart(spec, "when") ? null : fmt2(item.ts), { cls: "ak-timeline__when", args: [item] });
       slotInto(body, spec, "title", item.title, { cls: "ak-timeline__title", args: [item] });
       slotInto(body, spec, "sub", item.sub == null ? null : item.sub, { cls: "ak-timeline__sub", args: [item] });
       slotInto(body, spec, "extra", null, { cls: "ak-timeline__extra", args: [item] });
@@ -7432,8 +7435,13 @@
     try {
       const node = document.getElementById("aimeat-app-ref");
       if (!node) return null;
-      const text = (node.textContent || "").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
-      const parsed = JSON.parse(text);
+      const raw = node.textContent || "";
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = JSON.parse(raw.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
+      }
       return parsed && parsed.owner && parsed.app_id ? { owner: String(parsed.owner), filename: String(parsed.app_id) } : null;
     } catch {
       return null;
@@ -7453,6 +7461,32 @@
   function labelOf(block) {
     const p = block.props || {};
     return p.title || p.caption || block.component;
+  }
+  function applyViewerOverlay(layout, o) {
+    if (!o) return layout;
+    const out = {
+      v: layout.v,
+      look: layout.look,
+      nav: o.nav || layout.nav,
+      choreography: layout.choreography,
+      tokens: layout.tokens,
+      ambient: layout.ambient,
+      meta: layout.meta,
+      blocks: layout.blocks.slice()
+    };
+    if (Array.isArray(o.hidden) && o.hidden.length) {
+      out.blocks = out.blocks.filter(function(b) {
+        return o.hidden.indexOf(b.id) < 0;
+      });
+    }
+    if (Array.isArray(o.order) && o.order.length) {
+      out.blocks.sort(function(a, b) {
+        const ia = o.order.indexOf(a.id);
+        const ib = o.order.indexOf(b.id);
+        return (ia < 0 ? o.order.length : ia) - (ib < 0 ? o.order.length : ib);
+      });
+    }
+    return out;
   }
 
   // src/static/sdk-libs/atelier/mosaic-canvas.js
@@ -12579,7 +12613,7 @@
       }
       return Promise.resolve().then(fn);
     }
-    function buildBlock(block, into, entry) {
+    function buildBlock(block, into, entry, fills) {
       const p = block.props || {};
       const pick = spec.onPick ? function(item) {
         spec.onPick(block.id, item);
@@ -12883,7 +12917,7 @@
           const s = section({ target: into, title: p.title, hint: p.hint });
           alive.handles.push(s);
           const fillFn = (spec.fill || {})[block.id];
-          if (fillFn) fillFn(s.body);
+          if (fillFn && fills) fills.push({ id: block.id, run: fillFn, body: s.body });
           return;
         }
         case "emptyState": {
@@ -12935,32 +12969,6 @@
       }
     }
     let viewerOverlay = spec.overlay || null;
-    function applyViewerOverlay(layout, o) {
-      if (!o) return layout;
-      const out = {
-        v: layout.v,
-        look: layout.look,
-        nav: o.nav || layout.nav,
-        choreography: layout.choreography,
-        tokens: layout.tokens,
-        ambient: layout.ambient,
-        meta: layout.meta,
-        blocks: layout.blocks.slice()
-      };
-      if (Array.isArray(o.hidden) && o.hidden.length) {
-        out.blocks = out.blocks.filter(function(b) {
-          return o.hidden.indexOf(b.id) < 0;
-        });
-      }
-      if (Array.isArray(o.order) && o.order.length) {
-        out.blocks.sort(function(a, b) {
-          const ia = o.order.indexOf(a.id);
-          const ib = o.order.indexOf(b.id);
-          return (ia < 0 ? o.order.length : ia) - (ib < 0 ? o.order.length : ib);
-        });
-      }
-      return out;
-    }
     function render(layout) {
       for (const h of alive.handles) {
         if (h && h.destroy) h.destroy();
@@ -13021,6 +13029,7 @@
       });
       const band = el("div", { class: "ak-mosaic__band" });
       const units = [];
+      const fills = [];
       for (const block of visible) {
         const entry = {
           id: String(block.id),
@@ -13037,7 +13046,7 @@
         const unitEl = el("section", { class: "ak-mosaic__unit", "data-ak-block": block.id });
         entry.el = unitEl;
         if (block.props && block.props.motion === false) setMotionDefaults(unitEl, false);
-        buildBlock(block, unitEl, entry);
+        buildBlock(block, unitEl, entry, fills);
         if (block.effect) {
           const worn = fx(unitEl, block.effect);
           if (worn) alive.handles.push(worn);
@@ -13054,6 +13063,14 @@
       else if (nav === "rail") root.appendChild(projectRail(units));
       else if (nav === "overlay") root.appendChild(projectOverlay(units, alive));
       else root.appendChild(projectStack(units, alive));
+      for (const f of fills) {
+        if (destroyed) return;
+        try {
+          f.run(f.body);
+        } catch (err) {
+          console.error('aimeat-atelier: the fill for section "' + f.id + '" threw; the other blocks were built.', err);
+        }
+      }
     }
     let currentLayout = null;
     async function boot() {
@@ -16410,7 +16427,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.53.1",
+    version: "0.53.2",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

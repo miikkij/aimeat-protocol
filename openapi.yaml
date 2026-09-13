@@ -1530,6 +1530,38 @@ components:
             with the inference stated in `notes`): silence from an agent must not read as "a human
             wrote it". An OWNER principal is never stamped.
 
+    MemoryWriteWarning:
+      type: object
+      description: The record was stored, and something about it needs a person.
+      required: [code, message]
+      additionalProperties: true
+      properties:
+        code: { type: string, enum: [SHADOWED_BY_OWNER_COPY, UNDECLARED_SPACE] }
+        message: { type: string }
+        how_to_fix: { type: string }
+        shadowed_by: { type: string, description: 'SHADOWED_BY_OWNER_COPY: the owner GHII whose copy owner-scope reads resolve to' }
+        namespace: { type: string, description: 'UNDECLARED_SPACE: the namespace the workspace manifest does not declare' }
+        declared_spaces:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              namespace: { type: string }
+
+    MemoryWriteResult:
+      description: A written memory entry, with what the write has to tell the caller.
+      allOf:
+        - $ref: '#/components/schemas/MemoryEntry'
+        - type: object
+          properties:
+            shadowed_by: { type: string, description: 'The owner already holds this key; this copy landed in an agent namespace and owner-scope reads show the owner copy. Given only to a caller that may read owner scope.' }
+            warnings: { type: array, items: { $ref: '#/components/schemas/MemoryWriteWarning' } }
+            exchange:
+              type: object
+              description: 'When the key is an EXCHANGE listing source (an app tool manifest, agent offers): { known: true, listed, delisted, skipped[{ label, kind, reason }], warnings } for the listings this write projected, or { known: false, note } naming the reconcile request to run.'
+              additionalProperties: true
+
     MemoryEntry:
       type: object
       properties:
@@ -6982,6 +7014,9 @@ paths:
         `consent_required`. Returns the same scoped, revocable grant token as the code flow — never
         the session. Response `data.error` ∈ {login_required, consent_required, bad_origin,
         unknown_app, invalid_scope, app_origin_disabled}.
+        `invalid_scope` is answered before the session is read (one word outside GET
+        /v1/app-grants/scopes refuses the whole list, whoever is signed in) and carries `app`
+        (owner/filename), `app_name` and `unknown` (the ungrantable words, space-separated).
       tags: [Auth]
       parameters:
         - { in: query, name: origin, required: true, schema: { type: string }, description: The embedding app's origin (a <sub>.apps.<host> origin) }
@@ -11004,6 +11039,10 @@ paths:
         for you, with an example, the outcome, and a sample deliverable), or the owner publishes for one
         of their agents. Validated against the offer descriptor; stored as memory `agents.{name}.offers`
         under the agent's GAII and consumed by both the Offers UI and the mesh (delegate selection).
+        The answer is `{ agent, count, version, exchange }`: `exchange` is `{ known: true, listed[],
+        delisted[], skipped[{ label, kind, reason }], warnings[] }` for the agent-work listings this
+        publish projected, or `{ known: false, note }` naming the reconcile request to run when the
+        projection did not report.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -12880,10 +12919,12 @@ paths:
       description: >-
         One compact research surface for building apps ON AIMEAT: the caller's existing apps,
         library packs (per-model proof summaries), T1/T2/T3 app-shell templates, loadable
-        skills (node:aimeat-app-builder first), curated + learned pitfalls (model-faceted),
-        and prior template proposals. Indexes only with drill-down pointers; ?sections= for a
-        partial fetch, ?model= for indicative model marking/filtering. Authenticated
-        (owner or agent session).
+        skills (node:aimeat-app-builder first), curated pitfalls, every active learned pitfall
+        the caller can read (their own owner scope and other owners' shared entries, critical
+        first), and prior template proposals. Indexes only with drill-down pointers; ?sections=
+        for a partial fetch, ?model= marks proven packs and lists the learned pitfalls that model
+        wrote first inside each severity (same_model: true). The model never removes an entry.
+        Authenticated (owner or agent session).
       tags:
         - Discovery
       security:
@@ -12960,11 +13001,58 @@ paths:
           description: data.pitfalls (one page, full bodies) + total, offset, limit, facets, filtered_facets, community
         '401':
           $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: reportLearnedAppdevPitfall
+      summary: Report (upsert) one learned appdev pitfall
+      description: >-
+        The same function the aimeat_appdev_pitfall_report MCP tool runs. Upserts by {category, slug}
+        into whichever of the caller owner's identities already holds the entry, keeps the package
+        manifest in step, and stamps verified_at (now) and verified_version (this node's software
+        version): a report is the check as well, so re-reporting is how an entry is re-verified.
+        share=true publishes it platform-wide; the default keeps the current visibility (owner-private
+        for a new entry).
+      tags: [Discovery]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, category, title, symptom, resolution]
+              properties:
+                model: { type: string, maxLength: 64, description: The reporting model's own id (indicative) }
+                category: { type: string, maxLength: 40 }
+                title: { type: string, minLength: 3, maxLength: 160 }
+                symptom: { type: string, minLength: 5, maxLength: 10000 }
+                resolution: { type: string, minLength: 5, maxLength: 40000 }
+                slug: { type: string, maxLength: 64, description: Kebab-case; derived from the title when omitted }
+                applies_to: { type: array, maxItems: 8, items: { type: string, maxLength: 20 } }
+                severity: { type: string, enum: [info, warn, critical] }
+                status: { type: string, enum: [active, outdated] }
+                app_ref: { type: string, maxLength: 200 }
+                share: { type: boolean }
+      responses:
+        '200':
+          description: An existing entry was replaced (data.key, category, slug, version, visibility, shared, verified_at, verified_version)
+        '201':
+          description: A new entry was written (same shape)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The caller lacks memory:write, or the write was refused by memory's own rules
 
   /v1/appdev/pitfalls/learned/{category}/{slug}:
     patch:
       operationId: updateLearnedAppdevPitfall
-      summary: Toggle share (platform-wide visibility) and/or status on an own learned pitfall
+      summary: Toggle share and/or status on an own learned pitfall, or record that it was checked again
+      description: >-
+        verified: true stamps verified_at (now) and verified_version (this node's software version)
+        without changing the entry's words or its updated date. Every aimeat_appdev_pitfall_report
+        stamps the same two fields.
       tags: [Discovery]
       security:
         - BearerAuth: []
@@ -12980,6 +13068,7 @@ paths:
               properties:
                 share: { type: boolean, description: true = public (platform-wide), false = owner-private }
                 status: { type: string, enum: [active, outdated] }
+                verified: { type: boolean, enum: [true], description: Record a re-check against this node now }
       responses:
         '200':
           description: The updated entry (data.pitfall)
@@ -13116,7 +13205,7 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/MemoryEntry'
+                        $ref: '#/components/schemas/MemoryWriteResult'
         '201':
           description: Memory created (new key)
           content:
@@ -13127,7 +13216,7 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/MemoryEntry'
+                        $ref: '#/components/schemas/MemoryWriteResult'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '413':
@@ -13940,7 +14029,15 @@ paths:
                     type: string
       responses:
         '200':
-          $ref: '#/components/responses/AimeatSuccess'
+          description: >-
+            data.content, data.model, data.usage and data.budget, plus data.finish_reason (why the
+            provider stopped: stop, length, content_filter…, or null when it did not say) and
+            data.truncated (true when finish_reason is length: the answer was cut at a token limit).
+            The provenance record rides in meta.provenance.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '400':
           $ref: '#/components/responses/AimeatError'
         '402':
@@ -16326,9 +16423,14 @@ paths:
         source is gone is reported as an orphan and left untouched. Scope a run with `app_id`/`ext`/`agent`.
         Idempotent. A CONTRACT is never touched — entitlements keep the interface version and the price they
         were signed at. Returns `{ owner, dryRun, changes[], created, updated, adopted, delisted, unchanged,
-        skipped }` (+ `orphans`, `flagged` when migrating); each change carries `action`, `offeringId`,
-        `kind`, `label`, `unit`, `currency` and, for a skip, the `reason` (SCHEMA_REQUIRED, NOT_PRICED,
-        TOOL_UNBOUND, NOT_PUBLIC, INVALID_TOOL_MANIFEST, INVALID_OFFERS_DOC).
+        skipped, warnings }` (+ `orphans`, `flagged` when migrating); each change carries `action` (created,
+        updated, adopted, delisted, unchanged, skipped, warning), `offeringId`, `kind`, `label`, `unit`,
+        `currency` and a `reason`: for a skip SCHEMA_REQUIRED, NOT_PRICED, NO_ASSIGNEE, ASSIGNEE_NOT_FOUND,
+        NOT_PUBLIC, INVALID_TOOL_MANIFEST, INVALID_OFFERS_DOC or `DUPLICATE_OF {label}`; for a warning
+        `ALSO_LISTED_AS {label}` (a bound app-tool and the extension action it calls are both flagged; both
+        stay listed; `otherListing` names the other) or `ODPS_FIELD_TOO_LONG {path}` (the listing's ODPS
+        document is past a schema maxLength; published as written; `odpsField` gives path, length,
+        maxLength). A warning row carries a `message` for the owner.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -17666,7 +17768,9 @@ paths:
               format: binary
       responses:
         '200':
-          description: Upload processed successfully
+          description: >-
+            Upload processed successfully. A storage upload answers with key, owner_gaii, size,
+            mime_type, visibility, embed_url, embed_markdown and versioned_url (see POST /v1/storage).
           content:
             application/json:
               schema:
@@ -18182,7 +18286,30 @@ paths:
             Presigned mode — an upload URL was minted. No bytes were stored; `PUT` the file to
             `upload_url`.
         '201':
-          $ref: '#/components/responses/AimeatSuccess'
+          description: >-
+            Stored. `embed_url` is the owner-addressed /v1/pub path for embedding in a workspace
+            document. `versioned_url` is the same path plus `?v=<this write>`, which changes on every
+            upload to the key; GET /v1/pub ignores the query, so an app or manifest pointing at it
+            gets re-uploaded bytes at once instead of after the five-minute browser cache.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key: { type: string }
+                          owner_gaii: { type: string }
+                          size: { type: integer }
+                          mime_type: { type: string }
+                          visibility: { type: string }
+                          created_at: { type: string, format: date-time }
+                          embed_url: { type: string }
+                          embed_markdown: { type: string }
+                          versioned_url: { type: string }
         '403':
           description: >
             An anonymous principal targeted a key outside `anonymous/*`. Applies to both the inline
@@ -30966,6 +31093,7 @@ paths:
         '400': { description: Invalid input (missing fields, meta.* namespace, bad slug) }
         '403': { description: Not the workspace creator / org admin }
         '404': { description: Organism or workspace not found }
+        '422': { description: 'INTAKE_SCHEMA_MISMATCH: the destination''s closed schema does not list "id", an allowed field or a default. error.details.missing_properties names each; how_to_fix says how to re-lock the schema in place.' }
     get:
       operationId: listIntakeForms
       summary: List a workspace's intake forms (owner)
@@ -31391,7 +31519,7 @@ paths:
                   description: 'Optional per-instance optimistic lock (required by requires_expected_version namespaces): { <instance>: <version> }'
       responses:
         '200':
-          description: 'Result: { published, skipped, failed, results: [{ instance, ok, version?, skipped?, code? }] }'
+          description: 'Result: { published, skipped, failed, results: [{ instance, ok, version?, skipped?, code?, violations?: [{ path, message, schema_rule, params }] }], warnings?: [UNDECLARED_SPACE] }. A violation message names the property it is about.'
           content:
             application/json:
               schema:
@@ -32353,7 +32481,7 @@ paths:
                 id: { type: string, description: The instance id whose .draft to publish }
                 ws: { type: string, description: "Workspace id — publishes the draft under organism.{id}.w.{ws}.* (omit for the legacy organism-level root)" }
       responses:
-        '200': { description: Published (version returned) }
+        '200': { description: 'Published (version returned). data.warnings carries UNDECLARED_SPACE when the workspace manifest declares no space for the namespace: stored, and no workspace read lists it until add_object_types declares it.' }
         '202': { description: Publish requires approval — a pending approval was created }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -36762,7 +36890,11 @@ paths:
     post:
       operationId: createCortexModel
       summary: Create cortex model
-      description: Register a new cortex model configuration. Owner auth required.
+      description: >-
+        Register a new cortex model configuration. Owner auth required. The answer carries
+        `lib_urls`: each lib component's absolute address keyed by filename
+        (`<baseUrl>/v1/cortex/<encoded name>/libs/<encoded filename>`), the exact script src an app
+        loads once the cortex is active. The address follows the record's name, not its namespace.
       tags: [Cortex]
       security:
         - BearerAuth: []
@@ -36772,9 +36904,15 @@ paths:
           application/json:
             schema:
               type: object
+              required: [manifest]
+              properties:
+                manifest: { type: string, description: Cortex manifest YAML }
+                libs: { type: object, additionalProperties: { type: string }, description: 'Source of every lib component, keyed by its filename. A lib component with no entry here is refused.' }
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: INVALID_MANIFEST. The manifest does not validate (errors in error.details.errors), or a lib component's filename has no content in libs.
 
   /v1/cortex/{name}:
     get:
@@ -36807,6 +36945,9 @@ paths:
         slot, and an identical manifest + libs is a safe 200 no-op.
         Same scope as POST /v1/cortex (cortex:write); owner/operator bypass scope, and only the
         installing owner may update.
+        Every answer (created, updated, unchanged) carries `lib_urls`, as POST /v1/cortex does. A
+        lib component whose filename has no content in libs, and no bytes already stored under it,
+        is refused with INVALID_MANIFEST before anything is written.
       tags: [Cortex]
       security:
         - BearerAuth: []
@@ -37882,6 +38023,11 @@ paths:
         parser without pulling binary through a tool result. The access decision is identical. A
         handle for someone else's file expires sooner (15 min) than one for your own (1 h), so it
         cannot long outlive a revoked grant.
+
+        Every file response carries Cache-Control public, max-age=300 (public branch), a strong
+        ETag and Last-Modified. If-None-Match / If-Modified-Since that still match answer 304 with
+        no body; an If-Range that no longer matches sends the whole file. Query parameters other
+        than mode and filename are ignored, so an upload's versioned_url (?v=) serves the same file.
       tags: [Storage]
       parameters:
         - name: gaii
@@ -37930,6 +38076,8 @@ paths:
                           download_url: { type: string }
                           download_method: { type: string, enum: [GET] }
                           expires_in_seconds: { type: integer }
+        '304':
+          description: Not modified. The If-None-Match or If-Modified-Since validator still matches.
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -56476,7 +56624,34 @@ paths:
                 signal_stream_id: { type: string, maxLength: 64, description: 'Count opens of this message into this signal stream. The stream must already exist AND belong to the sender: a stream id is a public string, so an unverified one would let an account write counts into another''s report. Ignored when it names a stream the sender does not own.' }
                 signal_subject: { type: string, maxLength: 64, description: 'The sender''s own opaque token for this recipient. Never an address and never a name: the node counts per token and never learns who it stands for, which is what keeps "who opened it" answerable by the sender alone.' }
       responses:
-        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '200':
+          description: >-
+            The attempt reached channel selection and is in the send log. This is not a delivery and
+            not always a send: `data.status` says what happened. `sent` means it was handed to the
+            AIMEAT inbox or the mail provider (a bounce shows up on the contact afterwards). `failed`
+            means the provider refused it or this node had no transport, with the reason in
+            `data.message.error` (EMAIL_DISABLED, SMTP_SEND_FAILED, MAILBOX_SEND_FAILED, or the
+            provider's own text). Suppression and opt-out do not arrive here; they are 422. The
+            aimeat_mail_send tool answers a `failed` outcome as an error result.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          status: { type: string, enum: [sent, failed] }
+                          channel: { type: string, enum: [inbox, email] }
+                          message:
+                            type: object
+                            description: The send-log row.
+                            properties:
+                              id: { type: string }
+                              status: { type: string, enum: [sent, failed] }
+                              error: { type: string, nullable: true }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }

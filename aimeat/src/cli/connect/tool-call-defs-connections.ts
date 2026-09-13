@@ -10,14 +10,45 @@
  *   resource allowlist and the whole outbound policy chain are the node's answer here too. Nothing
  *   in this file decides anything.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — aimeat_mail_send answers ok:false with SEND_FAILED when the node says the
+ *     send did not go out. The 200 envelope used to pass through, so a refused send read as success.
+ *     refuseUnsentSend() is shared with the connector MCP door.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { requiredString, optionalString, optionalNumber } from './tool-call-helpers.js';
+import type { ApiResponse } from './api-client.js';
 
 /** The read direction names a RESOURCE; the node builds every URL from the parameters. */
 const readPath = (connectionId: string, resource: string) =>
     `/v1/connections/${encodeURIComponent(connectionId)}/read/${encodeURIComponent(resource)}`;
+
+/**
+ * A send that did not go out, turned from the REST answer into a refusal.
+ *
+ * POST /v1/outbound/send answers 200 for every attempt that reached channel selection and says what
+ * happened in `data.status`; that contract stays, because its callers read the field. A tool caller
+ * reads `ok` instead, so a provider refusal passed through as a 200 was reported as a sent message
+ * (appdev pitfall send-200-is-not-a-delivery). Both connector doors, this dispatch and the connector
+ * MCP, answer through here, and the node MCP says the same thing from the service result.
+ * Anything other than a non-sent outcome is handed back untouched.
+ */
+export function refuseUnsentSend(resp: ApiResponse): ApiResponse {
+    const data = resp.ok ? resp.data as { status?: unknown; channel?: unknown; message?: { id?: unknown; error?: unknown } } | undefined : undefined;
+    if (!data || typeof data.status !== 'string' || data.status === 'sent') return resp;
+    const messageId = typeof data.message?.id === 'string' ? data.message.id : null;
+    const reason = typeof data.message?.error === 'string' && data.message.error ? data.message.error : data.status;
+    const refusal = {
+        code: 'SEND_FAILED',
+        message: `Not sent (${reason}). Nothing reached the recipient; the attempt is in the send log`
+            + (messageId ? ` as ${messageId}.` : '.'),
+        status: data.status,
+        channel: data.channel,
+        message_id: messageId,
+        reason,
+    };
+    return { ok: false, error: refusal };
+}
 
 export const connectionCliTools: ConnectCliToolDefinition[] = [
     {
@@ -72,7 +103,7 @@ export const connectionCliTools: ConnectCliToolDefinition[] = [
     {
         // → POST /v1/outbound/send — the policied door, not around it.
         name: 'aimeat_mail_send',
-        handler: ({ client }, input) => {
+        handler: async ({ client }, input) => {
             const body: Record<string, unknown> = {
                 contact_id: requiredString(input, 'contact_id'),
                 subject: requiredString(input, 'subject'),
@@ -84,7 +115,7 @@ export const connectionCliTools: ConnectCliToolDefinition[] = [
             const replyTo = optionalString(input, 'reply_to'); if (replyTo) body.reply_to = replyTo;
             const disc = optionalString(input, 'ai_disclosure'); if (disc) body.ai_disclosure = disc;
             const theme = optionalString(input, 'theme'); if (theme) body.theme = theme;
-            return client.post('/v1/outbound/send', body);
+            return refuseUnsentSend(await client.post('/v1/outbound/send', body));
         },
     },
 ];

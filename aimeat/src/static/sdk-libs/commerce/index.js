@@ -12,12 +12,17 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-commerce.js"></script>
  *   const s = await AIMEAT.commerce.buyOffer('vendor#alice@node', 'translate-doc');
  * @version-history
+ *   v1.1.0 — 2026-09-13 — parseAmount(), the one amount parser, and microsFromInput built on it. The
+ *     old one-liner replaced only the first comma, so '1,500.00' became 1.5 EUR; an ambiguous amount
+ *     ('1,000') now returns null so the app asks again (appdev pitfall
+ *     amount-parser-reads-thousands-separator-as-decimal).
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-commerce.ts (SDK-libs migration Phase 2).
  */
 import { APEX_URL } from '../_core/config.js';
 import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-commerce.js');
 import { attach } from '../_core/namespace.js';
+import { parseAmount } from './amount.js';
 
 const NODE_URL = APEX_URL;
 
@@ -71,10 +76,25 @@ const commerce = {
     return commerce.fmtMoney(amount, currency);
   },
 
-  /** Parse a major-unit input ("1.50", "0,002") into integer money micro-units; null if not positive. */
+  /**
+   * Parse an amount in any common notation into a number, or null. '12,000.00' → 12000,
+   * '1.234,56' → 1234.56, '0,002' → 0.002. An AMBIGUOUS amount returns null: '1,000' and '1.000'
+   * are a thousand apart under the two conventions, so the app asks the person again instead of
+   * guessing. Full rules in ./amount.js.
+   * @param {unknown} input
+   * @returns {number|null}
+   */
+  parseAmount: parseAmount,
+
+  /**
+   * Parse a major-unit input ("1.50", "0,002", "1,500.00") into integer money micro-units.
+   * Null when the amount is not positive, cannot be read, or is ambiguous ("1,000"): see parseAmount.
+   * @param {unknown} str
+   * @returns {number|null}
+   */
   microsFromInput(str) {
-    const n = parseFloat(String(str).replace(',', '.'));
-    if (!Number.isFinite(n) || n <= 0) return null;
+    const n = parseAmount(str);
+    if (n === null || !(n > 0)) return null;
     return Math.round(n * MONEY_UNIT);
   },
 

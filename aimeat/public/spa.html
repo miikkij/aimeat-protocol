@@ -226,6 +226,7 @@
       "/js/app-sandbox.js": "/js/app-sandbox.js",
       "/js/display-prefs.js": "/js/display-prefs.js",
       "/js/format.js": "/js/format.js",
+      "/js/amount.js": "/js/amount.js",
       "/js/api.js": "/js/api.js",
       "/js/hooks.js": "/js/hooks.js",
       "/js/recents.js": "/js/recents.js",
@@ -1191,6 +1192,9 @@
         try {
           if (document.getElementById('headerAuth') && window.AIMEAT?.auth?.mountLoginButton) {
             window.AIMEAT.auth.mountLoginButton('#headerAuth', {
+              // The header folds the pill itself on a phone (theme.css, ≤640px), so it keeps the full
+              // row; compact became the pill's default everywhere on 2026-09-13.
+              compact: false,
               onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               onLogout: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               i18n: authI18n(),

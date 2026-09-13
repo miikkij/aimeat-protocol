@@ -11,11 +11,14 @@
  *   value, and a write that quietly landed somewhere the app would never look, together read as
  *   "the platform cannot share this data" — a wrong conclusion that cost a redesign. Naming the
  *   holder and the working call turns a dead end into a next step.
- * @structure notInYourNamespace · shadowedByOwnerCopy · OWNER_SCOPE_LIST_NOTE
+ * @structure notInYourNamespace · OWNER_SCOPE_LIST_NOTE
  * @usage
  *   import { notInYourNamespace } from './memory-namespace-hints.js';
  *   return { content: [{ type: 'text', text: JSON.stringify(notInYourNamespace(...), null, 2) }], isError: true };
  * @version-history
+ *   v1.1.0 — 2026-09-13 — shadowedByOwnerCopy removed: the shadow warning is written once, by
+ *     services/memory-write.ts, for every door, and this copy had no caller left. Its advice to use
+ *     an app-grant credential had already gone stale beside APP_GRANT_ADVICE.
  *   v1.0.0 — 2026-07-26 — Extracted from core.ts (max-file-lines) with the namespace-legibility work.
  *     Covered by test/e2e-memory-namespaces.ts.
  */
@@ -44,22 +47,6 @@ export function notInYourNamespace(key: string, callerGaii: string, foundUnder: 
         read_it: 'aimeat_memory_read { key, owner_scope: true }',
         read_it_over_rest: `GET /v1/memory/${encodeURIComponent(key)}?owner_scope=true`,
         to_write_it: APP_GRANT_ADVICE,
-    };
-}
-
-/**
- * Extra fields for a successful `aimeat_memory_write` whose key ALSO exists under the owner's GHII.
- * The write succeeded — into the caller's own namespace — but owner-scope reads resolve GHII-first,
- * so this copy will not surface anywhere, including in an owner-scope listing.
- */
-export function shadowedByOwnerCopy(key: string, callerGaii: string, ownerCopyGaii: string): Record<string, unknown> {
-    return {
-        warning: 'SHADOWED_BY_OWNER_COPY',
-        warning_detail: `This wrote to YOUR namespace (${callerGaii}), but "${key}" also exists under `
-            + `${ownerCopyGaii}. Owner-scope reads resolve GHII-first, so the owner's copy wins and this `
-            + 'one will not surface — not even in an owner-scope listing. To update the owner\'s record '
-            + 'itself, use an app-grant credential (sub = the owner GHII).',
-        shadowed_by: ownerCopyGaii,
     };
 }
 

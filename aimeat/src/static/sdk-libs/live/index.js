@@ -17,6 +17,11 @@
  *     minIntervalMs }. On a multi-agent fleet the 'memory' domain fires continuously, so every
  *     subscriber effectively polled. keyPrefix gates on a cheap server-side COUNT (the change frame
  *     carries no key, so a new key is detected and an in-place update is not). Additive.
+ *   v1.1.1 — 2026-09-13 — The gate stops losing changes (appdev pitfall
+ *     memory-live-events-are-a-firehose). minIntervalMs dropped an event inside the interval, so the
+ *     last change of a burst never reached the view; it is now a throttle with one trailing call. With
+ *     keyPrefix, an event that arrived during a count probe was dropped; one more probe now runs when
+ *     the current one settles. The SSE frame is unchanged: it still carries a domain name and no key.
  */
 import { makeSession } from '../_core/session.js';
 const { getSession } = makeSession('aimeat-live.js');
@@ -156,8 +161,15 @@ function disconnect() {
  *                  minIntervalMs instead of (or with) keyPrefix.
  *   agent        — GAII to scope the count to one agent's namespace.
  *   ownerScope   — count across the owner's GHII + agents (an app-grant token needs this).
- *   minIntervalMs— never invoke the callback more often than this. On a fleet with many agents
- *                  the 'memory' domain is a firehose; this is the blunt version of the gate.
+ *   minIntervalMs— never invoke the callback more often than this. A change that arrives inside the
+ *                  interval is HELD, not dropped: one trailing call delivers it (and everything else
+ *                  that arrived meanwhile) when the interval has passed, so the last change of a
+ *                  burst always reaches the view. On a fleet with many agents the 'memory' domain is
+ *                  a firehose; this is the blunt version of the gate.
+ *
+ * With keyPrefix, a change that arrives while a count probe is in flight is held too, and one more
+ * probe runs when the current one settles. Without that, a key written during the probe was missed
+ * until some unrelated write happened to come along.
  *
  * Why this exists: a multi-agent owner writes memory constantly, so `subscribe(['memory'], reload)`
  * fires more or less continuously, and every subscriber that re-fetched a full listing on each
@@ -174,13 +186,50 @@ function subscribe(domains, fn, opts) {
   var lastCall = 0;
   var probing = false;
   var primed = !prefixes;             // with keyPrefix, the first event only records a baseline
+  var held;                           // domains not yet delivered: a Set, null (= everything), or undefined (nothing)
+  var trailingTimer = null;
+  var active = true;
 
   function pass(dset) { lastCall = Date.now(); try { fn(dset); } catch { /* subscriber threw */ } }
 
+  /** Fold an event's domains into what is being held for the next delivery. */
+  function hold(dset) {
+    if (held === null) return;
+    if (dset === null) { held = null; return; }
+    if (held === undefined) held = new Set();
+    dset.forEach(function (d) { held.add(d); });
+  }
+
+  function take() { var d = held; held = undefined; return d; }
+
   function gate(dset) {
-    if (minInterval && (Date.now() - lastCall) < minInterval) return;
-    if (!prefixes) { pass(dset); return; }
-    if (probing) return;              // one probe in flight is enough
+    if (!active) return;
+    hold(dset);
+    schedule();
+  }
+
+  /** Run now, or once the interval since the last delivery has passed. */
+  function schedule() {
+    if (!active || held === undefined) return;
+    var wait = minInterval ? minInterval - (Date.now() - lastCall) : 0;
+    if (wait > 0) {
+      if (!trailingTimer) {
+        trailingTimer = setTimeout(function () {
+          trailingTimer = null;
+          // A hidden tab defers like the stream does: the visibility flush redelivers everything.
+          if (typeof document !== 'undefined' && document.hidden) { held = undefined; hadHiddenUpdate = true; return; }
+          schedule();
+        }, wait);
+      }
+      return;
+    }
+    run();
+  }
+
+  function run() {
+    if (!prefixes) { pass(take()); return; }
+    if (probing) return;              // held; probed again when this probe settles
+    var dset = take();
     probing = true;
     Promise.all(prefixes.map(function (p) {
       var qs = 'count=true&prefix=' + encodeURIComponent(p) +
@@ -201,15 +250,20 @@ function subscribe(domains, fn, opts) {
       });
       // A failed/unavailable probe must not silence a real update forever: if we could not
       // establish any baseline, fall through and let the subscriber decide.
-      if (!primed) { primed = true; if (res.every(function (r) { return r.count != null; })) return; }
+      if (!primed) { primed = true; if (res.every(function (r) { return r.count != null; })) { schedule(); return; } }
       if (changed) pass(dset);
-    }).catch(function () { probing = false; });
+      schedule();                     // an event that arrived during the probe gets its own probe
+    }).catch(function () { probing = false; schedule(); });
   }
 
   var entry = { domains: domains ? new Set(domains) : null, fn: gate };
   subscribers.push(entry);
   connect();
   return function () {
+    active = false;
+    clearTimeout(trailingTimer);
+    trailingTimer = null;
+    held = undefined;
     var i = subscribers.indexOf(entry);
     if (i >= 0) { subscribers.splice(i, 1); disconnect(); }
   };

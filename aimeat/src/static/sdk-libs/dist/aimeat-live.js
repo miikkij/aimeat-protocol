@@ -251,6 +251,9 @@
     var lastCall = 0;
     var probing = false;
     var primed = !prefixes;
+    var held;
+    var trailingTimer = null;
+    var active = true;
     function pass(dset) {
       lastCall = Date.now();
       try {
@@ -258,13 +261,53 @@
       } catch {
       }
     }
+    function hold(dset) {
+      if (held === null) return;
+      if (dset === null) {
+        held = null;
+        return;
+      }
+      if (held === void 0) held = /* @__PURE__ */ new Set();
+      dset.forEach(function(d) {
+        held.add(d);
+      });
+    }
+    function take() {
+      var d = held;
+      held = void 0;
+      return d;
+    }
     function gate(dset) {
-      if (minInterval && Date.now() - lastCall < minInterval) return;
+      if (!active) return;
+      hold(dset);
+      schedule();
+    }
+    function schedule() {
+      if (!active || held === void 0) return;
+      var wait = minInterval ? minInterval - (Date.now() - lastCall) : 0;
+      if (wait > 0) {
+        if (!trailingTimer) {
+          trailingTimer = setTimeout(function() {
+            trailingTimer = null;
+            if (typeof document !== "undefined" && document.hidden) {
+              held = void 0;
+              hadHiddenUpdate = true;
+              return;
+            }
+            schedule();
+          }, wait);
+        }
+        return;
+      }
+      run();
+    }
+    function run() {
       if (!prefixes) {
-        pass(dset);
+        pass(take());
         return;
       }
       if (probing) return;
+      var dset = take();
       probing = true;
       Promise.all(prefixes.map(function(p) {
         var qs = "count=true&prefix=" + encodeURIComponent(p) + (opts.agent ? "&agent=" + encodeURIComponent(opts.agent) : opts.ownerScope ? "&owner_scope=true" : "");
@@ -288,17 +331,26 @@
           primed = true;
           if (res.every(function(r) {
             return r.count != null;
-          })) return;
+          })) {
+            schedule();
+            return;
+          }
         }
         if (changed) pass(dset);
+        schedule();
       }).catch(function() {
         probing = false;
+        schedule();
       });
     }
     var entry = { domains: domains ? new Set(domains) : null, fn: gate };
     subscribers.push(entry);
     connect();
     return function() {
+      active = false;
+      clearTimeout(trailingTimer);
+      trailingTimer = null;
+      held = void 0;
       var i = subscribers.indexOf(entry);
       if (i >= 0) {
         subscribers.splice(i, 1);

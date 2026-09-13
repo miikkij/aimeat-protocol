@@ -22,6 +22,8 @@
  *     only payload a ZIP carried, so a packaged app came back with no name, icon or category and
  *     installed as "Installed from package". Written only when non-empty, so a package without
  *     metadata produces the same manifest bytes as before; read only when it is a plain object.
+ *   v1.3.0 — 2026-09-13 — A manifest.yaml that does not parse answers with the parser's line and
+ *     column (yamlErrorText, shared with the extension manifest builder) instead of "not valid YAML".
  */
 
 import { createHash } from 'node:crypto';
@@ -30,6 +32,7 @@ import yauzl from 'yauzl';
 import YAML from 'yaml';
 import type { PackageRecord, PackageComponentType } from '../storage/interface.js';
 import { isUnsafeName } from './safe-zip.js';
+import { yamlErrorText } from '../routes/extensions/manifest.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -321,8 +324,10 @@ export async function parseZip(buffer: Buffer, options: ZipOptions): Promise<Par
   let manifest: Record<string, unknown>;
   try {
     manifest = YAML.parse(manifestBuf.toString('utf-8')) as Record<string, unknown>;
-  } catch {
-    throw new ZipValidationError('INVALID_MANIFEST', 'manifest.yaml is not valid YAML');
+  } catch (err) {
+    // The parser's line and column, not just "invalid": the usual cause is an unquoted ": " inside a
+    // description, and the position is what an author needs to find it.
+    throw new ZipValidationError('INVALID_MANIFEST', `manifest.yaml is not valid YAML: ${yamlErrorText(err)}`);
   }
 
   const requiredFields = ['name', 'author', 'version', 'description', 'category'];

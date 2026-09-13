@@ -17,6 +17,9 @@
  *   pnpm check:mcp-schemas               # pre-commit + CI gate (input drift only)
  *   pnpm audit:mcp-schemas -- --strict   # full report, both axes
  * @version-history
+ *   v1.3.1 -- 2026-09-13 -- aimeat_extension_install leaves KNOWN_INPUT_DRIFT: both MCP surfaces take
+ *     manifest, scripts, update and activate. aimeat_app_draft_publish leaves it too: the audit
+ *     reported the entry stale (the connector door now takes spec_token and spec_ack).
  *   v1.3.0 -- 2026-09-03 -- Registers through mcp/register-all.ts instead of a hand-kept copy of the
  *     server's register list. The copy had fallen to 26 groups against the server's 52, so eleven
  *     families never reached the comparison — and the script printed them as "not server-registered"
@@ -194,11 +197,11 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     // one returning whole records (review item 6.4). One left, and it needs the same kind of REST
     // change before its connector line is worth writing:
     'aimeat_memory_write',       // expected_version — POST /v1/memory has no optimistic lock at all; the server MCP calls the write service directly and the PUT route spells it `version`
-    'aimeat_extension_install',  // activate, update
+    // aimeat_extension_install RESOLVED 2026-09-13: the connector declares update and activate and
+    // sends them to the doors that read them (PUT /v1/extensions/:name, then the activate route).
     'aimeat_knowledge_contribute', // model
     'aimeat_capabilities_create',  // status
     'aimeat_capabilities_update',  // status
-    'aimeat_app_draft_publish',  // spec_ack, spec_token — belongs to the app_* two-backends debt above
     'aimeat_app_draft_save',     // content_base64 vs content — same app_* debt
 
     // ── Seventeen the audit could not see until 2026-09-03. ──

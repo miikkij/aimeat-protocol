@@ -32,6 +32,8 @@
  *   const out = await publishAgentOffers({ storage, config }, caller, 'trader', offers);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own answer
  * @version-history
+ *   v1.1.0 — 2026-09-13 — The result carries `exchange`, the projection's report for this document,
+ *     so the MCP offer tool can say what listed and what was skipped.
  *   v1.0.0 — 2026-08-11 — Extracted from mcp/commerce.ts (August 2026 MCP audit, step 8). The REST
  *     route routes/agents/offers.ts still holds the second copy of the same sequence; pointing it
  *     here is a one-line change that belongs to whoever owns that file.
@@ -86,6 +88,8 @@ export type OffersWriteResult =
         docVersion: number;
         offers: Offer[];
         record: MemoryRecord;
+        /** What the EXCHANGE projection did with this document's listings, when it reported. */
+        exchange?: import('./exchange-projection.js').ReconcileReport | null;
     }
     | OffersWriteRefusal;
 
@@ -202,5 +206,6 @@ export async function publishAgentOffers(
         docVersion,
         offers: parsed.data.offers,
         record: written.record,
+        exchange: written.exchange ?? null,
     };
 }

@@ -15,6 +15,8 @@
  *   version recorded here alongside a hash of the pack's bytes. Change the code and the hash moves,
  *   and this fails until the version is bumped with it.
  * @version-history
+ *   v1.1.1 -- 2026-09-13 -- aimeat-charts 1.1.3, aimeat-surface 1.2.0 and aimeat-ui-motion 1.0.2
+ *     recorded, bumped with their appdev-pitfall fixes.
  *   v1.1.0 -- 2026-09-12 -- Two holes, both found by the defect happening again. The ledger held one
  *     pack of fifteen and the drift check only read what was listed, so fourteen were unguarded;
  *     every pack is in it now and a missing one fails. And the check compared hashes only while the
@@ -53,16 +55,16 @@ const dir = fileURLToPath(new URL('../../public/cortex-bundled/', import.meta.ur
  */
 const KNOWN: Record<string, { version: string; sha256: string }> = {
     'aimeat-canvas': { version: '1.0.1', sha256: '297f5f807074e0dd' },
-    'aimeat-charts': { version: '1.1.2', sha256: '691ad8f365372b03' },
+    'aimeat-charts': { version: '1.1.3', sha256: 'cdc21136313d147f' },
     'aimeat-dag': { version: '1.1.4', sha256: '56fff8df06d77259' },
     'aimeat-flow': { version: '1.0.1', sha256: '1634ee00cbb0099d' },
     'aimeat-i18n': { version: '1.4.0', sha256: 'dec0c56d811ba96a' },
     'aimeat-input': { version: '1.0.0', sha256: '5968dddac74e78aa' },
-    'aimeat-surface': { version: '1.1.1', sha256: '367836dc60ac1981' },
+    'aimeat-surface': { version: '1.2.0', sha256: 'baad6d81ddbc1f3e' },
     'aimeat-ui-dialogs': { version: '1.0.1', sha256: '70a017c3b69a64ce' },
     'aimeat-ui-forms': { version: '1.0.0', sha256: 'edc35e2d8441c1a0' },
     'aimeat-ui-layout': { version: '1.0.0', sha256: 'ae25d30f8878f8dd' },
-    'aimeat-ui-motion': { version: '1.0.1', sha256: '5e8431824cf8babf' },
+    'aimeat-ui-motion': { version: '1.0.2', sha256: '36dc71fef2a69084' },
     'aimeat-ui-nav': { version: '1.0.0', sha256: '949dcbde43c6bf61' },
     'aimeat-ui-viewers': { version: '1.1.0', sha256: 'd8085d04d0064238' },
     'aimeat-viewport': { version: '1.0.4', sha256: '1d215dd00655b1a8' },

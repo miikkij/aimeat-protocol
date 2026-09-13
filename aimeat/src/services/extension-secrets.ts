@@ -20,6 +20,11 @@
  *   v1.1.0 — 2026-08-10 — stripClientEncryptedValues: a value arriving already wrapped in
  *                         { encrypted } is dropped at the door. Only this node mints those, and
  *                         encryptSecretFields passes an already-encrypted value straight through.
+ *   v1.2.0 — 2026-09-13 — An unset secret reads as ABSENT: decryptSecretFields and maskSecretFields
+ *                         drop a stored descriptor object, the mask string, an empty value and an
+ *                         undecryptable one, and prepareSecretConfigForWrite no longer stores the
+ *                         mask or a descriptor on a first install. The sandbox had been handed a
+ *                         truthy object or the mask, and extensions sent either as a credential.
  */
 
 import { encrypt, decrypt } from './encryption.js';
@@ -122,9 +127,26 @@ export function encryptSecretFields(
 }
 
 /**
+ * A secret field that holds no VALUE: nothing, an empty string, the mask sentinel, or anything that
+ * is neither a string nor an encrypted wrapper. The last case is the manifest descriptor
+ * `{ type: 'secret', description }`, which the manifest flatten stored in place of a missing default
+ * until 2026-09-13, so records written before then still carry it.
+ */
+function isUnsetSecret(v: unknown): boolean {
+  if (isEncryptedValue(v)) return false;
+  return typeof v !== 'string' || v === '' || v === SECRET_MASK;
+}
+
+/**
  * Decrypt secret-typed fields back to plaintext strings for use inside the sandbox VM, and
- * strip the internal __secretKeys marker. Best-effort: if no key is configured, encrypted
- * values are blanked rather than leaked as ciphertext into the VM.
+ * strip the internal __secretKeys marker.
+ *
+ * AN UNSET SECRET IS ABSENT. A field with no value, a stored descriptor object, the mask string, or
+ * an encrypted value on a node with no key to open it is deleted, so `ctx.config.apiKey` is
+ * `undefined` and `if (ctx.config.apiKey)` means what it says. Before this the descriptor reached the
+ * VM as a truthy object and the mask as a truthy string, and an extension attached either one to an
+ * upstream request as its credential. Applied here, at read time, so records already stored in those
+ * shapes need no migration.
  */
 export function decryptSecretFields(
   configObj: Record<string, unknown> | undefined,
@@ -135,14 +157,22 @@ export function decryptSecretFields(
   delete out[SECRET_KEYS_FIELD];
   for (const k of secretKeys) {
     const v = out[k];
-    if (isEncryptedValue(v)) out[k] = key ? decrypt(v.encrypted, key) : '';
+    if (isEncryptedValue(v)) {
+      const plain = key ? decrypt(v.encrypted, key) : '';
+      if (plain) out[k] = plain;
+      else delete out[k];
+    } else if (isUnsetSecret(v)) {
+      delete out[k];
+    }
   }
   return out;
 }
 
 /**
  * Replace encrypted secret values with the mask sentinel for safe display in API responses,
- * and strip the internal __secretKeys marker. Set secrets become SECRET_MASK; unset stay absent.
+ * and strip the internal __secretKeys marker. Set secrets become SECRET_MASK; unset stay absent,
+ * including a stored descriptor object or a stored mask string, which would otherwise show as a
+ * value (or as the mask, claiming a secret is set when none is).
  */
 export function maskSecretFields(
   configObj: Record<string, unknown> | undefined,
@@ -152,6 +182,7 @@ export function maskSecretFields(
   delete out[SECRET_KEYS_FIELD];
   for (const k of secretKeys) {
     if (isEncryptedValue(out[k])) out[k] = SECRET_MASK;
+    else if (k in out && isUnsetSecret(out[k])) delete out[k];
   }
   return out;
 }
@@ -170,13 +201,17 @@ export function prepareSecretConfigForWrite(
 ): Record<string, unknown> | null {
   const secretKeys = getExtSecretKeys({ config: incoming });
   if (!secretKeys.length) return incoming;
-  const merged = existing ? preserveMaskedSecrets(incoming, existing, secretKeys) : incoming;
+  // Always, not only on an update: on a first install there is nothing to carry forward, and the
+  // same pass is what drops a submitted mask or descriptor instead of storing it as the value.
+  const merged = preserveMaskedSecrets(incoming, existing, secretKeys);
   return encryptSecretFields(merged, secretKeys, key);
 }
 
 /**
- * On an update, carry forward existing encrypted secret values when the incoming config omits
- * them or submits the mask sentinel — so a masked UI never wipes a stored secret.
+ * Carry forward existing encrypted secret values when the incoming config has no value for them:
+ * omitted, empty, the mask sentinel, or a descriptor object with no default. A masked UI or a
+ * manifest that declares the field without repeating its value therefore never wipes a stored secret. With
+ * nothing stored to carry, the field is dropped rather than stored as the mask or the descriptor.
  */
 export function preserveMaskedSecrets(
   incoming: Record<string, unknown>,
@@ -186,8 +221,9 @@ export function preserveMaskedSecrets(
   const out: Record<string, unknown> = { ...incoming };
   const prev = existing ?? {};
   for (const k of secretKeys) {
-    const v = out[k];
-    if (v === undefined || v === '' || v === SECRET_MASK) {
+    // An explicit null is left as it was sent: on an instance PATCH it is the one way a stored
+    // secret has ever been cleared, and the read side treats it as unset either way.
+    if (out[k] !== null && isUnsetSecret(out[k])) {
       if (isEncryptedValue(prev[k])) out[k] = prev[k];
       else delete out[k];
     }

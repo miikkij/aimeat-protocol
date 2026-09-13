@@ -103,6 +103,15 @@
     if (_active[key]) _active[key].stop();
     _active[key] = { nodes, stop: stopFn };
   }
+  function rekeyActive(fromInstrument, toInstrument, note) {
+    var from = fromInstrument + ":" + (note || "*");
+    var entry = _active[from];
+    if (!entry) return;
+    delete _active[from];
+    var to = toInstrument + ":" + (note || "*");
+    if (_active[to]) _active[to].stop();
+    _active[to] = entry;
+  }
   function stopActive(instrument, note) {
     if (!instrument) {
       Object.keys(_active).forEach(function(k) {
@@ -944,6 +953,15 @@
       _rtHandlerPeerData = null;
     }
   }
+  var STAND_IN = {
+    epiano: "piano",
+    "guitar-steel": "guitar",
+    "guitar-el": "guitar",
+    strings: "synth",
+    organ: "synth",
+    trumpet: "synth"
+  };
+  var _standInWarned = {};
   var audio = {
     play: function(instrument, note, opts) {
       if (sampleBuffers[instrument] && Object.keys(sampleBuffers[instrument]).length > 0) {
@@ -954,6 +972,16 @@
         return;
       }
       var inst = instruments[instrument];
+      var standIn = !inst && STAND_IN[instrument] ? STAND_IN[instrument] : null;
+      if (standIn && instruments[standIn]) {
+        if (!_standInWarned[instrument]) {
+          _standInWarned[instrument] = true;
+          console.warn("[aimeat-audio] " + instrument + " samples are not loaded; playing the " + standIn + " voice until AIMEAT.audio.loadSamples('" + instrument + "') resolves.");
+        }
+        instruments[standIn].play(note, opts);
+        rekeyActive(standIn, instrument, note);
+        return;
+      }
       if (!inst) {
         console.warn("[aimeat-audio] Unknown instrument:", instrument);
         return;

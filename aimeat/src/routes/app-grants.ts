@@ -20,6 +20,12 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.14.0 — 2026-09-13 — The silent bridge's invalid_scope answer names the app (`app`, `app_name`)
+ *     and the words the node cannot grant (`unknown`, space-separated), and it is given before the
+ *     session is read, because one unknown word refuses the sign-in for everybody. It was a bare
+ *     `invalid_scope`, which left the SDK nothing to say, so Sign In did nothing and said nothing.
+ *     A known word is now checked with hasOwnProperty on both doors, so `constructor` is not
+ *     mistaken for one.
  *   v1.13.0 — 2026-09-05 — GET /v1/app-grants, PATCH /:grantId/spend-cap and DELETE /:grantId moved by
  *     pure extraction to routes/app-grants-manage.ts, where the narrowing door joined them; this file
  *     was one route short of 800 lines.
@@ -342,7 +348,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     if (requested.length === 0) {
       return res.status(400).json(error(config.nodeId, 'INVALID_SCOPE', 'At least one scope is required'));
     }
-    const invalid = requested.filter(s => !APP_GRANTABLE_SCOPES[s]);
+    const invalid = requested.filter(s => !Object.prototype.hasOwnProperty.call(APP_GRANTABLE_SCOPES, s));
     if (invalid.length) {
       return res.status(400).json(error(config.nodeId, 'INVALID_SCOPE', `Not grantable: ${invalid.join(', ')}. The vocabulary is served at GET /v1/app-grants/scopes (note: file deletion is covered by storage:write).`));
     }
@@ -554,6 +560,19 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // The origin as the resolver accepted it, for the grant row's display/redirect field.
     const grantOriginHost = new URL(String(req.query.origin ?? '')).hostname.toLowerCase();
 
+    // A word outside the vocabulary refuses the whole list, whoever is signed in, so it is answered
+    // before the session is read. The answer names the app and the words: it used to be a bare
+    // `invalid_scope`, and the SDK, having no app to name and no popup that could succeed, did
+    // nothing, so Sign In did nothing and said nothing (appdev pitfall
+    // declare-aimeat-scopes-or-get-the-silent-four). The caller is the apex bridge page (checked
+    // above), `app` is what this node publishes at that origin, and `unknown` is the caller's own
+    // words handed back, so nothing here is new to the page that asked.
+    const asked = String(req.query.scope ?? '').split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
+    const unknownScopes = [...new Set(asked.filter(s => !Object.prototype.hasOwnProperty.call(APP_GRANTABLE_SCOPES, s)))];
+    if (unknownScopes.length) {
+      return reply({ ok: false, error: 'invalid_scope', app: grantTarget, app_name: grantName, unknown: unknownScopes.join(' ') });
+    }
+
     // Who is logged in on the apex (refresh cookie → session). Read-only; no rotation.
     const raw = readRefreshCookie(req);
     const session = raw ? await storage.getSessionByRefreshHash(hashToken(raw)) : null;
@@ -566,8 +585,6 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     if (!sessionValid) return reply({ ok: false, error: 'login_required', app: grantTarget, app_name: grantName });
     const owner = session!.owner;
 
-    const asked = String(req.query.scope ?? '').split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
-    if (asked.some(s => !APP_GRANTABLE_SCOPES[s])) return reply({ ok: false, error: 'invalid_scope' });
     // AUDIT H-9: a portfolio target gets the published ceiling and nothing more, before any branch
     // below decides whether to approve it — including the own-app branch, which asks the page what
     // it wants and believes the answer. See capPortfolioScopes for what this does and does not fix.

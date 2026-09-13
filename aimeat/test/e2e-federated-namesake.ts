@@ -18,6 +18,8 @@
  *   attestation. The runner pins AIMEAT_FEDERATION_AUTH_POLICY=all_peers and private egress.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-namesake
  * @version-history
+ *   v1.2.0 — 2026-09-13 — GET /v1/owners/:name: the visitor gets the namesake's public card, never
+ *     its roles or its agent roster (the door compared the owner name).
  *   v1.1.0 — 2026-09-13 — The identity itself, which is the root: the visitor's session resolves to
  *     their HOME GHII, so it reads none of the namesake's memory (direct, ?owner_scope=true or a
  *     listing), writes into none of it, and GET /v1/ghii/me is not the namesake's profile.
@@ -168,6 +170,19 @@ async function run() {
             `the visitor was handed the LOCAL account's identity: ${seen}`);
         assert(me.status === 404 || String(seen).endsWith(`@${homeNodeId}`),
             `a visitor is their home GHII or nothing here, got ${me.status} ${JSON.stringify(me.body?.data ?? me.body?.error).slice(0, 200)}`);
+    });
+
+    await test('GET /v1/owners/:name gives the visitor the namesake\'s public card, never its roles or agent roster', async () => {
+        // "Is this you" was answered by comparing the session's owner NAME with the account, so a
+        // visitor from another node was the local namesake at this door and saw who the operators are
+        // and every agent GAII the account holds. Found 2026-09-13 reading the §83 shape door by door.
+        const self = await json(`/v1/owners/${namesake}`, as(alice.token));
+        assert(self.status === 200 && Array.isArray(self.body.data.roles) && Array.isArray(self.body.data.agents),
+            `positive control: the local account sees its own roles and roster: ${JSON.stringify(self.body.data)}`);
+        const seen = await json(`/v1/owners/${namesake}`, as(fedToken));
+        assert(seen.status === 200, `the public card is public: ${seen.status}`);
+        assert(seen.body.data.roles === undefined && seen.body.data.agents === undefined,
+            `the visitor was shown the local account's roles or agents: ${JSON.stringify(seen.body.data)}`);
     });
 
     await test('The visitor cannot read the local namesake\'s PRIVATE memory', async () => {

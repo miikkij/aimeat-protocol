@@ -8,7 +8,11 @@
  *   (owner B sees A's SHARED entries in platform scope, never A's private ones).
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-appdev-pitfalls).
- * @version-history v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 4).
+ * @version-history
+ *   v1.1.0 — 2026-09-13 — The list's hint names a door that opens a shared entry, the row carries the
+ *     owner that door needs, and B reads A's shared body through it. A report and its list row carry
+ *     verified_at / verified_version.
+ *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 4).
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -183,6 +187,12 @@ await test('report: happy path creates a private entry with model attribution', 
     assert(out.key === 'packages/appdev-pitfalls/auth/silent-login-returns-null-on-app-origins', `key: ${out.key}`);
     assert(out.shared === false && out.visibility === 'owner', 'entry should default private');
     assert(out.version === 1, `version: ${out.version}`);
+    // A report is the check as well: it says when, and against which node version.
+    assert(typeof out.verified_at === 'string' && typeof out.verified_version === 'string' && out.verified_version.length > 0,
+        `report carries no verification stamp: ${JSON.stringify(out)}`);
+    const listed = await A.call('aimeat_appdev_pitfall_list', { scope: 'own' });
+    const row = JSON.parse(listed.result.content[0].text).pitfalls.find((p: any) => p.key === out.key);
+    assert(row && row.verified_at === out.verified_at && row.verified_version === out.verified_version, `list row lacks the stamp: ${JSON.stringify(row)}`);
 });
 
 await test('report: missing model is rejected', async () => {
@@ -262,6 +272,15 @@ await test('share=true publishes an entry platform-wide; owner B sees it (and ON
     const learnedShared = platOut.pitfalls.filter((p: any) => p.source === 'learned-shared');
     assert(learnedShared.some((p: any) => p.slug === 'keyboard-gap'), 'shared entry not visible to B');
     assert(!platOut.pitfalls.some((p: any) => p.slug === 'batching'), 'A private entry leaked to B');
+
+    // The hint names the door that opens a shared entry, and the row carries what that door needs.
+    assert(!/knowledge_get/.test(platOut.hint), `hint still names aimeat_knowledge_get: ${platOut.hint}`);
+    const row = learnedShared.find((p: any) => p.slug === 'keyboard-gap');
+    assert(typeof row.owner === 'string' && row.owner.length > 0, `shared row carries no owner: ${JSON.stringify(row)}`);
+    const body = await B.call('aimeat_memory_read_public', { gaii: row.owner, key: row.key });
+    const text = body.result?.content?.[0]?.text ?? '';
+    assert(body.result?.isError !== true && /dvh already excludes the keyboard/.test(text),
+        `the hinted door did not open the shared entry: ${text.slice(0, 200)}`);
 });
 
 await test('status=outdated hides an entry from default lists (kept, retrievable)', async () => {
