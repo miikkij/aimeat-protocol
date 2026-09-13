@@ -9,6 +9,7 @@
  *   the daily cap is. Every policy row carries a sentence about what it does.
  * @structure EconomyTab — strip · morsels · trade · money · grant form
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-08-31 — The poster face: sections with meaning sentences, morsels and money
  *     separated, the mint form explained. Replaces five equal-weight key-value cards.
  *   v1.1.0 — 2026-07-13 — Commerce card: checkout sessions, sales volume, operator fees, fee mode (TARGET-033)
@@ -77,7 +78,7 @@ export default function EconomyTab({ data, reload }) {
       </div>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${t('dashboard.ecoMorselsTitle')}<small>${t('dashboard.ecoMorselsSub')}</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${t('dashboard.ecoMorselsTitle')}<small>${t('dashboard.ecoMorselsSub')}</small></h2></div>
         <p class="adm-intro">${t('dashboard.ecoMorselsIntro')}</p>
         <div class="adm-two">
           <div>
@@ -95,7 +96,7 @@ export default function EconomyTab({ data, reload }) {
 
       ${c && html`
         <section class="og-sec">
-          <div class="og-sec-h"><h2>${t('dashboard.ecoTradeTitle')}<small>${t('dashboard.ecoTradeSub')}</small></h2></div>
+          <div class="og-sec-h"><h2 class="poster-section-title">${t('dashboard.ecoTradeTitle')}<small>${t('dashboard.ecoTradeSub')}</small></h2></div>
           <div class="adm-two">
             <div>
               <${Row} label=${t('dashboard.ecoCheckout')}
@@ -115,7 +116,7 @@ export default function EconomyTab({ data, reload }) {
         </section>
 
         <section class="og-sec">
-          <div class="og-sec-h"><h2>${t('dashboard.ecoMoneyTitle')}<small>${t('dashboard.ecoMoneySub')}</small></h2></div>
+          <div class="og-sec-h"><h2 class="poster-section-title">${t('dashboard.ecoMoneyTitle')}<small>${t('dashboard.ecoMoneySub')}</small></h2></div>
           <p class="adm-intro">${t('dashboard.ecoMoneyIntro')}</p>
           <div class="adm-half">
             <${Row} label=${t('dashboard.commerceMoneyVolume')} value=${fmtMoneyMap(c.money_volume) || '—'} />
@@ -124,7 +125,7 @@ export default function EconomyTab({ data, reload }) {
         </section>`}
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${t('dashboard.mintMorsels')}<small>04</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${t('dashboard.mintMorsels')}<small>04</small></h2></div>
         <p class="adm-intro">${t('dashboard.ecoMintIntro', { cap: num(e.max_operator_mint_per_day) })}</p>
         <div class="adm-mint">
           <label class="adm-fld adm-fld--wide"><span>${t('dashboard.gaii')}</span>
