@@ -22,6 +22,7 @@
  *   - AskingToJoin (05) — the pending requests, and the door to the history
  * @usage Imported by views/admin/federation-tab.js.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.0 — 2026-09-12 — Initial (the Federation page in the poster face).
  */
 import { h } from 'preact';
@@ -79,7 +80,7 @@ export function PeerTable({ peers, overview, onActivate, onPromote, onRemove, on
   return html`
     <section class="og-sec" id="adm-fed-03">
       <div class="og-sec-h">
-        <h2>${S('peers.title')}<small>03</small></h2>
+        <h2 class="poster-section-title">${S('peers.title')}<small>03</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${onAdd}>${S('peers.add')}</button>
           <button type="button" class="og-door og-door--quiet" onClick=${onTest}>${S('peers.test')}</button>
@@ -164,7 +165,7 @@ export function AskingToJoin({ overview, historyOpen, onToggleHistory, history, 
   return html`
     <section class="og-sec" id="adm-fed-05">
       <div class="og-sec-h">
-        <h2>${S('join.title')}<small>05</small></h2>
+        <h2 class="poster-section-title">${S('join.title')}<small>05</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${onToggleHistory}>
             ${historyOpen ? S('join.hideHistory') : S('join.showHistory', { n: num(overview.requests.history) })}

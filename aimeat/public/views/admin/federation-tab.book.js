@@ -25,6 +25,7 @@
  *   - AddPeerForm / TestNodeForm — the two forms, opened from section 03
  * @usage Imported by views/admin/federation-tab.js.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.0 — 2026-09-12 — Initial (the Federation page in the poster face).
  */
 import { h } from 'preact';
@@ -43,7 +44,7 @@ export function TheBook({ overview, onRebuild, onMirror }) {
   return html`
     <section class="og-sec" id="adm-fed-04">
       <div class="og-sec-h">
-        <h2>${S('book.title')}<small>04</small></h2>
+        <h2 class="poster-section-title">${S('book.title')}<small>04</small></h2>
         <div class="og-doors">
           ${book.is_primary
     ? html`<button type="button" class="og-door og-door--quiet" onClick=${onRebuild}>${S('book.rebuild')}</button>`
@@ -123,7 +124,7 @@ export function WhatIsOffered({ entries, loading, q, onQ }) {
   return html`
     <section class="og-sec" id="adm-fed-06">
       <div class="og-sec-h">
-        <h2>${S('dir.title')}<small>06</small></h2>
+        <h2 class="poster-section-title">${S('dir.title')}<small>06</small></h2>
       </div>
       <div class="adm-fed-search">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="16" y1="16" x2="21" y2="21"></line></svg>
