@@ -15,6 +15,7 @@
  *   - RunLog: the last fifty fires with what set each off and what it did
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face, and the four fields the page had been reading under the
  *     wrong names. Last run, Result and Next run were an em-dash on every row because the page read
  *     lastRun / lastResult / nextRun while the record carries lastRunAt / lastRunResult / nextRunAt;
@@ -204,7 +205,7 @@ export default function SchedulerTab({ data, reload }) {
       </div>
 
       <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2>${S('brokeTitle')}<small>01</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${S('brokeTitle')}<small>01</small></h2></div>
         ${m.failing.length === 0
     ? html`<p class="adm-sch-note">${S('brokeNone')}</p>`
     : html`
@@ -233,7 +234,7 @@ export default function SchedulerTab({ data, reload }) {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${S('nextTitle')}<small>02</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${S('nextTitle')}<small>02</small></h2></div>
         ${m.agenda.length === 0
     ? html`<p class="adm-sch-note">${S('nextNone')}</p>`
     : html`
@@ -256,7 +257,7 @@ export default function SchedulerTab({ data, reload }) {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${S('registerTitle')}<small>03</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${S('registerTitle')}<small>03</small></h2></div>
         <p class="adm-sch-lead">${S('registerLead')}</p>
 
         <div class="adm-sch-tools">
@@ -311,7 +312,7 @@ export default function SchedulerTab({ data, reload }) {
 
       <section class="og-sec">
         <div class="og-sec-h">
-          <h2>${S('logTitle')}<small>04</small></h2>
+          <h2 class="poster-section-title">${S('logTitle')}<small>04</small></h2>
           <button type="button" class="og-door" onClick=${prune}>${S('prune')}</button>
         </div>
         <p class="adm-sch-lead">${S('logLead')}</p>
