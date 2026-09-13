@@ -12962,11 +12962,58 @@ paths:
           description: data.pitfalls (one page, full bodies) + total, offset, limit, facets, filtered_facets, community
         '401':
           $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: reportLearnedAppdevPitfall
+      summary: Report (upsert) one learned appdev pitfall
+      description: >-
+        The same function the aimeat_appdev_pitfall_report MCP tool runs. Upserts by {category, slug}
+        into whichever of the caller owner's identities already holds the entry, keeps the package
+        manifest in step, and stamps verified_at (now) and verified_version (this node's software
+        version): a report is the check as well, so re-reporting is how an entry is re-verified.
+        share=true publishes it platform-wide; the default keeps the current visibility (owner-private
+        for a new entry).
+      tags: [Discovery]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, category, title, symptom, resolution]
+              properties:
+                model: { type: string, maxLength: 64, description: The reporting model's own id (indicative) }
+                category: { type: string, maxLength: 40 }
+                title: { type: string, minLength: 3, maxLength: 160 }
+                symptom: { type: string, minLength: 5, maxLength: 10000 }
+                resolution: { type: string, minLength: 5, maxLength: 40000 }
+                slug: { type: string, maxLength: 64, description: Kebab-case; derived from the title when omitted }
+                applies_to: { type: array, maxItems: 8, items: { type: string, maxLength: 20 } }
+                severity: { type: string, enum: [info, warn, critical] }
+                status: { type: string, enum: [active, outdated] }
+                app_ref: { type: string, maxLength: 200 }
+                share: { type: boolean }
+      responses:
+        '200':
+          description: An existing entry was replaced (data.key, category, slug, version, visibility, shared, verified_at, verified_version)
+        '201':
+          description: A new entry was written (same shape)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The caller lacks memory:write, or the write was refused by memory's own rules
 
   /v1/appdev/pitfalls/learned/{category}/{slug}:
     patch:
       operationId: updateLearnedAppdevPitfall
-      summary: Toggle share (platform-wide visibility) and/or status on an own learned pitfall
+      summary: Toggle share and/or status on an own learned pitfall, or record that it was checked again
+      description: >-
+        verified: true stamps verified_at (now) and verified_version (this node's software version)
+        without changing the entry's words or its updated date. Every aimeat_appdev_pitfall_report
+        stamps the same two fields.
       tags: [Discovery]
       security:
         - BearerAuth: []
@@ -12982,6 +13029,7 @@ paths:
               properties:
                 share: { type: boolean, description: true = public (platform-wide), false = owner-private }
                 status: { type: string, enum: [active, outdated] }
+                verified: { type: boolean, enum: [true], description: Record a re-check against this node now }
       responses:
         '200':
           description: The updated entry (data.pitfall)

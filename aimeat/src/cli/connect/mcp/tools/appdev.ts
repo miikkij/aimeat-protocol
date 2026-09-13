@@ -15,6 +15,7 @@
  * @usage registerAppdevTools(mcp, registry);
  * @version-history
  *   v1.1.1 -- 2026-09-13 -- appdev_overview's model parameter is described as ordering, not filtering.
+ *     pitfall_report posts to POST /v1/appdev/pitfalls/learned instead of writing raw memory.
  *   v1.1.0 -- 2026-08-11 -- proof_attach takes the node's own parameters (subject_type, verdict,
  *     evidence, test_set, tokens) and appends a ContributionProof to the ledger instead of setting a
  *     one-entry array in a shape the reader ignores. The append itself is shared with the shell door.
@@ -30,8 +31,6 @@ import { defineAppIam } from '../../../../services/iam/define-app-iam.js';
 import type { LevelDef } from '../../../../services/iam/model.js';
 import type { CommandDef } from '../../../../services/iam/app-commands.js';
 import { attachProofOverHttp } from '../../tool-call-defs-apps.js';
-
-const kebab = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
 export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -77,19 +76,17 @@ export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): vo
     app_ref: z.string().optional().describe('Related app owner/filename.html.'),
     share: z.boolean().optional().describe('true = publish platform-wide (public).'),
   }, annotationsFor('aimeat_appdev_pitfall_report'), async ({ model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share }) => {
-    const cat = kebab(category);
-    const slg = kebab(slug ?? title);
-    const appliesTo = (applies_to ?? []).map(a => a.toLowerCase());
-    const value: Record<string, unknown> = {
-      title, symptom, resolution, model: model.trim().toLowerCase(), category: cat, slug: slg,
-      applies_to: appliesTo, severity: severity ?? 'warn', status: status ?? 'active', updated: new Date().toISOString(),
+    // The node's own function behind POST /v1/appdev/pitfalls/learned: manifest, upsert into the
+    // identity that already holds the entry, and the verification stamp. This door used to write
+    // POST /v1/memory itself and got none of the three.
+    return out(await client.post('/v1/appdev/pitfalls/learned', {
+      model, category, title, symptom, resolution,
+      ...(slug ? { slug } : {}),
+      ...(applies_to ? { applies_to } : {}),
+      ...(severity ? { severity } : {}),
+      ...(status ? { status } : {}),
       ...(app_ref ? { app_ref } : {}),
-    };
-    return out(await client.post('/v1/memory', {
-      key: `packages/appdev-pitfalls/${cat}/${slg}`,
-      value,
-      visibility: share === true ? 'public' : 'owner',
-      tags: ['knowledge-entry', 'pitfall', `model:${model.trim().toLowerCase()}`, ...appliesTo.map(a => `applies:${a}`)],
+      ...(share !== undefined ? { share } : {}),
     }));
   });
 

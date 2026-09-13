@@ -623,28 +623,26 @@ export const appTools: ConnectCliToolDefinition[] = [
             share: { type: 'boolean', description: 'true = publish platform-wide (public).' },
         },
         handler: ({ client }, input) => {
-            const kebab = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-            const model = requiredString(input, 'model').trim().toLowerCase();
-            const category = kebab(requiredString(input, 'category'));
-            const title = requiredString(input, 'title');
-            const slug = (optionalString(input, 'slug') ?? title).toLowerCase();
-            const finalSlug = kebab(slug);
-            const appliesTo = (optionalArray(input, 'applies_to') ?? []).map(a => String(a).toLowerCase());
-            const now = new Date().toISOString();
-            const share = optionalBoolean(input, 'share');
-            const value: JsonObject = {
-                title, symptom: requiredString(input, 'symptom'), resolution: requiredString(input, 'resolution'),
-                model, category, slug: finalSlug, applies_to: appliesTo,
-                severity: optionalString(input, 'severity') ?? 'warn', status: optionalString(input, 'status') ?? 'active',
-                updated: now,
+            // POST /v1/appdev/pitfalls/learned runs the node MCP tool's own function. This door wrote
+            // POST /v1/memory itself until 2026-09-13: no manifest line, no `created`, no
+            // verification stamp, and a second copy under this agent's namespace whenever another of
+            // the owner's identities already held the entry.
+            const body: JsonObject = {
+                model: requiredString(input, 'model'),
+                category: requiredString(input, 'category'),
+                title: requiredString(input, 'title'),
+                symptom: requiredString(input, 'symptom'),
+                resolution: requiredString(input, 'resolution'),
             };
-            const appRef = optionalString(input, 'app_ref'); if (appRef) value.app_ref = appRef;
-            return client.post('/v1/memory', {
-                key: `packages/appdev-pitfalls/${category}/${finalSlug}`,
-                value,
-                visibility: share === true ? 'public' : 'owner',
-                tags: ['knowledge-entry', 'pitfall', `model:${model}`, ...appliesTo.map(a => `applies:${a}`)],
-            });
+            for (const field of ['slug', 'severity', 'status', 'app_ref'] as const) {
+                const v = optionalString(input, field);
+                if (v) body[field] = v;
+            }
+            const appliesTo = optionalArray(input, 'applies_to');
+            if (appliesTo) body.applies_to = appliesTo.map(a => String(a));
+            const share = optionalBoolean(input, 'share');
+            if (share !== undefined) body.share = share;
+            return client.post('/v1/appdev/pitfalls/learned', body);
         },
     },
     {

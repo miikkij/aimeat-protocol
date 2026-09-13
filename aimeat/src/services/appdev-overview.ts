@@ -200,6 +200,7 @@ export async function buildAppdevOverview(
             items: page.pitfalls.map(e => ({
                 key: e.key, title: e.title, category: e.category ?? null, model: e.model ?? null,
                 severity: e.severity, status: e.status, shared: e.shared, source: e.source,
+                verified_at: e.verified_at ?? null, verified_version: e.verified_version ?? null,
                 // A shared entry lives under another identity, and its body is read by naming it.
                 ...(e.source === 'shared' ? { owner: e.owner } : {}),
                 ...(model ? { same_model: e.model === model } : {}),

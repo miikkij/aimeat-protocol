@@ -10,7 +10,9 @@
  *   v1.2.0 — 2026-09-13 — +the overview's learned section under ?model=: every active entry the
  *     caller can read (own and other owners' shared), critical first, the named model's entries
  *     first inside a severity, a private entry of another owner never; the drill-down names a door
- *     that can open an entry.
+ *     that can open an entry. +POST /learned reports and upserts with a verification stamp, PATCH
+ *     verified re-checks without changing `updated`, cross-owner 404; every active curated entry
+ *     carries verifiedAt/verifiedVersion.
  *   v1.1.0 — 2026-09-03 — +the learned list as a page: paging, status default, severity/model/
  *     category/shared/q filters, scope vs filtered facets, severity sort, the community count and
  *     cross-owner isolation on the paged door (AppDev page, poster face).
@@ -354,6 +356,56 @@ await test('overview learned pitfalls: ?model= orders and never hides; shared en
         const { status: d } = await json(`/v1/appdev/pitfalls/learned/data/${slug}`, { method: 'DELETE', headers: { Authorization: `Bearer ${tokenB}` } });
         assert(d === 200, `cleanup ${slug}: ${d}`);
     }
+});
+
+// ── Reporting over REST, and the verification stamp every report and re-check writes ──
+
+await test('learned KB REST: POST reports and stamps verification; PATCH verified re-checks without touching the words', async () => {
+    const a = { Authorization: `Bearer ${tokenA}` };
+    const body = {
+        model: 'Kimi-K2.7-Code', category: 'data', slug: 'rest-report', title: 'Reported over REST',
+        symptom: 'a thing a builder observed', resolution: 'the better way to do it', applies_to: ['app'],
+    };
+    const first = await json('/v1/appdev/pitfalls/learned', { method: 'POST', headers: a, body: JSON.stringify(body) });
+    assert(first.status === 201, `first report ${first.status}: ${JSON.stringify(first.body)}`);
+    assert(first.body.data.key === 'packages/appdev-pitfalls/data/rest-report' && first.body.data.visibility === 'owner', `report shape: ${JSON.stringify(first.body.data)}`);
+    assert(typeof first.body.data.verified_at === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(first.body.data.verified_at), 'no verified_at on a report');
+    assert(typeof first.body.data.verified_version === 'string' && /^\d+\.\d+\.\d+/.test(first.body.data.verified_version), `verified_version: ${first.body.data.verified_version}`);
+
+    const again = await json('/v1/appdev/pitfalls/learned', { method: 'POST', headers: a, body: JSON.stringify({ ...body, title: 'Reported over REST, reworded' }) });
+    assert(again.status === 200 && again.body.data.updated === true && again.body.data.version === 2, `upsert: ${again.status} ${JSON.stringify(again.body.data)}`);
+
+    const { body: listed } = await json('/v1/appdev/pitfalls/learned?q=rest-report&status=all', { headers: a });
+    const rows = listed.data.pitfalls.filter((p: any) => p.slug === 'rest-report');
+    assert(rows.length === 1, `one entry expected after two reports, got ${rows.length}`);
+    assert(rows[0].title === 'Reported over REST, reworded' && rows[0].model === 'kimi-k2.7-code', `row: ${JSON.stringify(rows[0])}`);
+    const wordsUpdated = rows[0].updated;
+
+    await new Promise(r => setTimeout(r, 20));
+    const recheck = await json('/v1/appdev/pitfalls/learned/data/rest-report', { method: 'PATCH', headers: a, body: JSON.stringify({ verified: true }) });
+    assert(recheck.status === 200, `PATCH verified ${recheck.status}: ${JSON.stringify(recheck.body)}`);
+    const p = recheck.body.data.pitfall;
+    assert(p.verified_at > again.body.data.verified_at, `re-check did not move verified_at: ${p.verified_at} vs ${again.body.data.verified_at}`);
+    assert(p.updated === wordsUpdated, 'a re-check changed the entry\'s updated date, which is about its words');
+
+    const missing = await json('/v1/appdev/pitfalls/learned', { method: 'POST', headers: a, body: JSON.stringify({ category: 'data', title: 'no model' }) });
+    assert(missing.status === 400, `a report without model/symptom/resolution: ${missing.status}`);
+    const anon = await json('/v1/appdev/pitfalls/learned', { method: 'POST', body: JSON.stringify(body) });
+    assert(anon.status === 401, `anonymous report: ${anon.status}`);
+
+    // B cannot re-check A's entry.
+    const bCheck = await json('/v1/appdev/pitfalls/learned/data/rest-report', { method: 'PATCH', headers: { Authorization: `Bearer ${tokenB}` }, body: JSON.stringify({ verified: true }) });
+    assert(bCheck.status === 404, `B re-checked A's entry: ${bCheck.status}`);
+
+    const del = await json('/v1/appdev/pitfalls/learned/data/rest-report', { method: 'DELETE', headers: a });
+    assert(del.status === 200, `cleanup ${del.status}`);
+});
+
+await test('curated registry: every active entry says when it was last checked and on which version', async () => {
+    const { status, body } = await json('/v1/appdev/pitfalls?limit=100');
+    assert(status === 200, `curated ${status}`);
+    const unchecked = body.data.pitfalls.filter((p: any) => !p.verifiedAt || !p.verifiedVersion).map((p: any) => p.id);
+    assert(unchecked.length === 0, `curated entries with no verification: ${unchecked.join(', ')}`);
 });
 
 await test('templates REST: seed manifest → list/get with source app → cross-owner 404 → DELETE', async () => {

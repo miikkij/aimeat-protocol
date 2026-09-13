@@ -15,7 +15,8 @@
  * @version-history
  *   v1.3.0 -- 2026-09-13 -- filterPitfalls() takes preferModel: ordering inside a severity class,
  *     never a filter. The research overview now builds its learned section from this step instead of
- *     keeping only the entries the caller's own model had written.
+ *     keeping only the entries the caller's own model had written. A learned entry carries
+ *     `verified_at` / `verified_version` (verificationStamp()); setPitfallFlags() records a re-check.
  *   v1.2.0 -- 2026-09-03 -- filterPitfalls() and pitfallFacets(): the filter, sort, facet and page
  *     step the MCP list tool had inline, now shared with the REST route through
  *     queryLearnedPitfalls() (AppDev page, poster face). The page used to fetch every entry with
@@ -34,6 +35,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
+import { writeMemoryRecord } from './memory-write.js';
 
 export const PITFALL_PACKAGE_ID = 'appdev-pitfalls';
 export const PITFALL_PREFIX = `packages/${PITFALL_PACKAGE_ID}/`;
@@ -54,6 +56,14 @@ export interface LearnedPitfallValue {
     reported_by: string;
     created: string;
     updated: string;
+    /** When this entry was last checked against the platform, and the node version it was checked on. */
+    verified_at?: string;
+    verified_version?: string;
+}
+
+/** The stamp a report or an explicit re-check writes: now, on this node's software version. */
+export function verificationStamp(version: string, at: Date = new Date()): { verified_at: string; verified_version: string } {
+    return { verified_at: at.toISOString(), verified_version: version };
 }
 
 export function slugifyKb(s: string): string {
@@ -184,6 +194,8 @@ function toEntry(rec: MemoryRecord, source: 'own' | 'shared'): LearnedPitfallEnt
         status: v?.status ?? 'active',
         app_ref: v?.app_ref,
         updated: v?.updated ?? rec.updatedAt,
+        verified_at: v?.verified_at,
+        verified_version: v?.verified_version,
     };
 }
 
@@ -244,6 +256,8 @@ export interface PitfallLike {
     shared?: boolean;
     source?: string;
     app_ref?: string;
+    verified_at?: string | null;
+    verified_version?: string | null;
 }
 
 export interface PitfallListQuery {
@@ -355,11 +369,15 @@ export async function queryLearnedPitfalls(
     return { ...filterPitfalls(scope, query), community: shared.length };
 }
 
-/** Toggle the share (visibility) and/or status flags on one of the caller's own entries. */
+/**
+ * Toggle the share (visibility) and/or status flags on one of the caller's own entries, and/or
+ * record that it was checked again (`verified`: the node's own version and now). A re-check changes
+ * no words, so it leaves `updated` alone.
+ */
 export async function setPitfallFlags(
     storage: Storage, config: AimeatConfig, callerGaii: string,
     category: string, slug: string,
-    flags: { share?: boolean; status?: 'active' | 'outdated' },
+    flags: { share?: boolean; status?: 'active' | 'outdated'; verified?: { version: string } },
 ): Promise<LearnedPitfallEntry | null> {
     const key = pitfallEntryKey(category, slug);
     const existing = await findOwnEntry(storage, config, callerGaii, key);
@@ -370,6 +388,7 @@ export async function setPitfallFlags(
         value.status = flags.status;
         value.updated = now;
     }
+    if (flags.verified) Object.assign(value, verificationStamp(flags.verified.version));
     const visibility = flags.share === undefined
         ? existing.visibility
         : flags.share ? 'public' : 'owner';
@@ -382,6 +401,87 @@ export async function setPitfallFlags(
     };
     await storage.setMemory(updated);
     return toEntry(updated, 'own');
+}
+
+export interface PitfallReportInput {
+    model: string;
+    category: string;
+    title: string;
+    symptom: string;
+    resolution: string;
+    slug?: string;
+    applies_to?: string[];
+    severity?: 'info' | 'warn' | 'critical';
+    status?: 'active' | 'outdated';
+    app_ref?: string;
+    share?: boolean;
+}
+
+export type PitfallReportResult =
+    | { ok: true; key: string; category: string; slug: string; updated: boolean; version: number; visibility: string; verified_at: string; verified_version: string }
+    | { ok: false; status: number; code: string; message: string };
+
+/**
+ * Report (upsert) one learned pitfall: the ONE implementation behind the node's MCP tool, POST
+ * /v1/appdev/pitfalls/learned and, through that route, both connector doors. The connector doors
+ * used to write POST /v1/memory themselves, which skipped the manifest, lost `created` and
+ * `reported_by`, and wrote under the connector agent's own namespace even when the entry already
+ * lived under another of the owner's identities, where it then shadowed the original.
+ *
+ * Every report stamps `verified_at` / `verified_version`: a report is a claim about this node as it
+ * is now, so re-reporting an entry is how it is re-verified.
+ */
+export async function reportLearnedPitfall(
+    storage: Storage, config: AimeatConfig,
+    who: { principal: string; scopes: string[]; roles: string[] },
+    input: PitfallReportInput, softwareVersion: string,
+): Promise<PitfallReportResult> {
+    const cat = slugifyKb(input.category);
+    const slg = input.slug ? input.slug.toLowerCase() : slugifyKb(input.title);
+    if (!PITFALL_SLUG_RE.test(cat) || !PITFALL_SLUG_RE.test(slg)) {
+        return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'Invalid category/slug — use kebab-case (a-z, 0-9, dashes)' };
+    }
+    const key = pitfallEntryKey(cat, slg);
+    const now = new Date();
+    const existing = await findOwnEntry(storage, config, who.principal, key);
+    const normModel = input.model.trim().toLowerCase();
+    const stamp = verificationStamp(softwareVersion, now);
+    const value: LearnedPitfallValue = {
+        title: input.title, symptom: input.symptom, resolution: input.resolution,
+        model: normModel,
+        category: cat, slug: slg,
+        applies_to: (input.applies_to ?? []).map(a => a.toLowerCase()),
+        severity: input.severity ?? 'warn',
+        status: input.status ?? 'active',
+        ...(input.app_ref ? { app_ref: input.app_ref } : {}),
+        reported_by: who.principal,
+        created: (existing?.value as LearnedPitfallValue | null)?.created ?? now.toISOString(),
+        updated: now.toISOString(),
+        ...stamp,
+    };
+    const visibility = input.share === true ? 'public' : input.share === false ? 'owner' : (existing?.visibility ?? 'owner');
+    const tags = ['knowledge-entry', 'pitfall', `model:${normModel}`, ...value.applies_to.map(a => `applies:${a}`)];
+
+    // The entry is a memory record, so it answers to memory's rules: the archive guard, the key and
+    // value-size ceilings, the byte quota. Written into whichever of the owner's identities already
+    // holds the key, so an update never forks a second copy.
+    const written = await writeMemoryRecord({ storage, config }, {
+        principal: who.principal,
+        targetGaii: existing?.ownerGaii ?? who.principal,
+        scopes: who.scopes,
+        roles: who.roles,
+    }, {
+        key, value, visibility: visibility as MemoryRecord['visibility'], tags,
+        pipeline: 'appdev.pitfall_report',
+        ownerScoped: true,
+    });
+    if (!written.ok) return { ok: false, status: written.status, code: written.code, message: written.message };
+    await upsertPitfallManifest(storage, config, who.principal, key, input.title);
+    return {
+        ok: true, key, category: cat, slug: slg,
+        updated: !!existing, version: (existing?.version ?? 0) + 1, visibility,
+        ...stamp,
+    };
 }
 
 /** Delete one of the caller's own entries (record + manifest ref). */
