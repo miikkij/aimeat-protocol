@@ -8,6 +8,7 @@
  *   the numeral strip, the doors, the slab and the dashed box come from admin.css and
  *   organism.css; only what this page adds lives here. Every value is a theme.css token.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Own existing template-list and unchanged-hint spacing.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 
@@ -50,6 +51,8 @@
 .adm-em-box-row { display: flex; justify-content: space-between; gap: 12px; min-width: 0; font-size: .84rem; font-weight: 700; padding: .3rem 0; }
 .adm-em-box-row span { font-family: var(--font-mono); font-size: .76rem; font-weight: 400; color: var(--text-dim); text-align: right; overflow-wrap: anywhere; }
 .adm-em-hint { margin: .55rem 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-em-hint--flush { margin: 0; }
+.adm-em-templates { margin-top: 18px; }
 
 /* ── What the node sends automatically ─────────────────────────────────────────────────────── */
 .adm-em-row { display: grid; grid-template-columns: minmax(0, 1fr) 300px 150px 92px; gap: 0 18px; align-items: baseline; padding: .58rem 0; border-bottom: 1px solid var(--border); }

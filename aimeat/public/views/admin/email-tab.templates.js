@@ -14,6 +14,7 @@
  *   - buildAiPrompt(tpl, locale) — the paste for the operator's own AI, tags kept intact
  *
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose the shared template heading and external spacing.
  *   v2.0.0 — 2026-09-12 — The poster face, and the plain statement that a saved template does not
  *     reach a recipient yet. The AI prompt names the third shipped language instead of calling
  *     everything that is not Finnish English.
@@ -150,7 +151,7 @@ function Editor({ tpl, locale, onSave, onReset }) {
         ${tpl.isCustom && html`
           <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${reset}>${E('tpl.backToBuiltIn')}</button>`}
         ${said && html`<span class="adm-em-said ${said.ok ? 'is-ok' : 'is-bad'}">${said.text}</span>`}
-        ${!said && !changed && html`<span class="adm-em-hint" style="margin:0">${E('tpl.noChanges')}</span>`}
+        ${!said && !changed && html`<span class="adm-em-hint adm-em-hint--flush">${E('tpl.noChanges')}</span>`}
       </div>
       <p class="adm-em-hint">${E('tpl.aiHint')}</p>
       <${ConfirmUI} />
@@ -209,7 +210,7 @@ export default function Templates({ locale }) {
   return html`
     <section class="og-sec">
       <div class="og-sec-h">
-        <h2>${E('tpl.title')}<small>05</small></h2>
+        <h2 class="poster-section-title">${E('tpl.title')}<small>05</small></h2>
         <div class="og-doors">
           ${LOCALES.map(l => html`
             <button type="button" class="og-door og-door--quiet ${l === lang ? 'og-door--on' : ''}"
@@ -221,7 +222,7 @@ export default function Templates({ locale }) {
         <b>${E('tpl.warnLead')}</b> ${E('tpl.warn')}
       </div>
 
-      <div style="margin-top: 18px">
+      <div class="adm-em-templates">
         ${(list || []).map(tpl => html`
           <button type="button" class="adm-em-fold ${open === tpl.id ? 'is-open' : ''}" onClick=${() => setOpen(open === tpl.id ? null : tpl.id)}>
             <i>${tpl.id}</i><b>${E('kind.' + tpl.id)}</b>
