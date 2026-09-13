@@ -5,10 +5,12 @@
  *   table, the master output node + volume/mute control, the active-notes registry (for stop), and
  *   the shared instrument / sample / custom-synth registries. Imported by instruments.js (which
  *   populates the built-ins) and index.js (soundboard/samples/custom-synth/realtime/public API).
- * @structure ctx() · noteToFreq() · masterNode() · master · registerActive()/stopActive() ·
+ * @structure ctx() · noteToFreq() · masterNode() · master · registerActive()/rekeyActive()/stopActive() ·
  *   instruments/sampleBuffers/customSynths registries.
  * @usage import { ctx, noteToFreq, masterNode, registerActive } from './core.js';
  * @version-history
+ *   v1.1.0 — 2026-09-13 — rekeyActive(): a note played through a stand-in voice is filed under the
+ *     instrument the caller named, so stop() on that name reaches it.
  *   v1.0.0 — 2026-07-19 — Extracted from lib-audio.ts + audio-lib-part2.ts (SDK-libs migration Phase 2).
  */
 
@@ -88,6 +90,24 @@ export function registerActive(instrument, note, nodes, stopFn) {
   var key = instrument + ':' + (note || '*');
   if (_active[key]) _active[key].stop();
   _active[key] = { nodes: nodes, stop: stopFn };
+}
+
+/**
+ * File a playing note under another instrument name. A sample-only instrument played before its bank
+ * has loaded sounds through a built-in voice, which registers the note under ITS name; moving the
+ * entry is what lets `stop('strings', 'C4')` reach the voice that is actually sounding.
+ * @param {string} fromInstrument  The name the voice registered under (e.g. 'synth').
+ * @param {string} toInstrument    The name the caller asked for (e.g. 'strings').
+ * @param {string} [note]
+ */
+export function rekeyActive(fromInstrument, toInstrument, note) {
+  var from = fromInstrument + ':' + (note || '*');
+  var entry = _active[from];
+  if (!entry) return;
+  delete _active[from];
+  var to = toInstrument + ':' + (note || '*');
+  if (_active[to]) _active[to].stop();
+  _active[to] = entry;
 }
 
 export function stopActive(instrument, note) {

@@ -13,6 +13,11 @@
  * @tokens timeline --ak-timeline-dot · --ak-timeline-rail · --ak-timeline-gap · --ak-timeline-indent
  * @fork timeline Copy .ak-timeline* out of content.css; the rail is one ::before and the dot is one span, and you give up the keyed line so every event re-enters on every change.
  * @version-history
+ *   v0.53.2 — 2026-09-13 — A MOMENT IS FORMATTED ONLY WHEN IT IS ONE. The kit handed every string
+ *     to the browser's date reader, which turned an app's own `07/09, 04:10` into 9 July 2001 with
+ *     no warning. A Date, a number and an ISO 8601 or HTTP-style string are formatted as before;
+ *     any other string is printed as given. The `when` slot now stops the kit's own formatting
+ *     from running at all, and an event with no `ts` draws no moment line instead of "undefined".
  *   v0.51.0 — 2026-09-05 — THE EVENT TAKES WHAT THE APP GIVES IT: nine named parts, `extra` and
  *     `aside` left empty for a reference and a right-hand figure, `parts.item` for the whole
  *     event, two variants and four tokens (the dot, the rail's drop, the indent, the gap).
@@ -29,24 +34,36 @@ import { keyedRows } from './arrive.js';
 import { t } from './i18n.js';
 import { calendar, dateTime } from '../_core/format.js';
 import { emptyState } from './state.js';
-import { partEl, slotInto, applyVariant, partValue, fillPart } from './parts-model.js';
+import { partEl, slotInto, applyVariant, partValue, fillPart, hasPart } from './parts-model.js';
 
 /**
  * @typedef {object} TimelineItem
  * @property {string} id
- * @property {string|number|Date} ts
+ * @property {string|number|Date} [ts]  a Date, epoch milliseconds or an ISO 8601 string is
+ *   formatted for the reader; any other string is the app's own wording and is printed as given
  * @property {string} title
  * @property {string} [sub]
  * @property {'ok'|'warn'|'err'|'plain'} [tone]
  */
 
+/**
+ * A string the kit may read as a moment: ISO 8601 with its year first, or the HTTP, RSS and
+ * Date#toString forms, which name their month and carry a four-digit year. Nothing else, because
+ * the browser's date reader accepts far more than that and guesses: `07/09, 04:10` comes back as
+ * 9 July 2001, and `07/09/2026` is month-first whatever its writer meant.
+ */
+const MACHINE_MOMENT = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}|^(?:[A-Za-z]{3},? )?\d{1,2} [A-Za-z]{3} \d{4}\b|^[A-Za-z]{3} [A-Za-z]{3} \d{2} \d{4}\b/;
+
 /** Default moment wording: date + time in the viewer's locale — except DATE-ONLY input, which
  *  renders as a date. A bare "2026-08-26" parsed as a moment lands on midnight UTC and told
- *  every reader something happened at 3:00 AM (the first design review's finding). */
+ *  every reader something happened at 3:00 AM (the first design review's finding). A string that
+ *  is not a machine moment is printed as written, and an absent moment draws no line. */
 function fmtTs(ts) {
+  if (ts == null || ts === '') return null;
   // The distinction this file found on its own is what calendar() is for: a bare date is a day on
   // a calendar and must not be re-read in anyone's zone; everything else is a moment and is.
   if (typeof ts === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ts)) return calendar(ts, { dateStyle: 'medium' });
+  if (typeof ts === 'string' && !MACHINE_MOMENT.test(ts)) return ts;
   const d = ts instanceof Date ? ts : new Date(ts);
   if (Number.isNaN(d.getTime())) return String(ts);
   return dateTime(d, { dateStyle: 'medium', timeStyle: 'short' });
@@ -78,7 +95,9 @@ export function timeline(spec) {
     if (whole !== undefined) { fillPart(node, whole); return; }
     node.appendChild(partEl('span', 'ak-timeline__dot ak-timeline__dot--' + (item.tone || 'plain'), 'dot', { 'aria-hidden': 'true' }));
     const body = partEl('div', 'ak-timeline__body', 'body');
-    slotInto(body, spec, 'when', fmt(item.ts), { cls: 'ak-timeline__when', args: [item] });
+    // The kit's wording is worked out only when no `when` slot replaces it, so an app drawing its
+    // own moment can leave `ts` off and its own `format` is never called on the item.
+    slotInto(body, spec, 'when', hasPart(spec, 'when') ? null : fmt(item.ts), { cls: 'ak-timeline__when', args: [item] });
     slotInto(body, spec, 'title', item.title, { cls: 'ak-timeline__title', args: [item] });
     slotInto(body, spec, 'sub', item.sub == null ? null : item.sub, { cls: 'ak-timeline__sub', args: [item] });
     slotInto(body, spec, 'extra', null, { cls: 'ak-timeline__extra', args: [item] });

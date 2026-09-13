@@ -188,7 +188,7 @@ entry: index.html
     async function boot() {
       // The control has to be on the screen that asks for it. Telling somebody to sign in while
       // rendering nothing they can press is the same as telling them nothing.
-      AIMEAT.auth.mountLoginButton('#login', { compactPill: true });
+      AIMEAT.auth.mountLoginButton('#login', { compact: true });
       AIMEAT.auth.on('login', function () { started = false; start(); });
       session = await AIMEAT.auth.login().catch(function () { return null; });
       if (!session) { say('<p class="opacity-70">Sign in to run your shop — the button is at the top right.</p>'); return; }

@@ -17,6 +17,10 @@
  *   v1.3.0 — 2026-08-12 — aimeat-input: the platform's first answer for touch INPUT (the mobile
  *     rules covered layout only), with a keyboard equivalent per gesture so one implementation
  *     serves phone and desktop.
+ *   v1.4.0 — 2026-09-13 — Three bundled packs fixed from appdev pitfalls, each entry's version moved to
+ *     its YAML's (surface and ui-motion had already drifted a patch behind it): aimeat-charts 1.1.3
+ *     draws on a canvas id, aimeat-surface 1.2.0 reads "12,000.00" as twelve thousand, aimeat-ui-motion
+ *     1.0.2 no longer leaves a staggered and then highlighted element invisible.
  */
 import type { LibraryPack } from '../library-packs.js';
 
@@ -175,12 +179,14 @@ export const CORTEX_PACKS: LibraryPack[] = [
       '<script src="{{BASE_URL}}/v1/cortex/aimeat-charts/libs/aimeat-charts.js"></script>',
     ],
     requires: ['chartjs'],
-    version: '1.1.2',
+    version: '1.1.3',
     license: 'MIT',
     apiSurface: 'AIMEAT.charts',
     aiDoc: [
       'Include BOTH script tags (chartjs@4 first, then the cortex lib).',
       'AIMEAT.charts.ChartBuilder({elementId, data, type, options?}) — renders a chart from inline data.',
+      '  elementId: the id of a container (the lib builds the canvas inside it) or of a <canvas> (drawn on',
+      '  directly, replacing a chart it already holds). An error shows inside the container, or after the canvas.',
       "  data: {labels: string[], datasets: [{label, data: number[], backgroundColor?, borderColor?}]}",
       "  type: 'bar'|'line'|'pie'|'doughnut'|'radar'|'scatter'|'bubble'",
       'AIMEAT.charts.ChartPanel({elementId, chartKey, nodeUrl, token?}) — reads a chart:* memory key and renders it.',
@@ -192,7 +198,9 @@ export const CORTEX_PACKS: LibraryPack[] = [
       'AIMEAT.charts.palette(host?) — the colours a chart would draw with right now.',
       'For direct Chart.js access (custom plugins, mixed charts) use the chartjs pack instead — window.Chart is loaded by the same file.',
     ].join('\n'),
-    changelog: [],
+    changelog: [
+      { version: '1.1.3', date: '2026-09-13', summary: 'elementId may name a <canvas>. A canvas id used to nest a second canvas inside it and render a blank box with no error; the chart is now drawn on that canvas, and errors show beside it.' },
+    ],
     tierHint: 'T2',
     interviewTriggers: ['chart', 'graph', 'dashboard', 'kaavio', 'diagrammi', 'visualisointi'],
     sizeEstimate: '~8KB (+204KB chartjs)',
@@ -236,7 +244,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     url: '/v1/cortex/aimeat-surface/libs/aimeat-surface.js',
     include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-surface/libs/aimeat-surface.js"></script>'],
     requires: ['aimeat-ui-viewers', 'aimeat-ui-motion', 'aimeat-charts'],
-    version: '1.1.0',
+    version: '1.2.0',
     license: 'MIT',
     apiSurface: 'AIMEAT.surface',
     aiDoc: [
@@ -262,11 +270,15 @@ export const CORTEX_PACKS: LibraryPack[] = [
       'pinned. That is the difference between a chart of the right column and a table of plumbing.',
       'writeBrief() runs after resolve() on purpose, so a brief only ever sees fetched rows.',
       'The engine persists NOTHING — store specs in an app memory key, a workspace record or a board.',
+      'AMOUNTS AS TEXT: num(v) and agg() read "12,000.00", "1.234,56" and "1 500 000" as their writer meant;',
+      'an ambiguous cell like "1,000" counts as 0, and AIMEAT.surface.parseAmount(v) returns null for it so a',
+      'host can show how many rows it could not read. Same parser as AIMEAT.commerce.parseAmount.',
       'Load aimeat-ui-viewers + aimeat-ui-motion + aimeat-charts (+ chartjs@4) for full fidelity;',
       'every pack call degrades gracefully to plain DOM if one is missing.',
     ].join('\n'),
     changelog: [
       { version: '1.0.0', date: '2026-07-25', summary: 'Initial release (TARGET-051). Engine lifted out of the TILA app v0.2.6 behaviour-for-behaviour, including every graceful fallback. New here: pluggable data sources (TILA had its PRH company source hardwired into the engine and into the composer prompt), injected locale/strings/appId instead of closed-over app state, and an onPick callback so a host no longer wires the options button by hand.' },
+      { version: '1.2.0', date: '2026-09-13', summary: 'A "12,000.00" cell sums as 12000: num() replaced the first comma and summed it as 12. It reads through parseAmount now (also exposed), and an ambiguous "1,000" counts as 0 instead of as a guess.' },
     ],
     tierHint: 'T2',
     interviewTriggers: ['surface', 'dashboard', 'panel', 'living surface', 'ask my data', 'pinta', 'näkymä', 'koostenäkymä'],
@@ -472,7 +484,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     url: '/v1/cortex/aimeat-ui-motion/libs/aimeat-ui-motion.js',
     include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-ui-motion/libs/aimeat-ui-motion.js"></script>'],
     requires: [],
-    version: '1.0.0',
+    version: '1.0.2',
     license: 'MIT',
     apiSurface: 'AIMEAT.ui.motion',
     aiDoc: [
@@ -489,9 +501,12 @@ export const CORTEX_PACKS: LibraryPack[] = [
       'pulse(el), glow(el, color?), confettiTick(el) — micro-bling for live updates + success moments; use',
       '  sparingly (one confetti per user action, not per row).',
       'highlightRow(el) — brief background flash for an SSE-updated row instead of a full repaint.',
+      'Primitives may share an element: a highlightRow or pulse on a card staggerIn is still bringing in skips',
+      '  the rest of that entrance and the content stays visible.',
     ].join('\n'),
     changelog: [
       { version: '1.0.0', date: '2026-07-16', summary: 'Initial release: countUp, statTiles (+sparkline, trend badge), skeleton/unskeleton, staggerIn, viewTransition (View Transitions API + fallback), pulse/glow/confettiTick/highlightRow.' },
+      { version: '1.0.2', date: '2026-09-13', summary: 'staggerIn then highlightRow or pulse on the same element left it at opacity 0 for good. The entrance now hides only inside its keyframes, and staggerIn and highlightRow take their classes off when their animations end.' },
     ],
     tierHint: 'T2',
     interviewTriggers: ['animation', 'dashboard', 'kpi', 'stat', 'polish', 'skeleton', 'transition'],

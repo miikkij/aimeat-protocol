@@ -707,7 +707,7 @@
       file.type || void 0
     });
     const owner = written && (written.owner_gaii || written.ownerGaii);
-    const url = written && written.embed_url || (owner ? publicAddress(owner, written.key || key) : "");
+    const url = written && written.versioned_url || written && written.embed_url || (owner ? publicAddress(owner, written.key || key) : "");
     if (!url) {
       refuse('the upload of "' + key + '" answered without an address. Nothing was written to the manifest; check the file in storage before trying again.');
     }

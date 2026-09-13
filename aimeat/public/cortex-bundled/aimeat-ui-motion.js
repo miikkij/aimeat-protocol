@@ -17,6 +17,18 @@
  *     M.unskeleton('#table', renderedHtml); M.staggerIn('#table');
  *     await M.viewTransition('#view', function () { renderNextView(); });
  *   </script>
+ *
+ * @version-history
+ *   v1.0.2 — 2026-09-13 — Two primitives on one element leave it visible. .aum-stagger-item held a
+ *     static opacity:0 that only its own animation lifted, and highlightRow/pulse replace that
+ *     animation, so a staggered card that was then highlighted stayed invisible for good (appdev
+ *     pitfall motion-primitives-collide-invisible-content). The hidden start state now lives in the
+ *     keyframes, the entrance class comes off when the entrance ends, a later highlight or pulse takes
+ *     a waiting entrance off, and the highlight class comes off when its flash ends. Measured in
+ *     Chromium: staggerIn + highlightRow on one element, opacity 0 before and 1 after.
+ *   v1.0.1 — 2026-09-12 — A rolling counter reads the person's own number format when aimeat-i18n is
+ *     installed.
+ *   v1.0.0 — 2026-07-16 — Initial.
  */
 (function (global) {
   'use strict';
@@ -38,9 +50,12 @@
     '.aum-skel-bar { height: 14px; flex: 1; }',
     '.aum-skel-bar::after, .aum-skel-avatar::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent); animation: aum-shimmer 1.4s infinite; }',
     '@keyframes aum-shimmer { to { transform: translateX(100%); } }',
-    // stagger entrance
-    '.aum-stagger-item { opacity: 0; transform: translateY(8px); animation: aum-enter 380ms cubic-bezier(.22,1,.36,1) forwards; }',
-    '@keyframes aum-enter { to { opacity: 1; transform: none; } }',
+    // stagger entrance. The hidden start state lives in the keyframes and `both` holds it through the
+    // delay; there is NO static opacity:0. Another class that sets the animation shorthand (highlight,
+    // pulse, or the app's own) replaces aum-enter, and with a static opacity:0 the element then stayed
+    // invisible for good. Now losing the animation loses the hiding with it.
+    '.aum-stagger-item { animation: aum-enter 380ms cubic-bezier(.22,1,.36,1) both; }',
+    '@keyframes aum-enter { from { opacity: 0; transform: translateY(8px); } }',
     // view transition fallback
     '.aum-view-leave { animation: aum-leave 140ms ease forwards; }',
     '.aum-view-enter { animation: aum-enter-view 220ms cubic-bezier(.22,1,.36,1); }',
@@ -70,7 +85,7 @@
     '@keyframes aum-confetti { to { transform: translate(var(--aum-dx), var(--aum-dy)) rotate(var(--aum-rot)); opacity: 0; } }',
     '@media (prefers-reduced-motion: reduce) {',
     '  .aum-skel-bar::after, .aum-skel-avatar::after { animation: none; }',
-    '  .aum-stagger-item { animation: none; opacity: 1; transform: none; }',
+    '  .aum-stagger-item { animation: none; }',
     '  .aum-view-leave, .aum-view-enter { animation: none; }',
     '  .aum-pulse, .aum-highlight { animation: none; }',
     '}',
@@ -212,6 +227,26 @@
   }
 
   /**
+   * Take a stagger entrance off an element: the class, the delay staggerIn wrote, and the listener.
+   * Called when the entrance has ended, and by any later primitive on the same element, which
+   * supersedes an entrance still waiting there. A class left behind would replay the entrance the
+   * moment the later animation finished.
+   */
+  function endEntrance(el) {
+    el.removeEventListener('animationend', onEntranceEnd);
+    el.removeEventListener('animationcancel', onEntranceEnd);
+    if (!el.classList.contains('aum-stagger-item')) return;
+    el.classList.remove('aum-stagger-item');
+    el.style.animationDelay = '';
+  }
+
+  /** animationend / animationcancel of the element's OWN entrance, not one bubbling from a child. */
+  function onEntranceEnd(ev) {
+    if (ev.target !== ev.currentTarget || ev.animationName !== 'aum-enter') return;
+    endEntrance(ev.currentTarget);
+  }
+
+  /**
    * Staggered entrance for a list's children after render.
    * opts: { selector? (default: direct children), delay=35 (ms between items), max=14 }
    */
@@ -225,10 +260,12 @@
     var max = opts.max != null ? opts.max : 14;
     for (var i = 0; i < items.length; i++) {
       var el = items[i];
-      el.classList.remove('aum-stagger-item');
+      endEntrance(el);
       if (i < max) {
         el.style.animationDelay = (i * delay) + 'ms';
         el.classList.add('aum-stagger-item');
+        el.addEventListener('animationend', onEntranceEnd);
+        el.addEventListener('animationcancel', onEntranceEnd);
       }
     }
   }
@@ -263,6 +300,7 @@
     el = resolveEl(el);
     if (!el) return function () {};
     injectCss();
+    endEntrance(el);
     el.classList.add('aum-pulse');
     return function () { el.classList.remove('aum-pulse'); };
   }
@@ -278,14 +316,23 @@
     setTimeout(function () { el.style.boxShadow = prev || ''; }, 720);
   }
 
+  /** The flash has ended: take its class off so it never sits on the element under a later animation. */
+  function onHighlightEnd(ev) {
+    if (ev.target !== ev.currentTarget || ev.animationName !== 'aum-highlight') return;
+    ev.currentTarget.classList.remove('aum-highlight');
+    ev.currentTarget.removeEventListener('animationend', onHighlightEnd);
+  }
+
   /** Brief background flash on an SSE-updated row — beats a full-table repaint. */
   function highlightRow(el) {
     el = resolveEl(el);
     if (!el) return;
     injectCss();
+    endEntrance(el);
     el.classList.remove('aum-highlight');
     void el.offsetWidth;
     el.classList.add('aum-highlight');
+    el.addEventListener('animationend', onHighlightEnd);
   }
 
   /** Small, tasteful success confetti burst anchored to an element. One per user action. */

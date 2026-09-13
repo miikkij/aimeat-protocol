@@ -9,10 +9,12 @@
  *   password, an optional display name, and — when this node's gate requires one (config prelude
  *   `emailRequired`) — the email, asked up front rather than demanded after a failed create.
  *   Social buttons sit outside both tabs because one provider button serves both.
- * @structure showLoginModal(opts, renderBtn) → { buildModalInner, wireModal, render, switchLang,
+ * @structure showLoginModal(opts, renderBtn, onClosed?) → { buildModalInner, wireModal, render, switchLang,
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.9.0 — 2026-09-13 — An optional third argument, called when the dialog leaves the page by any
+ *     road, so AIMEAT.auth.signIn() can settle with the session or with null when it is dismissed.
  *   v1.8.0 — 2026-09-04 — The passkey button, first in the sign-in tab (modal-passkey.js). Pressed
  *     with the name field empty it starts a discoverable ceremony and the person types nothing at
  *     all; absent on a browser without WebAuthn.
@@ -79,7 +81,7 @@ const HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-
 const RULE_MARKS = '<svg class="r-ok" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3"></path></svg>'
   + '<svg class="r-no" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="8" height="8"></rect></svg>';
 
-export function showLoginModal(opts, renderBtn) {
+export function showLoginModal(opts, renderBtn, onClosed) {
   var i = opts.i18n || {};
   var lang = currentModalLang();
   // Which of the two tabs is showing. One modal, two separate jobs: signing in needs an identifier
@@ -95,6 +97,13 @@ export function showLoginModal(opts, renderBtn) {
 
   const modal = document.createElement('div');
   modal.id = 'aimeat-modal';
+  // The opener may want to hear the dialog leave the page, however it leaves: the X, Cancel,
+  // Escape, the page behind, a finished sign-in, or a newer dialog replacing this one. Each of those
+  // calls modal.remove(), so that is the one place to listen (AIMEAT.auth.signIn settles on it).
+  if (typeof onClosed === 'function') {
+    var removeModal = modal.remove.bind(modal);
+    modal.remove = function () { removeModal(); onClosed(); };
+  }
 
   // Capture typed values so they survive a re-render (language change).
   function captureInputs() {

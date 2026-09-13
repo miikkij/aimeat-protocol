@@ -11,6 +11,9 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-storage.js"></script>
  *   await AIMEAT.storage.upload(file); await AIMEAT.storage.download('key');
  * @version-history
+ *   v1.2.0 — 2026-09-13 — viewUrl() reads a `<gaii>/<key>` reference as an owner and a key, the way
+ *     the server's parseFileRef does. It used to file the whole reference as a key under the
+ *     signed-in person, so a picture an agent had uploaded answered 404 for its own owner.
  *   v1.1.0 — 2026-08-17 — viewUrl(): a URL that loads in an <img> for a file that is not public.
  *     A browser sends no Authorization header for an image, so a private picture drew a broken icon
  *     even for its owner. Answers a presigned handle instead, and hands a public file back as-is.
@@ -82,9 +85,10 @@ const storage = {
    * even for the person who owns it. The node answers `?mode=handle` with a presigned, short-lived
    * address that carries its own permission, and that one loads anywhere.
    *
-   * Takes what a table actually holds: a full address, a `/v1/pub/...` path, or a bare key of the
-   * signed-in person's own. A public file is handed back unchanged, because it already works and a
-   * presigned URL for it would only add an expiry it does not need.
+   * Takes what a table actually holds: a full address, a `/v1/pub/...` path, a `<gaii>/<key>`
+   * reference (what the platform's own file tools return, an agent's upload included), or a bare
+   * key of the signed-in person's own. A public file is handed back unchanged, because it already
+   * works and a presigned URL for it would only add an expiry it does not need.
    *
    * The URL expires. Fetch it when you are about to show the picture, not when you load the page.
    */
@@ -104,8 +108,15 @@ const storage = {
     } else if (value.startsWith('/v1/pub/')) {
       path = value;
     } else {
-      path = '/v1/pub/' + encodeURIComponent(session.ghii || session.owner || '') + '/'
-        + value.split('/').map(encodeURIComponent).join('/');
+      // A `<gaii>/<key>` reference names its owner in the first segment: the shape ctx.files.write()
+      // and the agent file tools return, read with the same test as the server's parseFileRef (an
+      // `@`, or an `ext:` namespace). Anything else is a key of the signed-in person's own.
+      const slash = value.indexOf('/');
+      const head = slash > 0 ? value.slice(0, slash) : '';
+      const named = head.indexOf('@') !== -1 || head.startsWith('ext:');
+      const owner = named ? head : (session.ghii || session.owner || '');
+      const key = named ? value.slice(slash + 1) : value;
+      path = '/v1/pub/' + encodeURIComponent(owner) + '/' + key.split('/').map(encodeURIComponent).join('/');
     }
 
     // Not an AIMEAT file address at all: a picture on somebody's own site, left exactly as written.

@@ -13,6 +13,8 @@
  * @usage import { renderOffer } from './offer-page.js';
  * @version-history
  *   v1.0.0 — 2026-08-30 — Initial.
+ *   v1.0.1 — 2026-09-13 — The money hint reads the price through microsFromInput, the same parser the
+ *     save uses; its own first-comma replace left the hint off for "1,500.00".
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -51,7 +53,7 @@ function SellingEditor({ it, ctx }) {
     await ctx.saveBilling(it, { price, priceMoney: amt ? { amount: amt, currency: moneyCur } : null, visibility: vis });
     setSaving(false);
   };
-  const money = Number(String(moneyAmt).replace(',', '.')) > 0;
+  const money = microsFromInput(moneyAmt) !== null;
   return html`
     <div class="op-sell">
       <label class="op-field"><span class="og-label">${c('colVisibility')}</span>

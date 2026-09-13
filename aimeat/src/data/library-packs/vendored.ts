@@ -10,6 +10,9 @@
  * @structure VENDORED_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   2026-09-13 — realtime aiDoc: what the lib now replays ('joined') and queues (a broadcast sent
+ *     while the socket opens), and what it still does not (other frames before a handler exists).
+ *     Styling changelog: bridge 1.4.0, the [hidden] rule.
  *   v1.0.0 — 2026-07-16 — initial: styling bundle + chartjs + mermaid + three + realtime
  *     (mermaid/three promoted from invisible-vendored to first-class packs; Phase 1).
  *   v1.1.0 — 2026-07-16 — Wave 1 additions: p5 1.11.13 (LGPL-2.1, owner-approved), pixi 8.19.0
@@ -102,6 +105,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
       'the bridge keeps theme-correct; you do not write those yourself, the libs emit them.',
     ].join('\n'),
     changelog: [
+      { version: 'tailwind 4.3.3 · daisyui 5.7.22 · aimeat-theme 2.1.0 · bridge 1.4.0', date: '2026-09-13', summary: 'The hidden attribute hides again. daisyUI component classes (.card, .stats and the rest) set display, which beats the browser\'s own [hidden] rule, so an element carrying hidden stayed on screen until the Tailwind JIT had compiled its preflight, and for good on a page that loads daisyUI without the JIT. The bridge now carries that one rule itself, so it holds from first paint. No include-line change.' },
       { version: 'tailwind 4.3.1 · daisyui 5.5.23 · aimeat-theme 2.1.0 · bridge 1.3.0', date: '2026-07-25', summary: 'FIX a long-standing platform-wide layout bug: the bridge mapped --border to a COLOUR at :root for the cortex aui-* components, while daisyUI 5 uses the same name as a border WIDTH inside calc() on nearly every component — so badge/input paddings computed to 0 and toggles collapsed to slivers on every bridge-loading page since 2026-06-26. The colour is now scoped to aui-* elements (with a --border-w width restore for daisyUI nested inside them); daisyUI components render with their intended geometry again. Owner review round on the default palette: display face is Inter (Space Grotesk stays vendored but no palette uses it by default), secondary is slate steel (#45637A light / #9AB8D0 dark, full AA pairs) replacing the purple, and controls take the crisper 6px field / 4px selector shape.' },
       { version: 'tailwind 4.3.1 · daisyui 5.5.23 · aimeat-theme 2.0.0', date: '2026-07-25', summary: 'aimeat-theme.css becomes a theme SYSTEM: a data-palette axis orthogonal to data-theme, with five designed palettes (aimeat coral default + paper/circuit/contrast/mist), each defining BOTH modes plus its own display face, radii and border weight — all verified by the extended pnpm check:theme (primary-vs-surface, completeness and picker-registry sync added; nothing loosened). Real typography ships with the theme: self-hosted Inter/Space Grotesk/Fraunces/JetBrains Mono (OFL, latin-ext), body+headings+code wired automatically; plus type-scale (--text-hero/-title/-body/-fine), elevation (--elev-card/-raise/-pop) and motion (--motion-*, --ease-*) tokens. The login pill now carries the full control cluster: segmented language switch (no more blind cycling), segmented light/dark, and a palette picker with true-colour swatches; AIMEAT.auth.getPalette()/setPalette()/getPalettes() are new. Existing apps keep their exact colours by default (the aimeat palette is unchanged) and gain fonts + the cluster on next load. Additive — no include-line change.' },
       { version: 'tailwind 4.3.1 · daisyui 5.5.23 · aimeat-theme 1.0.0', date: '2026-07-25', summary: 'NEW /lib/aimeat-theme.css: the AIMEAT daisyUI theme. --color-primary is now the house coral instead of daisyUI indigo, dark gets a designed surface ramp (daisyUI dark separated page from card by 1.05:1, so cards were invisible), and every semantic colour gets a `-content` pair chosen against its own fill per theme (daisyUI shipped ONE pair for both). Verified by pnpm check:theme. The bridge @imports it, so apps already loading the bridge pick it up with no edit — a published app WILL change from indigo to coral. Remove any hardcoded #E8564A and use the primary token.' },
@@ -621,8 +625,11 @@ export const VENDORED_PACKS: LibraryPack[] = [
     aiDoc: [
       'AimeatRealtime — rooms over the node\'s /v1/realtime WebSocket with optional WebRTC + Yjs CRDT.',
       'Construct: const rt = new AimeatRealtime(nodeBaseUrl, session.jwt) — positional, canonical —',
-      'or new AimeatRealtime({ session }) (sugar: session.jwt + the page origin). Register EVERY',
-      'rt.on(...) handler BEFORE rt.connect(roomId, nick).',
+      'or new AimeatRealtime({ session }) (sugar: session.jwt + the page origin). Register your',
+      'rt.on(...) handlers BEFORE rt.connect(roomId, nick): peer-joined and broadcast frames that',
+      "arrive before a handler exists are not replayed. Only 'joined' is: a handler added after the",
+      'join is called with it. Anything you broadcast while the socket is still opening is queued',
+      'and sent when it opens (since realtime.js v1.3.0).',
       'Rooms over HTTP first: await rt.createRoom({ app_type, name, is_public, max_peers, tags }) →',
       'room.id; await rt.listRooms({ app_type }) → rooms[]. Find-or-create by app_type and pick the',
       'LOWEST room id so concurrent creators converge on one room. Then rt.connect(room.id, nick).',

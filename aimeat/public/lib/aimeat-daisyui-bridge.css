@@ -22,6 +22,13 @@
  * @usage  <link href="/lib/daisyui@5.css" rel="stylesheet" />
  *         <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" />
  * @version-history
+ *   v1.4.0 — 2026-09-13 — The hidden attribute hides again. daisyUI's component classes (.card,
+ *     .stats and the rest) set `display`, which beats the browser's own [hidden] rule, so an element
+ *     carrying `hidden` stayed on screen. Tailwind's preflight brings the fix, but only after the JIT
+ *     has compiled, and never on a page that loads daisyUI without the JIT. The bridge now carries
+ *     preflight's rule itself, so it holds from first paint. Measured in Chromium: a hidden .card
+ *     computed `display: flex` before and `none` after (appdev pitfall
+ *     daisyui-component-defeats-hidden-attribute).
  *   v1.3.0 — 2026-07-25 — FIX the --border collision: the bridge mapped --border to a COLOUR at
  *     :root for the aui-* cortex components, while daisyUI 5 uses the same name as a border WIDTH
  *     inside calc() on nearly every component — the invalid calc collapsed badge/input paddings to
@@ -37,6 +44,17 @@
 /* MUST be the first rule: @import is only valid ahead of ordinary rules. Same-origin, cached
    alongside this file, and a no-op duplicate when the app also links the theme directly. */
 @import url('/lib/aimeat-theme.css');
+
+/* ── HIDDEN MEANS HIDDEN. Every daisyUI component class sets its own `display`, and an author rule
+      with a display beats the browser's [hidden] rule, so `<div class="card" hidden>` rendered.
+      Tailwind's preflight carries this exact rule, but it arrives only after the Tailwind JIT has
+      compiled, and an app may load daisyUI without the JIT at all. Same selector as preflight, so
+      nothing changes once the JIT has run; `until-found` keeps the browser's own find-in-page
+      behaviour. !important, so no component class's ordinary `display`, in a layer or out of one,
+      can outrank it. ── */
+[hidden]:where(:not([hidden='until-found'])) {
+  display: none !important;
+}
 
 :root {
   --text:           var(--color-base-content, #1A1A2E);
