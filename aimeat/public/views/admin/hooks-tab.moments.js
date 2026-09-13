@@ -15,6 +15,7 @@
  * @structure HookMoments({ data, onBind, busy, toSection }) — the filters, the groups, the rows
  * @usage <${HookMoments} data=${data} onBind=${bind} busy=${busy} toSection=${toSection} />
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose the shared poster section heading.
  *   v1.0.0 — 2026-09-12 — Initial (the Hooks page in the poster face).
  */
 import { h } from 'preact';
@@ -63,7 +64,7 @@ export function HookMoments({ data, onBind, busy, toSection }) {
 
   return html`
     <section class="og-sec" id="adm-hook-02">
-      <div class="og-sec-h"><h2>${S('moments.title')}<small>02</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('moments.title')}<small>02</small></h2>
         <div class="adm-hook-filters">
           ${[['all', S('moments.filterAll')], ['gates', S('moments.filterGates')], ['bound', S('moments.filterBound')]]
             .map(([id, label]) => html`
