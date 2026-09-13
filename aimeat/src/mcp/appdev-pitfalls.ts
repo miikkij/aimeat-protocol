@@ -13,7 +13,8 @@
  * @usage registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated);
  * @version-history
  *   v1.3.1 -- 2026-09-13 -- A shared entry in the list carries its `owner`, and the hint names the
- *     doors that can open one entry instead of aimeat_knowledge_get, which could not.
+ *     doors that can open one entry instead of aimeat_knowledge_get, which could not. Every report
+ *     stamps `verified_at` / `verified_version`, and every row of the list shows them (curated too).
  *   v1.3.0 -- 2026-09-03 -- The list's filter, sort, facet and page step is services/appdev-kb.ts
  *     filterPitfalls(), shared with the REST route the AppDev page reads; the tool keeps merging
  *     the curated registry in before it. Same output shape.
@@ -35,22 +36,19 @@ import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { getAppdevPitfalls } from '../data/appdev-pitfalls.js';
-import { writeMemoryRecord } from '../services/memory-write.js';
 import {
-    PITFALL_PACKAGE_ID, PITFALL_PREFIX, PITFALL_MANIFEST_KEY, PITFALL_SLUG_RE, slugifyKb,
+    PITFALL_PACKAGE_ID, PITFALL_PREFIX, PITFALL_MANIFEST_KEY,
     listOwnerScopeMemory as kbListOwnerScope, ownIdentitySet as kbOwnIdentitySet,
-    findOwnEntry as kbFindOwnEntry, upsertPitfallManifest,
-    pitfallEntryKey, deletePitfallEntry, filterPitfalls,
+    pitfallEntryKey, deletePitfallEntry, filterPitfalls, reportLearnedPitfall,
     type LearnedPitfallValue, type PitfallLike,
 } from '../services/appdev-kb.js';
+import { getSoftwareVersion } from '../utils/version.js';
 
 export { PITFALL_PACKAGE_ID };
 
 const SEVERITIES = ['info', 'warn', 'critical'] as const;
 
 type PitfallEntryValue = LearnedPitfallValue;
-
-function slugify(s: string): string { return slugifyKb(s); }
 
 function asIndexEntry(source: 'learned' | 'learned-shared', rec: MemoryRecord): Record<string, unknown> {
     const v = rec.value as Partial<PitfallEntryValue> | null;
@@ -65,6 +63,8 @@ function asIndexEntry(source: 'learned' | 'learned-shared', rec: MemoryRecord): 
         severity: v?.severity ?? 'warn',
         status: v?.status ?? 'active',
         updated: v?.updated ?? rec.updatedAt,
+        verified_at: v?.verified_at ?? null,
+        verified_version: v?.verified_version ?? null,
         shared: rec.visibility === 'public',
         // Another owner's entry is read by naming its holder (aimeat_memory_read_public {gaii, key}).
         ...(source === 'learned-shared' ? { owner: rec.ownerGaii } : {}),
@@ -85,9 +85,6 @@ export function registerAppdevPitfallTools(
     const listOwnerScopeMemory = (opts: { prefix?: string; tags?: string[] }) =>
         kbListOwnerScope(storage, config, agentGaii, opts);
     const ownIdentitySet = () => kbOwnIdentitySet(storage, config, agentGaii);
-    const findOwnEntry = (key: string) => kbFindOwnEntry(storage, config, agentGaii, key);
-    const upsertManifest = (entryKey: string, title: string, remove = false) =>
-        upsertPitfallManifest(storage, config, agentGaii, entryKey, title, remove);
 
     // ── aimeat_appdev_pitfall_report — upsert one learned pitfall ──
     mcp.tool(
@@ -108,61 +105,28 @@ export function registerAppdevPitfallTools(
         },
         annotationsFor('aimeat_appdev_pitfall_report'),
         async ({ model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share }) => {
-            const cat = slugify(category);
-            const slg = slug ? slug.toLowerCase() : slugify(title);
-            if (!PITFALL_SLUG_RE.test(cat) || !PITFALL_SLUG_RE.test(slg)) {
-                return { content: [{ type: 'text' as const, text: 'Invalid category/slug — use kebab-case (a-z, 0-9, dashes)' }], isError: true };
+            // The whole report is services/appdev-kb.ts reportLearnedPitfall(), the same function
+            // POST /v1/appdev/pitfalls/learned calls and both connector doors reach through it. The
+            // entry is a memory record and answers to memory's rules (archive guard, key and size
+            // ceilings, byte quota) inside that function, and it stamps the verification.
+            const r = await reportLearnedPitfall(storage, config,
+                { principal: agentGaii, scopes: sessionScopes, roles: ['agent'] },
+                { model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share },
+                getSoftwareVersion());
+            if (!r.ok) {
+                return { content: [{ type: 'text' as const, text: `${r.code}: ${r.message}` }], isError: true };
             }
-            const key = pitfallEntryKey(cat, slg);
-            const now = new Date().toISOString();
-            const existing = await findOwnEntry(key);
-            const normModel = model.trim().toLowerCase();
-
-            const value: PitfallEntryValue = {
-                title, symptom, resolution,
-                model: normModel,
-                category: cat, slug: slg,
-                applies_to: (applies_to ?? []).map(a => a.toLowerCase()),
-                severity: severity ?? 'warn',
-                status: status ?? 'active',
-                ...(app_ref ? { app_ref } : {}),
-                reported_by: agentGaii,
-                created: (existing?.value as PitfallEntryValue | null)?.created ?? now,
-                updated: now,
-            };
-            const visibility = share === true ? 'public' : share === false ? 'owner' : (existing?.visibility ?? 'owner');
-            const tags = ['knowledge-entry', 'pitfall', `model:${normModel}`, ...value.applies_to.map(a => `applies:${a}`)];
-
-            // The entry is a memory record, so it answers to memory's rules. Writing it straight to
-            // storage meant no archive guard ("this is finished, stop changing it" held on the REST
-            // door and not on the tool that writes these most), no key ceiling — every distinct
-            // {category, slug} is a NEW key on a tool designed to be called repeatedly, which is
-            // exactly the unbounded-key shape the memory audit exists to catch — no value-size
-            // ceiling, and no byte quota or overage charge, so the space was consumed and nobody
-            // paid for it.
-            const written = await writeMemoryRecord({ storage, config }, {
-                principal: agentGaii,
-                targetGaii: existing?.ownerGaii ?? agentGaii,
-                scopes: sessionScopes,
-                roles: ['agent'],
-            }, {
-                key, value, visibility, tags,
-                pipeline: 'mcp.appdev_pitfall_report',
-                ownerScoped: true,
-            });
-            if (!written.ok) {
-                return { content: [{ type: 'text' as const, text: `${written.code}: ${written.message}` }], isError: true };
-            }
-            await upsertManifest(key, title);
             emitResourceUpdated(agentGaii, `aimeat://knowledge/${PITFALL_PACKAGE_ID}`);
+            const { key, category: cat, slug: slg, visibility } = r;
 
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
                         key, category: cat, slug: slg,
-                        updated: !!existing, version: (existing?.version ?? 0) + 1,
+                        updated: r.updated, version: r.version,
                         visibility, shared: visibility === 'public',
+                        verified_at: r.verified_at, verified_version: r.verified_version,
                     }, null, 2),
                 }],
             };
@@ -203,6 +167,7 @@ export function registerAppdevPitfallTools(
                         source: 'curated', id: p.id, title: p.title, category: null, slug: p.id,
                         model: null, applies_to: p.appliesTo, severity: p.severity,
                         status: p.status ?? 'active', updated: p.updatedAt, shared: true,
+                        verified_at: p.verifiedAt ?? null, verified_version: p.verifiedVersion ?? null,
                         detail_url: `/v1/appdev/pitfalls/${p.id}`,
                     });
                 }

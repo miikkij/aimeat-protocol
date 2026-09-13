@@ -62,6 +62,15 @@ export interface AppdevPitfallEntry {
   /** Pointer into repo docs for maintainers (not served meaningfully to agents). */
   docRef?: string;
   updatedAt: string;
+  /**
+   * The day somebody last checked this entry against the platform code, and the node version that
+   * code was. `updatedAt` says when the WORDS changed; these say whether the words are still true.
+   * A registry nobody re-reads goes stale in silence: on 2026-09-13 one learned entry of 166 was
+   * marked outdated, while three that described fixed code were still telling builders to work
+   * around it.
+   */
+  verifiedAt?: string;
+  verifiedVersion?: string;
 }
 
 const E = (e: AppdevPitfallEntry): AppdevPitfallEntry => e;
@@ -520,12 +529,15 @@ export interface AppdevPitfallIndexEntry {
   appliesTo: AppdevPitfallScope[];
   severity: AppdevPitfallEntry['severity'];
   source: 'curated';
+  verifiedAt: string | null;
+  verifiedVersion: string | null;
 }
 
 /** Compact index (no symptom/fix bodies) for overview surfaces and pickers. */
 export function getAppdevPitfallIndex(opts?: { includeOutdated?: boolean }): AppdevPitfallIndexEntry[] {
   return getAppdevPitfalls(opts).map(p => ({
     id: p.id, title: p.title, appliesTo: p.appliesTo, severity: p.severity, source: p.source,
+    verifiedAt: p.verifiedAt ?? null, verifiedVersion: p.verifiedVersion ?? null,
   }));
 }
 
