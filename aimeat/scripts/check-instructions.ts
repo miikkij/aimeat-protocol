@@ -38,8 +38,15 @@ const SKILLS_DIR = join(REPO, '.claude', 'skills');
  * Seeded 2026-09-13 with CLAUDE.md at 36,698 bytes after the split, plus room for a few sentences.
  * A session start carries this file, the SessionStart hook's output and the harness's own prompt;
  * this is the part the repository decides.
+ *
+ * 38,000 → 38,400 on 2026-09-13, for one sentence, said out loud as this comment asks. The rule is
+ * that an English technical noun is never inflected into Finnish ("sviitti" for a test suite). It
+ * was ruled on 2026-09-12 and lived in skill aimeat-writing, which a session loads when its TASK is
+ * writing — and it was broken the next day by a session fixing a bug and reporting it in Finnish.
+ * It passes this comment's own test: it holds in every session, whatever that session touches,
+ * because every session answering this developer answers in Finnish.
  */
-const CEILING_BYTES = 38_000;
+const CEILING_BYTES = 38_400;
 
 function trackedFiles(): string[] {
     return execFileSync('git', ['-C', REPO, 'ls-files'], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })
