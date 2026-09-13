@@ -9,6 +9,7 @@
  *   an "ID card" face (renderIdCard): full GAII with its expansion, issued date, last seen,
  *   task/message tallies, trust + morsels — teaching display-name-vs-GAII at a glance.
  * @version-history
+ *   v3.5.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
  *   v3.4.0 -- 2026-09-06 -- The board honours the fleet search (`query`). The counts on the status
  *     pills are computed from the searched set, not the whole fleet: a pill reading 48 above a
  *     grid of three would be describing a fleet the person cannot see.
@@ -39,7 +40,7 @@ import { useMemo, useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
-import { agentState, agentBucket, agentRank, getStateColor } from './state-detector.js';
+import { agentState, agentBucket, agentRank } from './state-detector.js';
 import { agentGaii, matchesAgentQuery } from './tab-helpers.js';
 import { date as fmtDate, num } from '/js/format.js';
 
@@ -49,14 +50,14 @@ const html = htm.bind(h);
 // local BUCKET_OF map had no `system` key, so `BUCKET_OF[state] || 'quiet'` filed every internal
 // agent under "quiet" — on the one surface that exists to be read at a glance.
 const BUCKETS = [
-  { id: 'online', color: 'var(--success)', key: 'profile.agents.board.online' },
-  { id: 'quiet', color: 'var(--text-muted)', key: 'profile.agents.board.quiet' },
-  { id: 'onboarding', color: 'var(--warning)', key: 'profile.agents.board.onboarding' },
-  { id: 'issue', color: 'var(--danger)', key: 'profile.agents.board.issue' },
+  { id: 'online', key: 'profile.agents.board.online' },
+  { id: 'quiet', key: 'profile.agents.board.quiet' },
+  { id: 'onboarding', key: 'profile.agents.board.onboarding' },
+  { id: 'issue', key: 'profile.agents.board.issue' },
   // The tools the owner opens themselves. Teal rather than a status colour: the pill filters by
   // WHAT these are, where its neighbours filter by how things are going.
-  { id: 'connection', color: 'var(--teal)', key: 'profile.agents.board.connection' },
-  { id: 'internal', color: 'var(--text-muted)', key: 'profile.agents.board.internal' },
+  { id: 'connection', key: 'profile.agents.board.connection' },
+  { id: 'internal', key: 'profile.agents.board.internal' },
 ];
 
 export default function SharedBoard({ agents, onboardings, onAgentClick, query = '' }) {
@@ -100,26 +101,25 @@ export default function SharedBoard({ agents, onboardings, onAgentClick, query =
   if (!agents || agents.length === 0 || agentStates.length === 0) return null;
 
   return html`
-    <div class="pf-agd-board">
+    <div class="pf-agd-board poster-row--thing">
       <div class="pf-agd-board-legend">
         ${BUCKETS.map(b => html`
           <button key=${b.id}
             class="pf-agd-legend-pill ${bucketFilter === b.id ? 'pf-agd-legend-pill--active' : ''}"
             disabled=${counts[b.id] === 0 && bucketFilter !== b.id}
             onClick=${() => setBucketFilter(f => (f === b.id ? null : b.id))}>
-            <span class="pf-agd-legend-dot" style="background: ${b.color}"></span>
+            <span class="pf-agd-legend-dot" data-bucket=${b.id}></span>
             ${t(b.key)} <span class="pf-agd-legend-count">${counts[b.id]}</span>
           </button>
         `)}
       </div>
       <div class="pf-agd-board-grid">
         ${shown.map(({ agent, state, onboarding }) => {
-          const color = getStateColor(state);
           return html`
             <div
               key=${agent.name}
               class="pf-agd-board-card"
-              style="border-left-color: ${color}; --agd-state: ${color}"
+              data-state=${state}
               tabindex="0"
               role="button"
               onClick=${() => onAgentClick?.(agent.name)}

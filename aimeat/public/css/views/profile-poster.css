@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.11.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
  *   v1.10.0 -- 2026-09-13 -- Compose inbox top rules from poster.css.
  *   v1.9.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   v1.8.0 — 2026-09-13 — The dialog frame, header and footer rules leave for /css/dialog.css, the one
@@ -202,8 +203,8 @@
 .pf .agent-prompt-box { font-family: var(--font-mono); }
 
 /* ── The fleet board above the agent list: a ruled grid of names, the state as a left stripe ── */
-.pf .pf-agd-board, .pf .pf-agd-active { background: none; border: 0; border-top: 3px solid var(--text); border-radius: 0; padding: 0.9rem 0 0.5rem; }
-.pf .pf-agd-board-card { background: none; border: 0; border-left: 6px solid var(--text-muted); border-bottom: 2px solid var(--text); border-radius: 0; padding: 0.5rem 0.75rem; }
+.pf .pf-agd-board, .pf .pf-agd-active { background: none; border-radius: 0; padding: 0.9rem 0 0.5rem; }
+.pf .pf-agd-board-card { background: none; border: 0; border-left: 6px solid var(--agd-state, var(--text-muted)); border-bottom: 2px solid var(--text); border-radius: 0; padding: 0.5rem 0.75rem; }
 .pf .pf-agd-board-card:hover, .pf .pf-agd-board-card:focus-visible { background: var(--sun); color: var(--on-sun); box-shadow: none; }
 .pf .pf-agd-board-card:hover .pf-agd-board-card-name, .pf .pf-agd-board-card:focus-visible .pf-agd-board-card-name { color: var(--on-sun); }
 .pf .pf-agd-board-card-name { font-weight: var(--font-poster-strong-weight); }
