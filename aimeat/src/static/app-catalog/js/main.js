@@ -19,6 +19,10 @@
  *   v2.6.0 — 2026-09-03 — getServerAppRow handed to initDetail.
  *   v2.7.0 — 2026-09-13 — The extension popup and editor overlays open and close by `hidden`, and
  *     Escape closes the popup too, as it closes every other dialog.
+ *   v2.8.0 — 2026-09-13 — The dialogs are the site's one dialog (js/dialogs.js): initDialogs and the
+ *     closers of the dialogs whose closing does more than hide them. The per-dialog backdrop
+ *     handlers and the dialog half of the Escape cascade leave, because the dialog closes itself
+ *     and keeps a half-written form; the page's own keys stand aside while a dialog is open.
  */
 import { t, getLang, setLang, applyI18n } from './i18n.js';
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl, currentOwnerName, generateId, readFileAsText } from './util.js';
@@ -42,6 +46,7 @@ import { initRender, filterByState, KUNTO_KEYS, setBoundSkillApps, setSort, togg
 import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from './app-agents.js';
 import { checkLegacyLocalApps } from './migrate.js';
 import { toggleFavorite } from './favorites.js';
+import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
 
 
   // ── i18n (en / fi) ─────────────────────────────────
@@ -313,6 +318,14 @@ import { toggleFavorite } from './favorites.js';
       ? _urlLang
       : ((loadConfig().language === 'fi') ? 'fi' : 'en'));
     applyI18n();
+    // Every dialog in the template gets its X and its closing rules before anything can open one.
+    // A dialog whose closing does more than hide it names what it does here; the rest just close.
+    initDialogs();
+    onDlgClose('confirm-overlay', function () { closeConfirm(false); });
+    onDlgClose('modal-overlay', closeModal);
+    onDlgClose('settings-overlay', closeSettings);
+    onDlgClose('cortex-editor-overlay', closeCortexEditor);
+    onDlgClose('prompt-builder-overlay', closePbPanel);
     // A ?filter= from the profile's Apps page opens the library on one state or condition row:
     // the number a person clicked there is exactly the rows they get here. Set before the listing
     // loads; the first render reads it like a rail click.
@@ -346,12 +359,10 @@ import { toggleFavorite } from './favorites.js';
     loadCortexExtensions();
     loadConfigFromServer();
 
-    // Wire the in-page confirm dialog (OK resolves true; Cancel/backdrop resolve false).
+    // Wire the in-page confirm dialog (OK resolves true; Cancel, the X, Escape and the page behind
+    // resolve false through its closer above).
     document.getElementById('confirm-ok-btn').addEventListener('click', function () { closeConfirm(true); });
     document.getElementById('confirm-cancel-btn').addEventListener('click', function () { closeConfirm(false); });
-    document.getElementById('confirm-overlay').addEventListener('click', function (e) {
-      if (e.target === this) closeConfirm(false);
-    });
 
     // One-time migration off the retired browser-local catalog: offer a JSON export of any apps
     // left in the old IndexedDB store, so the server-only cutover never silently loses them.
@@ -430,43 +441,10 @@ import { toggleFavorite } from './favorites.js';
       closeSettings();
     });
 
-    // ── Click settings overlay to close ─────────────
-    document.getElementById('settings-overlay').addEventListener('click', function (e) {
-      if (e.target === this) {
-        closeSettings();
-      }
-    });
-
-    // ── Click publish overlay to close ──────────────
-    document.getElementById('publish-overlay').addEventListener('click', function (e) {
-      if (e.target === this) {
-        this.hidden = true;
-      }
-    });
-
-    // ── Click versions overlay to close ─────────────
-    document.getElementById('versions-overlay').addEventListener('click', function (e) {
-      if (e.target === this) {
-        this.hidden = true;
-      }
-    });
-
-    // ── Click subdomain overlay to close ────────────
-    document.getElementById('subdomain-overlay').addEventListener('click', function (e) {
-      if (e.target === this) {
-        this.hidden = true;
-      }
-    });
-
-    // ── Backup: file picker + overlay/menu close ────
+    // ── Backup: file picker + menu close ────────────
     document.getElementById('backup-file-input').addEventListener('change', function () {
       if (this.files && this.files[0]) importBackupFile(this.files[0]);
       this.value = '';
-    });
-    document.getElementById('backup-overlay').addEventListener('click', function (e) {
-      if (e.target === this) {
-        this.hidden = true;
-      }
     });
     document.addEventListener('click', function (e) {
       var menu = document.getElementById('backup-menu');
@@ -476,20 +454,6 @@ import { toggleFavorite } from './favorites.js';
       var cmenu = document.getElementById('create-menu');
       if (cmenu && !cmenu.hidden && !cmenu.contains(e.target) && e.target.id !== 'create-btn') {
         cmenu.hidden = true;
-      }
-    });
-
-    // ── Click cortex popup overlay to close ─────────
-    document.getElementById('cortex-popup-overlay').addEventListener('click', function (e) {
-      if (e.target === this) {
-        this.hidden = true;
-      }
-    });
-
-    // ── Click cortex editor overlay to close ────────
-    document.getElementById('cortex-editor-overlay').addEventListener('click', function (e) {
-      if (e.target === this) {
-        closeCortexEditor();
       }
     });
 
@@ -556,13 +520,6 @@ import { toggleFavorite } from './favorites.js';
       closeModal();
     });
 
-    // ── Click overlay to close ──────────────────────
-    document.getElementById('modal-overlay').addEventListener('click', function (e) {
-      if (e.target === this) {
-        closeModal();
-      }
-    });
-
     // ── Context menu action buttons ─────────────────
     var contextMenu = document.getElementById('context-menu');
     var contextBtns = contextMenu.querySelectorAll('button[data-action]');
@@ -619,30 +576,15 @@ import { toggleFavorite } from './favorites.js';
 
     // ── Keyboard shortcuts ──────────────────────────
     document.addEventListener('keydown', function (e) {
-      // Escape — close modals / overlays (source-overlay first in cascade)
+      // An open dialog owns the keyboard: its own Escape closes it (js/dialogs.js), and nothing
+      // behind it may close or open under it.
+      if (anyDlgOpen()) return;
+      // Escape — close the page's own layers, the topmost first.
       if (e.key === 'Escape') {
         if (!document.getElementById('iframe-view').hidden) {
           closeIframe();
-        } else if (!document.getElementById('cortex-editor-overlay').hidden) {
-          closeCortexEditor();
-        } else if (!document.getElementById('cortex-popup-overlay').hidden) {
-          document.getElementById('cortex-popup-overlay').hidden = true;
-        } else if (document.getElementById('prompt-builder-overlay').style.display === 'flex') {
-          closePbPanel();
-        } else if (!document.getElementById('source-overlay').hidden) {
-          document.getElementById('source-overlay').hidden = true;
         } else if (!document.getElementById('context-menu').hidden) {
           hideContextMenu();
-        } else if (!document.getElementById('publish-overlay').hidden) {
-          document.getElementById('publish-overlay').hidden = true;
-        } else if (!document.getElementById('subdomain-overlay').hidden) {
-          document.getElementById('subdomain-overlay').hidden = true;
-        } else if (!document.getElementById('backup-overlay').hidden) {
-          document.getElementById('backup-overlay').hidden = true;
-        } else if (!document.getElementById('settings-overlay').hidden) {
-          closeSettings();
-        } else if (!document.getElementById('modal-overlay').hidden) {
-          closeModal();
         } else if (!document.getElementById('detail-view').hidden) {
           closeDetailView();
         }
@@ -727,18 +669,15 @@ import { toggleFavorite } from './favorites.js';
     });
 
     // ── Close source modal helper ─────────────────────
+    // The source editor's closer: the X, Escape, the page behind and Close all ask here first.
     async function closeSourceModal() {
       var saveBtn = document.getElementById('save-source-btn');
       if (!saveBtn.disabled) {
         if (!(await showConfirm(t('confirm.unsavedClose')))) return;
       }
-      document.getElementById('source-overlay').hidden = true;
+      closeDlg('source-overlay');
     }
-
-    // ── Click source overlay background to close ─────
-    document.getElementById('source-overlay').addEventListener('click', function(e) {
-      if (e.target === this) closeSourceModal();
-    });
+    onDlgClose('source-overlay', closeSourceModal);
 
     // ── Source-editor real-origin staging (published apps): same server-draft path as the
     //    AI loop, but from the edited textarea — test on a real origin, then publish. ──
@@ -792,10 +731,6 @@ import { toggleFavorite } from './favorites.js';
     });
 
     document.getElementById('pb-description').addEventListener('input', updatePbPreview);
-
-    document.getElementById('prompt-builder-overlay').addEventListener('click', function(e) {
-      if (e.target === this) closePbPanel();
-    });
   });
 
 

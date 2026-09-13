@@ -8,8 +8,10 @@
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 9).
  *   v2.0.0 — 2026-07-20 — Server-only cutover: drop the local-catalog JSON export/import, the
  *     duplicate-cleanup, and Clear-all (all local-store features); initSettings is now a no-op.
+ *   v2.1.0 — 2026-09-13 — Settings and Help open and close through dialogs.js (the site's one dialog).
  */
 import { showConfirm, closeConfirm, showNotice, dismissNotice } from './ui.js';
+import { openDlg, closeDlg } from './dialogs.js';
 import { loadConfig, saveConfig } from './config.js';
 import { t, getLang } from './i18n.js';
 
@@ -74,7 +76,7 @@ function openSettings() {
   document.getElementById('setting-theme').value = config.theme || 'light';
   document.getElementById('setting-language').value = getLang();
   document.getElementById('setting-aimeat-url').value = config.aimeatUrl || '';
-  document.getElementById('settings-overlay').hidden = false;
+  openDlg('settings-overlay');
 }
 
 function saveSettings() {
@@ -84,7 +86,7 @@ function saveSettings() {
   saveConfig(config);
   try { localStorage.setItem('aimeat-theme', config.theme); } catch (e) {}
   applyTheme(config.theme);
-  document.getElementById('settings-overlay').hidden = true;
+  closeDlg('settings-overlay');
   // Sync config to server (best-effort)
   syncConfigToServer(config);
 }
@@ -166,11 +168,11 @@ function loadConfigFromServer() {
 }
 
 function closeSettings() {
-  document.getElementById('settings-overlay').hidden = true;
+  closeDlg('settings-overlay');
 }
 
-function openHelp() { document.getElementById('help-overlay').hidden = false; }
-function closeHelp() { document.getElementById('help-overlay').hidden = true; }
+function openHelp() { openDlg('help-overlay'); }
+function closeHelp() { closeDlg('help-overlay'); }
 
 // Confirm dialog + toast notices → ui.js (showConfirm/closeConfirm/showNotice/dismissNotice),
 // imported at the top. The OK/Cancel buttons are wired to closeConfirm() in bootstrap below.

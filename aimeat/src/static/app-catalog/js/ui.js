@@ -10,24 +10,28 @@
  * @version-history
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 3).
  *   v1.1.0 — 2026-07-10 — Add dtlBtn() detail-view button builder (phase 3b: dtl-btn dedup).
+ *   v1.2.0 — 2026-09-13 — The confirm is the site's one dialog (dialogs.js), and the toast stack
+ *     goes above an open dialog instead of under its backdrop (raiseAboveDialogs).
  */
 import { escapeHtml } from './util.js';
+import { openDlg, closeDlg } from './dialogs.js';
+import { raiseAboveDialogs } from '../../../../public/js/dialog.js';
 
 // In-page confirm dialog (replaces native confirm()). Promise-based so call sites stay linear:
 //   if (!(await showConfirm(msg))) return;   (make the enclosing handler `async`).
-// OK resolves true, Cancel/backdrop resolves false. Wired in main.js bootstrap.
+// OK resolves true; Cancel, the X, Escape and the page behind resolve false. Wired in main.js bootstrap.
 let _confirmResolve = null;
 
 export function showConfirm(message) {
   return new Promise(function (resolve) {
     _confirmResolve = resolve;
     document.getElementById('confirm-message').textContent = message;
-    document.getElementById('confirm-overlay').hidden = false;
+    openDlg('confirm-overlay');
   });
 }
 
 export function closeConfirm(result) {
-  document.getElementById('confirm-overlay').hidden = true;
+  closeDlg('confirm-overlay');
   var r = _confirmResolve; _confirmResolve = null;
   if (r) r(!!result);
 }
@@ -49,6 +53,7 @@ export function showNotice(message, type) {
   el.textContent = message;
   el.addEventListener('click', function () { dismissNotice(el); });
   stack.appendChild(el);
+  raiseAboveDialogs(stack);
   requestAnimationFrame(function () { el.classList.add('show'); });
   el._timer = setTimeout(function () { dismissNotice(el); }, type === 'error' ? 6500 : 3500);
   return el;
