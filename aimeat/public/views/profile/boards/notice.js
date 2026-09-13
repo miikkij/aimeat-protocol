@@ -10,6 +10,7 @@
  * @structure renderNotice · replyBlock · toolsFold
  * @usage import { renderNotice } from './notice.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose the reply row's top rule from poster.css.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import { h } from 'preact';
@@ -63,7 +64,7 @@ export function renderNotice(ctx, b, postId) {
       <p class="bp-notice-text">${post.body}</p>
       <${Section} id="bp-replies" num="01" title=${c('secReplies')} count=${replies.length}>
         ${!replies.length ? html`<p class="og-empty">${c('noReplies')}</p>` : replies.map(r => replyBlock(ctx, r, authors))}
-        <div class="bp-composer bp-composer--reply" id="bp-reply">
+        <div class="bp-composer bp-composer--reply poster-row--thing" id="bp-reply">
           <div class="og-field bp-composer-main"><label class="og-label" for="bp-reply-body">${c('reply')}</label><textarea id="bp-reply-body" class="og-textarea" rows="2" value=${ctx.replyText} onInput=${e => ctx.setReplyText(e.target.value)} placeholder=${c('replyPlaceholder')}></textarea></div>
           <div class="og-doors"><button type="button" class="og-slab" disabled=${ctx.replying || !ctx.replyText.trim()} onClick=${() => ctx.handleReply(boardId, post.id)}>${c('send')}</button></div>
         </div>
