@@ -8,6 +8,7 @@
  *   numeral strip, the dashed box and the doors come from admin.css and organism.css; only what this
  *   page adds lives here. Every value is a theme.css token, so the page flips with the theme.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Own the existing view spacing lifted from inline declarations.
  *   v1.0.0 — 2026-09-12 — Initial. Replaces the classic-shell card the tab used.
  */
 
@@ -21,6 +22,8 @@
 .adm-hook-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 90ch; }
 .adm-hook-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
 .adm-hook-note { margin: 10px 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-hook-note--flush { margin-top: 0; }
+.adm-hook-clear-failing { margin-top: 14px; }
 .adm-hook-code { display: inline-block; padding: 1px 6px; font-family: var(--font-mono); font-size: .75rem; background: var(--code-bg); color: var(--text); overflow-wrap: anywhere; }
 .adm-hook-mono { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
 .adm-hook-acts { display: flex; gap: 22px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
@@ -55,9 +58,12 @@
 .adm .adm-hook-fld--mono input[type="text"] { font-family: var(--font-mono); font-size: .8rem; font-weight: 500; }
 .adm-hook-fld svg { width: 16px; height: 16px; flex: none; stroke: var(--text); fill: none; stroke-width: 2.5; }
 .adm-hook-picked { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.adm-hook-picked + .adm-hook-fld { margin-top: 10px; }
 .adm-hook-chip { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 9px; border: 2px solid var(--text); background: none; color: var(--text); }
 .adm-hook-chip button { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--accent); line-height: 1; }
 .adm-hook-frame { border: 2px solid var(--text); background: var(--bg-surface); padding: 12px 14px; }
+.adm-hook-frame--request { margin-bottom: 16px; }
+.adm-hook .adm-hook-contract-warning { margin-top: 16px; }
 .adm-hook-pre { font-family: var(--font-mono); font-size: .75rem; line-height: 1.6; color: var(--text); white-space: pre; overflow-x: auto; margin: 0; }
 .adm-hook .og-box { max-width: none; }
 .adm-hook-box-body { font-size: .88rem; line-height: 1.55; }

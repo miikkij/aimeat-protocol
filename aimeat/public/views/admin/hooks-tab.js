@@ -15,6 +15,7 @@
  *     files: moments (02), bind (03), runs (04), and AskAi (05) here.
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose shared section headings and externalize spacing.
  *   v2.0.0 — 2026-09-12 — The poster face and its own read: the status word, the metric rows, the
  *     strip and five numbered sections. Binding is possible from the page for the first time, and
  *     every call a hook makes is recorded and listed.
@@ -60,7 +61,7 @@ function RightNow({ data, onBind, toSection }) {
 
   return html`
     <section class="og-sec og-sec--first" id="adm-hook-01">
-      <div class="og-sec-h"><h2>${S('now.title')}<small>01</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${() => toSection('03')}>${S('now.bindOne')}</button>
         </div>
@@ -70,7 +71,7 @@ function RightNow({ data, onBind, toSection }) {
           <div class="adm-ov-status ${gate ? 'danger' : ''}">${word}</div>
           <p class="adm-alert-line">${line}</p>
           <div class="adm-ov-up">${log}</div>
-          ${gate ? html`<div style="margin-top: 14px;">
+          ${gate ? html`<div class="adm-hook-clear-failing">
             <button type="button" class="og-door og-door--danger" onClick=${() => onBind(gate.name, [])}>
               ${S('now.clearFailing', { hook: gate.name })}
             </button>
@@ -122,7 +123,7 @@ function AskAi() {
   const paste = buildHooksPrompt({ url: getNodeUrl() });
   return html`
     <section class="og-sec" id="adm-hook-05">
-      <div class="og-sec-h"><h2>${S('ai.title')}<small>05</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('ai.title')}<small>05</small></h2>
         <div class="og-doors"><${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" /></div></div>
       <div class="adm-hook-ai">
         <div>
