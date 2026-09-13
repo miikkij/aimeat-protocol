@@ -13,6 +13,7 @@
  *   regular expressions, which have no spaces to break at, and a narrow cell sets one character
  *   to a line.
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Keep bar appearance in CSS while ratios use SVG width attributes.
  *   v2.0.0 — 2026-09-12 — Rewritten for the poster face. The rounded cards, the bordered table,
  *     the stat cards and the coloured pills of the classic shell are gone.
  *   v1.2.0 -- 2026-05-24 -- Add subsection, button row, notify button styles
@@ -46,7 +47,7 @@
 /* A regular expression breaks between characters or not at all: give it room and let it wrap. */
 .adm-agi-mono { font-family: var(--font-mono); font-size: .78rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: break-word; word-break: normal; }
 .adm-agi-bar { height: 12px; background: var(--bg-surface); }
-.adm-agi-bar i { display: block; height: 100%; background: var(--sun); }
+.adm-agi-bar svg { display: block; height: 100%; background: var(--sun); }
 .adm-agi-row.is-none .adm-agi-name, .adm-agi-row.is-none .adm-agi-n { color: var(--text-dim); }
 .adm-agi-row.is-none .adm-agi-bar { background: none; border-bottom: 1px solid var(--border); height: 1px; align-self: center; }
 .adm-agi-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 12px 2px 0; font-size: .78rem; color: var(--text-dim); }
@@ -55,10 +56,10 @@
 /* ── 03 · the readiness bands ── */
 .adm-agi-rows--ready .adm-agi-hrow, .adm-agi-rows--ready .adm-agi-row { grid-template-columns: 260px 90px 80px minmax(0, 1fr); }
 /* The four bands run from the coolest to the loudest so the row reads as a ladder. */
-.adm-agi-bar[data-level="expert"] i { background: var(--accent); }
-.adm-agi-bar[data-level="full"] i { background: var(--sun); }
-.adm-agi-bar[data-level="standard"] i { background: var(--text); }
-.adm-agi-bar[data-level="basic"] i { background: var(--text-dim); }
+.adm-agi-bar[data-level="expert"] svg { background: var(--accent); }
+.adm-agi-bar[data-level="full"] svg { background: var(--sun); }
+.adm-agi-bar[data-level="standard"] svg { background: var(--text); }
+.adm-agi-bar[data-level="basic"] svg { background: var(--text-dim); }
 
 /* ── 02 · one stuck run ── */
 .adm-agi-stuck { border-top: 2px solid var(--text); }

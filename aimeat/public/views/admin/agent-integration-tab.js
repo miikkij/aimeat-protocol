@@ -17,6 +17,7 @@
  *   - Bundles: one row per bundle that an agent actually asks for
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose shared B1 headings; bar ratios are SVG data with CSS appearance.
  *   v2.0.0 — 2026-09-12 — The poster face, and three things the old screen showed as if they
  *     worked: "Not started" read onboarding.not_started while the route sends `pending`, so it was
  *     always 0; the readiness bars divided by completed + in progress + not started while counting
@@ -115,14 +116,14 @@ function PlatformRegistry({ platforms, totalAgents }) {
 
   if (platforms.length === 0) {
     return html`<section class="og-sec og-sec--first">
-      <div class="og-sec-h"><h2>${S('regTitle')}<small>01</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('regTitle')}<small>01</small></h2></div>
       <p class="adm-agi-lead">${S('regEmpty')}</p>
     </section>`;
   }
 
   return html`
     <section class="og-sec og-sec--first">
-      <div class="og-sec-h"><h2>${S('regTitle')}<small>01</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('regTitle')}<small>01</small></h2></div>
 
       <div class="adm-agi-top">
         <div>
@@ -152,7 +153,7 @@ function PlatformRegistry({ platforms, totalAgents }) {
     ? S('recSelfReported')
     : p.id === 'other' ? S('recNothing') : p.detect_pattern}</span>
             <span class="adm-agi-bar">${count > 0
-    ? html`<i style="width: ${Math.min(count / (totalAgents || 1) * 100, 100)}%"></i>`
+    ? html`<svg width=${Math.min(count / (totalAgents || 1) * 100, 100) + '%'} aria-hidden="true"></svg>`
     : null}</span>
           </div>`;
   })}
@@ -177,7 +178,7 @@ function GettingSetUp({ onboarding, session, onAction }) {
 
   return html`
     <section class="og-sec">
-      <div class="og-sec-h"><h2>${S('setupTitle')}<small>02</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('setupTitle')}<small>02</small></h2></div>
 
       <div class="og-strip">
         <div><b>${num(completed)}</b><span>${S('cntFinished')}</span><small>${S('cntFinishedSub')}</small></div>
@@ -254,7 +255,7 @@ function Readiness({ readiness }) {
 
   return html`
     <section class="og-sec">
-      <div class="og-sec-h"><h2>${S('readyTitle')}<small>03</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('readyTitle')}<small>03</small></h2></div>
       <p class="adm-agi-lead">${S('readyLead')}</p>
       ${total === 0
     ? html`<p class="adm-agi-note">${S('readyEmpty')}</p>`
@@ -274,7 +275,7 @@ function Readiness({ readiness }) {
               <span class="adm-agi-n r">${num(count)}</span>
               <span class="adm-agi-pct r">${share(count, total)}</span>
               <span class="adm-agi-bar" data-level=${level}>${count > 0
-    ? html`<i style="width: ${count / total * 100}%"></i>`
+    ? html`<svg width=${count / total * 100 + '%'} aria-hidden="true"></svg>`
     : null}</span>
             </div>`;
   })}
@@ -307,7 +308,7 @@ function Bundles({ platforms, totalAgents }) {
 
   return html`
     <section class="og-sec">
-      <div class="og-sec-h"><h2>${S('bundlesTitle')}<small>04</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('bundlesTitle')}<small>04</small></h2></div>
       <p class="adm-agi-lead">${S('bundlesLead')}</p>
       ${rows.length === 0
     ? html`<p class="adm-agi-note">${S('bundlesEmpty')}</p>`
