@@ -12,6 +12,8 @@
  * @usage
  *   import { generateUploadToken, verifyUploadToken } from '../services/upload-token.js';
  * @version-history
+ *   v1.7.0 — 2026-09-13 — PRESIGNED_META_KEYS.app carries `cortex_agents`, validated at the mint and
+ *     again at the PUT, so an app's crew-defs survive the upload road the docs recommend.
  *   v1.6.0 — 2026-08-11 — PRESIGNED_META_KEYS.app carries `spec_token` / `spec_ack`, so the door
  *     every author is told to use above 1 KB can state which build spec the app was written against.
  *     Without them the presigned publish would report `spec_check: missing` for everybody, which is
@@ -152,8 +154,12 @@ export const PRESIGNED_META_KEYS = {
     // the one door that could not carry the statement, and the observable result was a node on
     // which no app had a provenance record at all. Carried through the SIGNED token, so the
     // declaration that arrives with the bytes is the one the caller made when they asked for the URL.
+    // `cortex_agents` joined on 2026-09-13. The comment above this list named it as a bug on record
+    // for two months while the key was missing from the list: both presigned doors accepted a
+    // crew-def, validated nothing, and published the app without it. The token is a short handle
+    // now, so what it carries is no longer bounded by a JWT's size.
     app: ['filename', 'name', 'description', 'category', 'tags', 'icon', 'version',
-          'ai_provenance', 'ai_provenance_id', 'spec_token', 'spec_ack', 'roadmap'],
+          'ai_provenance', 'ai_provenance_id', 'spec_token', 'spec_ack', 'roadmap', 'cortex_agents'],
     storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs'],
     extension: ['update', 'activate'],
     cortex: ['update', 'activate'],

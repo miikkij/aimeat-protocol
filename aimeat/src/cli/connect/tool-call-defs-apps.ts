@@ -8,7 +8,8 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
- *   v1.7.1 -- 2026-09-13 -- aimeat_appdev_overview's model parameter is described as ordering, not filtering.
+ *   v1.7.1 -- 2026-09-13 -- aimeat_appdev_overview's model parameter is described as ordering, not
+ *     filtering. aimeat_app_publish declares cortex_agents and sends them as cortex.agents.
  *   v1.7.0 -- 2026-09-06 -- Review item 6.3: aimeat_extension_invoke puts the instance in the PATH.
  *     It appended ?instance_id= to the extension-scoped route, which reads no query, so an
  *     instance-scoped call ran against the shared namespace and answered ok.
@@ -217,6 +218,7 @@ export const appTools: ConnectCliToolDefinition[] = [
             icon: { type: 'string', description: 'Emoji icon.' },
             version: { type: 'string', description: 'Semver display version. Generated if omitted.' },
             mime_type: { type: 'string', description: 'Defaults to text/html.' },
+            cortex_agents: { type: 'array', description: 'Declarative crew-defs this app ships (manifest.cortex.agents), validated at publish. Omit on update to carry them forward; [] clears.' },
         },
         handler: ({ client }, input) => {
             // POST /v1/apps takes `content` BASE64-ENCODED and refuses plain text with a 400. A
@@ -236,6 +238,11 @@ export const appTools: ConnectCliToolDefinition[] = [
             }
             const tags = optionalArray(input, 'tags');
             if (tags) body.tags = tags;
+            // The node's MCP tool took crew-defs from 2026-07-16 and this door did not declare them,
+            // so a fleet agent could not ship an app with its agents. POST /v1/apps reads them as
+            // `cortex.agents` and validates them there.
+            const crew = optionalArray(input, 'cortex_agents');
+            if (crew) body.cortex = { agents: crew };
             return client.post('/v1/apps', body);
         },
     },
