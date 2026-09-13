@@ -21,6 +21,7 @@
  *   - RealtimeTab({ data, reload }) — the three sections, the four empty states, the close question
  *   - dur / heard — the durations a row prints instead of a timestamp
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-12 — The poster face: all eight counters, the document count summed from the
  *     rooms it actually lives in, the three empties told apart, one room openable with its peers and
  *     documents, and a close question that says who it disconnects.
@@ -125,7 +126,7 @@ export default function RealtimeTab({ data, reload }) {
     return html`
       <div class="og adm-rt">
         <section class="og-sec og-sec--first">
-          <div class="og-sec-h"><h2>${R('who')}<small>01</small></h2></div>
+          <div class="og-sec-h"><h2 class="poster-section-title">${R('who')}<small>01</small></h2></div>
           <div class="adm-ov-grid">
             <div>
               <div class="adm-ov-status quiet">${R('statusOff')}</div>
@@ -156,7 +157,7 @@ export default function RealtimeTab({ data, reload }) {
 
       <section class="og-sec og-sec--first">
         <div class="og-sec-h">
-          <h2>${R('who')}<small>01</small></h2>
+          <h2 class="poster-section-title">${R('who')}<small>01</small></h2>
           <div class="og-doors">
             <button type="button" class="og-door og-door--quiet" onClick=${() => {
     document.querySelector('.adm-rt-since')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -206,7 +207,7 @@ export default function RealtimeTab({ data, reload }) {
 
       <section class="og-sec">
         <div class="og-sec-h">
-          <h2>${R('theRooms')}<small>02</small></h2>
+          <h2 class="poster-section-title">${R('theRooms')}<small>02</small></h2>
           <div class="og-doors">
             <button type="button" class="og-door og-door--quiet" onClick=${() => setBusiest(v => !v)}>
               ${busiest ? R('orderNewest') : R('orderBusiest')}</button>
@@ -251,7 +252,7 @@ export default function RealtimeTab({ data, reload }) {
 
       <section class="og-sec adm-rt-since">
         <div class="og-sec-h">
-          <h2>${R('since')}<small>03</small></h2>
+          <h2 class="poster-section-title">${R('since')}<small>03</small></h2>
         </div>
         <div class="adm-rt-counts">
           <div class="adm-rt-cnt"><span>${R('cntIn')}</span><b>${num(f.messagesIn)}</b></div>
