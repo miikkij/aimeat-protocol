@@ -16,6 +16,7 @@
  *   - StatusBar — which agent, what is left to spend, and what is wrong when something is
  * @usage import { ThreadList, Turn, Composer, StatusBar } from './chat/parts.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
  *   v1.3.1 — 2026-09-03 — The "use your own key" link goes to ?tab=ai, the AI page's route id.
  *   v1.3.0 — 2026-08-28 — ThreadList takes children, rendered under the list: the rail now carries
  *     everything that is not the conversation (the poster chat, vertical space first).
@@ -462,7 +463,7 @@ export function Composer({ value, onInput, onSend, onStop, onSpeak, onAttach, at
     };
 
     return html`
-        <div class="chat-composer">
+        <div class="chat-composer poster-row--thing">
             ${note ? html`<p class="chat-composer-note">${note}</p>` : ''}
             ${listening ? html`<p class="chat-composer-note">${tr('chat.hearing', 'Working out what you said…')}</p>` : ''}
             ${/* Attached and not yet sent. Each one is removable: a picture picked by mistake should

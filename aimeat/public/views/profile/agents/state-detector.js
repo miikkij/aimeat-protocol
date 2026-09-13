@@ -2,7 +2,8 @@
  * @file state-detector.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Presentation for an agent's state — the default tab and the colour. It does NOT
+ * @description Presentation for an agent's state: the default tab. Colours live in agents-detail.css.
+ *   It does NOT
  *   decide the state any more: the server does, in src/services/agent-health.ts, and every agent in
  *   /v1/agents carries a `health` object.
  *
@@ -14,11 +15,12 @@
  *   which inverted the comparison at the top. None of that was visible from this file.
  *
  *   States: 'system' | 'workstation' | 'new' | 'onboarding' | 'problem' | 'idle' | 'production'.
- * @structure agentState(agent) · getDefaultTab(state) · getStateColor(state)
+ * @structure agentState(agent) · getDefaultTab(state)
  * @usage
  *   import { agentState, getDefaultTab } from './state-detector.js';
  *   const state = agentState(agent);
  * @version-history
+ *   v2.2.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
  *   v2.1.0 -- 2026-08-31 -- 'workstation' is teal and opens on activity. It is an MCP connection a
  *     tool uses, not something that acts on its own, so it leaves the red/orange/green axis rather
  *     than being scored on it: unopened for a month used to be red, and a Hello Integration it does
@@ -66,27 +68,5 @@ export function getDefaultTab(state) {
     case 'idle': return 'tasks';
     case 'production': return 'tasks';
     default: return 'tasks';
-  }
-}
-
-/**
- * The dot beside an agent.
- *
- * Red, orange and green answer ONE question — is something wrong, pending, or fine — and grey is
- * its quiet fourth. `workstation` is deliberately none of them: it is teal, the colour its mode
- * badge already carries, because the question that axis asks does not apply to an MCP connection a
- * person opens and closes. Teal says WHAT it is where the others say HOW IT IS GOING, and that is
- * the point rather than an inconsistency.
- */
-export function getStateColor(state) {
-  switch (state) {
-    case 'new': return 'var(--warning)';
-    case 'onboarding': return 'var(--warning)';
-    case 'problem': return 'var(--danger)';
-    case 'system': return 'var(--success)';
-    case 'workstation': return 'var(--teal)';
-    case 'idle': return 'var(--text-muted)';
-    case 'production': return 'var(--success)';
-    default: return 'var(--text-muted)';
   }
 }

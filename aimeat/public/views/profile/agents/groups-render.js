@@ -6,6 +6,7 @@
  *   grouped agent-card renderer (none / custom groups / mode / tag). Extracted from
  *   ../agents-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.2.0 — 2026-09-06 — AgentSearch: one field above the board that narrows the board and the
  *     list together, on the agent's name or its GAII. Seventy-one agents on one account is past
@@ -123,7 +124,7 @@ export function ActiveTasksPanel({ activeTasksMap, agents, onOpen }) {
   const overflow = rows.length - shown.length;
 
   return html`
-    <div class="pf-agd-active">
+    <div class="pf-agd-active poster-row--thing">
       <div class="pf-agd-active-head">
         <span class="poster-section-title">${t('profile.agents.active.title')}${rows.length > 0 ? html` <span class="pf-agd-count-badge">(${rows.length})</span>` : ''}</span>
       </div>
