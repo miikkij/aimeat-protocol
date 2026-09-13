@@ -36,11 +36,19 @@ sharing code through `_core/`, **under 800 lines per file**, esbuild-bundled to 
 ## Cortex libs
 
 Browser IIFE installed on the node as a pack (manifest + `libs/`). The manifest wants
-`spec.version`, a `filename`, and a **string** `api_surface`; it serves from the bare name.
+`spec.version`, a `filename`, `exports` as a list of strings and a **string** `api_surface` (a YAML
+block scalar); anything else is refused naming the field. Every lib component's `filename` needs
+its source under `libs` in the same call (`{ manifest, libs: { "x.js": "..." } }`), or the install
+is refused; it serves from the bare name.
 
 - **The seeder is version-aware:** editing a bundled cortex `.js` without bumping the yaml
   `spec.version` will not refresh an installed node.
 - Updating is `PUT /v1/cortex/<name>` with `{manifest, libs}`.
+- **A cortex pack cannot import a served SDK lib**, and the portal under `public/js/` cannot either.
+  When one needs a function a lib already has, it carries a copy whose header names the original,
+  and a unit test feeds both the same inputs: `test/unit/cortex-surface-parse-amount.test.ts` holds
+  two copies of `parseAmount` to `commerce/amount.js`. A third hand-written variant is how
+  `'1,500.00'` came to read as 1.5 in three places at once.
 - Cortex is the layer that reads extension data and calls extension actions. It never bypasses the
   extension, and an app never bypasses cortex.
 
@@ -48,15 +56,32 @@ Browser IIFE installed on the node as a pack (manifest + `libs/`). The manifest 
 
 Server-side, sandboxed. `export default async function(ctx, input) { ... }` per action.
 
+**The full `ctx` table, and which run gets which member, is the node's build-extension prompt**
+(`GET /v1/prompts/build-extension`, source `src/services/build-extension-prompt.ts`).
+`test/unit/build-extension-prompt.test.ts` runs a script in the sandbox and fails when a member the
+guest receives is missing from that table, so change the table in the same commit as the sandbox.
+
 - **Write manifest schemas in YAML block style.** A flow mapping containing a comma breaks the
   scalar, the rest is read as a new key, and the action schema becomes garbage that fails validation
-  as a 500 on install. Parse the manifest locally before uploading.
+  as a 500 on install. Quote a description containing `: `; an install that does not parse answers
+  with the line and column.
 - `aimeat_extension_install` does not upsert: pass `update: true` (it survives the presigned path).
-- There is no `ctx.ai` in the sandbox: a paid AI capability calls the model through `ctx.fetch` with
-  a config secret. An unset secret config reads back as a truthy mask, so `if (ctx.config.key)`
-  happily sends a bogus credential.
-- `ctx.memory` is the extension's own sovereign `ext:{name}` namespace, and it is **world-readable**.
-  "Visible to the operator only" is not something it can express.
+- **The node does not check `input` against the action's `input` schema.** The schema is published
+  for callers and the market; the script checks the fields it reads.
+- **On a schedule, a workflow step or an `ai.start` `on_done` action, a normal return is a success
+  whatever it contains.** A missing capability or a failed precondition must `throw`. Test the method
+  (`ctx.wallet.consume`), not the object: `ctx.wallet` is always an object.
+- An `undefined` or `null` argument to a `ctx` call throws, naming the method and the position
+  (until 2026-09-13 it crossed the bridge as the text "undefined").
+- `ctx.ai.start` starts a background model call, billed to the extension's owner, and is absent on a
+  schedule and a workflow step. For a synchronous paid answer, call the provider through `ctx.fetch`
+  with a `type: secret` config or a `{{secret:NAME}}` header. A secret nobody set is `undefined` in
+  `ctx.config` (until 2026-09-13 it read as the descriptor object or the mask, both truthy).
+- `ctx.memory` is the extension's own sovereign `ext:{name}` namespace, and a key is **public unless
+  the write passes `{ visibility: 'private' }`**. The flag belongs on every write that holds personal
+  data (a write without it stores the key public again), and a code fix does not re-secure rows
+  already stored. An owner-only view is a private key served through an action that compares
+  `ctx.extension.owner` with `ctx.caller.owner`.
 - `ctx.workspace` is how an extension reaches an organism workspace, and it does so **as the caller**:
   the manifest declares `workspace: { read: true, write: true }` at the top level, and `index`, `get`,
   `write`, `writeDoc` and `publish` then run the same operations `aimeat_workspace_read/_write/_publish`
