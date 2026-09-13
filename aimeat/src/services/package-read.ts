@@ -31,7 +31,7 @@ export interface PackageListQuery {
     author?: string;
     category?: string;
     status?: string;
-    visibility?: string;
+    // No `visibility`: it is decided in listPackagesFor, never asked for. See the note there.
     search?: string;
     limit?: number;
     offset?: number;
@@ -41,8 +41,18 @@ export interface PackageListQuery {
  * List packages, defaulting to what the public may see.
  *
  * ASKING FOR YOUR OWN PACKAGES DROPS THE VISIBILITY FILTER. `?author=alice` read by alice returns
- * her private packages too, because a filter that hid them would make her own list lie to her. Any
- * other author name keeps the filter, so this cannot be used to read somebody else's private work.
+ * her private packages too, because a filter that hid them would make her own list lie to her.
+ *
+ * EVERY OTHER LIST IS PUBLIC, AND THE CALLER DOES NOT GET A SAY IN IT. The sentence that stood here
+ * said the filter "cannot be used to read somebody else's private work", and the line under it did
+ * the opposite: `visibility: ownList ? undefined : query.visibility ?? 'public'` passed the caller's
+ * own word into a storage filter that means `where visibility = ?`. So `GET /v1/packages` — a door
+ * with no authentication on it at all — answered `?visibility=private` with every author's private
+ * packages, `components` and all, which is their CONTENT and not merely their names. Found by the
+ * AI triage of 2026-09-13 and reproduced on aimeat.io before this was written.
+ *
+ * The value is now decided here and never read from the request: your own list, or the public one.
+ * A package is `private` or `public` and nothing else, so there is no third answer to lose.
  */
 export async function listPackagesFor(
     storage: Storage,
@@ -50,14 +60,13 @@ export async function listPackagesFor(
     query: PackageListQuery = {},
 ): Promise<{ packages: PackageRecord[]; total: number }> {
     const status = query.status ?? 'published';
-    const visibility = query.visibility ?? 'public';
     const ownList = Boolean(caller) && query.author === caller;
 
     const filter: PackageFilter = {
         author: query.author,
         category: query.category,
         status,
-        visibility: ownList ? undefined : visibility,
+        visibility: ownList ? undefined : 'public',
         search: query.search,
         limit: Math.min(200, Math.max(1, query.limit ?? 50)),
         offset: Math.max(0, query.offset ?? 0),

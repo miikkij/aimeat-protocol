@@ -38774,9 +38774,6 @@ paths:
         - name: author
           in: query
           schema: { type: string }
-        - name: visibility
-          in: query
-          schema: { type: string, enum: [private, public] }
         - name: status
           in: query
           schema: { type: string, enum: [draft, published, archived], default: published }
