@@ -8,6 +8,7 @@
  *   sections, the numeral strip, the doors and the slab come from admin.css and organism.css;
  *   only what this page adds lives here. Every value is a theme.css token.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose ink row boundaries from poster.css.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 
@@ -75,7 +76,7 @@
 .adm-subs-kept { font-family: var(--font-mono); font-size: .74rem; line-height: 1.7; color: var(--text-dim); overflow-wrap: anywhere; }
 
 /* A fresh node has none of these, and the empty state says what one would be for. */
-.adm-subs-empty { border-top: 3px solid var(--text); border-bottom: 3px solid var(--text); padding: 40px 0 44px; text-align: center; }
+.adm-subs-empty { border-bottom: 3px solid var(--text); padding: 40px 0 44px; text-align: center; }
 .adm-subs-empty h3 { margin: 0 0 12px; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.9rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); text-transform: uppercase; color: var(--text); }
 .adm-subs-empty p { margin: 0 auto 26px; max-width: 52ch; font-size: .95rem; line-height: 1.6; color: var(--text-dim); }
 .adm-subs-empty code { font-family: var(--font-mono); font-size: .82rem; color: var(--text); }

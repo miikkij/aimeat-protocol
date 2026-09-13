@@ -9,6 +9,7 @@
  *   admin.css and organism.css; only what this page adds lives here. Every value is a theme.css
  *   token, so the page flips with the theme.
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose ink row boundaries from poster.css.
  *   v1.1.0 — 2026-09-13 — The page's own copy of the poster dialog leaves; /css/dialog.css draws it for
  *     every dialog now.
  *   v1.0.0 — 2026-09-12 — Initial (the Realtime page in the poster face).
@@ -99,7 +100,7 @@
 }
 .adm-rt-x:hover { background: var(--text); color: var(--bg); }
 
-.adm-rt-psec { border-top: 3px solid var(--text); padding: 12px 0 2px; margin-top: 16px; }
+.adm-rt-psec { padding: 12px 0 2px; margin-top: 16px; }
 .adm-rt-sub { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .9rem; letter-spacing: .05em; text-transform: uppercase; color: var(--text); margin-bottom: 8px; }
 .adm-rt-prow { display: grid; grid-template-columns: minmax(0, 1fr) 10rem 6rem; gap: 0 14px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); min-height: 38px; }
 .adm-rt-prow--head { border-bottom: 0; padding-bottom: 3px; min-height: 0; }

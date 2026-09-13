@@ -26,6 +26,7 @@
  *   - FieldRow — one field: name, key, description, source, editor
  *   - ConfigTab (default)
  * @version-history
+ *   v2.3.0 -- 2026-09-13 -- Compose the configuration index rule from poster.css.
  *   v2.2.0 -- 2026-09-13 -- Compose domain and group headings with the shared B1 shape.
  *   v2.1.0 -- 2026-08-31 -- The save controls move into the pinned search row and the old→new
  *     list opens from a word there; the fixed bottom overlay that covered the content is gone.
@@ -327,7 +328,7 @@ export default function ConfigTab({ data, reload }) {
 
       ${domainOrder.length > 0 && html`
       <div class="adm-cfg-body">
-        <nav class="adm-cfg-rail" aria-label=${tr('dashboard.cfgToc', 'Sections')}>
+        <nav class="adm-cfg-rail poster-row--thing" aria-label=${tr('dashboard.cfgToc', 'Sections')}>
           ${domainOrder.map(domain => html`
             <div key=${domain}>
               <div class="d">${domainLabel(domain)}</div>

@@ -15,6 +15,7 @@
  *   - frontmatterOf / bumpPatch: reading a name and a version out of the text being edited
  * @usage registered in views/admin.js NAV_GROUPS
  * @version-history
+ *   v2.2.0 -- 2026-09-13 -- Compose remaining section headings and record rules from poster.css.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face, and five things the page held and never showed.
  *     `builtin` is computed by listSkills and was dropped, so nothing said which skills came with
@@ -359,7 +360,7 @@ function Open({ skill, onBack, onEdit, onDownload, onDelete, onVisibility, busy 
         <button type="button" onClick=${onBack}>${S('title')}</button> · ${skill.name}
       </div>
 
-      <div class="adm-sk-head">
+      <div class="adm-sk-head poster-row--thing">
         <h2>${skill.name}<i>v${skill.version} · ${skill.ref}</i></h2>
         <div class="adm-sk-doors">
           <button type="button" class="adm-sk-door" onClick=${onEdit}>${S('edit')}</button>
@@ -428,7 +429,7 @@ function Write({ editing, setEditing, skills, onPublish, busy }) {
   return html`
     <div class="adm-sk-page">
       <div class="adm-sk-head">
-        <h2>${editing.was ? S('editTitle', { name: editing.was.name }) : S('writeTitle')}<small>02</small></h2>
+        <h2 class="poster-section-title">${editing.was ? S('editTitle', { name: editing.was.name }) : S('writeTitle')}<small>02</small></h2>
         <button type="button" class="adm-sk-door" onClick=${() => setEditing(null)}>${t('common.cancel')}</button>
       </div>
       <p class="adm-sk-lead">${S('writeLead')}</p>

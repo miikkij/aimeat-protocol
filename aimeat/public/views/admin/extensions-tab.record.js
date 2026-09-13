@@ -13,6 +13,7 @@
  *   - Instances: create, pause, delete, edit config and translations for a multi-instance extension
  *
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose the action rule and replace inline instance layout with classes.
  *   v1.0.0 — 2026-09-12 — Initial. What an extension exposes and what calls it were both invisible
  *     before: the list showed a name, a version and a HEALTHY badge that only meant "active".
  */
@@ -94,7 +95,7 @@ function Instances({ ext, schema, onError }) {
       ${list.map(inst => html`
         <div class="adm-ex-frow">
           <b>${inst.id}</b>
-          <span class="adm-ex-box-row" style="border:0;padding:0">
+          <span class="adm-ex-box-row adm-ex-inst-row">
             <em>${inst.status === 'active' ? X('inst.running') : X('inst.paused')}<small>${X('inst.madeBy', { who: inst.createdBy || inst.created_by || '—', when: dt(inst.createdAt || inst.created_at) })}</small></em>
             <span>
               ${schema && html`<button type="button" class="og-door og-door--quiet"
@@ -107,15 +108,15 @@ function Instances({ ext, schema, onError }) {
         </div>
         ${editCfg === inst.id && html`<div class="adm-ex-panel">
           <${ConfigForm} schema=${schema} config=${cfgData} onChange=${setCfgData} />
-          <div class="adm-ex-acts" style="border-top:0;padding-top:12px">
+          <div class="adm-ex-acts adm-ex-inst-actions">
             <button class="adm-btn" onClick=${() => saveConfig(inst)}>${X('inst.save')}</button>
             <button type="button" class="og-door og-door--quiet" onClick=${() => setEditCfg(null)}>${X('inst.cancel')}</button>
           </div>
         </div>`}
         ${editTl === inst.id && html`<${TranslationEditor} extName=${ext.name} inst=${inst} onSave=${saveTranslations} />`}`)}
 
-      <div class="adm-ex-acts" style="border-top:0">
-        <div class="og-field" style="max-width:260px">
+      <div class="adm-ex-acts">
+        <div class="og-field adm-ex-inst-field">
           <label class="og-label" for=${'ex-inst-' + ext.name}>${X('inst.newId')}</label>
           <input id=${'ex-inst-' + ext.name} class="og-input" type="text" value=${newId}
             placeholder="my-instance-01" onInput=${e => setNewId(e.target.value)} />
@@ -220,7 +221,7 @@ export default function ExtensionRecord({ ext, onClose, onUninstall, onReload })
 
       ${ext.instances && html`<${Instances} ext=${ext} schema=${schema} onError=${showErr} />`}
 
-      <div class="adm-ex-acts">
+      <div class="adm-ex-acts poster-row--thing">
         <button class="adm-btn" onClick=${() => setActive(!active)} disabled=${busy}>
           ${active ? X('switchOff') : X('switchOn')}
         </button>

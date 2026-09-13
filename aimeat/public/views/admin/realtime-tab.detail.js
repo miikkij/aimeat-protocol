@@ -11,6 +11,7 @@
  * @structure RoomDetail({ room, idleMs, onClose, onCloseRoom })
  * @usage imported by realtime-tab.js
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose ink row boundaries from the shared poster class.
  *   v1.0.0 — 2026-09-12 — Initial (the Realtime page in the poster face).
  */
 import { h } from 'preact';
@@ -53,7 +54,7 @@ export default function RoomDetail({ room, idleMs, onClose, onCloseRoom }) {
         </button>
       </div>
 
-      <div class="adm-rt-psec">
+      <div class="adm-rt-psec poster-row--thing">
         <div class="adm-rt-sub">${R('theRoom')}</div>
         <dl class="adm-rt-kv">
           <dt>${R('openedBy')}</dt>
@@ -68,7 +69,7 @@ export default function RoomDetail({ room, idleMs, onClose, onCloseRoom }) {
         </dl>
       </div>
 
-      <div class="adm-rt-psec">
+      <div class="adm-rt-psec poster-row--thing">
         <div class="adm-rt-sub">${R('whoIsInIt')}</div>
         ${room.peers.length === 0
     ? html`<p class="adm-rt-note">${R('nobodyLeft')}</p>`
@@ -85,7 +86,7 @@ export default function RoomDetail({ room, idleMs, onClose, onCloseRoom }) {
           <p class="adm-rt-note">${R('nickNote')}</p>`}
       </div>
 
-      <div class="adm-rt-psec">
+      <div class="adm-rt-psec poster-row--thing">
         <div class="adm-rt-sub">${R('sharedDocs')}</div>
         ${room.docList.length === 0
     ? html`<p class="adm-rt-note">${R('noDocs')}</p>`
@@ -102,7 +103,7 @@ export default function RoomDetail({ room, idleMs, onClose, onCloseRoom }) {
           <p class="adm-rt-note">${R('docNote')}</p>`}
       </div>
 
-      <div class="adm-rt-psec">
+      <div class="adm-rt-psec poster-row--thing">
         <div class="adm-rt-sub">${R('closingIt')}</div>
         <p class="adm-rt-note">${room.peerCount === 0 ? R('closingWhyEmpty')
     : room.peerCount === 1 ? R('closingWhyOne')
