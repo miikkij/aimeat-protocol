@@ -8,6 +8,8 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-09-13 — Lineage, copy protection and versions open and close through dialogs.js (the
+ *     site's one dialog), and "is it open" asks the dialog rather than its hidden flag.
  *   2026-09-13 — The About and Promote headlines lose their inline flex styles: the headline is a
  *     slab now (app-catalog-poster.css) and lays out its own words and doors.
  *   2026-09-13 — Opening an app clears the rail's pinned section (resetDetailRail).
@@ -79,6 +81,7 @@ import { appManifestAgents } from './app-agents.js';
 import { isFavorite } from './favorites.js';
 import { saveWorkingCopy, loadCheckpoints, getCheckpoints, readCheckpoint, deleteCheckpoint, discardWorkingCopy, getDraft } from './workcopy.js';
 import { detailRailPage, renderDetailRail, resetDetailRail } from './detail-rail.js';
+import { openDlg, closeDlg, isDlgOpen } from './dialogs.js';
 
 // Injected once at bootstrap by main.js. Functions are main-local; the get* return main's LIVE
 // state (so reads + in-place mutations propagate across the reassignments main does each render).
@@ -328,7 +331,7 @@ function onAuthChanged() {
   try { refreshAll(); } catch (e) { try { loadPublishedApps(); } catch (e2) {} }
   var sub = document.getElementById('publish-submit-btn');
   var st = document.getElementById('publish-status');
-  if (sub && document.getElementById('publish-overlay') && !document.getElementById('publish-overlay').hidden) {
+  if (sub && isDlgOpen('publish-overlay')) {
     if (getCortexOwnerToken()) { sub.disabled = false; if (st) st.textContent = ''; }
     else { sub.disabled = true; if (st) { st.textContent = t('publish.loginRequired'); st.style.color = 'var(--accent)'; } }
   }
@@ -2281,7 +2284,7 @@ function showLineageModal(owner, filename) {
   statusEl.textContent = t('lineage.loading') || 'Loading lineage…';
   statusEl.style.color = 'var(--text-muted)';
   treeEl.innerHTML = '';
-  document.getElementById('lineage-overlay').hidden = false;
+  openDlg('lineage-overlay');
 
   fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/lineage')
     .then(function(resp) { if (!resp.ok) throw new Error('Server returned ' + resp.status); return resp.json(); })
@@ -2339,7 +2342,7 @@ function showProtectionModal(filename) {
   document.getElementById('protect-noRawDownload').checked = !!p.noRawDownload;
   document.getElementById('protection-title').textContent = filename;
   document.getElementById('protection-status').textContent = '';
-  document.getElementById('protection-overlay').hidden = false;
+  openDlg('protection-overlay');
 }
 
 function saveProtection() {
@@ -2368,7 +2371,7 @@ function saveProtection() {
         statusEl.textContent = '✔ ' + (t('protect.saved') || 'Saved');
         statusEl.style.color = '#34d399';
         loadPublishedApps();
-        setTimeout(function() { document.getElementById('protection-overlay').hidden = true; }, 800);
+        setTimeout(function() { closeDlg('protection-overlay'); }, 800);
       } else {
         statusEl.textContent = '✘ ' + ((json.error && json.error.message) || 'Failed');
         statusEl.style.color = 'var(--accent)';
@@ -2388,7 +2391,7 @@ function showVersionsModal(owner, filename) {
   statusEl.textContent = 'Loading versions…';
   statusEl.style.color = 'var(--text-muted)';
   listEl.innerHTML = '';
-  document.getElementById('versions-overlay').hidden = false;
+  openDlg('versions-overlay');
 
   fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/versions')
     .then(function(resp) {
@@ -2496,7 +2499,7 @@ function forkVersion(owner, filename, version) {
   var config = loadConfig();
   var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
   var statusEl = document.getElementById('versions-status');
-  var inVersionsModal = !document.getElementById('versions-overlay').hidden;
+  var inVersionsModal = isDlgOpen('versions-overlay');
   if (inVersionsModal) { statusEl.textContent = 'Forking…'; statusEl.style.color = '#34d399'; }
 
   // Server-side fork: the server copies the source bytes + manifest, enforces the

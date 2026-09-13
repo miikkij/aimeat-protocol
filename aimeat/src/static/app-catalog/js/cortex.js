@@ -7,6 +7,10 @@
  *   modules, holds its own module state, has no back-dependency on the entry module. Carved from main.js.
  * @usage import { loadCortexExtensions, openCortexEditor, openPromptBuilder, getCortexOwnerToken } from './cortex.js'
  * @version-history
+ *   v1.3.0 — 2026-09-13 — The popup, the editor and the prompt builder are the site's one dialog
+ *     (dialogs.js): the extension's name is the popup's title, its owner's edit door stands at the
+ *     footer's start, and the prompt builder opens and closes like every other dialog instead of
+ *     by style.display.
  *   v1.2.0 — 2026-09-13 — The extension popup and the extension editor wear the dialog frame the
  *     rest of the catalog's dialogs wear: markup with classes instead of inline styles, the title
  *     on the dialog slab, copy and remove as underlined words, save as the one loud slab, the
@@ -21,6 +25,7 @@ import { jsArg, currentOwnerName } from './util.js';
 import { showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t, getLang } from './i18n.js';
+import { openDlg, closeDlg } from './dialogs.js';
 
 // ── Cortex Extensions Bar ─────────────────────────
 
@@ -96,8 +101,14 @@ function showCortexPopup(encodedName) {
   var config = loadConfig();
   var url = config.aimeatUrl.replace(/\/+$/, '');
   var el = document.getElementById('cortex-popup-content');
+  var titleEl = document.getElementById('cortex-popup-title');
+  var ownerEl = document.getElementById('cortex-popup-owner');
+  var shownName = encodedName;
+  try { shownName = decodeURIComponent(encodedName); } catch (e) { /* a malformed name is shown as it came */ }
+  titleEl.textContent = shownName;
+  ownerEl.innerHTML = '';
   el.innerHTML = '<p class="cx-sub">' + cortexEsc(t('cortex.loading')) + '</p>';
-  document.getElementById('cortex-popup-overlay').hidden = false;
+  openDlg('cortex-popup-overlay');
 
   if (!cortexToken) { el.innerHTML = '<p class="cx-sub">' + cortexEsc(t('cortex.noToken')) + '</p>'; return; }
 
@@ -108,7 +119,8 @@ function showCortexPopup(encodedName) {
     .then(function(data) {
       var ext = data.data;
       var comps = ext.components || [];
-      var html = '<h2>' + cortexEsc(ext.name) + '</h2>';
+      titleEl.textContent = ext.name;
+      var html = '';
       if (ext.description) html += '<p class="cx-desc">' + cortexEsc(ext.description) + '</p>';
       html += '<div class="cx-label">' + cortexEsc(t('cortex.forApps')) + '</div>';
 
@@ -145,12 +157,11 @@ function showCortexPopup(encodedName) {
 
       // Edit button — only for the OWNER of this extension. The backend export/DELETE/PUT
       // routes enforce ownership too; this just hides a button that would 403 for everyone else.
+      // It is a side door, so it stands at the footer's start.
       var isOwner = false;
       try { var _me = currentOwnerName(); isOwner = !!_me && ext.installed_by === _me; } catch(e) {}
       if (isOwner) {
-        html += '<div class="cx-owner">'
-          + '<button type="button" class="modal-btn secondary" onclick="window._launcher.openCortexEditor(\'' + encodedName + '\')">' + cortexEsc(t('cortex.edit')) + '</button>'
-          + '</div>';
+        ownerEl.innerHTML = '<button type="button" class="modal-btn secondary" onclick="window._launcher.openCortexEditor(\'' + encodedName + '\')">' + cortexEsc(t('cortex.edit')) + '</button>';
       }
 
       el.innerHTML = html;
@@ -208,8 +219,8 @@ function openCortexEditor(encodedName) {
   cortexEditorLibCounter = 0;
 
   // Close the detail popup
-  document.getElementById('cortex-popup-overlay').hidden = true;
-  document.getElementById('cortex-editor-overlay').hidden = false;
+  closeDlg('cortex-popup-overlay');
+  openDlg('cortex-editor-overlay');
 
   fetch(url + '/v1/cortex/' + encodedName + '/export', {
     headers: { 'Authorization': 'Bearer ' + token }
@@ -351,7 +362,7 @@ function cortexEditorExport() {
 }
 
 function closeCortexEditor() {
-  document.getElementById('cortex-editor-overlay').hidden = true;
+  closeDlg('cortex-editor-overlay');
   cortexEditorExtName = null;
 }
 
@@ -374,7 +385,6 @@ function pbApplyTrackUi() {
 
 function openPromptBuilder(app) {
   pbSourceApp = app || null;
-  var overlay = document.getElementById('prompt-builder-overlay');
   var desc = document.getElementById('pb-description');
 
   // Reset state
@@ -422,13 +432,13 @@ function openPromptBuilder(app) {
   // Load the canonical platform-instructions core from the node (single source of truth)
   loadPbCore();
 
-  overlay.style.display = 'flex';
+  openDlg('prompt-builder-overlay');
   desc.focus();
   updatePbPreview();
 }
 
 function closePbPanel() {
-  document.getElementById('prompt-builder-overlay').style.display = 'none';
+  closeDlg('prompt-builder-overlay');
   pbSourceApp = null;
 }
 

@@ -14,6 +14,10 @@
  *   - buildAppCatalog() → assemble + write src/static/app-catalog.html (+ a generated-file banner)
  * @usage  pnpm build:app-catalog   (also run by `pnpm build` and `pnpm dev`)
  * @version-history
+ *   v1.2.0 — 2026-09-13 — public/css/dialog.css is appended after the poster sheet, and the bundle
+ *     takes public/js/dialog.js through js/dialogs.js, so the catalog's dialogs are the site's one
+ *     dialog rather than a copy; a change to either file makes check:app-catalog fail until the page
+ *     is rebuilt.
  *   v1.1.0 — 2026-09-13 — The poster sheet's type and sun tokens come from theme.css at build time
  *     instead of a hand copy. The copy had stayed at its 2026-08-28 values (Archivo Black, -.035em)
  *     for two weeks after theme.css moved to Fjalla One and its own tracking; now a change there
@@ -30,6 +34,8 @@ const SRC_DIR = join(__dirname, '..', 'src', 'static', 'app-catalog');
 const OUT_FILE = join(__dirname, '..', 'src', 'static', 'app-catalog.html');
 
 const THEME_FILE = join(__dirname, '..', 'public', 'css', 'theme.css');
+/** The site's one dialog; the catalog's dialogs wear the same file the SPA links. */
+const DIALOG_CSS_FILE = join(__dirname, '..', 'public', 'css', 'dialog.css');
 
 const STYLES_MARKER = '__APP_CATALOG_STYLES__';
 const BUNDLE_MARKER = '__APP_CATALOG_BUNDLE__';
@@ -84,17 +90,19 @@ export async function renderAppCatalog(): Promise<string> {
   if (!template.includes(STYLES_MARKER)) throw new Error(`template missing ${STYLES_MARKER}`);
   if (!template.includes(BUNDLE_MARKER)) throw new Error(`template missing ${BUNDLE_MARKER}`);
 
-  // The poster face is appended AFTER the base stylesheet so it wins every cascade it shares.
+  // The poster face is appended AFTER the base stylesheet so it wins every cascade it shares, and
+  // the site's dialog after both, so a dialog here is drawn by the same rules as one in the SPA.
   const poster = readFileSync(join(SRC_DIR, 'styles', 'app-catalog-poster.css'), 'utf-8');
   if (!poster.includes(TOKENS_MARKER)) throw new Error(`app-catalog-poster.css missing ${TOKENS_MARKER}`);
   const tokens = themePosterTokens(readFileSync(THEME_FILE, 'utf-8'));
   const css = readFileSync(join(SRC_DIR, 'styles', 'app-catalog.css'), 'utf-8') + '\n' +
-    poster.replace(TOKENS_MARKER, () => tokens.trimStart());
+    poster.replace(TOKENS_MARKER, () => tokens.trimStart()) + '\n' +
+    readFileSync(DIALOG_CSS_FILE, 'utf-8');
   const bundle = await bundleJs();
 
   const banner =
     '<!-- GENERATED FILE — do not edit directly. Source: src/static/app-catalog/ ' +
-    '(js/*.js + styles/*.css + _template.html) and the type tokens of public/css/theme.css. Rebuild: pnpm build:app-catalog -->\n';
+    '(js/*.js + styles/*.css + _template.html), the type tokens of public/css/theme.css, and public/css/dialog.css + public/js/dialog.js. Rebuild: pnpm build:app-catalog -->\n';
 
   return banner + template.replace(STYLES_MARKER, () => css).replace(BUNDLE_MARKER, () => bundle);
 }
@@ -108,7 +116,7 @@ async function checkAppCatalog(): Promise<void> {
   const fresh = await renderAppCatalog();
   const onDisk = readFileSync(OUT_FILE, 'utf-8');
   if (fresh !== onDisk) {
-    console.error('✗ src/static/app-catalog.html is STALE vs its sources: src/static/app-catalog/ and the type tokens in public/css/theme.css.');
+    console.error('✗ src/static/app-catalog.html is STALE vs its sources: src/static/app-catalog/, the type tokens in public/css/theme.css, and public/css/dialog.css + public/js/dialog.js.');
     console.error('  Run `pnpm build:app-catalog` and commit the regenerated file (a theme.css token change lands in the catalog this way).');
     process.exit(1);
   }

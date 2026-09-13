@@ -16,6 +16,13 @@
   @structure tokens · site bar · masthead, band, tools · rail · the index (rows and panels) ·
     foot · detail view · phone
   @version-history
+    v1.10.0 — 2026-09-13 — The dialogs are the site's one dialog (public/css/dialog.css, built in
+      after this sheet): the dialog frame, the title slab rule for .modal h2, .modal-actions, the
+      overlay scroll list, the .cx-overlay and #consents-overlay wrappers and the phone's .modal
+      padding leave. The catalog's button words take the footer's 44px press area, the page stops
+      scrolling behind an open dialog, a hidden footer button stays hidden, the toast stack is undone
+      from the browser's popover box, and .poster-section-title is the section slab here too, at
+      the dialog's size inside a dialog's body.
     v1.9.0 — 2026-09-13 — Every dialog overlay scrolls, so a dialog taller than the screen starts at
       its top instead of past it; the extension popup and editor in the dialog frame (.cx-*); the
       legal pages' recommendation as a chip (.lg-rec) instead of a sun bar.
@@ -342,16 +349,19 @@ footer .footer-brand { grid-column: 1 / -1; font-family: var(--font-poster); fon
    (2026-09-12) and the home's .koti-band-title: paper words on ink, a 6px sun stripe under it, the
    headline face at the poster tracking and leading. Ink and paper swap in the dark theme, so the
    slab turns light with dark words there. It replaces the rule that sat under the headline; a 3px
-   rule inside a section now means a row and only a row. The size stays each place's own. */
+   rule inside a section now means a row and only a row. The size stays each place's own.
+   .poster-section-title is the same class public/css/poster.css gives the slab on the other pages;
+   inside a dialog's body dialog.css sets its size a step smaller through --poster-section-size. */
 .dtl-section > h3,
 .cat-list-title h2, .cat-list-title .fav-section-title, .published-header h2,
-.modal h2, .prompt-builder-modal h2 {
+.poster-section-title {
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
   color: var(--bg); background: var(--text);
   padding: .55rem 1rem .5rem; border: 0; border-bottom: 6px solid var(--sun);
   margin: 0 0 1.4rem;
 }
+.poster-section-title { font-size: var(--poster-section-size, 1.9rem); }
 .dtl-section > h3 {
   display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 12px;
   font-size: 1.9rem;
@@ -546,14 +556,29 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .dtl-skill-desc { margin-top: 6px; font-size: .92rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; color: var(--text-dim); max-width: 70ch; }
 #detail-skill-attach { margin-top: 18px; }
 
-/* ── Dialogs: the same paper as the page, an ink frame, a sun shadow ─────────────────────── */
-.modal {
-  background: var(--bg); border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun);
-  padding: 28px 32px 30px; font-family: var(--font-body); animation: none;
-}
-/* The dialog's title is the section slab at the dialog's size (the shared rule above). */
-.modal h2 { font-size: 1.4rem; }
+/* ── Dialogs ──────────────────────────────────────────────────────────────────────────────── */
+/* The frame, the header with its title slab and X, the scrolling body, the footer and the phone
+   sheet are public/css/dialog.css, which the build puts after this sheet. What follows is what the
+   catalog puts inside a dialog, and the catalog's own button words fitted to the footer. */
+.modal { animation: none; }
+/* The app a dialog is about, beside the title: mono, as it is written. */
 .modal h2 .aga-app-ref { font-family: var(--font-mono); font-size: .8rem; text-transform: none; letter-spacing: 0; color: inherit; }
+/* This page has no global [hidden] rule, and a button word sets its own display, so a hidden
+   footer button (Try it safely before a draft exists) would still show without this. */
+dialog.dlg [hidden] { display: none !important; }
+/* A footer word is the dialog's underlined word with a 44px press area; the slab stays the slab. */
+dialog.dlg .dlg-foot .modal-btn:not(.primary):not(.success) {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0;
+  font-size: .8rem; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px;
+}
+dialog.dlg .dlg-foot .modal-btn:not(.primary):not(.success):hover { color: var(--accent); }
+dialog.dlg .dlg-foot .modal-btn.danger { color: var(--accent); }
+dialog.dlg .dlg-foot .modal-btn.primary, dialog.dlg .dlg-foot .modal-btn.success { font-size: .8rem; }
+/* The page behind a dialog does not scroll under it. */
+html:has(dialog.dlg[open]) { overflow: hidden; }
+/* The toast stack is a manual popover so it can show above an open dialog; the browser's own
+   popover box (centred, framed, painted) is undone so it stays the stack in the top right corner. */
+.notice-stack[popover] { inset: 16px 16px auto auto; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; overflow: visible; }
 .modal p, .help-p, .confirm-message, .parked-blurb { font-size: .95rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; color: var(--text); }
 .help-p { color: var(--text-dim); margin: 6px 0 0; }
 .modal-label, .modal .settings-row label, .modal label:not(.protect-row):not(.mz-check):not(.pb-trackcard):not(.pb-pack-item):not(.pb-ext-toggle):not(.pb-mode-radio):not(.cx-lib-name) { display: block; font-size: .9rem; font-weight: 700; color: var(--text); margin: 14px 0 2px; text-transform: none; letter-spacing: 0; }
@@ -567,7 +592,6 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 /* The tabs govern the body under them and nothing after it: a 4px sun bar down the left edge from
    under the tabs to the last line the chosen tab decides, as on the home (.koti-journey-panel). */
 .modal-tabs ~ .tab-content.active { border-left: 4px solid var(--sun); padding-left: 1.25rem; }
-.modal-actions { display: flex; gap: 22px; align-items: center; justify-content: flex-start; flex-wrap: wrap; margin-top: 24px; }
 .modal-btn, .modal-btn.secondary, .modal-btn.danger {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0 0 1px;
   font-family: var(--font-body); font-weight: 800; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text);
@@ -581,8 +605,6 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 }
 .modal-btn.primary:hover:not(:disabled), .modal-btn.success:hover:not(:disabled) { color: var(--sun); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); background: var(--text); }
 .modal-btn:disabled { opacity: .45; transform: none; }
-.settings-section { margin-top: 18px; }
-.settings-section-title { font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; margin: 0 0 6px; padding-bottom: 6px; border-bottom: 2px solid var(--text); }
 .settings-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
 .settings-row label { margin: 0; }
 .protect-row { padding: 12px 0; border-bottom: 1px solid var(--border); font-size: .92rem; font-weight: var(--font-poster-text-weight); line-height: 1.5; gap: 12px; }
@@ -608,38 +630,16 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 .drop-zone { border: 3px dashed var(--text); border-radius: 0; background: var(--surface); }
 .drop-zone.dragover { border-color: var(--accent); background: var(--surface); }
 .browse-btn { border: 2px solid var(--text); border-radius: 0; background: var(--bg); color: var(--text); font-weight: 800; }
-.source-modal { max-width: 840px; }
 #source-code { border: 3px solid var(--text); border-radius: 0; background: var(--surface); font-family: var(--font-mono); font-size: .8rem; }
 .backup-menu, #context-menu { border: 2px solid var(--text); border-radius: 0; box-shadow: 4px 4px 0 var(--sun); background: var(--bg); padding: 6px 0; }
 .backup-menu button, #context-menu button { font-family: var(--font-body); font-weight: 700; font-size: .9rem; border-radius: 0; }
 .backup-menu button:hover, #context-menu button:hover { background: var(--sun); color: var(--text); }
 .notice { border-radius: 0; border: 2px solid var(--text); border-left-width: 6px; box-shadow: 4px 4px 0 var(--sun); font-family: var(--font-body); font-weight: 700; }
 
-/* The generate-with-AI dialog: three numbered steps, the same numerals as the monetize form. */
-.prompt-builder-modal { max-width: 860px; background: var(--bg); border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); padding: 28px 32px 30px; }
-.prompt-builder-modal h2 { font-size: 1.4rem; }
 .consents-target { font-size: .8rem; color: var(--text-muted); margin: 0 0 12px; }
-#consents-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, .6); display: flex; justify-content: center; padding: 24px; }
 
-/* A dialog taller than the screen scrolls with its overlay instead of centring past the top edge,
-   where its title and first fields could not be reached (measured 2026-09-13: the add dialog's top
-   at -33px on a 390x844 phone, help at -180px, publish at -7px in a 1280x460 window). The overlay
-   scrolls; the auto margins centre a dialog that fits and fall to zero for one that does not. */
-#modal-overlay, #source-overlay, #settings-overlay, #help-overlay, #publish-overlay, #versions-overlay,
-#subdomain-overlay, #backup-overlay, #server-import-overlay, #json-import-overlay, #aimeat-import-overlay,
-#lineage-overlay, #confirm-overlay, #agents-overlay, #protection-overlay, #prompt-builder-overlay,
-#consents-overlay, #cortex-popup-overlay, #cortex-editor-overlay {
-  overflow-y: auto; overscroll-behavior: contain; align-items: flex-start;
-}
-.modal, .prompt-builder-modal { margin-block: auto; flex-shrink: 0; }
-
-/* ── The extension popup and the extension editor, in the dialog frame ───────────────────── */
-.cx-overlay { position: fixed; inset: 0; z-index: 650; background: rgba(0, 0, 0, .3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; justify-content: center; padding: 24px; }
-.cx-overlay--editor { z-index: 651; }
+/* ── What the extension popup and the extension editor hold ──────────────────────────────── */
 .modal label.cx-lib-name { font-weight: 700; font-size: .9rem; color: var(--text); }
-.cx-overlay[hidden] { display: none; }
-.cx-modal { max-width: 560px; }
-.cx-modal--editor { max-width: 840px; }
 .modal .cx-sub { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); margin: 0 0 12px; overflow-wrap: anywhere; }
 .modal .cx-desc { margin: 0 0 18px; color: var(--text-dim); }
 .cx-label { font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; margin: 0; padding-bottom: 6px; border-bottom: 2px solid var(--text); }
@@ -656,7 +656,6 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 textarea.cx-code { resize: vertical; tab-size: 2; }
 .cx-code--manifest { min-height: 280px; }
 .cx-code--lib { min-height: 160px; margin: 0; }
-.cx-owner { margin-top: 20px; }
 .cx-status { min-height: 1.2em; margin: 0 0 14px; font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); }
 .cx-status--err { color: var(--accent); }
 .cx-lib { margin: 14px 0 0; padding: 12px 14px 14px; border: 2px solid var(--text); }
@@ -664,6 +663,7 @@ textarea.cx-code { resize: vertical; tab-size: 2; }
 .modal label.cx-lib-name { display: flex; align-items: baseline; gap: 10px; flex: 1 1 240px; min-width: 0; margin: 0; }
 .cx-lib-name .modal-input { flex: 1 1 auto; min-width: 0; font-family: var(--font-mono); font-size: .85rem; padding: 4px 0; }
 .cx-add { margin-top: 14px; }
+/* The generate-with-AI dialog: three numbered steps, the same numerals as the monetize form. */
 .pb-intro { font-size: .95rem; font-weight: var(--font-poster-text-weight); line-height: 1.55; color: var(--text-dim); margin: 0 0 20px; }
 .pb-step { border-top: 3px solid var(--text); padding-top: 18px; margin-bottom: 22px; }
 .pb-step:first-of-type { border-top: 3px solid var(--text); padding-top: 18px; }
@@ -789,12 +789,11 @@ textarea.cx-code { resize: vertical; tab-size: 2; }
   .lg-row-actions { grid-column: 1; grid-row: auto; justify-self: start; white-space: normal; flex-wrap: wrap; }
   .lg-editor select.modal-input { max-width: none; }
   .mz-group > .mz-field, .mz-group > .mz-grid, .mz-group > .mz-more, .mz-group > .mz-check, .mz-group > .mz-hint, .mz-group > .od-tool-head, .mz-group > .od-form, .mz-group-lede { margin-left: 0; }
-  .modal { padding: 20px 18px 22px; box-shadow: 5px 5px 0 var(--sun); }
 }
 
 /* ── Narrow phone: the slabs at the home's phone numbers ─────────────────────────────────── */
 @media (max-width: 560px) {
   .dtl-section > h3, .cat-list-title h2, .cat-list-title .fav-section-title, .published-header h2 { font-size: 1.7rem; padding: .45rem .8rem .4rem; }
-  .modal h2, .prompt-builder-modal h2 { padding: .45rem .8rem .4rem; }
+  .poster-section-title { padding: .45rem .8rem .4rem; }
   .modal-tabs ~ .tab-content.active { padding-left: .9rem; }
 }
