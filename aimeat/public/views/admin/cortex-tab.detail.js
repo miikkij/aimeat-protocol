@@ -15,6 +15,7 @@
  * @structure CortexDetail (default export) · pieceName() · pieceDetail()
  * @usage <${CortexDetail} ext=${detail} row=${row} onBack=${...} ... />
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose shared B1 headings and stylesheet-owned spacing.
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
@@ -131,7 +132,7 @@ export default function CortexDetail({ ext, row, busy, onBack, onTurnOff, onTurn
               <span><b>${pieceName(c)}</b>
                 <span class="adm-why">${pieceDetail(c, ext.activation_artifacts)}</span></span>
             </div>`)}
-        <div class="og-box adm-cx-keeps">
+        <div class="og-box adm-cx-keeps poster-aside poster-aside--small">
           <span class="og-box-label">${C('detail.keepsLabel')}</span>
           ${C('detail.keeps')}
         </div>

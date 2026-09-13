@@ -20,6 +20,7 @@
  *     discovery-tab.shared.js.
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-11 — The poster face: the status word, the metric rows, the strip, six numbered
  *     sections, and the tag check shared between 01 and 02. The five steps became one row per
@@ -153,7 +154,7 @@ function Checks({ status }) {
           ${Row({ title: S('checks.speed'), why: S('checks.speedWhy'), chip: null, value: open(`https://pagespeed.web.dev/analysis?url=${enc}`) })}
           ${Row({ title: S('checks.bingInspect'), why: S('checks.bingInspectWhy'), chip: null, value: open('https://www.bing.com/webmasters/urlinspection'), last: true })}
         </div>
-        <div class="og-box">
+        <div class="og-box poster-aside poster-aside--small">
           <span class="og-box-label">${S('checks.aiLabel')}</span>
           <div class="adm-disc-paste">${paste}</div>
         </div>

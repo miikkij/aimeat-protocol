@@ -10,6 +10,7 @@
  *   kicker, title) comes from landing-showroom.css, which the view loads beside this sheet.
  *   Consumes theme.css tokens so it flips with dark/light.
  * @version-history
+ *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v2.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   v1.1.0 — 2026-06-02 — Phase 4: tokenize card/panel/border/text/bg-layer/code
  *     surfaces (#FFFFFF/#E5E7EB/#F3F4F6/#6B7280) for dark mode.
@@ -171,32 +172,6 @@
 .dv-instructions li { margin-bottom: .5rem; }
 .dv-instructions code { background: var(--code-bg); padding: .15rem .4rem; border: 2px solid var(--text); font-size: .85rem; font-family: var(--font-mono); }
 
-/* Upload */
-.dv-upload-area { border: 3px dashed var(--accent); padding: 1.5rem; text-align: center; margin-top: 1rem; background: var(--card-bg); }
-.dv-upload-area.dragover { background: var(--code-bg); }
-.dv-upload-btn { background: var(--accent); color: #FFFFFF; border: 3px solid var(--text); box-shadow: 4px 4px 0 var(--text); padding: .6rem 1.2rem; cursor: pointer; font-family: var(--font-showroom); text-transform: uppercase; font-size: .95rem; }
-.dv-upload-btn:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--text); }
-.dv-upload-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-
-/* Share URL */
-.dv-share-url { display: flex; align-items: center; gap: .5rem; background: var(--code-bg); border: 2px solid var(--success); padding: .6rem 1rem; margin-top: .75rem; font-family: var(--font-mono); font-size: .85rem; }
-.dv-share-url input { flex: 1; background: none; border: none; color: var(--text); font-family: var(--font-mono); font-size: .85rem; outline: none; }
-/* The share-url row's copy button confirms success by existing next to a live URL, so it is
-   styled as the success action rather than the accent one. */
-.dv-share-url .btn-primary { background: var(--success); box-shadow: none; }
-
-/* App list */
-.dv-app-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: .75rem; margin-top: 1rem; }
-.dv-app-item { background: var(--card-bg); padding: 1rem; border: 2px solid var(--text); }
-.dv-app-name { font-weight: 800; margin-bottom: .25rem; }
-.dv-app-meta { font-size: .75rem; color: var(--text-dim); }
-.dv-app-item a { color: var(--accent); }
-/* Open first: these apps run on the node, they are not files you take home.
-   Download stays available as the quieter second action. */
-.dv-app-actions { display: flex; align-items: center; gap: .6rem; margin-top: .6rem; flex-wrap: wrap; }
-.dv-app-open { font-size: .8rem; padding: .3rem .8rem; }
-.dv-app-download { font-size: .78rem; color: var(--text-dim); }
-.dv-app-item .dv-app-download { color: var(--text-dim); }
 
 /* ── MCP setup panel (portal-dev.panels.js): theme tokens throughout, so it flips in dark mode ── */
 .dv-callout { padding: .75rem 1rem; margin-bottom: 1rem; border: 2px solid var(--text); }

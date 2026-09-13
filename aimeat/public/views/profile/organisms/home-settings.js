@@ -17,6 +17,7 @@
  *   import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
  *   <OrganismSettings org ghii isCreator isMember canEdit showToast confirm onBack onChanged onLeave onDeleted />
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 -- 2026-09-13 -- Compose section headlines with poster-section-title.
  *   v1.0.1 — 2026-08-29 — The rail scrolls the content region only (poster-parts scrollTo), never the window.
@@ -250,7 +251,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
 
             <section class="og-sec" id="og-set-danger">
               <div class="og-sec-h"><h2 class="poster-section-title">${label('setDanger', 'Archive and delete')}<small>04</small></h2></div>
-              <div class="og-box">
+              <div class="og-box poster-aside poster-aside--small">
                 <span class="og-box-label">${label('reversible', 'Reversible')}</span>
                 <div class="og-box-row">
                   <span><b>${org.archived ? (t('organisms.unarchiveOrganismTitle') || 'Unarchive this organism') : (t('organisms.archiveOrganismTitle') || 'Archive this organism')}.</b> ${org.archived
@@ -260,7 +261,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
                 </div>
               </div>
               ${isCreator ? html`
-                <div class="og-box og-box--solid">
+                <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible">
                   <span class="og-box-label">${label('irreversible', 'Cannot be undone')}</span>
                   <div class="og-box-row">
                     <span><b>${t('organisms.deleteOrganismTitle') || 'Delete this organism'}.</b> ${delStatsText}</span>
@@ -278,7 +279,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
 
           ${isMember && !isCreator ? html`
             <section class="og-sec ${canEdit ? '' : 'og-sec--first'}">
-              <div class="og-box og-box--solid">
+              <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible">
                 <div class="og-box-row">
                   <span><b>${t('organisms.leave') || 'Leave'}.</b></span>
                   <button type="button" class="og-door og-door--danger" onClick=${onLeave}>${t('organisms.leave') || 'Leave'}</button>

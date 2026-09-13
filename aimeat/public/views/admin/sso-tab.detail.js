@@ -24,6 +24,7 @@
  *   - ConnectionDetail — the six steps, the walkthroughs, troubleshooting, the danger zone
  * @usage Imported by views/admin/sso-tab.js.
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 -- 2026-09-13 -- Compose ink row boundaries from the shared poster class.
  *   v1.0.0 — 2026-09-12 — Initial (the Organisation sign-in page in the poster face).
  */
@@ -262,7 +263,7 @@ export function ConnectionDetail({ id, node, onBack, onChanged, showErr, confirm
         </div>
         <div>
           <div class="adm-sso-lbl">${S('detail.briefTitle')}</div>
-          <div class="og-box">
+          <div class="og-box poster-aside poster-aside--small">
             <span class="og-box-label">${S('detail.briefLabel')}</span>
             <div class="adm-sso-paste">${aiBrief(conn)}</div>
           </div>

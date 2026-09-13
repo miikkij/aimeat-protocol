@@ -15,6 +15,7 @@
  *   renderRecord · renderPage
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.4.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.3.0 -- 2026-09-13 -- Compose the record value's top rule from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
@@ -256,8 +257,8 @@ function renderCover(ctx) {
       </div>
 
       ${searchRow}
-      ${showMemForm ? html`<div class="og-box og-box--solid"><span class="og-box-label">${c('newEntry', '+ New entry')}</span><${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} /></div>` : null}
-      ${showFileForm ? html`<div class="og-box og-box--solid"><span class="og-box-label">${c('upload', 'Upload a file')}</span><${FileUploadForm} onUpload=${handleUploadFiles} onCancel=${() => setShowFileForm(false)} /></div>` : null}
+      ${showMemForm ? html`<div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="og-box-label">${c('newEntry', '+ New entry')}</span><${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} /></div>` : null}
+      ${showFileForm ? html`<div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="og-box-label">${c('upload', 'Upload a file')}</span><${FileUploadForm} onUpload=${handleUploadFiles} onCancel=${() => setShowFileForm(false)} /></div>` : null}
 
       <div class="og-grid">
         <div class="og-main">
@@ -342,8 +343,8 @@ function renderSpace(ctx, id) {
       ${prefix ? html`<hr /><button type="button" class="og-rail-link" onClick=${() => deleteGroup(s.g, s.items.length)}><i>·</i>${c('deleteSpace', 'Delete the space')}<em>…</em></button>` : null}
     </nav>`;
   return renderPage(ctx, { id: 'space', crumbs: [{ label: s.label }], title: s.label, sub, doors, rail, children: html`
-    ${showMemForm ? html`<div class="og-box og-box--solid"><span class="og-box-label">${c('newEntry', '+ New entry')}</span><${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} /></div>` : null}
-    ${sharePanelFor ? html`<div class="og-box"><span class="og-box-label">${c('shareGroup', 'Share with a group')}</span>
+    ${showMemForm ? html`<div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="og-box-label">${c('newEntry', '+ New entry')}</span><${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} /></div>` : null}
+    ${sharePanelFor ? html`<div class="og-box poster-aside poster-aside--small"><span class="og-box-label">${c('shareGroup', 'Share with a group')}</span>
       ${groups.length === 0 ? html`<p class="og-hint">${t('profile.memory.shNoGroups') || 'No sharing groups yet.'}</p>` : html`
         <div class="og-fields"><div class="og-field"><span class="og-label">${t('profile.access.shPattern') || 'Pattern'}</span><input type="text" class="og-input" value=${sharePattern} onInput=${e => setSharePattern(e.target.value)} /><span class="og-hint">${t('profile.access.shPatternHelp') || ''}</span></div>
         <div class="og-field"><span class="og-label">${t('profile.memory.shPickGroup') || 'Group'}</span><select class="og-input" value=${shareGroupId} onChange=${e => setShareGroupId(e.target.value)}>${groups.map(g => html`<option key=${g.id} value=${g.id}>${g.name}</option>`)}</select></div>
@@ -446,12 +447,12 @@ function renderOther(ctx, id) {
   } else if (id === 'tools') {
     body = html`
       <div class="og-fields">
-        <div class="og-box og-box--solid"><span class="og-box-label">${t('profile.memory.exportBtn') || 'Export'}</span><p class="og-hint">${c('exportHint', 'A JSON backup of every key in this memory (the selected agent’s, if one is chosen). A key space can be exported alone from its own page.')}</p><div class="og-actions"><button type="button" class="og-slab" onClick=${() => handleExport()}>${t('profile.memory.exportBtn') || 'Export'}</button></div></div>
-        <div class="og-box og-box--solid"><span class="og-box-label">${t('profile.memory.importBtn') || 'Import'}</span><p class="og-hint">${c('importHint', 'A JSON backup made here or by an agent. Choose first what happens when a key already exists.')}</p>
+        <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="og-box-label">${t('profile.memory.exportBtn') || 'Export'}</span><p class="og-hint">${c('exportHint', 'A JSON backup of every key in this memory (the selected agent’s, if one is chosen). A key space can be exported alone from its own page.')}</p><div class="og-actions"><button type="button" class="og-slab" onClick=${() => handleExport()}>${t('profile.memory.exportBtn') || 'Export'}</button></div></div>
+        <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible"><span class="og-box-label">${t('profile.memory.importBtn') || 'Import'}</span><p class="og-hint">${c('importHint', 'A JSON backup made here or by an agent. Choose first what happens when a key already exists.')}</p>
           <div class="og-actions"><div class="og-choice">${['skip', 'overwrite', 'rename'].map(mode => html`<button type="button" key=${mode} class=${`og-choice-btn ${importMode === mode ? 'on' : ''}`} onClick=${() => setImportMode(mode)}>${t('profile.memory.importMode.' + mode) || mode}</button>`)}</div>
           <button type="button" class="og-slab" disabled=${importing} onClick=${triggerImport}>${importing ? '…' : (t('profile.memory.importBtn') || 'Import')}</button></div>
           <input type="file" accept="application/json,.json" ref=${importFileRef} class="pf-hidden" onChange=${handleImportFile} /></div>
-        ${!fullLoaded ? html`<div class="og-box"><span class="og-box-label">${t('profile.memory.loadContents') || 'Load all contents'}</span><p class="og-hint">${c('loadAllHint', 'The list carries keys and sizes only; loading every value lets the filter on the All-as-keys page search inside them. Costs one large read.')}</p><div class="og-actions"><button type="button" class="og-door" onClick=${loadFullContents}>${t('profile.memory.loadContents') || 'Load all contents'}</button></div></div>` : null}
+        ${!fullLoaded ? html`<div class="og-box poster-aside poster-aside--small"><span class="og-box-label">${t('profile.memory.loadContents') || 'Load all contents'}</span><p class="og-hint">${c('loadAllHint', 'The list carries keys and sizes only; loading every value lets the filter on the All-as-keys page search inside them. Costs one large read.')}</p><div class="og-actions"><button type="button" class="og-door" onClick=${loadFullContents}>${t('profile.memory.loadContents') || 'Load all contents'}</button></div></div>` : null}
       </div>`;
   }
   return renderPage(ctx, { id, crumbs: [{ label: title }], title, doors, children: body });

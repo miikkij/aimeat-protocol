@@ -26,6 +26,7 @@
  *   - FieldRow — one field: name, key, description, source, editor
  *   - ConfigTab (default)
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.3.0 -- 2026-09-13 -- Compose the configuration index rule from poster.css.
  *   v2.2.0 -- 2026-09-13 -- Compose domain and group headings with the shared B1 shape.
  *   v2.1.0 -- 2026-08-31 -- The save controls move into the pinned search row and the old→new
@@ -121,7 +122,7 @@ function shown(v) {
  */
 function PendingList({ paths, pending, schema }) {
   return html`
-    <div class="adm-cfg-listbox" role="status">
+    <div class="adm-cfg-listbox poster-aside" role="status">
       <ul>
         ${paths.map(p => html`
           <li key=${p}>

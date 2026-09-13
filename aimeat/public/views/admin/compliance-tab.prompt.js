@@ -24,6 +24,7 @@
  *   - CompliancePromptSection — section 07, the paste in the dashed box with a door that copies it
  * @usage imported by compliance-tab.js, rendered beside the kept reports
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.2.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.1.0 — 2026-09-05 — The section in the poster face: the whole paste sits in the dashed coral
  *     box under section 07 and the copy is a door in the section's header. The paste itself is
@@ -103,7 +104,7 @@ export function CompliancePromptSection({ nodeId, days }) {
       <div class="og-sec-h"><h2 class="poster-section-title">${t('admin.compliance.promptTitle')}<small>07</small></h2>
         <div class="og-doors"><${CopyButton} text=${prompt} label=${t('admin.compliance.promptCopy')} className="og-door og-door--quiet" /></div></div>
       <p class="adm-cmp-lead">${t('admin.compliance.promptNote')}</p>
-      <div class="og-box">
+      <div class="og-box poster-aside poster-aside--small">
         <span class="og-box-label">${t('admin.compliance.promptLabel')}</span>
         <div class="adm-cmp-paste">${prompt}</div>
       </div>

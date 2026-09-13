@@ -9,6 +9,7 @@
  *   last message; the three roads; the person form and the facts list; the together list; a
  *   message; the organism chooser box. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-09-13 -- Compose the shared initials box; retain only row dimensions and placement.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
@@ -40,7 +41,7 @@
 .ct-rows--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 /* The mark is a whole box: the row rule above would otherwise take its bottom edge (the row's 1px
    line wins on specificity), which is how the boxes shipped open at the bottom on 2026-08-30. */
-.ct-rows > .ct-av { width: 2.2rem; height: 2.2rem; padding: 0; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 2px solid var(--text); font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .95rem; color: var(--text); }
+.ct-rows > .ct-av { width: 2.2rem; height: 2.2rem; }
 .ct-rows > .ct-av--agent { border-style: dashed; color: var(--text-dim); }
 .ct-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
 .ct-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }

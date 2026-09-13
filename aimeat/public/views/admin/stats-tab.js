@@ -24,6 +24,7 @@
  *   - StatsTab (default) — the reads, and the six sections
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v3.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v3.0.0 — 2026-09-12 — The poster face and six numbered sections. Counted-over-a-period and
  *     live-at-this-second are now separate sections, a counter with nothing behind it says so
@@ -224,7 +225,7 @@ function AskAi({ from, to }) {
           ${Row({ title: S('ai.who'), why: S('ai.whoWhy'), chip: null, value: 'aimeat_admin_security_overview' })}
           ${Row({ title: S('ai.raw'), why: S('ai.rawWhy'), chip: null, value: '/v1/metrics', last: true })}
         </div>
-        <div class="og-box">
+        <div class="og-box poster-aside poster-aside--small">
           <span class="og-box-label">${S('ai.label')}</span>
           <div class="adm-st-paste">${paste}</div>
         </div>

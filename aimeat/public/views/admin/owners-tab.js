@@ -23,6 +23,7 @@
  *   - askGrant / askRevoke / askDisable / askEnable — the question each act asks first
  *
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-12 — The poster face: the flat six-column table becomes a section that names
  *     the operators, a strip of four figures, a searchable list with five filters, and the two
@@ -264,12 +265,12 @@ export default function OwnersTab({ data, session, reload, switchPage }) {
       <section class="og-sec adm-own-acts-sec">
         <div class="og-sec-h"><h2 class="poster-section-title">${R('acts')}<small>03</small></h2></div>
         <div class="adm-own-two">
-          <div class="og-box">
+          <div class="og-box poster-aside poster-aside--small">
             <span class="og-box-label">${R('grantLabel')}</span>
             <p>${R('grantBody')}</p>
             <p class="adm-own-rule">${R('grantRule')}</p>
           </div>
-          <div class="og-box og-box--solid">
+          <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible">
             <span class="og-box-label">${R('offLabel')}</span>
             <p>${R('offBody')}</p>
             <p class="adm-own-rule">${R('offRule')}</p>

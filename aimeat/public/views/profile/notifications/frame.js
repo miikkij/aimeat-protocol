@@ -9,6 +9,7 @@
  * @structure c · rel · Switch · inboxRows · inboxHead · senderRows · crumb · pageLinks
  * @usage import { c, inboxRows, senderRows, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   2026-09-13 -- Compose the shared initials-box role and its measured size cut.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Ilmoitusten sivu", direction A).
  */
 import { h } from 'preact';
@@ -55,7 +56,7 @@ export const inboxHead = () => html`<div class="nt-rows nt-rows--head"><div>${c(
 export function senderRows(ctx, rows) {
   return html`<div class="nt-src-rows">
     ${rows.map(r => { const p = r.prefs || {}; return html`
-      <div class=${`ct-av nt-av ${r.kind === 'aimeat' ? '' : 'ct-av--agent'}`} key=${'a' + r.key} aria-hidden="true">${(r.name || '?').slice(0, 1).toUpperCase()}</div>
+      <div class=${`ct-av nt-av poster-box poster-box--avatar ${r.kind === 'aimeat' ? '' : 'ct-av--agent'}`} key=${'a' + r.key} aria-hidden="true">${(r.name || '?').slice(0, 1).toUpperCase()}</div>
       <div class="nt-nm" key=${'n' + r.key}>${r.name}<small>${r.sub}</small></div>
       <div class="nt-w" key=${'w' + r.key}>${r.what}</div>
       <div class="nt-ctl" key=${'c' + r.key}>

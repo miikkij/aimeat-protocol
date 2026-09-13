@@ -30,6 +30,7 @@
  * @usage routed at /v1/fleet by spa.html and routes/portal.ts, and embedded as the "Your agents"
  *   section of Settings & Controls via views/profile/fleet-tab.js, which passes `embedded`.
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.6.0 -- 2026-09-13 -- Compose state section headings from the shared B1 shape.
  *   v1.5.0 -- 2026-09-13 -- Compose the standalone page title from poster.css.
  *   v1.4.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
@@ -155,7 +156,7 @@ function MigrateBanner({ migration, migrating, outcome, onPress }) {
   const ready = (migration.daemons ?? []).length > 0;
   const plural = (one, many) => (n === 1 ? t(one) : t(many).replace('{n}', String(n)));
   return html`
-    <div class="flt-migrate">
+    <div class="flt-migrate poster-aside">
       ${/* TITLED BY WHAT THE PRESS DOES, not by a diagnosis. It used to read "18 of your agents
             cannot sign in", and then the list below it showed a group of 12 called "Cannot sign
             in" and a group of 6 called "Never connected" — so the heading was wrong about a third

@@ -19,6 +19,7 @@
  * @structure AppsAdminTab (default) · RightNow · FourStates · TakenDown
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared poster headings and external spacing.
  *   v2.0.1 — 2026-09-13 — The take-down and delete dialogs' actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-12 — The poster face: five numbered sections, the facts the node already sent
@@ -124,7 +125,7 @@ function FourStates({ facts, number }) {
       ${step(2, 'parked', A('states.count', { n: num(facts.parked) }))}
       ${step(3, 'code', A('states.count', { n: num(facts.coded) }))}
       ${step(4, 'seo', A('states.count', { n: num(facts.notIndexed) }), true)}
-      <div class="og-box adm-ap-danger-note">
+      <div class="og-box adm-ap-danger-note poster-aside poster-aside--small">
         <span class="og-box-label">${A('states.dangerLabel')}</span>
         ${A('states.danger')}
       </div>
@@ -370,7 +371,7 @@ export default function AppsAdminTab() {
             disabled=${busy || deleting.typed !== deleting.filename} onClick=${doDelete}>${A('deleteForGood')}</button>`}>
         ${deleting && html`
           <p>${A('deleteAsk', { name: escHtml(deleting.name), owner: escHtml(deleting.owner) })}</p>
-          <div class="og-box">
+          <div class="og-box poster-aside poster-aside--small">
             <span class="og-box-label">${A('deleteWarnLabel')}</span>
             ${A('deleteWarn')}
           </div>

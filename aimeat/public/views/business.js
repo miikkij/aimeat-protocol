@@ -14,6 +14,7 @@
  *   explained on first use.
  * @usage routed at /v1/business by spa.html
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v2.2.0 — 2026-08-29 — The showroom face (design canvas "AIMEAT Index Pages"): the demo button
  *     sits in the hero, the ownership section is the ink band and the money section the sun band
@@ -50,14 +51,14 @@ function Case({ id, title, text, quote, quoteBy, proofHref, proofLabel, proofNot
     <div class="ld-case" id=${id}>
       <h3 class="ld-case-title">${title}</h3>
       <p class="ld-case-text">${text}</p>
-      ${quote && html`<blockquote class="ld-case-quote">“${quote}”<footer>— ${quoteBy}</footer></blockquote>`}
+      ${quote && html`<blockquote class="ld-case-quote poster-aside">“${quote}”<footer>— ${quoteBy}</footer></blockquote>`}
       ${proofHref
         // H-2: published-app proof links open in a sandboxed opaque-origin iframe, never a
         // top-level apex document. Non-app evidence (public viewers, external sites) opens normally.
         ? (isAppHtmlUrl(proofHref)
           ? html`<a class="ld-case-proof" href="#" role="button" onClick=${(e) => { e.preventDefault(); openAppSandboxed(proofHref, proofLabel); }}>${proofLabel}</a>`
           : html`<a class="ld-case-proof" href=${proofHref} target="_blank" rel="noopener">${proofLabel}</a>`)
-        : proofNote && html`<div class="ld-case-proofnote">${proofNote}</div>`}
+        : proofNote && html`<div class="ld-case-proofnote poster-aside">${proofNote}</div>`}
       ${ctaHref ? html`<a class="ld-path-cta" href=${ctaHref}>${ctaLabel}</a>` : ''}
     </div>
   `;

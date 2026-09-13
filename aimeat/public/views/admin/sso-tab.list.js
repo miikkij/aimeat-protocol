@@ -22,6 +22,7 @@
  *   - Organisations — section 02 with connections, and the create form
  * @usage Imported by views/admin/sso-tab.js.
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Organisation sign-in page in the poster face).
  */
@@ -68,7 +69,7 @@ export function BeforeYouStart({ node, onCreate, busy }) {
       <p class="adm-sso-note">${S('before.note')}</p>
 
       ${creating ? html`
-        <div class="adm-sso-newbox">
+        <div class="adm-sso-newbox poster-aside">
           <span class="adm-sso-newlabel">${S('form.title')}</span>
           <${CreateForm} busy=${busy} onCancel=${() => setCreating(false)}
             onCreate=${async (body) => { const ok = await onCreate(body); if (ok) setCreating(false); }} />
@@ -190,7 +191,7 @@ export function Organisations({ data, onOpen, onCreate, busy }) {
       ${anyBlocked ? html`<p class="adm-sso-note">${S('orgs.testOffNote')}</p>` : null}
 
       ${creating ? html`
-        <div class="adm-sso-newbox">
+        <div class="adm-sso-newbox poster-aside">
           <span class="adm-sso-newlabel">${S('form.title')}</span>
           <${CreateForm} busy=${busy} onCancel=${() => setCreating(false)}
             onCreate=${async (body) => { const ok = await onCreate(body); if (ok) setCreating(false); }} />

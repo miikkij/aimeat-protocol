@@ -17,6 +17,7 @@
  * @structure HookBind({ data, onBind, busy }) — the moment, the picker, the order, the contract
  * @usage <${HookBind} data=${data} onBind=${bind} busy=${busy} />
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose the shared heading and externalize spacing.
  *   v1.0.0 — 2026-09-12 — Initial (the Hooks page in the poster face).
  */
@@ -124,7 +125,7 @@ export function HookBind({ data, onBind, busy }) {
           <div class="adm-hook-frame">
             <pre class="adm-hook-pre">${S('bind.contract', { s: seconds })}</pre>
           </div>
-          <div class="og-box adm-hook-contract-warning">
+          <div class="og-box adm-hook-contract-warning poster-aside poster-aside--small">
             <span class="og-box-label">${S('bind.warnLabel')}</span>
             <div class="adm-hook-box-body">${S('bind.warnBody', { s: seconds })}</div>
           </div>

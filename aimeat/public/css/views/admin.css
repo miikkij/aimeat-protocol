@@ -8,6 +8,7 @@
  *   selected item, group labels wear the sun, the node id sits on top in mono. Content surfaces
  *   map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v2.10.0 -- 2026-09-13 -- Finish shared section headings and compose the configuration index rule.
  *   v2.9.0 -- 2026-09-13 -- Let migrated section headings compose B1 at the admin section size.
  *   v2.8.0 -- 2026-09-13 -- Compose the admin page title from poster.css.
@@ -481,7 +482,7 @@
 .adm-cfg-tools { position: sticky; top: 62px; z-index: 39; background: var(--bg-deep); display: flex; gap: 18px; align-items: center; margin: 0 0 14px; padding: 2px 0 10px; flex-wrap: wrap; }
 .adm-cfg-pending-mini { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .adm-cfg-pending-mini strong { color: var(--accent); font-size: .85rem; }
-.adm-cfg-listbox { border: 3px dashed var(--accent); background: var(--glass-bg); padding: 10px 14px; margin: 0 0 14px; }
+.adm-cfg-listbox { margin: 0 0 14px; }
 .adm-cfg-listbox ul { margin: 0; padding-left: 18px; font-size: .8rem; max-height: 40vh; overflow-y: auto; }
 .adm-cfg-listbox li { margin: 2px 0; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
 .adm-cfg-searchwrap { flex: 1; min-width: 280px; display: flex; align-items: center; gap: 10px; border-bottom: 3px solid var(--text); padding: 2px 2px 4px; }

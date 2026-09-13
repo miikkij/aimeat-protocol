@@ -15,6 +15,7 @@
  *   - askBody: the confirm dialog's body — the line people read and the doors that stay open
  *
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 -- 2026-09-13 -- Compose the four section headings from the shared B1 shape.
  *   v2.0.0 — 2026-09-12 — The poster face: two cards become four sections, the full-width red
  *     button and the purple restore button become one ink slab and two underlined words, the
@@ -211,7 +212,7 @@ export default function MaintenanceTab({ data, reload, switchPage }) {
       <section class="og-sec">
         <div class="og-sec-h"><h2 class="poster-section-title">${M('restore')}<small>04</small></h2>
           <div class="og-doors"><button type="button" class="og-door og-door--danger" onClick=${pickRestore}>${t('dashboard.restoreFromFile')}</button></div></div>
-        <div class="adm-maint-warn"><b>${M('restoreWarnLead')}</b> ${M('restoreWarn')}</div>
+        <div class="adm-maint-warn poster-aside"><b>${M('restoreWarnLead')}</b> ${M('restoreWarn')}</div>
         <p class="adm-maint-note">${M('restoreNote')}</p>
       </section>
 

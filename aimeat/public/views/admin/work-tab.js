@@ -20,6 +20,7 @@
  *   - WorkTab({ data, switchPage }) — the three sections
  *   - dur / deadlineWords — the countdown a row prints instead of a timestamp
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.2.0 — 2026-09-13 — Compose shared poster headings in the populated view.
  *   v2.1.0 -- 2026-09-13 -- Compose the empty state's frame and B1 heading from poster.css.
  *   v2.0.0 — 2026-09-12 — The poster face, and the table drawing at all: the key it read has never
@@ -237,7 +238,7 @@ export default function WorkTab({ data, switchPage }) {
           </div>
         </div>
         <div class="adm-work-two">
-          <div class="og-box">
+          <div class="og-box poster-aside poster-aside--small">
             <span class="og-box-label">${W('jobLabel')}</span>
             <div class="adm-work-flow">
               <i class="on">pending</i><s>→</s><i class="on">accepted</i><s>→</s><i class="on">in_progress</i><s>→</s><i class="on">delivered</i>
@@ -245,7 +246,7 @@ export default function WorkTab({ data, switchPage }) {
             <p>${W('jobBody')}</p>
             <p class="adm-work-rule">${W('jobRule')}</p>
           </div>
-          <div class="og-box og-box--solid">
+          <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible">
             <span class="og-box-label">${W('moneyLabel')}</span>
             <p>${W('moneyBody')}</p>
             <p class="adm-work-rule">${W('moneyRule')}</p>

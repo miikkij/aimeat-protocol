@@ -23,6 +23,7 @@
  * @structure PromptsTab (default) · RightNow · TakingCurrent · WhatChanged
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared poster headings and external reset-note spacing.
  *   v2.0.0 — 2026-09-12 — The poster face: four numbered sections, search over eighty-eight
  *     prompts, the list beside the editor, the three kinds on screen, the languages this site
@@ -121,7 +122,7 @@ function TakingCurrent({ facts, number, onResetAll }) {
       ${step(2, 'languages', P('taking.worthAWarning'))}
       ${step(3, 'group', P('taking.wholeGroup'))}
       ${step(4, 'orphan', P('taking.orphanValue', { n: num(facts.orphan) }), true)}
-      <div class="og-box adm-pr-reset-note">
+      <div class="og-box adm-pr-reset-note poster-aside poster-aside--small">
         <span class="og-box-label">${P('taking.dangerLabel')}</span>
         ${P('taking.danger')}
         <div class="og-doors adm-pr-reset-doors">

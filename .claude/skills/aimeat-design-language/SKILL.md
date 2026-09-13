@@ -2,7 +2,7 @@
 name: aimeat-design-language
 description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.4.0
+  version: 1.5.0
   updated: 2026-09-13
   owner: Jouni Miikki
 ---
@@ -185,15 +185,33 @@ dimensions. It does not re-declare the shape's font, rule, fill, padding or shad
 | Showroom slab and its named colours | `.showroom-slab`, `--hot`, `--sun`, `--ink` modifiers |
 
 Only page and section headline sizes take per-view properties: `--poster-page-size` and
-`--poster-section-size`, set on the view root. A shared modifier is allowed only for a cut named
-by this skill or a recorded design decision. A third size found in a sheet is a question in the
-wish's notes, not permission to add another modifier or override the shared shape.
+`--poster-section-size`, set on the view root. A deviating cut becomes a shared modifier only
+when at least two pages use it or the design language can name its role. A one-page cut folds
+into the canonical value. Record that normalization in the wish's notes with the page, old
+value, new value and before/after screenshots. This visual change is permitted by brief 10.7.
+Modifiers name a role or size, never a page. Each shape has at most two size modifiers,
+`--small` and `--large`; a third size raises a shape question in the notes and does not create
+another modifier. A view never re-declares a modifier's values.
+
+| Shape | Shared variant | Values and reason |
+|---|---|---|
+| Loud action | `.poster-slab--large` | 1.02rem, 8px sun shadow; the named big door role (brief 10.3). Base stays .8rem, 600, 4px sun shadow. |
+| Box | `.poster-box--avatar` | Square initials mark, .95rem poster face, no padding or margin, transparent ground; Contacts, Email and Notifications share this cut. Dimensions remain layout. |
+| Box initials mark | `.poster-box--avatar.poster-box--small` | .85rem; Apps, Companies and MCP share the smaller initials cut. |
+| Box | `.poster-box--meter` | Paper ground, no padding or margin, sun fill for SVG data geometry; the filled numerical meter role. |
+| Aside | `.poster-aside--small` | .9rem 1.1rem padding, .92rem / 1.55 text; the compact explanation used throughout organism settings and admin pages. |
+| Aside | `.poster-aside--large` | 1.25rem 1.5rem padding, surrounding body size and leading; Members and the shared human contact card. |
+| Aside | `.poster-aside--irreversible` | Solid coral border; the named irreversible-act explanation, composed with the same aside geometry. |
+| Showroom band | `.showroom-band--sun` | Sun ground and ink words; the money band role. |
+| Showroom section | `.showroom-section--coral` | 8px coral shadow; the named coral room cut. |
+| Showroom slab | `.showroom-slab--hot`, `--sun`, `--ink` | Named hot, sun and ink action colours; each shares the showroom slab geometry. |
 
 Run `pnpm check:poster-shapes` from `aimeat/`. It scans view and component sheets and refuses
 any new per-file pattern count. `pnpm debt` shows the remaining copies. Lower the baseline after
 a migration; `--record` requires an explicit decision to forgive debt. A green gate proves no
 new copies, not that the remaining baseline is zero. Verify migrations at all three viewports
-in both themes; only the B1 headline/panel and the reflow caused by the headline may differ.
+in both themes; permitted differences are B1 headline/panel reflow and documented single-page
+normalizations under brief 10.7.
 
 ### The kit an app is built from has its own contract
 

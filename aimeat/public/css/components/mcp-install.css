@@ -10,6 +10,7 @@
  *   text links. A person scanning top to bottom meets the least work first.
  * @structure .mcpi · .mcpi--tool · .mcpi--quick · .mcpi-oneclick · .mcpi-cmd · .mcpi-files
  * @version-history
+ *   2026-09-13 -- Keep the classic frame only when the caller has not composed a poster aside.
  *   v1.0.0 — 2026-08-27 — Initial.
  */
 
@@ -20,7 +21,7 @@
 }
 
 /* Inside the per-tool setup guide it is a framed aside above that tool's steps. */
-.mcpi--tool {
+.mcpi--tool:where(:not(.poster-aside)) {
   margin: 0 0 0.7rem;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--accent-soft-border, var(--border));

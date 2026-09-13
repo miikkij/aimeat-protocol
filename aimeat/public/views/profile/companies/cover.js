@@ -9,6 +9,7 @@
  * @structure renderCover · secRows · secCreate
  * @usage import { renderCover } from './companies/cover.js';
  * @version-history
+ *   2026-09-13 -- Compose the shared initials-box role and its measured size cut.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-31 — Initial. Replaces one long card per company with a row and a page.
  */
@@ -78,7 +79,7 @@ function secRows(ctx, rows) {
         <div class="co-rows">
           <div class="co-head" aria-hidden="true"></div><div class="co-head">${c('colCompany')}</div><div class="co-head">${c('colFront')}</div><div class="co-head">${c('colState')}</div><div class="co-head"></div>
           ${rows.map(({ co, facts, x }) => html`
-            <div class="co-av" key=${'a' + co.id} aria-hidden="true">${initials(co.name)}</div>
+            <div class="co-av poster-box poster-box--avatar poster-box--small" key=${'a' + co.id} aria-hidden="true">${initials(co.name)}</div>
             <div class="co-nm" key=${'n' + co.id}>${co.name}<small>${co.address ? co.address.replace(/^https?:\/\//, '') : co.slug}</small></div>
             <div class="co-w" key=${'f' + co.id}><b>${kindWord(co.frontPage?.kind)}</b>${co.frontPage?.kind === 'redirect' && co.frontPage.target ? html`<small>${co.frontPage.target.replace(/^https?:\/\//, '')}</small>` : null}<small>${ctx.addr[co.id] === true ? c('addressOk') : ctx.addr[co.id] === false ? c('addressDown') : ''}</small></div>
             <div class="co-w" key=${'s' + co.id}>${facts.done < facts.total ? html`<span class="co-warn">${c('factsShort', { n: `${facts.done}/${facts.total}` })}</span>` : html`<b>${c('factsDone')}</b>`}<small>${[x.smtpSet ? c('senderOwn') : c('senderShared'), co.organismId ? c('withOrganism') : c('noOrganism')].join(' · ')}</small></div>
