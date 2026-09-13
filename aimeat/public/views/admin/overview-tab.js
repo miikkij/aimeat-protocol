@@ -10,6 +10,7 @@
  *   config side by side with the words that take you to their pages.
  * @structure OverviewTab({ data, switchPage }) — status section · numeral strip · economy + config
  * @version-history
+ *   v2.2.0 -- 2026-09-13 -- Compose the three section headings from the shared B1 shape.
  *   v2.1.0 — 2026-08-31 — The numbers explain themselves (canvas "AIMEAT Hallinnan kolme sivua"):
  *     a meaning sentence under every health metric, the alarm count said in words, the strip
  *     cells and the section words open the pages they summarise.
@@ -77,7 +78,7 @@ export default function OverviewTab(props) {
   return html`
     <div class="og">
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${t('dashboard.nodeHealth')}<small>01</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${t('dashboard.nodeHealth')}<small>01</small></h2>
           <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('economy')}>${t('dashboard.ovToEconomy')}</button></div></div>
         <div class="adm-ov-grid">
           <div>
@@ -105,7 +106,7 @@ export default function OverviewTab(props) {
 
       <div class="adm-two">
         <section class="og-sec">
-          <div class="og-sec-h"><h2>${t('dashboard.economyToday')}<small>02</small></h2>
+          <div class="og-sec-h"><h2 class="poster-section-title">${t('dashboard.economyToday')}<small>02</small></h2>
             <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('economy')}>${t('dashboard.ovToEconomy')}</button></div></div>
           <${EconRow} label=${t('dashboard.transactionsToday')} value=${num(e.transactions_today)} />
           <${EconRow} label=${t('dashboard.morselsMovedToday')} value=${num(e.morsels_transacted_today)} />
@@ -113,7 +114,7 @@ export default function OverviewTab(props) {
           <${EconRow} label=${t('dashboard.burnedToday')} value=${num(e.burned_today)} />
         <//>
         <section class="og-sec">
-          <div class="og-sec-h"><h2>${t('dashboard.quickConfig')}<small>03</small></h2>
+          <div class="og-sec-h"><h2 class="poster-section-title">${t('dashboard.quickConfig')}<small>03</small></h2>
             <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('config')}>${t('dashboard.ovToConfig')}</button></div></div>
           <${EconRow} label=${t('dashboard.port')} value=${d.config.port} />
           <${EconRow} label=${t('dashboard.jwtTtl')} value=${d.config.jwt_ttl_seconds + 's'} />
