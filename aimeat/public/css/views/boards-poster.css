@@ -9,6 +9,7 @@
  *   the members block and the two columns of the app fold. NOTE: this file must be linked in
  *   spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose the notice reply's top rule from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
@@ -63,7 +64,7 @@
 
 /* ── The composer, a reply, the poster's tools ──────────────────────────────────────────────── */
 .bp-composer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18rem); gap: 1.2rem 1.6rem; align-items: start; }
-.bp-composer--reply { grid-template-columns: minmax(0, 1fr) auto; align-items: end; margin-top: 1.2rem; padding-top: 1rem; border-top: 3px solid var(--text); }
+.bp-composer--reply { grid-template-columns: minmax(0, 1fr) auto; align-items: end; margin-top: 1.2rem; padding-top: 1rem; }
 .bp-composer-main { gap: .6rem; }
 .bp-composer-side { display: flex; flex-direction: column; gap: 1rem; }
 .bp-composer-side .og-doors { margin-top: .2rem; }

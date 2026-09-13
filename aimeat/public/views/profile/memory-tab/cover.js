@@ -15,6 +15,7 @@
  *   renderRecord · renderPage
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- Compose the record value's top rule from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-06 — The public/members chips in a table of spaces move into their own mark
  *     group, pushed to the far end of the name cell so they line up down the table.
@@ -420,7 +421,7 @@ function renderRecord(ctx, key) {
       ${typeof m.bytes === 'number' ? html`<span>${formatBytes(m.bytes)}</span>` : null}
       ${visChip(m.visibility)}
     </div>
-    <div class="mp-value">
+    <div class="mp-value poster-row--thing">
       ${renderValue(ctx, m, showRaw)}
       ${v !== undefined ? html`<div class="og-actions"><button type="button" class="og-door og-door--quiet" onClick=${() => setShowRaw(r => !r)}>${showRaw ? c('showPretty', 'Show readable') : c('showRaw', 'Show raw')}</button></div>` : null}
     </div>` });
