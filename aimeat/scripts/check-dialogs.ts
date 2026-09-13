@@ -16,6 +16,8 @@
  * @structure dialogFindings(file, source) → string[] · main() walks the two trees
  * @usage pnpm check:dialogs
  * @version-history
+ *   v1.0.1 — 2026-09-13 — Comment stripping repeats until it changes nothing: one pass can join
+ *     what sat either side of a removed comment into a fresh opener (alert #1628).
  *   v1.0.0 — 2026-09-13 — Initial (wish "Yksi dialogikomponentti kaikille dialogeille").
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -46,15 +48,36 @@ const SCAN = [
   { dir: 'src/static/app-catalog', ext: ['.js', '.css', '.html'] },
 ];
 
+/**
+ * Remove every match, and keep removing until a pass changes nothing.
+ *
+ * One pass is not enough for a delimited pair, because deleting the middle can JOIN what was on
+ * either side into a fresh opener: `<!<!-- -->-- x -->` loses its inner comment and becomes
+ * `<!-- x -->`, which a single-pass strip then leaves in the text it was supposed to have cleaned.
+ * The same holds for `/*` and `*` + `/`. Here that only decides whether a comment is scanned for a
+ * hand-rolled dialog, so the cost of getting it wrong is a false finding rather than a hole — but
+ * it is the shape CodeQL calls js/incomplete-multi-character-sanitization, it was open as alert
+ * #1628, and the loop is the documented answer to it.
+ */
+function stripAll(source: string, pattern: RegExp): string {
+  let text = source;
+  for (;;) {
+    const next = text.replace(pattern, '');
+    if (next === text) return text;
+    text = next;
+  }
+}
+
+const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g;
+const HTML_COMMENT = /<!--[\s\S]*?-->/g;
+
 function stripCss(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '');
+  return stripAll(source, BLOCK_COMMENT);
 }
 
 /** Block and HTML comments go; a line comment goes only where `//` does not follow a colon or a quote (a URL). */
 function stripScript(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
+  return stripAll(stripAll(source, BLOCK_COMMENT), HTML_COMMENT)
     .replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
 }
 
