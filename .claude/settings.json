@@ -21,7 +21,14 @@
     "generated bundles and notices, lockfiles, tool-written baselines. The .env names are what",
     ".claudeignore listed as 'may contain secrets'; Claude Code never read that file (the 2.1.226",
     "binary has no occurrence of the word), so this is the first time the list is enforced.",
-    "Kept readable on purpose: openapi.yaml, locales/*.json, db-types.ts, aimeat/security/*.json."
+    "Kept readable on purpose: openapi.yaml, locales/*.json, db-types.ts, aimeat/security/*.json.",
+    "",
+    "WorktreeCreate (2026-09-13): `claude --worktree <name>` and the EnterWorktree tool run",
+    ".claude/hooks/worktree-create.sh instead of Claude Code's bare .claude/worktrees checkout, so",
+    "both produce this repo's .worktrees/<name> at origin/main with its own install and test env.",
+    "Measured: about 40 s to a ready worktree; the session loads that worktree's CLAUDE.md once, and",
+    "a Write to the main checkout is refused. No WorktreeRemove hook: Claude Code's own removal",
+    "deletes a link without following it (v2.1.205+), and a kept worktree is a person's call."
   ],
   "permissions": {
     "deny": [
@@ -53,6 +60,17 @@
             "type": "command",
             "command": "bash .claude/hooks/session-start.sh",
             "timeout": 30
+          }
+        ]
+      }
+    ],
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/worktree-create.sh",
+            "timeout": 900
           }
         ]
       }
