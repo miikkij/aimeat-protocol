@@ -9,6 +9,7 @@
  *   ledger and changelog, the filter chips and the search line, and the AI rule box.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 
@@ -77,7 +78,7 @@
 .lb-more small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
 
 /* ── The rule an AI gets ───────────────────────────────────────────────────────────────────── */
-.lb-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; border: 3px solid var(--text); background: var(--card-bg); }
+.lb-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; }
 .lb-rule .og-label { display: block; margin-bottom: .3rem; }
 .lb-rule .lb-para { margin-bottom: .6rem; }
 

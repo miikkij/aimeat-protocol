@@ -10,6 +10,7 @@
  * @structure renderPage · shelf · secAI
  * @usage import { renderPage } from './libraries/page.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
@@ -152,7 +153,7 @@ function secAI(ctx, num, all) {
   return html`
     <${Section} id="lb-ai" num=${num} title=${x('secAi')} count=${null}>
       <p class="lb-para">${x('aiIntro')}</p>
-      <div class="lb-rule">
+      <div class="lb-rule poster-frame">
         <span class="og-label">${x('ruleLabel')}</span>
         <p class="lb-para">${x('ruleBody', { base: ctx.nodeUrl })}</p>
         <div class="og-doors"><${CopyButton} text=${aiRule(ctx.nodeUrl)} className="og-door" label=${x('copyRule')} copiedLabel=${x('copied')} /></div>
