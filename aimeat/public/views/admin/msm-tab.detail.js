@@ -17,6 +17,7 @@
  * @structure MsmDetail (default export) · fieldRows()
  * @usage <${MsmDetail} msm=${detail} row=${row} onBack=${...} ... />
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose shared B1 headings and preserve spacing through view classes.
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
 import { h } from 'preact';
@@ -82,7 +83,7 @@ export default function MsmDetail({ msm, row, busy, editing, draft, onBack, onEd
         : html` ${M('detail.neverEdited')}`}</p>
 
       <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2>${M('detail.describes')}<small>${n()}</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('detail.describes')}<small>${n()}</small></h2></div>
         <div class="adm-msm-krow">
           <span class="adm-msm-k">${M('detail.calls')}</span>
           <span>${hosts.length > 0
@@ -97,7 +98,7 @@ export default function MsmDetail({ msm, row, busy, editing, draft, onBack, onEd
         ${tags.length > 0 && html`
           <div class="adm-msm-krow">
             <span class="adm-msm-k">${M('detail.tags')}</span>
-            <span class="adm-msm-sub" style="margin-top: 0">${tags.join(' · ')}</span>
+            <span class="adm-msm-sub adm-msm-tags">${tags.join(' · ')}</span>
           </div>`}
         <div class="adm-msm-krow adm-msm-krow--last">
           <span class="adm-msm-k">${M('detail.actionsK')}</span>
@@ -106,7 +107,7 @@ export default function MsmDetail({ msm, row, busy, editing, draft, onBack, onEd
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${M('detail.canAsk')}<small>${n()}</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('detail.canAsk')}<small>${n()}</small></h2></div>
         ${actions.length === 0
           ? html`<p class="adm-msm-note">${M('detail.noActions')}</p>`
           : actions.map(a => html`
@@ -131,7 +132,7 @@ export default function MsmDetail({ msm, row, busy, editing, draft, onBack, onEd
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${M('detail.before')}<small>${n()}</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('detail.before')}<small>${n()}</small></h2></div>
         <div class="adm-msm-krow">
           <span class="adm-msm-k">${M('detail.theKey')}</span>
           <span>${keyVar
@@ -147,7 +148,7 @@ export default function MsmDetail({ msm, row, busy, editing, draft, onBack, onEd
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${M('detail.whoSees')}<small>${n()}</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('detail.whoSees')}<small>${n()}</small></h2></div>
         <div class="adm-msm-krow">
           <span class="adm-msm-k">${M('detail.readableBy')}</span>
           <span>${M('detail.readableAll')} <span class="adm-msm-code">${publicPath(msm.name)}</span>
@@ -180,7 +181,7 @@ export default function MsmDetail({ msm, row, busy, editing, draft, onBack, onEd
               </button>
             </div>`}
 
-        <div class="og-box" style="margin-top: 14px">
+        <div class="og-box adm-msm-edit-note">
           <span class="og-box-label">${M('detail.editLabel')}</span>
           ${M('detail.editWhat')}
         </div>
