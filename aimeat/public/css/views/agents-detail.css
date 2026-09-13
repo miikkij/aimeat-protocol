@@ -6,6 +6,7 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.28.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
  *   v1.27.0 -- 2026-09-09 -- .pf-agd-crew-llm: which model an agent thinks with, on the Crew tab.
  *   v1.26.0 -- 2026-09-08 -- The new-agent panel (.pf-agd-new*): a two-column form that folds to
  *     one on a phone, the attach strip, and the waiting-proposal rows.
@@ -1308,7 +1309,6 @@
 
 .pf .pf-agd-board {
   background: var(--card-bg, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
   border-radius: var(--radius, 8px);
   padding: 1rem;
   margin-bottom: 1rem;
@@ -1317,7 +1317,6 @@
 /* Fleet "running now" panel (between the board and the agent list). */
 .pf .pf-agd-active {
   background: var(--card-bg, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
   border-radius: var(--radius, 8px);
   padding: 0.75rem 1rem;
   margin-bottom: 1rem;
@@ -4387,3 +4386,17 @@
   font-size: 0.78rem;
   color: var(--text-muted);
 }
+
+/* Status is data. Its colour lives here, including the quiet fallback for a future state. */
+.pf .pf-agd-board-card { --agd-state: var(--text-muted); }
+.pf .pf-agd-board-card[data-state="new"],
+.pf .pf-agd-board-card[data-state="onboarding"] { --agd-state: var(--warning); }
+.pf .pf-agd-board-card[data-state="problem"] { --agd-state: var(--danger); }
+.pf .pf-agd-board-card[data-state="system"],
+.pf .pf-agd-board-card[data-state="production"] { --agd-state: var(--success); }
+.pf .pf-agd-board-card[data-state="workstation"] { --agd-state: var(--teal); }
+.pf .pf-agd-legend-dot { background: var(--text-muted); }
+.pf .pf-agd-legend-dot[data-bucket="online"] { background: var(--success); }
+.pf .pf-agd-legend-dot[data-bucket="onboarding"] { background: var(--warning); }
+.pf .pf-agd-legend-dot[data-bucket="issue"] { background: var(--danger); }
+.pf .pf-agd-legend-dot[data-bucket="connection"] { background: var(--teal); }
