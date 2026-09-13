@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   2026-09-13 -- V2v: compose section top rules from poster.css.
  *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.14.0 -- 2026-09-13 -- Retire selectors whose profile views no longer render.
@@ -408,8 +409,8 @@
 .pf .pf-or-mrow--on { background: var(--sun); color: var(--on-sun); padding-left: 0.5rem; }
 .pf .dsc-item-title, .pf .pf-eco-name { font-weight: var(--font-poster-strong-weight); }
 /* Sections and panels */
-.pf .pf-or-wrapper, .pf .pf-or-section, .pf .pf-eco-section, .pf .pf-skl-section, .pf .cap-create-section, .pf .pf-eco-auto-flow-card, .pf .pf-eco-mcp, .pf .pf-eco-recipe {
-  background: none; border: 0; border-top: 3px solid var(--text); border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem;
+.pf .pf-or-wrapper, .pf .pf-or-section, .pf .pf-eco-section, .pf .pf-eco-auto-flow-card, .pf .pf-eco-mcp {
+  background: none; border-right: 0; border-bottom: 0; border-left: 0; border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem;
 }
 .pf .pf-or-panel, .pf .pf-or-picker, .pf .pf-eco-data-pre, .pf .pf-eco-mcp-sample-prompt, .pf .pf-skl-body-md, .pf .pf-skl-editor-md, .pf .pf-eco-cmd {
   border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); box-shadow: none;
