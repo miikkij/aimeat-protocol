@@ -149,23 +149,17 @@
       "box2": 1
     },
     "public/css/views/admin-organism-ownership.css": {
-      "headline": 3,
-      "action": 1,
-      "sun": 2,
-      "box2": 3,
-      "frame3": 1,
-      "aside": 1,
-      "slab": 1,
-      "dialog": 1
-    },
-    "public/css/views/admin-owners.css": {
       "headline": 2,
       "action": 1,
       "sun": 2,
       "box2": 2,
-      "frame3": 1,
-      "slab": 1,
-      "dialog": 1
+      "aside": 1
+    },
+    "public/css/views/admin-owners.css": {
+      "headline": 1,
+      "action": 1,
+      "sun": 2,
+      "box2": 1
     },
     "public/css/views/admin-packages.css": {
       "action": 1,
@@ -190,12 +184,11 @@
       "box2": 3
     },
     "public/css/views/admin-realtime.css": {
-      "headline": 5,
+      "headline": 4,
       "rule": 1,
-      "box2": 3,
-      "frame3": 3,
-      "record": 1,
-      "dialog": 1
+      "box2": 2,
+      "frame3": 2,
+      "record": 1
     },
     "public/css/views/admin-scheduler.css": {
       "headline": 1,
@@ -470,14 +463,13 @@
     },
     "public/css/views/profile-poster.css": {
       "headline": 5,
-      "rule": 13,
+      "rule": 12,
       "action": 7,
       "sun": 12,
-      "box2": 16,
-      "frame3": 7,
+      "box2": 15,
+      "frame3": 6,
       "record": 3,
       "slab": 1,
-      "dialog": 1,
       "label": 3
     },
     "public/css/views/profile.css": {
