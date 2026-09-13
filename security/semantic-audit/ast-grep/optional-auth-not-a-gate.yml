@@ -5,11 +5,13 @@
 # therefore admits the anonymous principal as if it were authenticated. Require real auth with the
 # requireAuth() middleware; to detect anonymity check `req.auth.anonymous === true`.
 #
-# Scoped to src/routes: inside src/auth/middleware.ts, `if (!req.auth)` IS the correct body of the
-# gate middlewares (requireAuth, requireRole, …), so that file is excluded by the CI config's path,
-# not by this rule. Currently clean in routes — this rule keeps it that way.
+# CI scans aimeat/src, not just src/routes, so every gate middleware outside src/auth/middleware.ts
+# is read by this rule too. That is deliberate: a gate that lives in its own file is as reachable
+# without requireAuth() ahead of it as a route is, and the two such files that tripped this rule on
+# 2026-09-13 (auth/owner-mailbox-gate.ts, auth/account-security.ts) were both fixed rather than
+# exempted — `if (!req.auth || req.auth.anonymous)` is the shape that passes and is also correct.
 #
-# Run:  npx -p @ast-grep/cli ast-grep scan --rule security/semantic-audit/ast-grep/optional-auth-not-a-gate.yml aimeat/src/routes
+# Run:  npx -p @ast-grep/cli ast-grep scan --rule security/semantic-audit/ast-grep/optional-auth-not-a-gate.yml aimeat/src
 
 id: optional-auth-if-not-req-auth-gate
 language: typescript
