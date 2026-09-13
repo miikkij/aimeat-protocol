@@ -11,6 +11,7 @@
  *   - NotebookTab (default export) — capture box, trust toggles, librarian search, inbox list → NoteCard
  * @usage html`<${NotebookTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-06-19 — Initial: capture + librarian search (slice A).
  *   v1.1.0 — 2026-06-21 — Enrich stage (Phase 1) + delegate (Phase 2) + distribute & trust toggles (Phase 3).
@@ -251,7 +252,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
 
     <div class="poster-section-title pf-nb-section">${t('profile.notebook.librarianTitle')}</div>
     <div class="section-desc">${t('profile.notebook.librarianDesc')}</div>
-    <div class="sub-tabs pf-nb-scope">
+    <div class="sub-tabs poster-row--thing pf-nb-scope">
       <button class="sub-tab ${searchScope === 'own' ? 'active' : ''}" onClick=${() => pickScope('own')}>${t('profile.notebook.scopeOwn')}</button>
       <button class="sub-tab ${searchScope === 'public' ? 'active' : ''}" onClick=${() => pickScope('public')}>${t('profile.notebook.scopePublic')}</button>
     </div>
