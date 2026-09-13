@@ -13,6 +13,7 @@
  *   The blocks the showroom restyled but did not replace (the wish box, the app wall, the counters,
  *   the change log) keep their rules in landing.css.
  * @version-history
+ *   v1.4.0 -- 2026-09-13 -- Compose the agent registration aside from poster.css.
  *   v1.3.0 -- 2026-09-13 -- V2: the safety band and room frames compose shared shapes.
  *   v1.2.0 -- 2026-09-13 -- V2: shared classes own the showroom doors, slabs and coral asides.
  *   v1.1.1 — 2026-08-29 — The headline's offset shadow is the sun, not coral: coral behind ink at that
@@ -71,7 +72,7 @@
 .ld-sh-action .ld-wish { margin: 0; }
 .ld-sh-lead { margin: 0; font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.5; color: var(--text-dim); }
 .ld-sh-doors { display: flex; gap: 1.75rem; flex-wrap: wrap; }
-.ld-sh-agentdoor { display: flex; flex-direction: column; gap: .75rem; align-items: flex-start; padding: 1rem 1.25rem; border: 3px dashed var(--accent); background: var(--card-bg); }
+.ld-sh-agentdoor { display: flex; flex-direction: column; gap: .75rem; align-items: flex-start; }
 .ld-sh-agentdoor-sub, .ld-sh-agentdoor-note { margin: 0; font-family: var(--font-showroom-body); font-size: .92rem; line-height: 1.5; color: var(--text-dim); }
 
 /* The showroom picture at full width, so it carries the weight of the headline. */
