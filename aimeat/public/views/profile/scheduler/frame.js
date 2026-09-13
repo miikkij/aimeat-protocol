@@ -8,6 +8,7 @@
  * @structure c · hhmm · whoRuns · resultWord · lastRun · crumb · pageLinks · renderPage
  * @usage import { renderPage, whoRuns, c, hhmm } from './frame.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-12 — `loc()` is gone: it derived the date FORMAT from the page LANGUAGE, which
  *     is a separate setting, and /js/format.js reads the reader's own. `hhmm` reads their clock too
@@ -85,7 +86,7 @@ export function renderPage(ctx, { id, crumbs, title, chips = null, doors = null,
       </div>
       ${strip}
       <div class="og-grid">
-        <div class="og-main">${children}</div>
+        <div class="og-main poster-row--thing">${children}</div>
         <div class="sc-side">
           <nav class="og-rail" aria-label=${c('railTitle')}>
             <span class="og-rail-label">${t('profile.scheduler.title')}</span>

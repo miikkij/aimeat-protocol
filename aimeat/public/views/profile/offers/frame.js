@@ -8,6 +8,7 @@
  * @structure c · loc · when · word · agentMark · statusWord · deliveryRows · crumb · pageLinks · renderPage
  * @usage import { renderPage, c, deliveryRows } from './frame.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
@@ -92,7 +93,7 @@ export function renderPage(ctx, { id, crumbs, title, chips = null, doors = null,
       </div>
       ${strip}
       <div class="og-grid">
-        <div class="og-main">${children}</div>
+        <div class="og-main poster-row--thing">${children}</div>
         <div class="op-side">
           <nav class="og-rail" aria-label=${c('railTitle')}>
             <span class="og-rail-label">${t('profile.tabs.offers')}</span>

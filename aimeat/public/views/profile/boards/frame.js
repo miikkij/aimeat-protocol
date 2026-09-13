@@ -9,6 +9,7 @@
  * @structure c · words · who · leftWords · standingWords · followedOf · boardRows · noticeRow · crumb · renderPage
  * @usage import { renderPage, boardRows, noticeRow } from './frame.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Taulujen sivu", direction A).
  */
@@ -146,7 +147,7 @@ export function renderPage(ctx, { crumbs, label = null, title, chips = null, doo
       </div>
       ${strip}
       <div class="og-grid">
-        <div class="og-main">${children}</div>
+        <div class="og-main poster-row--thing">${children}</div>
         <nav class="og-rail" aria-label=${c('railTitle')}>
           <span class="og-rail-label">${t('profile.tabs.boards')}</span>
           ${back || html`<button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'cover' })}><i>←</i>${c('backTo')}</button>`}

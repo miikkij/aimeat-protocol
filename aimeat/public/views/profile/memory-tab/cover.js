@@ -15,6 +15,7 @@
  *   renderRecord · renderPage
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.3.0 -- 2026-09-13 -- Compose the record value's top rule from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-06 — The public/members chips in a table of spaces move into their own mark
@@ -107,7 +108,7 @@ function renderPage(ctx, { id, crumbs, title, sub = null, doors = null, rail = n
         ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
       </div>
       <div class="og-grid">
-        <div class="og-main">${children}</div>
+        <div class="og-main poster-row--thing">${children}</div>
         <div class="mp-side">
           ${rail}
           <nav class="og-rail" aria-label=${c('railTitle', 'In your memory')}>

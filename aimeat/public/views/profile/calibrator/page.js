@@ -10,6 +10,7 @@
  * @structure renderPage · mast · strip · secRuns · secPrompt · versionRow · secTemplates · secRoads
  * @usage import { renderPage } from './page.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Kalibraattori-sivu", direction A).
  */
@@ -51,7 +52,7 @@ export function renderPage(ctx) {
       ${mast(ctx, runs, latest)}
       ${strip(ctx, runs, latest)}
       <div class="og-grid">
-        <div class="og-main">
+        <div class="og-main poster-row--thing">
           ${secRuns(ctx, runs, empties)}
           ${secPrompt(ctx)}
           ${secModels(ctx)}
