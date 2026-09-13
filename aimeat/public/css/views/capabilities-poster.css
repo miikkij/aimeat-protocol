@@ -10,6 +10,7 @@
  *   the hand-added form and the AI rule box.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
  *   v1.0.0 — 2026-09-03 — Initial (replaces capabilities.css, the flat list's styles).
  */
 
@@ -90,7 +91,7 @@
 .cp-form-doors .cp-hint { margin: 0; }
 
 /* ── The rule an AI gets ───────────────────────────────────────────────────────────────────── */
-.cp-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; border: 3px solid var(--text); background: var(--card-bg); }
+.cp-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; }
 .cp-rule .og-label { display: block; margin-bottom: .3rem; }
 .cp-rule .cp-para { margin-bottom: .6rem; }
 

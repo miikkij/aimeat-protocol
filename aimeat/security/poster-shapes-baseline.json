@@ -1,14 +1,14 @@
 {
   "_note": "Copied design-language declarations, recorded debt rather than approval. This files map may only shrink. After migration, lower the affected counts or remove cleared files. Only an explicit developer decision permits re-seeding with pnpm check:poster-shapes --record.",
   "_measured": {
-    "date": "2026-09-13T02:01:00.000Z",
+    "date": "2026-09-13T02:10:00.000Z",
     "files": 78,
-    "declarations": 710,
+    "declarations": 706,
     "patterns": {
       "headline": 133,
       "sun": 129,
       "box2": 189,
-      "frame3": 65,
+      "frame3": 61,
       "record": 31,
       "rule": 47,
       "action": 73,
@@ -23,7 +23,7 @@
       "headline": 2,
       "sun": 2,
       "box2": 2,
-      "frame3": 4,
+      "frame3": 3,
       "record": 3
     },
     "public/css/views/admin-agent-integration.css": {
@@ -280,7 +280,7 @@
     "public/css/views/capabilities-poster.css": {
       "sun": 1,
       "box2": 2,
-      "frame3": 2,
+      "frame3": 1,
       "record": 1
     },
     "public/css/views/changelog.css": {
@@ -386,7 +386,7 @@
     "public/css/views/libraries-poster.css": {
       "sun": 1,
       "box2": 1,
-      "frame3": 2,
+      "frame3": 1,
       "record": 1
     },
     "public/css/views/mcp-poster.css": {
@@ -430,7 +430,7 @@
     "public/css/views/packages-poster.css": {
       "sun": 2,
       "box2": 1,
-      "frame3": 2,
+      "frame3": 1,
       "record": 1
     },
     "public/css/views/portal-dev.css": {

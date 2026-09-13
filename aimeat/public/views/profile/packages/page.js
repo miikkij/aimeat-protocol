@@ -11,6 +11,7 @@
  * @structure renderPage · secInstalled · secOffers · secOwn · secNew · secAgent
  * @usage import { renderPage } from './packages/page.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-05 — A third road, leading: make a package out of apps you already have. Each
  *     app says what it loads, because that is what decides whether it travels with the package or is
@@ -232,7 +233,7 @@ function secAgent(ctx) {
   return html`
     <${Section} id="pk-ai" num="05" title=${x('secAi')} count=${null}>
       <p class="pk-para">${x('aiIntro')}</p>
-      <div class="pk-rule">
+      <div class="pk-rule poster-frame">
         <span class="og-label">${x('ruleLabel')}</span>
         <p class="pk-para">${x('ruleBody')}</p>
         <div class="og-doors"><${CopyButton} text=${agentRule(ctx.nodeUrl)} className="og-door" label=${x('copyRule')} copiedLabel=${x('copied')} /></div>
