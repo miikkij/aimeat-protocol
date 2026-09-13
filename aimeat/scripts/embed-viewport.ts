@@ -18,6 +18,9 @@
  *   pnpm check:viewport    # verify, non-zero exit on drift
  * @version-history
  *   v1.0.0 — 2026-07-25 — Initial (TARGET-051 Slice 1): aimeat-dag embeds aimeat-viewport.
+ *   v1.2.0 — 2026-09-13 — And the THIRD place the version is written: the library-packs registry,
+ *     which is what the catalogue and the build-app prompt advertise. Four packs had drifted from
+ *     their manifests at once, and the only thing asserting it was a suite in the advisory sweep.
  *   v1.1.0 — 2026-07-25 — Also assert every pack's VERSION constant matches its manifest;
  *     they crossed once already (constant 1.0.1 while the manifest said 1.0.2).
  */
@@ -25,6 +28,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getLibraryPacks } from '../src/data/library-packs.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = join(__dirname, '..');
@@ -83,13 +87,14 @@ function main(): void {
   }
 
   drifted += checkVersions(check);
+  drifted += checkRegistryVersions(check);
 
   if (check) {
     if (drifted > 0) {
       console.error(`\n${drifted} problem(s). Run: pnpm sync:viewport (embed) and align the versions by hand.`);
       process.exit(1);
     }
-    console.log('✓ embedded aimeat-viewport is in sync; pack VERSION constants match their manifests');
+    console.log('✓ embedded aimeat-viewport is in sync; pack VERSION constants and registry versions match their manifests');
   }
 }
 
@@ -120,6 +125,37 @@ function checkVersions(check: boolean): number {
       console.error(`✗ ${file}: VERSION constant is ${m[1]} but ${file.replace(/\.js$/, '.yaml')} declares ${y[1]}`);
     } else if (!check) {
       console.log(`✓ ${file}: VERSION ${m[1]} matches its manifest`);
+    }
+  }
+  return bad;
+}
+
+/**
+ * THE THIRD PLACE a bundled cortex pack's version is written down: the library-packs registry,
+ * which is what /v1/library-packs, the build-app prompt and llms-full.txt tell an AI to load.
+ *
+ * A manifest bump makes the seeder republish; the registry entry is edited in a different file and
+ * gets forgotten, and then the catalogue advertises a version of the pack that no longer exists.
+ * e2e-library-packs asserts this, but that suite lives in the ADVISORY nightly sweep, so the drift
+ * is found by a robot at three in the morning two days later instead of by the person who caused
+ * it. On 2026-09-13 four packs had drifted at once (aimeat-canvas, aimeat-surface, aimeat-i18n,
+ * aimeat-ui-motion) and the sweep had been red on it since 2026-09-08. Here it costs one gate run.
+ */
+function checkRegistryVersions(check: boolean): number {
+  let bad = 0;
+  for (const pack of getLibraryPacks()) {
+    if (pack.kind !== 'cortex') continue;
+    const yamlPath = join(BUNDLED, `${pack.id}.yaml`);
+    if (!existsSync(yamlPath)) continue;
+
+    const y = readFileSync(yamlPath, 'utf-8').match(/^\s*version:\s*"([\d.]+)"/m);
+    if (!y) continue;
+
+    if (y[1] !== pack.version) {
+      bad++;
+      console.error(`✗ ${pack.id}: the library-packs registry says ${pack.version} but ${pack.id}.yaml declares ${y[1]}`);
+    } else if (!check) {
+      console.log(`✓ ${pack.id}: registry version ${pack.version} matches its manifest`);
     }
   }
   return bad;

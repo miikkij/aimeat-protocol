@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.2.1 (2026-09-13): check:viewport also holds the library-packs registry to the manifests.
  *  - 1.2.0 (2026-09-13): Hold the always-loaded instruction size and every path rule's globs.
  *  - 1.1.0 (2026-09-13): Refuse new copies of the shared poster shapes.
  *  - 1.0.0 (2026-09-08): A4: share the CI check registry with audit consumers.
@@ -25,7 +26,7 @@ export const FAST_CHECKS = [
     { script: 'check:plain-language', label: 'Plain language for the messages a person hears' },
     { script: 'check:poster-shapes', label: 'Design-language shapes live in poster.css, not in view sheets' },
     { script: 'check:dialogs', label: 'One dialog for the site: no hand-rolled overlay, backdrop or role="dialog" box' },
-    { script: 'check:viewport', label: 'Cortex pack integrity: embed + VERSION constants' },
+    { script: 'check:viewport', label: 'Cortex pack integrity: embed + VERSION constants + registry versions' },
     { script: 'check:ai-disclosure', label: 'AI disclosure gates: one LLM path, one publish path, labels intact' },
     { script: 'check:locales', label: 'Language files agree with en.json' },
     { script: 'check:licenses', label: 'Licences allowed, every served file accounted for' },
