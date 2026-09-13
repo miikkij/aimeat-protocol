@@ -19,6 +19,8 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.8.0 — 2026-09-13 — The dialog frame, header and footer rules leave for /css/dialog.css, the one
+ *     dialog every page uses; only the account dialogs' field rules stay.
  *   v1.7.0 -- 2026-09-13 -- V2: profile markup selects the shared crumb shape.
  *   v1.6.0 — 2026-09-13 — V1: profile markup composes shared page and B1 section headings.
  *   v1.5.1 — 2026-09-09 — Account dialogs share the poster frame, fields and actions in Home and Settings.
@@ -268,25 +270,14 @@
 .pf .pagination { font-family: var(--font-mono); }
 
 /* ── Dialogs ────────────────────────────────────────────────────────────────────────────── */
-.modal, .pf-account-modal { border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); font-family: var(--font-showroom-body); }
-.modal-header h3, .pf-account-modal .pf-edit-title { font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); font-size: 1.4rem; text-transform: uppercase; letter-spacing: var(--font-poster-tracking); }
-.modal-footer, .pf-account-modal .pf-edit-footer { border-top: 3px solid var(--text); padding-top: 1rem; }
-
-/* These dialogs also open from Home, outside the profile shell. */
-.pf-account-modal { animation: none; background: var(--card-bg); color: var(--text); display: flex; flex-direction: column; overflow: hidden; }
-.pf-account-modal .pf-edit-header, .pf-account-modal .pf-edit-footer { flex: none; }
-.pf-account-modal .pf-edit-body { overflow-y: auto; min-height: 0; }
-.pf-account-modal .pf-edit-close { border: 2px solid var(--text); border-radius: 0; color: var(--text); flex: none; min-width: 44px; min-height: 44px; }
+/* The frame, header, X and footer of every dialog are /css/dialog.css. What stays here is how the
+   account dialogs' fields look; those dialogs also open from Home, outside the profile shell. */
 .pf-account-modal .pf-edit-input { width: 100%; min-width: 0; box-sizing: border-box; }
 .pf-account-modal .pf-pw-eye { right: 0; top: 0; bottom: 3px; transform: none; margin: auto 0; height: fit-content; }
-.pf-account-modal .pf-edit-footer { flex-wrap: wrap; align-items: center; gap: 1rem; }
 .pf-account-modal .pf-edit-link { align-self: flex-start; width: fit-content; text-decoration: none; }
 .pf-account-modal .pf-edit-readonly, .pf-account-modal .pf-avatar-preview, .pf-account-modal .pf-edit-error { border-radius: 0; }
 .pf-account-modal .pf-edit-readonly { background: none; border: 0; border-bottom: 1px solid var(--border); padding-inline: 0; }
 .pf-account-modal .pf-avatar-preview { border: 2px solid var(--text); }
-@media (max-width: 600px) {
-  .pf-account-modal .pf-edit-footer-left { flex-basis: 100%; }
-}
 
 /* ── Words on the sun stay ink in every theme ───────────────────────────────────────────── */
 .pf .pf-side-item--active, .pf .pf-next-card--primary, .pf .pf-next-card:hover, .pf .pf-mcp-badge,

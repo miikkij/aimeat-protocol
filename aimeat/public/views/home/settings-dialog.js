@@ -20,6 +20,8 @@
  *   import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
  *   html`<${HomeSettingsDialog} open=${open} onClose=${close} />`
  * @version-history
+ *   2026-09-13: The dialog is the site's one dialog at its medium size; its two sections open on the
+ *     page's own slab (poster-section-title) and the door out is a row under an ink rule.
  *   2026-09-09: Account actions use the same underlined control as the home header.
  *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v2.1.1 — 2026-08-29 — A preview box above the chips shows the chosen figure without leaving the dialog.
@@ -133,25 +135,28 @@ export function HomeSettingsDialog({ open, onClose, session, showToast }) {
     onClose=${() => setPanel('settings')}
     onChanged=${() => { setPanel('settings'); showToast?.(t('profile.landing.passwordChanged')); }} />`;
   return html`
-    <${Modal} open=${open} onClose=${onClose}
+    <${Modal} open=${open} onClose=${onClose} size="md"
       title=${tr('home.settings.title', 'Home settings')}
       className="koti-settings-modal">
       <div class="koti-settings">
-        <section class="koti-account-settings">
-          <h3>${t('homeJourney.account')}</h3>
+        ${/* Inside a dialog a section starts the way it does on the page: the slab, a size smaller. */''}
+        <section class="poster-section koti-account-settings">
+          <h3 class="poster-section-title">${t('homeJourney.account')}</h3>
           <button type="button" class="koti-link" onClick=${() => setPanel('password')}>${t('profile.landing.changePasswordBtn')}</button>
           <button type="button" class="koti-link" onClick=${() => setPanel('profile')}>${t('homeJourney.profileLanguage')}</button>
           <a class="koti-link" href="/v1/profile?tab=access">${t('homeJourney.security')} →</a>
           <p class="koti-hint">${t('homeJourney.securityHint')}</p>
         </section>
-        <h3>${t('homeJourney.appearance')}</h3>
-        <${AchievementsToggle} />
-        <${MarginPatternSetting} />
-        <${StartPageSetting} className="koti-settings-startpage" />
+        <section class="poster-section">
+          <h3 class="poster-section-title">${t('homeJourney.appearance')}</h3>
+          <${AchievementsToggle} />
+          <${MarginPatternSetting} />
+          <${StartPageSetting} className="koti-settings-startpage" />
+        </section>
         ${/* Everything that is not the home's own. A full page load rather than a router call: the
               dialog is open over the home, and the cleanest way out of a modal into another shell
               is to leave. */''}
-        <a class="koti-settings-door" href="/v1/profile">
+        <a class="koti-settings-door poster-row--thing" href="/v1/profile">
           <span class="koti-settings-door-title">${tr('home.settings.allControls', 'All settings and controls')} →</span>
           <span class="koti-settings-door-hint">
             ${tr('home.settings.allControlsHint', 'Agents, memory, apps, access, billing: everything behind the home.')}

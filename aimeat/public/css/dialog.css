@@ -1,0 +1,141 @@
+/**
+ * @file dialog.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The look of every dialog on the site: one <dialog class="dlg"> with three parts.
+ *   A header (.dlg-head) is the section slab at the dialog's size, holding the title and, when the
+ *   dialog wants one, the X. The body (.dlg-body) is the only part that scrolls, and a headline
+ *   inside it wears the page's own shapes from poster.css (.poster-section-title at the dialog's
+ *   smaller size, .poster-label, .poster-row). A footer (.dlg-foot) holds the actions: underlined
+ *   words, and one loud slab.
+ *   On a desktop the dialog floats in the middle in a 3px ink frame with a 12px sun shadow. On a
+ *   phone (560px and narrower) it is a sheet at the bottom edge, as wide as the screen, growing with
+ *   its content up to the full height; the header and footer stay put while the body scrolls, the
+ *   footer clears the home indicator, and with interactive-widget=resizes-content in the viewport
+ *   the on-screen keyboard shortens the sheet instead of covering the footer.
+ *   Behaviour is public/js/dialog.js; the Preact component is components/Modal.js. The app catalog
+ *   gets this file copied into its page at build time (scripts/build-app-catalog.ts).
+ * @structure frame · header and X · body · footer and its actions · sizes · phone
+ * @version-history
+ *   v1.0.0 — 2026-09-13 — Initial (wish "Yksi dialogikomponentti kaikille dialogeille").
+ */
+
+/* ── The frame ─────────────────────────────────────────────────────────────────────────────── */
+dialog.dlg {
+  box-sizing: border-box;
+  width: min(var(--dlg-width, 560px), calc(100vw - 48px));
+  max-width: none; min-width: 0;
+  max-height: calc(100dvh - 48px);
+  margin: auto; padding: 0;
+  border: 3px solid var(--text); border-radius: 0;
+  background: var(--bg); color: var(--text);
+  box-shadow: 12px 12px 0 var(--sun);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+dialog.dlg[open] { display: flex; flex-direction: column; }
+dialog.dlg::backdrop { background: rgba(0, 0, 0, .45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+
+/* ── The header: the slab, the title, the X ────────────────────────────────────────────────── */
+dialog.dlg .dlg-head {
+  flex: none; display: flex; align-items: center; gap: 12px;
+  margin: 0; padding: .55rem .55rem .5rem 1rem;
+  background: var(--text); color: var(--bg);
+  border: 0; border-bottom: 6px solid var(--sun);
+}
+dialog.dlg .dlg-title {
+  flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; background: none; border: 0;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
+  font-size: var(--dlg-title-size, 1.4rem); line-height: var(--font-poster-leading);
+  letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
+  color: inherit; overflow-wrap: anywhere;
+}
+/* The X: a 26px square framed in the header's own colour, inside a 44px press area. */
+dialog.dlg .dlg-close {
+  flex: none; position: relative; width: 44px; height: 44px; margin: -4px 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
+  color: inherit; cursor: pointer; opacity: 1;
+}
+dialog.dlg .dlg-close::before {
+  content: ''; position: absolute; width: 26px; height: 26px; box-sizing: border-box;
+  border: 2px solid currentColor;
+}
+dialog.dlg .dlg-close svg { position: relative; display: block; }
+dialog.dlg .dlg-close:hover::before, dialog.dlg .dlg-close:focus-visible::before { background: var(--bg); }
+dialog.dlg .dlg-close:hover, dialog.dlg .dlg-close:focus-visible { color: var(--text); outline: none; }
+dialog.dlg .dlg-close:hover svg, dialog.dlg .dlg-close:focus-visible svg { color: var(--text); }
+/* A dialog without a title keeps its X in the corner, over the body. */
+dialog.dlg > .dlg-close { position: absolute; top: 8px; right: 8px; margin: 0; color: var(--text); z-index: 1; }
+dialog.dlg > .dlg-close:hover::before, dialog.dlg > .dlg-close:focus-visible::before { background: var(--text); }
+dialog.dlg > .dlg-close:hover svg, dialog.dlg > .dlg-close:focus-visible svg { color: var(--bg); }
+
+/* ── The body: the only part that scrolls ─────────────────────────────────────────────────── */
+dialog.dlg .dlg-body {
+  flex: 1 1 auto; min-height: 0; margin: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  padding: 1.4rem 1.5rem 1.5rem;
+  /* A section headline inside a dialog is the page's slab, a size smaller. */
+  --poster-section-size: 1.15rem;
+}
+dialog.dlg .dlg-body > :first-child { margin-top: 0; }
+dialog.dlg .dlg-body > :last-child { margin-bottom: 0; }
+dialog.dlg > .dlg-close + .dlg-body { padding-right: 3.5rem; }
+dialog.dlg .dlg-body .poster-section-title { margin-bottom: 1rem; }
+dialog.dlg .dlg-body .poster-section + .poster-section { margin-top: 2rem; }
+dialog.dlg .dlg-body .poster-section { margin-top: 0; }
+/* The question a confirm dialog asks is running text, in ink. */
+dialog.dlg .modal-confirm-message { color: var(--text); margin: 0; font-size: 1rem; line-height: 1.55; }
+
+/* ── The footer: the actions ───────────────────────────────────────────────────────────────── */
+dialog.dlg .dlg-foot {
+  flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end;
+  gap: .8rem 1.4rem; margin: 0; padding: .9rem 1.5rem 1rem;
+  border-top: 3px solid var(--text); background: var(--bg);
+}
+/* Something that belongs on the footer's other end (a side door like "Change password…"). */
+dialog.dlg .dlg-foot .dlg-foot-start { margin-right: auto; }
+/* The site's button classes wear the poster's two words here, whichever view opened the dialog. */
+dialog.dlg .dlg-foot .btn-ghost, dialog.dlg .dlg-foot .btn-outline, dialog.dlg .dlg-foot .btn-secondary, dialog.dlg .dlg-foot .poster-action {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0; background: none; box-shadow: none;
+  border: 0; border-radius: 0; color: var(--text);
+  font-family: var(--font-body); font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em;
+  text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; cursor: pointer;
+}
+dialog.dlg .dlg-foot .btn-ghost:hover, dialog.dlg .dlg-foot .btn-outline:hover, dialog.dlg .dlg-foot .btn-secondary:hover, dialog.dlg .dlg-foot .poster-action:hover { color: var(--accent); background: none; }
+dialog.dlg .dlg-foot .btn-primary, dialog.dlg .dlg-foot .btn-danger-solid, dialog.dlg .dlg-foot .poster-slab {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px;
+  border: 0; border-radius: 0; background: var(--text); color: var(--bg); box-shadow: 4px 4px 0 var(--sun);
+  font-family: var(--font-body); font-weight: var(--font-poster-strong-weight); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em;
+  cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease;
+}
+dialog.dlg .dlg-foot .btn-danger-solid { background: var(--accent); color: #fff; box-shadow: 4px 4px 0 var(--text); }
+dialog.dlg .dlg-foot .btn-primary:hover:not(:disabled), dialog.dlg .dlg-foot .poster-slab:hover:not(:disabled) { color: var(--sun); background: var(--text); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); }
+dialog.dlg .dlg-foot .btn-danger-solid:hover:not(:disabled) { background: var(--accent); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--text); }
+dialog.dlg .dlg-foot button:disabled { opacity: .45; cursor: default; transform: none; }
+/* The focus a dialog opens with (Cancel, on a destructive question) is a coral outline, not a grey box. */
+dialog.dlg .dlg-foot :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ── Sizes ─────────────────────────────────────────────────────────────────────────────────── */
+dialog.dlg.dlg--sm { --dlg-width: 440px; }
+dialog.dlg.dlg--md { --dlg-width: 560px; }
+dialog.dlg.dlg--lg { --dlg-width: 840px; }
+dialog.dlg.dlg--xl { --dlg-width: 1080px; }
+
+/* ── Phone: a sheet at the bottom edge ────────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  dialog.dlg {
+    width: 100vw; max-height: calc(100dvh - env(safe-area-inset-top, 0px));
+    margin: auto 0 0; border-width: 3px 0 0; box-shadow: 0 -6px 0 var(--sun);
+    --dlg-title-size: 1.2rem;
+  }
+  dialog.dlg .dlg-head { padding: .45rem .35rem .4rem .8rem; }
+  dialog.dlg .dlg-body { padding: 1.1rem 1rem 1.2rem; }
+  dialog.dlg .dlg-foot { padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom, 0px)); gap: .6rem 1.2rem; }
+  /* The loud action takes the row, so it is the easy one to reach with a thumb. */
+  dialog.dlg .dlg-foot .btn-primary, dialog.dlg .dlg-foot .btn-danger-solid, dialog.dlg .dlg-foot .poster-slab { flex: 1 1 auto; }
+}
+
+/* The page behind: a modal dialog makes it inert, and the body's overscroll-behavior keeps a scroll
+   in the dialog from running on into it. The SPA's window never scrolls (theme.css html { overflow:
+   clip }); a page whose document scrolls locks it itself (the app catalog does, in its own sheet). */

@@ -4,12 +4,15 @@
  * SPDX-License-Identifier: MIT
  * @description Profile edit / change-password / presence modals + presence pill. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-13: The three dialogs open in the site's one dialog (components/Modal.js) instead of an
+ *     overlay of their own: the same header, X, scrolling body and footer as every other dialog, the
+ *     phone sheet, and Modal's guard in place of the two hand-written Escape listeners.
  *   2026-09-09: Mark both account dialogs for the shared poster form skin in every host view.
  *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/landing-page.js (max-file-lines)
  */
 import { h } from "preact";
-import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "preact/hooks";
+import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import htm from "htm";
 const html = htm.bind(h);
 import { t } from "/js/i18n.js";
@@ -22,6 +25,7 @@ import { useToast } from "/components/Toast.js";
 import { DisplayPrefsFields } from "/components/DisplayPrefsFields.js";
 import { setDisplayPrefs } from "/js/display-prefs.js";
 import { swallowed } from '/js/swallowed.js';
+import { Modal } from '/components/Modal.js';
 
 /* ───── Edit Profile Modal ───── */
 
@@ -31,12 +35,6 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
   const [saving, setSaving] = useState(false);
   const [fields, setFields] = useState({ display_name: '', bio: '', avatar: '', locale: 'en', region: '', timezone: '', directory_listed: false });
   const [currentEmail, setCurrentEmail] = useState('');
-  const [dirty, setDirty] = useState(false);
-  useLayoutEffect(() => {
-    const closeEmpty = (e) => { if (e.key === 'Escape' && !dirty && !saving) onClose(); };
-    document.addEventListener('keydown', closeEmpty);
-    return () => document.removeEventListener('keydown', closeEmpty);
-  }, [dirty, saving, onClose]);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,7 +62,7 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
     return () => { cancelled = true; };
   }, []);
 
-  const set = (key, val) => { setDirty(true); setFields(prev => ({ ...prev, [key]: val })); };
+  const set = (key, val) => { setFields(prev => ({ ...prev, [key]: val })); };
 
   const save = async () => {
     setSaving(true);
@@ -88,19 +86,25 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
     setSaving(false);
   };
 
-  const onOverlayClick = (e) => {
-    if (e.target === e.currentTarget && !dirty && !saving) onClose();
-  };
+  // The dialog keeps a half-written form open against Escape and a stray click (Modal's guard);
+  // while a save is on its way nothing closes it.
+  const requestClose = () => { if (!saving) onClose(); };
+
+  const footer = loading ? null : html`
+    <button class="btn-outline" onClick=${requestClose} disabled=${saving}>
+      ${t('profile.landing.editCancel')}
+    </button>
+    <button class="btn-primary" onClick=${save} disabled=${saving}>
+      ${saving ? t('profile.landing.editSaving') : t('profile.landing.editSave')}
+    </button>`;
+  const footerStart = loading ? null : html`
+    <a href="#" class="pf-edit-link" onClick=${(e) => { e.preventDefault(); onChangePassword?.(); }}>
+      ${t('profile.landing.changePassword')}…</a>`;
 
   return html`
-    <div class="pf-edit-overlay" onClick=${onOverlayClick}>
-      <div class="pf-edit-modal pf-account-modal" role="dialog" aria-modal="true" aria-label=${t('profile.landing.editModalTitle')}>
-        <div class="pf-edit-header">
-          <h2 class="pf-edit-title">${t('profile.landing.editModalTitle')}</h2>
-          <button class="pf-edit-close" onClick=${onClose} aria-label=${t('profile.landing.editCancel')}>✕</button>
-        </div>
+    <${Modal} open=${true} onClose=${requestClose} title=${t('profile.landing.editModalTitle')}
+      className="pf-account-modal" footer=${footer} footerStart=${footerStart}>
         ${loading ? html`<div class="pf-edit-loading"><${Spinner} /></div>` : html`
-          <div class="pf-edit-body">
             <label class="pf-edit-label">
               ${t('profile.landing.editDisplayName')}
               <input type="text" class="pf-edit-input" value=${fields.display_name}
@@ -152,21 +156,9 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
                 <span class="pf-edit-hint">${t('profile.landing.editDirectoryHint') || 'Off by default. When on, other signed-in members can find you (name, bio, avatar) in the directory. Anonymous visitors never see it.'}</span>
               </span>
             </label>
-          </div>
-          <div class="pf-edit-footer">
-            <a href="#" class="pf-edit-link pf-edit-footer-left" onClick=${(e) => { e.preventDefault(); onChangePassword?.(); }}>
-              ${t('profile.landing.changePassword')}…</a>
-            <button class="btn-outline" onClick=${onClose} disabled=${saving}>
-              ${t('profile.landing.editCancel')}
-            </button>
-            <button class="btn-primary" onClick=${save} disabled=${saving}>
-              ${saving ? t('profile.landing.editSaving') : t('profile.landing.editSave')}
-            </button>
-          </div>
         `}
-      </div>
-      <${ToastContainer} />
-    </div>
+        <${ToastContainer} />
+    <//>
   `;
 }
 
@@ -194,12 +186,6 @@ export function ChangePasswordModal({ onClose, onChanged }) {
   // accounts that have never set one (Google sign-in). When false we offer "set a
   // password" with no current-password field, since there's nothing to verify against.
   const [hasPassword, setHasPassword] = useState(null);
-  const dirty = !!(current || newPw || confirm);
-  useLayoutEffect(() => {
-    const closeEmpty = (e) => { if (e.key === 'Escape' && !dirty && !saving) onClose(); };
-    document.addEventListener('keydown', closeEmpty);
-    return () => document.removeEventListener('keydown', closeEmpty);
-  }, [dirty, saving, onClose]);
 
   useEffect(() => {
     let cancelled = false;
@@ -245,24 +231,24 @@ export function ChangePasswordModal({ onClose, onChanged }) {
     setSaving(false);
   };
 
-  const onOverlayClick = (e) => {
-    if (e.target === e.currentTarget && !dirty && !saving) onClose();
-  };
+  const requestClose = () => { if (!saving) onClose(); };
 
   // OAuth accounts with no password set: "set a password" flow (no current field).
   const setupMode = hasPassword === false;
 
+  const footer = html`
+    <button class="btn-outline" onClick=${requestClose} disabled=${saving}>
+      ${t('profile.landing.editCancel')}
+    </button>
+    <button class="btn-primary" onClick=${save} disabled=${saving || hasPassword === null || (!setupMode && !current) || !rulesOk || !confirm || mismatch}>
+      ${saving
+        ? (setupMode ? (t('profile.landing.passwordSaving') || t('profile.landing.passwordChanging')) : t('profile.landing.passwordChanging'))
+        : (setupMode ? (t('profile.landing.setPasswordBtn') || 'Set password') : (t('profile.landing.changePasswordBtn') || 'Change password'))}
+    </button>`;
+
   return html`
-    <div class="pf-edit-overlay" onClick=${onOverlayClick}>
-      <div class="pf-edit-modal pf-account-modal" role="dialog" aria-modal="true"
-        aria-label=${t(setupMode ? 'profile.landing.setPasswordTitle' : 'profile.landing.changePasswordTitle')}>
-        <div class="pf-edit-header">
-          <h2 class="pf-edit-title">${setupMode
-            ? (t('profile.landing.setPasswordTitle') || 'Set a password')
-            : t('profile.landing.changePasswordTitle')}</h2>
-          <button class="pf-edit-close" onClick=${onClose} aria-label=${t('profile.landing.editCancel')}>✕</button>
-        </div>
-        <div class="pf-edit-body">
+    <${Modal} open=${true} onClose=${requestClose} className="pf-account-modal" size="sm" footer=${footer}
+      title=${setupMode ? (t('profile.landing.setPasswordTitle') || 'Set a password') : t('profile.landing.changePasswordTitle')}>
           ${setupMode ? html`
             <div class="pf-edit-hint">${t('profile.landing.setPasswordHint')
               || 'Your account has no password yet (you signed in with Google). Choose a password to also sign in with your username.'}</div>
@@ -285,19 +271,7 @@ export function ChangePasswordModal({ onClose, onChanged }) {
           </label>
           ${mismatch ? html`<div class="pf-edit-error">${t('profile.landing.passwordMismatch')}</div>` : null}
           ${err && html`<div class="pf-edit-error">${err}</div>`}
-        </div>
-        <div class="pf-edit-footer">
-          <button class="btn-outline" onClick=${onClose} disabled=${saving}>
-            ${t('profile.landing.editCancel')}
-          </button>
-          <button class="btn-primary" onClick=${save} disabled=${saving || hasPassword === null || (!setupMode && !current) || !rulesOk || !confirm || mismatch}>
-            ${saving
-              ? (setupMode ? (t('profile.landing.passwordSaving') || t('profile.landing.passwordChanging')) : t('profile.landing.passwordChanging'))
-              : (setupMode ? (t('profile.landing.setPasswordBtn') || 'Set password') : (t('profile.landing.changePasswordBtn') || 'Change password'))}
-          </button>
-        </div>
-      </div>
-    </div>
+    <//>
   `;
 }
 
@@ -306,15 +280,11 @@ export function ChangePasswordModal({ onClose, onChanged }) {
  * <PresenceDialog>. The dot the pill shows is the same <PresenceDot> rendered next
  * to people everywhere else, kept live by the pill's own fetch + live-update wiring. */
 export function PresenceDialog({ cfg, status, saving, onSave, onClose }) {
-  const onOverlayClick = (e) => { if (e.target === e.currentTarget) onClose(); };
+  // Every choice here saves the moment it is made, so there is no half-written form to guard.
   return html`
-    <div class="pf-edit-overlay" onClick=${onOverlayClick}>
-      <div class="pf-edit-modal pf-presence-modal">
-        <div class="pf-edit-header">
-          <h2 class="pf-edit-title">${t('presence.control.title')}</h2>
-          <button class="pf-edit-close" onClick=${onClose} aria-label=${t('profile.landing.editCancel')}>✕</button>
-        </div>
-        <div class="pf-edit-body">
+    <${Modal} open=${true} onClose=${onClose} title=${t('presence.control.title')} size="sm" guard=${false}
+      className="pf-presence-modal"
+      footer=${html`<button class="btn-primary" onClick=${onClose}>${t('profile.close')}</button>`}>
           <div class="pf-presence-head">
             <div class="section-desc">${t('presence.control.desc')}</div>
             <${PresenceDot} status=${status} size="md" label=${true} />
@@ -358,12 +328,7 @@ export function PresenceDialog({ cfg, status, saving, onSave, onClose }) {
             ${cfg.visibility === 'everyone' ? t('presence.control.visEveryoneHint')
               : cfg.visibility === 'contacts' ? t('presence.control.visContactsHint') : ''}
           </div>
-        </div>
-        <div class="pf-edit-footer">
-          <button class="btn-primary" onClick=${onClose}>${t('profile.close')}</button>
-        </div>
-      </div>
-    </div>
+    <//>
   `;
 }
 

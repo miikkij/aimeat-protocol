@@ -7,6 +7,8 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.18.0 — 2026-09-13 — The markdown viewer's and the AI popovers' own overlays, frames and heads
+ *     leave for the site's one dialog (/css/dialog.css); the modes are poster tabs.
  *   v1.17.0 -- 2026-09-13 -- The list's sections and closable groups (.inbox-sec*, .inbox-chev,
  *     .inbox-conv-group-bar), the archive control on a row and a group (.inbox-conv-act,
  *     .inbox-group-act), selection (.inbox-list-tools, .inbox-conv-check), and the "List rules" page
@@ -529,42 +531,12 @@
 .inbox-attach-cap { display: flex; align-items: center; gap: 6px; font-size: 12px; max-width: 200px; }
 .inbox-attach-cap .inbox-attach-name { flex: 1; min-width: 0; color: var(--text-dim); }
 
-/* In-app markdown viewer overlay. */
-.inbox-mdviewer-overlay {
-  position: fixed; inset: 0; z-index: 1200; background: rgba(0, 0, 0, 0.6);
-  display: flex; align-items: center; justify-content: center; padding: 24px;
-}
-.inbox-mdviewer {
-  display: flex; flex-direction: column; width: min(860px, 100%); max-height: 88vh;
-  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden;
-}
-.inbox-mdviewer-head {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface);
-}
-.inbox-mdviewer-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.inbox-mdviewer-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.inbox-mdviewer-body { padding: 18px 22px; overflow: auto; }
-
-/* ── Reply with AI popover (TARGET-031) ── */
-.inbox-ai-overlay {
-  position: fixed; inset: 0; z-index: 1200; background: rgba(0, 0, 0, 0.6);
-  display: flex; align-items: center; justify-content: center; padding: 24px;
-}
-.inbox-ai-modal {
-  display: flex; flex-direction: column; gap: 10px; width: min(720px, 100%); max-height: 88vh;
-  padding: 16px 18px; background: var(--card); border: 1px solid var(--border);
-  border-radius: var(--radius-md); overflow: hidden;
-}
-.inbox-ai-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.inbox-ai-title { font-weight: 600; }
-.inbox-ai-modes { display: flex; gap: 6px; }
-.inbox-ai-mode {
-  border: 1px solid var(--border); background: var(--surface); cursor: pointer;
-  padding: 5px 12px; border-radius: var(--radius-sm); font-size: 13px; color: var(--text-dim);
-}
-.inbox-ai-mode:hover { color: var(--text); }
-.inbox-ai-mode--on { background: var(--accent-subtle); border-color: var(--accent-border); color: var(--accent); }
+/* ── The markdown viewer and the Reply-with-AI / notebook popovers (TARGET-031) ──
+   The dialog around them is the site's one dialog (/css/dialog.css); these are their insides. */
+.inbox-ai-modal .dlg-body { display: flex; flex-direction: column; gap: 10px; }
+.inbox-ai-modes { display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; margin-bottom: .2rem; }
+.inbox-ai-modes .poster-tab { min-height: 44px; }
+.inbox-ai-modal .poster-panel { display: flex; flex-direction: column; gap: 10px; margin: 0; }
 .inbox-ai-hint { font-size: 12.5px; color: var(--text-dim); line-height: 1.4; }
 .inbox-ai-text {
   width: 100%; resize: vertical; font-family: var(--font-mono, monospace); font-size: 12.5px;

@@ -10,6 +10,8 @@
  *   only what this page adds lives here. Every value is a theme.css token, so the page flips with
  *   the theme.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — The page's own copy of the poster dialog leaves; /css/dialog.css draws it for
+ *     every dialog now.
  *   v1.0.0 — 2026-09-12 — Initial (the Owners page in the poster face).
  */
 
@@ -122,45 +124,8 @@
 .adm-own-two .og-box p:last-child { margin-bottom: 0; }
 .adm-own-rule { font-weight: 700; color: var(--text); }
 
-/* ── The question each act asks first, in the poster face ─────────────────────────────────── */
-/* Scoped to this page's dialogs by the className useConfirm forwards, so no other dialog in the
-   app changes shape. Ink frame, sun shadow, no radius; the confirm is the slab and the cancel is
-   an underlined word, as the design language has it. */
-.modal.adm-own-dlg {
-  background: var(--card-bg); border: 3px solid var(--text); border-radius: 0;
-  box-shadow: 12px 12px 0 var(--sun); padding: 20px 24px 22px; max-width: 560px;
-}
-.modal.adm-own-dlg .modal-header { margin-bottom: 6px; align-items: flex-start; }
-.modal.adm-own-dlg .modal-header h3 {
-  margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400);
-  font-size: 1.35rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em);
-  text-transform: uppercase; color: var(--text);
-}
-/* The corner people look at first: a 26px ink square, not a grey glyph. */
-.modal.adm-own-dlg .modal-close {
-  flex: none; width: 26px; height: 26px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
-  border: 2px solid var(--text); border-radius: 0; padding: 0; opacity: 1; font-size: .8rem; color: var(--text);
-}
-.modal.adm-own-dlg .modal-close:hover { background: var(--text); color: var(--bg); }
-.modal.adm-own-dlg .modal-confirm-message { color: var(--text); margin: 0; }
-.modal.adm-own-dlg .modal-footer { align-items: center; gap: 22px; padding-top: 18px; }
-.modal.adm-own-dlg .modal-footer .btn-primary,
-.modal.adm-own-dlg .modal-footer .btn-danger-solid {
-  background: var(--text); color: var(--bg); border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
-  padding: 11px 16px; font-family: inherit; font-weight: 600; font-size: .8rem; letter-spacing: .04em; text-transform: uppercase;
-  transition: transform .1s, box-shadow .1s;
-}
-.modal.adm-own-dlg .modal-footer .btn-danger-solid { background: var(--accent); color: #FFFFFF; box-shadow: 4px 4px 0 var(--text); }
-.modal.adm-own-dlg .modal-footer .btn-primary:hover,
-.modal.adm-own-dlg .modal-footer .btn-danger-solid:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); }
-.modal.adm-own-dlg .modal-footer .btn-danger-solid:hover { box-shadow: 2px 2px 0 var(--text); }
-.modal.adm-own-dlg .modal-footer .btn-ghost {
-  background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; padding: 0 0 1px;
-  font-family: inherit; font-weight: 800; font-size: .8rem; color: var(--text);
-}
-.modal.adm-own-dlg .modal-footer .btn-ghost:hover { color: var(--accent); border-bottom-color: var(--accent); }
-
 /* ── The body of the question each act asks first ─────────────────────────────────────────── */
+/* The dialog around it (frame, title, X, the two actions) is the site's one dialog, /css/dialog.css. */
 .adm-own-ask { display: flex; flex-direction: column; gap: 10px; text-align: left; }
 .adm-own-ask-who { font-family: var(--font-mono); font-size: .8rem; color: var(--accent); }
 .adm-own-ask-note { font-size: .85rem; color: var(--text-dim); }

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Useful work and account settings on the home, in the poster face.
  * @version-history
+ *   v1.2.0 — 2026-09-13 — The account section in the settings dialog opens on the slab, so its 2px
+ *     bottom rule goes; the dialog's X is sized by /css/dialog.css.
  *   v1.1.0 — 2026-09-12 — The section starts with the band title's ink slab (home.css), so the rule
  *     above it goes; the area the chosen task governs (hint, connection line, prompt, links) sits in
  *     .koti-journey-panel with a 4px sun bar down its left edge, the selection's own colour carried
@@ -27,9 +29,9 @@
 .koti-journey-details summary { cursor: pointer; min-height: 44px; font-weight: var(--font-poster-strong-weight); }
 .koti-journey-result { border: 2px solid var(--text); background: var(--card-bg); padding: 1rem; margin-block: 1rem; overflow-wrap: anywhere; }
 .koti-journey-result p { white-space: pre-wrap; }
-.koti-account-settings { display: flex; flex-direction: column; align-items: flex-start; gap: .8rem; border-bottom: 2px solid var(--text); padding-bottom: 1rem; margin-bottom: 1rem; }
+.koti-account-settings { display: flex; flex-direction: column; align-items: flex-start; gap: .8rem; }
+.koti-account-settings > .poster-section-title { align-self: stretch; }
 .koti-account-settings button, .koti-account-settings a { min-height: 44px; }
-.koti-settings-modal .modal-close { min-width: 44px; min-height: 44px; }
 @media (max-width: 600px) {
   .koti-journey .koti-link, .koti-account-settings .koti-link { white-space: normal; text-align: left; }
   .koti-journey-connect { padding: .75rem; }
