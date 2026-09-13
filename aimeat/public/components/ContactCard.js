@@ -9,6 +9,7 @@
  *   when the node has no contact email configured.
  * @usage import { ContactCard } from '/components/ContactCard.js';
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.0.0 — 2026-06-10 — Initial (owner spec: human card).
  *   v2.0.0 — 2026-07-28 — Contact details from siteLinks instead of hardcoded. A clone of
  *     this repo used to publish the founder's phone number on its own business page.
@@ -34,7 +35,7 @@ export function ContactCard() {
   if (contacts.length === 0) return null;
 
   return html`
-    <div class="ld-contact">
+    <div class="ld-contact poster-aside poster-aside--large">
       <div class="ld-contact-title">${tr('contact.title', 'Talk to a human.')}</div>
       <div class="ld-contact-people">
         ${contacts.map(c => html`

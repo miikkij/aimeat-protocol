@@ -11,6 +11,7 @@
  *   views/profile/organisms/home.js and read by home-settings.js. The inner panels (workspace list,
  *   roster, agents, board, map, timeline) keep their own pj- rules; a few are quieted here.
  * @version-history
+ *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v1.6.0 -- 2026-09-13 -- Compose the workspace document index rule from poster.css.
  *   v1.5.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.4.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
@@ -85,9 +86,7 @@
 .og-fold--toggle:hover span:first-of-type { color: var(--accent); }
 .og-fold-sec.is-open .og-fold--toggle { margin-bottom: .9rem; }
 .og-fold-body { display: flex; flex-direction: column; gap: .8rem; }
-.og-box { padding: .9rem 1.1rem; border: 3px dashed var(--accent); background: var(--card-bg); font-size: .92rem; line-height: 1.55; }
 .og-box + .og-box { margin-top: .9rem; }
-.og-box--solid { border-style: solid; }
 .og-box-label { display: block; margin-bottom: .3rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .75rem; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
 .og-box-row { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; }
 .og-box-row > button { flex: none; }

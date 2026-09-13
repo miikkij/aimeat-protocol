@@ -23,6 +23,7 @@
  * @structure MsmTab (default) · RightNow · ReadyMade · WhatItTakes
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared B1 headings and stylesheet-owned layout.
  *   v2.0.1 — 2026-09-13 — The delete dialog's actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-12 — The poster face: five numbered sections, its own listing (the tab and the
@@ -113,7 +114,7 @@ function WhatItTakes({ facts, number }) {
       ${row('public')}
       ${row('write')}
       ${row('travel', true)}
-      <div class="og-box adm-msm-takes-note">
+      <div class="og-box adm-msm-takes-note poster-aside poster-aside--small">
         <span class="og-box-label">${M('takes.boxLabel')}</span>
         ${M('takes.box', { days: num(facts.daysQuiet) })}
       </div>
@@ -291,7 +292,7 @@ export default function MsmTab() {
           <button type="button" class="og-door og-door--quiet og-door--danger"
             disabled=${busy || removing.typed !== removing.name} onClick=${doDelete}>${M('deleteIt')}</button>`}>
         ${removing && html`
-          <div class="og-box">
+          <div class="og-box poster-aside poster-aside--small">
             <span class="og-box-label">${M('dialog.deleteWarnLabel')}</span>
             ${M('dialog.deleteWarn')}
           </div>

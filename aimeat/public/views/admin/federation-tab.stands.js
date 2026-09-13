@@ -26,6 +26,7 @@
  *   - WhoMaySignIn (02) — the policy, the scopes, and what this node offers
  * @usage Imported by views/admin/federation-tab.js.
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.0 — 2026-09-12 — Initial (the Federation page in the poster face).
  */
@@ -190,7 +191,7 @@ export function WhoMaySignIn({ data, saving, onPolicy, onScope, onOpenJoin, onGo
           ${Row({ title: S('offer.csms'), why: null, chip: null, value: S('offer.of', { n: num(offer.csms), total: num(offer.csms_total) }), last: true })}
 
           ${offer.gives_nothing && html`
-            <div class="og-box adm-fed-box--afterRows">
+            <div class="og-box adm-fed-box--afterRows poster-aside poster-aside--small">
               <span class="og-box-label">${S('offer.nothingLabel')}</span>
               ${S('offer.nothingBody')}
               <div class="adm-fed-acts">

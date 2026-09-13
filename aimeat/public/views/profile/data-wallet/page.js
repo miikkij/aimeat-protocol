@@ -14,6 +14,7 @@
  *   secRoads
  * @usage import { renderPage } from './data-wallet/page.js';
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 -- 2026-09-13 -- V2: select shared ink frames for explanations and the export row.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Tietolompakko-sivu", direction A).
@@ -72,7 +73,7 @@ function federated(ctx) {
     <div class="og og-dw">
       ${crumb()}
       <div class="og-mast"><div class="og-mast-words"><h1 class="og-title poster-page-title">${t('profile.tabs.dataWallet')}<small>${x('titleSub')}</small></h1><p class="og-desc">${x('desc')}</p></div></div>
-      <div class="og-box og-box--solid dw-box"><span class="og-box-label">${x('federatedLabel')}</span>${x('federatedBody', { node: ctx.session?.homeNode || '?' })}</div>
+      <div class="og-box og-box--solid dw-box poster-aside poster-aside--small poster-aside--irreversible"><span class="og-box-label">${x('federatedLabel')}</span>${x('federatedBody', { node: ctx.session?.homeNode || '?' })}</div>
     </div>`;
 }
 
@@ -207,7 +208,7 @@ function secGrant(ctx) {
               <option value="">${ctx.orgs.length ? x('form.pickOrg') : x('form.noOrgs')}</option>
               ${ctx.orgs.map((o) => html`<option key=${o.id} value=${o.id}>${o.name}</option>`)}
             </select>
-            ${f.what === 'ws' ? html`<select class="og-input" style="margin-top: .4rem;" value=${f.wsId} disabled=${!f.orgId} onChange=${(e) => ctx.setForm({ wsId: e.target.value })}>
+            ${f.what === 'ws' ? html`<select class="og-input dw-workspace-select" value=${f.wsId} disabled=${!f.orgId} onChange=${(e) => ctx.setForm({ wsId: e.target.value })}>
               <option value="">${!f.orgId ? x('form.pickOrgFirst') : wsList.length ? x('form.pickWs') : x('form.noWs')}</option>
               ${wsList.map((w) => html`<option key=${w.id} value=${w.id}>${w.name}</option>`)}
             </select>` : null}

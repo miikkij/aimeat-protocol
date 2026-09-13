@@ -17,6 +17,7 @@
  *   square mono chip, 2px framed, selected on the sun; and the ink slab, which comes from
  *   .btn-primary rather than from here.
  * @version-history
+ *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v2.3.0 -- 2026-09-13 -- Compose state section headings from the shared B1 shape.
  *   v2.2.0 -- 2026-09-13 -- Compose the standalone page title from poster.css.
  *   v2.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
@@ -279,18 +280,7 @@
    Shape 2, the dashed coral box: the aside that has to be said out loud. A COLUMN, NOT A ROW —
    it was a flex row, which is the shape for one sentence, and it says four things in the order a
    person needs them: what is wrong, what the press does, what it costs, what it needs. */
-.flt-migrate {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.45rem;
-  border: 3px dashed var(--accent);
-  border-radius: 0;
-  background: var(--card-bg);
-  padding: 1.1rem 1.2rem;
-  margin-bottom: 1.6rem;
-  min-width: 0;
-}
+.flt-migrate { display: flex; flex-direction: column; align-items: flex-start; gap: 0.45rem; margin-bottom: 1.6rem; min-width: 0; }
 
 .flt-migrate-head {
   margin: 0;

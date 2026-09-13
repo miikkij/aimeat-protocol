@@ -20,6 +20,7 @@
  *   - CreateForm — the operator's own system package
  * @usage Imported by views/admin/knowledge-tab.js.
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Knowledge page in the poster face).
  */
@@ -143,7 +144,7 @@ export function CreateForm({ onCreate, onCancel, busy }) {
   const ready = form.name.trim() && form.entries.some(e => e.title.trim());
 
   return html`
-    <div class="adm-kn-newbox">
+    <div class="adm-kn-newbox poster-aside">
       <span class="adm-kn-newlabel">${S('create.title')}</span>
       <div class="adm-kn-form">
         <div class="adm-kn-fld">

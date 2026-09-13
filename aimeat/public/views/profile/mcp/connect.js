@@ -10,6 +10,7 @@
  * @structure secConnect · quickWays · proofBlock · failList
  * @usage import { secConnect } from './connect.js';
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   2026-09-13 -- V2aa: compose the proof section headline with the shared B1 class.
  *   v1.0.0 — 2026-09-02 — Initial (design canvas "AIMEAT MCP-sivu", direction A).
  */
@@ -32,15 +33,15 @@ export function secConnect(ctx, proven) {
         ${quickWays(ctx)}
         <div class="og-folds">
           <${Fold} id="mcp-guide" num="·" title=${m('guideFold')} sub=${m('guideFoldSub')} open=${ctx.folds.guide} onToggle=${() => ctx.setFold('guide', !ctx.folds.guide)}>
-            <${McpSetupGuide} />
+            <${McpSetupGuide} installClassName="poster-aside" />
           <//>
           <${Fold} id="mcp-proof" num="·" title=${m('proofFold')} sub=${m('proofFoldSub', { date: day(ctx.proof?.at) })} open=${ctx.folds.proof} onToggle=${() => ctx.setFold('proof', !ctx.folds.proof)}>
             ${proofBlock(ctx, true)}
           <//>
         </div>` : html`
         <p class="mc-lead">${m('connectLeadNew')}</p>
-        <${McpSetupGuide} />
-        <div class="mc-pre">
+        <${McpSetupGuide} installClassName="poster-aside" />
+        <div class="mc-pre poster-aside">
           <span class="mc-pre-label">${m('preTitle')}</span>
           <p>${m('preAddress')}</p>
           <p>${m('preManaged')}</p>

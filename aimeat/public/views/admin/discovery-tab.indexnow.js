@@ -16,6 +16,7 @@
  *   the plan dialog
  * @usage <${DiscoveryInstant} status=${status} onChanged=${load} />
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.1 — 2026-09-13 — The plan dialog is the large size and its actions sit in its footer.
  *   v1.0.0 — 2026-09-11 — Initial (the Discovery page in the poster face).
@@ -141,7 +142,7 @@ export function DiscoveryInstant({ status, onChanged }) {
             value: S('instant.wholeVal', { n: everything.url_count, hosts: everything.host_count }), last: true })}
         </div>
         <div>
-          <div class="og-box">
+          <div class="og-box poster-aside poster-aside--small">
             <span class="og-box-label">${S('instant.boxLabel')}</span>
             ${!ix.key_configured ? html`
               <div class="adm-disc-box-body">${S('instant.noKeyBox')}</div>

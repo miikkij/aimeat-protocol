@@ -10,6 +10,7 @@
  *   column is bounded so a long tracking code or label wraps inside its cell. NOTE: this file must
  *   be linked in spa.html.
  * @version-history
+ *   2026-09-13 -- Compose the meter frame and sun fill; carry its data through SVG geometry.
  *   v1.2.0 -- 2026-09-13 -- Compose detail frames from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose the pace explanation with the shared ink frame.
  *   v1.0.0 — 2026-09-04 — Initial.
@@ -45,8 +46,8 @@
 .wal-src b { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.15rem; white-space: nowrap; }
 .wal-pace { display: flex; align-items: center; gap: 1.2rem; margin-top: .9rem; padding: .8rem 1rem; font-size: .9rem; line-height: 1.55; }
 .wal-pace b { font-weight: 800; }
-.wal-bar { position: relative; flex: 0 0 15rem; height: 1.5rem; border: 2px solid var(--text); background: var(--bg); overflow: hidden; }
-.wal-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--sun); }
+.wal-bar { position: relative; flex: 0 0 15rem; height: 1.5rem; overflow: hidden; }
+.wal-bar svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .wal-bar span { position: absolute; left: .5rem; top: 0; line-height: 1.3rem; font-family: var(--font-mono); font-size: .72rem; color: var(--text); }
 .wal-uses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem 1.2rem; font-size: .84rem; line-height: 1.5; }
 .wal-uses > div { padding: .4rem 0; border-bottom: 1px solid var(--border); min-width: 0; }

@@ -22,6 +22,7 @@
  * @structure CortexTab (default) · RightNow · WhatOffDoes · WhoCanRead
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared B1 headings; move existing layout values to the view sheet.
  *   v2.0.1 — 2026-09-13 — The turn-off, remove and remove-all dialogs' actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-12 — The poster face: five numbered sections, the dependant count the page had
@@ -107,7 +108,7 @@ function WhoCanRead({ facts, number }) {
       ${row('public', num(facts.publicCount))}
       ${row('private', num(facts.privateCount))}
       ${row('site', num(facts.siteCount), true)}
-      <div class="og-box adm-cx-read-note">
+      <div class="og-box adm-cx-read-note poster-aside poster-aside--small">
         <span class="og-box-label">${C('read.boxLabel')}</span>
         ${C('read.box', { n: num(facts.all) })}
       </div>
@@ -298,7 +299,7 @@ export default function CortexTab() {
           <button type="button" class="og-door og-door--quiet og-door--danger"
             disabled=${busy || removing.typed !== removing.name} onClick=${doRemove}>${C('removeForGood')}</button>`}>
         ${removing && html`
-          <div class="og-box">
+          <div class="og-box poster-aside poster-aside--small">
             <span class="og-box-label">${C('dialog.removeWarnLabel')}</span>
             ${C('dialog.removeWarn')}
           </div>
@@ -460,7 +461,7 @@ export default function CortexTab() {
         ${removingBatch && html`
           <p>${C('dialog.batchAsk', { n: num(removingBatch.items.length) })}</p>
           <p class="adm-cx-applist">${removingBatch.items.map((e, i) => html`${i > 0 ? ' · ' : ''}${e.name}`)}</p>
-          <div class="og-box adm-cx-batch-warning">
+          <div class="og-box adm-cx-batch-warning poster-aside poster-aside--small">
             <span class="og-box-label">${C('dialog.removeWarnLabel')}</span>
             ${C('dialog.batchWarn')}
           </div>

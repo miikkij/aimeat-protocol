@@ -9,6 +9,7 @@
  * @structure learnedRow · proposalRow · curatedRow
  * @usage import { learnedRow, proposalRow, curatedRow } from './rows.js';
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { h } from 'preact';
@@ -41,7 +42,7 @@ export function learnedRow(ctx, p) {
             : html`<button type="button" class="og-door og-door--quiet" disabled=${busy} onClick=${() => ctx.toggleOutdated(p)}>${a('makeOutdated')}</button>`}` : null}
       </div>
       ${open ? html`
-        <div class="ad-open">
+        <div class="ad-open poster-aside">
           <span class="og-label">${a('symptom')}</span><p>${p.symptom}</p>
           <span class="og-label">${a('resolution')}</span><p>${p.resolution}</p>
           <span class="og-label">${a('whence')}</span>
@@ -73,7 +74,7 @@ export function proposalRow(ctx, p) {
         <button type="button" class="og-door og-door--quiet" disabled=${busy} onClick=${() => ctx.removeProposal(p)}>${a('remove')}</button>
       </div>
       ${open ? html`
-        <div class="ad-open">
+        <div class="ad-open poster-aside">
           <p>${p.description}</p>
           <span class="og-label">${a('generalises')}</span><p>${p.reuseNotes}</p>
           ${p.startModeRationale ? html`<span class="og-label">${a('startMode')}</span><p>${modeLabel(p.startMode)}: ${p.startModeRationale}</p>` : null}
@@ -94,7 +95,7 @@ export function curatedRow(ctx, p) {
       <div class="ad-me"><b>${(p.appliesTo || []).map(areaLabel).join(' · ')}</b></div>
       <div class="ad-go"><button type="button" class="og-door" onClick=${() => ctx.toggleRow('cur:' + p.id)}>${open ? a('close') : a('open')}</button></div>
       ${open ? html`
-        <div class="ad-open">
+        <div class="ad-open poster-aside">
           <span class="og-label">${a('symptom')}</span><p>${p.symptom}</p>
           <span class="og-label">${a('resolution')}</span><p>${p.fix}</p>
         </div>` : null}

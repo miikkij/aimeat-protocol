@@ -8,6 +8,7 @@
  *   rows on the cover, the facts grid with its consequences, the front-page choice row, the edit
  *   and SMTP grids, the events rows and the chat roads. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-09-13 -- Compose the shared initials box; retain only row dimensions and placement.
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 
@@ -25,7 +26,7 @@
 .co-rows > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
 .co-rows > .co-head { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 /* The mark is a whole box of its own: the row rule above would otherwise cut its bottom border. */
-.co-rows > .co-av { width: 2.2rem; height: 2.2rem; padding: 0; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 2px solid var(--text); font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .85rem; color: var(--text); }
+.co-rows > .co-av { width: 2.2rem; height: 2.2rem; }
 .co-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
 .co-nm small { display: block; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; overflow-wrap: anywhere; }
 .co-w { font-size: .82rem; line-height: 1.45; color: var(--text-dim); }

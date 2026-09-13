@@ -3,6 +3,7 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Share recurring initials boxes and the compact, large and irreversible asides.
  *   v1.1.0 -- 2026-09-13 -- V2: source band phone padding and the named coral section shadow cut.
  *   v1.0.0 -- 2026-09-13 -- V0: lift the existing shapes; section titles and panels use the locked B1 design.
  */
@@ -61,15 +62,28 @@
 .poster-slab--large:hover { box-shadow: 4px 4px 0 var(--sun); }
 
 /* Boxes carry the object; dimensions, grids and placement belong to the view. */
-.poster-box { border: 2px solid var(--text); background: var(--card-bg); padding: 1rem; margin-block: 1rem; }
+.poster-box, .poster-box.poster-box--avatar { border: 2px solid var(--text); }
+.poster-box { background: var(--card-bg); padding: 1rem; margin-block: 1rem; }
+.poster-box.poster-box--avatar {
+  display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+  padding: 0; margin: 0; background: transparent;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .95rem;
+  color: var(--text);
+}
+.poster-box--avatar.poster-box--small { font-size: .85rem; }
+.poster-box--meter { margin: 0; padding: 0; background: var(--bg); }
+.poster-box--meter rect { fill: var(--sun); shape-rendering: crispEdges; }
 .poster-frame { border: 3px solid var(--text); background: var(--card); }
 .poster-dialog { border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); font-family: var(--font-showroom-body); }
 .poster-record { padding: 1.2rem 1.4rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card); }
 /* profile-poster.css has no coral aside. The existing .ld-sh-box supplies this shape. */
 .poster-aside {
-  padding: 1rem 1.25rem; border: 3px dashed var(--accent); background: var(--card-bg);
+  padding: 1rem 1.25rem; border: 3px dashed var(--accent); border-radius: 0; background: var(--card-bg);
   font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.6; color: var(--text);
 }
+.poster-aside--small { padding: .9rem 1.1rem; font-family: inherit; font-size: .92rem; line-height: 1.55; color: inherit; }
+.poster-aside--large { padding: 1.25rem 1.5rem; font-size: inherit; line-height: inherit; color: inherit; }
+.poster-aside--irreversible { border-style: solid; }
 /* contacts-poster.css .ct-tag, with the brief's explicit mono / 500 typography. */
 .poster-chip {
   display: inline-block; padding: .1rem .45rem; border: 1px solid var(--text); border-radius: 0;

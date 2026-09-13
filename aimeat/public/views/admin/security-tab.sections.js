@@ -8,6 +8,7 @@
  *   with a door to Settings), and the paste for the operator's own AI.
  * @structure IncidentsSection · AccountsSection · SettingsSection · AskAiSection
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-05 — Initial (the Security page in the poster face).
  */
@@ -147,7 +148,7 @@ export function AskAiSection() {
       <div class="og-sec-h"><h2 class="poster-section-title">${S('ai.title')}<small>06</small></h2>
         <div class="og-doors"><${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" /></div></div>
       <p class="adm-sec-lead">${S('ai.lead')}</p>
-      <div class="og-box">
+      <div class="og-box poster-aside poster-aside--small">
         <span class="og-box-label">${S('ai.label')}</span>
         <div class="adm-sec-paste">${paste}</div>
       </div>

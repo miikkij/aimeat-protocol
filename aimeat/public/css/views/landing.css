@@ -5,6 +5,7 @@
  * @description Logged-out landing + pricing pages (ld- prefix). Theme tokens only;
  *   path cards stack on mobile, ticker truncates to one line.
  * @version-history
+ *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v2.2.0 -- 2026-09-13 -- V2: the wall search composes its shared poster frame.
  *   v2.1.2 — 2026-08-29 — The pricing code block reads var(--font-mono) instead of a Consolas stack.
  *   v2.1.1 — 2026-08-29 — The business hero's shadow is the sun (with the front page), and the "why it
@@ -207,11 +208,11 @@
 .ld-case:nth-child(3n+3) { box-shadow: 6px 6px 0 var(--sun); }
 .ld-case-title { margin: 0; font-family: var(--font-showroom-body); font-size: 1.19rem; font-weight: 800; line-height: 1.3; }
 .ld-case-text { margin: 0; color: var(--text); font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.6; flex: 1; }
-.ld-case-quote { margin: 0; padding: .75rem 1rem; border: 3px dashed var(--accent); background: var(--card-bg); border-radius: 0; font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.6; }
+.ld-case-quote { margin: 0; }
 .ld-case-quote footer { color: var(--text-dim); font-size: .85rem; margin-top: .25rem; }
 .ld-case-proof { align-self: flex-start; font-family: var(--font-showroom-body); font-size: .95rem; color: var(--text); text-decoration: none; font-weight: 800; border-bottom: 3px solid var(--accent); }
 .ld-case-proof:hover { color: var(--accent); text-decoration: none; }
-.ld-case-proofnote { font-family: var(--font-showroom-body); font-size: .9rem; line-height: 1.6; color: var(--text); font-style: normal; border: 3px dashed var(--accent); background: var(--card-bg); border-radius: 0; padding: .75rem 1rem; }
+.ld-case-proofnote { font-style: normal; }
 
 /* Cases grouped by how far up the value ladder they sit: work happens without you →
    the company runs on it → the company earns on it. A group with no cases is dropped in
@@ -249,7 +250,7 @@
 }
 
 /* ── Contact card (business + pricing only): the dashed box that says the thing out loud ── */
-.ld-contact { max-width: 560px; margin: 3rem auto 0; padding: 1.25rem 1.5rem; border: 3px dashed var(--accent); border-radius: 0; background: var(--card-bg); text-align: center; font-family: var(--font-showroom-body); }
+.ld-contact { max-width: 560px; margin: 3rem auto 0; text-align: center; }
 .ld-contact-title { font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: 1.4rem; letter-spacing: .01em; margin-bottom: .75rem; }
 /* Two people side by side on a wide screen, stacked on a phone. */
 .ld-contact-people { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: .5rem; }

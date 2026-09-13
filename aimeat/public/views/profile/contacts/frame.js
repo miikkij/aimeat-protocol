@@ -10,6 +10,7 @@
  * @structure c · rel · day · parts · nameOf · initials · kindWord · stateWord · sortPeople · peopleRows · noAccountRows · agentRows · crumb · pageLinks · renderPage
  * @usage import { c, renderPage, peopleRows } from './frame.js';
  * @version-history
+ *   2026-09-13 -- Compose the shared initials-box role and its measured size cut.
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Kontaktien sivu", direction A).
@@ -60,7 +61,7 @@ export function sortPeople(rows) {
   });
 }
 
-const av = (r, agent) => html`<div class=${`ct-av ${agent ? 'ct-av--agent' : ''}`} aria-hidden="true">${initials(r)}</div>`;
+const av = (r, agent) => html`<div class=${`ct-av poster-box poster-box--avatar ${agent ? 'ct-av--agent' : ''}`} aria-hidden="true">${initials(r)}</div>`;
 const tags = (r) => html`<span class="ct-tags">${r.relation ? html`<span class="ct-tag ct-tag--rel">${r.relation}</span>` : null}${(r.tags || []).map(x => html`<span class="ct-tag" key=${x}>${x}</span>`)}</span>`;
 const lastMsg = (r) => (r.last_message_at ? html`<b>${rel(r.last_message_at)}</b><small>${r.last_sender === r.contact_id ? '' : c('youWrote') + ' '}${r.last_message || ''}</small>` : html`<small>${c('noMessagesYet')}</small>`);
 
