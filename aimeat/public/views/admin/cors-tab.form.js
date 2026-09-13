@@ -10,6 +10,7 @@
  *   admin shell's lists, which already carry every person and agent.
  * @structure parseOrigins · QuickAdd · OriginsField · PickField · InlineEditor · GiveForm · ListSection
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose each list section heading from the shared B1 shape.
  *   v1.0.0 — 2026-09-08 — Initial (the CORS page in the poster face).
  */
 import { h } from 'preact';
@@ -144,7 +145,7 @@ export function ListSection({ kind, number, rows, total, candidates, onSave, onC
   const saveRow = async (id, arr) => { if (await onSave(id, arr)) setEditing(null); };
   return html`
     <section class="og-sec" id=${'adm-cors-' + number}>
-      <div class="og-sec-h"><h2>${C(kind + '.title')}<small>${number}</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${C(kind + '.title')}<small>${number}</small></h2>
         <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${onDoor}>${door}</button></div></div>
       <p class="adm-cors-lead">${C(kind + '.lead')}</p>
       ${rows.length === 0 ? html`<div class="adm-cors-empty">${C(kind + '.none', { n: total })}</div>` : null}

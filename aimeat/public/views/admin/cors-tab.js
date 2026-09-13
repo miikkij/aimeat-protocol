@@ -13,6 +13,7 @@
  * @structure CorsTab({ data, switchPage }) — load · RightNow · Strip · the two ListSections from
  *   cors-tab.form.js · OrderSection · AskAiSection · the actions (save, clear)
  * @version-history
+ *   v2.1.0 -- 2026-09-13 -- Compose section headings from the shared B1 shape.
  *   v2.0.0 — 2026-09-08 — The poster face and the one read: the three cards become five sections,
  *     the native selects become a picker that narrows as you type, the cookie doors and the
  *     precedence ladder appear on a screen for the first time, and every write re-reads on a live
@@ -78,7 +79,7 @@ function RightNow({ ov, switchPage }) {
     </div>`;
   return html`
     <section class="og-sec og-sec--first" id="adm-cors-01">
-      <div class="og-sec-h"><h2>${C('now.title')}<small>01</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('now.title')}<small>01</small></h2>
         <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('config')}>${C('now.toSettings')}</button></div></div>
       <div class="adm-ov-grid">
         <div>
@@ -129,7 +130,7 @@ function OrderSection({ ov, switchPage }) {
     </div>`;
   return html`
     <section class="og-sec" id="adm-cors-04">
-      <div class="og-sec-h"><h2>${C('order.title')}<small>04</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('order.title')}<small>04</small></h2></div>
       <p class="adm-cors-lead">${C('order.lead')}</p>
       ${step(1, 'record', html`<span class="adm-mval">PUT /v1/memory/cors/:key</span>`)}
       ${step(2, 'agent', html`<span class="adm-mval">PUT /v1/agents/:name/cors</span>`)}
@@ -143,7 +144,7 @@ function AskAiSection() {
   const paste = buildCorsPrompt({ url: getNodeUrl() });
   return html`
     <section class="og-sec" id="adm-cors-05">
-      <div class="og-sec-h"><h2>${C('ai.title')}<small>05</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('ai.title')}<small>05</small></h2>
         <div class="og-doors"><${CopyButton} text=${paste} label=${C('ai.copy')} className="og-door og-door--quiet" /></div></div>
       <p class="adm-cors-lead">${C('ai.lead')}</p>
       <div class="og-box">
