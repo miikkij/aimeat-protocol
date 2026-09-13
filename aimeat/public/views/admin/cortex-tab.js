@@ -22,6 +22,7 @@
  * @structure CortexTab (default) · RightNow · WhatOffDoes · WhoCanRead
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose shared B1 headings; move existing layout values to the view sheet.
  *   v2.0.1 — 2026-09-13 — The turn-off, remove and remove-all dialogs' actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-12 — The poster face: five numbered sections, the dependant count the page had
  *     been discarding, the unused ones grouped, a confirmation that names what breaks, and removal
@@ -58,7 +59,7 @@ function goTo(id) {
 function RightNow({ facts, number, onBusiest }) {
     return html`
     <section class="og-sec og-sec--first" id="adm-cx-now">
-      <div class="og-sec-h"><h2>${C('now.title')}<small>${number}</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('now.title')}<small>${number}</small></h2></div>
       <div class="og-strip">
         <div><b>${num(facts.all)}</b><span>${C('strip.installed')}</span><small>${C('strip.installedSub')}</small></div>
         <button type="button" onClick=${() => goTo('adm-cx-loaded')}>
@@ -85,7 +86,7 @@ function WhatOffDoes({ number }) {
     </div>`;
     return html`
     <section class="og-sec" id="adm-cx-off">
-      <div class="og-sec-h"><h2>${C('off.title')}<small>${number}</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('off.title')}<small>${number}</small></h2></div>
       ${step(1, 'goes')}
       ${step(2, 'stays')}
       ${step(3, 'remove', true)}
@@ -101,12 +102,12 @@ function WhoCanRead({ facts, number }) {
     </div>`;
     return html`
     <section class="og-sec" id="adm-cx-read">
-      <div class="og-sec-h"><h2>${C('read.title')}<small>${number}</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('read.title')}<small>${number}</small></h2></div>
       <p class="adm-cx-lead">${C('read.lead')}</p>
       ${row('public', num(facts.publicCount))}
       ${row('private', num(facts.privateCount))}
       ${row('site', num(facts.siteCount), true)}
-      <div class="og-box" style="margin-top: 16px">
+      <div class="og-box adm-cx-read-note">
         <span class="og-box-label">${C('read.boxLabel')}</span>
         ${C('read.box', { n: num(facts.all) })}
       </div>
@@ -276,8 +277,8 @@ export default function CortexTab() {
               <p class="adm-cx-big">${apps === 1 ? C('dialog.offLoadedOne') : C('dialog.offLoaded', { n: num(apps) })}</p>
               <p class="adm-cx-applist">${names.map((a, i) => html`${i > 0 ? ' · ' : ''}${a}`)}
                 ${apps > names.length ? html` ${C('detail.andMore', { n: num(apps - names.length) })}` : ''}</p>
-              <p class="adm-cx-lead" style="margin-top: 14px">${C('dialog.offBreaks')}</p>`
-            : html`<p class="adm-cx-lead" style="margin-top: 6px">${C('dialog.offNobody')}</p>`}
+              <p class="adm-cx-lead adm-cx-off-breaks">${C('dialog.offBreaks')}</p>`
+            : html`<p class="adm-cx-lead adm-cx-off-nobody">${C('dialog.offNobody')}</p>`}
           <div class="adm-mrow adm-mrow--two">
             <span><b>${C('dialog.goes')}</b><span class="adm-why">${C('dialog.goesWhy')}</span></span>
             <span class="adm-mval"></span>
@@ -370,7 +371,7 @@ export default function CortexTab() {
     <div class="adm-cx-scroll">
       <table class="adm-cx-tbl">
         <thead><tr>
-          <th style="width: 42%">${C('col.name')}</th>
+          <th class="adm-cx-name-column">${C('col.name')}</th>
           <th class="r">${C('col.version')}</th>
           <th class="r">${C('col.by')}</th>
           <th class="r">${C('col.apps')}</th>
@@ -419,7 +420,7 @@ export default function CortexTab() {
       <${RightNow} facts=${facts} number=${n()} onBusiest=${() => setQuery(facts.busiestName)} />
 
       <section class="og-sec" id="adm-cx-loaded">
-        <div class="og-sec-h"><h2>${C('loaded.title')}<small>${n()}</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${C('loaded.title')}<small>${n()}</small></h2>
           <div class="og-doors"><span class="adm-cx-note">${C('loaded.count', { n: num(loaded.length), total: num(facts.all) })}</span></div></div>
 
         <div class="adm-cx-tools">
@@ -436,7 +437,7 @@ export default function CortexTab() {
       </section>
 
       <section class="og-sec" id="adm-cx-unused">
-        <div class="og-sec-h"><h2>${C('unused.title')}<small>${n()}</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${C('unused.title')}<small>${n()}</small></h2>
           <div class="og-doors"><span class="adm-cx-note">${C('unused.count', { n: num(unusedShown), total: num(facts.all) })}</span></div></div>
         <p class="adm-cx-lead">${C('unused.lead')}</p>
         ${groups.length === 0
@@ -459,7 +460,7 @@ export default function CortexTab() {
         ${removingBatch && html`
           <p>${C('dialog.batchAsk', { n: num(removingBatch.items.length) })}</p>
           <p class="adm-cx-applist">${removingBatch.items.map((e, i) => html`${i > 0 ? ' · ' : ''}${e.name}`)}</p>
-          <div class="og-box" style="margin-top: 14px">
+          <div class="og-box adm-cx-batch-warning">
             <span class="og-box-label">${C('dialog.removeWarnLabel')}</span>
             ${C('dialog.batchWarn')}
           </div>

@@ -15,6 +15,7 @@
  * @structure CortexDetail (default export) · pieceName() · pieceDetail()
  * @usage <${CortexDetail} ext=${detail} row=${row} onBack=${...} ... />
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose shared B1 headings and stylesheet-owned spacing.
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
 import { h } from 'preact';
@@ -108,7 +109,7 @@ export default function CortexDetail({ ext, row, busy, onBack, onTurnOff, onTurn
       })}</p>
 
       <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2>${C('detail.who')}<small>${n()}</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${C('detail.who')}<small>${n()}</small></h2></div>
         ${apps > 0
           ? html`
             <p class="adm-cx-big">${apps === 1 ? C('detail.loadedByOne') : C('detail.loadedBy', { n: num(apps) })}</p>
@@ -116,11 +117,11 @@ export default function CortexDetail({ ext, row, busy, onBack, onTurnOff, onTurn
               ${apps > names.length ? html` ${C('detail.andMore', { n: num(apps - names.length) })}` : ''}</p>`
           : html`
             <p class="adm-cx-big">${C('detail.nobody')}</p>
-            <p class="adm-cx-lead" style="margin-top: 8px">${site ? C('detail.nobodySite') : C('detail.nobodyWhy')}</p>`}
+            <p class="adm-cx-lead adm-cx-detail-nobody">${site ? C('detail.nobodySite') : C('detail.nobodyWhy')}</p>`}
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${C('detail.put')}<small>${n()}</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${C('detail.put')}<small>${n()}</small></h2>
           <div class="og-doors"><span class="adm-cx-note">${C('detail.pieceCount', { n: num(comps.length) })}</span></div></div>
         ${comps.length === 0
           ? html`<p class="adm-cx-note">${C('detail.noPieces')}</p>`
@@ -130,28 +131,28 @@ export default function CortexDetail({ ext, row, busy, onBack, onTurnOff, onTurn
               <span><b>${pieceName(c)}</b>
                 <span class="adm-why">${pieceDetail(c, ext.activation_artifacts)}</span></span>
             </div>`)}
-        <div class="og-box" style="margin-top: 18px">
+        <div class="og-box adm-cx-keeps">
           <span class="og-box-label">${C('detail.keepsLabel')}</span>
           ${C('detail.keeps')}
         </div>
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${C('detail.versions')}<small>${n()}</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${C('detail.versions')}<small>${n()}</small></h2>
           <div class="og-doors"><span class="adm-cx-note">${C('detail.versionCount', { n: num(versions.length) })}</span></div></div>
         ${versions.length === 0
           ? html`<p class="adm-cx-note">${C('detail.noVersions')}</p>`
           : versions.map((v, i) => html`
             <div class=${'adm-cx-vrow' + (i === versions.length - 1 ? ' adm-cx-vrow--last' : '')}>
-              <span style="font-weight: 700">${v.version}</span>
+              <span class="adm-cx-version-name">${v.version}</span>
               <span>${v.version === ext.version ? C('detail.thisOne') : C('detail.olderOne')}</span>
               <span class="adm-mval">${dt(v.created_at)}</span>
             </div>`)}
-        <p class="adm-cx-lead" style="margin-top: 12px">${C('detail.versionsWhy')}</p>
+        <p class="adm-cx-lead adm-cx-versions-note">${C('detail.versionsWhy')}</p>
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${C('detail.can')}<small>${n()}</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${C('detail.can')}<small>${n()}</small></h2></div>
         <div class="adm-cx-doers">
           ${on
             ? html`<button type="button" class="og-slab" disabled=${busy} onClick=${onTurnOff}>${C('turnOff')}</button>`
@@ -163,7 +164,7 @@ export default function CortexDetail({ ext, row, busy, onBack, onTurnOff, onTurn
             ${C('removeForGood')}
           </button>
         </div>
-        <p class="adm-cx-lead" style="margin-top: 14px">${C('detail.canWhy')}</p>
+        <p class="adm-cx-lead adm-cx-can-note">${C('detail.canWhy')}</p>
       </section>
     </div>`;
 }
