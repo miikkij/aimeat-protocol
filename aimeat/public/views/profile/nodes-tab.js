@@ -5,6 +5,7 @@
  * @description Profile tab for managing personal node registrations, visibility,
  *   agent assignments, tunnel URLs, and mailbox status.
  * @version-history
+ *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-03-16 — Initial nodes tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
@@ -219,7 +220,7 @@ function NodeForm({ onRegister, onCancel }) {
 export default function NodesTab(props) {
   const [sub, setSub] = useState('nodes');
   return html`
-    <div class="sub-tabs">
+    <div class="sub-tabs poster-row--thing">
       <button class="sub-tab ${sub === 'nodes' ? 'active' : ''}" onClick=${() => setSub('nodes')}>${t('profile.tabs.nodes')}</button>
       <button class="sub-tab ${sub === 'stats' ? 'active' : ''}" onClick=${() => setSub('stats')}>${t('profile.tabs.nodeStats')}</button>
     </div>

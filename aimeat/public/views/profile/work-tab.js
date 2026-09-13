@@ -6,6 +6,7 @@
  *   Displays inbox (received) and sent work items with accept/decline/deliver actions
  *   and a rating modal for completed deliveries.
  * @version-history
+ *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — The rate and deliver dialogs' actions sit in their footers, Cancel first.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
@@ -194,7 +195,7 @@ export default function WorkTab({ session, showToast, onStats }) {
   return html`
     <div class="poster-page-title">${t('profile.work.title')}</div>
     <div class="section-desc">${t('profile.work.desc')}</div>
-    <div class="sub-tabs">
+    <div class="sub-tabs poster-row--thing">
       <button class="sub-tab ${workSubTab === 'inbox' ? 'active' : ''}" onClick=${() => setWorkSubTab('inbox')}>${t('profile.work.inbox')}</button>
       <button class="sub-tab ${workSubTab === 'sent' ? 'active' : ''}" onClick=${() => setWorkSubTab('sent')}>${t('profile.work.sent')}</button>
     </div>
