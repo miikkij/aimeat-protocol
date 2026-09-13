@@ -8,6 +8,7 @@
  *   selected item, group labels wear the sun, the node id sits on top in mono. Content surfaces
  *   map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   v2.7.0 -- 2026-09-13 -- Compose configuration section headings from poster.css.
  *   v2.6.0 — 2026-09-12 — A numeral strip whose cells are filters wraps on a narrow screen like one
  *     whose cells are not. organism.css halves `.og-strip > div` under 1100px and a button is not a
  *     div, so the Applications and Cortex strips kept four columns at 1036px with three cells at
@@ -510,11 +511,10 @@
 .adm-cfg-rail .g:hover { color: var(--text); }
 .adm-cfg-rail .g em { font-family: var(--font-mono); font-size: .66rem; font-style: normal; }
 .adm-cfg-rail .g .adm-cfg-edited-dot { font-size: .6rem; }
-.adm-cfg-sec { border-top: 3px solid var(--text); padding: 12px 0 8px; margin-bottom: 6px; scroll-margin-top: 10px; }
+.adm-cfg-sec { --poster-section-size: 1.3rem; padding: 12px 0 8px; margin-bottom: 6px; scroll-margin-top: 10px; }
 .adm-cfg-sec-h { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
-.adm-cfg-sec-h h2 { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.3rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); text-transform: uppercase; color: var(--text); }
 .adm-cfg-sec-h small { font-family: var(--font-mono); font-size: .72rem; color: var(--accent); }
-.adm-cfg-domain-head2 { margin: 18px 0 8px; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .95rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+.adm-cfg-domain { --poster-section-size: .95rem; }
 .adm-cfg-frow { display: grid; grid-template-columns: minmax(0, 1.4fr) auto minmax(220px, 1fr) auto; gap: 0 18px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .adm-cfg-frow.adm-cfg-row-edited { background: none; }
 .adm-cfg-fname { min-width: 0; font-size: .88rem; font-weight: 600; color: var(--text); }
