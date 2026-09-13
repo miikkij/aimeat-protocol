@@ -498,6 +498,23 @@ export async function resolveAppTarget(
   }
 
   const requested = String(ask.requestedOwner ?? '').trim();
+
+  // `requested` NAMES A PERSON, and it arrives from a URL segment or a request body. accountOf()
+  // below parses a PRINCIPAL — `agent#owner@node` — and so reads everything after a `#` as the
+  // owner. That is the right rule for a principal and the wrong one for this string, and the two
+  // spellings of "whose app is this" disagreed: a door beside this one looks the app up with
+  // `segment.split('@')[0]`, so `POST /v1/apps/bob@x%23mallory/app.html/screenshot` found BOB's app
+  // while this function read the same segment as `mallory`, matched it against caller `mallory`,
+  // and answered "your own app" with no permission check at all. Reproduced on 2026-09-13: the
+  // direct attempt was refused 403 and the `#` spelling answered 200 with `"owner":"sandbox"`.
+  //
+  // An owner name cannot contain `#` (OWNER_RE in utils/gaii.ts), so refusing one narrows nothing
+  // that was ever legitimate. It is refused HERE, before the comparison, because this is the single
+  // function that decides whether an act lands in somebody else's bucket.
+  if (requested.includes('#')) {
+    return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'That is not an owner name.' };
+  }
+
   // Compared as key segments, so `Alice` asking about `alice`'s app is asking about her own.
   if (!requested || accountOf(requested) === accountOf(caller)) {
     return { ok: true, ...(await ownAppScope(storage, config, caller)), delegated: null };
