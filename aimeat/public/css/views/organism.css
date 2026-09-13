@@ -11,6 +11,7 @@
  *   views/profile/organisms/home.js and read by home-settings.js. The inner panels (workspace list,
  *   roster, agents, board, map, timeline) keep their own pj- rules; a few are quieted here.
  * @version-history
+ *   v1.6.0 -- 2026-09-13 -- Compose the workspace document index rule from poster.css.
  *   v1.5.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.4.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.3.0 -- 2026-09-13 -- Compose B1 section titles from poster.css; retain rules on folded rows.
@@ -179,7 +180,7 @@
 .og-page .pj-section > .pj-section-head { display: none; }
 .og-page .pj-section > .section-desc:first-of-type { display: none; }
 /* The document index and the document lose the card: paper, an ink rule, the sun on the open one. */
-.og-page .pj-doc-index { flex: 0 0 250px; border: 0; border-top: 3px solid var(--text); border-radius: 0; background: transparent; padding: .4rem 0 0; max-height: none; }
+.og-page .pj-doc-index { flex: 0 0 250px; border-radius: 0; background: transparent; padding: .4rem 0 0; max-height: none; }
 .og-page .pj-doc-item { border-radius: 0; border-left: 3px solid transparent; padding: .3rem .4rem .3rem .6rem; }
 .og-page .pj-doc-item.active { background: var(--sun); border-left-color: var(--text); }
 .og-page .pj-doc-item.active .pj-doc-link { color: var(--on-sun); font-weight: 800; }
