@@ -60,6 +60,17 @@ describe('check:dialogs findings', () => {
     expect(dialogFindings('public/views/x.js', js)).toEqual([]);
   });
 
+  it('strips a comment whose removal would form a fresh opener out of its neighbours', () => {
+    // One pass leaves the shape it was meant to delete: dropping the inner `<!-- -->` joins the
+    // `<!` in front of it to the `--` behind it, and what is left is a comment again. Same for the
+    // block comment below. The gate then reads the "comment" as code and reports a dialog nobody
+    // wrote. CodeQL calls this js/incomplete-multi-character-sanitization (alert #1628).
+    const html = '<!<!-- -->-- <div role="dialog"> --> <p>real</p>';
+    expect(dialogFindings('src/static/app-catalog/_template.html', html)).toEqual([]);
+    const js = '//**/* aria-modal was here */ var a = 1;';
+    expect(dialogFindings('public/views/x.js', js)).toEqual([]);
+  });
+
   it('a function named showModal is not a call on a <dialog>', () => {
     expect(dialogFindings('src/static/app-catalog/js/apps-io.js', 'function showModal() { openDlg("modal-overlay"); }\nshowModal();')).toEqual([]);
   });
