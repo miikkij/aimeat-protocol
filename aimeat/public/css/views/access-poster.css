@@ -12,6 +12,7 @@
  *   quieted here. Every column is bounded so a long origin or label wraps inside its cell.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- Compose access and recovery frames from poster.css.
  *   2026-09-13 -- V2t: let shared card rules survive the access panel cascade.
  *   v1.2.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
  *   v1.1.0 — 2026-09-06 — Section 04, the secrets: a four-column list whose name column carries the
@@ -65,7 +66,7 @@
 .ac-devices > div small { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
 .ac-devices > .ac-dh { padding: 0 0 .25rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .ac-devices > .ac-dn { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.2rem; line-height: 1; text-align: right; }
-.ac-keybox { margin-top: .9rem; padding: .8rem 1rem; border: 3px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }
+.ac-keybox { margin-top: .9rem; padding: .8rem 1rem; font-size: .9rem; line-height: 1.55; display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }
 .ac-keybox b { font-weight: 800; }
 .ac-keybox code { display: inline-block; max-width: 100%; margin-top: .3rem; font-family: var(--font-mono); font-size: .78rem; background: var(--bg-dim); padding: .15rem .5rem; overflow-wrap: anywhere; filter: blur(4px); transition: filter .2s; }
 .ac-keybox code.is-shown { filter: none; }
@@ -96,7 +97,7 @@
 .ac-key > .ac-kwhen.is-low { color: var(--accent); }
 .ac-key > .ac-kgo { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
 .ac-kgo .og-door { font-size: .72rem; }
-.ac-key > .ac-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.ac-key > .ac-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; box-shadow: 8px 8px 0 var(--sun); font-size: .9rem; line-height: 1.55; color: var(--text); }
 .ac-open .og-doors { margin-top: .9rem; }
 .ac-open .og-label { display: block; margin: .9rem 0 .3rem; }
 .ac-rights { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr) auto; gap: 0 1rem; margin-top: .4rem; }
@@ -107,6 +108,8 @@
 .ac-rights > .ac-rw b { font-weight: 800; }
 .ac-rights > .ac-rgo { text-align: right; }
 .ac-rights .og-door { font-size: .7rem; }
+.ac-para.ac-spend-summary { margin: 0; }
+.ac-fed .ac-hint { margin: 0; }
 .ac-spend { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: .6rem; }
 .ac-spend .og-input { width: 9rem; }
 .ac-more { margin-top: .8rem; display: flex; gap: 1.4rem; flex-wrap: wrap; align-items: center; }
@@ -141,7 +144,7 @@
 .ac-secret > .ac-swhen { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
 .ac-secret > .ac-sgo { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
 .ac-sgo .og-door { font-size: .72rem; }
-.ac-secret > .ac-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.ac-secret > .ac-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; box-shadow: 8px 8px 0 var(--sun); font-size: .9rem; line-height: 1.55; color: var(--text); }
 .ac-swrite { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: .6rem; }
 .ac-swrite .og-input { flex: 1 1 16rem; min-width: 10rem; }
 .ac-swrite .og-door { font-size: .72rem; }
