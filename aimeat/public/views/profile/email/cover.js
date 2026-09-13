@@ -10,6 +10,7 @@
  * @structure renderCover · secAddress · secMailboxes · secSent · lettersFold · chatFold
  * @usage import { renderCover } from './email/cover.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces a page that verified one address and said nothing else.
  */
 import { h } from 'preact';
@@ -42,7 +43,7 @@ export function renderCover(ctx) {
       ${crumb()}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${c('title')}</h1>
+          <h1 class="og-title poster-page-title">${c('title')}</h1>
           <div class="og-chips">
             ${verified ? chip(c('chipVerified')) : chip(c('chipUnverified'), 'og-chip--coral')}${mailboxes ? chip(c('chipMailboxes', { n: mailboxes })) : null}${chip(c('chipSent', { n: sent30 }), sent30 ? '' : 'og-chip--dim')}
           </div>

@@ -9,6 +9,7 @@
  *   field and the framed sample on an offer's page, the selling editor, the rating row and the map.
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-06 — The map's three flat views (columns, grid, tiles): the tile that is a link, the
  *     need head, the matrix with a modifier per column count, the blocks that grow with what they hold.
  *   v1.0.0 — 2026-08-30 — Initial.
@@ -21,7 +22,7 @@
 .og-op .op-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
 .og-op .op-more { margin: .8rem 0 0; font-size: .85rem; }
 .og-op .op-more button { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-weight: 800; color: var(--text); border-bottom: 2px solid var(--text); }
-.og-title.op-title--page { font-size: 2.1rem; overflow-wrap: anywhere; }
+.og-op.og-page { --poster-page-size: 2.1rem; }
 .op-side { display: flex; flex-direction: column; gap: 1rem; }
 .op-st--done { color: var(--success, #10B981); } .op-st--err { color: var(--accent); } .op-st--wait { color: var(--text-dim); }
 .og-op .og-strip b.op-st-ok { color: var(--success, #10B981); } .og-op .og-strip b.op-st-err { color: var(--accent); }

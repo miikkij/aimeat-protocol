@@ -9,6 +9,7 @@
  *   the members block and the two columns of the app fold. NOTE: this file must be linked in
  *   spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
@@ -24,7 +25,7 @@
 .og-bp .bp-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
 .og-bp .bp-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: bpBlink 1s steps(2, start) infinite; }
 @keyframes bpBlink { to { visibility: hidden; } }
-.og-title.bp-title--page { font-size: 2.1rem; overflow-wrap: anywhere; }
+.og-bp.og-page { --poster-page-size: 2.1rem; }
 .og-bp .bp-more { margin-top: .8rem; }
 .og-bp .og-rail-link.on { color: var(--accent); }
 .og-bp .bp-rail-static { cursor: default; }

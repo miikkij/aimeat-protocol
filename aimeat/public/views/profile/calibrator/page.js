@@ -10,6 +10,7 @@
  * @structure renderPage · mast · strip · secRuns · secPrompt · versionRow · secTemplates · secRoads
  * @usage import { renderPage } from './page.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Kalibraattori-sivu", direction A).
  */
 import { h } from 'preact';
@@ -91,7 +92,7 @@ function mast(ctx, runs, latest) {
             <input class="og-input" type="text" value=${ctx.nameDraft} aria-label=${x('rename')} onInput=${(e) => ctx.setNameDraft(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') ctx.saveName(); if (e.key === 'Escape') ctx.setRenaming(false); }} />
             <button type="button" class="og-door" disabled=${!ctx.nameDraft.trim() || ctx.busy === 'project'} onClick=${() => ctx.saveName()}>${x('save')}</button>
             <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.setRenaming(false)}>${x('cancel')}</button>
-          </div>` : html`<h1 class="og-title">${p.name}<small>${x('titleSubProject')}</small></h1>`}
+          </div>` : html`<h1 class="og-title poster-page-title">${p.name}<small>${x('titleSubProject')}</small></h1>`}
         <div class="og-chips">${chips}</div>
         <p class="og-desc og-desc--page">${x('projectDesc')}${avg != null && runs.length >= 2 ? ' ' + x('projectDescTrend', { from: runAverage(runs[0]) ?? 0, to: avg, n: runs.length }) : ''}</p>
         ${msg(ctx.projectMsg)}

@@ -13,6 +13,7 @@
  *   secRoads
  * @usage import { renderPage } from './wallet/page.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 -- 2026-09-13 -- V2: select the shared ink frame for the pace explanation.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Lompakko-sivu", direction A).
  */
@@ -72,7 +73,7 @@ function federated(ctx) {
   return html`
     <div class="og og-wal">
       ${crumb()}
-      <div class="og-mast"><div class="og-mast-words"><h1 class="og-title">${t('profile.tabs.wallet')}<small>${x('titleSub')}</small></h1><p class="og-desc">${x('desc')}</p></div></div>
+      <div class="og-mast"><div class="og-mast-words"><h1 class="og-title poster-page-title">${t('profile.tabs.wallet')}<small>${x('titleSub')}</small></h1><p class="og-desc">${x('desc')}</p></div></div>
       <div class="og-box og-box--solid wal-box"><span class="og-box-label">${x('federatedLabel')}</span>${x('federatedBody', { node: ctx.session?.homeNode || '?' })}</div>
     </div>`;
 }
@@ -93,7 +94,7 @@ function mast(ctx) {
   return html`
     <div class="og-mast">
       <div class="og-mast-words">
-        <h1 class="og-title">${t('profile.tabs.wallet')}<small>${x('titleSub')}</small></h1>
+        <h1 class="og-title poster-page-title">${t('profile.tabs.wallet')}<small>${x('titleSub')}</small></h1>
         <div class="og-chips">${chips}</div>
         <p class="og-desc">${x('desc')}</p>
         ${msg(ctx.requestMsg)}

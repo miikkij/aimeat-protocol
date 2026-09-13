@@ -11,6 +11,7 @@
  * @structure renderWorkflowsView · renderCover · secWorkflows · secWaiting · questionBlock · secNew · pasteBlock · howToRead
  * @usage import { renderWorkflowsView } from './workflows/cover.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces the card list whose two buttons started things on the click.
  */
 import { h } from 'preact';
@@ -51,7 +52,7 @@ function renderCover(ctx) {
       ${crumb(ctx, [])}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('profile.workflows.title')}</h1>
+          <h1 class="og-title poster-page-title">${t('profile.workflows.title')}</h1>
           <div class="og-chips">
             ${chip(items.length, 'chipWorkflows')}${scheduled ? chip(scheduled, 'chipScheduled') : null}${waiting ? chip(waiting, 'chipWaiting', 'og-chip--coral') : null}${partial ? chip(partial, 'chipPartial', 'og-chip--coral') : null}
           </div>

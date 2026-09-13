@@ -11,6 +11,7 @@
  * @structure renderContactsView · renderCover · secPeople · secNoAccount · secAgents · whereUsed
  * @usage import { renderContactsView } from './contacts/cover.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces the two flat lists whose "people you messaged" was mostly agents.
  */
 import { h } from 'preact';
@@ -52,7 +53,7 @@ function renderCover(ctx) {
       ${crumb(ctx, [])}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('contacts.title')}</h1>
+          <h1 class="og-title poster-page-title">${t('contacts.title')}</h1>
           <div class="og-chips">
             ${chip(people.length, 'chipPeople')}${noAccount.length ? chip(noAccount.length, 'chipNoAccount') : null}${agents.length ? chip(agents.length, 'chipAgents') : null}${invitesOpen ? chip(invitesOpen, 'chipInvites', 'og-chip--coral') : null}${ctx.blockedCount ? chip(ctx.blockedCount, 'chipBlocked', 'og-chip--dim') : null}
           </div>

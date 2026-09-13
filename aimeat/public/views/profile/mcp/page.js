@@ -9,6 +9,7 @@
  * @structure renderPage · secRows · secSuggest
  * @usage import { renderPage } from './mcp/page.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-02 — Initial.
  */
 import { h } from 'preact';
@@ -40,7 +41,7 @@ export function renderPage(ctx) {
       ${crumb()}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('profile.tabs.mcp')}<small>${m('titleSub')}</small></h1>
+          <h1 class="og-title poster-page-title">${t('profile.tabs.mcp')}<small>${m('titleSub')}</small></h1>
           <div class="og-chips">
             ${rows.length ? chip(m('chipCount', { n: rows.length })) : chip(m('chipNone'), 'og-chip--coral')}
             ${proven ? chip(m('chipProven', { date: day(ctx.proof.at) }), 'og-chip--sun') : chip(m('chipUnproven'), 'og-chip--coral')}

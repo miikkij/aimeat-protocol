@@ -8,6 +8,7 @@
  *   map of kinds, the rows of entries with the query words marked, the place cards and the result
  *   groups. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 -- 2026-09-13 -- V2: compose the search row's top rule from poster.css.
  *   v1.0.1 — 2026-08-30 — The loading mark: a blinking coral square before the counting line.
  *   v1.0.0 — 2026-08-30 — Initial.
@@ -23,7 +24,7 @@
 .og-dv .dv-more { margin: .8rem 0 0; font-size: .85rem; }
 .og-dv .dv-more button, .og-dv .dv-morerow button { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: .85rem; font-weight: 800; color: var(--text); border-bottom: 2px solid var(--text); }
 .og-dv .dv-more button:hover, .og-dv .dv-morerow button:hover { color: var(--accent); border-bottom-color: var(--accent); }
-.og-title.dv-title--page { font-size: 2.1rem; overflow-wrap: anywhere; }
+.og-dv.og-page { --poster-page-size: 2.1rem; }
 .og-dv .dv-chip--btn { cursor: pointer; }
 .og-dv .dv-chip--btn:hover { border-color: var(--accent); color: var(--accent); }
 

@@ -9,6 +9,7 @@
  * @structure renderCover · secRows · secCreate
  * @usage import { renderCover } from './companies/cover.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-31 — Initial. Replaces one long card per company with a row and a page.
  */
 import { h } from 'preact';
@@ -39,7 +40,7 @@ export function renderCover(ctx) {
       ${crumb(null)}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${c('title')}</h1>
+          <h1 class="og-title poster-page-title">${c('title')}</h1>
           <div class="og-chips">
             ${chip(c('chipCompanies', { n: rows.length }), rows.length ? '' : 'og-chip--dim')}
             ${incomplete.length ? chip(c('chipIncomplete', { name: incomplete[0].co.name }), 'og-chip--coral') : rows.length ? chip(c('chipAllSet')) : null}

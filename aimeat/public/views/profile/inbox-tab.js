@@ -14,6 +14,7 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.3.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v2.2.0 -- 2026-09-13 -- The list is in sections the server places (people, own agents, a rule's
  *     heading, the archive), each closable, with archive and restore on a row, a group and a
  *     selection (./inbox-tab/list-panel.js, ./inbox-tab/use-organize.js), and a "List rules" page
@@ -678,7 +679,7 @@ export default function InboxTab({ showToast }) {
       </div>
       <div class="og-mast og-mast--page">
         <div class="og-mast-words">
-          <h1 class="og-title">${isPage ? pageTitle : t('inbox.title')}${!isPage ? html`<small>
+          <h1 class="og-title poster-page-title">${isPage ? pageTitle : t('inbox.title')}${!isPage ? html`<small>
             <span>${(t('inbox.cover.figConvs') || '{n} conversations').replace('{n}', String(convTotal))}</span>
             ${unreadTotal ? html`<span class="og-chip og-chip--sun">${(t('inbox.cover.figUnread') || '{n} unread').replace('{n}', String(unreadTotal))}</span>` : null}
             ${requests.length ? html`<span class="og-chip">${(t('inbox.cover.figRequests') || '{n} requests').replace('{n}', String(requests.length))}</span>` : null}
