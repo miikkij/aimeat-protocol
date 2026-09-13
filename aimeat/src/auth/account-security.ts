@@ -7,6 +7,7 @@
  *   and their docblocks moved unchanged, and middleware.ts re-exports all three, so every existing
  *   import keeps working.
  * @version-history
+ *   v1.0.1 — 2026-09-13 — requireOwnerPrincipal's 401 also refuses the anonymous identity.
  *   v1.0.0 — 2026-09-12 — Pure extraction from src/auth/middleware.ts (max-file-lines), on the day
  *     isThirdPartyPrincipal joined the family and pushed that file past 800.
  */
@@ -97,7 +98,10 @@ export function isThirdPartyPrincipal(auth: Request['auth'] | undefined): boolea
 
 export function requireOwnerPrincipal() {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.auth) {
+    // `!req.auth` alone is not the test: optionalAuth runs globally and, in anonymous mode, injects
+    // a shared identity, so an unauthenticated caller arrives here truthy. Nobody signed in as
+    // nobody changes how an account is signed into (invariant 6).
+    if (!req.auth || req.auth.anonymous) {
       deny401(req, res, 'Authentication required');
       return;
     }
