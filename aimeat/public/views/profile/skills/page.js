@@ -10,6 +10,7 @@
  * @structure renderPage · shelf · secNew · secAgent
  * @usage import { renderPage } from './skills/page.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 -- 2026-09-13 -- V2: select the shared ink frame for the agent rule.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
@@ -50,7 +51,7 @@ export function renderPage(ctx) {
       ${crumb()}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('skills.tabLabel')}<small>${x('titleSub')}</small></h1>
+          <h1 class="og-title poster-page-title">${t('skills.tabLabel')}<small>${x('titleSub')}</small></h1>
           <div class="og-chips">
             ${lib ? chip(none ? x('chipNone') : x('chipOwn', { n: own.length }), none ? 'og-chip--coral' : 'og-chip--sun') : null}
             ${lib ? chip(x('chipNode', { n: node.length })) : null}

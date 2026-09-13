@@ -10,6 +10,7 @@
  *   list. Public section headlines compose poster.css, as the profile sections do.
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.2.0 -- 2026-09-13 -- V2: public section headlines use the shared B1 shape.
  *   v1.1.0 -- 2026-09-13 -- V2: compose the public search row's top rule from poster.css.
  *   v1.0.0 — 2026-08-30 — Initial.
@@ -29,7 +30,7 @@
 .og-kp .kp-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
 .og-kp .kp-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: kpBlink 1s steps(2, start) infinite; }
 @keyframes kpBlink { to { visibility: hidden; } }
-.og-title.kp-title--page { font-size: 2.1rem; overflow-wrap: anywhere; }
+.og-kp.og-page { --poster-page-size: 2.1rem; }
 .og-kp .og-strip b .kp-of { font-size: 1.1rem; color: var(--text-dim); }
 
 /* ── The packages table ─────────────────────────────────────────────────────────────────────── */
@@ -109,9 +110,9 @@
 .kp-lib .kp-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
 .kp-lib .kp-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
 .kp-lib .kp-nm small { display: block; font-size: .8rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; }
+.og.og-kp--public { --poster-page-size: 2.6rem; }
 .og-kp--public { max-width: 1150px; margin: 0 auto; padding: 1.6rem 1.5rem 3rem; background: var(--bg); }
 .og-kp--public .og-sec h2 small { font-family: var(--font-mono); font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--accent); margin-left: .6rem; }
-.og-kp--public .og-title { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 2.6rem; line-height: 1; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; margin: 0; }
 .kp-desk { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: .8rem 1.4rem; align-items: end; margin-top: 1.4rem; padding: 1rem 0; border-bottom: 3px solid var(--text); }
 .kp-field { width: 100%; min-width: 0; box-sizing: border-box; border: 0; border-bottom: 3px solid var(--text); background: transparent; padding: .45rem 0; font: inherit; font-size: 1.2rem; color: var(--text); }
 .kp-field:focus { outline: none; border-bottom-color: var(--accent); }

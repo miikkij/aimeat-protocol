@@ -11,6 +11,7 @@
  * @structure renderKnowledgeView · renderCover · secPackages · secMake · importPreview · secOrganisms · secLibrary
  * @usage import { renderKnowledgeView } from './knowledge/cover.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces the action bar, the always-open import box and the wall
  *     of expandable cards.
  */
@@ -53,7 +54,7 @@ function renderCover(ctx) {
       ${crumb(ctx, [])}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('knowledge.tabLabel')}</h1>
+          <h1 class="og-title poster-page-title">${t('knowledge.tabLabel')}</h1>
           <div class="og-chips">
             ${chip(pkgs.length, 'chipPackages')}${chip(totals.entries, 'chipEntries')}${chip(listed, 'chipListed')}${chip(clonable, 'chipClonable')}
             ${federated ? chip(federated, 'chipFederated') : null}${drafts ? chip(drafts, 'chipDrafts', 'og-chip--dim') : null}${datasets ? chip(datasets, 'chipDatasets', 'og-chip--coral') : null}

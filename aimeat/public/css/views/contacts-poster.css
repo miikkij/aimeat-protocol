@@ -9,6 +9,7 @@
  *   last message; the three roads; the person form and the facts list; the together list; a
  *   message; the organism chooser box. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
@@ -23,7 +24,7 @@
 .og-ct .ct-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
 .og-ct .ct-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: ctBlink 1s steps(2, start) infinite; }
 @keyframes ctBlink { to { visibility: hidden; } }
-.og-title.ct-title--page { font-size: 2.1rem; overflow-wrap: anywhere; }
+.og-ct.og-page { --poster-page-size: 2.1rem; }
 .og-ct .og-label { display: block; }
 .og-ct .og-chip.ct-chip--case { text-transform: none; }
 .og-ct .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }

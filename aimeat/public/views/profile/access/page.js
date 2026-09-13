@@ -19,6 +19,7 @@
  *   secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-06 — Section 04, the secrets: the list with what names each one, the add form
  *     as a fold with a write-only value field, a replace on the row and a delete behind the
  *     confirm. The strip counts them, the rail carries them, and 05 to 07 moved down by one.
@@ -93,7 +94,7 @@ function mast(ctx) {
   return html`
     <div class="og-mast">
       <div class="og-mast-words">
-        <h1 class="og-title">${t('profile.tabs.access')}<small>${x('titleSub')}</small></h1>
+        <h1 class="og-title poster-page-title">${t('profile.tabs.access')}<small>${x('titleSub')}</small></h1>
         <div class="og-chips">${chips}</div>
         <p class="og-desc">${x('desc')}</p>
       </div>

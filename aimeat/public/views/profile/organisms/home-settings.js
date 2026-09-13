@@ -17,6 +17,7 @@
  *   import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
  *   <OrganismSettings org ghii isCreator isMember canEdit showToast confirm onBack onChanged onLeave onDeleted />
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 -- 2026-09-13 -- Compose section headlines with poster-section-title.
  *   v1.0.1 — 2026-08-29 — The rail scrolls the content region only (poster-parts scrollTo), never the window.
  *   v1.0.0 — 2026-08-29 — Extracted from home.js and redrawn on the canvas; the type is a preset or any
@@ -186,7 +187,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
         <span>/</span>
         <span class="og-crumb-here">${t('organisms.settings') || 'Settings'}</span>
       </div>
-      <h1 class="og-title">${t('organisms.settings') || 'Settings'}
+      <h1 class="og-title poster-page-title">${t('organisms.settings') || 'Settings'}
         <small>
           ${org.createdAt ? html`<span>${t('organisms.createdAt') || 'Created'} ${fmtDate(org.createdAt)}</span>` : null}
           <span>${t('organisms.creator') || 'Creator'} ${org.creatorGhii || '-'}</span>

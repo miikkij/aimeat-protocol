@@ -11,6 +11,7 @@
  * @structure renderPage · secInstalled · secOffers · secOwn · secNew · secAgent
  * @usage import { renderPage } from './packages/page.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-05 — A third road, leading: make a package out of apps you already have. Each
  *     app says what it loads, because that is what decides whether it travels with the package or is
  *     named as something the installing side must already have.
@@ -52,7 +53,7 @@ export function renderPage(ctx) {
       ${crumb()}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('profile.tabs.packages')}<small>${x('titleSub')}</small></h1>
+          <h1 class="og-title poster-page-title">${t('profile.tabs.packages')}<small>${x('titleSub')}</small></h1>
           <div class="og-chips">
             ${d ? chip(none ? x('chipNone') : x('chipInstalled', { n: instances.length }), none ? 'og-chip--coral' : 'og-chip--sun') : null}
             ${d ? chip(x('chipOffers', { n: offers.length })) : null}
