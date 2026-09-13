@@ -8,6 +8,7 @@
  *   selected item, group labels wear the sun, the node id sits on top in mono. Content surfaces
  *   map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   v2.9.0 -- 2026-09-13 -- Let migrated section headings compose B1 at the admin section size.
  *   v2.8.0 -- 2026-09-13 -- Compose the admin page title from poster.css.
  *   v2.7.0 -- 2026-09-13 -- Compose configuration section headings from poster.css.
  *   v2.6.0 — 2026-09-12 — A numeral strip whose cells are filters wraps on a narrow screen like one
@@ -409,9 +410,9 @@
 .adm-btn-action:hover { border-color: var(--text); }
 
 /* ── The overview in the poster face (design canvas "AIMEAT Hallinnan kehys", Main) ── */
-/* The section headline and its coral number: organism.css lays the header row out but the
-   heading's face lives in the profile sheets, which do not reach .adm — so it is said here. */
-.adm .og-sec-h h2 {
+/* Migrated sections compose poster-section-title; the legacy face remains until their peers move. */
+.adm .og-sec { --poster-section-size: 1.5rem; }
+.adm .og-sec-h h2:where(:not(.poster-section-title)) {
   margin: 0;
   font-family: var(--font-poster);
   font-weight: var(--font-poster-weight, 400);
