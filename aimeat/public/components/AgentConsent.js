@@ -21,6 +21,7 @@
  *   import { AgentConsent } from '/components/AgentConsent.js';
  *   html`<${AgentConsent} requests=${pending} onApprove=${fn} onDeny=${fn} />`
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: the profile approval heading composes the shared B1 section class.
  *   v1.0.0 — 2026-08-07 — Extracted from views/profile/agents-tab.js so the home and the profile
  *     render the same panel (remake phase 4, E7).
@@ -88,7 +89,7 @@ function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
   ];
 
   return html`
-    <div class="card mt-1 p-1 agc-card" key=${req.user_code}>
+    <div class="card mt-1 p-1 agc-card ${variant === 'inline' ? 'poster-row--thing' : ''}" key=${req.user_code}>
       <div class="flex-row mb-half">
         <span class="badge badge-info">${t('profile.agents.pendingRequests.waiting')}</span>
         <span class="text-caption">

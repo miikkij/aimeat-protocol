@@ -6,6 +6,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v3.15.0 -- 2026-09-13 -- Remove the document index frame superseded by the shared poster rule.
  *   v3.14.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   v3.13.0 — 2026-09-13 — The account and presence dialogs' own overlay, frame, header, X and footer
@@ -249,7 +250,7 @@
 .pf-hero-inner .tab:hover,.pf .tab:hover{color:var(--text,#1A1A2E);border-color:var(--text-muted);background:var(--bg-surface)}
 .pf-hero-inner .tab.active,.pf .tab.active{color:#fff;background:var(--accent,#E8564A);border-color:var(--accent,#E8564A);font-weight:600}
 .pf .section-desc{color:var(--text-dim,#6B7280);font-size:.85rem;margin-bottom:1.25rem;line-height:1.5;max-width:700px}
-.pf .card{background:var(--bg-card);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem;margin-bottom:.75rem;transition:border-color .2s}
+.pf .card{background:var(--bg-card);border-radius:12px;padding:1.25rem;margin-bottom:.75rem;transition:border-color .2s}
 .pf .card:hover{border-color:var(--accent,#E8564A)}
 /* Card variant="glass" (GlassCard, #22) must beat the aggressive .pf .card defaults
    so it keeps the former .pf-glass-card look (surface bg, 8px radius, 16px pad, no hover). */
@@ -354,7 +355,7 @@
 .pf .mem-group-actions{margin-left:auto;display:inline-flex;align-items:center;gap:.15rem;opacity:0;transition:opacity .15s}
 .pf .mem-group-header:hover .mem-group-actions{opacity:1}
 .pf .mem-search-summary{display:flex;justify-content:space-between;align-items:center;padding:.35rem .2rem;border-bottom:1px solid var(--border);margin-bottom:.25rem}
-.pf .key-rules-box{background:var(--bg-surface);border:1px solid rgba(139,92,246,.3);border-radius:8px;padding:.75rem;margin-top:.75rem;margin-bottom:.5rem}
+.pf .key-rules-box{background:var(--bg-surface);border-radius:8px;padding:.75rem;margin-top:.75rem;margin-bottom:.5rem}
 .pf .mem-detail{background:rgba(0,0,0,.04);border:1px solid rgba(232,86,74,.1);border-radius:8px;padding:1rem;margin-top:.5rem;font-size:.85rem}
 .pf .mem-detail pre{white-space:pre-wrap;word-break:break-all;font-family: var(--font-mono);color:var(--text,#1A1A2E);font-size:.8rem}
 .pf .mem-detail .mem-actions{display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap}
@@ -2261,7 +2262,7 @@
 .pj-approval { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.4rem 0; border-top: 1px solid var(--border); }
 .pj-approval:first-of-type { border-top: none; }
 .pj-approval-text { flex: 1; font-size: 0.88rem; }
-.pj-section { border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.75rem; background: var(--card); }
+.pj-section { border-radius: 10px; padding: 0.6rem 0.75rem; background: var(--card); }
 /* Action buttons sit right after the title (not pushed to the far edge) so they
    stay visually tied to the panel they act on. */
 /* Fresh-join welcome banner (invite-accept redirect, UX-remake v3 P8): says whose team the

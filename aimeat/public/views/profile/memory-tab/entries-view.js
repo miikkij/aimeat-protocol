@@ -7,6 +7,7 @@
  *   of memory rows with per-row visibility/rules/cart/federation controls. Extracted verbatim from
  *   memory-tab.js as a ctx-consuming plain render function (all state/handlers passed in via ctx).
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.1.0 — 2026-08-11 — Sharing left the visibility menu. A row shows a "shared · N" badge when a
  *     key-space share covers its key (with the group names in the title), and the expanded row can
  *     open a share panel pre-filled with the key's own space. Picking a group from a VISIBILITY
@@ -189,7 +190,7 @@ export function renderEntries(ctx) {
               </div>`;
           })()}
           ${sharePanelFor === m.key && html`
-            <div class="key-rules-box" onClick=${(e) => e.stopPropagation()}>
+            <div class="key-rules-box poster-row--thing" onClick=${(e) => e.stopPropagation()}>
               ${groups.length === 0 ? html`
                 <div class="text-meta-sm mb-half">${t('profile.memory.shNoGroups')}</div>
                 <button class="btn-outline btn-sm" onClick=${() => {
@@ -223,7 +224,7 @@ export function renderEntries(ctx) {
           `}
           ${editingMemTags !== m.key && m.tags?.length > 0 && html`<div class="text-meta-sm mb-half">${m.tags.join(', ')}</div>`}
           ${keyRulesPopover && keyRulesPopover.key === m.key && html`
-            <div class="key-rules-box">
+            <div class="key-rules-box poster-row--thing">
               <div class="flex-between mb-half">
                 <strong class="text-caption">\u{1F6E1}️ ${t('permissions.sharingRules')}</strong>
                 <button class="btn-outline btn-sm" onClick=${() => setKeyRulesPopover(null)}>✕</button>

@@ -10,6 +10,7 @@
  * @structure renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab
  * @usage import { renderSettingsPanel } from '/views/profile/organisms/workspace/panels.js';
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v2.0.0 — 2026-08-29 — renderTabsNav removed: the cover (cover.js) replaced the 21-tab block with
  *     tables and a rail, and a panel is a page of its own.
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
@@ -122,7 +123,7 @@ export function renderSettingsPanel(ctx) {
 export function renderShareTab(ctx) {
   const { share, docTypes, shareBusy, patchShare, objectsFor, wsT, isDocPublic, sharePw, setSharePw, showToast, anythingPublic, orgId, wsId } = ctx;
   return html`
-    <div class="pj-section">
+    <div class="pj-section poster-row--thing">
       <div class="section-desc">${t('organisms.sharePublicDesc') || 'Make published document-space pages readable by anyone with the link — no login required. Drafts are never shared. Anything you make public is also announced on the public activity feed on the front page.'}</div>
       ${share && docTypes.length > 0 ? html`
         <div class="pj-share-feed">
@@ -222,7 +223,7 @@ export function renderShareTab(ctx) {
 export function renderReviewTab(ctx) {
   const { gateOn, toggleGate, busy, approvals, resolve } = ctx;
   return html`
-    <div class="pj-section">
+    <div class="pj-section poster-row--thing">
       <label class="pj-gate-label" title=${t('organisms.publishGateHint') || 'When on, an agent’s publish is held for your review instead of going live'}>
         <input type="checkbox" checked=${gateOn} onChange=${toggleGate} disabled=${busy} />
         ${'🔒 '}${t('organisms.publishGate') || 'Require review before publishing'}
@@ -248,7 +249,7 @@ export function renderActivityTab(ctx) {
   return html`
     <${ActivityPanel} orgId=${orgId} wsId=${wsId} />
     ${(ws.decisions || []).length > 0 ? html`
-      <div class="pj-section">
+      <div class="pj-section poster-row--thing">
         <div class="pj-section-title">${t('organisms.decisions') || 'Recent decisions'}</div>
         ${ws.decisions.slice(-8).reverse().map((d, i) => html`
           <div class="pj-item pj-decision" key=${'dec' + i}><span class="pj-item-text">${(String(d.summary || ''))}</span></div>

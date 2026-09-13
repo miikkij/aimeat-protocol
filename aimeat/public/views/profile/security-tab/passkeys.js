@@ -16,6 +16,7 @@
  * @structure PasskeysSection({ passkeysAvailable, showToast, onChanged })
  * @usage html`<${PasskeysSection} passkeysAvailable=${true} ... />`
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 import { h } from 'preact';
@@ -102,7 +103,7 @@ export function PasskeysSection({ showToast }) {
   return html`
     <h3 class="card-h3 mt-section">${t('profile.security.passkeys.title')}</h3>
     <p class="text-caption mb-1">${t('profile.security.passkeys.desc')}</p>
-    <div class="card">
+    <div class="card poster-row--thing">
       ${state.count === 0
         ? html`<p class="text-caption mb-half">${t('profile.security.passkeys.none')}</p>`
         : html`

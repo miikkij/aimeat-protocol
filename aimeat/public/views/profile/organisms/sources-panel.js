@@ -9,6 +9,7 @@
  * @structure SRC_ICON (internal), SourcesPanel
  * @usage import { SourcesPanel } from '/views/profile/organisms/sources-panel.js';
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  */
 import { h } from 'preact';
@@ -119,7 +120,7 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
   };
 
   return html`
-    <div class="pj-section pj-sources">
+    <div class="pj-section pj-sources poster-row--thing">
       <div class="pj-section-head">
         <span class="pj-section-title">${t('organisms.sources') || 'Sources'}<span class="pj-doc-tag">${sources.length}</span></span>
         <button class="btn-outline btn-sm" onClick=${() => setPicking(p => !p)}>

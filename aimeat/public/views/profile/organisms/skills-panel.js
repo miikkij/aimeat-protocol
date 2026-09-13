@@ -12,6 +12,7 @@
  *   import { SkillsPanel } from '/views/profile/organisms/skills-panel.js';
  *   html`<${SkillsPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />`
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 -- 2026-07-06 -- Initial creation (Skills feature — workspace UI surface)
  */
 import { h } from 'preact';
@@ -106,7 +107,7 @@ export function SkillsPanel({ orgId, wsId, showToast }) {
   };
 
   return html`
-    <div class="pj-section pf-skl">
+    <div class="pj-section pf-skl poster-row--thing">
       <div class="pf-skl-section-header">
         <span class="pf-skl-section-title">${t('skills.wsPanelTitle') || 'Workspace skills'}</span>
         <button class="btn-primary btn-sm" onClick=${() => { setEditorMd(WS_SKILL_TEMPLATE); setEditorOpen(!editorOpen); }}>

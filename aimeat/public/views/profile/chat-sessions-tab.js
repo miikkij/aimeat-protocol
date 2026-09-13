@@ -6,6 +6,7 @@
  *   Shows active sessions, allows creating new ones via prompt copy, and
  *   removing existing sessions.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-03-16 — Initial chat sessions tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes; fix fallback strings
@@ -100,7 +101,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
     <div class="poster-page-title">${t('profile.chatSessions.title')}</div>
     <div class="section-desc">${t('profile.chatSessions.desc')}</div>
 
-    <div class="card mb-1">
+    <div class="card mb-1 poster-row--thing">
       <div class="card-header">
         <div class="card-title">${t('profile.chatSessions.createTitle')}</div>
       </div>
@@ -132,7 +133,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
         ${chatSessions.map(s => {
           const isExpanded = expanded === s.name;
           return html`
-            <div class="card ${isExpanded ? 'card-expanded' : ''}" key=${s.name}>
+            <div class="card ${isExpanded ? 'card-expanded' : ''} poster-row--thing" key=${s.name}>
               <div class="card-header card-clickable" onClick=${() => toggleExpand(s.name)}>
                 <span class="expand-icon">${isExpanded ? '\u25BC' : '\u25B6'}</span>
                 <div class="card-title">${escHtml(s.display_name || s.name || '-')}</div>

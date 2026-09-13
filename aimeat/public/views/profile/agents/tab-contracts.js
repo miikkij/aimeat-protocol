@@ -9,6 +9,7 @@
  * @structure TabContracts — offered-contracts row + Active engagements + Retired (history)
  * @usage <${TabContracts} agent=${agent} agentName=${agent.name} showToast=${showToast} />
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.1.0 -- 2026-07-17 -- Card layout: offers and active-workspaces side by side in
  *     pf-agd-card-grid; retired history spans full width.
  *   v1.0.0 — 2026-07-03 — Initial agent Contracts sub-tab (engagement visibility + activate/deactivate).
@@ -73,7 +74,7 @@ export default function TabContracts({ agent, agentName, showToast }) {
 
   return html`
     <div class="pf-agd-contracts pf-agd-card-grid">
-      <div class="pf-agd-card">
+      <div class="pf-agd-card poster-row--thing">
       <div class="pf-agd-section-title">${t('profile.agents.detail.contracts.offersTitle') || 'Contracts this agent offers'}</div>
       <div class="section-desc">${t('profile.agents.detail.contracts.offersDesc') || 'The workspace contracts this agent advertises. Owners see these when choosing an agent for a workspace.'}</div>
       <div class="agc-caps">
@@ -83,7 +84,7 @@ export default function TabContracts({ agent, agentName, showToast }) {
       </div>
       </div>
 
-      <div class="pf-agd-card">
+      <div class="pf-agd-card poster-row--thing">
       <div class="pf-agd-section-title">${t('profile.agents.detail.contracts.activeTitle') || 'Active in these workspaces'}</div>
       ${active.length ? html`
         <div class="agc-list">
@@ -104,7 +105,7 @@ export default function TabContracts({ agent, agentName, showToast }) {
       </div>
 
       ${retired.length ? html`
-        <div class="pf-agd-card pf-agd-card--full">
+        <div class="pf-agd-card pf-agd-card--full poster-row--thing">
         <div class="pf-agd-section-title">${t('profile.agents.detail.contracts.retiredTitle') || 'Retired (history)'}</div>
         <div class="agc-list">
           ${retired.map(e => html`

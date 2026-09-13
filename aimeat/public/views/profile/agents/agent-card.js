@@ -5,6 +5,7 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.26.0 -- 2026-09-06 -- The GAII stands on the row itself, closed and open, and copies itself
  *     when pressed (GaiiChip). It was the one thing about an agent that gets typed somewhere else,
  *     and it was reachable only by hovering a board tile. Split (max-file-lines): the delivery
@@ -248,7 +249,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
 
   if (!expanded) {
     return html`
-      <div class="pf-agd-card">
+      <div class="pf-agd-card poster-row--thing">
         <div class="pf-agd-collapsed ${state === 'problem' ? 'pf-agd-collapsed--problem' : ''}"
              onClick=${() => onToggle(agent.name)}>
           <div class="pf-agd-collapsed-main">
@@ -278,7 +279,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
   }
 
   return html`
-    <div class="pf-agd-card">
+    <div class="pf-agd-card poster-row--thing">
       <div class="pf-agd-expanded">
         <!-- Zone 1: Identity -->
         <div class="pf-agd-zone1" onClick=${handleCollapse}>

@@ -12,6 +12,7 @@
  * @structure default export TabQuality({ agentName })
  * @usage rendered by agent-card.js renderTabContent() for the 'quality' tab
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.5.0 -- 2026-07-17 -- Card layout: performance full-width, reviews|rate side by
  *     side, custom metrics full-width (shared pf-agd-card-grid scheme).
  *   v1.4.0 -- 2026-07-16 -- Mount folds statistics + done-tasks into GET /v1/agents/:name/quality/overview
@@ -159,7 +160,7 @@ export default function TabQuality({ agentName, showToast }) {
   return html`
     <div class="pf-agd-quality pf-agd-card-grid">
       <!-- Performance -->
-      <div class="pf-agd-card pf-agd-card--full">
+      <div class="pf-agd-card pf-agd-card--full poster-row--thing">
       <div class="pf-agd-section-title">${t('profile.agents.detail.quality.performanceTitle')}</div>
       <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.performanceDesc')}</div>
       <div class="stat-grid">
@@ -197,7 +198,7 @@ export default function TabQuality({ agentName, showToast }) {
       </div>
 
       <!-- Reviews by context -->
-      <div class="pf-agd-card">
+      <div class="pf-agd-card poster-row--thing">
       <div class="pf-agd-section-title">${t('profile.agents.detail.quality.reviewsTitle')}</div>
       <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.reviewsDesc')}</div>
       ${contextKeys.length === 0
@@ -228,7 +229,7 @@ export default function TabQuality({ agentName, showToast }) {
       </div>
 
       <!-- Rate deliverables (completed tasks the owner can rate) -->
-      <div class="pf-agd-card">
+      <div class="pf-agd-card poster-row--thing">
       <div class="pf-agd-section-title">${t('profile.agents.detail.quality.pendingTitle')}</div>
       <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.pendingDesc')}</div>
       ${doneTasks.length === 0
@@ -252,7 +253,7 @@ export default function TabQuality({ agentName, showToast }) {
       </div>
 
       <!-- Custom metrics -->
-      <div class="pf-agd-card pf-agd-card--full">
+      <div class="pf-agd-card pf-agd-card--full poster-row--thing">
       <div class="pf-agd-section-title">${t('profile.agents.detail.quality.customTitle')}</div>
       <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.customDesc')}</div>
       ${custom.length === 0

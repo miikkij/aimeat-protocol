@@ -12,6 +12,7 @@
  *   quieted here. Every column is bounded so a long origin or label wraps inside its cell.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-09-13 -- V2t: let shared card rules survive the access panel cascade.
  *   v1.2.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
  *   v1.1.0 — 2026-09-06 — Section 04, the secrets: a four-column list whose name column carries the
  *     {{secret:NAME}} spelling under the name, and the write-only field that replaces a value. It
@@ -56,7 +57,7 @@
    wear the poster skin; their own section titles duplicate the row above them and go. */
 .ac-panel { border-bottom: 1px solid var(--border); padding: .2rem 0 .6rem; }
 .ac-panel > .card-h3, .ac-panel > .text-caption:first-of-type { display: none; }
-.ac-panel .card { border-top: 0; padding: .4rem 0 .4rem; margin-bottom: 0; }
+.ac-panel .card { padding: .4rem 0 .4rem; margin-bottom: 0; }
 .ac-panel .card:last-child { padding-bottom: .2rem; }
 .ac-devices { display: grid; grid-template-columns: minmax(0, 1.3fr) 7rem 9rem; gap: 0 1rem; margin: .2rem 0 0 1.4rem; }
 .ac-devices > div { padding: .4rem 0; border-bottom: 1px solid var(--border); font-size: .85rem; line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }

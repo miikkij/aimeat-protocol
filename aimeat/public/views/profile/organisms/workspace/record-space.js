@@ -9,6 +9,7 @@
  * @structure recordAiLabel (internal), recordFields (internal), renderRecordSpace
  * @usage import { renderRecordSpace } from '/views/profile/organisms/workspace/record-space.js';
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3: the AI-transparency label on every record that owes
  *     one — the compact chip in the list row (first exposure), the block form with the
  *     "How this was made" link in the expanded view. Fed by `_aiProvenance` from the workspace read.
@@ -62,7 +63,7 @@ export function renderRecordSpace(ctx, ot) {
     showArchived, reopen, setRecordArchived,
   } = ctx;
   return html`
-    <div class="pj-section" key=${ot.name}>
+    <div class="pj-section poster-row--thing" key=${ot.name}>
       <div class="pj-section-head">
         <span class="pj-section-title">${(wsT('type.' + ot.name) || ot.name)}</span>
         ${ot.append ? null : html`<button class="btn-outline btn-sm" onClick=${() => startAdd(ot)}>${'+ '}${t('organisms.addDraft') || 'Add draft'}</button>`}

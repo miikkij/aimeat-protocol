@@ -10,6 +10,7 @@
  * @structure renderDocSpace
  * @usage import { renderDocSpace } from '/views/profile/organisms/workspace/doc-space.js';
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- Compose the document index top rule with poster-row--thing.
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
  */
@@ -101,7 +102,7 @@ export function renderDocSpace(ctx, ot) {
     </div>`;
 
   return html`
-    <div class="pj-section" key=${ot.name}>
+    <div class="pj-section poster-row--thing" key=${ot.name}>
       <div class="pj-section-head">
         <span class="pj-section-title">${(wsT('type.' + ot.name) || ot.name)}<span class="pj-doc-tag">${t('organisms.docs') || 'docs'}</span></span>
         <button class="btn-outline btn-sm" onClick=${() => addSection(ot.name, null)}>${'+ '}${t('organisms.section') || 'Section'}</button>

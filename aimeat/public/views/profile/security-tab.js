@@ -5,6 +5,7 @@
  * @description Profile tab for CORS origin management (GHII + per-agent): which web addresses may
  *   reach the account's API. Operator-only in the menu (the Infrastructure group).
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.6.0 — 2026-09-05 — Two-step sign-in, the passkeys and the sessions moved to the Access page,
  *     which every member can open; this tab sits in the operator-only group, so a member could not
@@ -120,7 +121,7 @@ export default function SecurityTab({ session, showToast }) {
     <div class="section-desc">${t('profile.security.desc')}</div>
 
     ${securityData.managedBy && html`
-      <div class="card mb-1">
+      <div class="card mb-1 poster-row--thing">
         <span class="pf-bold">${t('profile.security.managedTitle')}</span>
         <p class="text-caption mb-0">${t('profile.security.managedDesc').replace('{name}', securityData.managedBy.name)}</p>
       </div>
@@ -130,7 +131,7 @@ export default function SecurityTab({ session, showToast }) {
 
     <h3 class="card-h3 mt-section">${t('profile.security.ghiiTitle')}</h3>
     <p class="text-caption mb-1">${t('profile.security.ghiiDesc')}</p>
-    <div class="card">
+    <div class="card poster-row--thing">
       <div class="flex-between mb-half">
         <span class="pf-bold">${t('profile.security.allowedOrigins')}</span>
         <span class="badge ${isInherited ? 'badge-muted' : 'badge-success'}">${isInherited ? t('profile.security.inherited') : t('profile.security.custom')}</span>
@@ -157,7 +158,7 @@ export default function SecurityTab({ session, showToast }) {
     <p class="text-caption mb-1">${t('profile.security.agentsDesc')}</p>
     ${agentsCors.length === 0
       ? html`<div class="empty">${t('profile.security.noAgents')}</div>`
-      : html`<div class="card scroll-x">
+      : html`<div class="card scroll-x poster-row--thing">
           <${DataTable}
             headers=${[t('profile.security.agent'), t('profile.security.origins'), t('profile.security.status'), '']}
             rows=${agentsCors.map(ac => {
@@ -188,7 +189,7 @@ export default function SecurityTab({ session, showToast }) {
     }
 
     <h3 class="card-h3 mt-section">${t('profile.security.inheritanceTitle')}</h3>
-    <div class="card">
+    <div class="card poster-row--thing">
       <p class="text-caption">${t('profile.security.inheritanceDesc')}</p>
       <div class="text-code text-meta text-accent mt-xs">
         Memory key \u2192 Agent \u2192 GHII (your account) \u2192 Node default
