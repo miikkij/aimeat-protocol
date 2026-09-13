@@ -17,6 +17,7 @@
  *   - fieldsOf / bounds: reading one field's rule out of the definition
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v2.2.0 -- 2026-09-13 -- Compose remaining section headings and record rules from poster.css.
  *   v2.1.0 — 2026-09-13 — Compose shared poster list and empty-state headings.
  *   v2.0.0 — 2026-09-12 — The poster face, and the list that could never show anything: the tab
  *     read `data.csm?.templates` while admin.js stores the read at `d.csmTemplates`, so the array
@@ -346,7 +347,7 @@ function One({ csm, onBack, onDelete }) {
         <button type="button" onClick=${onBack}>${S('crumb')}</button> · ${csm.name}
       </div>
 
-      <div class="adm-csm-head">
+      <div class="adm-csm-head poster-row--thing">
         <h2>${csm.name}<i>${svc.version ? 'v' + svc.version + ' · ' : ''}${csm.json_schema_key}</i></h2>
         <div class="adm-csm-doors">
           <button type="button" class="adm-csm-door" onClick=${() => setShowYaml(!showYaml)}>
@@ -428,7 +429,7 @@ function Create({ yaml, setYaml, examples, onTake, onCreate, loading, err, onCan
   return html`
     <div class="adm-csm-page">
       <div class="adm-csm-head">
-        <h2>${S('createTitle')}<small>02</small></h2>
+        <h2 class="poster-section-title">${S('createTitle')}<small>02</small></h2>
         <button type="button" class="adm-csm-door" onClick=${onCancel}>${t('common.cancel')}</button>
       </div>
       <p class="adm-csm-lead">${S('createLead')}</p>
@@ -474,7 +475,7 @@ function PromptView({ prompt, onBack }) {
         <button type="button" onClick=${onBack}>${S('crumb')}</button> · ${S('aiWritesIt')}
       </div>
       <div class="adm-csm-head">
-        <h2>${S('promptTitle')}</h2>
+        <h2 class="poster-section-title">${S('promptTitle')}</h2>
         <${CopyButton} text=${prompt} className="adm-btn"
           label=${t('common.copy')} copiedLabel=${t('common.copied')} />
       </div>

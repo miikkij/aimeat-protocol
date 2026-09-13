@@ -17,6 +17,7 @@
  *   - Field / readWord / openJson: the pieces both views share
  * @usage Imported by memory-tab.js; not mounted on its own.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose record and audience row boundaries from poster.css.
  *   v1.0.0 — 2026-09-12 — Initial, with the page rebuilt around the question.
  */
 import { h } from 'preact';
@@ -81,7 +82,7 @@ export function Record({ rec, onBack, onDelete, onRestore, busy, graceDays }) {
         <span>&#8201;/&#8201; ${rec.owner_gaii}</span>
       </div>
 
-      <div class="adm-mem-rhead">
+      <div class="adm-mem-rhead poster-row--thing">
         <div class="adm-mem-lbl">${S('recordEyebrow')}</div>
         <div class="adm-mem-rkey">${rec.key}</div>
         <p class="adm-mem-rlead">${S('recordLead')}</p>
@@ -161,13 +162,13 @@ export function Reach({ counts, total, originCount, onPick, onBack }) {
         <span>&#8201;/&#8201; ${S('reachCrumb')}</span>
       </div>
 
-      <div class="adm-mem-rhead">
+      <div class="adm-mem-rhead poster-row--thing">
         <div class="adm-mem-lbl">${S('reachEyebrow')}</div>
         <h2 class="adm-mem-rtitle">${S('reachTitle')}</h2>
         <p class="adm-mem-rlead">${S('reachLead')}</p>
       </div>
 
-      <div class="adm-mem-ladder">
+      <div class="adm-mem-ladder poster-row--thing">
         ${REACH.map(v => {
           const n = counts?.[v] ?? 0;
           return html`

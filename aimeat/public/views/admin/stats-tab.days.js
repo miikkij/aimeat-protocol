@@ -24,6 +24,7 @@
  *   - TheDays (03) — the two charts, and the numbers behind them
  * @usage Imported by stats-tab.js.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose shared B1 headings; SVG data carries bar heights and readings.
  *   v1.0.0 — 2026-09-12 — Initial (the Statistics page in the poster face).
  */
 import { h } from 'preact';
@@ -52,9 +53,8 @@ function Spark({ row, days }) {
   return html`
     <span class="adm-st-spark">
       ${row.series.map((v, i) => html`
-        <i class="adm-st-bar adm-st-bar--${row.role}"
-           style=${`height:${barHeight(v, row.peak)}%`}
-           title=${`${days[i]} · ${num(v)}`}></i>`)}
+        <svg class="adm-st-bar adm-st-bar--${row.role}"
+           height=${barHeight(v, row.peak) + '%'}><title>${`${days[i]} · ${num(v)}`}</title></svg>`)}
     </span>`;
 }
 
@@ -73,7 +73,7 @@ export function WhatMoved({ rows, days, onShowNumbers }) {
   return html`
     <section class="og-sec" id="adm-st-02">
       <div class="og-sec-h">
-        <h2>${S('moved.title')}<small>02</small></h2>
+        <h2 class="poster-section-title">${S('moved.title')}<small>02</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${onShowNumbers}>${S('moved.numbers')}</button>
         </div>
@@ -142,9 +142,8 @@ function Plot({ title, series, days, note }) {
           <div class="adm-st-day" onMouseEnter=${() => setHover(i)} onMouseLeave=${() => setHover(null)}>
             <div class="adm-st-pair">
               ${series.map(s => html`
-                <i class="adm-st-bar adm-st-bar--${s.role}"
-                   style=${`height:${barHeight(s.values[i], peak)}%`}
-                   title=${`${day} · ${s.label} ${num(s.values[i])}`}></i>`)}
+                <svg class="adm-st-bar adm-st-bar--${s.role}"
+                   height=${barHeight(s.values[i], peak) + '%'}><title>${`${day} · ${s.label} ${num(s.values[i])}`}</title></svg>`)}
             </div>
           </div>`)}
       </div>
@@ -189,7 +188,7 @@ export function TheDays({ daily, days, showNumbers, onToggle }) {
   return html`
     <section class="og-sec" id="adm-st-03">
       <div class="og-sec-h">
-        <h2>${S('days.title')}<small>03</small></h2>
+        <h2 class="poster-section-title">${S('days.title')}<small>03</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${onToggle}>
             ${showNumbers ? S('days.showCharts') : S('days.showNumbers')}

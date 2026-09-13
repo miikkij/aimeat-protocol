@@ -1,16 +1,16 @@
 {
   "_note": "Copied design-language declarations, recorded debt rather than approval. This files map may only shrink. After migration, lower the affected counts or remove cleared files. Only an explicit developer decision permits re-seeding with pnpm check:poster-shapes --record.",
   "_measured": {
-    "date": "2026-09-13T07:10:14.551Z",
+    "date": "2026-09-13T14:36:21Z",
     "files": 78,
-    "declarations": 664,
+    "declarations": 648,
     "patterns": {
-      "headline": 122,
+      "headline": 120,
       "sun": 128,
       "box2": 187,
       "frame3": 50,
       "record": 31,
-      "rule": 31,
+      "rule": 17,
       "action": 73,
       "slab": 8,
       "aside": 22,
@@ -31,7 +31,6 @@
     },
     "public/css/views/admin-agents.css": {
       "headline": 3,
-      "rule": 1,
       "action": 1,
       "sun": 1,
       "box2": 3,
@@ -46,7 +45,6 @@
     },
     "public/css/views/admin-boards.css": {
       "headline": 2,
-      "rule": 1,
       "action": 3,
       "sun": 2,
       "box2": 2,
@@ -69,7 +67,6 @@
     },
     "public/css/views/admin-csm.css": {
       "headline": 2,
-      "rule": 1,
       "box2": 4,
       "aside": 1
     },
@@ -85,7 +82,6 @@
       "box2": 3
     },
     "public/css/views/admin-email.css": {
-      "rule": 1,
       "action": 3,
       "sun": 3,
       "box2": 6,
@@ -94,7 +90,6 @@
     },
     "public/css/views/admin-extensions.css": {
       "headline": 1,
-      "rule": 1,
       "action": 1,
       "sun": 1,
       "box2": 3,
@@ -129,8 +124,7 @@
       "aside": 1
     },
     "public/css/views/admin-memory.css": {
-      "headline": 6,
-      "rule": 4,
+      "headline": 5,
       "action": 3,
       "sun": 2,
       "box2": 1,
@@ -184,7 +178,6 @@
     },
     "public/css/views/admin-realtime.css": {
       "headline": 4,
-      "rule": 1,
       "box2": 2,
       "frame3": 2,
       "record": 1
@@ -201,7 +194,6 @@
     },
     "public/css/views/admin-skills.css": {
       "headline": 3,
-      "rule": 1,
       "action": 1,
       "sun": 2,
       "box2": 4,
@@ -209,7 +201,6 @@
     },
     "public/css/views/admin-sso.css": {
       "headline": 2,
-      "rule": 1,
       "action": 1,
       "aside": 1
     },
@@ -220,7 +211,6 @@
     },
     "public/css/views/admin-subdomains.css": {
       "headline": 1,
-      "rule": 1,
       "action": 3,
       "sun": 2,
       "box2": 3
@@ -235,8 +225,8 @@
       "sun": 1
     },
     "public/css/views/admin.css": {
-      "headline": 3,
-      "rule": 2,
+      "headline": 2,
+      "rule": 1,
       "action": 1,
       "sun": 1,
       "aside": 1

@@ -10,6 +10,7 @@
  *   only what this page adds lives here. Every value is a theme.css token, so the page flips with
  *   the theme.
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose ink row boundaries from poster.css.
  *   v1.1.0 — 2026-09-13 — Keep fleet-bar appearance in CSS while SVG attributes carry the ratios.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
@@ -88,7 +89,7 @@
 .adm-ag-trow:last-of-type { border-bottom: 0; }
 .adm-ag-trow span { font-family: var(--font-mono); font-size: .76rem; font-weight: 400; color: var(--text-dim); }
 .adm-ag-trust p { margin: 12px 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
-.adm-ag-acts { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 3px solid var(--text); }
+.adm-ag-acts { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; }
 .adm-ag-acts p { margin: 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); max-width: 34ch; }
 
 /* ── Whose they are ────────────────────────────────────────────────────────────────────────── */

@@ -15,6 +15,7 @@
  *   - whoOf / readWord: how a row says whose a board is and who may read it
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.2.0 -- 2026-09-13 -- Compose remaining section headings and record rules from poster.css.
  *   v2.1.0 — 2026-09-13 — Compose the board-list section heading from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face, and the missing field that broke three things. A board
  *     has no slug — the record carries an id and GET /v1/boards never sent one — so "Slug:" was
@@ -269,7 +270,7 @@ function One({ board, posts, authors, total, busy, onBack, onFlip, onDelete, onA
         <button type="button" onClick=${onBack}>${S('title')}</button> · ${board.name || board.id}
       </div>
 
-      <div class="adm-brd-head">
+      <div class="adm-brd-head poster-row--thing">
         <h2>${board.name || board.id}<i>${board.id}${total ? ' · ' + S('nNotices', { n: num(total) }) : ''}</i></h2>
         <div class="adm-brd-doors">
           <button type="button" class="adm-brd-door is-quiet" onClick=${onDelete}>${S('delete')}</button>
@@ -392,7 +393,7 @@ function Make({ form, setForm, onMake, busy, onCancel }) {
   return html`
     <div class="adm-brd-page">
       <div class="adm-brd-head">
-        <h2>${S('makeTitle')}<small>02</small></h2>
+        <h2 class="poster-section-title">${S('makeTitle')}<small>02</small></h2>
         <button type="button" class="adm-brd-door" onClick=${onCancel}>${t('common.cancel')}</button>
       </div>
       <p class="adm-brd-lead">${S('makeLead')}</p>

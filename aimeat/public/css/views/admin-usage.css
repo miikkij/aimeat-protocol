@@ -16,6 +16,7 @@
  *   page can rank eighty models where the old chart ran out of distinct colours at twelve and began
  *   repeating them inside a stacked bar.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Keep chart appearance on the SVG bars that carry the data.
  *   v1.0.0 — 2026-09-12 — Initial. Replaces the classic-shell cards and the two Chart.js canvases.
  */
 
@@ -75,7 +76,7 @@
 .adm-us-day { flex: 1 1 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; min-width: 0; }
 .adm-us-day:hover { background: var(--bg-surface); }
 .adm-us-pair { display: flex; align-items: flex-end; gap: 2px; width: 100%; height: 100%; }
-.adm-us-pair i { flex: 1 1 0; min-width: 0; max-width: 14px; border-radius: 3px 3px 0 0; }
+.adm-us-pair svg { flex: 1 1 0; min-width: 0; max-width: 14px; border-radius: 3px 3px 0 0; }
 .adm-us-bar-house { background: var(--us-house); }
 .adm-us-bar-own { background: var(--us-own); }
 .adm-us-xaxis { display: flex; gap: 4px; margin-top: 6px; }

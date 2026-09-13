@@ -13,6 +13,7 @@
  *   - Field: one label-and-value row, with an optional door at its end
  *
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose ink row boundaries from the shared poster class.
  *   v1.0.0 — 2026-09-12 — Initial, with the Agents page in the poster face.
  */
 import { h } from 'preact';
@@ -138,7 +139,7 @@ export default function AgentRecord({ agent, detail, loading, now, onClose, onOw
         <${Trust} agent=${agent} detail=${detail} loading=${loading} />
       </div>
 
-      <div class="adm-ag-acts">
+      <div class="adm-ag-acts poster-row--thing">
         <button type="button" class="adm-btn" onClick=${onOrigins}>${A('actOrigins')}</button>
         <p>${A('actOriginsWhy')}</p>
       </div>

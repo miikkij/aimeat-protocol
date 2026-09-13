@@ -15,6 +15,7 @@
  *   - Refusals: the four things the route answers no to, in its own words
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.2.0 -- 2026-09-13 -- Compose ink row boundaries from the shared poster class.
  *   v2.1.0 -- 2026-09-13 -- Compose list and add-form headings from the shared B1 shape.
  *   v2.0.1 — 2026-09-13 — The delete dialog's actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-12 — The poster face: the table becomes rows, search and filters arrive (a
@@ -206,7 +207,7 @@ export default function SubdomainsAdminTab() {
         ${error && html`<${ErrorBox} message=${error} />`}
 
         ${loading ? html`<${Spinner} />` : sites.length === 0 ? html`
-          <div class="adm-subs-empty">
+          <div class="adm-subs-empty poster-row--thing">
             <h3>${S('emptyTitle')}</h3>
             <p>${S('emptyBody')} <code>sanomat${apex}</code></p>
             <button class="adm-btn" onClick=${() => setShowCreate(true)}>${S('emptyAdd')}</button>
