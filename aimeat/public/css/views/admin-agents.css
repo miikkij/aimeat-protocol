@@ -10,6 +10,7 @@
  *   only what this page adds lives here. Every value is a theme.css token, so the page flips with
  *   the theme.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Keep fleet-bar appearance in CSS while SVG attributes carry the ratios.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 
@@ -99,7 +100,7 @@
 .adm-ag-onum--coral { color: var(--accent); }
 .adm-ag-osm { font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); }
 .adm-ag-bar { height: 10px; background: var(--bg-surface); border: 2px solid var(--text); }
-.adm-ag-bar i { display: block; height: 100%; background: var(--text); }
+.adm-ag-bar svg { display: block; height: 100%; background: var(--text); }
 
 /* ── Narrower than the poster column ───────────────────────────────────────────────────────── */
 @media (max-width: 1100px) {
