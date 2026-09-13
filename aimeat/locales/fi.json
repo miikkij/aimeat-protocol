@@ -7639,6 +7639,7 @@
   "notifpage.save": "Tallenna",
   "notifpage.saved": "Tallennettu.",
   "notifpage.saveFailed": "Asetuksia ei saatu tallennettua: yritä hetken päästä uudelleen.",
+  "notifpage.settingsUnavailable": "Ilmoitusasetuksesi eivät latautuneet, joten mitään ei tallennettu. Lataa sivu uudelleen ja yritä sitten uudestaan.",
   "notifpage.howTitle": "Miten ilmoitus syntyy",
   "notifpage.howSub": "sovelluksen tekijälle · laajennukselle · agentille · chatissa",
   "notifpage.how.appK": "sovelluksen tekijälle",
