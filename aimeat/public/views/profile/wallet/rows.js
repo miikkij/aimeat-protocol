@@ -10,6 +10,7 @@
  * @structure txRow · txOpen · railRow · railOpen · shareRow · moneyRow
  * @usage import { txRow, railRow, shareRow, moneyRow } from './rows.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose detail frames from poster.css.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 import { h } from 'preact';
@@ -39,7 +40,7 @@ function txOpen(ctx, tx, w) {
   const agent = tx.initiator_gaii ? (ctx.agents || []).find((a) => a.gaii === tx.initiator_gaii) : null;
   const missing = html`<span class="is-dim">${x('detail.notRecorded')}</span>`;
   return html`
-    <div class="wal-open">
+    <div class="wal-open poster-frame">
       <p class="wal-lead">${x('detail.lead', { n: morsels(tx.amount), when: `${dateWord(tx.timestamp)} ${timeWord(tx.timestamp)}`, what: w.title })} ${tx.initiator_gaii ? x('detail.leadAgent', { name: agent?.name || shortName(tx.initiator_gaii) }) : x('detail.leadYou')}${!tx.tracking_code && !tx.counterparty_gaii ? ' ' + x('detail.leadMissing') : ''}</p>
       <div class="wal-kv">
         <div class="wal-k">${x('detail.who')}</div><div class="wal-v">${tx.initiator_gaii ? html`${agent?.name || shortName(tx.initiator_gaii)} <code>${tx.initiator_gaii}</code><small>${x('detail.agentSpends')}</small>` : x('detail.youOrSystem')}</div>
@@ -100,7 +101,7 @@ function railOpen(ctx, id) {
     ? [[x('help.card1'), ['https://dashboard.stripe.com/register', 'dashboard.stripe.com/register']], [x('help.card2'), ['https://dashboard.stripe.com/apikeys', 'dashboard.stripe.com/apikeys']], [x('help.card3')], [x('help.card4')]]
     : [[x('help.stable1'), ['https://www.coinbase.com/wallet', 'Coinbase Wallet'], ['https://metamask.io/', 'MetaMask']], [x('help.stable2')], [x('help.stable3')], ...(s.testnet ? [[x('help.stable4')]] : [])];
   return html`
-    <div class="wal-open">
+    <div class="wal-open poster-frame">
       <p class="wal-lead">${stripe ? x('rail.cardLead') : x('rail.stableLead')}</p>
       <div class="wal-field">
         <input class="og-input" type=${stripe ? 'password' : 'text'} autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true" value=${draft} placeholder=${stripe ? 'sk_live_…' : '0x…'} aria-label=${stripe ? x('rail.keyLabel') : x('rail.addressLabel')} onInput=${(e) => (stripe ? ctx.setKeyDraft(e.target.value) : ctx.setAddrDraft(e.target.value))} />
