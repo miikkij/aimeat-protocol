@@ -24,6 +24,7 @@
  *   - the opened organism is organism-ownership-tab.detail.js
  * @usage registered in views/admin.js under the Identity group
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared poster headings and externalize column alignment.
  *   v2.0.0 — 2026-09-12 — The poster face, and the listing that makes the page usable: sections
@@ -242,7 +243,7 @@ export default function OrganismOwnershipTab({ data, reload }) {
         </div>
 
         <div class="adm-oo-row adm-oo-row--head">
-          <div class="adm-oo-n">#</div>
+          <div class="adm-oo-n poster-stat-number poster-stat-number--small">#</div>
           <div>${O('colOrganism')}</div>
           <div>${O('colHeld')}</div>
           <div class="adm-oo-people-head">${O('colPeople')}</div>
@@ -254,7 +255,7 @@ export default function OrganismOwnershipTab({ data, reload }) {
     ? html`<${Empty} text=${O('none')} />`
     : shown.map((r, i) => html`
           <div class="adm-oo-row ${r.stuck ? 'is-stuck' : ''} ${r.id === openId ? 'is-open' : ''}">
-            <div class="adm-oo-n">${String(oldestFirst ? found.length - i : i + 1).padStart(2, '0')}</div>
+            <div class="adm-oo-n poster-stat-number poster-stat-number--small">${String(oldestFirst ? found.length - i : i + 1).padStart(2, '0')}</div>
             <div class="adm-oo-nm">
               <button type="button" class="adm-oo-name" onClick=${() => open(r.id)}>${r.name}</button>
               <em>${r.id.split('-')[0]}</em>

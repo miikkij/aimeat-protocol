@@ -10,6 +10,7 @@
  * @structure renderPage · mast · strip · secRuns · secPrompt · versionRow · secTemplates · secRoads
  * @usage import { renderPage } from './page.js';
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Kalibraattori-sivu", direction A).
@@ -185,7 +186,7 @@ function versionRow(ctx, v, viewing) {
   const shown = viewing ? viewing.version === v.version : v.version === p.currentVersion;
   return html`
     <div class=${`cal-ver ${shown ? 'is-on' : ''}`} key=${v.version}>
-      <div class="cal-ver-n">v${v.version}<small>${dateWord(v.createdAt)} ${timeWord(v.createdAt)}</small></div>
+      <div class="cal-ver-n poster-stat-number poster-stat-number--small">v${v.version}<small>${dateWord(v.createdAt)} ${timeWord(v.createdAt)}</small></div>
       <div class="cal-ver-w">${v.changelog || x('noChangelog')}${v.version === p.currentVersion ? html` <span class="og-chip og-chip--sun og-chip--xs">${x('current')}</span>` : null}</div>
       <div class="cal-ver-go">${shown ? html`<small>${x('shown')}</small>` : html`<button type="button" class="og-door og-door--quiet" onClick=${() => ctx.viewVersion(v.version)}>${x('show')}</button>`}</div>
     </div>`;

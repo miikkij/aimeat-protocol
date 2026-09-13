@@ -9,6 +9,7 @@
  * @structure c · kindName · kindSub · HUMAN_TYPES · desk · entryCells · entryRows · crumb · renderPage · openEntry
  * @usage import { renderPage, desk, entryRows, openEntry } from './frame.js';
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.3.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 -- 2026-09-13 -- V2: use the shared ink rule on the search row.
@@ -64,7 +65,7 @@ export function desk(ctx) {
 /** The cells of entries: when, what (with the words marked), kind and place, a door. */
 export function entryCells(ctx, list, { words = [], time = true } = {}) {
   return list.map((e, i) => html`
-      ${time ? html`<div class="dv-at" key=${'a' + i}>${hhmm(new Date(e.updatedAt))}<small>${dayLabel(new Date(e.updatedAt))}</small></div>` : null}
+      ${time ? html`<div class="dv-at poster-stat-number poster-stat-number--small" key=${'a' + i}>${hhmm(new Date(e.updatedAt))}<small>${dayLabel(new Date(e.updatedAt))}</small></div>` : null}
       <div class="dv-nm" key=${'n' + i}><button type="button" class="og-tbl-name" onClick=${() => openEntry(ctx, e)}>${hl(e.title || e.id, words)}</button>${e.description ? html`<small>${hl(e.description, words)}</small>` : null}</div>
       <div class="dv-where" key=${'w' + i}><b>${kindName(e.type)}</b>${placeOf(e) ? ` · ${placeOf(e)}` : ''}${!time ? ` · ${rel(e.updatedAt)}` : ''}</div>
       <div class="og-tbl-door" key=${'d' + i}><button type="button" class="og-door" onClick=${() => openEntry(ctx, e)}>${c('open')}</button></div>`);

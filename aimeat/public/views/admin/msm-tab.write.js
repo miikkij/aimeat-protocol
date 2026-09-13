@@ -16,6 +16,7 @@
  * @structure MsmWrite (default export)
  * @usage <${MsmWrite} templates=${...} yaml=${...} onSave=${...} ... />
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.1.0 — 2026-09-13 — Compose shared B1 headings; keep existing layout in the view sheet.
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
@@ -41,7 +42,7 @@ export default function MsmWrite({ templates, picked, yaml, federate, busy, err,
 
     const step = (i, key, last) => html`
       <div class=${'adm-msm-step' + (last ? ' adm-msm-step--last' : '')}>
-        <span class="adm-msm-stepn">${String(i).padStart(2, '0')}</span>
+        <span class="adm-msm-stepn poster-stat-number poster-stat-number--small poster-stat-number--step">${String(i).padStart(2, '0')}</span>
         <span><b>${M('write.' + key)}</b><span class="adm-why">${M('write.' + key + 'Why')}</span></span>
       </div>`;
 

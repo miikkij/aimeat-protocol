@@ -10,6 +10,7 @@
  *   two roads. Every column is bounded so a long key or name wraps inside its cell. NOTE: this file
  *   must be linked in spa.html.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Keep the workspace chooser's placement in the view sheet.
  *   v1.2.0 -- 2026-09-13 -- Compose detail frames from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose explanations and the export row with the shared ink frame.
@@ -55,7 +56,7 @@
 .dw-w b { color: var(--text); font-weight: 800; }
 .dw-w small { display: block; font-family: var(--font-mono); font-size: .68rem; }
 .dw-row > .dw-when { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
-.dw-row > .dw-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.35rem; line-height: 1; color: var(--text); text-align: right; white-space: nowrap; }
+.dw-row > .dw-n { text-align: right; white-space: nowrap; margin-right: 0; }
 .dw-row > .dw-n.is-low { color: var(--accent); }
 .dw-row > .dw-n.is-good { color: var(--success-fg); }
 .dw-n small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .66rem; font-weight: 400; color: var(--text-dim); }

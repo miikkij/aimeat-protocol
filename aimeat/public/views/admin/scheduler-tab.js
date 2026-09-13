@@ -15,6 +15,7 @@
  *   - RunLog: the last fifty fires with what set each off and what it did
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face, and the four fields the page had been reading under the
  *     wrong names. Last run, Result and Next run were an em-dash on every row because the page read
@@ -212,7 +213,7 @@ export default function SchedulerTab({ data, reload }) {
           <div class="adm-sch-top">
             <div>
               <div class="adm-sch-lbl">${S('brokeLabel')}</div>
-              <div class="adm-sch-hero">${S('brokeHero', { n: num(m.failing.length), total: num(m.total) })}</div>
+              <div class="adm-sch-hero poster-stat-number">${S('brokeHero', { n: num(m.failing.length), total: num(m.total) })}</div>
               <p class="adm-sch-hero-sub">${S('brokeHeroSub')}</p>
             </div>
             <div><p class="adm-sch-lead">${S('brokeLead')}</p></div>

@@ -14,6 +14,7 @@
  *   surfaces), and the refusal bar wears the reserved critical red because a refusal is a status
  *   and never a series. Everything else on this page is a theme.css token and flips.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.0.0 — 2026-09-12 — Initial. Replaces the classic-shell cards and the four Chart.js canvases.
  */
 
@@ -55,7 +56,7 @@
 .adm-st-crow--last { border-bottom: 0; }
 .adm-st-crow b { font-weight: 700; }
 .adm-st-crow .adm-why { overflow-wrap: anywhere; }
-.adm-st-num { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.5rem; line-height: 1; letter-spacing: var(--font-poster-tracking, .01em); text-align: right; color: var(--text); }
+.adm-st-num { text-align: right; margin-right: 0; }
 .adm-st-num--none { color: var(--text-dim); }
 .adm-st-chip { display: inline-block; padding: 1px 7px; font-family: var(--font-mono); font-size: .66rem; font-weight: 500; text-transform: uppercase; line-height: 1.6; white-space: nowrap; }
 .adm-st-chip--ok { background: var(--success-bg); color: var(--success-fg); }

@@ -22,6 +22,7 @@
  * @structure CortexTab (default) · RightNow · WhatOffDoes · WhoCanRead
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared B1 headings; move existing layout values to the view sheet.
  *   v2.0.1 — 2026-09-13 — The turn-off, remove and remove-all dialogs' actions sit in the dialog's footer.
@@ -82,7 +83,7 @@ function RightNow({ facts, number, onBusiest }) {
 function WhatOffDoes({ number }) {
     const step = (i, key, last) => html`
     <div class=${'adm-cx-step' + (last ? ' adm-cx-step--last' : '')}>
-      <span class="adm-cx-stepn">${String(i).padStart(2, '0')}</span>
+      <span class="adm-cx-stepn poster-stat-number poster-stat-number--small poster-stat-number--step">${String(i).padStart(2, '0')}</span>
       <span><b>${C('off.' + key)}</b><span class="adm-why">${C('off.' + key + 'Why')}</span></span>
     </div>`;
     return html`

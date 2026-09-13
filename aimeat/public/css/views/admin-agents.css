@@ -10,6 +10,7 @@
  *   only what this page adds lives here. Every value is a theme.css token, so the page flips with
  *   the theme.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.2.0 -- 2026-09-13 -- Compose ink row boundaries from poster.css.
  *   v1.1.0 — 2026-09-13 — Keep fleet-bar appearance in CSS while SVG attributes carry the ratios.
  *   v1.0.0 — 2026-09-12 — Initial.
@@ -64,7 +65,7 @@
 /* ── The record a row opens into ───────────────────────────────────────────────────────────── */
 .adm-ag-rec { border: 3px solid var(--text); background: var(--card-bg); box-shadow: 8px 8px 0 var(--sun); padding: 22px 24px 24px; margin: 14px 0 22px; }
 .adm-ag-rec-h { display: flex; align-items: flex-start; justify-content: space-between; gap: 30px; padding-bottom: 14px; border-bottom: 3px solid var(--text); }
-.adm-ag-rec-h h3 { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.8rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); text-transform: uppercase; color: var(--text); overflow-wrap: anywhere; }
+.adm-ag-rec-h h3 { overflow-wrap: anywhere; }
 .adm-ag-rec-addr { display: block; margin-top: 8px; font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); overflow-wrap: anywhere; }
 .adm-ag-rec-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
 .adm-ag-rec-chips span { font-family: var(--font-mono); font-size: .68rem; line-height: 1.6; padding: 1px 7px; border: 2px solid var(--text); color: var(--text); }
@@ -83,7 +84,7 @@
 
 .adm-ag-trust { border: 2px solid var(--text); background: var(--bg-surface); padding: 15px 17px 17px; }
 .adm-ag-trust-h { display: block; margin-bottom: 9px; font-size: .64rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.adm-ag-trust-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 2.8rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); color: var(--accent); }
+.adm-ag-trust-n { margin-right: 0; }
 .adm-ag-trust-n span { font-family: var(--font); font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--text); margin-left: 10px; }
 .adm-ag-trow { display: flex; justify-content: space-between; gap: 14px; padding: .35rem 0; border-bottom: 1px solid var(--border); font-size: .82rem; font-weight: 600; }
 .adm-ag-trow:last-of-type { border-bottom: 0; }
@@ -97,7 +98,7 @@
 .adm-ag-orow--head { padding: 0 0 .35rem; border-bottom: 0; font-size: .64rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .adm-ag-onm { font-size: .93rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm-ag-onm small { font-family: var(--font-mono); font-size: .74rem; font-weight: 400; color: var(--text-dim); margin-left: 8px; }
-.adm-ag-onum { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.5rem; line-height: 1; color: var(--text); }
+.adm-ag-onum { margin-right: 0; }
 .adm-ag-onum--coral { color: var(--accent); }
 .adm-ag-osm { font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); }
 .adm-ag-bar { height: 10px; background: var(--bg-surface); border: 2px solid var(--text); }

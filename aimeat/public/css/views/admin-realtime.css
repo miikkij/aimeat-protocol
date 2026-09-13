@@ -9,6 +9,7 @@
  *   admin.css and organism.css; only what this page adds lives here. Every value is a theme.css
  *   token, so the page flips with the theme.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.2.0 -- 2026-09-13 -- Compose ink row boundaries from poster.css.
  *   v1.1.0 — 2026-09-13 — The page's own copy of the poster dialog leaves; /css/dialog.css draws it for
  *     every dialog now.
@@ -48,14 +49,7 @@
 /* The room whose panel is open below keeps the sun edge, so the panel is never orphaned. */
 .adm-rt-row.is-open { background: var(--card-bg); box-shadow: inset 3px 0 0 var(--sun); }
 
-.adm-rt-n {
-  font-family: var(--font-poster);
-  font-weight: var(--font-poster-weight, 400);
-  font-size: 1.35rem;
-  line-height: var(--font-poster-leading, 1);
-  text-align: right;
-  color: var(--text);
-}
+.adm-rt-n { text-align: right; margin-right: 0; }
 .adm-rt-nm { min-width: 0; }
 .adm-rt-open {
   display: block; max-width: 100%; background: none; border: 0; padding: 0; cursor: pointer;

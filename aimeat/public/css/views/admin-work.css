@@ -10,6 +10,7 @@
  *   what this page adds lives here. Every value is a theme.css token, so the page flips with the
  *   theme.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.1.0 -- 2026-09-13 -- Compose the empty state's frame and B1 heading from poster.css.
  *   v1.0.0 — 2026-09-12 — Initial (the Work page in the poster face).
  */
@@ -33,14 +34,7 @@
 .adm-work-row--head div { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .adm-work-row--head .adm-work-n, .adm-work-row--head .adm-work-cost { text-align: right; }
 
-.adm-work-n {
-  font-family: var(--font-poster);
-  font-weight: var(--font-poster-weight, 400);
-  font-size: 1.35rem;
-  line-height: var(--font-poster-leading, 1);
-  text-align: right;
-  color: var(--text);
-}
+.adm-work-n { text-align: right; margin-right: 0; }
 .adm-work-tc { font-family: var(--font-mono); font-size: .72rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The status word is the machine's own and is never translated, so it is set in the machine's face. */
 .adm-work-st {

@@ -14,6 +14,7 @@
  * @structure WhichVersion · MenuLinks · OwnHtml · SavedTexts · AskAi · WhatChanged
  * @usage html`<${WhichVersion} hasCustom=${false} source="default" parts=${9} />`
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose shared poster headings and external section spacing.
  *   v1.0.0 — 2026-09-12 — Initial.
@@ -32,7 +33,7 @@ const P = (key, params) => t('admin.portal.' + key, params);
 export function WhichVersion({ hasCustom, source, parts, number }) {
   const step = (n, key, value, last) => html`
     <div class=${'adm-pt-step' + (last ? ' adm-pt-step--last' : '')}>
-      <span class="adm-pt-stepn">${n}</span>
+      <span class="adm-pt-stepn poster-stat-number poster-stat-number--small poster-stat-number--step">${n}</span>
       <span><b>${P('rank.' + key)}</b><span class="adm-why">${P('rank.' + key + 'Why')}</span></span>
       <span class="adm-mval">${value}</span>
     </div>`;

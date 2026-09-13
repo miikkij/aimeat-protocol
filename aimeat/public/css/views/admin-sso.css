@@ -12,6 +12,7 @@
  *   or it is not, and a company can sign in or it cannot. Those are statuses, so they wear the
  *   status tokens and nothing else is coloured.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v1.1.0 -- 2026-09-13 -- Compose ink row boundaries from poster.css.
  *   v1.0.0 — 2026-09-12 — Initial. Replaces the classic-shell cards the tab used.
@@ -61,7 +62,7 @@
 .adm-sso-step { display: grid; grid-template-columns: 44px minmax(0, 1fr) 150px; gap: 0 18px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--border); }
 .adm-sso-step--last { border-bottom: 0; }
 .adm-sso-step > * { min-width: 0; }
-.adm-sso-step-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.6rem; line-height: 1; color: var(--text-muted); }
+.adm-sso-step-n { margin-right: 0; }
 .adm-sso-step-n.done { color: var(--success-fg); }
 .adm-sso-step-n.now { color: var(--accent); }
 .adm-sso-step b { font-weight: 700; font-size: .95rem; }

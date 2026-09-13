@@ -8,6 +8,7 @@
  * @structure c · loc · when · word · agentMark · statusWord · deliveryRows · crumb · pageLinks · renderPage
  * @usage import { renderPage, c, deliveryRows } from './frame.js';
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial.
@@ -44,7 +45,7 @@ export const costTime = (offer) => [word('latency', offer.latency), word('cost',
 export function deliveryRows(ctx, list) {
   return html`<div class="op-back">
     ${list.map(d => html`
-      <div class="op-at" key=${'a' + d.task_id}>${when(d.updated_at)}</div>
+      <div class="op-at poster-stat-number poster-stat-number--small" key=${'a' + d.task_id}>${when(d.updated_at)}</div>
       <div class="op-nm" key=${'n' + d.task_id}><button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'deliverable', taskId: d.task_id })}>${d.title || d.task_id}</button>${d.verification ? html`<small>${d.verification}</small>` : null}</div>
       <div class="op-who" key=${'w' + d.task_id}>${d.agent}</div>
       <div class=${`op-st ${statusClass(d.status)}`} key=${'s' + d.task_id}>${statusWord(d.status)}${d.rating ? html` · ${'★'.repeat(d.rating.stars || 0)}` : ''}</div>

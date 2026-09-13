@@ -10,6 +10,7 @@
  * @structure txRow · txOpen · railRow · railOpen · shareRow · moneyRow
  * @usage import { txRow, railRow, shareRow, moneyRow } from './rows.js';
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.1.0 -- 2026-09-13 -- Compose detail frames from poster.css.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
@@ -29,7 +30,7 @@ export function txRow(ctx, tx) {
     <div class=${`wal-row wal-tx ${open ? 'is-open' : ''}`} key=${tx.id}>
       <div class="wal-nm"><button type="button" class="og-tbl-name" onClick=${() => ctx.toggleTx(tx.id)}>${w.title}</button><small>${w.sub}</small></div>
       <div class="wal-w">${dateWord(tx.timestamp)} ${timeWord(tx.timestamp)}</div>
-      <div class=${`wal-amt ${kind === 'out' ? 'is-out' : kind === 'in' ? 'is-in' : ''}`}>${signed(tx.amount)}<small>${morsels(tx.amount) === x('morselOne', { n: 1 }) ? x('unitOne') : x('unitMany')}</small></div>
+      <div class=${`wal-amt poster-stat-number poster-stat-number--small ${kind === 'out' ? 'is-out' : kind === 'in' ? 'is-in' : ''}`}>${signed(tx.amount)}<small>${morsels(tx.amount) === x('morselOne', { n: 1 }) ? x('unitOne') : x('unitMany')}</small></div>
       <div class="wal-go"><button type="button" class="og-door" onClick=${() => ctx.toggleTx(tx.id)}>${open ? x('close') : x('open')}</button></div>
       ${open ? txOpen(ctx, tx, w) : null}
     </div>`;
@@ -127,7 +128,7 @@ export function shareRow(entry, i) {
     <div class="wal-row" key=${entry.tracking_code || i}>
       <div class="wal-nm">${what}<small>${entry.released_at ? `${dateWord(entry.released_at)} ${timeWord(entry.released_at)} · ` : ''}${x('share.' + status) !== 'walpage.share.' + status ? x('share.' + status) : status}</small></div>
       <div class="wal-w">${entry.buyer ? x('share.buyer', { name: shortName(entry.buyer) }) : ''}${entry.note ? ` · ${entry.note}` : ''}</div>
-      <div class=${`wal-amt ${status === 'released' || status === 'paid' ? 'is-in' : ''}`}>${money(entry.amount, entry.currency)}</div>
+      <div class=${`wal-amt poster-stat-number poster-stat-number--small ${status === 'released' || status === 'paid' ? 'is-in' : ''}`}>${money(entry.amount, entry.currency)}</div>
       <div class="wal-go"><span class=${`og-chip ${status === 'accrued' ? 'og-chip--dim' : ''}`}>${x('share.' + status) !== 'walpage.share.' + status ? x('share.' + status) : status}</span></div>
     </div>`;
 }
@@ -142,7 +143,7 @@ export function moneyRow(item, sale) {
     <div class="wal-row" key=${item.id}>
       <div class="wal-nm">${sale ? x('money.soldTitle', { title }) : x('money.boughtTitle', { title })}<small>${done ? (sale ? x('money.paidToYou') : x('money.paid')) : stale ? x('money.expired') : x('money.open')}${sale && item.buyerOwner ? ` · ${x('share.buyer', { name: item.buyerOwner })}` : ''}</small></div>
       <div class="wal-w">${dateWord(when)} ${timeWord(when)}</div>
-      <div class=${`wal-amt ${done ? (sale ? 'is-in' : '') : 'is-dim'}`}>${sale && done ? '+' : ''}${money(amount, item.currency)}</div>
+      <div class=${`wal-amt poster-stat-number poster-stat-number--small ${done ? (sale ? 'is-in' : '') : 'is-dim'}`}>${sale && done ? '+' : ''}${money(amount, item.currency)}</div>
       <div class="wal-go">${!done ? html`<span class="og-chip og-chip--dim">${stale ? x('money.expired') : x('money.open')}</span>` : null}</div>
     </div>`;
 }
