@@ -6,6 +6,7 @@
  *   Displays inbox (received) and sent work items with accept/decline/deliver actions
  *   and a rating modal for completed deliveries.
  * @version-history
+ *   2026-09-13 — The rate and deliver dialogs' actions sit in their footers, Cancel first.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.3.0 — 2026-07-16 — Mount folds inbox + sent into GET /v1/work/overview (getWorkOverview); individual reads kept as fallback.
  *   v1.0.0 — 2026-03-16 — Initial work tab
@@ -213,7 +214,10 @@ function RateModal({ desc, onSubmit, onCancel }) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   return html`
-    <${Modal} open=${true} onClose=${onCancel} title=${t('profile.work.rateTitle')}>
+    <${Modal} open=${true} onClose=${onCancel} title=${t('profile.work.rateTitle')}
+      footer=${html`
+        <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
+        <button class="btn-primary" onClick=${() => onSubmit(rating, comment)}>${t('profile.work.submitRating')}</button>`}>
       <p class="text-meta mb-1">${t('profile.work.rateDesc')} ${escHtml(desc || '')}</p>
       <div class="star-rating mb-1">
         ${[1,2,3,4,5].map(i => html`
@@ -221,28 +225,23 @@ function RateModal({ desc, onSubmit, onCancel }) {
         `)}
       </div>
       <div class="form-row"><label>${t('profile.work.commentLabel')}</label><textarea class="input-field" rows="2" value=${comment} onInput=${e => setComment(e.target.value)}></textarea></div>
-      <div class="form-actions">
-        <button class="btn-primary" onClick=${() => onSubmit(rating, comment)}>${t('profile.work.submitRating')}</button>
-        <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
-      </div>
     <//>`;
 }
 
 function DeliverModal({ desc, loading, onSubmit, onCancel }) {
   const [result, setResult] = useState('');
   return html`
-    <${Modal} open=${true} onClose=${onCancel} title=${t('profile.work.deliver')}>
+    <${Modal} open=${true} onClose=${onCancel} title=${t('profile.work.deliver')}
+      footer=${html`
+        <button class="btn-outline" disabled=${loading} onClick=${onCancel}>${t('profile.cancel')}</button>
+        <button class="btn-primary" disabled=${loading} onClick=${() => onSubmit(result || undefined)}>
+          ${loading ? t('profile.work.delivering') : t('profile.work.deliver')}
+        </button>`}>
       <p class="text-meta mb-1">${t('profile.work.delivering')}: ${escHtml(desc || '')}</p>
       <div class="form-row">
         <label>${t('profile.work.commentLabel')}</label>
         <textarea class="input-field" rows="4" placeholder="Describe the completed work or attach results..."
           value=${result} onInput=${e => setResult(e.target.value)}></textarea>
-      </div>
-      <div class="form-actions">
-        <button class="btn-primary" disabled=${loading} onClick=${() => onSubmit(result || undefined)}>
-          ${loading ? t('profile.work.delivering') : t('profile.work.deliver')}
-        </button>
-        <button class="btn-outline" disabled=${loading} onClick=${onCancel}>${t('profile.cancel')}</button>
       </div>
     <//>`;
 }

@@ -18,6 +18,7 @@
  * @structure DiscoveryApps({ status, onChanged }) — mode chips, tally filters, search, table, block dialog
  * @usage <${DiscoveryApps} status=${status} onChanged=${load} />
  * @version-history
+ *   v2.0.1 — 2026-09-13 — The block dialog's actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-11 — The poster face: mode and tally as chips, the search as an underline
  *     field, the address and last-told columns (the address from the notice plan, the stamp from
  *     seo.announcedAt), twenty-five rows with the rest behind a word.
@@ -197,18 +198,17 @@ export function DiscoveryApps({ status, onChanged }) {
           ${filtered.length > PAGE ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => setAll(!all)}>${all ? S('apps.showFewer') : S('apps.showAll', { n: filtered.length })}</button>` : null}
         </div>` : null}
 
-      <${Modal} open=${!!blocking} onClose=${() => setBlocking(null)} title=${S('apps.blockTitle', { name: blocking?.name ?? '' })}>
+      <${Modal} open=${!!blocking} onClose=${() => setBlocking(null)} title=${S('apps.blockTitle', { name: blocking?.name ?? '' })}
+        footer=${blocking && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setBlocking(null)}>${S('cancel')}</button>
+          <button type="button" class="og-slab og-slab--danger" disabled=${busy}
+            onClick=${() => act(() => adminService.blockAppSeo(blocking.owner, blocking.filename, true, blocking.reason?.trim() || undefined), 'apps.blockedOk')}>${S('apps.block')}</button>`}>
         ${blocking && html`
           <p>${S('apps.blockBody')}</p>
           <div class="adm-disc-lbl">${S('apps.blockReason')}</div>
           <div class="adm-disc-fld adm-disc-fld--wide">
             <input type="text" value=${blocking.reason} placeholder=${S('apps.blockReasonHint')}
               onInput=${e => setBlocking({ ...blocking, reason: e.target.value })} />
-          </div>
-          <div class="adm-disc-acts">
-            <button type="button" class="og-slab og-slab--danger" disabled=${busy}
-              onClick=${() => act(() => adminService.blockAppSeo(blocking.owner, blocking.filename, true, blocking.reason?.trim() || undefined), 'apps.blockedOk')}>${S('apps.block')}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setBlocking(null)}>${S('cancel')}</button>
           </div>`}
       <//>
     </section>`;

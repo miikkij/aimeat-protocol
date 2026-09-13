@@ -490,7 +490,6 @@
 .pf audio.pf-file-preview-media{width:100%}
 .pf .pf-file-preview-text{width:100%;max-height:70vh;overflow:auto;white-space:pre-wrap;word-break:break-word;font-family: var(--font-mono);font-size:.8rem;line-height:1.5;margin:0;padding:.75rem;text-align:left;color:var(--text,#1F2937)}
 .pf .pf-file-preview-status{color:var(--text-dim,#6B7280);font-size:.9rem;padding:2rem;text-align:center}
-.pf .pf-file-preview-actions{display:flex;gap:.5rem;justify-content:flex-end;margin-top:.75rem}
 /* Collection cart — per-row toggle + the tray */
 .pf .mem-cart-btn{background:transparent;border:1px solid transparent;border-radius:6px;cursor:pointer;font-size:.8rem;line-height:1;padding:2px 5px;opacity:.45;transition:opacity .15s,background .15s}
 .pf .mem-cart-btn:hover{opacity:1;background:var(--accent-subtle,rgba(232,86,74,.1))}
@@ -3141,7 +3140,6 @@
 .pf-eco-recipe-foot { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; }
 .pf-eco-recipe-note { margin: 0; font-size: .76rem; }
 .pf-eco-revoke-input { width: 100%; box-sizing: border-box; margin: .6rem 0; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: .5rem .7rem; }
-.pf-eco-revoke-actions { display: flex; justify-content: flex-end; gap: .5rem; }
 /* Pending advisories approval surface (B7/B8) */
 .pf-eco-adv { margin-top: .9rem; padding-top: .7rem; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: .6rem; }
 .pf-eco-adv-list { display: flex; flex-direction: column; gap: .6rem; }

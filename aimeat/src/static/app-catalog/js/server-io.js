@@ -19,6 +19,9 @@
  *     every other dialog title; its target line takes a class instead of an inline style.
  *   v2.3.1 — 2026-09-13 — The consents overlay's layout moves to the stylesheet (#consents-overlay),
  *     so it scrolls like every other dialog instead of centring past the top of a short screen.
+ *   v2.4.0 — 2026-09-13 — Publish, subdomain, backup and consents are the site's one dialog
+ *     (dialogs.js). The consents dialog is built as a <dialog> with header, body and footer, and
+ *     Revoke moves from the body into the footer.
  *   v2.0.0 — 2026-08-28 — The showroom skin: community and favourites render as rows (rows.js),
  *     favourites is a third view of its own, the header's sort order applies to both lists, and
  *     the rail reads getCommunityApps / getFavoriteServerApps for its tag counts.
@@ -38,6 +41,7 @@ import { fetchAppContentBase64, refreshServerMgmt } from './detail.js';
 import { favStarHtml, isFavorite, loadFavorites } from './favorites.js';
 import { rowHtml, fmtDate } from './rows.js';
 import { loadPromoted } from './promote.js';
+import { openDlg, closeDlg, onDlgClose } from './dialogs.js';
 
 // Injected once at bootstrap by main.js: read getters + write setters for the shared app-state
 // (which stays main-owned), plus a few main-local fns.
@@ -122,7 +126,7 @@ function showPublishModal(appId, opts) {
     pubStatus.textContent = '';
     pubSubmit.disabled = false;
   }
-  document.getElementById('publish-overlay').hidden = false;
+  openDlg('publish-overlay');
 }
 
 function submitPublish() {
@@ -238,8 +242,7 @@ function submitPublish() {
           // Close the modal shortly after showing success \u2014 otherwise it dead-ends with a
           // disabled button and the user isn't sure the publish took.
           setTimeout(function () {
-            var ov = document.getElementById('publish-overlay');
-            if (ov) ov.hidden = true;
+            closeDlg('publish-overlay');
             submitBtn.disabled = false;
           }, 1400);
         });
@@ -378,7 +381,7 @@ function showSubdomainModal(owner, filename) {
   document.getElementById('subdomain-input').value = existing ? existing.subdomain : '';
   document.getElementById('subdomain-status').textContent = '';
   document.getElementById('subdomain-unassign-btn').style.display = existing ? '' : 'none';
-  document.getElementById('subdomain-overlay').hidden = false;
+  openDlg('subdomain-overlay');
 }
 
 function subdomainApiCall(method, path, body) {
@@ -412,7 +415,7 @@ function submitSubdomainAssign() {
     return;
   }
   if (sub === subdomainModalState.existingSub) {
-    document.getElementById('subdomain-overlay').hidden = true;
+    closeDlg('subdomain-overlay');
     return;
   }
   statusEl.style.color = 'var(--text-muted)';
@@ -460,23 +463,33 @@ function unassignSubdomain() {
 
 // ── App grant consents (H-2) ─────────────────────
 // Manage the scoped grant THIS user gave a (usually someone else's) app: see the granted scopes
-// and revoke. Reuses the owner-authenticated /v1/app-grants list + delete; a tiny dynamic modal.
-function closeConsents() { var o = document.getElementById('consents-overlay'); if (o) o.remove(); }
+// and revoke. Reuses the owner-authenticated /v1/app-grants list + delete; a dialog built on demand
+// in the same shape as the template's, and removed again when it closes.
+function closeConsents() {
+  var d = document.getElementById('consents-overlay');
+  if (!d) return;
+  closeDlg(d);
+  d.remove();
+}
 function openConsents(owner, filename, appName) {
   var target = bareOwnerName(owner) + '/' + filename;
   closeConsents();
-  var ov = document.createElement('div');
-  ov.id = 'consents-overlay';
-  ov.onclick = function (e) { if (e.target === ov) closeConsents(); };
-  var box = document.createElement('div');
-  box.className = 'modal';
-  box.innerHTML = '<h2>' + t('consents.title') + '</h2>'
+  var dlg = document.createElement('dialog');
+  dlg.id = 'consents-overlay';
+  dlg.className = 'dlg modal dlg--md';
+  dlg.setAttribute('data-dlg-guard', 'off');
+  dlg.innerHTML = '<header class="dlg-head"><h2 class="dlg-title">' + escapeHtml(t('consents.title')) + '</h2><button type="button" class="dlg-close"></button></header>'
+    + '<div class="dlg-body">'
     + '<div class="consents-target">' + escapeHtml(appName || filename) + ' · ' + escapeHtml(target) + '</div>'
     + '<div id="consents-body" style="font-size:.9rem;color:var(--text-muted)">' + t('common.loading') + '</div>'
-    + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">'
-    + '<button type="button" class="modal-btn secondary" onclick="window._launcher.closeConsents()">' + t('common.close') + '</button></div>';
-  ov.appendChild(box);
-  document.body.appendChild(ov);
+    + '</div>'
+    + '<footer class="dlg-foot">'
+    + '<button type="button" class="modal-btn secondary" data-dlg-close>' + escapeHtml(t('common.close')) + '</button>'
+    + '<button type="button" class="modal-btn danger" id="consents-revoke-btn" hidden>' + escapeHtml(t('consents.revoke')) + '</button>'
+    + '</footer>';
+  document.body.appendChild(dlg);
+  onDlgClose('consents-overlay', closeConsents);
+  openDlg(dlg);
   subdomainApiCall('GET', '/v1/app-grants').then(function (json) {
     var grants = (json.data && json.data.grants) || [];
     var g = grants.filter(function (x) { return x.app === target; })[0];
@@ -487,8 +500,12 @@ function openConsents(owner, filename, appName) {
       + '<ul style="margin:0 0 14px;padding-left:18px">'
       + g.scopes.map(function (s) { return '<li><code>' + escapeHtml(s) + '</code></li>'; }).join('')
       + '</ul>'
-      + '<div style="font-size:.8rem;color:var(--text-muted);margin-bottom:12px">' + t('consents.hint') + '</div>'
-      + '<button type="button" class="modal-btn danger" onclick="window._launcher.revokeConsent(\'' + jsArg(g.grant_id) + '\')">' + t('consents.revoke') + '</button>';
+      + '<div style="font-size:.8rem;color:var(--text-muted)">' + t('consents.hint') + '</div>';
+    var revoke = document.getElementById('consents-revoke-btn');
+    if (revoke) {
+      revoke.onclick = function () { revokeConsent(g.grant_id); };
+      revoke.hidden = false;
+    }
   }).catch(function (e) {
     var body = document.getElementById('consents-body');
     if (body) { body.style.color = '#ef4444'; body.textContent = e.message || String(e); }
@@ -572,14 +589,13 @@ function importBackupPick() {
 }
 
 function importBackupFile(file) {
-  var overlay = document.getElementById('backup-overlay');
   var statusEl = document.getElementById('backup-status');
   var body = document.getElementById('backup-import-body');
   document.getElementById('backup-restore-btn').style.display = 'none';
   body.innerHTML = '';
   statusEl.style.color = 'var(--text-muted)';
   statusEl.textContent = t('backup.inspecting');
-  overlay.hidden = false;
+  openDlg('backup-overlay');
 
   file.arrayBuffer()
     .then(function (buf) {

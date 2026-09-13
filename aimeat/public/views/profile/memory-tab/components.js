@@ -7,6 +7,8 @@
  *   universal file preview modal, the drag-and-drop upload form, and the edit-memory modal.
  *   Extracted from memory-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.1 — 2026-09-13 — The file preview (extra large) and the edit dialog (large) keep their actions
+ *     in the footer.
  *   v1.1.0 — 2026-08-11 — The create form and the edit modal no longer offer "group" as a
  *     visibility, and their group pickers are gone with it. A group is an audience, not a tier:
  *     give the record the visibility it has for everyone else, then share the key space.
@@ -241,7 +243,10 @@ export function FilePreviewModal({ file, nodeUrl, onClose, onDownload, showToast
   };
 
   return html`
-    <${Modal} open=${true} onClose=${onClose} title=${fKey} className="pf-file-preview-modal">
+    <${Modal} open=${true} onClose=${onClose} title=${fKey} className="pf-file-preview-modal" size="xl" guard=${false}
+      footer=${html`
+        <button class="btn-outline" onClick=${openInTab}>${t('profile.files.openInTab') || 'Open in new tab'} ↗</button>
+        <button class="btn-outline" onClick=${() => onDownload(file)}>${t('profile.files.download')}</button>`}>
       <div class="pf-file-preview-body">
         ${loading && html`<div class="pf-file-preview-status">${t('profile.files.previewLoading') || 'Loading preview…'}</div>`}
         ${err && html`<div class="pf-file-preview-status">${t('profile.files.previewError') || 'Couldn’t load this file'}</div>`}
@@ -251,10 +256,6 @@ export function FilePreviewModal({ file, nodeUrl, onClose, onDownload, showToast
         ${!loading && !err && cat === 'audio' && objUrl && html`<audio class="pf-file-preview-media" src=${objUrl} controls></audio>`}
         ${!loading && !err && cat === 'text' && text !== null && html`<pre class="pf-file-preview-text">${text}</pre>`}
         ${!loading && !err && cat === 'other' && html`<div class="pf-file-preview-status">${t('profile.files.noPreview') || 'No preview for this file type — download it instead'}</div>`}
-      </div>
-      <div class="pf-file-preview-actions">
-        <button class="btn-outline btn-sm" onClick=${openInTab}>${'↗'} ${t('profile.files.openInTab') || 'Open in new tab'}</button>
-        <button class="btn-outline btn-sm" onClick=${() => onDownload(file)}>${t('profile.files.download')}</button>
       </div>
     <//>`;
 }
@@ -390,7 +391,11 @@ export function EditMemoryModal({ memKey, initialValue, initialVisibility, initi
   const canSave = !jsonError;
 
   return html`
-    <${Modal} open=${true} onClose=${onCancel} title=${`${t('profile.memory.editTitle')}: ${memKey}`}>
+    <${Modal} open=${true} onClose=${onCancel} title=${`${t('profile.memory.editTitle')}: ${memKey}`} size="lg"
+      footer=${html`
+        <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
+        <button class="btn-primary" disabled=${!canSave}
+          onClick=${() => onSave(value, vis, initialVersion, undefined)}>${t('profile.save')}</button>`}>
         <div class="form-row flex-row mb-half">
           <label class="pf-label-inline">${t('profile.memory.visLabel')}</label>
           ${/* Same as the create form: a group is an audience, not a visibility. Sharing a key
@@ -402,10 +407,5 @@ export function EditMemoryModal({ memKey, initialValue, initialVisibility, initi
         <textarea class="input-field mem-edit-textarea ${jsonError ? 'mem-edit-textarea--error' : ''}" rows="14"
           value=${value} onInput=${e => setValue(e.target.value)}></textarea>
         ${jsonError && html`<div class="mem-json-error">${t('profile.memory.invalidJson')} — ${jsonError}</div>`}
-        <div class="form-actions mt-1">
-          <button class="btn-primary" disabled=${!canSave}
-            onClick=${() => onSave(value, vis, initialVersion, undefined)}>${t('profile.save')}</button>
-          <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
-        </div>
     <//>`;
 }

@@ -10,6 +10,8 @@
  *   then render <${ToastContainer} /> at the view root (NOT inside any element
  *   with transform/filter — those trap the fixed-position pill).
  * @version-history
+ *   v1.2.0 — 2026-09-13 — The pill shows above an open dialog (raiseAboveDialogs): a dialog is in
+ *     the browser's top layer, and a toast raised from inside one sat under its dimmed backdrop.
  *   v1.1.0 — 2026-07-06 — Accept string kinds: call sites across the codebase pass
  *     'success'/'error'/'info'/'warning' as the second arg, which as a truthy value
  *     made every toast (including successes) render red. normalizeToastType() is
@@ -19,6 +21,7 @@
 import { h } from 'preact';
 import { useState, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { raiseAboveDialogs } from '/js/dialog.js';
 const html = htm.bind(h);
 
 /**
@@ -50,7 +53,7 @@ export function useToast() {
 
   function ToastContainer() {
     if (!toast) return null;
-    return html`<div class="toast toast-${toast.type}">${toast.msg}</div>`;
+    return html`<div class="toast toast-${toast.type}" ref=${raiseAboveDialogs}>${toast.msg}</div>`;
   }
 
   return { showToast, ToastContainer };

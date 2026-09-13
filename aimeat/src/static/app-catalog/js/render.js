@@ -26,6 +26,7 @@
  *   v3.1.0 — 2026-08-28 — The poster face (design canvas "App Catalog Poster"): the rows are a
  *     numbered index that opens in place, the header sticker becomes the band with the numbers
  *     (plus the opens total) and the masthead's mono line, and the foot carries the count.
+ *   v3.2.0 — 2026-09-13 — The source editor opens through dialogs.js (the site's one dialog).
  */
 import { escapeHtml, jsArg, sourceLabel, filterAttr, isSameOriginUrl } from './util.js';
 import { getAllApps, saveApp, deleteApp } from './db.js';
@@ -38,6 +39,7 @@ import { openPromptBuilder } from './cortex.js';
 import { openDetailView, openPublishedDetail } from './detail.js';
 import { loadPublishedApps, showPublishModal, applyServerFilter, deleteServerApp, getCommunityApps, getFavoriteServerApps, rerenderServerLists } from './server-io.js';
 import { rowHtml, fmtKb, fmtDate } from './rows.js';
+import { openDlg } from './dialogs.js';
 
 // browser-local list + filter state stay main-owned; injected once via initRender at bootstrap.
 let getMainApps, setAllApps, getActiveTag, setActiveTag, getSearchQuery;
@@ -853,7 +855,7 @@ function viewSource(app) {
   if (pubTestedBtn) pubTestedBtn.hidden = !canStage;
   var stageStatus = document.getElementById('source-draft-status');
   if (stageStatus) stageStatus.textContent = '';
-  overlay.hidden = false;
+  openDlg(overlay);
   // Store app metadata for save and prompt
   overlay.dataset.appName = app.name || 'App';
   overlay.dataset.appId = app.id || '';
@@ -890,7 +892,7 @@ function generateSharePrompt(app) {
     textarea.value = prompt;
     textarea.readOnly = true;
     saveBtn.style.display = 'none';
-    overlay.hidden = false;
+    openDlg(overlay);
     overlay.dataset.appId = '';
     overlay.dataset.originalSource = '';
   });
@@ -935,7 +937,7 @@ function generateHomepagePrompt() {
   title.textContent = t('homepage.title');
   textarea.value = prompt;
   overlay.dataset.appName = 'Homepage';
-  overlay.hidden = false;
+  openDlg(overlay);
 }
 
 export {

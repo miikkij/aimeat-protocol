@@ -16,9 +16,11 @@
  *   half-filled form is not lost to a stray key or click. A press that starts inside the dialog and
  *   ends outside it (selecting text, dragging) is not a press on the page behind.
  * @structure wireDialog(dialog, { onRequestClose, guard }) → { reset, isDirty, unwire } ·
- *   openDialog(dialog) · closeDialog(dialog) · CLOSE_ICON
+ *   openDialog(dialog) · closeDialog(dialog) · raiseAboveDialogs(el) · CLOSE_ICON
  * @usage import { wireDialog, openDialog, closeDialog, CLOSE_ICON } from '/js/dialog.js';
  * @version-history
+ *   v1.1.0 — 2026-09-13 — raiseAboveDialogs: a toast shown while a dialog is open goes into the top
+ *     layer after it, instead of under the dialog's dimmed backdrop.
  *   v1.0.0 — 2026-09-13 — Initial (wish "Yksi dialogikomponentti kaikille dialogeille").
  */
 
@@ -93,4 +95,23 @@ export function openDialog(dialog) {
 /** Close, if open. */
 export function closeDialog(dialog) {
   if (dialog && dialog.open) dialog.close();
+}
+
+/**
+ * Put a floating notice (a toast) above any open dialog. A modal dialog is in the browser's top
+ * layer, which no z-index reaches, so a toast raised while one is open would sit under its dimmed
+ * backdrop. As a manual popover the toast enters that layer too, and showing it again puts it on
+ * top. A browser without popovers keeps the element's own z-index.
+ * @param {HTMLElement | null} el
+ */
+export function raiseAboveDialogs(el) {
+  if (!el || typeof el.showPopover !== 'function' || !el.isConnected) return;
+  if (!el.hasAttribute('popover')) el.setAttribute('popover', 'manual');
+  try {
+    if (el.matches(':popover-open')) el.hidePopover();
+    el.showPopover();
+    // eslint-disable-next-line aimeat/no-silent-catch -- a popover the browser refuses to show keeps its z-index, which is where every toast was before; there is nothing to report.
+  } catch {
+    /* the toast still shows, under an open dialog as it did before */
+  }
 }

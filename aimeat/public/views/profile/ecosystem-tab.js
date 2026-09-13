@@ -10,6 +10,7 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   2026-09-13 — The revoke dialog's actions sit in its footer.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v3.2.0 — 2026-07-13 — Split for max-file-lines: MOVED sub-components/helpers into relative sibling
  *     modules (ecosystem-tab.helpers.js — pure helpers/consts; ecosystem-tab.automation.js —
@@ -331,16 +332,15 @@ export default function EcosystemTab({ onStats, showToast }) {
             </div>`;
         })}
 
-      <${Modal} open=${!!revokeApp} onClose=${() => setRevokeApp(null)} title=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}>
-        <p>${t('profile.ecosystem.revokeWarn', { app: revokeApp })}</p>
-        <input class="pf-eco-revoke-input" type="text" value=${revokeInput}
-          placeholder=${revokeApp || ''} onInput=${e => setRevokeInput(e.target.value)} />
-        <div class="pf-eco-revoke-actions">
+      <${Modal} open=${!!revokeApp} onClose=${() => setRevokeApp(null)} title=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}
+        footer=${html`
           <button class="btn-ghost" onClick=${() => setRevokeApp(null)}>${t('common.cancel')}</button>
           <button class="btn-danger-solid" disabled=${revokeInput !== revokeApp} onClick=${onRevokeConfirm}>
             ${t('profile.ecosystem.revoke')}
-          </button>
-        </div>
+          </button>`}>
+        <p>${t('profile.ecosystem.revokeWarn', { app: revokeApp })}</p>
+        <input class="pf-eco-revoke-input" type="text" value=${revokeInput}
+          placeholder=${revokeApp || ''} onInput=${e => setRevokeInput(e.target.value)} />
       <//>
     </div>`;
 }

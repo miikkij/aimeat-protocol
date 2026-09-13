@@ -17,6 +17,8 @@
  *   gets this file copied into its page at build time (scripts/build-app-catalog.ts).
  * @structure frame · header and X · body · footer and its actions · sizes · phone
  * @version-history
+ *   v1.1.0 — 2026-09-13 — The footer's start holds more than one action in a row (the app catalog's
+ *     source editor has two copy words there).
  *   v1.0.0 — 2026-09-13 — Initial (wish "Yksi dialogikomponentti kaikille dialogeille").
  */
 
@@ -93,8 +95,9 @@ dialog.dlg .dlg-foot {
   gap: .8rem 1.4rem; margin: 0; padding: .9rem 1.5rem 1rem;
   border-top: 3px solid var(--text); background: var(--bg);
 }
-/* Something that belongs on the footer's other end (a side door like "Change password…"). */
-dialog.dlg .dlg-foot .dlg-foot-start { margin-right: auto; }
+/* Something that belongs on the footer's other end (a side door like "Change password…"); two or
+   more of them keep the footer's own spacing. */
+dialog.dlg .dlg-foot .dlg-foot-start { margin-right: auto; display: flex; flex-wrap: wrap; align-items: center; gap: .8rem 1.4rem; }
 /* The site's button classes wear the poster's two words here, whichever view opened the dialog. */
 dialog.dlg .dlg-foot .btn-ghost, dialog.dlg .dlg-foot .btn-outline, dialog.dlg .dlg-foot .btn-secondary, dialog.dlg .dlg-foot .poster-action {
   display: inline-flex; align-items: center; min-height: 44px; padding: 0; background: none; box-shadow: none;

@@ -9,6 +9,7 @@
  *   strip and the badges come from admin.css and organism.css; only what this page adds lives here.
  *   Every value is a theme.css token, so the page flips with the theme.
  * @version-history
+ *   v1.0.1 — 2026-09-13 — .adm-cx-dialog-acts leaves: the dialogs' actions are in the dialog's footer.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 
@@ -85,7 +86,6 @@
 .adm-cx-field { display: block; margin-top: 12px; }
 .adm-cx-field > span { display: block; font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
 .adm .adm-cx-field input[type="text"] { width: 100%; box-sizing: border-box; }
-.adm-cx-dialog-acts { display: flex; gap: 16px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
 
 @media (max-width: 860px) {
   .adm-cx-step { grid-template-columns: 36px minmax(0, 1fr); gap: 4px 12px; }

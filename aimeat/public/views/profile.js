@@ -10,6 +10,8 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-09-13 — The toast pill shows above an open dialog (raiseAboveDialogs in /js/dialog.js)
+ *     instead of under its dimmed backdrop.
  *   2026-09-06 — The signed-out wall is the door (profile/door.js): it names where the address leads
  *     (Settings & Controls → the tab the URL asks for), offers sign-in and an account, and the shell
  *     renders the site footer under it. The old wall ("Your AIMEAT Profile" under an aurora theme.css
@@ -42,6 +44,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { normalizeToastType } from '/components/Toast.js';
+import { raiseAboveDialogs } from '/js/dialog.js';
 import { getSession, onAuthChange } from '/js/services/auth.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import { apiGet } from '/js/api.js';
@@ -344,5 +347,5 @@ export default function Profile({ navigate, locale }) {
     </div>
 
     <!-- Toast -->
-    ${toast && html`<div class="toast toast-${toast.type}">${toast.msg}</div>`}`;
+    ${toast && html`<div class="toast toast-${toast.type}" ref=${raiseAboveDialogs}>${toast.msg}</div>`}`;
 }

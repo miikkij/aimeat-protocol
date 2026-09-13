@@ -6,6 +6,8 @@
  *   permission checkboxes, read-only view for non-owners. Extracted from ../agents-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.0.1 — 2026-09-13 — The large dialog size; Cancel and Save sit in the footer, where they stay in
+ *     view while the advanced list scrolls.
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/agents-tab.js (max-file-lines)
  *   v1.1.0 — 2026-08-08 — The editor stopped treating `*` as "every box". It expanded the wildcard
  *     into all of them, so memory:write-reserved — which the server grants on the exact string
@@ -89,7 +91,13 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
   const isReadOnly = !(session.roles?.includes('owner') || session.roles?.includes('operator'));
 
   return html`
-    <${Modal} open=${true} onClose=${onCancel} className="scope-modal" title=${`${t('profile.agents.scopeUi.scopeProfile')}: ${agent.display_name || agent.name}`}>
+    <${Modal} open=${true} onClose=${onCancel} className="scope-modal" size="lg" title=${`${t('profile.agents.scopeUi.scopeProfile')}: ${agent.display_name || agent.name}`}
+      footer=${isReadOnly ? html`
+        <button class="btn-outline" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>` : html`
+        <button class="btn-outline" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>
+        <button class="btn-primary" onClick=${handleSave} disabled=${saving}>
+          ${saving ? t('profile.agents.scopeUi.saving') : t('profile.agents.scopeUi.save')}
+        </button>`}>
         <div class="scope-agent-info">${escHtml(agent.gaii || '')}
           ${agent.gaii ? html`<${InboxLink} to=${agent.gaii} title=${t('inbox.messageThis')} className="scope-agent-msg">${MAIL_ICON}</${InboxLink}>` : null}
         </div>
@@ -98,9 +106,6 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
           <p class="text-caption mb-1">${t('profile.agents.scopeUi.readOnlyView')}</p>
           <div class="scope-readonly-list">
             ${scopes.map(s => html`<span class="scope-tag">${escHtml(s)}</span>`)}
-          </div>
-          <div class="form-actions mt-section">
-            <button class="btn-outline" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>
           </div>
         ` : html`
           <div class="scope-templates">
@@ -172,13 +177,6 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
           `}
 
           <p class="scope-reconnect-note">${t('profile.agents.scopeUi.reconnectNote')}</p>
-
-          <div class="form-actions mt-1">
-            <button class="btn-primary" onClick=${handleSave} disabled=${saving}>
-              ${saving ? t('profile.agents.scopeUi.saving') : t('profile.agents.scopeUi.save')}
-            </button>
-            <button class="btn-outline" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>
-          </div>
         `}
     <//>`;
 }

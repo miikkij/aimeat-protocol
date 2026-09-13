@@ -12,6 +12,8 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.39.0 — 2026-09-13 — .toast undoes the browser's popover box (inset, margin, border), because the
+       pill now enters the top layer as a manual popover to show above an open dialog.
      v1.38.0 — 2026-09-13 — The classic .modal-overlay / .modal / .modal-header / .modal-close / .modal-footer
        rules leave: components/Modal.js renders a native <dialog class="dlg"> styled by /css/dialog.css, and
        nothing else on the site used them.
@@ -1728,6 +1730,9 @@ select.input-field { cursor: pointer; }
   box-shadow: var(--shadow-xl);
   animation: toastIn 0.3s ease, toastOut 0.4s ease 2.4s forwards;
   pointer-events: auto; box-sizing: border-box;
+  /* The pill is a manual popover so it can show above an open dialog (raiseAboveDialogs in
+     /js/dialog.js); these undo the browser's own popover box, which is centred and framed. */
+  top: auto; right: auto; margin: 0; border: 0; overflow: visible;
 }
 .toast.error, .toast-error { background: var(--toast-danger-bg); color: var(--toast-fg); }
 .toast-success { background: var(--toast-success-bg); color: var(--toast-fg); }
