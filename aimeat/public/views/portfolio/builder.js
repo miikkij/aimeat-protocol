@@ -6,6 +6,7 @@
  *   prompt, and upload/publish the resulting HTML. Extracted from portfolio.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- Compose poster rules and move inline presentation to portfolio.css.
  *   v1.2.0 — 2026-08-28 — "AIMEAT poster" is the first design style and the default: the house
  *     face (Archivo Black headlines, ink rules, one coral band with a sun stripe) written into the
  *     prompt, so a page built from here matches the home it is linked from.
@@ -320,7 +321,7 @@ export function PortfolioBuilder({ session, navigate }) {
 
       <!-- The loop is the whole point: AIMEAT composes a prompt, YOUR AI chat builds the
            HTML, you paste it back. Without this banner step 1 gives no hint of steps 4-5. -->
-      <div class="portfolio-flow">
+      <div class="portfolio-flow poster-row--thing">
         <span class="portfolio-flow-step"><span class="portfolio-flow-num">①</span> ${tr('portfolio.builder.flow1', 'Select your content and style')}</span>
         <span class="portfolio-flow-arrow">→</span>
         <span class="portfolio-flow-step"><span class="portfolio-flow-num">②</span> ${tr('portfolio.builder.flow2', 'Generate a prompt and run it in your AI chat (Claude, ChatGPT, …)')}</span>
@@ -345,10 +346,10 @@ export function PortfolioBuilder({ session, navigate }) {
       <div class="portfolio-builder">
 
         <!-- Step 1: Select Content -->
-        <div class="portfolio-step">
+        <div class="portfolio-step poster-row--thing">
           <h3><span class="portfolio-step-number">1</span> ${t('portfolio.builder.step1Title')}</h3>
 
-          ${!hasContent && html`<p style="color:var(--text-dim);">${t('portfolio.builder.noContent')}</p>`}
+          ${!hasContent && html`<p class="portfolio-no-content">${t('portfolio.builder.noContent')}</p>`}
 
           ${catalog.images.length > 0 && html`
             <details class="portfolio-source-group" open>
@@ -381,7 +382,7 @@ export function PortfolioBuilder({ session, navigate }) {
                       </div>
                     `)}
                     ${filteredImgs.length === 0 && imageTagFilter.size > 0 && html`
-                      <div style="padding:.5rem;font-size:.8rem;color:var(--text-dim)">${t('tags.noMatch') || 'No items match selected tags'}</div>
+                      <div class="portfolio-no-match">${t('tags.noMatch') || 'No items match selected tags'}</div>
                     `}
                   </div>
                 `;
@@ -473,7 +474,7 @@ export function PortfolioBuilder({ session, navigate }) {
                       `;
                     })}
                     ${filteredMems.length === 0 && memoryTagFilter.size > 0 && html`
-                      <div style="padding:.5rem;font-size:.8rem;color:var(--text-dim)">${t('tags.noMatch') || 'No items match selected tags'}</div>
+                      <div class="portfolio-no-match">${t('tags.noMatch') || 'No items match selected tags'}</div>
                     `}
                   </div>
                 `;
@@ -483,10 +484,10 @@ export function PortfolioBuilder({ session, navigate }) {
         </div>
 
         <!-- Step 2: Style & Purpose -->
-        <div class="portfolio-step">
+        <div class="portfolio-step poster-row--thing">
           <h3><span class="portfolio-step-number">2</span> ${t('portfolio.builder.step2Title')}</h3>
 
-          <p style="color:var(--text-bright); font-size:0.95rem; margin-bottom:0.5rem;">${t('portfolio.builder.portfolioType')}</p>
+          <p class="portfolio-type-label">${t('portfolio.builder.portfolioType')}</p>
           <div class="portfolio-options">
             ${PORTFOLIO_TYPES.map(pt => html`
               <div class="portfolio-option ${portfolioType === pt.id ? 'selected' : ''}"
@@ -502,7 +503,7 @@ export function PortfolioBuilder({ session, navigate }) {
               value=${customTypeDesc} onInput=${(e) => setCustomTypeDesc(e.target.value)}></textarea>
           `}
 
-          <p style="color:var(--text-bright); font-size:0.95rem; margin:1.5rem 0 0.5rem;">${t('portfolio.builder.designStyle')}</p>
+          <p class="portfolio-style-label">${t('portfolio.builder.designStyle')}</p>
           <div class="portfolio-options">
             ${DESIGN_STYLES.map(ds => html`
               <div class="portfolio-option ${designStyle === ds.id ? 'selected' : ''}"
@@ -515,9 +516,9 @@ export function PortfolioBuilder({ session, navigate }) {
         </div>
 
         <!-- Step 3: Auth-Gated Sections -->
-        <div class="portfolio-step">
+        <div class="portfolio-step poster-row--thing">
           <h3><span class="portfolio-step-number">3</span> ${t('portfolio.builder.step3Title')}</h3>
-          <p style="color:var(--text-dim); font-size:0.9rem; margin-bottom:0.75rem;">${t('portfolio.builder.authGateLabel')}</p>
+          <p class="portfolio-auth-label">${t('portfolio.builder.authGateLabel')}</p>
           <div class="portfolio-auth-gates">
             ${AUTH_GATES.map(gate => html`
               <div class="portfolio-source-item">
@@ -535,7 +536,7 @@ export function PortfolioBuilder({ session, navigate }) {
         </div>
 
         <!-- Step 4: Generate Prompt -->
-        <div class="portfolio-step">
+        <div class="portfolio-step poster-row--thing">
           <h3><span class="portfolio-step-number">4</span> ${t('portfolio.builder.step4Title')}</h3>
 
           <div class="portfolio-generate-row">
@@ -558,7 +559,7 @@ export function PortfolioBuilder({ session, navigate }) {
               </button>
             </div>
 
-            <div class="portfolio-instructions">
+            <div class="portfolio-instructions poster-row--thing">
               <strong>${t('portfolio.builder.instructions')}</strong>
               <ol>
                 <li>${t('portfolio.builder.inst1')}</li>
@@ -571,7 +572,7 @@ export function PortfolioBuilder({ session, navigate }) {
         </div>
 
         <!-- Step 5: Upload Portfolio HTML -->
-        <div class="portfolio-step">
+        <div class="portfolio-step poster-row--thing">
           <h3><span class="portfolio-step-number">5</span> ${t('portfolio.builder.step5Title')}</h3>
 
           <div class="portfolio-publish-target">
@@ -597,15 +598,15 @@ export function PortfolioBuilder({ session, navigate }) {
             onDrop=${handleDrop}>
             <input type="file" accept=".html" ref=${fileInputRef}
               onChange=${(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); }} />
-            <p style="margin:0; color:var(--text-dim);">
+            <p class="portfolio-upload-hint">
               ${uploading ? '...' : t('portfolio.builder.uploadDragDrop')}
             </p>
           </div>
 
-          <div style="display:flex; align-items:center; gap:0.75rem; margin:1rem 0; color:var(--text-dim); font-size:0.9rem;">
-            <hr style="flex:1; border:none; border-top:1px solid var(--border-dim);" />
+          <div class="portfolio-paste-divider">
+            <hr />
             <span>${tr('portfolio.builder.orPaste', 'or paste HTML directly')}</span>
-            <hr style="flex:1; border:none; border-top:1px solid var(--border-dim);" />
+            <hr />
           </div>
 
           <textarea class="portfolio-paste-area"
@@ -632,10 +633,7 @@ export function PortfolioBuilder({ session, navigate }) {
           `}
 
           ${uploadStatus && html`
-            <div style="margin-top:0.75rem; padding:0.5rem 1rem; border-radius:8px;
-              background:${uploadStatus.ok ? 'rgba(80,200,120,0.08)' : 'rgba(255,80,80,0.08)'};
-              border:1px solid ${uploadStatus.ok ? 'rgba(80,200,120,0.2)' : 'rgba(255,80,80,0.2)'};
-              color:${uploadStatus.ok ? '#50c878' : '#ff5050'};">
+            <div class="portfolio-upload-status" data-ok=${String(uploadStatus.ok)}>
               ${uploadStatus.msg}
             </div>
           `}
@@ -643,7 +641,7 @@ export function PortfolioBuilder({ session, navigate }) {
 
       </div>
 
-      <div style="margin-top:2rem;">
+      <div class="portfolio-back">
         <button class="btn-ghost" onClick=${() => navigate('/v1/profile')}>
           ← ${tr('portfolio.builder.backToProfile', 'Profile')}
         </button>

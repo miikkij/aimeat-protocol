@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.12.0 -- 2026-09-13 -- Compose portfolio section and flow rules from poster.css.
  *   v1.11.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
  *   v1.10.0 -- 2026-09-13 -- Compose inbox top rules from poster.css.
  *   v1.9.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
@@ -82,8 +83,11 @@
 /* ── Cards become sections: a rule on top, the page behind them ────────────────────────── */
 .pf .card, .pf .card.card-glass, .pf .pf-agd-card, .pj-section, .kpkg-card, .pf .key-rules-box,
 .portfolio-step, .portfolio-instructions, .pf .pf-agd-webhook-form {
-  background: none; border: 0; border-top: 3px solid var(--text); border-radius: 0; box-shadow: none;
+  background: none; border-radius: 0; box-shadow: none;
   padding: 1.1rem 0 1.5rem; margin-bottom: 2rem;
+}
+.pf .card, .pf .card.card-glass, .pf .pf-agd-card, .pj-section, .kpkg-card, .pf .key-rules-box, .pf .pf-agd-webhook-form {
+  border: 0; border-top: 3px solid var(--text);
 }
 .pf .card:hover, .pf .card.card-glass:hover { border-color: var(--text); box-shadow: none; transform: none; }
 .pf .card-expanded { border-top-color: var(--accent); }
@@ -289,7 +293,7 @@
   font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight); font-size: 1.8rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
 }
 .portfolio-step-number { width: auto; height: auto; border-radius: 0; background: none; color: var(--accent); font-family: var(--font-mono); font-size: 0.85rem; font-weight: 400; margin: 0; }
-.portfolio-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 2rem; padding: 0; margin: 2rem 0 1.5rem; background: none; border: 0; border-top: 3px solid var(--text); border-radius: 0; }
+.portfolio-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 2rem; padding: 0; margin: 2rem 0 1.5rem; background: none; border-radius: 0; }
 .portfolio-flow-arrow { display: none; }
 .portfolio-flow-step { display: block; padding: 0.9rem 0 1rem; border-bottom: 2px solid var(--text); font-weight: var(--font-poster-strong-weight); font-size: 1rem; line-height: 1.35; }
 .portfolio-flow-num { display: block; font-family: var(--font-mono); font-weight: 400; font-size: 1.3rem; line-height: 1; color: var(--accent); margin: 0 0 0.45rem; }
