@@ -10,6 +10,7 @@
  *   only what this page adds lives here. Every value is a theme.css token, so the page flips with
  *   the theme.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.1.0 — 2026-09-13 — The page's own copy of the poster dialog leaves; /css/dialog.css draws it for
  *     every dialog now.
  *   v1.0.0 — 2026-09-12 — Initial (the Owners page in the poster face).
@@ -43,14 +44,7 @@
 }
 .adm-own-tr--head .adm-own-n, .adm-own-tr--head .adm-own-ag { font-family: inherit; font-size: .66rem; color: var(--accent); }
 
-.adm-own-n {
-  font-family: var(--font-poster);
-  font-weight: var(--font-poster-weight, 400);
-  font-size: 1.35rem;
-  line-height: var(--font-poster-leading, 1);
-  text-align: right;
-  color: var(--text);
-}
+.adm-own-n { text-align: right; margin-right: 0; }
 .adm-own-nm { display: flex; align-items: center; gap: 10px; min-width: 0; }
 /* The name is the way into the row: pressing it pins the doors open, which is the same gesture a
    phone has and a pointer's hover does not. */

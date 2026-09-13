@@ -6,6 +6,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 — Compose overview B1 headings and row rules from shared poster classes.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2v: compose section top rules from poster.css.
@@ -1723,11 +1724,7 @@
 }
 .pf .pf-lp-stat:hover .pf-lp-stat-val { color: var(--sun); }
 .pf .pf-lp-stat-ico { display: none; }
-.pf .pf-lp-stat-val {
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 4.2rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking);
-  color: var(--bg); font-variant-numeric: tabular-nums;
-}
+.pf .pf-lp-stat-val { font-variant-numeric: tabular-nums; margin-right: 0; }
 .pf .pf-lp-stat-green { color: var(--bg); }
 .pf .pf-lp-stat-label { font-family: var(--font-showroom-body); font-weight: 800; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; }
 /* A phone: the masthead shrinks to what the width holds, and the numbers halve. Measured before
@@ -1740,7 +1737,6 @@
   .pf .pf-lp-stats { margin: 1.5rem -1rem 0; padding: 3rem 1.5rem 3.5rem; gap: 20px 28px; }
   .pf .pf-lp-stats::before { height: 150px; }
   .pf .pf-lp-stats::after { transform: translateY(calc(-50% + 88px)) rotate(-3deg); }
-  .pf .pf-lp-stat-val { font-size: 2.6rem; }
 }
 .pf .pf-federation-badge {
   display: inline-flex; align-items: center; gap: 6px;
@@ -2963,21 +2959,19 @@
 .pf-usage-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.5rem; }
 .pf-usage-label { font-size: 1rem; font-weight: 800; color: var(--text); }
 .pf-usage-card .text-meta-sm { font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-dim); }
-.pf-usage-bar { height: 18px; border-radius: 0; background: var(--card); border: 2px solid var(--text); overflow: hidden; }
-.pf-usage-fill { height: 100%; background: var(--accent); border-radius: 0; transition: width 0.3s; }
-.pf-usage-fill--danger { background: var(--danger); }
+.pf-usage-bar { height: 18px; overflow: hidden; }
 .pf-usage-chips { display: flex; flex-wrap: wrap; gap: 0.6rem 1.8rem; margin-top: 1.2rem; }
 .pf-usage-chip { display: inline-flex; flex-direction: row; align-items: baseline; gap: 0.5rem; padding: 0; border: 0; border-radius: 0; background: none; cursor: pointer; text-align: left; font-family: inherit; }
 .pf-usage-chip[disabled] { cursor: default; }
 .pf-usage-chip:not([disabled]):hover .pf-usage-chip-val { color: var(--accent); }
-.pf-usage-chip-val { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.5rem; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+.pf-usage-chip-val { font-variant-numeric: tabular-nums; margin-right: 0; }
 .pf-usage-chip-label { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); }
 /* Home "AI apps spend" card — 24h/7d/30d as big numerals + per-app stacked bar + top apps */
 .pf-ai-card { grid-column: 1 / -1; }
 .pf-ai-windows { display: flex; flex-wrap: wrap; gap: 2.5rem; margin: 0.4rem 0 1.4rem; }
 .pf-ai-win { display: flex; flex-direction: column; gap: 0.35rem; padding: 0; border: 0; border-radius: 0; background: none; }
 .pf-ai-win-label { order: 2; font-size: 0.74rem; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 0.08em; }
-.pf-ai-win-cost { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); color: var(--text); font-variant-numeric: tabular-nums; }
+.pf-ai-win-cost { font-variant-numeric: tabular-nums; margin-right: 0; }
 .pf-ai-windows .pf-ai-win:first-child .pf-ai-win-cost { color: var(--accent); }
 .pf-ai-win-sub { order: 3; font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .pf-ai-chart { margin: 0.2rem 0 1rem; padding-top: 0.6rem; }

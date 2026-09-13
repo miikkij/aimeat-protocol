@@ -12,6 +12,7 @@
  * @structure renderSchedulerView · renderCover · secNext · secRhythm · secContinuous · secRare · secAll · secAgents · registerTable · pages
  * @usage import { renderSchedulerView } from './scheduler/cover.js';
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces the seven-column week grid and the wall of cards.
  */
@@ -112,7 +113,7 @@ function agendaRows(ctx, list) {
   const nowMs = Date.now();
   return html`<div class="sc-agenda">
     ${list.map((o, i) => html`
-      <div class="sc-at" key=${'a' + i}>${hhmm(o.at)}<small>${dayLabel(o.at)}</small></div>
+      <div class="sc-at poster-stat-number poster-stat-number--small" key=${'a' + i}>${hhmm(o.at)}<small>${dayLabel(o.at)}</small></div>
       <div class="sc-nm" key=${'n' + i}>${openBtn(ctx, o.s)}<small>${cronWordsFor(o.s)}${o.s.purpose ? ` · ${o.s.purpose}` : ''}</small></div>
       <div class="sc-who" key=${'w' + i}>${whoRuns(o.s)}</div>
       <div class="sc-in" key=${'i' + i}>${o.at.getTime() > nowMs ? formatUntil(o.at.toISOString()) : ''}</div>`)}
@@ -185,7 +186,7 @@ function secRare(ctx) {
   return html`<${Section} id="sc-rare" num="04" title=${c('secRare')} count=${c('secRareSub')}>
     ${list.length ? html`<div class="sc-agenda sc-agenda--rare">
       ${list.map(s => { const d = new Date(s.nextRunAt); return html`
-        <div class="sc-at" key=${'a' + s.id}>${fmtDate(d, { day: 'numeric', month: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })}<small>${fmtDate(d, { weekday: 'short' })} ${hhmm(d)}</small></div>
+        <div class="sc-at poster-stat-number poster-stat-number--small" key=${'a' + s.id}>${fmtDate(d, { day: 'numeric', month: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })}<small>${fmtDate(d, { weekday: 'short' })} ${hhmm(d)}</small></div>
         <div class="sc-nm" key=${'n' + s.id}>${openBtn(ctx, s)}<small>${cronWordsFor(s)}</small></div>
         <div class="sc-who" key=${'w' + s.id}>${whoRuns(s)}</div>
         <div class="sc-in" key=${'i' + s.id}>${formatUntil(s.nextRunAt)}</div>`; })}
@@ -205,7 +206,7 @@ export function registerTable(ctx, list, { id = 'reg', head = true } = {}) {
         <div class="sc-w" key=${'w' + s.id}>${cronWordsFor(s)}</div>
         <div class="sc-m" key=${'o' + s.id}>${whoRuns(s)}</div>
         <div class="sc-m" key=${'l' + s.id}>${lastRun(s)}</div>
-        <div class="sc-n" key=${'r' + s.id}>${s.runCount ?? 0}</div>
+        <div class="sc-n poster-stat-number poster-stat-number--small" key=${'r' + s.id}>${s.runCount ?? 0}</div>
         <div class="og-tbl-door" key=${'d' + s.id}><button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'detail', id: s.id })}>${c('open')}</button></div>`)}
     </div>
     ${list.length > TABLE_ROWS ? html`<p class="sc-more"><button type="button" onClick=${() => ctx.toggleMore(id)}>${open ? c('showFewer') : c('showRest', { n: list.length - TABLE_ROWS })}</button></p>` : null}`;

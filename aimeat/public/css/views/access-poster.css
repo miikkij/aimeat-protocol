@@ -12,6 +12,7 @@
  *   quieted here. Every column is bounded so a long origin or label wraps inside its cell.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.3.0 -- 2026-09-13 -- Compose access and recovery frames from poster.css.
  *   2026-09-13 -- V2t: let shared card rules survive the access panel cascade.
  *   v1.2.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
@@ -51,7 +52,7 @@
 .ac-row > .ac-w b { color: var(--text); font-weight: 800; }
 .ac-row > .ac-r { display: flex; align-items: center; gap: 1rem; flex: none; margin-left: auto; white-space: nowrap; }
 .ac-row > .ac-r .og-door { font-size: .72rem; }
-.ac-row > .ac-r .ac-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.35rem; line-height: 1; color: var(--text); }
+.ac-row > .ac-r .ac-n { margin-right: 0; }
 .ac-row.is-sub { padding-left: 1.4rem; }
 .ac-row.is-last { border-bottom: 0; }
 /* The two panels that come from the Security tab (two-step, passkeys) sit inside the row list and
@@ -65,7 +66,7 @@
 .ac-devices > div b { font-weight: 800; }
 .ac-devices > div small { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
 .ac-devices > .ac-dh { padding: 0 0 .25rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.ac-devices > .ac-dn { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.2rem; line-height: 1; text-align: right; }
+.ac-devices > .ac-dn { text-align: right; margin-right: 0; }
 .ac-keybox { margin-top: .9rem; padding: .8rem 1rem; font-size: .9rem; line-height: 1.55; display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }
 .ac-keybox b { font-weight: 800; }
 .ac-keybox code { display: inline-block; max-width: 100%; margin-top: .3rem; font-family: var(--font-mono); font-size: .78rem; background: var(--bg-dim); padding: .15rem .5rem; overflow-wrap: anywhere; filter: blur(4px); transition: filter .2s; }

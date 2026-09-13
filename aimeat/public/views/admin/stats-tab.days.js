@@ -24,6 +24,7 @@
  *   - TheDays (03) — the two charts, and the numbers behind them
  * @usage Imported by stats-tab.js.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.1.0 -- 2026-09-13 -- Compose shared B1 headings; SVG data carries bar heights and readings.
  *   v1.0.0 — 2026-09-12 — Initial (the Statistics page in the poster face).
  */
@@ -60,8 +61,8 @@ function Spark({ row, days }) {
 
 /** The value column of a row, which says what state the counter is in rather than printing a zero. */
 function CounterValue({ row }) {
-  if (row.state === 'never') return html`<span class="adm-st-num adm-st-num--none">—</span>`;
-  return html`<span class="adm-st-num">${num(row.total)}</span>`;
+  if (row.state === 'never') return html`<span class="adm-st-num adm-st-num--none poster-stat-number poster-stat-number--small">—</span>`;
+  return html`<span class="adm-st-num poster-stat-number poster-stat-number--small">${num(row.total)}</span>`;
 }
 
 /** Section 02: what moved, one row per counter that has ever moved. */
@@ -106,7 +107,7 @@ export function WhatMoved({ rows, days, onShowNumbers }) {
             <span class="adm-why">${never.map(r => S('counter.' + r.name)).join(' · ')}</span>
           </span>
           <span><span class="adm-st-chip adm-st-chip--muted">${S('moved.neverChip')}</span></span>
-          <span class="adm-st-num adm-st-num--none">—</span>
+          <span class="adm-st-num adm-st-num--none poster-stat-number poster-stat-number--small">—</span>
           <span class="adm-st-aside">${S('moved.neverWhy')}</span>
         </div>` : null}
     </section>`;

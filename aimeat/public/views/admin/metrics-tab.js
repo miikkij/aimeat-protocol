@@ -17,6 +17,7 @@
  *   - Line                   -- the session-history chart with a reading under the cursor
  *   - MetricsTab (default)   -- the five sections
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v2.1.0 — 2026-09-13 — Compose shared B1 headings; measured shares use SVG width data.
  *   v2.0.0 — 2026-09-12 — The poster face. Three blue sparklines with no scale become one line of
  *     the number that matters, with its ends labelled and a reading under the cursor; every share
@@ -311,7 +312,7 @@ export default function MetricsTab() {
         <div class="adm-mx-top">
           <div>
             <div class="adm-mx-lbl">${M('realUse')}</div>
-            <div class="adm-mx-hero">${fmtBytes(realUse)}</div>
+            <div class="adm-mx-hero poster-stat-number poster-stat-number--large">${fmtBytes(realUse)}</div>
             <p class="adm-mx-hero-sub">
               <b>${fmtBytes(heapUsed)}</b> ${M('heroJs')}<br />
               <b>${fmtBytes(external)}</b> ${M('heroBuffers')}<br />

@@ -10,6 +10,7 @@
  *   organism.css; only what this page adds lives here. Every value is a theme.css token, so the page
  *   flips with the theme.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v1.2.0 — 2026-09-13 — Own the existing people-column heading alignment.
  *   v1.1.0 — 2026-09-13 — The page's own copy of the poster dialog leaves; /css/dialog.css draws it for
@@ -42,14 +43,7 @@
 .adm-oo-row--head .adm-oo-n { font-family: inherit; font-size: .66rem; color: var(--accent); }
 .adm-oo-people-head { text-align: right; }
 
-.adm-oo-n {
-  font-family: var(--font-poster);
-  font-weight: var(--font-poster-weight, 400);
-  font-size: 1.35rem;
-  line-height: var(--font-poster-leading, 1);
-  text-align: right;
-  color: var(--text);
-}
+.adm-oo-n { text-align: right; margin-right: 0; }
 .adm-oo-nm { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .adm-oo-name {
   background: none; border: 0; padding: 0; cursor: pointer;

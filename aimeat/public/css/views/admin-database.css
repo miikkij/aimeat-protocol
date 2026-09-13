@@ -8,13 +8,14 @@
  *   or by name. The sections, the strip, the doors and the slab come from admin.css and
  *   organism.css; only what this page adds lives here. Every value is a theme.css token.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.1.0 — 2026-09-13 — Keep table-bar appearance in CSS while SVG attributes carry the ratios.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 
 .adm-db-top { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 0 48px; align-items: start; }
 .adm-db-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
-.adm-db-hero { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 3.4rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); color: var(--text); }
+.adm-db-hero { margin-right: 0; }
 .adm-db-hero-sub { margin: .7rem 0 0; font-family: var(--font-mono); font-size: .75rem; line-height: 1.7; color: var(--text-dim); }
 .adm-db-hero-sub b { font-weight: 500; color: var(--text); }
 

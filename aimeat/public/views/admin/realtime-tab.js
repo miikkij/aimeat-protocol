@@ -21,6 +21,7 @@
  *   - RealtimeTab({ data, reload }) — the three sections, the four empty states, the close question
  *   - dur / heard — the durations a row prints instead of a timestamp
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-12 — The poster face: all eight counters, the document count summed from the
@@ -219,7 +220,7 @@ export default function RealtimeTab({ data, reload }) {
     ? html`<${Empty} text=${f.state === 'never' ? R('noneEver') : R('noneNow')} />`
     : html`
           <div class="adm-rt-row adm-rt-row--head">
-            <div class="adm-rt-n">#</div>
+            <div class="adm-rt-n poster-stat-number poster-stat-number--small">#</div>
             <div>${R('colRoom')}</div>
             <div>${R('colWho')}</div>
             <div>${R('colDocs')}</div>
@@ -228,7 +229,7 @@ export default function RealtimeTab({ data, reload }) {
           </div>
           ${shown.map((r, i) => html`
             <div class="adm-rt-row ${r.id === openId ? 'is-open' : ''}">
-              <div class="adm-rt-n">${String(i + 1).padStart(2, '0')}</div>
+              <div class="adm-rt-n poster-stat-number poster-stat-number--small">${String(i + 1).padStart(2, '0')}</div>
               <div class="adm-rt-nm">
                 <button type="button" class="adm-rt-open" onClick=${() => setOpenId(r.id === openId ? null : r.id)}>${r.name}</button>
                 <em>${[r.appType, r.createdBy, r.isPublic ? R('public') : R('private')].filter(Boolean).join(' · ')}</em>

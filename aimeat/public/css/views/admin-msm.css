@@ -9,6 +9,7 @@
  *   strip and the badges come from admin.css and organism.css; only what this page adds lives here.
  *   Every value is a theme.css token, so the page flips with the theme.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.1.0 — 2026-09-13 — Own the existing MSM spacing; section shapes compose poster.css.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
@@ -66,7 +67,7 @@
 .adm-msm-step { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 0 19px; align-items: baseline; padding: .7rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text); }
 .adm-msm-step--last { border-bottom: 0; }
 .adm-msm-step b { font-weight: 700; }
-.adm-msm-stepn { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.5rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); color: var(--accent); }
+.adm-msm-stepn { margin-right: 0; }
 
 /* ── one manifest opened ── */
 .adm-msm-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-top: 18px; }

@@ -15,6 +15,7 @@
  *   - frontmatterOf / bumpPatch: reading a name and a version out of the text being edited
  * @usage registered in views/admin.js NAV_GROUPS
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.2.0 -- 2026-09-13 -- Compose remaining section headings and record rules from poster.css.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
@@ -289,7 +290,7 @@ export default function SkillsAdminTab() {
         <div class="adm-sk-top">
           <div>
             <div class="adm-sk-lbl">${S('heroLabel')}</div>
-            <div class="adm-sk-hero">${S('hero', { n: num(m.open), total: num(m.total) })}</div>
+            <div class="adm-sk-hero poster-stat-number">${S('hero', { n: num(m.open), total: num(m.total) })}</div>
             <p class="adm-sk-hero-sub">${S('heroSub', { total: num(m.total) })}</p>
           </div>
           <div><p class="adm-sk-lead">${m.here === 0
@@ -362,7 +363,7 @@ function Open({ skill, onBack, onEdit, onDownload, onDelete, onVisibility, busy 
       </div>
 
       <div class="adm-sk-head poster-row--thing">
-        <h2>${skill.name}<i>v${skill.version} · ${skill.ref}</i></h2>
+        <h2 class="poster-record-title">${skill.name}<i>v${skill.version} · ${skill.ref}</i></h2>
         <div class="adm-sk-doors">
           <button type="button" class="adm-sk-door" onClick=${onEdit}>${S('edit')}</button>
           <button type="button" class="adm-sk-door" onClick=${onDownload}>${S('download')}</button>

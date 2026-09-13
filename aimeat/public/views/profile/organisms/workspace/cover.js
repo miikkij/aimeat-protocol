@@ -15,6 +15,7 @@
  * @structure renderWorkspaceView (cover or page) · renderCover · renderPage · renderRail · renderTree
  * @usage import { renderWorkspaceView } from './workspace/cover.js';
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-29 — Initial. Replaces the tab block (21 tabs in three rows), the overview
@@ -149,7 +150,7 @@ function spaceTable(ctx, spaces) {
         const u = memory ? unseenOf('space:' + ot.name) : 0;
         const last = memory ? latestFor(ctx, ot) : null;
         return html`
-          <div class="og-tbl-n" key=${'n' + ot.name}>${n ?? '·'}</div>
+          <div class="og-tbl-n poster-stat-number poster-stat-number--small" key=${'n' + ot.name}>${n ?? '·'}</div>
           <div class="og-tbl-nm" key=${'m' + ot.name}><button type="button" class="og-tbl-name" onClick=${() => openSpace(ctx, ot)}>${spaceLabel(ctx, ot)}</button>${newChip(u)}${!memory ? html`<span class="og-chip og-chip--dim">${String(ot.backing)}</span>` : null}</div>
           <div class="og-tbl-last" key=${'w' + ot.name}>${last ? tr('organisms.ws.latest', 'latest') : ''}</div>
           <div class="og-tbl-last" key=${'l' + ot.name}>${last ? html`<button type="button" class="og-tbl-go" onClick=${() => gotoEvent(ctx, last)}>${instanceTitle(last.type, last.instance)}</button>` : html`<span class="og-tbl-dot">·</span>`}</div>

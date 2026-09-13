@@ -23,6 +23,7 @@
  *   - askGrant / askRevoke / askDisable / askEnable — the question each act asks first
  *
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-12 — The poster face: the flat six-column table becomes a section that names
@@ -75,7 +76,7 @@ function OwnerRow({ row, index, open, onOpen, onGrant, onRevoke, onDisable, onEn
 
   return html`
     <div class="adm-own-tr ${open ? 'is-open' : ''} ${row.disabledAt ? 'is-off' : ''}">
-      <div class="adm-own-n">${String(index).padStart(2, '0')}</div>
+      <div class="adm-own-n poster-stat-number poster-stat-number--small">${String(index).padStart(2, '0')}</div>
       <div class="adm-own-nm">
         <button type="button" class="adm-own-name" onClick=${onOpen}>${row.name}</button>
         ${row.display && html`<span class="adm-own-sub">${row.display}</span>`}
@@ -238,7 +239,7 @@ export default function OwnersTab({ data, session, reload, switchPage }) {
         </div>
 
         <div class="adm-own-tr adm-own-tr--head">
-          <div class="adm-own-n">#</div>
+          <div class="adm-own-n poster-stat-number poster-stat-number--small">#</div>
           <div>${R('colName')}</div>
           <div class="adm-own-ag">${R('colAgents')}</div>
           <div>${R('colCreated')}</div>

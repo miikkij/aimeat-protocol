@@ -9,6 +9,7 @@
  *   badges come from admin.css and organism.css; only what this page adds lives here. Every value
  *   is a theme.css token, so the page flips with the theme.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.2.0 — 2026-09-13 — Own existing note spacing formerly declared in markup.
  *   v1.1.1 — 2026-09-13 — .adm-ap-dialog-acts leaves: the dialogs' actions are in the dialog's footer.
  *   v1.1.0 — 2026-09-12 — The table stacks at 1100px rather than 768: the content column is about
@@ -88,7 +89,7 @@
 .adm-ap-step { display: grid; grid-template-columns: 44px minmax(0, 1fr) minmax(190px, auto); gap: 0 19px; align-items: baseline; padding: .7rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text); }
 .adm-ap-step--last { border-bottom: 0; }
 .adm-ap-step b { font-weight: 700; }
-.adm-ap-stepn { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.5rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); color: var(--accent); }
+.adm-ap-stepn { margin-right: 0; }
 
 /* ── the two dialogs ── */
 .adm-ap-field { display: block; margin-top: 12px; }
