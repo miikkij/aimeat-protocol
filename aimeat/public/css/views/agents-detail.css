@@ -6,6 +6,7 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   2026-09-13 -- V2y: shared B1 class owns the agent setup panel headline.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
@@ -1941,10 +1942,6 @@
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
-}
-.pf .pf-agd-basic-title {
-  font-weight: 600;
-  font-size: 0.95rem;
 }
 .pf .pf-agd-basic-desc {
   font-size: 0.85rem;

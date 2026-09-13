@@ -17,6 +17,7 @@
  * @structure BasicAgentsPanel({ session, showToast, onCreated })
  * @usage <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
+ *   2026-09-13 -- V2y: compose the section headline with the shared B1 class.
  *   2026-09-03 — An `emphasis` prop so the Agents section can render the button as an outline, and
  *     the acts-alone notice agrees with itself when there is one name. Default unchanged.
  *   v1.0.0 — 2026-08-31 — Initial (Agent v2, V1).
@@ -103,7 +104,7 @@ export default function BasicAgentsPanel({ session, showToast, onCreated, emphas
     <div class="pf-agd-basic">
       <div class="pf-agd-basic-head">
         <div>
-          <div class="pf-agd-basic-title">${t('profile.agents.basic.title')}</div>
+          <div class="pf-agd-basic-title poster-section-title">${t('profile.agents.basic.title')}</div>
           <div class="pf-agd-basic-desc">${t('profile.agents.basic.desc')}</div>
         </div>
         ${allThere
