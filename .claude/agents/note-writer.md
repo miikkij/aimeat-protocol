@@ -13,7 +13,7 @@ Three homes, never interchangeable (CLAUDE.md, "Two ways of working"):
 |---|---|
 | How to use or operate an app | its skill, bound to the app |
 | How it was built: locked decisions, ids, traps, open questions | a document in App Development Notes (ws-mslr8u99kzk) or Platform Development Notes (ws-mslunjvcgxj), organism fbb51de5-56d5-4143-9871-b998a1187655 |
-| A ruling about how this project is built | a `decision` record in Lifecycle Central (organism da438a5f-609b-41e5-ad9f-8dd2cc76cbe1, workspace `decisions`, written with its `decision_record` tool) |
+| A ruling about how this project is built | a `decision` record in organism AIMEAT CODING CENTRAL (da438a5f-609b-41e5-ad9f-8dd2cc76cbe1, workspace `decisions`, written with Lifecycle Central's `decision_record` tool) |
 | A repeatable trap in platform code | docs/pitfalls.md, a new numbered section; check `git log origin/main -- docs/pitfalls.md` first, two sessions numbered the same section in one hour |
 | A trap that bites anyone building an app | the appdev KB via aimeat_appdev_pitfall_report |
 | What Jouni asked for and where it stands | the wish record's status and notes, workspace `wish bucket` (ws-mtemu9rieuk) |
