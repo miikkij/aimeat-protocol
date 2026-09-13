@@ -6,6 +6,7 @@
  *   tokens an agent can use to log in and test apps. Extracted from access-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-07-13 — Extracted from access-tab.js (max-file-lines)
  */
 import { h } from 'preact';
@@ -136,7 +137,7 @@ export function AccessTokensSection({ session, showToast, initial }) {
     <div class="section-desc">${t('profile.access.patDesc') || 'Create a revocable token an agent can use (as a Bearer header) to log in and test your apps. One token can be shared across all your agents.'}</div>
 
     ${created && html`
-      <div class="card access-card-warn">
+      <div class="card access-card-warn poster-row--thing">
         <div class="card-title">${t('profile.access.patCreatedTitle') || 'Token created — copy it now'}</div>
         <div class="access-warn-text">⚠ ${t('profile.access.patShownOnce') || 'This token is shown only once. Store it now; you cannot see it again.'}</div>
         <div class="mem-item">
@@ -164,7 +165,7 @@ export function AccessTokensSection({ session, showToast, initial }) {
               <button class="btn-outline btn-sm" onClick=${() => setShowCreate(true)}>${t('profile.access.patCreate') || 'New Token'}</button>
             </div>`)
         : tokens.map(tok => html`
-            <div class="card" key=${tok.id}>
+            <div class="card poster-row--thing" key=${tok.id}>
               <div class="flex-between">
                 <div class="card-title">${escHtml(tok.label)}</div>
                 ${levelBadge(tok)}

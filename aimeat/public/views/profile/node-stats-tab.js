@@ -5,6 +5,7 @@
  * @description Profile tab showing real-time node statistics including uptime,
  *   request counts, tunnel metrics, mailbox stats, and security counters.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-03-16 — Initial node stats tab
  *   v1.1.0 — 2026-03-17 — Replace all inline styles with CSS classes
@@ -84,7 +85,7 @@ export default function NodeStatsTab() {
     </div>
 
     <div class="stat-two-col">
-      <div class="card p-1">
+      <div class="card p-1 poster-row--thing">
         <h4 class="stat-panel-h4">${t('profile.nodeStats.requestsByMethod')}</h4>
         ${s.requests_by_method ? Object.entries(s.requests_by_method).map(([m, c]) => html`
           <div class="stat-row">
@@ -92,7 +93,7 @@ export default function NodeStatsTab() {
             <span class="stat-row-value">${num(c)}</span>
           </div>`) : null}
       </div>
-      <div class="card p-1">
+      <div class="card p-1 poster-row--thing">
         <h4 class="stat-panel-h4">${t('profile.nodeStats.requestsByStatus')}</h4>
         ${s.requests_by_status ? Object.entries(s.requests_by_status).map(([code, c]) => {
           const tone = code.startsWith('2') ? 'success' : code.startsWith('4') ? 'warn' : code.startsWith('5') ? 'danger' : '';

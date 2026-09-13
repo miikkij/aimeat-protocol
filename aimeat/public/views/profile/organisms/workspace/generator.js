@@ -10,6 +10,7 @@
  * @structure WorkspaceGenerator
  * @usage import { WorkspaceGenerator } from '/views/profile/organisms/workspace/generator.js';
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
  *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
  *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
@@ -83,7 +84,7 @@ export function WorkspaceGenerator({ orgId, wsId, showToast, onApplied, onOpenSe
   }, [pasteText, genErrors, showToast]);
 
   return html`
-    <div class="pj-section">
+    <div class="pj-section poster-row--thing">
       <div class="pj-section-title">${showRegenerate ? (t('organisms.restructureTitle') || 'Restructure / add types with AI') : (t('organisms.generateTitle') || 'Or generate a custom workspace with AI')}</div>
       <div class="section-desc">${showRegenerate
         ? (t('organisms.restructureDesc') || 'Describe what to add or change. Existing types and their data are kept — the AI extends the current structure. (To start completely fresh, delete the workspace below first.)')

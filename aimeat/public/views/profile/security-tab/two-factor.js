@@ -18,6 +18,7 @@
  *   - the two code-gated actions (regenerate, disable) ask for the code inline
  * @usage html`<${TwoFactorSection} twoFactor=${ov.two_factor} managed=${!!managedBy} ... />`
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-09-04 — Initial. Closes the half-built TOTP feature: backend complete, no UI.
  */
 import { h } from 'preact';
@@ -115,7 +116,7 @@ export function TwoFactorSection({ twoFactor, managed, showToast, onChanged }) {
     const codes = setupData.backup_codes || [];
     return html`
       <h3 class="card-h3 mt-section">${t('profile.security.twoFactor.title')}</h3>
-      <div class="card">
+      <div class="card poster-row--thing">
         <p class="pf-bold mb-half">${t('profile.security.twoFactor.setupStep1')}</p>
         ${setupData.qr_data_url && html`
           <img class="pf-2fa-qr" src=${setupData.qr_data_url}
@@ -155,7 +156,7 @@ export function TwoFactorSection({ twoFactor, managed, showToast, onChanged }) {
   return html`
     <h3 class="card-h3 mt-section">${t('profile.security.twoFactor.title')}</h3>
     <p class="text-caption mb-1">${t('profile.security.twoFactor.desc')}</p>
-    <div class="card">
+    <div class="card poster-row--thing">
       <div class="flex-between mb-half">
         <span class="pf-bold">${t('profile.security.twoFactor.authenticatorApp')}</span>
         <span class="badge ${tf.enabled ? 'badge-success' : 'badge-muted'}">

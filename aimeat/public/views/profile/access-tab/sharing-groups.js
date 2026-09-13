@@ -5,6 +5,7 @@
  * @description Sharing Groups section — CRUD for sharing groups with expandable
  *   member lists. Extracted from access-tab.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.2.0 — 2026-08-11 — Key-space shares: each group shows what it can actually reach, with add
  *     and revoke, and a count on the collapsed header. The group was only ever half the answer —
  *     it says WHO, and until now nothing on this page said WHAT they get.
@@ -287,7 +288,7 @@ export function SharingGroupsSection({ showToast, initial }) {
     const groupShares = sharesOf(group.id);
 
     return html`
-      <div class="card ${isExpanded ? 'card-expanded' : ''}" key=${group.id}>
+      <div class="card ${isExpanded ? 'card-expanded' : ''} poster-row--thing" key=${group.id}>
         <div class="card-header card-clickable" onClick=${() => setExpandedId(isExpanded ? null : group.id)}>
           <span class="expand-icon">${isExpanded ? '▼' : '▶'}</span>
           <div class="card-title">${escHtml(group.name)}</div>

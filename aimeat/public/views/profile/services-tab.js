@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab for publishing/managing services and browsing the catalogue.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS classes; i18n for unit options and detail labels
  */
@@ -52,7 +53,7 @@ function ServiceCard({ svc, expanded, onToggle, actions }) {
   const priceMorsels = svc.price_morsels ?? svc.pricing?.base_morsels ?? svc.pricing?.baseMorsels ?? 0;
 
   return html`
-    <div class="card card-clickable ${expanded ? 'svc-card-expanded' : ''}" onClick=${onToggle}>
+    <div class="card card-clickable ${expanded ? 'svc-card-expanded' : ''} poster-row--thing" onClick=${onToggle}>
       <div class="card-header">
         <div class="flex-row">
           <span class="svc-expand-icon">${expanded ? '\u25BC' : '\u25B6'}</span>

@@ -6,6 +6,7 @@
  *   Exports: Spinner, recipientBadge, isExpiringSoon, VisibilityPill, ToggleSwitch, GlassCard,
  *   KebabMenu, TagInput.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-03-07 — Initial shared helpers (Spinner, recipientBadge, isExpiringSoon)
  *   v1.1.0 — 2026-03-17 — Add VisibilityPill, ToggleSwitch, GlassCard components; refactor recipientBadge to CSS classes
  *   v1.2.0 — 2026-06-02 — Component unification (§2): Spinner now delegates to the
@@ -66,7 +67,7 @@ export { ToggleSwitch } from '/components/ToggleSwitch.js';
 /** Glass-style card container (email-tab, notifications-tab) — delegates to the
  *  canonical /components/Card.js (variant="glass" → .card-glass); call sites unchanged. */
 export function GlassCard({ children }) {
-  return html`<${Card} variant="glass" hoverable=${false}>${children}<//>`;
+  return html`<${Card} variant="glass" className="poster-row--thing" hoverable=${false}>${children}<//>`;
 }
 
 /** "…" actions menu — items: { label, icon?, danger?, divider?, onClick } (falsy items are
