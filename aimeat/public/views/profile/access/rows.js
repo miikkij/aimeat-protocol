@@ -12,6 +12,7 @@
  * @structure keyRow · keyOpen · secretRow · sessionsBlock · federationBlock
  * @usage import { keyRow, secretRow, sessionsBlock, federationBlock } from './rows.js';
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.2.0 -- 2026-09-13 -- Compose access detail frames and extract inline layout.
  *   v1.1.0 — 2026-09-06 — secretRow: the vault's rows for section 04. It shows the name and never
  *     the value, because the value cannot be read back from the server either.
@@ -130,11 +131,11 @@ export function sessionsBlock(ctx) {
       <div class="ac-dh">${x('col.device')}</div><div class="ac-dh ac-dn">${x('col.sessions')}</div><div class="ac-dh">${x('col.lastUsed')}</div>
       ${devices.map((d) => html`
         <div key=${'d' + (d.label || '')}><b>${d.label || x('deviceUnknown')}</b>${s.mine.current && (s.mine.current.device_label ?? null) === d.label ? html`<small>${x('thisDeviceAmong')}</small>` : null}</div>
-        <div class="ac-dn" key=${'n' + (d.label || '')}>${n(d.count)}</div>
+        <div class="ac-dn poster-stat-number poster-stat-number--small" key=${'n' + (d.label || '')}>${n(d.count)}</div>
         <div key=${'l' + (d.label || '')}>${d.last_used_at ? `${dateWord(d.last_used_at)} ${timeWord(d.last_used_at)}` : ''}</div>`)}
       ${agents.total ? html`
         <div><b>${x('agentsRow', { n: agents.distinct })}</b><small>${agents.by_agent.slice(0, 6).map((a) => a.name).join(', ')}${agents.by_agent.length > 6 ? ` +${agents.by_agent.length - 6}` : ''}</small></div>
-        <div class="ac-dn">${n(agents.total)}</div>
+        <div class="ac-dn poster-stat-number poster-stat-number--small">${n(agents.total)}</div>
         <div>${agents.by_agent[0]?.last_used_at ? `${dateWord(agents.by_agent[0].last_used_at)} ${timeWord(agents.by_agent[0].last_used_at)}` : ''}</div>` : null}
     </div>`;
 }

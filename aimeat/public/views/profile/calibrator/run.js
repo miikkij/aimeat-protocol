@@ -12,6 +12,7 @@
  *   stepSynthesize · pasteBox · pre · proposalList
  * @usage import { runRow, emptiesRow } from './run.js';
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.0.1 — 2026-09-04 — Model labels through labelWords: the stored ones carry a maker prefix and a price.
  *   v1.0.0 — 2026-09-04 — Initial (replaces calibrator-batch.js v1.1.0 and calibrator-batch.step4.js).
  */
@@ -149,7 +150,7 @@ function stepAnalyze(ctx, run, detail) {
     const dims = a.dimensions || [];
     return html`
       <div class="cal-m" key=${m.modelId}>
-        <div class="cal-m-h"><b>${labelWords(m.modelLabel)}</b>${a.overallScore != null ? html`<b class=${'cal-pct ' + scoreClass(a.overallScore)}>${a.overallScore} %</b>` : null}<small>${a.status === 'error' ? html`<span class="is-err">${a.error}</span>` : a.status === 'done' ? x('checkpointsN', { n: dims.length, ok: dims.filter((d) => d.pass).length }) : x('stepRightPending')}</small></div>
+        <div class="cal-m-h"><b>${labelWords(m.modelLabel)}</b>${a.overallScore != null ? html`<b class=${'cal-pct poster-stat-number poster-stat-number--small ' + scoreClass(a.overallScore)}>${a.overallScore} %</b>` : null}<small>${a.status === 'error' ? html`<span class="is-err">${a.error}</span>` : a.status === 'done' ? x('checkpointsN', { n: dims.length, ok: dims.filter((d) => d.pass).length }) : x('stepRightPending')}</small></div>
         ${dims.length ? html`
           <div class="cal-dims">
             <div class="cal-dh"></div><div class="cal-dh">${x('colCheckpoint')}</div><div class="cal-dh">${x('colExpected')}</div><div class="cal-dh">${x('colActual')}</div><div class="cal-dh">${x('colWeight')}</div>

@@ -23,6 +23,7 @@
  * @structure PromptsTab (default) · RightNow · TakingCurrent · WhatChanged
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared poster headings and external reset-note spacing.
  *   v2.0.0 — 2026-09-12 — The poster face: four numbered sections, search over eighty-eight
@@ -110,7 +111,7 @@ function RightNow({ facts, number, onShowChanged }) {
 function TakingCurrent({ facts, number, onResetAll }) {
   const step = (n, key, value, last) => html`
     <div class=${'adm-pr-step' + (last ? ' adm-pr-step--last' : '')}>
-      <span class="adm-pr-stepn">${n}</span>
+      <span class="adm-pr-stepn poster-stat-number poster-stat-number--small poster-stat-number--step">${n}</span>
       <span><b>${P('taking.' + key)}</b><span class="adm-why">${P('taking.' + key + 'Why')}</span></span>
       <span class="adm-mval">${value}</span>
     </div>`;

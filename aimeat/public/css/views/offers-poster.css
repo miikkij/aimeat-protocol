@@ -9,6 +9,7 @@
  *   field and the framed sample on an offer's page, the selling editor, the rating row and the map.
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-06 — The map's three flat views (columns, grid, tiles): the tile that is a link, the
  *     need head, the matrix with a modifier per column count, the blocks that grow with what they hold.
@@ -36,7 +37,7 @@
 .op-back { display: grid; grid-template-columns: 6rem minmax(0, 1fr) minmax(0, 10rem) minmax(0, 7rem) 3.5rem; gap: 0 1.1rem; align-items: center; }
 .op-back > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
 .op-back--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.op-at { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.35rem; line-height: 1; color: var(--text); }
+.op-at { margin-right: 0; }
 .op-at small { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: .2rem; }
 .op-back .op-nm, .op-cat .op-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
 .op-back .op-nm .og-tbl-name, .op-cat .op-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }

@@ -2,7 +2,7 @@
 name: aimeat-design-language
 description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.5.0
+  version: 1.6.0
   updated: 2026-09-13
   owner: Jouni Miikki
 ---
@@ -168,6 +168,7 @@ dimensions. It does not re-declare the shape's font, rule, fill, padding or shad
 | Shape | Class |
 |---|---|
 | Page title | `.poster-page-title` |
+| Opened record title | `.poster-record-title` |
 | Section and B1 headline | `.poster-section`, `.poster-section-title` |
 | Area governed by the selected tab | `.poster-panel` |
 | Hairline row; row that is the thing | `.poster-row`; `.poster-row--thing` |
@@ -199,9 +200,15 @@ another modifier. A view never re-declares a modifier's values.
 | Box | `.poster-box--avatar` | Square initials mark, .95rem poster face, no padding or margin, transparent ground; Contacts, Email and Notifications share this cut. Dimensions remain layout. |
 | Box initials mark | `.poster-box--avatar.poster-box--small` | .85rem; Apps, Companies and MCP share the smaller initials cut. |
 | Box | `.poster-box--meter` | Paper ground, no padding or margin, sun fill for SVG data geometry; the filled numerical meter role. |
+| Box meter | `.poster-box--quota` | Card ground with coral consumption; `.is-full` changes the fill to danger. The quota meter is a named data role, with its ratio carried by SVG geometry. |
 | Aside | `.poster-aside--small` | .9rem 1.1rem padding, .92rem / 1.55 text; the compact explanation used throughout organism settings and admin pages. |
 | Aside | `.poster-aside--large` | 1.25rem 1.5rem padding, surrounding body size and leading; Members and the shared human contact card. |
 | Aside | `.poster-aside--irreversible` | Solid coral border; the named irreversible-act explanation, composed with the same aside geometry. |
+| Numeral | `.poster-stat-number--small` | 1.35rem, unit leading and normal tracking; the recurring row number in Access, Data Wallet, Discover, Offers, Scheduler, Wallet and admin rosters. |
+| Numeral | `.poster-stat-number--large` | 3.4rem; Database and Metrics share the larger headline count. Base stays 3rem. The source phone cut is 2.2rem at 560px for base and large. |
+| Numeral | `.poster-stat-number--step` | Coral for the numbered instruction step, repeated across admin Apps, CORS, Cortex, MSM, Portal and Prompts; composes with the compact numeral. |
+| Numeral | `.poster-stat-number--band` | Paper words on the ink band; the number keeps its shared typography. |
+| Record title | `.poster-record-title--small` | 1.8rem and the poster leading; Agents and Extensions share this cut. Base 1.9rem / 1.05 is shared by Boards, CSM and Skills. |
 | Showroom band | `.showroom-band--sun` | Sun ground and ink words; the money band role. |
 | Showroom section | `.showroom-section--coral` | 8px coral shadow; the named coral room cut. |
 | Showroom slab | `.showroom-slab--hot`, `--sun`, `--ink` | Named hot, sun and ink action colours; each shares the showroom slab geometry. |

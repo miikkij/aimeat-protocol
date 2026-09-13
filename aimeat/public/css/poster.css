@@ -3,6 +3,7 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- Share numeral cuts, record titles and the quota meter role.
  *   v1.2.0 -- 2026-09-13 -- Share recurring initials boxes and the compact, large and irreversible asides.
  *   v1.1.0 -- 2026-09-13 -- V2: source band phone padding and the named coral section shadow cut.
  *   v1.0.0 -- 2026-09-13 -- V0: lift the existing shapes; section titles and panels use the locked B1 design.
@@ -73,6 +74,9 @@
 .poster-box--avatar.poster-box--small { font-size: .85rem; }
 .poster-box--meter { margin: 0; padding: 0; background: var(--bg); }
 .poster-box--meter rect { fill: var(--sun); shape-rendering: crispEdges; }
+.poster-box--meter.poster-box--quota { background: var(--card); }
+.poster-box--quota rect { fill: var(--accent); transition: width .3s; }
+.poster-box--quota.is-full rect { fill: var(--danger); }
 .poster-frame { border: 3px solid var(--text); background: var(--card); }
 .poster-dialog { border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); font-family: var(--font-showroom-body); }
 .poster-record { padding: 1.2rem 1.4rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card); }
@@ -101,6 +105,20 @@
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: 3rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking);
   color: var(--text); margin-right: .6rem;
+}
+.poster-stat-number--small { font-size: 1.35rem; line-height: 1; letter-spacing: normal; }
+.poster-stat-number--large { font-size: 3.4rem; }
+.poster-stat-number--step { color: var(--accent); }
+.poster-stat-number--band { color: var(--bg); }
+.poster-record-title {
+  margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight);
+  font-size: 1.9rem; line-height: 1.05; letter-spacing: var(--font-poster-tracking);
+  text-transform: uppercase; color: var(--text);
+}
+.poster-record-title--small { font-size: 1.8rem; line-height: var(--font-poster-leading); }
+/* The source numeral's phone cut is home.css .koti-big at 560px. */
+@media (max-width: 560px) {
+  .poster-stat-number:where(:not(.poster-stat-number--small)) { font-size: 2.2rem; }
 }
 
 /* Showroom: .ld-sh-trust, .ld-sh-room, .ld-sh-door and .ld-sh-btn.

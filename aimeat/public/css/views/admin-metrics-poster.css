@@ -9,13 +9,14 @@
  *   its own maximum in the header, so a bar is never a proportion of something a reader guesses.
  *   The sections, the strip and the doors come from admin.css and organism.css.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.1.0 — 2026-09-13 — Keep share-bar appearance in CSS while SVG attributes carry the ratios.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 
 .adm-mx-top { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 0 48px; align-items: start; }
 .adm-mx-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
-.adm-mx-hero { font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 3.4rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); color: var(--text); }
+.adm-mx-hero { margin-right: 0; }
 .adm-mx-hero-sub { margin: .7rem 0 0; font-family: var(--font-mono); font-size: .75rem; line-height: 1.7; color: var(--text-dim); }
 .adm-mx-hero-sub b { font-weight: 500; color: var(--text); }
 .adm-mx-live { display: inline-flex; align-items: center; gap: 7px; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }

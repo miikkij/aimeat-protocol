@@ -11,6 +11,7 @@
  *   views/profile/organisms/home.js and read by home-settings.js. The inner panels (workspace list,
  *   roster, agents, board, map, timeline) keep their own pj- rules; a few are quieted here.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v1.6.0 -- 2026-09-13 -- Compose the workspace document index rule from poster.css.
  *   v1.5.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
@@ -125,7 +126,7 @@
 .og-tbl { display: grid; grid-template-columns: 2.6rem minmax(0, 1fr) auto minmax(0, 18rem) auto; gap: 0 1.1rem; align-items: center; }
 .og-tbl > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
 .og-tbl--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.og-tbl-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.5rem; line-height: 1; text-align: right; color: var(--text); }
+.og-tbl-n { text-align: right; margin-right: 0; }
 .og-tbl-nm { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 /* The visibility chips sit at the far end of the name cell, so they stand in one line down the
    table against the size column instead of trailing each name wherever it happens to end. */

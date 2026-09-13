@@ -10,6 +10,7 @@
  *   column is bounded so a long tracking code or label wraps inside its cell. NOTE: this file must
  *   be linked in spa.html.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the meter frame and sun fill; carry its data through SVG geometry.
  *   v1.2.0 -- 2026-09-13 -- Compose detail frames from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose the pace explanation with the shared ink frame.
@@ -71,7 +72,7 @@
 .wal-w b { color: var(--text); font-weight: 800; }
 .wal-w small { display: block; font-family: var(--font-mono); font-size: .68rem; }
 .wal-row > .wal-cur { font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); overflow-wrap: anywhere; }
-.wal-row > .wal-amt { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.35rem; line-height: 1; color: var(--text); text-align: right; white-space: nowrap; }
+.wal-row > .wal-amt { text-align: right; white-space: nowrap; margin-right: 0; }
 .wal-row > .wal-amt.is-in { color: var(--success-fg); }
 .wal-row > .wal-amt.is-out { color: var(--accent); }
 .wal-row > .wal-amt.is-dim { color: var(--text-dim); }

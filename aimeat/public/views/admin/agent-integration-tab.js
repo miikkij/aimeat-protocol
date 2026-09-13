@@ -17,6 +17,7 @@
  *   - Bundles: one row per bundle that an agent actually asks for
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v2.1.0 — 2026-09-13 — Compose shared B1 headings; bar ratios are SVG data with CSS appearance.
  *   v2.0.0 — 2026-09-12 — The poster face, and three things the old screen showed as if they
  *     worked: "Not started" read onboarding.not_started while the route sends `pending`, so it was
@@ -128,7 +129,7 @@ function PlatformRegistry({ platforms, totalAgents }) {
       <div class="adm-agi-top">
         <div>
           <div class="adm-agi-lbl">${S('regHeroLabel')}</div>
-          <div class="adm-agi-hero">${S('regHero', { n: num(unrecognised), total: num(totalAgents) })}</div>
+          <div class="adm-agi-hero poster-stat-number">${S('regHero', { n: num(unrecognised), total: num(totalAgents) })}</div>
           <p class="adm-agi-hero-sub">${S('regHeroSub')}</p>
         </div>
         <div><p class="adm-agi-lead">${S('regLead')}</p></div>

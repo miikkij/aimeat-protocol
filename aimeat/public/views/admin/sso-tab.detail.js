@@ -24,6 +24,7 @@
  *   - ConnectionDetail — the six steps, the walkthroughs, troubleshooting, the danger zone
  * @usage Imported by views/admin/sso-tab.js.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 -- 2026-09-13 -- Compose ink row boundaries from the shared poster class.
  *   v1.0.0 — 2026-09-12 — Initial (the Organisation sign-in page in the poster face).
@@ -58,7 +59,7 @@ function Step({ n, state, title, children, aside, last }) {
   const cls = state === 'done' ? 'done' : state === 'now' ? 'now' : '';
   return html`
     <div class="adm-sso-step ${last ? 'adm-sso-step--last' : ''}">
-      <span class="adm-sso-step-n ${cls}">${n}</span>
+      <span class="adm-sso-step-n ${cls} poster-stat-number poster-stat-number--small">${n}</span>
       <span><b>${title}</b>${children}</span>
       <span class="adm-sso-step-r">${aside}</span>
     </div>`;

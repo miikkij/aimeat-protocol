@@ -13,6 +13,7 @@
  *   - Field: one label-and-value row, with an optional door at its end
  *
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.1.0 -- 2026-09-13 -- Compose ink row boundaries from the shared poster class.
  *   v1.0.0 — 2026-09-12 — Initial, with the Agents page in the poster face.
  */
@@ -71,7 +72,7 @@ function Trust({ agent, detail, loading }) {
   return html`
     <div class="adm-ag-trust">
       <span class="adm-ag-trust-h">${A('trustHead')}</span>
-      <div class="adm-ag-trust-n">${trustText(tr.score)}<span>${A('trustOf100')}</span></div>
+      <div class="adm-ag-trust-n poster-stat-number">${trustText(tr.score)}<span>${A('trustOf100')}</span></div>
       <div class="adm-ag-trow">${A('trustDeliveries')}<span>${tr.total_deliveries ?? 0}</span></div>
       <div class="adm-ag-trow">${A('trustSuccess')}<span>${tr.total_deliveries
     ? (tr.success_rate * 100).toFixed(0) + '%'
@@ -98,7 +99,7 @@ export default function AgentRecord({ agent, detail, loading, now, onClose, onOw
     <div class="adm-ag-rec">
       <div class="adm-ag-rec-h">
         <div>
-          <h3>${agent.display_name || agent.gaii.split('#')[0]}</h3>
+          <h3 class="poster-record-title poster-record-title--small">${agent.display_name || agent.gaii.split('#')[0]}</h3>
           <span class="adm-ag-rec-addr">${agent.gaii}</span>
           <div class="adm-ag-rec-chips">
             <span class=${isAwake(agent, now) ? 'is-live' : ''}>

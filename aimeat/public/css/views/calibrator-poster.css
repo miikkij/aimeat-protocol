@@ -10,6 +10,7 @@
  *   box; the version rows and the two editors; the model rows and the picker; the score chart with
  *   its legend; the two roads. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.0.1 — 2026-09-04 — Seen on aimeat.io: the score column was `auto` with unwrapped labels and
  *     took the row, the words column shrank to one letter, and the cells' `align-self: center` put
  *     each bottom rule under its own content instead of on the row. Every column is bounded now,
@@ -78,7 +79,7 @@
 .cal-m-h { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; }
 .cal-m-h > b { font-weight: 800; }
 .cal-m-h small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
-.cal-pct { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.25rem; line-height: 1; }
+.cal-pct { margin-right: 0; }
 .cal-pre { border: 1px solid var(--border); background: var(--card-bg); }
 .cal-pre summary { cursor: pointer; padding: .35rem .6rem; font-size: .78rem; font-weight: 800; color: var(--text); }
 .cal-pre pre { margin: 0; padding: .5rem .7rem; max-height: 22rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; border-top: 1px solid var(--border); }
@@ -113,7 +114,7 @@
 .cal-vers { display: flex; flex-direction: column; margin-bottom: 1rem; }
 .cal-ver { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: .45rem 0; border-bottom: 1px solid var(--border); font-size: .88rem; }
 .cal-ver.is-on { background: var(--bg-dim); margin: 0 -.5rem; padding: .45rem .5rem; }
-.cal-ver-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.15rem; line-height: 1; }
+.cal-ver-n { margin-right: 0; }
 .cal-ver-n small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .66rem; font-weight: 400; color: var(--text-dim); }
 .cal-ver-w { color: var(--text); overflow-wrap: anywhere; }
 .cal-ver-go { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }

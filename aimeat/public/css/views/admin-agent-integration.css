@@ -13,6 +13,7 @@
  *   regular expressions, which have no spaces to break at, and a narrow cell sets one character
  *   to a line.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v2.1.0 — 2026-09-13 — Keep bar appearance in CSS while ratios use SVG width attributes.
  *   v2.0.0 — 2026-09-12 — Rewritten for the poster face. The rounded cards, the bordered table,
  *     the stat cards and the coloured pills of the classic shell are gone.
@@ -31,7 +32,7 @@
 /* ── 01 · the headline beside the sentence that explains it ── */
 .adm-agi-top { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 0 48px; align-items: start; }
 .adm-agi-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
-.adm-agi-hero { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3.2rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); color: var(--text); }
+.adm-agi-hero { margin-right: 0; }
 .adm-agi-hero-sub { margin: .7rem 0 0; font-size: .88rem; line-height: 1.6; color: var(--text-dim); }
 
 /* ── The registry rows ── */
@@ -85,7 +86,6 @@
 
 @media (max-width: 900px) {
   .adm-agi-top { grid-template-columns: 1fr; gap: 1.2rem; }
-  .adm-agi-hero { font-size: 2.4rem; }
   .adm-agi-hrow, .adm-agi-bhrow { display: none; }
   .adm-agi-row { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
   .adm-agi-rows--ready .adm-agi-row { grid-template-columns: minmax(0, 1fr) auto; }

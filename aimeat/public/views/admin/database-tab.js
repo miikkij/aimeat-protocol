@@ -13,6 +13,7 @@
  *   - Line({ points, onPick })    -- the seven-day line with a reading under the cursor
  *   - DatabaseTab (default)       -- the two sections, and the wait state before the second snapshot
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v2.1.0 -- 2026-09-13 -- Compose shared B1 headings; table ratios use SVG width data.
  *   v2.0.0 -- 2026-09-12 -- The poster face. The cards become two sections; the 168 hourly
  *     snapshots the page already fetched are drawn as a line instead of three numbers; "relative
@@ -208,7 +209,7 @@ export default function DatabaseTab() {
         <div class="adm-db-top">
           <div>
             <div class="adm-db-lbl">${D('heroLabel')}</div>
-            <div class="adm-db-hero">${num(current.totalRows)}</div>
+            <div class="adm-db-hero poster-stat-number poster-stat-number--large">${num(current.totalRows)}</div>
             ${/* The two memory numbers count rows INSIDE the Memory table, so they say so: printed
                   bare under "rows, all tables" they read as counts of the whole database. */ ''}
             <p class="adm-db-hero-sub">
