@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   2026-09-13 -- V2y: compose agent setup panel section headings from poster.css.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2v: compose section top rules from poster.css.
  *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
@@ -452,11 +453,7 @@
   border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim);
   padding: 1.1rem 1.2rem; margin-bottom: 1.6rem; box-shadow: none;
 }
-.pf .pf-agd-basic-title {
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 1.25rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking);
-  text-transform: uppercase; color: var(--text);
-}
+.pf .pf-agd-basic, .pf .pf-agd-new { --poster-section-size: 1.25rem; }
 .pf .pf-agd-basic-desc, .pf .pf-agd-basic-item-desc, .pf .pf-agd-basic-hint,
 .pf .pf-agd-basic-item-gets { font-weight: var(--font-poster-text-weight); color: var(--text-dim); font-family: var(--font-showroom-body); }
 .pf .pf-agd-basic-name { font-weight: var(--font-poster-strong-weight); font-size: 0.95rem; }
