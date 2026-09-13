@@ -11,6 +11,8 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-ai.js"></script>
  *   if (await AIMEAT.ai.isAvailable()) { const r = await AIMEAT.ai.complete({ prompt, app_id }); }
  * @version-history
+ *   v1.5.0 - 2026-09-13 - complete() sends `images`, and the spend guard counts them as part of the
+ *     call. The route had accepted pictures since June and this body dropped them.
  *   v1.4.0 - 2026-08-31 - AIMEAT.ai.job.* : background jobs (start/get/list/cancel/waitFor). A
  *     completion that takes half an hour cannot be a fetch an app holds open, and every published
  *     app would otherwise have written its own sentence for "the node is busy". The refusal codes
@@ -116,6 +118,9 @@ const ai = {
    * Run a single completion. Returns { content, model, usage, budget }.
    * Throws an Error with .code set on quota/permission/auth failures.
    *
+   * `images`: an array of data: or https: URLs (at most 8; downscale first) turns the call into a
+   * vision request, answered by the owner's vision model.
+   *
    * This spends the signed-in user's own OpenRouter money, so two guards ride along:
    *   • repeats collapse — while an identical call (same app_id + model + prompts) is in flight,
    *     every further call gets the SAME promise. Five clicks on "Summarise" = one paid call.
@@ -148,6 +153,10 @@ const ai = {
       top_p: opts.top_p,
       max_tokens: opts.max_tokens,
       app_id: opts.app_id,
+      // Pictures for a vision request: data: or https: URLs, at most 8 (the route refuses more).
+      // POST /v1/ai/complete has read this since 2026-06-24 and this body never carried it, so a
+      // question about a picture went out as text alone and the model answered it anyway.
+      images: Array.isArray(opts.images) ? opts.images : undefined,
     };
     const call = async () => {
       if (opts.confirm) {
@@ -179,7 +188,10 @@ const ai = {
       return r.meta && r.meta.provenance ? { ...r.data, provenance: r.meta.provenance } : r.data;
     };
     if (opts.allowDuplicate) return call();
-    const key = keyOf(['ai', opts.app_id, opts.model || opts.modelRole, opts.systemPrompt, opts.prompt]);
+    // The pictures are part of what makes two calls the same call; without them a second picture
+    // under one prompt would be handed the first picture's answer.
+    const key = keyOf(['ai', opts.app_id, opts.model || opts.modelRole, opts.systemPrompt, opts.prompt,
+      Array.isArray(opts.images) ? opts.images.join('\n') : '']);
     return once(key, call, { ttlMs: opts.dedupeMs || 0 });
   },
 

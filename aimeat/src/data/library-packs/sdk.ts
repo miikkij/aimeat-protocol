@@ -10,6 +10,8 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.12.1 — 2026-09-13 — aimeat-ai's aiDoc says how a picture reaches the model (`images`), now that
+ *     complete() sends it.
  *   v1.12.0 — 2026-09-05 — aimeat-living 0.1.0: the living document, one JSON record wired to
  *     itself through formulas in one dependency graph. Its aiDoc teaches the whole record format
  *     (the seven node types, the units rule, the two roads onto the screen, three worked examples)
@@ -211,7 +213,7 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: ['aimeat-auth'],
     license: 'MIT',
     apiSurface: 'AIMEAT.ai',
-    aiDoc: "LLM completions through the user's own OpenRouter key (AIMEAT.ai.complete, completeJson, isAvailable, models, usage). Server enforces daily USD budget + per-app quota; rejects with descriptive err.code (NO_API_KEY / QUOTA_EXHAUSTED / APP_QUOTA_EXHAUSTED / etc.). Pattern: detect with isAvailable(), compose the prompt from app data, call with app_id so spend is attributable, render the result into an editable field. Never bundle your own API key.",
+    aiDoc: "LLM completions through the user's own OpenRouter key (AIMEAT.ai.complete, completeJson, isAvailable, models, usage). Server enforces daily USD budget + per-app quota; rejects with descriptive err.code (NO_API_KEY / QUOTA_EXHAUSTED / APP_QUOTA_EXHAUSTED / etc.). Pattern: detect with isAvailable(), compose the prompt from app data, call with app_id so spend is attributable, render the result into an editable field. A question about a picture passes images: [dataUrlOrHttpsUrl] (at most 8, downscale first) and the owner's vision model answers it. Never bundle your own API key.",
     changelog: [],
     tierHint: 'T1',
     interviewTriggers: ['ai', 'llm', 'summary', 'suggestion', 'generate', 'tekoäly'],
