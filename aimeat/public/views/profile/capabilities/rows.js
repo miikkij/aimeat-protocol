@@ -11,6 +11,7 @@
  * @structure providerRow · providerOpen
  * @usage import { providerRow } from './rows.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose catalogue detail frames from poster.css.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { h } from 'preact';
@@ -59,7 +60,7 @@ function providerOpen(ctx, g) {
   const sourceTab = g.shelf === 'ext' ? 'extensions' : g.shelf === 'app' ? 'apps' : g.shelf === 'agent' ? 'agents' : null;
   const usage = ctx.details[first?.id]?.usage || first?.usage || '';
   return html`
-    <div class="cp-open">
+    <div class="cp-open poster-frame">
       <p class="cp-lead">${g.summary || ''}</p>
       <span class="og-label">${g.shelf === 'ext' ? x('actions') : g.shelf === 'app' ? x('tools') : g.shelf === 'agent' ? x('offers') : x('capability')} · ${x('idFormIs', { form: idForm(g) })}</span>
       <div class="cp-act">
