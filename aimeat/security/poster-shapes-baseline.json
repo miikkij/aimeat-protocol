@@ -1,20 +1,20 @@
 {
   "_note": "Copied design-language declarations, recorded debt rather than approval. This files map may only shrink. After migration, lower the affected counts or remove cleared files. Only an explicit developer decision permits re-seeding with pnpm check:poster-shapes --record.",
   "_measured": {
-    "date": "2026-09-13T00:30:00.000Z",
-    "files": 79,
-    "declarations": 746,
+    "date": "2026-09-13T00:48:00.000Z",
+    "files": 78,
+    "declarations": 726,
     "patterns": {
-      "headline": 136,
+      "headline": 133,
       "sun": 129,
-      "box2": 193,
-      "frame3": 70,
+      "box2": 189,
+      "frame3": 66,
       "record": 31,
-      "rule": 64,
+      "rule": 61,
       "action": 73,
-      "slab": 10,
+      "slab": 8,
       "aside": 23,
-      "dialog": 5,
+      "dialog": 1,
       "label": 12
     }
   },
@@ -149,23 +149,17 @@
       "box2": 1
     },
     "public/css/views/admin-organism-ownership.css": {
-      "headline": 3,
-      "action": 1,
-      "sun": 2,
-      "box2": 3,
-      "frame3": 1,
-      "aside": 1,
-      "slab": 1,
-      "dialog": 1
-    },
-    "public/css/views/admin-owners.css": {
       "headline": 2,
       "action": 1,
       "sun": 2,
       "box2": 2,
-      "frame3": 1,
-      "slab": 1,
-      "dialog": 1
+      "aside": 1
+    },
+    "public/css/views/admin-owners.css": {
+      "headline": 1,
+      "action": 1,
+      "sun": 2,
+      "box2": 1
     },
     "public/css/views/admin-packages.css": {
       "action": 1,
@@ -190,12 +184,11 @@
       "box2": 3
     },
     "public/css/views/admin-realtime.css": {
-      "headline": 5,
+      "headline": 4,
       "rule": 1,
-      "box2": 3,
-      "frame3": 3,
-      "record": 1,
-      "dialog": 1
+      "box2": 2,
+      "frame3": 2,
+      "record": 1
     },
     "public/css/views/admin-scheduler.css": {
       "headline": 1,
@@ -268,9 +261,6 @@
       "headline": 2,
       "box2": 2,
       "aside": 1
-    },
-    "public/css/views/boards-poster.css": {
-      "rule": 1
     },
     "public/css/views/build-story.css": {
       "rule": 1,
@@ -417,7 +407,6 @@
       "aside": 1
     },
     "public/css/views/memory.css": {
-      "rule": 1,
       "box2": 2,
       "frame3": 1
     },
@@ -470,14 +459,13 @@
     },
     "public/css/views/profile-poster.css": {
       "headline": 5,
-      "rule": 13,
+      "rule": 12,
       "action": 7,
       "sun": 12,
-      "box2": 16,
-      "frame3": 7,
+      "box2": 15,
+      "frame3": 6,
       "record": 3,
       "slab": 1,
-      "dialog": 1,
       "label": 3
     },
     "public/css/views/profile.css": {
