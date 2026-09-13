@@ -27,6 +27,7 @@
  *   - UsageTab (default) — the reads, and the six sections
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face and six numbered sections, over one read that says whose
  *     money each figure is. The eighteen-series stacked charts are gone (the palette cycled at
  *     twelve, so six models shared a colour); the models are ranked rows and the one chart splits
@@ -117,7 +118,7 @@ function WhatItCostsYou({ data, control, onAskProvider, asking }) {
   return html`
     <section class="og-sec og-sec--first" id="adm-us-01">
       <div class="og-sec-h">
-        <h2>${S('now.title')}<small>01</small></h2>
+        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
         ${control}
       </div>
 
@@ -206,7 +207,7 @@ function AskAi({ from, to }) {
   return html`
     <section class="og-sec" id="adm-us-06">
       <div class="og-sec-h">
-        <h2>${S('ai.title')}<small>06</small></h2>
+        <h2 class="poster-section-title">${S('ai.title')}<small>06</small></h2>
         <div class="og-doors">
           <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
         </div>
