@@ -14,6 +14,7 @@
  *   - trustCell / scopeCell: the two columns whose reading is not the raw value
  *
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose the shared poster list heading.
  *   v1.0.0 — 2026-09-12 — Initial, with the Agents page in the poster face.
  */
 import { h } from 'preact';
@@ -74,7 +75,7 @@ export default function AgentsList({
   return html`
     <section class="og-sec">
       <div class="og-sec-h">
-        <h2>${A('listTitle')}<small>02</small></h2>
+        <h2 class="poster-section-title">${A('listTitle')}<small>02</small></h2>
         <div class="og-doors"><span class="og-door og-door--quiet">${oldestFirst ? A('sortOldest') : A('sortNewest')}</span></div>
       </div>
 
