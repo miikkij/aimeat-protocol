@@ -21,6 +21,7 @@
  *   - agents-tab.derive.js does the counting, .list.js is section 02, .record.js is an opened row
  *
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose the remaining B1 headings; fleet ratios use SVG width data.
  *   v2.0.0 — 2026-09-12 — The poster face: one table of 143 unsearchable rows becomes three
  *     sections, a search, five filter chips and a record that says what an agent may do and where
  *     it may be called from. The morsel column is gone and the trust column is read rather than
@@ -52,7 +53,7 @@ function RightNow({ counts, fleets, nodeId, owners, onOwners }) {
   return html`
     <section class="og-sec og-sec--first">
       <div class="og-sec-h">
-        <h2>${A('nowTitle')}<small>01</small></h2>
+        <h2 class="poster-section-title">${A('nowTitle')}<small>01</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${onOwners}>${A('toOwners')}</button>
         </div>
@@ -93,11 +94,11 @@ function RightNow({ counts, fleets, nodeId, owners, onOwners }) {
 /** Section 03: who holds what. The bar is the owner's share of the whole node. */
 function Fleets({ fleets, total, onOwners }) {
   const pct = n => (total ? Math.round((n / total) * 100) : 0);
-  const bar = n => html`<div class="adm-ag-bar"><i style=${`width: ${pct(n)}%`}></i></div>`;
+  const bar = n => html`<div class="adm-ag-bar"><svg width=${pct(n) + '%'} aria-hidden="true"></svg></div>`;
   return html`
     <section class="og-sec">
       <div class="og-sec-h">
-        <h2>${A('fleetsTitle')}<small>03</small></h2>
+        <h2 class="poster-section-title">${A('fleetsTitle')}<small>03</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${onOwners}>${A('toOwners')}</button>
         </div>
