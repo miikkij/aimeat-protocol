@@ -12,7 +12,8 @@
  *   if (await AIMEAT.ai.isAvailable()) { const r = await AIMEAT.ai.complete({ prompt, app_id }); }
  * @version-history
  *   v1.5.0 - 2026-09-13 - complete() sends `images`, and the spend guard counts them as part of the
- *     call. The route had accepted pictures since June and this body dropped them.
+ *     call. The route had accepted pictures since June and this body dropped them. The JSDoc names
+ *     finish_reason and truncated, which the route now answers.
  *   v1.4.0 - 2026-08-31 - AIMEAT.ai.job.* : background jobs (start/get/list/cancel/waitFor). A
  *     completion that takes half an hour cannot be a fetch an app holds open, and every published
  *     app would otherwise have written its own sentence for "the node is busy". The refusal codes
@@ -115,7 +116,9 @@ const ai = {
   },
 
   /**
-   * Run a single completion. Returns { content, model, usage, budget }.
+   * Run a single completion. Returns { content, model, usage, budget, finish_reason, truncated }.
+   * `truncated` is true when the provider cut the answer at a token limit (finish_reason 'length'):
+   * show it as unfinished or ask again, never as the whole answer.
    * Throws an Error with .code set on quota/permission/auth failures.
    *
    * `images`: an array of data: or https: URLs (at most 8; downscale first) turns the call into a

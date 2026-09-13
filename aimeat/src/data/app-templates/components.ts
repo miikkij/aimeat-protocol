@@ -11,6 +11,13 @@
  *   COMP_MERMAID_DIAGRAM · COMP_THREE_SCENE · COMP_P5_SKETCH · COMP_PIXI_STAGE · COMP_PHASER_ARCADE ·
  *   COMP_FLOW_EDITOR
  * @version-history
+ *   v1.3.0 — 2026-09-13 — COMP_SHARED_FEED and COMP_PHASER_ARCADE's leaderboard read through
+ *     AIMEAT.data.discover(). Both called search() as if it read every user's public keys, which it
+ *     never did (it reads the caller's own namespaces), and sorted the { results, total } object it
+ *     returns, so the feed threw on load and, fixed by hand, showed each visitor only their own posts
+ *     (appdev pitfall search-does-not-read-across-users-use-discover). COMP_DATED_ARCHIVE threw the same
+ *     way on search()'s object and now lists by key prefix; COMP_SEARCH's server-side line reads
+ *     `.results`.
  *   v1.2.0 — 2026-08-29 — COMP_LEAFLET_MAP: the real-map recipe (leaflet pack) with the two
  *     classic traps and the licence attribution written in.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 5: COMP_AI_ACTION discloses. The component every app
@@ -48,7 +55,7 @@ async function removeItem(id) {
   return items;
 }`;
 
-export const COMP_SHARED_FEED = `// shared-feed — a public community feed (aimeat-data). Each user writes their OWN key; everyone reads.
+export const COMP_SHARED_FEED = `// shared-feed — a public community feed (aimeat-data). Each user writes their OWN public key; everyone signed in reads them all.
 async function post(text) {
   var id = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
   await AIMEAT.data.set('{{app}}.feed.' + id,
@@ -56,8 +63,15 @@ async function post(text) {
     { visibility: 'public' });
 }
 async function loadFeed() {
-  var results = await AIMEAT.data.search('{{app}}.feed.'); // public entries across all users
-  return results.sort(function (a, b) { return (b.at || '').localeCompare(a.at || ''); });
+  // discover(), not search() or list(): those read only YOUR OWN keys, so every visitor would see only
+  // their own posts. discover() lists every user's public keys under the prefix with their values, and
+  // your own posts come back too, marked mine: true. Test it with TWO accounts.
+  // Listing needs a signed-in visitor: return null here and draw a "sign in to see the feed" state.
+  if (!AIMEAT.auth.getSession()) return null;
+  var rows = await AIMEAT.data.discover('{{app}}.feed.', { limit: 100 }); // max 200 per call; page with offset
+  return rows
+    .map(function (r) { return Object.assign({}, r.value, { owner: r.owner_gaii, mine: r.mine }); })
+    .sort(function (a, b) { return (b.at || '').localeCompare(a.at || ''); });
 }`;
 
 export const COMP_PUBLIC_INTAKE = `// public-intake — let ANYONE (not logged in) submit into your workspace: lead / contact / feedback / RSVP / quiz forms.
@@ -123,9 +137,9 @@ async function saveSettings(patch) {
 
 export const COMP_DATED_ARCHIVE = `// dated-archive — show entries by date, newest first (aimeat-data). Keys like {{app}}.YYYY-MM-DD.*
 async function loadArchive() {
-  var entries = await AIMEAT.data.search('{{app}}.'); // matching entries
+  var entries = (await AIMEAT.data.list({ prefix: '{{app}}.' })).items; // [{ key, value, updated_at, … }]
   var byDay = {};
-  entries.forEach(function (e) { var d = (e.date || (e.key || '').split('.')[1] || ''); (byDay[d] = byDay[d] || []).push(e); });
+  entries.forEach(function (e) { var d = ((e.value && e.value.date) || (e.key || '').split('.')[1] || ''); (byDay[d] = byDay[d] || []).push(e); });
   return Object.keys(byDay).sort().reverse().map(function (d) { return { date: d, items: byDay[d] }; });
 }`;
 
@@ -155,7 +169,7 @@ function filterItems(items, q) {
   return items.filter(function (it) { return JSON.stringify(it).toLowerCase().indexOf(q) !== -1; });
 }
 // Bind: input.addEventListener('input', function () { render(filterItems(all, input.value)); });
-// Server-side across stored entries (aimeat-data): var hits = await AIMEAT.data.search('{{app}}.' + query);`;
+// Server-side across YOUR stored entries (aimeat-data): var hits = (await AIMEAT.data.search(query)).results; // [{ key, value }]`;
 
 export const COMP_LIST_DETAIL = `// list+detail — master/detail: a list on the left, the selected item's detail on the right.
 function renderListDetail(target, items, rowLabel, renderDetail) {
@@ -339,7 +353,11 @@ async function saveHighScore(score) { // one public key per player -> a leaderbo
   var prev = (await AIMEAT.data.get('{{app}}.highscore')) || { score: 0 };
   if (score > (prev.score || 0)) await AIMEAT.data.set('{{app}}.highscore', { score: score, by: s.owner, at: new Date().toISOString() }, { visibility: 'public' });
 }
-async function leaderboard() { return (await AIMEAT.data.search('{{app}}.highscore')).sort(function (a, b) { return (b.score || 0) - (a.score || 0); }).slice(0, 10); }`;
+async function leaderboard() { // every player's public score: discover(), because search() reads only your own keys
+  if (!AIMEAT.auth.getSession()) return null; // listing needs a signed-in visitor
+  var rows = await AIMEAT.data.discover('{{app}}.highscore', { limit: 200 });
+  return rows.map(function (r) { return r.value; }).sort(function (a, b) { return (b.score || 0) - (a.score || 0); }).slice(0, 10);
+}`;
 
 export const COMP_FLOW_EDITOR = `// flow-editor — an editable drag-and-drop flow/mindmap (aimeat-flow cortex; engine stays internal).
 // Load IN ORDER: <link rel="stylesheet" href="/lib/drawflow@0.min.css">

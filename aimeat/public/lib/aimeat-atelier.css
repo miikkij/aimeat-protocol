@@ -49,6 +49,9 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.53.2 — 2026-09-13 — No rules changed. The version is pinned to AIMEAT.atelier.version, and
+ *     that moved for three script fixes: a section's fill runs with its body in the page, timeline
+ *     prints a string that is not a machine date as given, and appRef() works at parse time.
  *   v0.53.1 — 2026-09-05 — No rules changed. The version is pinned to AIMEAT.atelier.version, and
  *     that moved for a script fix: the mosaic's bound figure forwards `unit` and `direction` to
  *     figure(), which it had never done, so a bound figure shows what it is measured in.

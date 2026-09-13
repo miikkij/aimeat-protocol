@@ -197,18 +197,20 @@ entry: index.html
     async function takeHold(it) {
       var msg = $('hold-msg');
       if (!session) {
-        // AIMEAT.auth.login() is the NON-interactive path: on an app origin it restores a session
-        // that already exists and answers null otherwise. Asking a visitor to sign in and then
-        // calling that is a dead end, and the overlay covers the pill that would have worked. So the
-        // house control is pressed for them rather than reimplemented here.
-        try { session = await AIMEAT.auth.login(); } catch (err) { session = null; }
-        if (!session) {
+        // AIMEAT.auth.signIn() is the interactive sign-in: the silent bridge first and then the
+        // consent popup on an app origin, the sign-in modal anywhere else. This click is the user
+        // gesture the popup needs. AIMEAT.auth.login() would only restore a session that already
+        // exists. The 'login' handler in boot() repaints once the visitor is in. A node too old to
+        // have signIn gets the pill's own button pressed, as before.
+        msg.className = 'text-sm opacity-70';
+        msg.textContent = t('signingIn');
+        if (AIMEAT.auth.signIn) {
+          AIMEAT.auth.signIn().catch(function () { return null; });
+        } else {
           var pill = document.getElementById('aimeat-login-btn');
           if (pill) { pill.click(); } else if (AIMEAT.auth.showLoginModal) { AIMEAT.auth.showLoginModal(); }
-          msg.className = 'text-sm opacity-70';
-          msg.textContent = t('signingIn');
-          return;
         }
+        return;
       }
       $('ov-hold').disabled = true;
       var res = await AIMEAT.shop.reserve(session, { sku: it.sku, qty: 1, minutes: 15 })
@@ -306,7 +308,7 @@ entry: index.html
       // The sign-in control, on the first screen a visitor sees. Without it the page can only TELL
       // somebody to sign in and give them nothing to press: the app-origin bridge restores a
       // session silently when there is one, and the interactive path needs a real click.
-      AIMEAT.auth.mountLoginButton('#login', { compactPill: true });
+      AIMEAT.auth.mountLoginButton('#login', { compact: true });
 
       // A session may already exist (the app-origin bridge). Not having one is normal and costs
       // the visitor nothing until they reach for a hold.

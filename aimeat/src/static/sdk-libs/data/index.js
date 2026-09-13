@@ -8,8 +8,8 @@
  *   (the `creator@node` construction in get()'s fallback) come from _core/config — the exact values
  *   the legacy string form baked in via `${config.baseUrl}` / `${config.nodeId}`.
  * @structure imports NODE_URL/NODE_ID (config), authFetch (session), attach (namespace);
- *   withProvenance()/publicEntryResponse(); data.set/get/getEntry/update/delete/list/search/
- *   getPublic/getPublicEntry; attach('data', …).
+ *   withProvenance()/publicEntryResponse()/mapAtMost()/discoverRow(); data.set/get/getEntry/update/
+ *   delete/list/count/discover/search/getPublic/getPublicEntry; attach('data', …).
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-data.js"></script>
  *   await AIMEAT.data.set('key', { value }); await AIMEAT.data.get('key');
  * @version-history
@@ -26,6 +26,11 @@
  *     Until now every read path here ended in `res.data`, so an app could render model-written
  *     content with no way to state its origin no matter how carefully the writing agent declared
  *     it. Same loss the connector had (ai-provenance-carry.ts v1.1.0); the browser had it too.
+ *   v1.4.0 — 2026-09-13 — discover(prefix, opts): other people's public entries under a prefix, with
+ *     their values and the caller's own rows put back. There was no browser method for
+ *     GET /v1/memory/discover, and the node's own shared-feed template used search(), which reads only
+ *     the caller's namespaces, so every visitor of a community feed saw only their own posts (appdev
+ *     pitfall search-does-not-read-across-users-use-discover). Additive.
  */
 import { NODE_URL, NODE_ID } from '../_core/config.js';
 import { makeSession } from '../_core/session.js';
@@ -85,6 +90,46 @@ function withParams(path, params) {
   const qs = params.toString();
   if (!qs) return path;
   return path + (path.indexOf('?') >= 0 ? '&' : '?') + qs;
+}
+
+/** How many public value reads discover() runs at once: one per row, but never a burst of 200. */
+const DISCOVER_READS_AT_ONCE = 6;
+
+/**
+ * Run `fn` over `items` with at most `n` calls in flight, keeping the order of the results.
+ * @template T, R
+ * @param {T[]} items
+ * @param {number} n
+ * @param {(item: T) => Promise<R>} fn
+ * @returns {Promise<R[]>}
+ */
+async function mapAtMost(items, n, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  }
+  const workers = [];
+  for (let w = 0; w < Math.min(n, items.length); w++) workers.push(worker());
+  await Promise.all(workers);
+  return out;
+}
+
+/** The fields a discover row carries, whichever door it came through. */
+function discoverRow(item, mine) {
+  return {
+    key: item.key,
+    owner_gaii: item.owner_gaii,
+    visibility: item.visibility,
+    tags: item.tags,
+    version: item.version,
+    created_at: item.created_at,
+    updated_at: item.updated_at,
+    mine: mine,
+  };
 }
 
 // ── Memory API (Tier 1, JWT auth) ──
@@ -202,8 +247,88 @@ const data = {
     return (d && typeof d.count === 'number') ? d.count : null;
   },
 
+  /**
+   * List OTHER people's public entries under a key prefix, with their values. The read for a shared
+   * feed, a public leaderboard or a community map: each user writes their own public key, and this is
+   * how everyone else finds them.
+   *
+   * search() and list() never do this. They read the caller's own identity set (the signed-in person
+   * and their agents), so a feed built on them shows each visitor only their own posts, which looks
+   * like "nobody has posted yet" and is invisible on a one-account test. This calls
+   * GET /v1/memory/discover, which lists public entries across the node's users but carries no values
+   * and leaves the caller out, and makes up both: one public read per row (at most six at a time) and
+   * the caller's own public entries under the prefix, marked `mine: true`.
+   *
+   * It needs a signed-in session, because the listing door does: a signed-out visitor gets the usual
+   * "Not logged in" error, so design that state rather than rendering it as an empty feed. A row whose
+   * value is gone by the time it is read (deleted, or made private) is left out; if every read fails,
+   * the first error is thrown instead of returning an empty list.
+   *
+   * @param {string} prefix  Key prefix, e.g. 'myapp.feed.'.
+   * @param {{ limit?: number, offset?: number, owner?: string, withValues?: boolean, includeMine?: boolean }} [opts]
+   *   limit       rows asked of the node, 1 to 200 (default 50); it pages with offset.
+   *   owner       only entries whose owner GAII starts with this.
+   *   withValues  false returns metadata only and makes no public reads (default true).
+   *   includeMine false leaves the caller's own entries out, as the route does (default true).
+   * @returns {Promise<Array<{ key: string, owner_gaii: string, value?: any, visibility: string,
+   *   tags?: string[], version?: number, created_at?: string, updated_at?: string, mine: boolean }>>}
+   *   The caller's own rows first, then everyone else's in the node's order.
+   */
+  async discover(prefix, opts) {
+    const o = opts || {};
+    const withValues = o.withValues !== false;
+    const limit = Math.min(Math.max(parseInt(String(o.limit), 10) || 50, 1), 200);
+    const params = new URLSearchParams();
+    if (prefix) params.set('prefix', prefix);
+    params.set('limit', String(limit));
+    if (o.offset) params.set('offset', String(o.offset));
+    if (o.owner) params.set('owner', o.owner);
+    const res = await authFetch('/v1/memory/discover?' + params.toString());
+    if (!res.ok) throw new Error(res.error?.message || 'Failed to discover public memory');
+    const found = (res.data?.items || []).filter(function (i) { return i && i.key && i.owner_gaii; });
+
+    const rows = [];
+    const seen = new Set();
+    if (o.includeMine !== false) {
+      const own = new URLSearchParams();
+      if (prefix) own.set('prefix', prefix);
+      own.set('visibility', 'public');
+      own.set('limit', String(limit));
+      if (!withValues) own.set('include', 'meta');
+      const mineRes = await authFetch('/v1/memory?' + own.toString());
+      if (!mineRes.ok) throw new Error(mineRes.error?.message || 'Failed to list your own public memory');
+      (mineRes.data?.items || []).forEach(function (item) {
+        const row = discoverRow(item, true);
+        if (withValues) row.value = item.value;
+        seen.add(row.owner_gaii + '\n' + row.key);
+        rows.push(row);
+      });
+    }
+
+    const theirs = found.filter(function (i) { return !seen.has(i.owner_gaii + '\n' + i.key); });
+    if (!withValues) return rows.concat(theirs.map(function (i) { return discoverRow(i, false); }));
+
+    // Each read settles to { value } or { error }, so one failed row neither aborts the list nor
+    // disappears unaccounted: it is counted, and a list where EVERY read failed throws.
+    const read = await mapAtMost(theirs, DISCOVER_READS_AT_ONCE, function (item) {
+      return data.getPublic(item.owner_gaii, item.key).then(
+        function (value) { return { item: item, value: value, error: null }; },
+        function (error) { return { item: item, value: null, error: error }; });
+    });
+    const failures = read.filter(function (r) { return r.error; });
+    if (failures.length > 0 && failures.length === read.length) throw failures[0].error;
+    read.forEach(function (r) {
+      if (r.error || r.value == null) return;   // failed, or gone since the listing (deleted, made private)
+      const row = discoverRow(r.item, false);
+      row.value = r.value;
+      rows.push(row);
+    });
+    return rows;
+  },
+
   // Search memory entries
   // opts: { visibility, agent, ownerScope } — scoping as in list().
+  // Reads the CALLER's own identity set only; other people's public entries come from discover().
   async search(query, opts) {
     const params = scopeParams(opts);
     params.set('q', query);

@@ -110,9 +110,10 @@
      * even for the person who owns it. The node answers `?mode=handle` with a presigned, short-lived
      * address that carries its own permission, and that one loads anywhere.
      *
-     * Takes what a table actually holds: a full address, a `/v1/pub/...` path, or a bare key of the
-     * signed-in person's own. A public file is handed back unchanged, because it already works and a
-     * presigned URL for it would only add an expiry it does not need.
+     * Takes what a table actually holds: a full address, a `/v1/pub/...` path, a `<gaii>/<key>`
+     * reference (what the platform's own file tools return, an agent's upload included), or a bare
+     * key of the signed-in person's own. A public file is handed back unchanged, because it already
+     * works and a presigned URL for it would only add an expiry it does not need.
      *
      * The URL expires. Fetch it when you are about to show the picture, not when you load the page.
      */
@@ -130,7 +131,12 @@
       } else if (value.startsWith("/v1/pub/")) {
         path = value;
       } else {
-        path = "/v1/pub/" + encodeURIComponent(session.ghii || session.owner || "") + "/" + value.split("/").map(encodeURIComponent).join("/");
+        const slash = value.indexOf("/");
+        const head = slash > 0 ? value.slice(0, slash) : "";
+        const named = head.indexOf("@") !== -1 || head.startsWith("ext:");
+        const owner = named ? head : session.ghii || session.owner || "";
+        const key = named ? value.slice(slash + 1) : value;
+        path = "/v1/pub/" + encodeURIComponent(owner) + "/" + key.split("/").map(encodeURIComponent).join("/");
       }
       if (path.indexOf("/v1/pub/") !== 0) return value;
       const ownerGaii = decodeURIComponent(path.slice("/v1/pub/".length).split("/")[0] || "");

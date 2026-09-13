@@ -34,6 +34,11 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.53.2 — 2026-09-13 — A section's `fill` runs once its unit is in the page, still inside the
+ *     same render. It used to run on a detached element, so a fill that measured got 0x0, and a
+ *     fill that threw ended the render with every later block missing; now a throw is logged with
+ *     the block id and the rest of the screen is built. applyViewerOverlay moved whole to
+ *     mosaic-layout.js to keep this file under the 800-line rule.
  *   v0.53.1 — 2026-09-05 — A bound figure carries its `unit` and `direction`. Both are fields
  *     figure() has always taken and the bound case never forwarded, so the same record read one
  *     way through the mosaic and another way by hand.
@@ -112,7 +117,7 @@ import { ambient } from './ambient.js';
 import { fx } from './effects.js';
 import { patchFor, derivedColumns, wireLive } from './mosaic-bind.js';
 import { morph } from './mosaic-motion.js';
-import { appRef, loadLayout, labelOf } from './mosaic-layout.js';
+import { appRef, loadLayout, labelOf, applyViewerOverlay } from './mosaic-layout.js';
 import { aide } from './aide.js';
 import { projectCanvas } from './mosaic-canvas.js';
 import { projectStack, projectOverlay, projectRail, projectPicker, projectDeck, projectFlow } from './mosaic-projections.js';
@@ -143,7 +148,7 @@ export { appRef };
  *   live?: Record<string, { keyPrefix?: string|string[], domains?: string[], minIntervalMs?: number }>,
  *   actions?: Array<{ id: string, summary: string, params?: Record<string, string>, run?: (params: any) => any }>,
  *   overlay?: { hidden?: string[], order?: string[], nav?: string }|null,
- *   fill?: Record<string, (body: HTMLElement) => void>,
+ *   fill?: Record<string, (body: HTMLElement) => void>,   // called with the body already in the page
  *   onPick?: (blockId: string, item: any) => void,
  *   onSearch?: (bind: string, query: string) => void,
  *   onMove?: (blockId: string, cardId: string, toColumnId: string) => void,
@@ -191,8 +196,10 @@ export function mosaic(spec) {
    *   this block's row in what blocks() answers with; `bound` is stamped here, at BUILD time,
    *   because a caller asking right after the render must not be told "no" for the one turn the
    *   source is still resolving in.
+   * @param {Array<{ id: string, run: (body: HTMLElement) => void, body: HTMLElement }>} [fills]
+   *   where a section's fill waits until render() has put the unit in the page
    */
-  function buildBlock(block, into, entry) {
+  function buildBlock(block, into, entry, fills) {
     const p = block.props || {};
     const pick = spec.onPick ? function (item) { spec.onPick(block.id, item); } : undefined;
     const empty = { title: p.emptyTitle, hint: p.emptyHint };
@@ -454,7 +461,7 @@ export function mosaic(spec) {
         const s = section({ target: into, title: p.title, hint: p.hint });
         alive.handles.push(s);
         const fillFn = (spec.fill || {})[block.id];
-        if (fillFn) fillFn(s.body);
+        if (fillFn && fills) fills.push({ id: block.id, run: fillFn, body: s.body });
         return;
       }
       case 'emptyState': {
@@ -499,32 +506,9 @@ export function mosaic(spec) {
 
   // ── The flat projections live in mosaic-projections.js; the canvas one in mosaic-canvas.js.
 
-  /** The viewer's own overlay, applied over the owner's layout at render. */
+  /** The viewer's own overlay, applied over the owner's layout at render (applyViewerOverlay
+   *  lives in mosaic-layout.js). */
   let viewerOverlay = spec.overlay || null;
-
-  /**
-   * Apply one viewer's overlay to a layout copy: `hidden` drops blocks, `order` re-sorts the
-   * rest (ids it does not name keep their place at the end), `nav` re-projects. Props are
-   * deliberately untouchable — an overlay arranges, it never rewrites content.
-   * @param {any} layout @param {{ hidden?: string[], order?: string[], nav?: string }|null} o
-   */
-  function applyViewerOverlay(layout, o) {
-    if (!o) return layout;
-    const out = {
-      v: layout.v, look: layout.look, nav: o.nav || layout.nav, choreography: layout.choreography,
-      tokens: layout.tokens, ambient: layout.ambient, meta: layout.meta, blocks: layout.blocks.slice(),
-    };
-    if (Array.isArray(o.hidden) && o.hidden.length) {
-      out.blocks = out.blocks.filter(function (b) { return o.hidden.indexOf(b.id) < 0; });
-    }
-    if (Array.isArray(o.order) && o.order.length) {
-      out.blocks.sort(function (a, b) {
-        const ia = o.order.indexOf(a.id); const ib = o.order.indexOf(b.id);
-        return (ia < 0 ? o.order.length : ia) - (ib < 0 ? o.order.length : ib);
-      });
-    }
-    return out;
-  }
 
   // ── Render, and the handle ───────────────────────────────────────────────────────────────────
 
@@ -601,6 +585,7 @@ export function mosaic(spec) {
     const visible = layout.blocks.filter(function (b) { return !b.hidden; });
     const band = el('div', { class: 'ak-mosaic__band' });
     const units = [];
+    const fills = [];
     for (const block of visible) {
       /** This block's row in blocks(): what it is, whether it reads a source, where it landed. */
       const entry = {
@@ -619,7 +604,7 @@ export function mosaic(spec) {
       // block's props is the block-level opt-out, stamped on its unit before the component is
       // built inside it, so everything the component makes reads the same answer.
       if (block.props && block.props.motion === false) setMotionDefaults(unitEl, false);
-      buildBlock(block, unitEl, entry);
+      buildBlock(block, unitEl, entry, fills);
       // The block's effect wears on its unit: the server proved it on this look (a colour or
       // overlay effect under words through the matrix; a picture effect only on a picture).
       if (block.effect) {
@@ -639,6 +624,16 @@ export function mosaic(spec) {
     else if (nav === 'rail') root.appendChild(projectRail(units));
     else if (nav === 'overlay') root.appendChild(projectOverlay(units, alive));
     else root.appendChild(projectStack(units, alive));
+
+    // THE APP'S FILLS RUN LAST, on section bodies that are in the page by now, so a fill can
+    // measure and read computed styles. Each runs on its own: a fill that throws is named, and the
+    // blocks around it stand (a throw used to end the render with every later block unbuilt).
+    for (const f of fills) {
+      if (destroyed) return;
+      try { f.run(f.body); } catch (err) {
+        console.error('aimeat-atelier: the fill for section "' + f.id + '" threw; the other blocks were built.', err);
+      }
+    }
   }
 
   let currentLayout = null;

@@ -36,6 +36,15 @@
     e.envelope = res;
     return e;
   }
+  function withWarnings(res) {
+    var d = res && res.data !== void 0 ? res.data : res;
+    if (d && Array.isArray(d.warnings)) {
+      d.warnings.forEach(function(w) {
+        console.warn("[AIMEAT.organism]", w && w.code, w && w.message);
+      });
+    }
+    return d;
+  }
   var TITLE_FIELDS = ["title", "name", "subject", "label"];
   var BODY_FIELDS = ["content", "body", "markdown", "text", "md", "description", "summary"];
   function pickField(obj, names) {
@@ -280,7 +289,7 @@
       if (Array.isArray(opts.tags) && opts.tags.length) body.tags = opts.tags;
       var res = await authFetch("/v1/memory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (res.ok === false) throw fail(res, "Failed to save draft");
-      return res.data !== void 0 ? res.data : res;
+      return withWarnings(res);
     },
     // Publish a draft -> new .version.N + .latest (or a pending approval when the workspace gates publishes).
     async publish(orgId, wsId, namespace2, id) {
@@ -290,7 +299,7 @@
         body: JSON.stringify({ ws: wsId || void 0, namespace: namespace2, id })
       });
       if (res.ok === false) throw fail(res, "Failed to publish");
-      return res.data !== void 0 ? res.data : res;
+      return withWarnings(res);
     },
     // BULK publish MANY records in ONE request (data-access redesign). Two shapes:
     //   • ids: ['id', ...]                → publish each record's existing DRAFT (the edit → publish flow)
@@ -313,7 +322,7 @@
         body: JSON.stringify(body)
       });
       if (res.ok === false) throw fail(res, "Failed to publish records");
-      return res.data !== void 0 ? res.data : res;
+      return withWarnings(res);
     },
     // BULK delete MANY record families in ONE request (data-access redesign) — ids: [id,...]. Removes each
     // record's bare/.draft/.latest/.version.N owned by the caller's own identity in one batched call

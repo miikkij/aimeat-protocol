@@ -19,6 +19,9 @@
  *   lib.add('images', 'hero', { file: put.url, w: 32, h: 40, bytes: put.bytes });
  *   await lib.save();
  * @version-history
+ *   v1.1.0 — 2026-09-13 — upload() returns the node's versioned address (`?v=` that changes on every
+ *     write) when there is one, so re-uploading an asset under the same key reaches players at once
+ *     instead of after the five-minute cache on /v1/pub.
  *   v1.0.0 — 2026-09-02 — Initial: the public upload and the /v1/pub address it answers with.
  */
 import { refuse } from './manifest.js';
@@ -99,7 +102,12 @@ export async function upload(file, opts) {
   });
 
   const owner = written && (written.owner_gaii || written.ownerGaii);
-  const url = (written && written.embed_url)
+  // The VERSIONED address first. /v1/pub answers with five minutes of browser freshness and a
+  // re-upload replaces the file under the same key, so a manifest carrying the plain address kept
+  // drawing the old picture after the upload that replaced it. `versioned_url` is the same address
+  // with `?v=<this write>`, which the node ignores and every cache treats as a new file.
+  const url = (written && written.versioned_url)
+    || (written && written.embed_url)
     || (owner ? publicAddress(owner, written.key || key) : '');
   if (!url) {
     refuse('the upload of "' + key + '" answered without an address. Nothing was written to the '

@@ -10,7 +10,10 @@ metadata:
     domain: visualization
 
 spec:
-  version: "1.1.2"
+  # 1.1.3: elementId may name a <canvas>, and the chart is drawn on it instead of on a second canvas
+  # nested inside it, where the browser drew nothing. The version is what makes an ALREADY-INSTALLED
+  # cortex refresh: the seeder skips one whose stored version matches.
+  version: "1.1.3"
   license: MIT
   components:
     - type: schema
@@ -79,14 +82,16 @@ spec:
 
         AIMEAT.charts.ChartPanel({elementId, chartKey, nodeUrl, token?})
           - Reads a chart:* key from AIMEAT storage and renders it
-          - elementId: string — DOM element id to render into
+          - elementId: string, the id of the container to render into (the lib creates the
+            canvas), or of a <canvas> to draw on
           - chartKey: string — AIMEAT memory key (e.g. 'chart:sales-2024')
           - nodeUrl: string — AIMEAT node URL
           - token: string — optional auth token for private data
 
         AIMEAT.charts.ChartBuilder({elementId, data, type, options?})
           - Renders a chart directly from inline data
-          - elementId: string — DOM element id
+          - elementId: string, the id of the container to render into (the lib creates the
+            canvas), or of a <canvas> to draw on
           - data: {labels: string[], datasets: [{label, data: number[], backgroundColor?, borderColor?}]}
           - type: 'bar'|'line'|'pie'|'doughnut'|'radar'|'scatter'|'bubble'
           - options: Chart.js options object (optional)
@@ -174,5 +179,9 @@ spec:
           type: 'bar'|'line'|'pie'|'doughnut'|'radar'|'scatter'|'bubble'
 
         AIMEAT.charts.TYPES = ['bar','line','pie','doughnut','radar','scatter','bubble']
+
+        elementId: the id of a container (the lib builds the canvas inside it) or of a <canvas>
+        (drawn on directly; a chart it already holds is replaced). Errors show inside a container,
+        or right after a canvas.
 
         Requires: <script src="/lib/chartjs@4.js"></script>

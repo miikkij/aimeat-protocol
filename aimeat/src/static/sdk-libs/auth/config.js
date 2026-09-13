@@ -10,6 +10,8 @@
  *   AUTH_PROVIDERS · PROVIDER_ICONS.
  * @usage import { NODE_URL, APEX_URL, AUTH_PROVIDERS, appDeclaredScopes } from './config.js';
  * @version-history
+ *   v1.0.1 — 2026-09-13 — The appDeclaredScopes comment says what the node does with an unknown
+ *     scope word (refuses the whole sign-in) instead of the opposite.
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part1.ts (SDK-libs migration Phase 3).
  */
 export { NODE_URL, APEX_URL, NODE_ID } from '../_core/config.js';
@@ -20,10 +22,13 @@ export { NODE_URL, APEX_URL, NODE_ID } from '../_core/config.js';
 export const APP_DEFAULT_SCOPES = 'memory:read memory:write storage:read storage:write';
 
 // An app declares the scopes it needs with <meta name="aimeat-scopes" content="scope scope …">.
-// Only declared apps deviate from the default set — e.g. an AI app adds "ai:use" so its grant
-// can spend the owner's AI budget. Falls back to APP_DEFAULT_SCOPES when undeclared, so existing
-// apps are unaffected. The authorize endpoint still validates every scope against the node's
-// grantable vocabulary, so a bogus meta value can only ever request LESS than the node allows.
+// The declaration REPLACES the default set rather than adding to it: an AI app that needs the
+// default four plus "ai:use" names all five. Falls back to APP_DEFAULT_SCOPES when the tag is
+// absent or empty. The node validates every word against its grantable vocabulary
+// (GET /v1/app-grants/scopes), and ONE word outside it refuses the whole sign-in: the silent bridge
+// answers invalid_scope and GET /v1/app-grants/authorize answers 400 INVALID_SCOPE, so nobody can
+// sign in to that app, its owner included. (This comment said a bogus value could only ever request
+// less than the node allows, which was never true; corrected 2026-09-13.)
 export function appDeclaredScopes() {
   try {
     var m = document.querySelector('meta[name="aimeat-scopes"]');

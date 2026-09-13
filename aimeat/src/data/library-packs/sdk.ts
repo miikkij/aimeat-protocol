@@ -10,6 +10,13 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.12.3 — 2026-09-13 — aimeat-auth's aiDoc names AIMEAT.auth.signIn(), the compact default and
+ *     res.ok; aimeat-storage's names viewUrl() with a "<gaii>/<key>" reference and versioned_url.
+ *   v1.12.2 — 2026-09-13 — Four appdev pitfalls answered in the libs, and said where a builder reads:
+ *     aimeat-data's aiDoc names discover() as the cross-user read (search() and list() read only your
+ *     own namespaces); aimeat-commerce's names parseAmount and its refusal of an ambiguous "1,000";
+ *     aimeat-audio's names the six sample-only instruments, loadSamples and the stand-in voice;
+ *     aimeat-live's says minIntervalMs delivers the last change with a trailing call.
  *   v1.12.1 — 2026-09-13 — aimeat-ai's aiDoc says how a picture reaches the model (`images`), now that
  *     complete() sends it.
  *   v1.12.0 — 2026-09-05 — aimeat-living 0.1.0: the living document, one JSON record wired to
@@ -76,7 +83,7 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: [],
     license: 'MIT',
     apiSurface: 'AIMEAT.auth',
-    aiDoc: 'Login UI, Ed25519 auth, JWT lifecycle, session management. Handle BOTH login paths: mountLoginButton onLogin fires ONLY on a fresh sign-in (not on reload) — also call AIMEAT.auth.login() on load to restore an already-signed-in user. session.fetch() returns already-parsed JSON.',
+    aiDoc: 'Login UI, Ed25519 auth, JWT lifecycle, session management. Handle BOTH login paths: mountLoginButton onLogin fires ONLY on a fresh sign-in (not on reload) — also call AIMEAT.auth.login() on load to restore an already-signed-in user. For a sign-in button of your own, call AIMEAT.auth.signIn() from its click handler: the consent popup on an app origin, the sign-in modal elsewhere; it resolves to the session or null. login() only restores and never opens anything. mountLoginButton is compact on phones by default; pass compact:false to keep the full row. session.fetch() returns already-parsed JSON: check res.ok before res.data, because a refusal resolves as a value.',
     changelog: [],
     tierHint: 'T1',
     interviewTriggers: [],
@@ -100,9 +107,10 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: ['aimeat-auth'],
     license: 'MIT',
     apiSurface: 'AIMEAT.data',
-    aiDoc: 'Memory API: get, set, search, getPublic, list, count. PRIVATE data: AIMEAT.data.set(key, value, { visibility: "private" }). SHARED/community data: each user writes their own public key, everyone reads with AIMEAT.data.getPublic(ownerGaii, key) — the only anonymous read. Shared feeds, journals, comments are ALL built this way. READING WHAT AGENTS PRODUCED: agent output lives under the AGENT\'s namespace (name#owner@node), not the owner\'s, and an app-grant token gets no automatic owner-scope broadening — so an unscoped list() returns NOTHING for it and the app looks empty. Say which namespace: list({ prefix, ownerScope: true }) for the owner\'s whole set, or { agent: "<full GAII>" } for one; the same { agent, ownerScope } options work on get/getEntry/search, and each listed item carries owner_gaii to pass straight back into get(). LISTINGS: pass { meta: true } for anything you render as a table/board — the default response inlines EVERY value, so a broad prefix is megabytes per load; meta returns key + bytes + tags + updated_at and you fetch a value on demand. { count: true } (or data.count()) returns just a number — the cheap "did anything change?" probe.',
+    aiDoc: 'Memory API: get, set, search, getPublic, list, count, discover. PRIVATE data: AIMEAT.data.set(key, value, { visibility: "private" }). SHARED/community data: each user writes their own public key, everyone reads with AIMEAT.data.getPublic(ownerGaii, key) — the only anonymous read. Shared feeds, journals, comments are ALL built this way. FINDING OTHER PEOPLE\'S PUBLIC KEYS: search() and list() read ONLY your own namespaces (you and your agents), so a feed or leaderboard built on them shows every visitor only their own rows, and a one-account test cannot tell. Use AIMEAT.data.discover(prefix, { limit? (max 200), offset?, withValues?, includeMine? }) → [{ key, owner_gaii, value, updated_at, mine }]: every user\'s public entries under the prefix with their values, your own rows included and marked mine: true. It needs a signed-in visitor (design the signed-out state), and search() returns { results, total, query }, never a bare array. Verify a shared read with TWO accounts. READING WHAT AGENTS PRODUCED: agent output lives under the AGENT\'s namespace (name#owner@node), not the owner\'s, and an app-grant token gets no automatic owner-scope broadening — so an unscoped list() returns NOTHING for it and the app looks empty. Say which namespace: list({ prefix, ownerScope: true }) for the owner\'s whole set, or { agent: "<full GAII>" } for one; the same { agent, ownerScope } options work on get/getEntry/search, and each listed item carries owner_gaii to pass straight back into get(). LISTINGS: pass { meta: true } for anything you render as a table/board — the default response inlines EVERY value, so a broad prefix is megabytes per load; meta returns key + bytes + tags + updated_at and you fetch a value on demand. { count: true } (or data.count()) returns just a number — the cheap "did anything change?" probe.',
     changelog: [
       { version: '1.1.0', date: '2026-07-25', summary: 'get/getEntry/list/search take { agent, ownerScope }; list takes { meta, count }; added data.count(). Additive — existing calls unchanged.' },
+      { version: '1.4.0', date: '2026-09-13', summary: 'Added data.discover(prefix, opts): other users\' public entries under a prefix, with values, your own rows put back and marked mine. search() never read across users; build a shared feed or leaderboard on discover(). Additive.' },
     ],
     tierHint: 'T1',
     interviewTriggers: [],
@@ -168,8 +176,10 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: ['aimeat-auth'],
     license: 'MIT',
     apiSurface: 'AIMEAT.storage',
-    aiDoc: 'File upload/download, chunked upload, drag & drop helper. Cross-user image display: upload with visibility "public" and reference /v1/pub/<owner-ghii>/<key> — publicUrl() returns an owner-auth URL that will NOT load for other users. Never embed images as base64 in memory values.',
-    changelog: [],
+    aiDoc: 'File upload/download, chunked upload, drag & drop helper. Cross-user image display: upload with visibility "public" and reference /v1/pub/<owner-ghii>/<key> — publicUrl() returns an owner-auth URL that will NOT load for other users. Never embed images as base64 in memory values. AIMEAT.storage.viewUrl(address) returns a URL that loads in an <img> for a file that is not public; it takes a full URL, a /v1/pub/ path, a "<gaii>/<key>" reference as ctx.files.write() and the agent file tools return it, or a bare key of the signed-in person. Call it when you draw the picture: the URL expires. After a re-upload to the same key, point at the upload answer\'s versioned_url, which changes on every write.',
+    changelog: [
+      { version: '1.2.0', date: '2026-09-13', summary: 'viewUrl() reads a "<gaii>/<key>" reference as an owner and a key, so a picture an agent uploaded opens for its owner instead of answering 404. Upload answers carry versioned_url.' },
+    ],
     tierHint: 'T1',
     interviewTriggers: ['image', 'file', 'upload', 'gallery', 'kuva', 'tiedosto'],
     sizeEstimate: '~8KB',
@@ -441,15 +451,17 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: ['aimeat-auth'],
     license: 'MIT',
     apiSurface: 'AIMEAT.commerce',
-    aiDoc: 'Buy/sell agent offers via checkout sessions: buyOffer(agent, offerId) (open + complete in one call), openCheckout/completeCheckout, the public priced-offer feed(), price reading (getOffer, priceOf) and money formatting — money is integer 6-decimal MICRO-units, fmtMoney(1500000, "EUR") → "1.50 EUR"; morsels stay plain integers. A 402 error carries err.paymentRequired + the x402-style err.accepts list. Never ask the user for payment secrets.',
-    changelog: [],
+    aiDoc: 'Buy/sell agent offers via checkout sessions: buyOffer(agent, offerId) (open + complete in one call), openCheckout/completeCheckout, the public priced-offer feed(), price reading (getOffer, priceOf) and money formatting — money is integer 6-decimal MICRO-units, fmtMoney(1500000, "EUR") → "1.50 EUR"; morsels stay plain integers. A 402 error carries err.paymentRequired + the x402-style err.accepts list. Never ask the user for payment secrets. READING AN AMOUNT a person typed, a grid cell, a CSV or an AI reply: AIMEAT.commerce.parseAmount(text) → number | null, and microsFromInput(text) → micros | null on top of it. Never hand-roll parseFloat(s.replace(",", ".")): it reads "12,000.00" as 12. parseAmount decides the decimal mark first: with both "," and "." the LAST is the decimal mark ("12,000.00" → 12000, "1.234,56" → 1234.56); one mark repeated groups ("1,000,000"); spaces group ("1 500 000"); one mark followed by one or two digits, or led by 0 ("0,002"), is decimal. An AMBIGUOUS amount returns null: "1,000" and "1.000" are a thousand in one convention and one in the other, so show the input again and ask (for example "did you mean 1000 or 1?") instead of guessing.',
+    changelog: [
+      { version: '1.1.0', date: '2026-09-13', summary: 'Added parseAmount(text). microsFromInput reads through it: "1,500.00" is now 1500 (it was 1.5), and an ambiguous "1,000" returns null so the app asks again.' },
+    ],
     tierHint: 'T1',
     interviewTriggers: ['sell', 'buy', 'shop', 'checkout', 'kauppa', 'myynti'],
     sizeEstimate: '~7KB',
     status: 'stable',
     modelTier: 'needs-doc',
     promptGroup: 'economy',
-    promptLine: '- aimeat-commerce.js — buy/sell agent offers via checkout sessions: `AIMEAT.commerce.buyOffer(agent, offerId)` (open + complete in one call), `openCheckout`/`completeCheckout`, the public priced-offer `feed()`, price reading (`getOffer`, `priceOf`) and money formatting — money is integer 6-decimal MICRO-units, `AIMEAT.commerce.fmtMoney(1500000, "EUR")` → "1.50 EUR"; morsels stay plain integers (`fmtAmount` is currency-aware). A 402 error carries `err.paymentRequired` + the x402-style `err.accepts` list. Never ask the user for payment secrets — seller PSP config lives server-side. Requires aimeat-auth.',
+    promptLine: '- aimeat-commerce.js — buy/sell agent offers via checkout sessions: `AIMEAT.commerce.buyOffer(agent, offerId)` (open + complete in one call), `openCheckout`/`completeCheckout`, the public priced-offer `feed()`, price reading (`getOffer`, `priceOf`) and money formatting — money is integer 6-decimal MICRO-units, `AIMEAT.commerce.fmtMoney(1500000, "EUR")` → "1.50 EUR"; morsels stay plain integers (`fmtAmount` is currency-aware). Read a typed or exported amount with `AIMEAT.commerce.parseAmount(text)` ("12,000.00" → 12000; an ambiguous "1,000" → null, so ask again), never `parseFloat(s.replace(",", "."))`. A 402 error carries `err.paymentRequired` + the x402-style `err.accepts` list. Never ask the user for payment secrets — seller PSP config lives server-side. Requires aimeat-auth.',
   },
   {
     id: 'aimeat-exchange',
@@ -523,8 +535,10 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: [],
     license: 'MIT',
     apiSurface: 'AIMEAT.audio',
-    aiDoc: 'Audio engine: 6 built-in instruments (piano, guitar, bass, drums, flute, synth), custom synth builder, sample loader, soundboard, realtime bridge for jam apps.',
-    changelog: [],
+    aiDoc: 'Audio engine: 6 built-in instruments (piano, guitar, bass, drums, flute, synth), custom synth builder, sample loader, soundboard, realtime bridge for jam apps. AIMEAT.audio.play(instrument, note, { velocity?, duration? }). SAMPLE-ONLY instruments: strings, organ, epiano, trumpet, guitar-steel and guitar-el have recorded samples and no synth voice of their own. Call AIMEAT.audio.loadSamples(name) at boot for every one you use (it returns a promise; hasSamples(name) says when the bank is in). Until it resolves, play() sounds a stand-in voice (epiano → piano, the guitars → guitar, strings/organ/trumpet → synth) and logs one note naming loadSamples, so it is audible but not yet the real instrument. loadSamples on piano/guitar/bass/flute/drums upgrades those from synth to recorded sound.',
+    changelog: [
+      { version: '1.1.0', date: '2026-09-13', summary: 'A sample-only instrument played before loadSamples() resolved made no sound and logged "Unknown instrument"; it now plays a stand-in voice and says the samples are not loaded.' },
+    ],
     tierHint: 'T1',
     interviewTriggers: ['music', 'sound', 'audio', 'musiikki', 'ääni'],
     sizeEstimate: '~60KB',
@@ -633,9 +647,10 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: ['aimeat-auth'],
     license: 'MIT',
     apiSurface: 'AIMEAT.live',
-    aiDoc: "AIMEAT.live.subscribe(['organisms','memory'], (domains) => reload()) — one shared, owner-scoped EventSource per browser (multi-tab via Web Locks + BroadcastChannel), debounced, visibility-gated, auto-reconnecting. The callback tells you WHICH domains changed; re-fetch only that data. Use this instead of polling for any view that shows server data. Deletes do not emit a change event — refresh locally after a delete. FIREHOSE WARNING: 'memory' fires on ANY write by the owner or any of their agents, so on an account with an active agent fleet it is near-continuous and a handler that re-fetches a full listing becomes a permanent poll. Gate it with the third argument: subscribe(['memory'], reload, { keyPrefix: 'crews.', ownerScope: true }) fires only when the key count under that prefix moved, or { minIntervalMs: 10000 } to just rate-limit. The change frame carries a DOMAIN name and never the key that changed, so keyPrefix catches a NEW key, not an in-place update — use minIntervalMs for update-sensitive views. And never let a live event repaint a surface the user is reading: if a dialog is open, refresh in the background and leave the visible content alone.",
+    aiDoc: "AIMEAT.live.subscribe(['organisms','memory'], (domains) => reload()) — one shared, owner-scoped EventSource per browser (multi-tab via Web Locks + BroadcastChannel), debounced, visibility-gated, auto-reconnecting. The callback tells you WHICH domains changed; re-fetch only that data. Use this instead of polling for any view that shows server data. Deletes do not emit a change event — refresh locally after a delete. FIREHOSE WARNING: 'memory' fires on ANY write by the owner or any of their agents, so on an account with an active agent fleet it is near-continuous and a handler that re-fetches a full listing becomes a permanent poll. Gate it with the third argument: subscribe(['memory'], reload, { keyPrefix: 'crews.', ownerScope: true }) fires only when the key count under that prefix moved, or { minIntervalMs: 10000 } to just rate-limit: at most one call per interval, and a change inside the interval is delivered by one trailing call when it ends, so the last change of a burst always arrives. The change frame carries a DOMAIN name and never the key that changed, so keyPrefix catches a NEW key, not an in-place update — use minIntervalMs for update-sensitive views. And never let a live event repaint a surface the user is reading: if a dialog is open, refresh in the background and leave the visible content alone.",
     changelog: [
       { version: '1.1.0', date: '2026-07-25', summary: 'subscribe() takes a third options argument { keyPrefix, agent, ownerScope, minIntervalMs } to gate the memory firehose. Additive.' },
+      { version: '1.1.1', date: '2026-09-13', summary: 'The gate stops losing changes: minIntervalMs delivers a change inside the interval with one trailing call instead of dropping it, and keyPrefix probes again when a change arrived during a count probe.' },
     ],
     tierHint: 'T1',
     interviewTriggers: ['live', 'realtime'],

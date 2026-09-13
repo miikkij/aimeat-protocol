@@ -10,10 +10,12 @@ metadata:
     domain: ui
 
 spec:
+  # 1.0.2: two primitives on one element leave it visible. The entrance hides only inside its
+  # keyframes, and staggerIn/highlightRow take their classes off when their animations end.
   # 1.0.1 — a rolling counter reads the person's own number format when aimeat-i18n is installed.
   # The version is what makes an ALREADY-INSTALLED cortex refresh: the seeder skips one whose
   # stored version matches, so new code behind an unchanged line reaches no existing node.
-  version: "1.0.1"
+  version: "1.0.2"
   license: MIT
   components:
     - type: prompt
@@ -52,6 +54,9 @@ spec:
         M.glow(el, color?)           one-off glow ring (e.g. newly created item)
         M.highlightRow(el)           brief background flash for an SSE-updated row
         M.confettiTick(el)           small success burst — ONE per user action, never per row
+
+        Primitives may share an element: highlightRow or pulse on a card that staggerIn is still
+        bringing in skips the rest of that entrance, and the content stays visible.
 
         Recipes:
         - Dashboard mount: skeleton() each panel → fetch → unskeleton + staggerIn; statTiles

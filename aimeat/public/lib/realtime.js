@@ -5,18 +5,22 @@
  * @description AimeatRealtime — browser client for AIMEAT P2P realtime rooms (WS rooms +
  *   WebRTC data channels + Yjs CRDT sync) and SharedClock (network-synced timeline).
  * @version-history
+ *   v1.3.0 — 2026-09-13 — Frames sent while the socket is still opening are queued and sent on open
+ *     instead of dropped, and a 'joined' handler registered after the join is called with it. The
+ *     usage example below had shown connect() before on() and broadcast(), the order that lost both.
  *   v1.2.0 — 2026-07-19 — constructor also accepts an options object ({ session } or
  *     { baseUrl, token }); positional (baseUrl, token) unchanged — existing apps unaffected
  *   v1.1.0 — 2026-07-18 — SharedClock added (extracted from the Band Jam pattern)
  *   v1.0.0 — 2026-03-03 — initial WS rooms + WebRTC + Yjs client
  *
- * Usage:
+ * Usage (handlers first, then connect; a late 'joined' handler still gets the join):
  *   const rt = new AimeatRealtime('https://node.example.com', token);
  *   // or equivalently: new AimeatRealtime({ session })   (uses session.jwt + page origin)
  *   const room = await rt.createRoom({ app_type: 'whiteboard', name: 'My Board' });
- *   rt.connect(room.id, 'Alice');
+ *   rt.on('joined', (msg) => console.log('In the room as', msg.peerId));
  *   rt.on('peer-joined', (msg) => console.log('New peer:', msg.nick));
- *   rt.broadcast({ draw: { x: 10, y: 20 } });
+ *   rt.connect(room.id, 'Alice');
+ *   rt.broadcast({ draw: { x: 10, y: 20 } });   // queued until the socket opens
  *
  * WebRTC P2P (optional, for low-latency data/audio):
  *   rt.on('peer-joined', (msg) => rt.connectPeer(msg.peerId));
@@ -49,6 +53,10 @@ class AimeatRealtime {
     this.roomId = null;
     this.peers = new Map();
     this._handlers = {};
+    // The last 'joined' frame of the live socket, handed to a 'joined' handler registered after it
+    // arrived; and the frames sent while the socket was still opening, sent once it opens.
+    this._lastJoined = null;
+    this._outbox = [];
     // WebRTC state
     this._peerConnections = new Map(); // peerId → { pc, dataChannel, iceServers }
     this._iceServers = null;
@@ -125,8 +133,15 @@ class AimeatRealtime {
     const url = `${protocol}://${host}/v1/realtime/ws?room=${encodeURIComponent(roomId)}&token=${encodeURIComponent(this.token)}&nick=${encodeURIComponent(nick)}`;
 
     this.ws = new WebSocket(url);
+    this._lastJoined = null;
+    this._outbox = [];
 
-    this.ws.onopen = () => this._emit('open', {});
+    this.ws.onopen = () => {
+      // What the app sent before the socket finished opening goes out now, in order.
+      const queued = this._outbox.splice(0);
+      for (const m of queued) this._send(m);
+      this._emit('open', {});
+    };
 
     this.ws.onmessage = (event) => {
       try {
@@ -138,6 +153,8 @@ class AimeatRealtime {
     this.ws.onclose = (event) => {
       this.peerId = null;
       this.peers.clear();
+      this._lastJoined = null;
+      this._outbox = [];
       this._emit('close', { code: event.code, reason: event.reason });
     };
 
@@ -153,6 +170,8 @@ class AimeatRealtime {
       this.peerId = null;
       this.peers.clear();
     }
+    this._lastJoined = null;
+    this._outbox = [];
     this._closeAllPeerConnections();
     this._yjsDocs.clear();
   }
@@ -318,6 +337,11 @@ class AimeatRealtime {
   on(event, handler) {
     if (!this._handlers[event]) this._handlers[event] = [];
     this._handlers[event].push(handler);
+    // 'joined' arrives the moment the socket opens, so a handler written after connect() used to
+    // wait for a frame that had already gone by. The live socket's join is handed to it now.
+    if (event === 'joined' && this._lastJoined) {
+      try { handler(this._lastJoined); } catch { /* ignore handler errors */ }
+    }
     return this;
   }
 
@@ -332,6 +356,9 @@ class AimeatRealtime {
   _send(msg) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
+    } else if (this.ws && this.ws.readyState === WebSocket.CONNECTING && this._outbox.length < 200) {
+      // Sent before the socket opened: kept and sent on open instead of dropped in silence.
+      this._outbox.push(msg);
     }
   }
 
@@ -346,6 +373,7 @@ class AimeatRealtime {
             this.peers.set(p.peerId, { nick: p.nick, state: p.state });
           }
         }
+        this._lastJoined = msg;
         this._emit('joined', msg);
         break;
 
