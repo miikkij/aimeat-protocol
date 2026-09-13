@@ -7,6 +7,7 @@
  *   agent picker), and <EcoAutomationSection> (the unified turnkey publish→process→deliver flow).
  *   Extracted from ecosystem-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.1 — 2026-09-13 — The reject-advisory dialog's actions sit in its footer.
  *   v1.1.0 — 2026-07-16 — Card mount folds schedules + recipe + organisms + advisories into GET
  *     /v1/ecosystem-apps/:app/automation (getAutomationOverview); agent list stays separate; fallback kept.
  *   v1.0.0 — 2026-07-13 — Extracted from ecosystem-tab.js (max-file-lines)
@@ -645,12 +646,11 @@ export function EcoAutomationSection({ app, showToast }) {
         </div>
       </div>
 
-      <${Modal} open=${!!confirmId} onClose=${() => setConfirmId(null)} title=${t('profile.ecosystem.advReject')}>
-        <p>${t('profile.ecosystem.advRejectConfirm')}</p>
-        <div class="pf-eco-revoke-actions">
+      <${Modal} open=${!!confirmId} onClose=${() => setConfirmId(null)} title=${t('profile.ecosystem.advReject')} size="sm"
+        footer=${html`
           <button class="btn-ghost" onClick=${() => setConfirmId(null)}>${t('common.cancel')}</button>
-          <button class="btn-danger-solid" onClick=${() => onRejectAdv(confirmId)}>${t('profile.ecosystem.advReject')}</button>
-        </div>
+          <button class="btn-danger-solid" onClick=${() => onRejectAdv(confirmId)}>${t('profile.ecosystem.advReject')}</button>`}>
+        <p>${t('profile.ecosystem.advRejectConfirm')}</p>
       <//>
     </div>`;
 }

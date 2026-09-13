@@ -16,6 +16,7 @@
  *   the plan dialog
  * @usage <${DiscoveryInstant} status=${status} onChanged=${load} />
  * @version-history
+ *   v1.0.1 — 2026-09-13 — The plan dialog is the large size and its actions sit in its footer.
  *   v1.0.0 — 2026-09-11 — Initial (the Discovery page in the poster face).
  */
 import { h } from 'preact';
@@ -163,16 +164,15 @@ export function DiscoveryInstant({ status, onChanged }) {
         </div>
       </div>
 
-      <${Modal} open=${planOpen} onClose=${() => setPlanOpen(false)} title=${S('instant.planTitle')}>
+      <${Modal} open=${planOpen} onClose=${() => setPlanOpen(false)} title=${S('instant.planTitle')} size="lg"
+        footer=${plan && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setPlanOpen(false)}>${S('instant.planClose')}</button>
+          <button type="button" class="og-slab" disabled=${!!sending || !can} onClick=${() => announce('all')}>${S('instant.planSend', { n: plan.url_count })}</button>`}>
         ${plan && html`
           <div class="adm-disc-plan-hosts">
             ${plan.hosts.map((h_) => html`<span key=${h_.host} class="adm-disc-fchip">${h_.host.replace(/^https?:\/\//, '')} · ${h_.url_count}</span>`)}
           </div>
-          <div class="adm-disc-plan-urls">${plan.urls.map((u) => html`<div key=${u}>${u}</div>`)}</div>
-          <div class="adm-disc-acts">
-            <button type="button" class="og-slab" disabled=${!!sending || !can} onClick=${() => announce('all')}>${S('instant.planSend', { n: plan.url_count })}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setPlanOpen(false)}>${S('instant.planClose')}</button>
-          </div>`}
+          <div class="adm-disc-plan-urls">${plan.urls.map((u) => html`<div key=${u}>${u}</div>`)}</div>`}
       <//>
     </section>`;
 }

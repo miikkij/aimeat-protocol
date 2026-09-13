@@ -7,6 +7,7 @@
  *   helper renderers (status labels, JSON tree, memory entry, request-changes modal, blur
  *   preference). Extracted from ../agents-tasks-subtab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.0.1 — 2026-09-13 — The request-changes dialog's actions sit in its footer.
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/agents-tasks-subtab.js (max-file-lines)
  */
 import { h } from 'preact';
@@ -101,7 +102,12 @@ function RequestChangesModal({ open, onClose, onSubmit, submitting }) {
     if (!trimmed) return;
     onSubmit(trimmed);
   }
-  return html`<${Modal} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.requestChangesTitle')}>
+  return html`<${Modal} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.requestChangesTitle')}
+    footer=${html`
+      <button class="btn-ghost" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
+      <button class="btn-primary" onClick=${handleSend} disabled=${submitting || !message.trim()}>
+        ${submitting ? t('profile.agents.tasks.requestChangesSending') : t('profile.agents.tasks.requestChangesSend')}
+      </button>`}>
     <p class="pf-agd-modal-help">${t('profile.agents.tasks.requestChangesHelp')}</p>
     <textarea
       class="pf-agd-revision-textarea"
@@ -110,12 +116,6 @@ function RequestChangesModal({ open, onClose, onSubmit, submitting }) {
       onInput=${e => setMessage(e.target.value)}
       rows=${6}
     ></textarea>
-    <div class="modal-footer">
-      <button class="btn-ghost" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
-      <button class="btn-primary" onClick=${handleSend} disabled=${submitting || !message.trim()}>
-        ${submitting ? t('profile.agents.tasks.requestChangesSending') : t('profile.agents.tasks.requestChangesSend')}
-      </button>
-    </div>
   <//>`;
 }
 

@@ -9,6 +9,7 @@
  *   badges come from admin.css and organism.css; only what this page adds lives here. Every value
  *   is a theme.css token, so the page flips with the theme.
  * @version-history
+ *   v1.1.1 — 2026-09-13 — .adm-ap-dialog-acts leaves: the dialogs' actions are in the dialog's footer.
  *   v1.1.0 — 2026-09-12 — The table stacks at 1100px rather than 768: the content column is about
  *     290px narrower than the window, so between those two widths the table scrolled sideways
  *     inside its own box with the row actions off the right edge, while the page reported no
@@ -90,7 +91,6 @@
 .adm-ap-field { display: block; margin-top: 12px; }
 .adm-ap-field > span { display: block; font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
 .adm .adm-ap-field input[type="text"] { width: 100%; box-sizing: border-box; }
-.adm-ap-dialog-acts { display: flex; gap: 16px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
 
 @media (max-width: 1100px) {
   .adm-ap-scan { grid-template-columns: 1fr; gap: 18px 0; }

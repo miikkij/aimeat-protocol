@@ -13,6 +13,7 @@
  * @structure TrackResponseModal({ open, msg, onClose, onDone, showToast, defaultMode, allowPark })
  * @usage import { TrackResponseModal } from '/views/profile/track-response-modal.js';
  * @version-history
+ *   v1.0.1 — 2026-09-13 — Each phase's actions sit in the dialog's footer.
  *   v1.0.0 — 2026-06-21 — Extracted from inbox-tab.js so the Notebook can reuse it; + park-to-notebook.
  */
 import { h } from 'preact';
@@ -146,8 +147,20 @@ export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defa
 
   const parkBtn = allowPark ? html`<button class="btn-outline" disabled=${busy} onClick=${park}>📓 ${t('inbox.trackPark')}</button>` : null;
 
+  const footer = phase === 'error' ? html`
+      <button class="btn-ghost" disabled=${busy} onClick=${onClose}>${t('common.cancel')}</button>
+      ${parkBtn}
+      <button class="btn-outline" disabled=${busy} onClick=${() => { window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'mcp' } })); onClose?.(); }}>${t('inbox.trackConfigureAi')}</button>`
+    : phase === 'review' ? html`
+      <button class="btn-ghost" disabled=${busy} onClick=${close}>${t('common.cancel')}</button>
+      ${parkBtn}
+      <button class="btn-primary" disabled=${busy || !namespace} onClick=${submit}>
+        ${busy ? html`<span class="inbox-spinner"></span> ${t('inbox.trackCreating')}` : t('inbox.trackCreate')}
+      </button>`
+    : null;
+
   return html`
-    <${Modal} open=${open} onClose=${close} title=${t('inbox.trackResponse')} className="inbox-track-modal">
+    <${Modal} open=${open} onClose=${close} title=${t('inbox.trackResponse')} className="inbox-track-modal" footer=${footer}>
       ${phase === 'classify' ? html`
         <div class="inbox-track-classify">
           <${Spinner} />
@@ -159,11 +172,6 @@ export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defa
         <div class="inbox-track-form">
           <p class="inbox-track-hint">${t('inbox.trackNeedsAi')}</p>
           ${aiErr?.message ? html`<p class="inbox-tracked-err">${escHtml(aiErr.message)}</p>` : null}
-          <div class="inbox-track-actions">
-            <button class="btn-ghost" disabled=${busy} onClick=${onClose}>${t('common.cancel')}</button>
-            ${parkBtn}
-            <button class="btn-outline" disabled=${busy} onClick=${() => { window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'mcp' } })); onClose?.(); }}>${t('inbox.trackConfigureAi')}</button>
-          </div>
         </div>` : null}
 
       ${phase === 'review' ? html`
@@ -205,13 +213,6 @@ export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defa
             </select>
           </label>
           <p class="inbox-track-hint">${t('inbox.trackFillNote')}</p>
-          <div class="inbox-track-actions">
-            <button class="btn-ghost" disabled=${busy} onClick=${close}>${t('common.cancel')}</button>
-            ${parkBtn}
-            <button class="btn-primary" disabled=${busy || !namespace} onClick=${submit}>
-              ${busy ? html`<span class="inbox-spinner"></span> ${t('inbox.trackCreating')}` : t('inbox.trackCreate')}
-            </button>
-          </div>
         </div>` : null}
     </${Modal}>`;
 }
