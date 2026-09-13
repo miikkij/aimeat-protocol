@@ -8,6 +8,7 @@
  *   value as prose or as key/value rows, the file rows, and the quiet forms the old list still uses
  *   when it sits inside a page. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose the record value's top rule from poster.css.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 
@@ -19,7 +20,7 @@
 .mp-sort button.on { color: var(--accent); border-bottom-color: var(--accent); }
 .og-title.mp-title--key { font-family: var(--font-mono); font-weight: 500; font-size: 1.7rem; text-transform: none; letter-spacing: 0; }
 .mp-meta { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-top: .6rem; font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
-.mp-value { margin-top: 1.2rem; padding-top: 1rem; border-top: 3px solid var(--text); }
+.mp-value { margin-top: 1.2rem; padding-top: 1rem; }
 .mp-prose { font-size: 1rem; line-height: 1.65; max-width: 68ch; white-space: pre-wrap; overflow-wrap: anywhere; }
 .mp-prose .md-body, .mp-prose .markdown { white-space: normal; }
 .mp-kv { display: grid; grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); gap: .5rem 1.2rem; font-size: .95rem; line-height: 1.5; }
