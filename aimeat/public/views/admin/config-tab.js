@@ -26,6 +26,7 @@
  *   - FieldRow — one field: name, key, description, source, editor
  *   - ConfigTab (default)
  * @version-history
+ *   v2.2.0 -- 2026-09-13 -- Compose domain and group headings with the shared B1 shape.
  *   v2.1.0 -- 2026-08-31 -- The save controls move into the pinned search row and the old→new
  *     list opens from a word there; the fixed bottom overlay that covered the content is gone.
  *   v2.0.0 -- 2026-08-31 -- The poster face: search over name/key/description, the only-changed
@@ -340,7 +341,7 @@ export default function ConfigTab({ data, reload }) {
         <div>
           ${domainOrder.map(domain => html`
             <div class="adm-cfg-domain" key=${domain}>
-              <h3 class="adm-cfg-domain-head2">${domainLabel(domain)}</h3>
+              <h3 class="poster-section-title">${domainLabel(domain)}</h3>
               ${byDomain.get(domain).map(([g, items]) => {
                 const helpKey = 'dashboard.cfgHelp_' + g;
                 const helpText = t(helpKey);
@@ -350,7 +351,7 @@ export default function ConfigTab({ data, reload }) {
                 return html`
                 <section class="adm-cfg-sec" id=${'cfg-' + g} key=${g}>
                   <div class="adm-cfg-sec-h">
-                    <h2>${groupLabel(g)}</h2>
+                    <h2 class="poster-section-title">${groupLabel(g)}</h2>
                     <small>${tr('dashboard.cfgSecCount', '{n} settings').replace('{n}', items.length)}${changedHere ? ' · ' + tr('dashboard.cfgSecChanged', '{n} changed').replace('{n}', changedHere) : ''}${editedHere > 0 ? html` <span class="adm-cfg-edited-dot">● ${editedHere}</span>` : ''}</small>
                   </div>
                   ${hasHelp && html`<${ExpandableHelp} title=${t('dashboard.cfgHelpTitle')}><p>${helpText}</p></${ExpandableHelp}>`}
