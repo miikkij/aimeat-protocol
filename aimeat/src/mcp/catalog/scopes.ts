@@ -20,6 +20,7 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.22.1 -- 2026-09-13 -- aimeat_board_rules_set → social:write, the word PATCH /v1/boards/:id/rules asks.
  *   v1.22.0 -- 2026-09-13 -- aimeat_dm_archive_as_owner and aimeat_dm_organize_as_owner →
  *     messages:organize-as-owner, outside the '*' bundle.
  *   v1.21.0 -- 2026-09-12 -- aimeat_dm_inbox_as_owner and aimeat_dm_thread_as_owner → messages:read-as-owner,
@@ -467,6 +468,8 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_board_reply: 'social:write',
     aimeat_board_react: 'social:write',
     aimeat_board_delete: 'social:write',
+    // PATCH /v1/boards/:id/rules asks social:write, and so does the tool that is that door.
+    aimeat_board_rules_set: 'social:write',
     // Who may READ a shared board, which is a different promise from posting to one. The HTTP
     // route rejects every agent session outright ("even operator agents must use their owner
     // session"); this door stays open and costs its own tick.

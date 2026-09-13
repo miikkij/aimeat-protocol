@@ -22,6 +22,10 @@
  *   v1.0.0 — 2026-07-16 — Initial: generic Public Intake capability (forms CRUD + anon submit).
  *   v1.1.0 — 2026-07-16 — Server-computed default tokens ({{now}}/{{today}}/{{uuid}}) resolved per
  *     submission, so a form can stamp a schema-required created-at/id without the node knowing field names.
+ *   v1.2.0 — 2026-09-13 — POST /v1/intake/forms refuses a form its destination cannot hold: 422
+ *     INTAKE_SCHEMA_MISMATCH naming every property ("id", an allowed field, a default) the space's
+ *     closed schema does not list. The definition used to succeed and every anonymous submission then
+ *     failed on the "id" the submit path adds, seen only by the anonymous submitter.
  */
 import type { Router, Request, Response } from 'express';
 import { randomUUID, randomBytes } from 'node:crypto';
@@ -33,6 +37,7 @@ import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitChange } from '../../services/event-bus.js';
+import { logger } from '../../utils/logger.js';
 import type { OrganismHelpers } from './shared.js';
 
 /** Server-trusted intake-form config, stored at organism.{org}.w.{ws}.meta.intake.{formId}. */
@@ -102,6 +107,31 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
 
   const strList = (v: unknown): string[] => Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 
+  /**
+   * The names a form puts into every record that its destination's locked schema refuses, or [] when
+   * the schema can hold them all (or there is no lock).
+   *
+   * The submit path adds `id`, copies the allowed fields and the defaults, then validates against the
+   * space's lock, and a workspace always locks strict, which closes an object schema to every
+   * property it does not list. A form naming one such property was accepted here and every anonymous
+   * submission to it was then refused with 422, which only the anonymous submitter ever saw. The
+   * test is the validator's own rule: listed under `properties`, or matching a `patternProperties` key.
+   */
+  async function namesTheSchemaRefuses(org: string, ws: string, namespace: string, names: string[]): Promise<string[]> {
+    const lock = await storage.findApplicableSchema(`organism.${org}.w.${ws}.${namespace}.${randomUUID()}.latest`);
+    if (!lock) return [];
+    const schema = lock.schemaJson ?? {};
+    const closed = schema.additionalProperties === false || (lock.schemaMode === 'strict' && schema.type === 'object');
+    if (!closed) return [];
+    const listed = new Set(Object.keys((schema.properties as Record<string, unknown> | undefined) ?? {}));
+    const patterns: RegExp[] = [];
+    for (const p of Object.keys((schema.patternProperties as Record<string, unknown> | undefined) ?? {})) {
+      // A pattern this engine cannot compile cannot admit a name at submit time either, so it admits none here.
+      try { patterns.push(new RegExp(p, 'u')); } catch (err) { logger.warn('intake form: uncompilable patternProperties key admits nothing', { namespace, pattern: p, error: String(err) }); }
+    }
+    return [...new Set(names)].filter(n => !listed.has(n) && !patterns.some(re => re.test(n)));
+  }
+
   /* ── POST /v1/intake/forms — define/update a public intake form (ws creator / org admin). ── */
   router.post('/v1/intake/forms', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
@@ -121,6 +151,23 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
     }
     const allowedFields = strList(b.allowed_fields);
     if (!allowedFields.length) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'allowed_fields (non-empty array) is required')); return; }
+    const defaults = (b.defaults && typeof b.defaults === 'object') ? b.defaults as Record<string, unknown> : {};
+
+    // Refused before anything is stored: a form whose records the destination cannot hold would take
+    // no submission at all, and the only one told would be an anonymous visitor.
+    const refused = await namesTheSchemaRefuses(org, ws, namespace, ['id', ...allowedFields, ...Object.keys(defaults)]);
+    if (refused.length) {
+      const list = refused.map(n => `"${n}"`).join(', ');
+      res.status(422).json(error(config.nodeId, 'INTAKE_SCHEMA_MISMATCH',
+        `Every submission to this form would be refused: the locked schema for "${namespace}" does not allow additional properties and does not list ${list}. `
+        + 'The node adds "id" to each record and writes the allowed fields and defaults into it. Add these to the schema\'s properties, or take them out of the form.',
+        422, {
+          missing_properties: refused,
+          schema_url: `/v1/memory/${encodeURIComponent(`organism.${org}.w.${ws}.${namespace}`)}/schema`,
+          how_to_fix: `Re-lock the schema in place with the missing properties added: PUT /v1/organisms/${org}/workspace?ws=${ws} with { schemas: { "${namespace}": <schema> } }, or aimeat_workspace_update { organism_id, ws, schemas }. The workspace does not need to be recreated.`,
+        }));
+      return;
+    }
 
     const now = new Date().toISOString();
     const existing = await readForm(org, ws, formId);
@@ -128,7 +175,7 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
     const cfg: IntakeFormConfig = {
       formId, orgId: org, ws, namespace, ownerGhii, allowedFields,
       requiredFields: strList(b.required_fields),
-      defaults: (b.defaults && typeof b.defaults === 'object') ? b.defaults as Record<string, unknown> : {},
+      defaults,
       mode: b.mode === 'draft' ? 'draft' : 'publish',
       honeypotField: typeof b.honeypot_field === 'string' ? b.honeypot_field : null,
       enabled: b.enabled !== false,

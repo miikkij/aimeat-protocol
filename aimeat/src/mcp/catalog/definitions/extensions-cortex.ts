@@ -12,6 +12,10 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   v1.1.0 — 2026-09-13 — aimeat_extension_get takes include_source (each action's script, for the
+ *     installer's own sessions holding ext:write), and aimeat_cortex_install takes update (redeploy in
+ *     place) and names lib_urls. Over MCP an installed extension's code could not be read back and a
+ *     cortex could not be updated at all; the description sent an MCP-only agent to a REST route.
  *   v1.0.0 — 2026-08-25 — Extracted from organisms-workspaces-apps.ts (max-file-lines)
  */
 import type { AimeatToolDefinition } from './types.js';
@@ -72,10 +76,13 @@ export const extensionsCortexTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_extension_get',
-        description: 'Get one extension\'s full detail by name: status, version, author, required APIs, every action with input/output schemas, config, resource limits, federation, and instance support. Works for inactive extensions too (unlike aimeat_extension_list). Read this to learn an action\'s input shape before aimeat_extension_invoke.',
+        description: 'Get one extension\'s full detail by name: status, version, author, required APIs, every action with input/output schemas, config, resource limits, federation, and instance support. Works for inactive extensions too (unlike aimeat_extension_list). Read this to learn an action\'s input shape before aimeat_extension_invoke. Pass include_source:true to get each action\'s installed script as well, which is what you need to add an action or change one and redeploy with aimeat_extension_install update:true; only the installing owner\'s own sessions holding ext:write may read it, and anyone else is refused.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { name: { type: 'string', required: true, description: 'Extension name.' } },
+        input: {
+            name: { type: 'string', required: true, description: 'Extension name.' },
+            include_source: { type: 'boolean', description: 'Also return each action\'s installed script. Refused unless this extension was installed by your own owner and the session holds ext:write.' },
+        },
     },
     {
         name: 'aimeat_iam_define',
@@ -97,12 +104,13 @@ export const extensionsCortexTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_cortex_install',
-        description: 'Install a NEW cortex extension (browser-side IIFE that reads ext data and user data and renders rich UI). Two modes: UPLOAD MODE (recommended) — call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and lib files in libs/. INLINE MODE — provide the manifest YAML string plus a libs map directly. Activate afterwards with aimeat_cortex_activate. CREATE-ONLY: installing a name that already exists FAILS (the ZIP upload path returns PROCESSING_FAILED) — update an existing cortex with PUT /v1/cortex/{name} instead (JSON body { manifest, libs }, cortex:write scope; idempotent redeploy that bumps the version and keeps it active), or delete it first with aimeat_cortex_delete.',
+        description: 'Install a cortex extension (browser-side IIFE that reads ext data and user data and renders rich UI), or redeploy one you installed. Two modes. UPLOAD MODE: call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and lib files in libs/. INLINE MODE: provide the manifest YAML string plus a libs map directly. Activate a new one afterwards with aimeat_cortex_activate. REDEPLOYING: pass update:true with the inline manifest and libs to replace your installed cortex of that metadata.name in place, with no delete: it stays served for the whole call, an active one stays active and re-runs its initialisation, and identical bytes answer "unchanged". Without update:true a name that already exists is refused. update:true works in inline mode only; the ZIP upload creates. Do not delete a live cortex to reinstall it, because every app loading its lib breaks until the new one is active. The answer names each lib\'s address in lib_urls; that is the exact script src an app loads.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             manifest: { type: 'string', description: 'Cortex manifest in YAML format. Omit to get an upload_url for a ZIP bundle. Use @file:path with the CLI fallback.' },
             libs: { type: 'object', description: 'Map of filename to JavaScript source code for lib files. Omit for upload mode.' },
+            update: { type: 'boolean', description: 'Replace your installed cortex of the manifest\'s metadata.name in place (inline mode only). Without it an existing name is refused.' },
         },
     },
     {

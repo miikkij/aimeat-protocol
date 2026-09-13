@@ -8,6 +8,9 @@
  *   email path (PDF + Finvoice attachments composed), the public unsubscribe
  *   endpoint's no-enumeration behavior, cross-owner isolation and cross-scope 403.
  * @version-history
+ *   v1.2.0 — 2026-09-13 — Test 6b pins the fields of a failed send's 200 answer that aimeat_mail_send
+ *     on the connector doors reads to answer it as an error (appdev pitfall
+ *     send-200-is-not-a-delivery), and that the log row carries the id and reason it names.
  *   v1.1.0 — 2026-08-16 — E2E quality, outbound:343: the unsubscribe was only ever fetched with an
  *     unknown token, so the opt-out it exists to perform was never measured and the route could
  *     have stopped writing unnoticed. Test 17 reads the recipient's real token out of the database
@@ -199,6 +202,29 @@ await test('6. a plain-email recipient falls to the email channel; no SMTP → h
   assert(r.status === 200, `expected 200 (the send is logged), got ${r.status} ${JSON.stringify(r.body)}`);
   assert(r.body.data.channel === 'email' && r.body.data.status === 'failed', `expected email/failed, got ${r.body.data.channel}/${r.body.data.status}`);
   assert(r.body.data.message.error === 'EMAIL_DISABLED', `expected EMAIL_DISABLED, got ${r.body.data.message.error}`);
+});
+
+await test('6b. a failed send keeps the 200 contract the tool doors read, and its log row says the same', async () => {
+  // The REST answer stays 200 for a failed send (decided 2026-09-13), and aimeat_mail_send on the
+  // connector and CLI doors turns it into an error by reading exactly these fields:
+  // data.status, data.channel, data.message.id and data.message.error (refuseUnsentSend in
+  // cli/connect/tool-call-defs-connections.ts). A rename or a status change here would make those
+  // doors report a refused send as sent again, with nothing else going red.
+  const r = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({ contact_id: plainContactId, kind: 'transactional', subject: 'Sopimusviesti', body: 'Sisältö.' }),
+  });
+  assert(r.status === 200 && r.body.ok === true, `expected 200 ok, got ${r.status} ${JSON.stringify(r.body)}`);
+  const d = r.body.data;
+  assert(d.status === 'failed', `data.status: ${d.status}`);
+  assert(d.channel === 'email', `data.channel: ${d.channel}`);
+  assert(typeof d.message?.id === 'string' && d.message.id.length > 0, `data.message.id: ${JSON.stringify(d.message)}`);
+  assert(d.message.error === 'EMAIL_DISABLED', `data.message.error: ${d.message.error}`);
+  const log = await json('/v1/outbound/log?status=failed&per_page=200', { headers: authed(A.token) });
+  assert(log.status === 200, `log read: ${log.status}`);
+  const row = (log.body.data.messages as any[]).find(m => m.id === d.message.id);
+  assert(!!row, 'the failed attempt must be in the send log under the id the answer named');
+  assert(row.status === 'failed' && row.error === 'EMAIL_DISABLED', `log row: ${JSON.stringify(row)}`);
 });
 
 await test('7. opt-out blocks marketing but not transactional', async () => {

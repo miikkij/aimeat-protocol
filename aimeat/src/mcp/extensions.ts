@@ -11,6 +11,10 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v2.4.0 — 2026-09-13 — aimeat_extension_get takes include_source and returns each action's
+ *     script_content past the installer check GET /v1/extensions/:name?full=true applies. The scripts
+ *     were readable over HTTP only, so an agent extending its own installed extension had to rebuild
+ *     every existing action from memory.
  *   v2.3.0 — 2026-09-06 — aimeat_extension_invoke passes the session's scopes into ctx.caller, as
  *     the HTTP door does, so a script holding a permission word answers the same on both surfaces.
  *   v2.2.0 — 2026-09-05 — aimeat_extension_invoke attaches ctx.workspace when the manifest declares
@@ -696,12 +700,22 @@ export function registerExtensionsTools(
         descriptionFor('aimeat_extension_get'),
         {
             name: z.string().describe('Name of the extension to retrieve'),
+            include_source: z.boolean().optional().describe('Also return each action\'s installed script. Refused unless your own owner installed it and this session holds ext:write.'),
         },
         annotationsFor('aimeat_extension_get'),
-        async ({ name }) => {
+        async ({ name, include_source }) => {
             const ext = await storage.getExtension(name);
             if (!ext) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
+            }
+
+            // The source is the whole implementation of somebody's extension, and GET
+            // /v1/extensions/:name?full=true answers it only past canManageInstalledExt. Same rule
+            // here, through the request-free half of it: the installer's own principal holding
+            // ext:write, or an operator. Refused outright rather than answered without the scripts,
+            // because an answer that lacks what was asked for, and says nothing, reads as "this action has no code".
+            if (include_source && !canManageExtensionAs(resolveCaller(), config, ext.installedBy)) {
+                return { content: [{ type: 'text' as const, text: `The source of extension "${name}" is readable only by its installer's own sessions holding ext:write.` }], isError: true };
             }
 
             return {
@@ -720,6 +734,9 @@ export function registerExtensionsTools(
                             path: a.path,
                             input_schema: a.inputSchema,
                             output_schema: a.outputSchema,
+                            // Adding an action means redeploying the whole manifest with every script,
+                            // and until 2026-09-13 no MCP door could read the scripts back.
+                            ...(include_source ? { script_content: a.scriptContent } : {}),
                         })),
                         // Masked: an API surface returns the mask for a set secret, never the value.
                         config: maskSecretFields(ext.config, getExtSecretKeys(ext)),

@@ -28,6 +28,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.1.0 — 2026-09-13 — publishWorkspaceOp carries publishDraft's UNDECLARED_SPACE warning as
+ *     `warnings`, as POST /v1/organisms/:id/publish does.
  *   v1.0.0 — 2026-09-05 — Extracted from src/mcp/workspaces.ts (a pure move of the three tool
  *     bodies) so ctx.workspace in the extension sandbox calls the same functions the tools call.
  *     Two additions the tools do not use yet: `ifVersion` on a single-record draft write (the
@@ -368,7 +370,7 @@ export interface PublishWorkspaceArgs { organismId: string; ws: string; namespac
  */
 export async function publishWorkspaceOp(
     deps: WorkspaceOpsDeps, caller: WorkspaceOpsCaller, args: PublishWorkspaceArgs,
-): Promise<WorkspaceOpResult<{ published: string; version: number; skipped?: boolean }>> {
+): Promise<WorkspaceOpResult<{ published: string; version: number; skipped?: boolean; warnings?: unknown[] }>> {
     const { storage, config } = deps;
     const { organismId, ws, namespace, id } = args;
     const H = createOrganismHelpers(config, storage);
@@ -390,12 +392,15 @@ export async function publishWorkspaceOp(
             : refuse(409, 'PUBLISH_REFUSED', 'Publish refused: ' + JSON.stringify(result.violations), { violations: result.violations });
     }
     emitChange('organisms');
+    // UNDECLARED_SPACE: stored, and no workspace read lists it. The web door answers it; this one
+    // dropped it, so an agent publishing over MCP into an older workspace was never told.
+    const warned = result.warning ? { warnings: [result.warning] } : {};
     // A no-op re-publish leaves no new version, so it earns no audit entry and no snapshot either.
-    if (result.skipped) return { ok: true, data: { published: base, version: result.version, skipped: true } };
+    if (result.skipped) return { ok: true, data: { published: base, version: result.version, skipped: true, ...warned } };
     await H.writeDecision(organismId, caller.writerGaii, `published ${namespace}.${id} v${result.version}`, [`${namespace}.${id}`]);
     void updateOrganismStructure(storage, config, organismId, { event: 'content published', actor: caller.writerGaii }).catch(err => { logger.warn('publish: timeline best-effort', { error: String(err) }); });
     void import('./onboarding-funnel.js')
         .then(m => m.recordActivation(storage, config, caller.ownerName, 'workspace'))
         .catch(err => { logger.warn('publish: activation marker is best-effort', { error: String(err) }); });
-    return { ok: true, data: { published: base, version: result.version } };
+    return { ok: true, data: { published: base, version: result.version, ...warned } };
 }

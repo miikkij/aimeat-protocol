@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.53.1 -- 2026-09-13 -- Add e2e-memory-discover.ts to ALL_SUITES: the cross-user public read a
+ *            shared feed is built on (AIMEAT.data.discover), with two accounts. Not in the guard tier.
  *   v1.53.0 -- 2026-09-13 -- Add e2e-inbox-organize.ts to ALL_SUITES: the Messages list's sections,
  *            archive and rules, and messages:organize-as-owner. Not in the guard tier.
  *   v1.52.0 -- 2026-09-13 -- Add e2e-ai-provider-allowlist.ts to ALL_SUITES: the operator's provider
@@ -103,7 +105,7 @@
  *            eleven of its seventeen assertions are a refusal, and the capability it proves did not
  *            exist before (a receiving node could not refuse a relay). It spawns its own node on
  *            40293 with its own sqlite file, so it neither needs nor disturbs the shared server
- *            (40291 is e2e-sealed-config's; see docs/pitfalls.md §38).
+ *            (40291 is e2e-sealed-config's; see docs/pitfalls.md §38b).
  *   v1.27.0 -- 2026-09-02 -- Add e2e-workspace-doc-edit.ts: in-place document edits, the byte-identity
  *            of everything they do not touch, and two concurrent appends both surviving.
  *   v1.26.0 -- 2026-09-02 -- Add e2e-app-playtest.ts: the game playtest bench through the audit door.
@@ -573,6 +575,8 @@ const ALL_SUITES = [
     'test/e2e-organism-dangling-refs.ts',
     'test/e2e-librarian.ts',
     'test/e2e-discover.ts',
+    // The cross-user public read a shared feed is built on, proven with two accounts.
+    'test/e2e-memory-discover.ts',
     // The people directory: consent gate, the semantic record, radius and keyword search.
     'test/e2e-directory-index.ts',
     'test/e2e-agent-readiness.ts',

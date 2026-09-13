@@ -8,6 +8,11 @@
  *   also checked against the workspace manifest's write guards (services/write-guards.ts)
  *   here, so one call site covers the REST, MCP and publish surfaces alike.
  * @version-history
+ *   v1.3.0 — 2026-09-13 — A violation names the property it is about (`must NOT have additional
+ *     properties: "b"`, the accepted values of an enum), on both validators, and
+ *     validateValueAgainstSchema also returns `violations` with path, rule and params. The batch
+ *     publish kept only the generic message, so a publish refused by one new field repeated
+ *     "/ must NOT have additional properties" per record and never said which field.
  *   v1.2.0 — 2026-07-07 — TARGET-009 S1: validateMemoryWrite runs checkWriteGuard first
  *     (create_only / requires_expected_version manifest policies); optional writeCtx carries
  *     the publish path's expected_version.
@@ -67,17 +72,58 @@ export function clearValidatorCache(): void {
   validatorCache.clear();
 }
 
+/** One schema violation, in the shape every door hands back. */
+export interface SchemaViolation {
+  path: string;
+  message: string;
+  schema_rule: string;
+  params?: Record<string, unknown>;
+}
+
+type AjvError = NonNullable<ValidateFunction['errors']>[number];
+
 /**
- * Validate a value against a JSON Schema using the shared (cached) ajv. Returns ok + ajv messages.
+ * Ajv's message with the name it is about. Ajv puts the offending property of an
+ * `additionalProperties` refusal, and the accepted values of an `enum`, in `params` and leaves the
+ * message generic, so a caller reading only the message saw "must NOT have additional properties"
+ * once per record and nothing saying which property. `required` and `type` already name theirs.
+ */
+function namedMessage(err: AjvError): string {
+  const base = err.message ?? 'Unknown validation error';
+  const p = (err.params ?? {}) as Record<string, unknown>;
+  if (typeof p.additionalProperty === 'string') return `${base}: "${p.additionalProperty}"`;
+  if (typeof p.unevaluatedProperty === 'string') return `${base}: "${p.unevaluatedProperty}"`;
+  if (Array.isArray(p.allowedValues)) return `${base}: ${JSON.stringify(p.allowedValues)}`;
+  if ('allowedValue' in p) return `${base}: ${JSON.stringify(p.allowedValue)}`;
+  return base;
+}
+
+function toViolations(errors: ValidateFunction['errors']): SchemaViolation[] {
+  return (errors ?? []).map(err => ({
+    path: err.instancePath || '/',
+    message: namedMessage(err),
+    schema_rule: err.keyword,
+    params: err.params as Record<string, unknown>,
+  }));
+}
+
+/**
+ * Validate a value against a JSON Schema using the shared (cached) ajv. Returns ok + one message per
+ * violation (path first, then what is wrong and the name it is about), and `violations` with the path,
+ * rule and params beside each message, which is what the single-write door has always returned.
  * If the schema itself is invalid, ok:false with the compile error (a bad schema must not pass).
  * Used by the workflow `json_schema` signal leaf — see services/workflow/eval-context.ts.
  */
-export function validateValueAgainstSchema(value: unknown, schema: Record<string, unknown>): { ok: boolean; errors?: string[] } {
+export function validateValueAgainstSchema(
+  value: unknown, schema: Record<string, unknown>,
+): { ok: boolean; errors?: string[]; violations?: SchemaViolation[] } {
   let validate: ValidateFunction;
   try { validate = getValidator(schema); }
   catch (err) { return { ok: false, errors: [`invalid schema: ${(err as Error).message}`] }; }
   const ok = validate(value) as boolean;
-  return ok ? { ok: true } : { ok: false, errors: (validate.errors ?? []).map(e => `${e.instancePath || '/'} ${e.message}`) };
+  if (ok) return { ok: true };
+  const violations = toViolations(validate.errors);
+  return { ok: false, errors: violations.map(v => `${v.path} ${v.message}`), violations };
 }
 
 export function removeFromCache(schema: Record<string, unknown>): void {
@@ -86,12 +132,7 @@ export function removeFromCache(schema: Record<string, unknown>): void {
 
 export interface ValidationResult {
   valid: boolean;
-  errors?: Array<{
-    path: string;
-    message: string;
-    schema_rule: string;
-    params?: Record<string, unknown>;
-  }>;
+  errors?: SchemaViolation[];
   schemaKey?: string;
 }
 
@@ -144,12 +185,7 @@ export async function validateMemoryWrite(
 
   return {
     valid: false,
-    errors: (validate.errors ?? []).map(err => ({
-      path: err.instancePath || '/',
-      message: err.message ?? 'Unknown validation error',
-      schema_rule: err.keyword,
-      params: err.params as Record<string, unknown>,
-    })),
+    errors: toViolations(validate.errors),
     schemaKey: schemaRecord.keyPattern,
   };
 }

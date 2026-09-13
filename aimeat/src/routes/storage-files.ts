@@ -83,13 +83,19 @@
  *     way to being refused. Each door now takes the metadata first, runs its access decision on
  *     that, and hands serveStoredFile() a reader. Measured against Postgres through this route,
  *     10 MB file: suffix range 76 ms to 4 ms, a 64 kB window 82 ms to 3 ms, HEAD 65 ms to 2 ms.
+ *   v1.16.0 -- 2026-09-13 -- A file written again under the same key stops being served stale. Every
+ *     download door passes the request's conditional headers to serveStoredFile, which sends a
+ *     strong ETag and answers If-None-Match / If-Modified-Since with 304 (HEAD /v1/storage sends the
+ *     same ETag). GET /v1/pub keeps max-age=300 and exposes ETag and Last-Modified to scripts. POST
+ *     /v1/storage answers with versioned_url, the /v1/pub address plus ?v=<this write>, which the
+ *     route ignores and every cache treats as new (appdev pitfall pub-file-cache-stale-assets).
  */
 import { Router } from 'express';
 import type { Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { setStoredFileHeaders, safeDownloadName } from '../utils/file-download-headers.js';
 import { storageChunkedUploadRouter } from './storage-files-chunked.js';
-import { setAcceptRanges, serveStoredFile, needsBytesForType, type StoredFileReader } from '../utils/http-range.js';
+import { setAcceptRanges, serveStoredFile, needsBytesForType, storedFileEtag, versionedAddress, type StoredFileReader } from '../utils/http-range.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { requireAuth, requireExternalPrincipal, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -177,7 +183,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // beats an anchor's `download` attribute in every browser, so a name the page knows is of no
         // use unless it reaches this response.
         const named = verified.filename ? { ...file, downloadName: verified.filename } : file;
-        if (!await serveStoredFile(res, named, req.headers.range, readerFor(verified.sub, verified.key), { headOnly: req.method === 'HEAD' })) {
+        if (!await serveStoredFile(res, named, req.headers.range, readerFor(verified.sub, verified.key), { headOnly: req.method === 'HEAD', conditionals: req.headers })) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'File not found'));
         }
     });
@@ -287,6 +293,11 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             // to that workspace's members on save (never the public internet) — use it, not /v1/storage/<key>.
             embed_url: pubEmbedUrl(file.ownerGaii, file.key),
             embed_markdown: pubEmbedMarkdown(file.ownerGaii, file.key),
+            // The same address with ?v=<this write>. GET /v1/pub answers with five minutes of browser
+            // freshness and a re-upload replaces the file under the same key, so a page or manifest
+            // that points at this one gets the new bytes at once. embed_url stays unversioned: the
+            // document image normaliser reads a /v1/pub path as owner plus key.
+            versioned_url: versionedAddress(pubEmbedUrl(file.ownerGaii, file.key), file),
         }, [
             { description: 'Download this file', method: 'GET', url: `/v1/storage/${encodeURIComponent(key)}` },
             { description: 'List all files', method: 'GET', url: '/v1/storage' },
@@ -407,7 +418,12 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             // from a browser at all — without it a fetch() sees the 206 and none of its geometry.
             res.setHeader('Access-Control-Allow-Origin', '*');
             res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-            res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
+            // ETag and Last-Modified are exposed so a script can revalidate or compare what it holds.
+            res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, ETag, Last-Modified');
+            // Five minutes of freshness stays (decided 2026-09-13), and serveStoredFile adds the ETag
+            // that lets a browser revalidate with a 304 once it runs out. A re-upload inside that
+            // window is reached through the versioned address the upload answer hands out, since
+            // the query is ignored here and `?v=` is a different cache entry.
             res.setHeader('Cache-Control', 'public, max-age=300');
             // THE DOOR A DATA PACKAGE IS READ THROUGH, and until now the only one with no range
             // support at all: every partial request came back 200 with the whole file, so a reader
@@ -417,7 +433,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             // internet reaches it, the bytes come back from the apex origin, and their type is
             // whatever the uploader said it was, so an uploaded page would run as the portal. Images,
             // media, PDFs and plain text still render; everything else is saved rather than shown.
-            if (!await serveStoredFile(res, file, req.headers.range, readerFor(gaii, key), { headOnly: req.method === 'HEAD' })) {
+            if (!await serveStoredFile(res, file, req.headers.range, readerFor(gaii, key), { headOnly: req.method === 'HEAD', conditionals: req.headers })) {
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
             }
             return;
@@ -473,7 +489,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // artefact through a narrower door, and a door that answers ranges only when the file is
         // public would make "share this dataset with one buyer" a strictly worse product than
         // "publish it to everyone".
-        if (!await serveStoredFile(res, file, req.headers.range, readerFor(gaii, key), { headOnly: req.method === 'HEAD' })) {
+        if (!await serveStoredFile(res, file, req.headers.range, readerFor(gaii, key), { headOnly: req.method === 'HEAD', conditionals: req.headers })) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
         }
     });
@@ -517,6 +533,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         const withBytes = needsBytesForType(file) ? await storage.getStorageFile(gaii, key) : null;
         setStoredFileHeaders(res, withBytes ?? file);
         setAcceptRanges(res);
+        // The validator the GET sends, so a HEAD probe and the fetch after it agree on the version.
+        const etag = storedFileEtag(file);
+        if (etag) res.setHeader('ETag', etag);
         res.setHeader('Content-Length', file.size);
         res.setHeader('X-AIMEAT-Visibility', file.visibility);
         res.setHeader('X-AIMEAT-Created', file.createdAt);
@@ -574,7 +593,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
-        if (!await serveStoredFile(res, file, req.headers.range, readerFor(gaii, key), { headOnly: req.method === 'HEAD' })) {
+        if (!await serveStoredFile(res, file, req.headers.range, readerFor(gaii, key), { headOnly: req.method === 'HEAD', conditionals: req.headers })) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found in your namespace: ${key}`));
         }
     });

@@ -6,6 +6,9 @@
  *   connected, how to start one, and reading and sending through a connected mailbox.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — aimeat_mail_send says a send that did not go out comes back as an error
+ *     with the provider's reason. It said a successful answer meant the provider accepted the
+ *     message, which was false for a failed send, the one case that answered as a success.
  *   v1.0.0 — 2026-08-26 — Initial. The whole subsystem was REST-and-browser only until now, which
  *     on a node whose primary interface is AI chat meant a capability that was not finished.
  */
@@ -73,7 +76,7 @@ export const connectionTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_mail_send',
-        description: "Send a message to a SAVED recipient (aimeat_contact_list / aimeat_contact_add), never to a free address — that is the structural anti-spam device, not a formality. Pass connection_id to send through your own connected mailbox, so it leaves from your own address with your domain's SPF and DKIM and lands in your own Sent Items; without one it goes through the node's shared sender. Everything is gated on the way out: a suppressed address, an opt-out on a 'marketing' message, and a rolling daily allowance each refuse with a reason. A SUCCESSFUL ANSWER IS NOT A DELIVERY — it means the provider accepted the message; a bounce shows up on the contact afterwards. Requires both outbound:send and connections:use, and is absent without them rather than present and refusing.",
+        description: "Send a message to a SAVED recipient (aimeat_contact_list / aimeat_contact_add), never to a free address — that is the structural anti-spam device, not a formality. Pass connection_id to send through your own connected mailbox, so it leaves from your own address with your domain's SPF and DKIM and lands in your own Sent Items; without one it goes through the node's shared sender. Everything is gated on the way out: a suppressed address, an opt-out on a 'marketing' message, and a rolling daily allowance each refuse with a reason. A send the provider refused, or one this node had no way to make, comes back as an ERROR carrying the provider's reason and the send-log id, so tell the person it was not sent. A success says the message was handed over; that is still not a delivery, and a bounce shows up on the contact afterwards. Requires both outbound:send and connections:use, and is absent without them rather than present and refusing.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

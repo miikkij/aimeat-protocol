@@ -6,9 +6,17 @@
  *   upsert/redeploy (PUT), inspect, activate/deactivate, visibility, prompts/ontology/export,
  *   uninstall (DELETE), and public lib-file serving. Cortex extensions materialise schemas,
  *   prompts, actions, boards, ontologies, seed-data, and browser lib bundles.
- * @structure cortexRouter() — all /v1/cortex* routes; activateExtension()/deactivateExtension() — init helpers.
+ * @structure cortexRouter() — all /v1/cortex* routes; activateExtension()/deactivateExtension() — init helpers;
+ *   upsertCortex(): the redeploy, shared with aimeat_cortex_install update:true; cortexLibUrls(): each lib's address.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   v1.6.1 — 2026-09-13 — upsertCortex refuses a lib component with no content (INVALID_MANIFEST,
+ *     naming the file) before anything is written, on create and on replace, as installCortex does.
+ *   v1.6.0 — 2026-09-13 — The install and upsert answers carry `lib_urls`, each lib's absolute address
+ *     keyed by filename. The address follows the record's name, and nothing said which name, so an
+ *     author guessed the script src and a wrong guess was an app that loaded nothing. The PUT body
+ *     moves unchanged into upsertCortex(), which aimeat_cortex_install calls with update:true: the
+ *     tool could only create, and told an MCP-only agent to use this route.
  *   v1.5.0 — 2026-09-05 — The four detail reads and the list ask canSeeCortex. `visibility` was a
  *     field this file stored, showed on every read and enforced on none: any signed-in principal
  *     read the full component map, prompts, ontology and activation artifacts of another owner's
@@ -41,7 +49,9 @@ import { emitChange } from '../services/event-bus.js';
 import { parseCortexManifest, validateNamespaceOwnership } from '../services/cortex-manifest.js';
 import { cortexInstallRefusal } from '../services/install-quotas.js';
 import {
-  installCortex, activateCortex, deactivateCortex, deleteCortex, canSeeCortex, visibleCortexes, type CortexCaller,
+  installCortex, activateCortex, deactivateCortex, deleteCortex, canSeeCortex, visibleCortexes,
+  libsWithoutContent, missingLibsMessage, type CortexCaller,
+  type CortexDeps, type CortexOutcome, type CortexRefusal,
 } from '../services/cortex-lifecycle.js';
 import { activateExtension, deactivateExtension } from './cortex/activation.js';
 import { refreshCortexDependencies, dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
@@ -52,6 +62,268 @@ import { cortexOntologyToSkos } from '../services/cortex-ontology-skos.js';
 // Re-exported so existing consumers (e.g. services/generator-registration.ts) keep importing
 // `activateExtension` from '../routes/cortex.js' unchanged after the activation logic moved out.
 export { activateExtension } from './cortex/activation.js';
+
+/**
+ * Where each lib of this cortex is served: the exact `<script src>` an app loads, keyed by filename.
+ *
+ * The address follows the record's NAME, encoded as one path segment, so a cortex named
+ * `owner/thing` serves from `/v1/cortex/owner%2Fthing/libs/…` and one named `thing` in namespace
+ * `owner` from `/v1/cortex/thing/libs/…`. No answer said which, so an author guessed, and a wrong
+ * guess is a 404 inside an app that shows nothing. Absolute, because apps run on their own origins.
+ */
+export function cortexLibUrls(
+  baseUrl: string,
+  cortex: Pick<CortexExtensionRecord, 'name' | 'components'>,
+): Record<string, string> {
+  const urls: Record<string, string> = {};
+  for (const comp of cortex.components) {
+    if (comp.type === 'lib') {
+      urls[comp.filename] = `${baseUrl}/v1/cortex/${encodeURIComponent(cortex.name)}/libs/${encodeURIComponent(comp.filename)}`;
+    }
+  }
+  return urls;
+}
+
+/** What an upsert did. `record` carries what the answer and lib_urls are built from. */
+export type CortexUpsertResult =
+  | { action: 'created'; record: CortexExtensionRecord; warnings?: string[] }
+  | { action: 'unchanged'; record: CortexExtensionRecord }
+  | {
+    action: 'updated';
+    record: Pick<CortexExtensionRecord, 'name' | 'namespace' | 'version' | 'status' | 'components'>;
+    reinitialized: boolean;
+    warnings?: string[];
+  };
+
+const upsertRefusal = (status: number, code: string, message: string, details?: unknown): { ok: false; refusal: CortexRefusal } =>
+  ({ ok: false, refusal: { status, code, message, details } });
+
+/**
+ * Create a cortex, or replace an installed one in place: PUT /v1/cortex/:name, and
+ * aimeat_cortex_install with update:true. Extracted from the PUT handler unchanged, so the redeploy
+ * has one implementation whichever door asks for it. The tool could only create, and its
+ * description sent an agent to this route over HTTP, which an MCP-only agent cannot reach.
+ *
+ * Redeploy without a live gap. Unlike the old deactivate→DELETE→re-POST dance, an existing cortex
+ * keeps its identity and stays served for the whole call: lib bytes are swapped in place (overwrite,
+ * never delete-then-recreate for files that persist, so GET /libs never 404s mid-upsert), and for an
+ * ACTIVE cortex init is re-run (re-activate alone skips init, so new behaviour would not go live
+ * otherwise). Updating an existing cortex never consumes a quota slot. Identical bytes are a no-op.
+ *
+ * `input.name` is the address the caller named (the URL on PUT); left out, the manifest's own
+ * metadata.name is the address. `mayReplaceOthers` decides whether an operator may replace a cortex
+ * another owner installed; it defaults to `caller.isOperator`, which is the HTTP door's answer. The
+ * tool passes false, as its lifecycle tools already do (mcp/cortex.ts says why), while still
+ * letting the operator's namespace claim through as its install does.
+ */
+export async function upsertCortex(
+  deps: CortexDeps,
+  caller: CortexCaller,
+  input: { name?: string; manifest: unknown; libs?: unknown },
+  mayReplaceOthers: boolean = caller.isOperator,
+): Promise<CortexOutcome<CortexUpsertResult>> {
+  const { storage, config } = deps;
+  const { manifest, libs } = input;
+
+  if (!manifest || typeof manifest !== 'string') {
+    return upsertRefusal(400, 'INVALID_INPUT', 'manifest is required and must be a YAML string');
+  }
+
+  // Manifest size limit (reuse lib size config as a reasonable upper bound)
+  const manifestSizeKb = Buffer.byteLength(manifest, 'utf-8') / 1024;
+  if (manifestSizeKb > config.cortexMaxLibSizeKb) {
+    return upsertRefusal(413, 'MANIFEST_TOO_LARGE',
+      `Manifest size ${Math.round(manifestSizeKb)}KB exceeds limit of ${config.cortexMaxLibSizeKb}KB`);
+  }
+
+  // Validate + normalise lib payload
+  const newLibs: Record<string, string> = {};
+  if (libs && typeof libs === 'object') {
+    for (const [filename, content] of Object.entries(libs as Record<string, unknown>)) {
+      if (typeof content !== 'string') {
+        return upsertRefusal(400, 'INVALID_INPUT', `libs["${filename}"] must be a string`);
+      }
+      const sizeKb = Buffer.byteLength(content, 'utf8') / 1024;
+      if (sizeKb > config.cortexMaxLibSizeKb) {
+        return upsertRefusal(413, 'QUOTA_EXCEEDED',
+          `Lib "${filename}" is ${sizeKb.toFixed(1)}KB, max is ${config.cortexMaxLibSizeKb}KB`);
+      }
+      newLibs[filename] = content;
+    }
+  }
+
+  const ownerName = caller.ownerName;
+  const result = parseCortexManifest(manifest, ownerName, newLibs);
+  if (!result.ok || !result.extension) {
+    return upsertRefusal(400, 'INVALID_MANIFEST', 'Manifest validation failed', {
+      errors: result.errors,
+      warnings: result.warnings,
+    });
+  }
+  const parsed = result.extension;
+  const name = input.name ?? parsed.name;
+
+  // The manifest's name identifies the resource — it must match the URL.
+  if (parsed.name !== name) {
+    return upsertRefusal(400, 'NAME_MISMATCH',
+      `Manifest metadata.name "${parsed.name}" does not match URL name "${name}"`);
+  }
+
+  // Namespace ownership check (operators can use any namespace)
+  if (!caller.isOperator && !validateNamespaceOwnership(parsed.namespace, ownerName)) {
+    return upsertRefusal(403, 'NAMESPACE_DENIED',
+      `This add-on is filed under "${parsed.namespace}", which belongs to somebody else. File it under "${ownerName}" or under "community" instead.`);
+  }
+
+  const existing = await storage.getCortexExtension(name);
+
+  // ── CREATE branch — brand-new cortex, so the node's ceiling applies. It used to say "mirrors
+  // POST" and then write the check out again; a mirror kept in step by hand is not a mirror.
+  if (!existing) {
+    const overQuota = await cortexInstallRefusal({ storage, config }, true);
+    if (overQuota) return upsertRefusal(overQuota.status, overQuota.code, overQuota.message);
+    // A lib component with no bytes is refused before anything is written, as installCortex does:
+    // recorded and never served, it answered 201 and the app 404'd on the script.
+    const missing = libsWithoutContent(parsed.components, newLibs);
+    if (missing.length) return upsertRefusal(400, 'INVALID_MANIFEST', missingLibsMessage(missing));
+    for (const [filename, content] of Object.entries(newLibs)) {
+      await storage.setCortexLibFile(name, filename, content);
+    }
+    const record = await storage.createCortexExtension(parsed);
+    emitChange('cortex');
+    return { ok: true, value: { action: 'created', record, warnings: result.warnings } };
+  }
+
+  // ── UPDATE branch: only the installing owner, or an operator the door lets through, may replace it. ──
+  if (existing.installedBy !== ownerName && !mayReplaceOthers) {
+    return upsertRefusal(403, 'FORBIDDEN', 'Not your extension');
+  }
+
+  // Idempotency — identical manifest + identical lib bytes ⇒ no-op (no churn, no re-init).
+  const currentLibs: Record<string, string> = {};
+  for (const comp of existing.components) {
+    if (comp.type === 'lib') {
+      const content = await storage.getCortexLibFile(name, comp.filename);
+      if (content !== null) currentLibs[comp.filename] = content;
+    }
+  }
+  // A lib the new manifest names must arrive now or already be stored under that filename.
+  const missingOnUpdate = libsWithoutContent(parsed.components, newLibs, new Set(Object.keys(currentLibs)));
+  if (missingOnUpdate.length) return upsertRefusal(400, 'INVALID_MANIFEST', missingLibsMessage(missingOnUpdate));
+  const newKeys = Object.keys(newLibs).sort();
+  const curKeys = Object.keys(currentLibs).sort();
+  const libsEqual = newKeys.length === curKeys.length
+    && newKeys.every((k, i) => k === curKeys[i])
+    && newKeys.every(k => newLibs[k] === currentLibs[k]);
+  if (existing.manifest.trim() === manifest.trim() && libsEqual) {
+    return { ok: true, value: { action: 'unchanged', record: existing } };
+  }
+
+  const wasActive = existing.status === 'active';
+  const gaii = caller.gaii;
+  const now = new Date().toISOString();
+
+  // 1) Swap lib bytes in place FIRST. Files present in both old and new are overwritten
+  //    atomically (per-row), so the live app sees new code immediately and never 404s.
+  for (const [filename, content] of Object.entries(newLibs)) {
+    await storage.setCortexLibFile(name, filename, content);
+  }
+
+  // 2) Persist the new manifest + components while preserving identity (status stays as-is,
+  //    installedAt/installedBy/visibility/activatedAt unchanged), so GET reflects the new
+  //    shape and the lib-serve route keeps returning bytes.
+  await storage.updateCortexExtension(name, {
+    namespace: parsed.namespace,
+    shortName: parsed.shortName,
+    apiVersion: parsed.apiVersion,
+    version: parsed.version,
+    description: parsed.description,
+    author: parsed.author,
+    license: parsed.license,
+    tags: parsed.tags,
+    labels: parsed.labels,
+    aimeatCompat: parsed.aimeatCompat,
+    manifest,
+    components: parsed.components,
+  });
+
+  // 3) Re-run init for an active cortex so new behaviour actually goes live (a plain
+  //    re-activate would skip init). Tear down the OLD side-effects (schemas/actions/boards/
+  //    prompts/ontologies; seed-data + lib files are preserved by deactivateExtension), then
+  //    activate the NEW components. An inactive cortex has no live side-effects — init waits
+  //    for the next /activate.
+  let reinitialized = false;
+  if (wasActive) {
+    await deactivateExtension(existing, storage, gaii);
+    const reinitBase: CortexExtensionRecord = {
+      ...existing,
+      version: parsed.version,
+      components: parsed.components,
+      activationArtifacts: {
+        schemaKeys: [],
+        promptKeys: [],
+        actionIds: [],
+        boardIds: [],
+        ontologyKeys: [],
+        seedDataKeys: existing.activationArtifacts.seedDataKeys,  // preserve user seed-data tracking
+        libFiles: [],  // repopulated from the new lib components
+      },
+    };
+    const artifacts = await activateExtension(reinitBase, config, storage, gaii);
+    await storage.updateCortexExtension(name, {
+      status: 'active',
+      activatedAt: now,
+      activationArtifacts: artifacts,
+    });
+    reinitialized = true;
+  }
+
+  // 4) Remove stale lib files (present before, absent now) LAST, so the served set is only
+  //    ever a superset of what the live app references during the swap.
+  const newLibNames = new Set<string>();
+  for (const comp of parsed.components) {
+    if (comp.type === 'lib') newLibNames.add(comp.filename);
+  }
+  for (const comp of existing.components) {
+    if (comp.type === 'lib' && !newLibNames.has(comp.filename)) {
+      await storage.deleteCortexLibFile(name, comp.filename);
+    }
+  }
+
+  // 5) The dependency map follows the served set: read the libraries as they now are (a component
+  //    kept without new bytes keeps its old ones) and replace this cortex's edges.
+  const servedLibs: Record<string, string> = {};
+  for (const comp of parsed.components) {
+    if (comp.type !== 'lib') continue;
+    const content = await storage.getCortexLibFile(name, comp.filename);
+    if (content !== null) servedLibs[comp.filename] = content;
+  }
+  await refreshCortexDependencies(storage, name, parsed.version, servedLibs)
+    .catch(err => logger.warn('PUT /v1/cortex/:name: dependency map not refreshed', { name, error: String(err) }));
+  // 6) The version just deployed joins the kept ones; apps pinned to the previous one keep loading it.
+  const nowStored = await storage.getCortexExtension(name);
+  if (nowStored) {
+    await snapshotCortexVersion(storage, nowStored, servedLibs, ownerName)
+      .catch(err => logger.warn('PUT /v1/cortex/:name: version not kept', { name, version: parsed.version, error: String(err) }));
+  }
+
+  emitChange('cortex');
+  return {
+    ok: true,
+    value: {
+      action: 'updated',
+      record: {
+        name: parsed.name,
+        namespace: parsed.namespace,
+        version: parsed.version,
+        status: wasActive ? 'active' : existing.status,
+        components: parsed.components,
+      },
+      reinitialized,
+      warnings: result.warnings,
+    },
+  };
+}
 
 export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -129,6 +401,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       installed_by: record.installedBy,
       component_count: record.components.length,
       warnings,
+      lib_urls: cortexLibUrls(config.baseUrl, record),
     }, [
       { description: 'Activate this extension', method: 'POST', url: `/v1/cortex/${encodeURIComponent(record.name)}/activate` },
       { description: 'View extension details', method: 'GET', url: `/v1/cortex/${encodeURIComponent(record.name)}` },
@@ -136,87 +409,23 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── PUT /v1/cortex/:name — idempotent upsert (create, or replace in place) ──
-  // Redeploy without a live gap. Unlike the old deactivate→DELETE→re-POST dance, an existing
-  // cortex keeps its identity and stays served for the whole call: lib bytes are swapped in
-  // place (overwrite — never delete-then-recreate for files that persist, so GET /libs never
-  // 404s mid-upsert), and for an ACTIVE cortex init is re-run (re-activate alone skips init, so
-  // new behaviour would not go live otherwise). Updating an existing cortex never consumes a
-  // quota slot. Identical bytes are a safe 200 no-op. Same scope as POST /v1/cortex
-  // (cortex:write); owner/operator bypass scope, and only the installing owner may update.
+  // Same scope as POST /v1/cortex (cortex:write); owner/operator bypass scope, and only the
+  // installing owner may update. The upsert itself is upsertCortex() above, which
+  // aimeat_cortex_install update:true calls too; this handler renders its answer.
   router.put('/v1/cortex/:name', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     const { manifest, libs } = req.body ?? {};
-
-    if (!manifest || typeof manifest !== 'string') {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'manifest is required and must be a YAML string'));
+    const out = await upsertCortex({ storage, config }, callerOf(req), { name, manifest, libs });
+    if (!out.ok) {
+      res.status(out.refusal.status).json(
+        error(config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
       return;
     }
+    const done = out.value;
+    const lib_urls = cortexLibUrls(config.baseUrl, done.record);
 
-    // Manifest size limit (reuse lib size config as a reasonable upper bound)
-    const manifestSizeKb = Buffer.byteLength(manifest, 'utf-8') / 1024;
-    if (manifestSizeKb > config.cortexMaxLibSizeKb) {
-      res.status(413).json(error(config.nodeId, 'MANIFEST_TOO_LARGE',
-        `Manifest size ${Math.round(manifestSizeKb)}KB exceeds limit of ${config.cortexMaxLibSizeKb}KB`));
-      return;
-    }
-
-    // Validate + normalise lib payload
-    const newLibs: Record<string, string> = {};
-    if (libs && typeof libs === 'object') {
-      for (const [filename, content] of Object.entries(libs as Record<string, string>)) {
-        if (typeof content !== 'string') {
-          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `libs["${filename}"] must be a string`));
-          return;
-        }
-        const sizeKb = Buffer.byteLength(content, 'utf8') / 1024;
-        if (sizeKb > config.cortexMaxLibSizeKb) {
-          res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
-            `Lib "${filename}" is ${sizeKb.toFixed(1)}KB, max is ${config.cortexMaxLibSizeKb}KB`));
-          return;
-        }
-        newLibs[filename] = content;
-      }
-    }
-
-    const ownerName = req.auth!.owner;
-    const result = parseCortexManifest(manifest, ownerName, newLibs);
-    if (!result.ok || !result.extension) {
-      res.status(400).json(error(config.nodeId, 'INVALID_MANIFEST', 'Manifest validation failed', 400, {
-        errors: result.errors,
-        warnings: result.warnings,
-      }));
-      return;
-    }
-    const parsed = result.extension;
-
-    // The manifest's name identifies the resource — it must match the URL.
-    if (parsed.name !== name) {
-      res.status(400).json(error(config.nodeId, 'NAME_MISMATCH',
-        `Manifest metadata.name "${parsed.name}" does not match URL name "${name}"`));
-      return;
-    }
-
-    // Namespace ownership check (operators can use any namespace)
-    if (!req.auth!.roles.includes('operator') && !validateNamespaceOwnership(parsed.namespace, ownerName)) {
-      res.status(403).json(error(config.nodeId, 'NAMESPACE_DENIED',
-        `This add-on is filed under "${parsed.namespace}", which belongs to somebody else. File it under "${ownerName}" or under "community" instead.`));
-      return;
-    }
-
-    const existing = await storage.getCortexExtension(name);
-
-    // ── CREATE branch — brand-new cortex, so the node's ceiling applies. It used to say "mirrors
-    // POST" and then write the check out again; a mirror kept in step by hand is not a mirror.
-    if (!existing) {
-      const overQuota = await cortexInstallRefusal({ storage, config }, true);
-      if (overQuota) {
-        res.status(overQuota.status).json(error(config.nodeId, overQuota.code, overQuota.message));
-        return;
-      }
-      for (const [filename, content] of Object.entries(newLibs)) {
-        await storage.setCortexLibFile(name, filename, content);
-      }
-      const record = await storage.createCortexExtension(parsed);
+    if (done.action === 'created') {
+      const record = done.record;
       res.status(201).json(success(config.nodeId, {
         name: record.name,
         namespace: record.namespace,
@@ -226,148 +435,42 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
         installed_at: record.installedAt,
         installed_by: record.installedBy,
         component_count: record.components.length,
-        warnings: result.warnings,
+        warnings: done.warnings,
+        lib_urls,
       }, [
         { description: 'Activate this extension', method: 'POST', url: `/v1/cortex/${encodeURIComponent(record.name)}/activate` },
         { description: 'View extension details', method: 'GET', url: `/v1/cortex/${encodeURIComponent(record.name)}` },
       ]));
-      emitChange('cortex');
       return;
     }
 
-    // ── UPDATE branch — only the installing owner (or an operator) may replace it. ──
-    if (existing.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
-      return;
-    }
-
-    // Idempotency — identical manifest + identical lib bytes ⇒ 200 no-op (no churn, no re-init).
-    const currentLibs: Record<string, string> = {};
-    for (const comp of existing.components) {
-      if (comp.type === 'lib') {
-        const content = await storage.getCortexLibFile(name, comp.filename);
-        if (content !== null) currentLibs[comp.filename] = content;
-      }
-    }
-    const newKeys = Object.keys(newLibs).sort();
-    const curKeys = Object.keys(currentLibs).sort();
-    const libsEqual = newKeys.length === curKeys.length
-      && newKeys.every((k, i) => k === curKeys[i])
-      && newKeys.every(k => newLibs[k] === currentLibs[k]);
-    if (existing.manifest.trim() === manifest.trim() && libsEqual) {
+    if (done.action === 'unchanged') {
       res.json(success(config.nodeId, {
-        name: existing.name,
-        version: existing.version,
-        status: existing.status,
+        name: done.record.name,
+        version: done.record.version,
+        status: done.record.status,
         action: 'unchanged',
         message: 'Cortex is already up to date',
+        lib_urls,
       }, [
         { description: 'View extension details', method: 'GET', url: `/v1/cortex/${encodeURIComponent(name)}` },
       ]));
       return;
     }
 
-    const wasActive = existing.status === 'active';
-    const gaii = req.auth!.sub;
-    const now = new Date().toISOString();
-
-    // 1) Swap lib bytes in place FIRST. Files present in both old and new are overwritten
-    //    atomically (per-row), so the live app sees new code immediately and never 404s.
-    for (const [filename, content] of Object.entries(newLibs)) {
-      await storage.setCortexLibFile(name, filename, content);
-    }
-
-    // 2) Persist the new manifest + components while preserving identity (status stays as-is,
-    //    installedAt/installedBy/visibility/activatedAt unchanged), so GET reflects the new
-    //    shape and the lib-serve route keeps returning bytes.
-    await storage.updateCortexExtension(name, {
-      namespace: parsed.namespace,
-      shortName: parsed.shortName,
-      apiVersion: parsed.apiVersion,
-      version: parsed.version,
-      description: parsed.description,
-      author: parsed.author,
-      license: parsed.license,
-      tags: parsed.tags,
-      labels: parsed.labels,
-      aimeatCompat: parsed.aimeatCompat,
-      manifest,
-      components: parsed.components,
-    });
-
-    // 3) Re-run init for an active cortex so new behaviour actually goes live (a plain
-    //    re-activate would skip init). Tear down the OLD side-effects (schemas/actions/boards/
-    //    prompts/ontologies; seed-data + lib files are preserved by deactivateExtension), then
-    //    activate the NEW components. An inactive cortex has no live side-effects — init waits
-    //    for the next /activate.
-    let reinitialized = false;
-    if (wasActive) {
-      await deactivateExtension(existing, storage, gaii);
-      const reinitBase: CortexExtensionRecord = {
-        ...existing,
-        version: parsed.version,
-        components: parsed.components,
-        activationArtifacts: {
-          schemaKeys: [],
-          promptKeys: [],
-          actionIds: [],
-          boardIds: [],
-          ontologyKeys: [],
-          seedDataKeys: existing.activationArtifacts.seedDataKeys,  // preserve user seed-data tracking
-          libFiles: [],  // repopulated from the new lib components
-        },
-      };
-      const artifacts = await activateExtension(reinitBase, config, storage, gaii);
-      await storage.updateCortexExtension(name, {
-        status: 'active',
-        activatedAt: now,
-        activationArtifacts: artifacts,
-      });
-      reinitialized = true;
-    }
-
-    // 4) Remove stale lib files (present before, absent now) LAST, so the served set is only
-    //    ever a superset of what the live app references during the swap.
-    const newLibNames = new Set<string>();
-    for (const comp of parsed.components) {
-      if (comp.type === 'lib') newLibNames.add(comp.filename);
-    }
-    for (const comp of existing.components) {
-      if (comp.type === 'lib' && !newLibNames.has(comp.filename)) {
-        await storage.deleteCortexLibFile(name, comp.filename);
-      }
-    }
-
-    // 5) The dependency map follows the served set: read the libraries as they now are (a component
-    //    kept without new bytes keeps its old ones) and replace this cortex's edges.
-    const servedLibs: Record<string, string> = {};
-    for (const comp of parsed.components) {
-      if (comp.type !== 'lib') continue;
-      const content = await storage.getCortexLibFile(name, comp.filename);
-      if (content !== null) servedLibs[comp.filename] = content;
-    }
-    await refreshCortexDependencies(storage, name, parsed.version, servedLibs)
-      .catch(err => logger.warn('PUT /v1/cortex/:name: dependency map not refreshed', { name, error: String(err) }));
-    // 6) The version just deployed joins the kept ones; apps pinned to the previous one keep loading it.
-    const nowStored = await storage.getCortexExtension(name);
-    if (nowStored) {
-      await snapshotCortexVersion(storage, nowStored, servedLibs, req.auth!.owner)
-        .catch(err => logger.warn('PUT /v1/cortex/:name: version not kept', { name, version: parsed.version, error: String(err) }));
-    }
-
     res.json(success(config.nodeId, {
-      name: parsed.name,
-      namespace: parsed.namespace,
-      version: parsed.version,
-      status: wasActive ? 'active' : existing.status,
+      name: done.record.name,
+      namespace: done.record.namespace,
+      version: done.record.version,
+      status: done.record.status,
       action: 'updated',
-      reinitialized,
-      component_count: parsed.components.length,
-      warnings: result.warnings,
+      reinitialized: done.reinitialized,
+      component_count: done.record.components.length,
+      warnings: done.warnings,
+      lib_urls,
     }, [
       { description: 'View extension details', method: 'GET', url: `/v1/cortex/${encodeURIComponent(name)}` },
     ]));
-    emitChange('cortex');
   });
 
   // ── GET /v1/cortex/:name — get extension details ──

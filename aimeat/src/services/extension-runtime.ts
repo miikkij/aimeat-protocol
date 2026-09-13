@@ -8,6 +8,12 @@
  *   Node.js globals (process, require, Buffer, etc.) -- only a controlled
  *   `ctx` API proxy.
  * @version-history
+ *   v2.9.0 — 2026-09-13 — The bridge REFUSES an undefined or null argument to any host call, naming
+ *     the ctx method and the position, instead of reading it with getString() as the string
+ *     "undefined". A script that forgot `input.key` wrote a real file under that name and returned
+ *     normally, which scheduled and workflow runs record as success. The datapackage and workspace
+ *     wrappers pass required strings raw so the check can see them; an omitted wallet.consume reason
+ *     and datapackage.fail message still arrive as ''.
  *   v2.8.0 — 2026-09-06 — The `__fetch` bridge calls ctx.fetch instead of running its own safeFetch
  *     and its own body decoder. Those forty lines were a second implementation of a capability the
  *     builder already owned, which made buildExtensionCtx's fetch dead code — and the two had
@@ -89,6 +95,24 @@ function drainJobs(vm: QuickJSContext): void {
     if (vm.runtime.alive) vm.runtime.executePendingJobs();
 }
 
+/** The name a script author wrote, for each host function, so a refusal names `ctx.files.write`
+ *  rather than the bridge's own `__files_write`. */
+const GUEST_CALL_NAMES: Record<string, string> = {
+    __memory_get: 'ctx.memory.get', __memory_get_versioned: 'ctx.memory.getVersioned',
+    __memory_set: 'ctx.memory.set', __memory_search: 'ctx.memory.search',
+    __memory_delete: 'ctx.memory.delete', __memory_getPublic: 'ctx.memory.getPublic',
+    __fetch: 'ctx.fetch', __files_read: 'ctx.files.read', __files_write: 'ctx.files.write',
+    __dp_publish: 'ctx.datapackage.publish', __dp_validate: 'ctx.datapackage.validate',
+    __dp_infer: 'ctx.datapackage.inferSchema', __dp_open: 'ctx.datapackage.open',
+    __dp_rows: 'ctx.datapackage.rows', __dp_fail: 'ctx.datapackage.fail',
+    __ws_index: 'ctx.workspace.index', __ws_get: 'ctx.workspace.get', __ws_write: 'ctx.workspace.write',
+    __ws_writeDoc: 'ctx.workspace.writeDoc', __ws_publish: 'ctx.workspace.publish',
+    __wallet_consume: 'ctx.wallet.consume', __wallet_balance: 'ctx.wallet.getBalance',
+    __ext_buy: 'ctx.buy', __ai_start: 'ctx.ai.start',
+    __consent_check: 'ctx.consent.check', __consent_require: 'ctx.consent.require',
+    __trust_getScore: 'ctx.trust.getScore', __notify: 'ctx.notify', __email: 'ctx.email',
+};
+
 function registerAsyncHostFn(
     vm: QuickJSContext,
     name: string,
@@ -103,6 +127,24 @@ function registerAsyncHostFn(
     }
 
     const fnHandle = vm.newFunction(name, (...argHandles: QuickJSHandle[]) => {
+        // An undefined or null argument is REFUSED, never converted. getString() below turns any
+        // value into its string form, so `ctx.files.write(input.key, input.b64)` with no key used to
+        // reach the host as the key "undefined" (and "undefined" decodes as six bytes of base64), a
+        // real file was written under that name, and the action returned normally, which a scheduled
+        // run or a workflow step records as a success. Every optional argument is JSON-encoded by its
+        // guest wrapper before it gets here, so a raw undefined or null at this point is always a
+        // value the script meant to pass and did not have. Refused before the budget is counted: no
+        // host work happens for it.
+        const bad = argHandles.findIndex(h => vm.typeof(h) === 'undefined' || vm.sameValue(h, vm.null));
+        if (bad !== -1) {
+            const refusal = vm.newPromise();
+            const what = vm.typeof(argHandles[bad]) === 'undefined' ? 'undefined' : 'null';
+            refusal.reject(vm.newString(`${GUEST_CALL_NAMES[name] ?? name}: argument ${bad + 1} is ${what}. `
+                + 'Check the value before the call and throw with your own message when it is missing.'));
+            refusal.settled.then(() => drainJobs(vm));
+            return refusal.handle;
+        }
+
         const args = argHandles.map(h => vm.getString(h));
         const promise = vm.newPromise();
 
@@ -208,25 +250,28 @@ ${userFnDecl}
         } : undefined,
         // AIMEAT Data Packages. publish() REJECTS when the quality gate refuses, so an await on it
         // throws, and an unattended run is a failed run. A returned verdict would read as success.
+        // Required string arguments cross RAW, so the bridge can refuse one that is undefined or
+        // null; a String() here would have turned it into "undefined" before the check could see it.
         datapackage: __dp_publish ? {
             publish:     async (input)                => __call(__dp_publish,  [JSON.stringify(input ?? {})]),
             validate:    async (resources)            => __call(__dp_validate, [JSON.stringify(resources ?? [])]),
             inferSchema: async (rows)                 => __call(__dp_infer,    [JSON.stringify(rows ?? [])]),
-            open:        async (ref)                  => __call(__dp_open,     [String(ref)]),
-            rows:        async (ref, resource, opts)  => __call(__dp_rows,     [String(ref), String(resource), opts ? JSON.stringify(opts) : '{}']),
-            fail:        async (name, message)        => __call(__dp_fail,     [String(name), String(message)]),
+            open:        async (ref)                  => __call(__dp_open,     [ref]),
+            rows:        async (ref, resource, opts)  => __call(__dp_rows,     [ref, resource, opts ? JSON.stringify(opts) : '{}']),
+            fail:        async (name, message)        => __call(__dp_fail,     [name, message == null ? '' : message]),
         } : undefined,
         // An organism workspace, as the caller. Absent unless the manifest declares it and a real
         // caller is present; a refusal REJECTS with the service's own "CODE: message".
         workspace: __ws_index ? {
-            index:    async (org, ws)                       => __call(__ws_index,    [String(org), String(ws)]),
-            get:      async (org, ws, ids, opts)            => __call(__ws_get,      [String(org), String(ws), JSON.stringify(ids ?? []), JSON.stringify(opts || {})]),
-            write:    async (org, ws, space, id, value, opts) => __call(__ws_write,  [String(org), String(ws), String(space), String(id), JSON.stringify(value === undefined ? null : value), JSON.stringify(opts || {})]),
-            writeDoc: async (org, ws, space, doc, opts)     => __call(__ws_writeDoc, [String(org), String(ws), String(space), JSON.stringify(doc ?? {}), JSON.stringify(opts || {})]),
-            publish:  async (org, ws, ns, id, opts)         => __call(__ws_publish,  [String(org), String(ws), String(ns), String(id), JSON.stringify(opts || {})]),
+            index:    async (org, ws)                       => __call(__ws_index,    [org, ws]),
+            get:      async (org, ws, ids, opts)            => __call(__ws_get,      [org, ws, JSON.stringify(ids ?? []), JSON.stringify(opts || {})]),
+            write:    async (org, ws, space, id, value, opts) => __call(__ws_write,  [org, ws, space, id, JSON.stringify(value === undefined ? null : value), JSON.stringify(opts || {})]),
+            writeDoc: async (org, ws, space, doc, opts)     => __call(__ws_writeDoc, [org, ws, space, JSON.stringify(doc ?? {}), JSON.stringify(opts || {})]),
+            publish:  async (org, ws, ns, id, opts)         => __call(__ws_publish,  [org, ws, ns, id, JSON.stringify(opts || {})]),
         } : undefined,
         wallet: {
-            consume:    __wallet_consume    ? (async (amount, reason) => __call(__wallet_consume, [String(amount), reason]))  : undefined,
+            // The reason is optional; an omitted one arrives as '' rather than being refused.
+            consume:    __wallet_consume    ? (async (amount, reason) => __call(__wallet_consume, [String(amount), reason == null ? '' : reason]))  : undefined,
             getBalance: __wallet_balance    ? (async ()               => __call(__wallet_balance, []))                         : undefined,
         },
         // Buy from another provider on this extension's owner's account. JSON both ways: the bridge

@@ -27,6 +27,9 @@
  *     to take it back: the capability existed as DELETE /v1/storage/{key} and on no tool, so the
  *     cleanup after any agent-side experiment needed a human with a REST client. It deletes through
  *     services/storage-file-write.ts, the same removeStorageFile() the route now calls.
+ *   v1.3.0 — 2026-09-13 — aimeat_storage_upload's inline answer carries versioned_url, the /v1/pub
+ *     address plus ?v=<this write>, as POST /v1/storage does. A re-upload to the same key was served
+ *     from browsers' five-minute copies (appdev pitfall pub-file-cache-stale-assets).
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -37,6 +40,7 @@ import { parseGaiiLoose } from '../utils/gaii.js';
 import { writeStorageFile, mintStorageUploadUrl, removeStorageFile } from '../services/storage-file-write.js';
 import { resolveFileRef, handleFromResolved } from '../services/file-refs.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
+import { versionedAddress } from '../utils/http-range.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, jsonContent } from './catalog/shape.js';
@@ -133,6 +137,9 @@ export function registerCoreStorageTools(
                     // members (visibility:'workspace'); it is never exposed to the public internet.
                     embed_url: pubEmbedUrl(file.ownerGaii, file.key),
                     embed_markdown: pubEmbedMarkdown(file.ownerGaii, file.key),
+                    // For an app or a page, not a document: the same address with ?v=<this write>,
+                    // so a re-upload under this key is not served from a browser's five-minute copy.
+                    versioned_url: versionedAddress(pubEmbedUrl(file.ownerGaii, file.key), file),
                 }, null, 2) }],
             };
         },

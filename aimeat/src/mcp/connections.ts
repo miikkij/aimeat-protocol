@@ -23,6 +23,9 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.1.0 — 2026-09-13 — aimeat_mail_send returns an error result when the send did not go out
+ *     (the provider refused it, or the node had no transport), with the reason and the send-log id.
+ *     It used to return a success result with a "Not sent" note, which an agent reported as sent.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { z } from 'zod';
@@ -233,13 +236,28 @@ export function registerConnectionTools(
                         ...(ai_disclosure ? { aiDisclosure: { level: ai_disclosure } } : {}),
                         ...(theme ? { theme } : {}),
                     });
+                    // A SEND THAT DID NOT GO OUT IS AN ERROR RESULT on this door. The REST route
+                    // answers 200 with the outcome in data.status, and its callers read that field;
+                    // an agent reads isError, and a "Not sent" note inside a success result was
+                    // reported to people as a sent message (appdev pitfall
+                    // send-200-is-not-a-delivery). The attempt is in the send log either way, so
+                    // the answer names the row.
+                    if (result.status !== 'sent') {
+                        const reason = result.log.error ?? result.status;
+                        return {
+                            content: [{
+                                type: 'text',
+                                text: JSON.stringify({
+                                    status: result.status, channel: result.channel, message_id: result.log.id, reason,
+                                    note: `Not sent (${reason}). Nothing reached the recipient; the attempt is in the send log as ${result.log.id}.`,
+                                }, null, 2),
+                            }],
+                            isError: true,
+                        };
+                    }
                     return ok({
                         status: result.status, channel: result.channel, message_id: result.log.id,
-                        // A 200 is not a delivery, and saying so here is cheaper than the appdev
-                        // pitfall that already exists for callers who assumed it was.
-                        note: result.status === 'sent'
-                            ? 'Handed over to the provider. Delivery is theirs from here; a bounce shows up on the contact.'
-                            : `Not sent: ${result.log.error ?? result.status}.`,
+                        note: 'Handed over to the provider. Delivery is theirs from here; a bounce shows up on the contact.',
                     });
                 } catch (err) {
                     if (err instanceof OutboundError) return fail(`${err.code}: ${err.message}`);

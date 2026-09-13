@@ -43,6 +43,11 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   v1.4.0 — 2026-09-13 — installCortex refuses a lib component whose filename has no content in
+ *     `libs` (INVALID_MANIFEST naming the file and the key), before anything is written. It used to
+ *     answer 201 with the component recorded and no bytes, so the app 404ed on the lib URL.
+ *     libsWithoutContent() is exported for the PUT upsert, which decides the same thing inline. A
+ *     name this owner already holds answers 409 before that question, as it did before.
  *   v1.3.0 — 2026-09-05 — canSeeCortex / visibleCortexes: the READ counterpart of the ownership
  *     test the three lifecycle writes already made. Five read doors (four detail reads and both
  *     lists, HTTP and MCP) carried requireAuth() alone, so any signed-in principal read any owner's
@@ -152,6 +157,30 @@ function refuse(status: number, code: string, message: string, details?: unknown
     return { ok: false, refusal: { status, code, message, details } };
 }
 
+/**
+ * The lib filenames a manifest declares that have no bytes to serve: not in the `libs` sent with
+ * this call and, on an update, not already stored either. Pure, so the PUT upsert in
+ * routes/cortex.ts can ask the same question with the filenames it read back from storage.
+ */
+export function libsWithoutContent(
+    components: CortexExtensionRecord['components'],
+    libs: Record<string, string>,
+    alreadyStored: ReadonlySet<string> = new Set(),
+): string[] {
+    return components
+        .filter((c): c is Extract<typeof c, { type: 'lib' }> => c.type === 'lib')
+        .map(c => c.filename)
+        .filter(f => typeof libs[f] !== 'string' && !alreadyStored.has(f));
+}
+
+/** The refusal text for libsWithoutContent, naming the files and the key they belong under. */
+export function missingLibsMessage(missing: string[]): string {
+    const list = missing.map(f => `"${f}"`).join(', ');
+    return `The manifest declares lib ${list} but no content arrived for ${missing.length === 1 ? 'it' : 'them'}. `
+        + `Send each file's source under "libs", keyed by its filename: { "manifest": "...", "libs": { ${JSON.stringify(missing[0])}: "<source>" } }. `
+        + 'A key spelled "lib", or a ZIP with the file outside libs/, carries no bytes, and the app would 404 on the script.';
+}
+
 export interface CortexInstallResult {
     record: CortexExtensionRecord;
     /** Manifest warnings: unsafe lib patterns, undiscoverable exports. Not a refusal. */
@@ -247,6 +276,24 @@ export async function installCortex(
     const prior = await storage.getCortexExtension(ext.name);
     if (prior && prior.installedBy !== caller.ownerName) {
         return refuse(403, 'FORBIDDEN', 'Not your extension');
+    }
+    // The same answer the insert below gives for a name this owner already holds, decided here so it
+    // comes before the lib-content question: install never replaces, so for a duplicate the missing
+    // bytes are not the thing to fix. The insert stays the race-proof check for the name.
+    if (prior) {
+        return refuse(409, 'CONFLICT', `Extension "${ext.name}" is already installed`);
+    }
+
+    // Every lib component must arrive WITH its bytes. This read only `libs`, so a request that spelled
+    // it `lib`, or a ZIP with the file outside libs/, answered 201 and recorded a component with
+    // nothing behind it: the node called the cortex installed and the app 404ed on the script tag.
+    // Refused here, before the record is claimed, so a refusal leaves nothing written.
+    const missing = libsWithoutContent(ext.components, libs);
+    if (missing.length) {
+        return refuse(400, 'INVALID_MANIFEST', missingLibsMessage(missing), {
+            errors: missing.map(f => `lib "${f}" has no content in libs`),
+            warnings: result.warnings,
+        });
     }
 
     // Claim the name FIRST, then write the bytes. The read above cannot settle who holds a name that

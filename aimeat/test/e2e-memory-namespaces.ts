@@ -16,6 +16,10 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-memory-namespaces
  * @version-history
+ *   v1.1.0 — 2026-09-13 — SHADOWED_BY_OWNER_COPY on every agent write the owner's copy hides: over
+ *     POST /v1/memory, which never warned, and over the node MCP tool on a key the agent already
+ *     held, where it went quiet after the first write. Includes the create, app-save, write-again
+ *     sequence from the appdev pitfall, and a second owner's same-named key as the cross-owner case.
  *   v1.0.0 — 2026-07-26 — Initial. Written after the namespace model was mis-diagnosed as a
  *     platform limitation; these assertions are what stop a refactor changing it silently.
  */
@@ -63,6 +67,61 @@ async function getToken(subject: string, priv: string, isAgent: boolean): Promis
     return body.data.token;
 }
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
+
+// ── The node MCP door, for the same agent. The shadowing warning has to reach an agent on both of
+//    the doors it writes through, and the MCP one is where it used to go quiet after the first write.
+let mcpToken = '', mcpSession = '', mcpNextId = 1;
+function parseSSE(text: string, id: number): any {
+    for (const evt of text.split('\n\n')) {
+        let data = '';
+        for (const line of evt.trim().split('\n')) if (line.startsWith('data: ')) data += line.slice(6);
+        if (!data) continue;
+        try { const m = JSON.parse(data); if (m.id === id) return m; } catch { /* not a JSON-RPC frame */ }
+    }
+    return {};
+}
+async function rpc(method: string, params: Record<string, unknown> = {}, notify = false) {
+    const id = mcpNextId++;
+    const res = await fetch(`${BASE}/v1/mcp`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+            Authorization: `Bearer ${mcpToken}`,
+            ...(mcpSession ? { 'mcp-session-id': mcpSession, 'mcp-protocol-version': '2025-03-26' } : {}),
+        },
+        body: JSON.stringify(notify ? { jsonrpc: '2.0', method, params } : { jsonrpc: '2.0', id, method, params }),
+    });
+    const sid = res.headers.get('mcp-session-id');
+    if (sid) mcpSession = sid;
+    if (notify) { await res.text(); return {}; }
+    const ct = res.headers.get('content-type') ?? '';
+    return ct.includes('text/event-stream') ? parseSSE(await res.text(), id) : await res.json() as any;
+}
+async function openMcpSession(gaii: string, priv: string): Promise<void> {
+    const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'ns-shadow e2e', redirect_uris: [] }) });
+    const ts = new Date().toISOString();
+    const params = new URLSearchParams({
+        response_type: 'code', client_id: client.body.client_id, gaii,
+        signature: await signMsg(priv, gaii + NODE_ID + ts), timestamp: ts,
+    });
+    const auth = await json(`/v1/mcp/authorize?${params}`);
+    const tok = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret }),
+    });
+    assert(tok.status === 200, `mcp token ${tok.status}: ${JSON.stringify(tok.body)}`);
+    mcpToken = tok.body.access_token;
+    mcpSession = '';
+    await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'ns-shadow e2e', version: '1.0.0' } });
+    await rpc('notifications/initialized', {}, true);
+}
+async function mcpWrite(args: Record<string, unknown>): Promise<{ isError: boolean; data: any }> {
+    const body = await rpc('tools/call', { name: 'aimeat_memory_write', arguments: args });
+    const text = body?.result?.content?.[0]?.text ?? '';
+    let data: any;
+    try { data = JSON.parse(text); } catch { data = { _raw: text || JSON.stringify(body) }; }
+    return { isError: body?.result?.isError === true || body?.error !== undefined, data };
+}
 
 const codeVerifier = randomBytes(32).toString('base64url');
 const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
@@ -150,6 +209,9 @@ async function main() {
             body: JSON.stringify({ key: AGENT_ONLY_KEY, value: { by: 'agent' }, visibility: 'owner' }),
         });
         assert(w.status === 201, `agent write: ${w.status} ${JSON.stringify(w.body)}`);
+        // Positive control for Phase 3: nobody else holds this key, so nothing shadows it.
+        assert(w.body.data.shadowed_by === undefined && w.body.data.warnings === undefined,
+            `an unshared key must carry no warning, got ${JSON.stringify(w.body.data.warnings)}`);
         const l = await json(`/v1/memory?owner_scope=true&prefix=${encodeURIComponent(AGENT_ONLY_KEY)}`, {
             headers: { Authorization: `Bearer ${ownerToken}` },
         });
@@ -182,10 +244,89 @@ async function main() {
             body: JSON.stringify({ key: SHARED_KEY, value: { by: 'agent-newer' }, visibility: 'owner' }),
         });
         assert(w.status === 201, `agent shadow write: ${w.status}`);
+        // The write door says so. It used to pass ownerScoped:true for every caller, "no owner copy
+        // to shadow", which is false for an agent, so this answer carried nothing.
+        assert(w.body.data.shadowed_by === ownerGhii(), `REST must name the owner copy, got ${JSON.stringify(w.body.data)}`);
+        assert((w.body.data.warnings ?? []).some((x: any) => x.code === 'SHADOWED_BY_OWNER_COPY'),
+            `warnings must carry SHADOWED_BY_OWNER_COPY, got ${JSON.stringify(w.body.data.warnings)}`);
         const r = await json(`/v1/memory/${encodeURIComponent(SHARED_KEY)}?owner_scope=true`, {
             headers: { Authorization: `Bearer ${ownerToken}` },
         });
         assert(r.body.data.value.by === 'app', `GHII copy must win, got ${JSON.stringify(r.body.data.value)}`);
+    });
+
+    // THE SEQUENCE THE WARNING WENT QUIET ON (appdev pitfall data/owner-copy-shadows-agent-write):
+    // the agent CREATES the key, the owner then saves it from the app, and the agent writes again.
+    // The check ran only when the agent had no copy yet, so from the second write on, every agent
+    // update was hidden behind the owner's copy with no word, on the node MCP door as well.
+    const SEQ_KEY = 'nstest.sequence.model';
+    await test('agent creates a key, the app saves it as the owner: the agent write that follows is warned (REST)', async () => {
+        const first = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ key: SEQ_KEY, value: { rev: 1, by: 'agent' }, visibility: 'owner' }),
+        });
+        assert(first.status === 201 && first.body.data.shadowed_by === undefined, `first agent write: ${first.status} ${JSON.stringify(first.body.data)}`);
+        const app = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${appToken}` },
+            body: JSON.stringify({ key: SEQ_KEY, value: { rev: 2, by: 'app' }, visibility: 'private' }),
+        });
+        assert(app.status === 201 && app.body.data.owner_gaii === ownerGhii(), `app save: ${app.status} ${JSON.stringify(app.body.data)}`);
+        const again = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ key: SEQ_KEY, value: { rev: 3, by: 'agent' }, visibility: 'owner' }),
+        });
+        assert(again.status === 200, `second agent write updates its own copy: ${again.status}`);
+        assert(again.body.data.shadowed_by === ownerGhii(), `the second agent write must be warned, got ${JSON.stringify(again.body.data)}`);
+    });
+
+    await test('…and the same agent is warned over the node MCP door, on a key it already holds', async () => {
+        await openMcpSession(agentGaii, agentPriv);
+        const w = await mcpWrite({ key: SEQ_KEY, value: { rev: 4, by: 'agent-mcp' }, visibility: 'owner' });
+        assert(!w.isError, `mcp write refused: ${JSON.stringify(w.data)}`);
+        assert(w.data.owner_gaii === agentGaii, `lands in the agent namespace, got ${w.data.owner_gaii}`);
+        assert(w.data.shadowed_by === ownerGhii() && w.data.warning === 'SHADOWED_BY_OWNER_COPY',
+            `MCP must warn on a key the agent already holds, got ${JSON.stringify(w.data)}`);
+        assert((w.data.warnings ?? []).some((x: any) => x.code === 'SHADOWED_BY_OWNER_COPY'), 'and in warnings');
+        const r = await json(`/v1/memory/${encodeURIComponent(SEQ_KEY)}?owner_scope=true`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(r.body.data.value.by === 'app', `what the warning says is true: the owner copy still wins, got ${JSON.stringify(r.body.data.value)}`);
+    });
+
+    await test('a second owner\'s copy of the same key name shadows nothing here (cross-owner)', async () => {
+        // The check looks under THIS agent's owner only. A different person holding the same key
+        // name is a different namespace entirely and must not appear in the answer.
+        const other = `nsother${Date.now() % 1000000}`;
+        const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: other, public_key: 'placeholder' }) });
+        assert(reg.status === 201, `register second owner: ${reg.status}`);
+        const otherToken = await getToken(other, reg.body.data.private_key, false);
+        const own = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${otherToken}` },
+            body: JSON.stringify({ key: 'nstest.crossowner.only', value: { by: 'other' } }),
+        });
+        assert(own.status === 201, `other owner write: ${own.status}`);
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ key: 'nstest.crossowner.only', value: { by: 'agent' } }),
+        });
+        assert(w.status === 201 && w.body.data.shadowed_by === undefined,
+            `another owner's key must not be named, got ${JSON.stringify(w.body.data)}`);
+    });
+
+    await test('an agent WITHOUT memory:read is not told the owner holds the key (the warning is a read)', async () => {
+        // Naming the owner's copy says a key exists in the owner's namespace. An agent reads owner
+        // scope with memory:read; one that cannot read there must not learn it by writing a key.
+        const ag = await json('/v1/agents', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ name: 'nswriteonly', owner, capabilities: ['memory'], scopes: ['memory:write'] }),
+        });
+        assert(ag.status === 201, `register write-only agent: ${ag.status} ${JSON.stringify(ag.body)}`);
+        const wo = await getToken(ag.body.data.agent.gaii, ag.body.data.private_key, true);
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${wo}` },
+            body: JSON.stringify({ key: SHARED_KEY, value: { by: 'write-only agent' } }),
+        });
+        assert(w.status === 201, `write-only agent write: ${w.status} ${JSON.stringify(w.body)}`);
+        assert(w.body.data.shadowed_by === undefined && w.body.data.warnings === undefined,
+            `a caller that cannot read owner scope must not be told, got ${JSON.stringify(w.body.data)}`);
     });
 
     await test('the shadowed copy is named in also_under instead of disappearing', async () => {
@@ -319,6 +460,7 @@ async function main() {
         assert(w.status === 201, `write: ${w.status} ${JSON.stringify(w.body)}`);
         assert(w.body.data.owner_gaii === ownerGhii(),
             `expected the owner GHII, got ${w.body.data.owner_gaii}`);
+        assert(w.body.data.shadowed_by === undefined, 'a write INTO the owner namespace shadows nothing');
     });
 
     await test('the OWNER reads it as their own record, no owner_scope needed', async () => {
