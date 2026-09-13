@@ -10,6 +10,7 @@
  *   kicker, title) comes from landing-showroom.css, which the view loads beside this sheet.
  *   Consumes theme.css tokens so it flips with dark/light.
  * @version-history
+ *   v2.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   v1.1.0 — 2026-06-02 — Phase 4: tokenize card/panel/border/text/bg-layer/code
  *     surfaces (#FFFFFF/#E5E7EB/#F3F4F6/#6B7280) for dark mode.
  *   v1.2.0 — 2026-06-02 — Component unification (#6 stat cards): remove .dv-stat* /
@@ -93,7 +94,7 @@
 .dv-step-header { display: flex; align-items: center; gap: 1.1rem; }
 .dv-num { font-family: var(--font-showroom); font-size: 2.75rem; line-height: 1; color: var(--accent); text-shadow: 3px 3px 0 var(--text); }
 .dv-step-label { font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: 1.9rem; line-height: 1.05; }
-.dv-folds { margin-top: 2.5rem; border-top: 3px solid var(--text); display: flex; flex-direction: column; }
+.dv-folds { margin-top: 2.5rem; display: flex; flex-direction: column; }
 .dv-fold { border-bottom: 1px solid var(--border); }
 .dv-fold:last-child { border-bottom: 0; }
 .dv-fold-row { display: flex; align-items: center; gap: 1.1rem; padding: .9rem 0; font-family: var(--font-showroom-body); font-size: 1.05rem; font-weight: 600; line-height: 1.3; color: var(--text-dim); }

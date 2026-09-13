@@ -8,6 +8,7 @@
  *   (.ld-sh-h2, .ld-sh-text, .ld-sh-box, .ld-sh-btn, .ld-sh-sticker, .ld-sh-door), which is the
  *   point: the story and the front page are one voice.
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   v1.1.0 — 2026-08-29 — The connect story (views/connect-story.js) on the same shapes: the tool chips,
  *     the three-step strip and the door, cs- prefix.
  *   v1.0.0 — 2026-08-28 — Initial.
@@ -33,7 +34,7 @@
 .bs-rail-num { display: inline-flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; font-family: var(--font-showroom); font-size: .8rem; border: 2px solid var(--sun); color: var(--sun); }
 
 /* A beat: copy on one side, the picture on the other, flipped every other time. */
-.bs-beat { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 3.5rem; align-items: center; padding: 3.5rem 0; border-top: 3px solid var(--text); scroll-margin-top: 1rem; }
+.bs-beat { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 3.5rem; align-items: center; padding: 3.5rem 0; scroll-margin-top: 1rem; }
 .bs-beat-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 1.1rem; }
 .bs-num { font-family: var(--font-showroom); font-size: 4rem; line-height: 1; color: var(--accent); text-shadow: 4px 4px 0 var(--text); }
 .bs-picture {
