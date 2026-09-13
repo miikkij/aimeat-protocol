@@ -1,7 +1,7 @@
 # `scripts/`
 
-Local developer utilities for the AIMEAT repo. Standalone, stdlib-only Python — no `pip install`,
-no venv required.
+Local developer utilities for the AIMEAT repo. Standalone and dependency-free: stdlib-only Python
+(no `pip install`, no venv) and plain Node scripts.
 
 ## `gen_image.py` — the AIMEAT image generator
 
@@ -110,3 +110,24 @@ of paid for twice.
 OpenRouter bills per image at generation time (FLUX.2 Pro has roughly a `$0.03` floor per image;
 Gemini flash-image is cheaper). Each run prints the billed cost reported by OpenRouter. Generate
 deliberately, not in bulk-speculation.
+
+## `eval-skill.mjs`: measure what a skill changes
+
+Runs a skill's eval suite from `.claude/evals/<skill>/` with `claude plugin eval`: every case
+several times with the skill and without it, then the score in each arm and the difference.
+
+```bash
+pnpm eval:skill aimeat-writing --model sonnet --max-cost-usd 5
+pnpm eval:skill aimeat-writing --case finnish-ui-copy --runs 1 --ablation none   # one cheap look
+```
+
+The skill stays where sessions load it. Each run copies `.claude/skills/<skill>/` and the suite
+into a throwaway plugin in the temp directory, runs the eval there, copies the results to
+`.claude/evals/<skill>/results/<timestamp>/` (gitignored, with `report.html`) and deletes the
+temp copy. Any `claude plugin eval` option passes through; the report stays local unless you pass
+`--publish-report`.
+
+Written and measured with Claude Code 2.1.270 on the PATH (`claude --version`). The runs use your own
+login and count against your plan; set `--max-cost-usd`. The first `aimeat-writing` run cost
+$1.13 on Sonnet and $3.11 on Opus for three cases, three runs, two arms. When to run it and how to
+read the result: `.claude/rules/skills.md`.

@@ -131,6 +131,7 @@
     "check:copied-logic": "cd aimeat && pnpm check:copied-logic",
     "check:doc-counts": "cd aimeat && pnpm check:doc-counts",
     "check:instructions": "cd aimeat && pnpm check:instructions",
+    "eval:skill": "node scripts/eval-skill.mjs",
     "check:imports-tracked": "cd aimeat && pnpm check:imports-tracked",
     "boot:smoke": "cd aimeat && pnpm boot:smoke",
     "test:env:init": "cd aimeat && pnpm test:env:init",
