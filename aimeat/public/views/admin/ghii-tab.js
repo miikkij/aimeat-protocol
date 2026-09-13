@@ -15,6 +15,7 @@
  *   - setLevel / doDelete / doRemoveEmail / doResetTotp: call admin service
  *
  * @version-history
+ *   v2.2.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.1.0 — 2026-09-12 — The row prints the name before the @ and keeps the whole identity in the
  *     hover and in the stacked view: at 1280 the person column had 4px to spare on a local node's
  *     ids, and a production one is six characters longer, so the identity would have wrapped on
@@ -211,7 +212,7 @@ export default function GhiiTab({ data, reload, switchPage }) {
 
       <section class="og-sec og-sec--first">
         <div class="og-sec-h">
-          <h2>${G('now')}<small>01</small></h2>
+          <h2 class="poster-section-title">${G('now')}<small>01</small></h2>
           <div class="og-doors">
             <button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('owners')}>${G('nowToOwners')}</button>
           </div>
@@ -248,7 +249,7 @@ export default function GhiiTab({ data, reload, switchPage }) {
 
       <section class="og-sec">
         <div class="og-sec-h">
-          <h2>${G('people')}<small>02</small></h2>
+          <h2 class="poster-section-title">${G('people')}<small>02</small></h2>
           <div class="og-doors">
             <button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('agents')}>${G('peopleToAgents')}</button>
           </div>
@@ -283,7 +284,7 @@ export default function GhiiTab({ data, reload, switchPage }) {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${G('levels')}<small>03</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${G('levels')}<small>03</small></h2></div>
         <${Row} title=${G('lvl0')} why=${G('lvl0Why')} chip=${html`<${Badge} type="critical" label="L0" />`}
           value=${G('nPeople', { n: num(c.l0) })} />
         <${Row} title=${G('lvl1')} why=${G('lvl1Why')} chip=${html`<${Badge} type="watch" label="L1" />`}
