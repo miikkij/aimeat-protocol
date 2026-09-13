@@ -21,6 +21,7 @@
  *   - PackageTable (03) — the rows, and the footer that says how many there are
  * @usage Imported by views/admin/knowledge-tab.js.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Knowledge page in the poster face).
  */
 import { h } from 'preact';
@@ -108,7 +109,7 @@ export function PackageTable({ data, q, onQ, filters, onFilter, onClear, onPage,
   return html`
     <section class="og-sec" id="adm-kn-03">
       <div class="og-sec-h">
-        <h2>${S('list.title')}<small>03</small></h2>
+        <h2 class="poster-section-title">${S('list.title')}<small>03</small></h2>
       </div>
 
       <${Filters} q=${q} onQ=${onQ} filters=${filters} onFilter=${onFilter} onClear=${onClear}

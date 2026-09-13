@@ -24,6 +24,7 @@
  *   - KnowledgeAdminTab (default) — one read, the four sections, and the review panel
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face. One read that carries the count and the shape, a table
  *     with search and real paging in place of the card grid, and the review trail read back.
  *   v1.1.0 — 2026-06-02 — Admin design unification: entry-content textarea
@@ -54,7 +55,7 @@ function AskAi({ summary }) {
   return html`
     <section class="og-sec" id="adm-kn-05">
       <div class="og-sec-h">
-        <h2>${S('ai.title')}<small>05</small></h2>
+        <h2 class="poster-section-title">${S('ai.title')}<small>05</small></h2>
         <div class="og-doors">
           <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
         </div>

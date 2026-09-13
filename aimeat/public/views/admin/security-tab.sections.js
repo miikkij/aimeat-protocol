@@ -8,6 +8,7 @@
  *   with a door to Settings), and the paste for the operator's own AI.
  * @structure IncidentsSection · AccountsSection · SettingsSection · AskAiSection
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-05 — Initial (the Security page in the poster face).
  */
 import { h } from 'preact';
@@ -38,7 +39,7 @@ export function IncidentsSection({ ov, onResolve, onDelete, onPayload }) {
   const sourceWord = (source) => source ? tOr('admin.security.incidents.source.' + source, source) : '';
   return html`
     <section class="og-sec" id="adm-sec-03">
-      <div class="og-sec-h"><h2>${S('incidents.title')}<small>03</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('incidents.title')}<small>03</small></h2></div>
       <p class="adm-sec-lead">${S('incidents.lead')}</p>
       ${items.length === 0 ? html`<div class="adm-sec-empty adm-sec-empty--last">${S('incidents.none')}</div>` : null}
       ${items.length > 0 && open === 0 ? html`<div class="adm-sec-empty">${lastResolved ? S('incidents.noneOpen', { date: fmtDate(lastResolved) }) : S('incidents.noneOpenPlain')}</div>` : null}
@@ -65,7 +66,7 @@ export function AccountsSection({ ov, switchPage }) {
     .join(', ');
   return html`
     <section class="og-sec" id="adm-sec-04">
-      <div class="og-sec-h"><h2>${S('accounts.title')}<small>04</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('accounts.title')}<small>04</small></h2>
         <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('owners')}>${t('dashboard.owners')}</button></div></div>
       <${DoorRow}
         title=${a.operators.length === 1 ? S('accounts.operatorsOne') : S('accounts.operatorsMany', { n: num(a.operators.length) })}
@@ -97,7 +98,7 @@ export function SettingsSection({ ov, switchPage }) {
   const toConfig = () => switchPage('config');
   return html`
     <section class="og-sec" id="adm-sec-05">
-      <div class="og-sec-h"><h2>${S('settings.title')}<small>05</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('settings.title')}<small>05</small></h2>
         <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${toConfig}>${t('dashboard.config')}</button></div></div>
       <p class="adm-sec-lead">${S('settings.lead')}</p>
       <${DoorRow}
@@ -143,7 +144,7 @@ export function AskAiSection() {
   const paste = buildSecurityPrompt({ url: getNodeUrl() });
   return html`
     <section class="og-sec" id="adm-sec-06">
-      <div class="og-sec-h"><h2>${S('ai.title')}<small>06</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('ai.title')}<small>06</small></h2>
         <div class="og-doors"><${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" /></div></div>
       <p class="adm-sec-lead">${S('ai.lead')}</p>
       <div class="og-box">
