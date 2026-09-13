@@ -30,6 +30,7 @@
  * @usage routed at /v1/fleet by spa.html and routes/portal.ts, and embedded as the "Your agents"
  *   section of Settings & Controls via views/profile/fleet-tab.js, which passes `embedded`.
  * @version-history
+ *   v1.5.0 -- 2026-09-13 -- Compose the standalone page title from poster.css.
  *   v1.4.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   v1.3.0 — 2026-09-03 — A row opens the agent. The href is an address and was never an
  *     instruction: embedded in Settings & Controls it pushed a query onto the URL the profile had
@@ -336,7 +337,7 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
     // and would tear the SSE connection down and back up each time.
   }, [owner]);
 
-  const heading = embedded ? '' : html`<h1 class="flt-title">${t('fleet.title')}</h1>`;
+  const heading = embedded ? '' : html`<h1 class="flt-title poster-page-title">${t('fleet.title')}</h1>`;
 
   if (!signedIn) {
     return html`<div class="flt">
