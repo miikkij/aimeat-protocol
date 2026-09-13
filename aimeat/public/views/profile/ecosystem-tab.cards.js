@@ -8,6 +8,7 @@
  *   details" disclosure: principal, grants, subscriptions, binding). Extracted from ecosystem-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   2026-09-13 -- V2v: compose section top rules from poster.css.
  *   v1.0.0 — 2026-07-13 — Extracted from ecosystem-tab.js (max-file-lines)
  *   v1.1.0 — 2026-08-08 — Copy control unified: the bespoke .copy-prompt-btn is the shared .btn-primary, whose
  *       .copied state now lives in theme.css. Copy labels come from the shared common.* keys.
@@ -67,7 +68,7 @@ export function EcoSetupGuide({ app }) {
   const guide = setup && (setup[locale] || setup.en || setup.fi);
 
   return html`
-    <div class="pf-eco-section pf-eco-setup-guide">
+    <div class="pf-eco-section poster-row--thing pf-eco-setup-guide">
       <div class="pf-eco-section-title">${t('profile.ecosystem.setupGuideTitle')}</div>
       ${guide
         ? html`<div class="pf-eco-setup-guide-md"><${Markdown} text=${guide} /></div>`
@@ -114,9 +115,9 @@ export function EcoAskInClaude({ app }) {
     : '';
 
   return html`
-    <div class="pf-eco-section pf-eco-ask">
+    <div class="pf-eco-section poster-row--thing pf-eco-ask">
       <div class="pf-eco-section-title">${t('profile.ecosystem.askClaudeTitle')}</div>
-      <div class="pf-eco-mcp">
+      <div class="pf-eco-mcp poster-row--thing">
         <div class="pf-eco-mcp-head">
           <span class="pf-eco-mcp-icon">💬</span>
           <strong class="pf-eco-mcp-title">${t('profile.ecosystem.mcpTitle')}</strong>

@@ -10,6 +10,7 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   2026-09-13 -- V2v: compose section top rules from poster.css.
  *   2026-09-13 — The revoke dialog's actions sit in its footer.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v3.2.0 — 2026-07-13 — Split for max-file-lines: MOVED sub-components/helpers into relative sibling
@@ -300,10 +301,10 @@ export default function EcosystemTab({ onStats, showToast }) {
 
                   ${app.status !== 'revoked' && html`<${EcoAskInClaude} app=${app} />`}
 
-                  <div class="pf-eco-section">
+                  <div class="pf-eco-section poster-row--thing">
                   </div>
 
-                  <div class="pf-eco-section">
+                  <div class="pf-eco-section poster-row--thing">
                     <div class="pf-eco-section-title">${t('profile.ecosystem.dataTitle')}</div>
                     ${appData[app.geai] === undefined
                       ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.dataLoading')}</div>`
@@ -317,7 +318,7 @@ export default function EcosystemTab({ onStats, showToast }) {
                   </div>
 
                   ${app.status !== 'revoked' && html`
-                    <div class="pf-eco-section pf-eco-disconnect">
+                    <div class="pf-eco-section poster-row--thing pf-eco-disconnect">
                       <div class="pf-eco-section-title">${t('profile.ecosystem.disconnectTitle')}</div>
                       <p class="pf-eco-dim pf-eco-disconnect-hint">${t('profile.ecosystem.disconnectHint')}</p>
                       <button class="btn-danger-solid btn-sm" onClick=${() => { setRevokeApp(app.app); setRevokeInput(''); }}>

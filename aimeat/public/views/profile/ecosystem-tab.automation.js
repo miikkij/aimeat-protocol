@@ -7,6 +7,7 @@
  *   agent picker), and <EcoAutomationSection> (the unified turnkey publish→process→deliver flow).
  *   Extracted from ecosystem-tab.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-13 -- V2v: compose section top rules from poster.css.
  *   v1.1.1 — 2026-09-13 — The reject-advisory dialog's actions sit in its footer.
  *   v1.1.0 — 2026-07-16 — Card mount folds schedules + recipe + organisms + advisories into GET
  *     /v1/ecosystem-apps/:app/automation (getAutomationOverview); agent list stays separate; fallback kept.
@@ -393,7 +394,7 @@ export function EcoAutomationSection({ app, showToast }) {
 
   if (revoked) {
     return html`
-      <div class="pf-eco-section">
+      <div class="pf-eco-section poster-row--thing">
         <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
         <div class="pf-eco-dim">${t('profile.ecosystem.autoRevoked')}</div>
         <p class="pf-eco-dim pf-eco-reconnect-hint">${t('profile.ecosystem.revokeReconnectHint')}</p>
@@ -402,7 +403,7 @@ export function EcoAutomationSection({ app, showToast }) {
 
   if (!loaded) {
     return html`
-      <div class="pf-eco-section">
+      <div class="pf-eco-section poster-row--thing">
         <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
         <div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.automationLoading')}</div>
       </div>`;
@@ -420,7 +421,7 @@ export function EcoAutomationSection({ app, showToast }) {
   const deliverState = pendingCount > 0 ? 'wait' : 'ok';
 
   return html`
-    <div class="pf-eco-section pf-eco-auto-flow" data-eco-auto=${app.app}>
+    <div class="pf-eco-section poster-row--thing pf-eco-auto-flow" data-eco-auto=${app.app}>
       <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
       <p class="pf-eco-dim pf-eco-auto-flow-intro">${t('profile.ecosystem.autoIntro')}</p>
 
@@ -441,7 +442,7 @@ export function EcoAutomationSection({ app, showToast }) {
         </div>`}
 
       <!-- ── the ONE config card, read top-to-bottom ── -->
-      <div class="pf-eco-auto-flow-card">
+      <div class="pf-eco-auto-flow-card poster-row--thing">
         <!-- ① What this app produces -->
         <div class="pf-eco-auto-flow-step">
           <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep1')}</div>
