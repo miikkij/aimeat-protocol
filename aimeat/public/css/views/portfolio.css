@@ -6,6 +6,7 @@
  *   column) and full-bleed public viewer (.portfolio-viewer-full).
  * @usage Loaded by spa.html; classes consumed by public/views/portfolio.js.
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- Compose poster rules and own the builder's inline presentation.
  *   v1.2.0 — 2026-08-29 — The two monospace rules read var(--font-mono) instead of naming a family.
  *   v1.1.0 — 2026-07-03 — Full-bleed public viewer: .portfolio-viewer-full column fills
  *     the viewport below the nav, slim toolbar, iframe flexes to remaining height.
@@ -29,7 +30,6 @@
 
 .portfolio-step {
   background: var(--card-bg, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
   border-radius: 12px;
   padding: 1.5rem;
 }
@@ -240,7 +240,6 @@
 /* ── Instructions ── */
 .portfolio-instructions {
   background: rgba(124,92,255,0.05);
-  border: 1px solid rgba(124,92,255,0.12);
   border-radius: 8px;
   padding: 1rem 1.25rem;
   margin-top: 1rem;
@@ -422,7 +421,7 @@
 
 /* ── Builder workflow round (2026-06-10): flow banner, summaries, preview, publish bits ── */
 .portfolio-subtitle-text { color: var(--text-dim); margin-bottom: 1rem; }
-.portfolio-flow { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .7rem 1rem; margin-bottom: 1.5rem; background: var(--bg-surface, var(--bg-dim)); border: 1px solid var(--border); border-radius: 10px; font-size: .88rem; color: var(--text); }
+.portfolio-flow { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .7rem 1rem; margin-bottom: 1.5rem; background: var(--bg-surface, var(--bg-dim)); border-radius: 10px; font-size: .88rem; color: var(--text); }
 .portfolio-flow-num { font-weight: 700; margin-right: .25rem; }
 .portfolio-flow-arrow { color: var(--text-dim); }
 .portfolio-published-bar { margin-bottom: 1.5rem; padding: .75rem 1rem; background: rgba(80,200,120,.08); border: 1px solid rgba(80,200,120,.25); border-radius: 8px; display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
@@ -438,3 +437,16 @@
 .portfolio-paste-actions { display: flex; gap: .6rem; margin-top: .5rem; flex-wrap: wrap; }
 .portfolio-badge-toggle { margin: -0.25rem 0 0.75rem; }
 .portfolio-preview-frame { margin-top: .75rem; min-height: 420px; width: 100%; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+
+/* Builder presentation: state stays in the component, visual values stay here. */
+.portfolio-no-content { color: var(--text-dim); }
+.portfolio-no-match { padding: .5rem; font-size: .8rem; color: var(--text-dim); }
+.portfolio-type-label { color: var(--text-bright); font-size: .95rem; margin-bottom: .5rem; }
+.portfolio-style-label { color: var(--text-bright); font-size: .95rem; margin: 1.5rem 0 .5rem; }
+.portfolio-auth-label { color: var(--text-dim); font-size: .9rem; margin-bottom: .75rem; }
+.portfolio-upload-hint { margin: 0; color: var(--text-dim); }
+.portfolio-paste-divider { display: flex; align-items: center; gap: .75rem; margin: 1rem 0; color: var(--text-dim); font-size: .9rem; }
+.portfolio-paste-divider hr { flex: 1; border: none; border-top: 1px solid var(--border-dim); }
+.portfolio-upload-status { margin-top: .75rem; padding: .5rem 1rem; border-radius: 8px; background: rgba(255,80,80,.08); border: 1px solid rgba(255,80,80,.2); color: #ff5050; }
+.portfolio-upload-status[data-ok="true"] { background: rgba(80,200,120,.08); border-color: rgba(80,200,120,.2); color: #50c878; }
+.portfolio-back { margin-top: 2rem; }
