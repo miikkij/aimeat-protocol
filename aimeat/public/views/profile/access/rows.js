@@ -12,6 +12,7 @@
  * @structure keyRow · keyOpen · secretRow · sessionsBlock · federationBlock
  * @usage import { keyRow, secretRow, sessionsBlock, federationBlock } from './rows.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose access detail frames and extract inline layout.
  *   v1.1.0 — 2026-09-06 — secretRow: the vault's rows for section 04. It shows the name and never
  *     the value, because the value cannot be read back from the server either.
  *   v1.0.0 — 2026-09-05 — Initial.
@@ -52,7 +53,7 @@ function keyOpen(ctx, row) {
   const minutes = Math.max(1, Math.round((ctx.ov?.access_ttl_seconds || 900) / 60));
   const canTake = (g) => groups.length > 1 || g.scopes.length < row.scopes.length;
   return html`
-    <div class="ac-open">
+    <div class="ac-open poster-frame">
       <p class="ac-lead">${x('open.lead', { name: row.name })} ${x('open.applies', { min: minutes })}</p>
       <div class="ac-rights">
         ${groups.map((g) => html`
@@ -62,7 +63,7 @@ function keyOpen(ctx, row) {
       </div>
       ${row.canSpend ? html`
         <span class="og-label">${x('spend.title')}</span>
-        <p class="ac-para" style="margin: 0;">${row.spendCap == null ? x('spend.noLimit') : x('spend.used', { spent: n(row.spent), cap: n(row.spendCap) })}</p>
+        <p class="ac-para ac-spend-summary">${row.spendCap == null ? x('spend.noLimit') : x('spend.used', { spent: n(row.spent), cap: n(row.spendCap) })}</p>
         <div class="ac-spend">
           <input class="og-input" type="number" min="0" step="1" inputmode="numeric" placeholder=${x('spend.placeholder')} value=${ctx.spendDraft[row.id] ?? ''} onInput=${(e) => ctx.setSpendDraft(row.id, e.target.value)} />
           <button type="button" class="og-door" disabled=${ctx.busy === row.id} onClick=${() => ctx.setSpendCap(row, ctx.spendDraft[row.id])}>${x('spend.set')}</button>
@@ -105,7 +106,7 @@ export function secretRow(ctx, row) {
 /** The one field that writes a value, on the row it belongs to. It is never filled from the server. */
 function secretReplace(ctx, row, busy) {
   return html`
-    <div class="ac-open">
+    <div class="ac-open poster-frame">
       <span class="og-box-label">${x('secrets.replaceTitle', { name: row.name })}</span>
       <p class="ac-lead">${x('secrets.replaceHint')}</p>
       <div class="ac-swrite">
@@ -148,6 +149,6 @@ export function federationBlock(ctx) {
     <div class="ac-fed">
       <input class="og-input" type="text" placeholder=${x('fed.addPlaceholder')} disabled=${fed.all} value=${ctx.fedInput} onInput=${(e) => ctx.setFedInput(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && ctx.addFedNode()} />
       <button type="button" class="og-door" disabled=${fed.all || ctx.busy === 'fed' || !ctx.fedInput.trim()} onClick=${() => ctx.addFedNode()}>${x('fed.add')}</button>
-      <span class="ac-hint" style="margin: 0;">${fed.all ? x('fed.allHint') : x('fed.listHint')}</span>
+      <span class="ac-hint">${fed.all ? x('fed.allHint') : x('fed.listHint')}</span>
     </div>`;
 }
