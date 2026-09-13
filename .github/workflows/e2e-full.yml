@@ -65,8 +65,21 @@ jobs:
 
       # Four lanes: four nodes at once, every suite still alone on an empty database. Measured on
       # one lane before this existed: 285 suites, 38 minutes, 20 of them restarts between suites.
+      #
+      # AND FOUR LANES IS WHY THE BOOT BUDGET IS RAISED HERE. Some twenty suites spawn a node of
+      # their own, and that node starts on a runner where four lanes are already restarting theirs
+      # between suites — a boot of this node costs about 8 seconds of CPU, so five of them want
+      # forty. On 2026-09-12 e2e-app-silent and e2e-ai-provider-stub each spent the whole 180-second
+      # default without binding a port, having been given 5.6 seconds of CPU in that time: about
+      # three per cent of one core, and about two thirds of what one boot needs. Neither was stuck;
+      # both were starved, and the sweep called them failures. 420 seconds is that measurement with
+      # room over it, and it costs nothing on a healthy run: the poll returns the moment the node
+      # answers. The guard tier runs two lanes and keeps the default, which is the pressure the
+      # default was measured against.
       - name: Full sweep (${{ matrix.backend }})
         working-directory: aimeat
+        env:
+          AIMEAT_E2E_BOOT_MS: 420000
         run: pnpm test:e2e:${{ matrix.backend }}
 
       - name: Open or update the issue for a red sweep

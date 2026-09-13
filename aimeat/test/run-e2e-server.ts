@@ -7,6 +7,10 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.4.0 -- 2026-09-13 -- startServer keeps the tail of STDOUT as well as stderr, and names the
+ *            port and backend. Winston writes every level to stdout, so the boot's own refusals
+ *            went into the drain: the nightly sweep of 2026-09-12 reported a lane dead at 11888ms
+ *            with an empty reason and none of its suites run.
  *   v1.3.0 -- 2026-09-12 -- A port that will not come free says WHO holds it. The refusal named the
  *            port and the moment and nothing else, so five red CI runs in one day were each answered
  *            with a re-run and a guess; an AIMEAT node answers /v1/build with its own id and build
@@ -615,6 +619,43 @@ export async function requirePortFree(port: number, timeoutMs: number, context: 
 }
 
 // ── Server lifecycle ──
+
+/** Lines kept per stream for a failure message. Enough for a stack, short enough to read. */
+const TAIL_LINES = 20;
+
+/**
+ * Read BOTH of a spawned node's streams and hand back the tail of what it said.
+ *
+ * WHY STDOUT AND NOT ONLY STDERR. This node logs through Winston, whose console transport writes
+ * every level to STDOUT, so `logger.error(...); process.exit(1)` — how the boot refuses an
+ * unreadable node key, a database it cannot open, a pin it does not understand — says its piece on
+ * the stream this file used to drain into an empty arrow function. The nightly sweep of 2026-09-12
+ * is what that costs: `Lane failed: Test server exited during startup (code 1, signal null) after
+ * 11888ms.` followed by a blank line, for a lane that then ran none of its 70-odd suites and left
+ * issue #7 with nothing in it to read.
+ *
+ * Reading stdout was never optional either: an unread pipe fills and stops the writer, so the
+ * "drained" listener was doing work, just throwing the result away.
+ *
+ * wait-for-server.ts has kept both tails since 2026-09-09 for the nodes a SUITE spawns. This is the
+ * same thing for the runner's own server, which is the one whose death takes a whole lane with it.
+ */
+export function keepTails(child: ChildProcess): () => string {
+    const out: string[] = [];
+    const err: string[] = [];
+    const keep = (into: string[]) => (d: Buffer) => {
+        into.push(d.toString());
+        while (into.length > TAIL_LINES) into.shift();
+    };
+    child.stdout?.on('data', keep(out));
+    child.stderr?.on('data', keep(err));
+    // stderr first: a crash lands there, and the log lines that led to it read as context under it.
+    return () => {
+        const text = [err.join(''), out.join('')].map(s => s.trim()).filter(Boolean).join('\n---\n');
+        return text ? `\n${text}` : ' (the node printed nothing on either stream)';
+    };
+}
+
 const SERVER_EXIT_TIMEOUT_MS = 10_000;
 const PORT_FREE_TIMEOUT_MS = 15_000;
 const SERVER_READY_TIMEOUT_MS = 60_000;
@@ -638,19 +679,13 @@ export async function startServer(target: RunnerTarget): Promise<ChildProcess> {
         for (const path of [authLog, `${authLog}.1`]) if (existsSync(path)) unlinkSync(path);
     });
 
-    // Keep the tail of stderr. A server that dies on boot (a bad pin, a database it cannot open)
-    // used to report only "failed to start within 60000ms", with the reason drained to nothing.
-    const stderrTail: string[] = [];
-    child.stdout?.on('data', () => { /* drained: suite output is what the log is for */ });
-    child.stderr?.on('data', (d: Buffer) => {
-        stderrTail.push(d.toString());
-        if (stderrTail.length > 20) stderrTail.shift();
-    });
+    const tail = keepTails(child);
+    const where = `:${target.port}, ${target.dbType}`;
 
     const started = Date.now();
     while (Date.now() - started < SERVER_READY_TIMEOUT_MS) {
         if (child.exitCode !== null || child.signalCode !== null) {
-            throw new Error(`Test server exited during startup (code ${child.exitCode}, signal ${child.signalCode}) after ${Date.now() - started}ms.\n${stderrTail.join('').trim()}`);
+            throw new Error(`Test server (${where}) exited during startup (code ${child.exitCode}, signal ${child.signalCode}) after ${Date.now() - started}ms.${tail()}`);
         }
         try {
             const res = await fetch(`${target.baseUrl}/v1/spec`);
@@ -661,7 +696,7 @@ export async function startServer(target: RunnerTarget): Promise<ChildProcess> {
         await new Promise(r => setTimeout(r, 300));
     }
     child.kill('SIGKILL');
-    throw new Error(`Server failed to start within ${SERVER_READY_TIMEOUT_MS}ms.\n${stderrTail.join('').trim()}`);
+    throw new Error(`Test server (${where}) failed to start within ${SERVER_READY_TIMEOUT_MS}ms.${tail()}`);
 }
 
 /**
