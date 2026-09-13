@@ -25,6 +25,7 @@
  * @structure NewAgentPanel({ session, showToast, onCreated })
  * @usage <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
+ *   2026-09-13 -- V2y: compose the section headline with the shared B1 class.
  *   v1.0.0 — 2026-09-08 — Initial. The proposal routes shipped 2026-09-02 with no surface at all.
  */
 import { h } from 'preact';
@@ -158,7 +159,7 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents })
     <div class="pf-agd-new">
       <div class="pf-agd-basic-head">
         <div>
-          <div class="pf-agd-basic-title">${t('profile.agents.new.title')}</div>
+          <div class="pf-agd-basic-title poster-section-title">${t('profile.agents.new.title')}</div>
           <div class="pf-agd-basic-desc">${t('profile.agents.new.desc')}</div>
         </div>
         <button class="btn-primary btn-sm" onClick=${() => setOpen(!open)}>
