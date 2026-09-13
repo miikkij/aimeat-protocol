@@ -9,12 +9,20 @@
  *   the numeral strip and the badges come from admin.css and organism.css; only what this page adds
  *   lives here. Every value is a theme.css token, so the page flips with the theme.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Own existing section spacing and horizontal menu arrows.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 
 .adm-pt-intro { margin: 0 0 .8rem; font-size: .88rem; line-height: 1.55; color: var(--text-dim); max-width: 76ch; }
 .adm-pt-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
 .adm-pt-note { margin: 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-pt-lb-note { margin-bottom: 16px; }
+.adm-pt-lb-doors { margin-top: 10px; }
+.adm-pt-problems { margin-bottom: 14px; }
+.adm-pt-problems-list { margin: 0; padding-left: 18px; }
+.adm-pt-html-warning, .adm-pt-section-detail { margin-top: 14px; }
+.adm-pt-section-doors { margin-top: 12px; }
+.adm-pt-save-note { margin-top: 8px; }
 .adm-pt-empty { padding: 10px 0; font-size: .88rem; color: var(--text-dim); }
 .adm-pt .adm-mrow--last { border-bottom: 0; }
 .adm-pt .adm-mrow .adm-mval { overflow-wrap: anywhere; }
@@ -58,6 +66,7 @@
 .adm-pt-num { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin-top: 1px; font-family: var(--font-mono); font-size: .72rem; color: var(--bg); background: var(--text); }
 .adm-pt-num--off { background: var(--border); color: var(--text-muted); }
 .adm-pt-move { display: flex; flex-direction: column; gap: 1px; padding-top: 1px; }
+.adm-pt-move--menu { display: inline-flex; flex-direction: row; gap: 8px; vertical-align: middle; }
 .adm-pt-move button { padding: 0; border: 0; background: none; line-height: 0; color: var(--text); cursor: pointer; }
 .adm-pt-move button:disabled { color: var(--border); cursor: default; }
 .adm-pt-move svg, .adm-pt-fld svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: square; }
