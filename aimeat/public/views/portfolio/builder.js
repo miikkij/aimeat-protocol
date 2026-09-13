@@ -6,6 +6,7 @@
  *   prompt, and upload/publish the resulting HTML. Extracted from portfolio.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 -- 2026-09-13 -- Compose the page headline and five B1 section slabs.
  *   v1.3.0 -- 2026-09-13 -- Compose poster rules and move inline presentation to portfolio.css.
  *   v1.2.0 — 2026-08-28 — "AIMEAT poster" is the first design style and the default: the house
  *     face (Archivo Black headlines, ink rules, one coral band with a sun stripe) written into the
@@ -316,7 +317,7 @@ export function PortfolioBuilder({ session, navigate }) {
 
   return html`
     <div class="portfolio-container">
-      <h1>${t('portfolio.builder.heading')}</h1>
+      <h1 class="poster-page-title">${t('portfolio.builder.heading')}</h1>
       <p class="portfolio-subtitle-text">${t('portfolio.builder.subtitle')}</p>
 
       <!-- The loop is the whole point: AIMEAT composes a prompt, YOUR AI chat builds the
@@ -347,7 +348,7 @@ export function PortfolioBuilder({ session, navigate }) {
 
         <!-- Step 1: Select Content -->
         <div class="portfolio-step poster-row--thing">
-          <h3><span class="portfolio-step-number">1</span> ${t('portfolio.builder.step1Title')}</h3>
+          <h3 class="poster-section-title"><span class="portfolio-step-number">1</span> ${t('portfolio.builder.step1Title')}</h3>
 
           ${!hasContent && html`<p class="portfolio-no-content">${t('portfolio.builder.noContent')}</p>`}
 
@@ -485,7 +486,7 @@ export function PortfolioBuilder({ session, navigate }) {
 
         <!-- Step 2: Style & Purpose -->
         <div class="portfolio-step poster-row--thing">
-          <h3><span class="portfolio-step-number">2</span> ${t('portfolio.builder.step2Title')}</h3>
+          <h3 class="poster-section-title"><span class="portfolio-step-number">2</span> ${t('portfolio.builder.step2Title')}</h3>
 
           <p class="portfolio-type-label">${t('portfolio.builder.portfolioType')}</p>
           <div class="portfolio-options">
@@ -517,7 +518,7 @@ export function PortfolioBuilder({ session, navigate }) {
 
         <!-- Step 3: Auth-Gated Sections -->
         <div class="portfolio-step poster-row--thing">
-          <h3><span class="portfolio-step-number">3</span> ${t('portfolio.builder.step3Title')}</h3>
+          <h3 class="poster-section-title"><span class="portfolio-step-number">3</span> ${t('portfolio.builder.step3Title')}</h3>
           <p class="portfolio-auth-label">${t('portfolio.builder.authGateLabel')}</p>
           <div class="portfolio-auth-gates">
             ${AUTH_GATES.map(gate => html`
@@ -537,7 +538,7 @@ export function PortfolioBuilder({ session, navigate }) {
 
         <!-- Step 4: Generate Prompt -->
         <div class="portfolio-step poster-row--thing">
-          <h3><span class="portfolio-step-number">4</span> ${t('portfolio.builder.step4Title')}</h3>
+          <h3 class="poster-section-title"><span class="portfolio-step-number">4</span> ${t('portfolio.builder.step4Title')}</h3>
 
           <div class="portfolio-generate-row">
             <button class="btn-primary" disabled=${totalSelected === 0} onClick=${handleGenerate}>
@@ -573,7 +574,7 @@ export function PortfolioBuilder({ session, navigate }) {
 
         <!-- Step 5: Upload Portfolio HTML -->
         <div class="portfolio-step poster-row--thing">
-          <h3><span class="portfolio-step-number">5</span> ${t('portfolio.builder.step5Title')}</h3>
+          <h3 class="poster-section-title"><span class="portfolio-step-number">5</span> ${t('portfolio.builder.step5Title')}</h3>
 
           <div class="portfolio-publish-target">
             ${tr('portfolio.builder.publishTarget', 'Will be published at:')}
