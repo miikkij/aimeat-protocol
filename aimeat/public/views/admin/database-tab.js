@@ -13,6 +13,7 @@
  *   - Line({ points, onPick })    -- the seven-day line with a reading under the cursor
  *   - DatabaseTab (default)       -- the two sections, and the wait state before the second snapshot
  * @version-history
+ *   v2.1.0 -- 2026-09-13 -- Compose shared B1 headings; table ratios use SVG width data.
  *   v2.0.0 -- 2026-09-12 -- The poster face. The cards become two sections; the 168 hourly
  *     snapshots the page already fetched are drawn as a line instead of three numbers; "relative
  *     size" (rows, measured against the biggest table, with no number) becomes a share of all rows
@@ -102,10 +103,8 @@ export default function DatabaseTab() {
   const [order, setOrder] = useState('biggest');
   const [at, setAt] = useState(null);
 
-  // useToast returns fresh function identities every render; reached through a ref so `load`
-  // stays stable. With showErr as a dependency every completed fetch re-rendered, rebuilt
-  // `load`, re-ran the load effect and fetched again — a continuous poll measured at about
-  // 25 requests/s while this tab was open.
+  // This ref kept `load` stable before useToast memoized its callbacks. Previously every
+  // completed fetch rebuilt `load` and re-ran the effect, measured at about 25 requests/s.
   const showErrRef = useRef(showErr);
   showErrRef.current = showErr;
 
@@ -199,7 +198,7 @@ export default function DatabaseTab() {
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
       <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2>${D('sizeTitle')}<small>01</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${D('sizeTitle')}<small>01</small></h2>
           <div class="og-doors">
             <button type="button" class="og-door" onClick=${capture} disabled=${capturing}>
               ${capturing ? D('capturing') : D('captureNow')}
@@ -259,7 +258,7 @@ export default function DatabaseTab() {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${D('whereTitle')}<small>02</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${D('whereTitle')}<small>02</small></h2></div>
         <p class="adm-db-lead">${byGrowth ? D('leadGrowth') : D('leadSize')}</p>
 
         <div class="adm-db-tools">
@@ -285,7 +284,7 @@ export default function DatabaseTab() {
               <span class="adm-db-n r">${num(r.n)}</span>
               <span class="adm-db-d r">${signed(r.delta)}</span>
               <span class="adm-db-pct r">${shareOf(r)}</span>
-              <span class="adm-db-share"><i style=${`width:${barOf(r).toFixed(1)}%`}></i></span>
+              <span class="adm-db-share"><svg width=${barOf(r).toFixed(1) + '%'} aria-hidden="true"></svg></span>
             </div>`)}
         </div>
 
