@@ -20,6 +20,7 @@
  *   - CreateForm — the operator's own system package
  * @usage Imported by views/admin/knowledge-tab.js.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Knowledge page in the poster face).
  */
 import { h } from 'preact';
@@ -62,7 +63,7 @@ export function ReviewPanel({ pkg, onClose, onSubmit, busy }) {
   return html`
     <section class="og-sec" id="adm-kn-04">
       <div class="og-sec-h">
-        <h2>${S('review.title')}<small>04</small></h2>
+        <h2 class="poster-section-title">${S('review.title')}<small>04</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${onClose}>${S('review.back')}</button>
         </div>

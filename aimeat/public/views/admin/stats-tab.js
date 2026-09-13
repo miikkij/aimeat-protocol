@@ -24,6 +24,7 @@
  *   - StatsTab (default) — the reads, and the six sections
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v3.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v3.0.0 — 2026-09-12 — The poster face and six numbered sections. Counted-over-a-period and
  *     live-at-this-second are now separate sections, a counter with nothing behind it says so
  *     instead of drawing a zero, the empty weekly and monthly charts are gone, and the two charts
@@ -125,7 +126,7 @@ function RightNow({ rows, live, days, from, to, control }) {
   return html`
     <section class="og-sec og-sec--first" id="adm-st-01">
       <div class="og-sec-h">
-        <h2>${S('now.title')}<small>01</small></h2>
+        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
         ${control}
       </div>
 
@@ -211,7 +212,7 @@ function AskAi({ from, to }) {
   return html`
     <section class="og-sec" id="adm-st-06">
       <div class="og-sec-h">
-        <h2>${S('ai.title')}<small>06</small></h2>
+        <h2 class="poster-section-title">${S('ai.title')}<small>06</small></h2>
         <div class="og-doors">
           <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
         </div>
