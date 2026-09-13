@@ -14,6 +14,7 @@
  * @structure WhichVersion · MenuLinks · OwnHtml · SavedTexts · AskAi · WhatChanged
  * @usage html`<${WhichVersion} hasCustom=${false} source="default" parts=${9} />`
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose shared poster headings and external section spacing.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 import { h } from 'preact';
@@ -36,7 +37,7 @@ export function WhichVersion({ hasCustom, source, parts, number }) {
     </div>`;
   return html`
     <section class="og-sec" id="adm-pt-rank">
-      <div class="og-sec-h"><h2>${P('rank.title')}<small>${number}</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${P('rank.title')}<small>${number}</small></h2></div>
       <p class="adm-pt-lead">${P('rank.lead')}</p>
       ${step(1, 'html', hasCustom ? P('rank.inUse') : P('rank.htmlNone'))}
       ${step(2, 'layout', source === 'stored' ? (hasCustom ? P('rank.notUsed') : P('rank.inUse')) : P('rank.layoutNone'))}
@@ -49,7 +50,7 @@ export function WhichVersion({ hasCustom, source, parts, number }) {
 export function MenuLinks({ links, labels, saving, onToggle, onMove, onSave, number }) {
   return html`
     <section class="og-sec" id="adm-pt-menu">
-      <div class="og-sec-h"><h2>${P('menu.title')}<small>${number}</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${P('menu.title')}<small>${number}</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" disabled=${saving || !links} onClick=${onSave}>${P('menu.save')}</button>
         </div></div>
@@ -68,7 +69,7 @@ export function MenuLinks({ links, labels, saving, onToggle, onMove, onSave, num
               </button>
             </span>
             <span class="adm-mval">
-              <span class="adm-pt-move" style="display:inline-flex;flex-direction:row;gap:8px;vertical-align:middle">
+              <span class="adm-pt-move adm-pt-move--menu">
                 <button type="button" disabled=${idx === 0} onClick=${() => onMove(idx, -1)} title=${P('parts.moveUp')}
                   aria-label=${P('parts.moveUp')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg></button>
                 <button type="button" disabled=${idx === links.length - 1} onClick=${() => onMove(idx, 1)} title=${P('parts.moveDown')}
@@ -87,7 +88,7 @@ export function OwnHtml({ hasCustom, updatedAt, template, onTemplate, onSave, on
   const [open, setOpen] = useState(hasCustom);
   return html`
     <section class="og-sec" id="adm-pt-html">
-      <div class="og-sec-h"><h2>${P('html.title')}<small>${number}</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${P('html.title')}<small>${number}</small></h2>
         <div class="og-doors">
           ${!open && html`<button type="button" class="og-door og-door--quiet" onClick=${() => setOpen(true)}>${P('html.write')}</button>`}
           <button type="button" class="og-door og-door--quiet" onClick=${() => { setOpen(true); onLoadCurrent(); }}>${P('html.loadCurrent')}</button>
@@ -99,16 +100,16 @@ export function OwnHtml({ hasCustom, updatedAt, template, onTemplate, onSave, on
           : html`<${Badge} type="muted" label=${P('html.badgeNone')} />`}</span>
         <span class="adm-mval">${hasCustom && updatedAt ? dt(updatedAt) : '__site_template__'}</span>
       </div>
-      <div class="og-box" style="margin-top: 14px">
+      <div class="og-box adm-pt-html-warning">
         <span class="og-box-label">${P('html.warnLabel')}</span>
         ${P('html.warn')}
       </div>
       ${open && html`
-        <div style="margin-top: 14px">
+        <div class="adm-pt-section-detail">
           <textarea class="adm-pt-textarea" rows="18" value=${template}
             placeholder=${P('html.editorPh')}
             onInput=${(e) => onTemplate(e.target.value)}></textarea>
-          <div class="og-doors" style="margin-top: 12px">
+          <div class="og-doors adm-pt-section-doors">
             <button type="button" class="adm-btn" onClick=${onSave}>${P('html.save')}</button>
             <button type="button" class="og-door og-door--quiet" onClick=${onDownload}>${P('html.download')}</button>
             ${hasCustom && html`<button type="button" class="og-door og-door--quiet og-door--danger" onClick=${onDelete}>${P('html.delete')}</button>`}
@@ -126,7 +127,7 @@ export function SavedTexts({ memKeys, kv, newKey, newVal, onKey, onVal, onAdd, o
     </div>`;
   return html`
     <section class="og-sec" id="adm-pt-texts">
-      <div class="og-sec-h"><h2>${P('texts.title')}<small>${number}</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${P('texts.title')}<small>${number}</small></h2></div>
       <div class="adm-pt-two">
         <div>
           <p class="adm-pt-lead">${P('texts.lead')}</p>
@@ -151,7 +152,7 @@ export function SavedTexts({ memKeys, kv, newKey, newVal, onKey, onVal, onAdd, o
               <input class="adm-input" value=${newVal} placeholder=${P('texts.valuePh')} onInput=${(e) => onVal(e.target.value)} /></label>
             <button type="button" class="og-door og-door--quiet" onClick=${onAdd}>${P('texts.add')}</button>
           </div>
-          <p class="adm-pt-note" style="margin-top: 8px">${P('texts.saveNote')}</p>
+          <p class="adm-pt-note adm-pt-save-note">${P('texts.saveNote')}</p>
         </div>
         <div>
           <p class="adm-pt-lead">${P('texts.tagsLead')}</p>
@@ -169,7 +170,7 @@ export function SavedTexts({ memKeys, kv, newKey, newVal, onKey, onVal, onAdd, o
 export function AskAi({ paste, onPaste, onCopyLayout, onCopySite, onApply, busy, number }) {
   return html`
     <section class="og-sec" id="adm-pt-ai">
-      <div class="og-sec-h"><h2>${P('ai.title')}<small>${number}</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${P('ai.title')}<small>${number}</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${onCopyLayout}>${P('ai.copyLayout')}</button>
           <button type="button" class="og-door og-door--quiet" onClick=${onCopySite}>${P('ai.copySite')}</button>
@@ -177,7 +178,7 @@ export function AskAi({ paste, onPaste, onCopyLayout, onCopySite, onApply, busy,
       <p class="adm-pt-lead">${P('ai.lead')}</p>
       <textarea class="adm-pt-textarea" rows="6" value=${paste}
         placeholder=${P('ai.pastePh')} onInput=${(e) => onPaste(e.target.value)}></textarea>
-      <div class="og-doors" style="margin-top: 12px">
+      <div class="og-doors adm-pt-section-doors">
         <button type="button" class="og-door og-door--quiet" disabled=${busy || !paste.trim()} onClick=${onApply}>${P('ai.apply')}</button>
         <span class="adm-pt-note">${P('ai.applyNote')}</span>
       </div>
@@ -188,7 +189,7 @@ export function AskAi({ paste, onPaste, onCopyLayout, onCopySite, onApply, busy,
 export function WhatChanged({ changes, versions, onVersions, onRestore, number }) {
   return html`
     <section class="og-sec" id="adm-pt-log">
-      <div class="og-sec-h"><h2>${P('log.title')}<small>${number}</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${P('log.title')}<small>${number}</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${onVersions}>${P('log.versions')}</button>
         </div></div>
@@ -205,7 +206,7 @@ export function WhatChanged({ changes, versions, onVersions, onRestore, number }
             <span class="adm-mval">${dt(c.changed_at ?? c.changedAt)} · ${escHtml(c.changed_by ?? c.changedBy ?? '-')}</span>
           </div>`)}
       ${versions !== null && html`
-        <div style="margin-top: 14px">
+        <div class="adm-pt-section-detail">
           <p class="adm-pt-lead">${P('log.versionsLead')}</p>
           ${versions.length === 0
             ? html`<p class="adm-pt-empty">${P('log.versionsNone')}</p>`

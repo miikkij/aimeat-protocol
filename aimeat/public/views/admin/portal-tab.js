@@ -24,6 +24,7 @@
  *   portal-tab.sections.js · PartsList/AddPart from portal-tab.parts.js · PagePreview
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose shared poster headings and external note spacing.
  *   v2.0.0 — 2026-09-12 — The poster face: eight numbered sections in the order an operator asks,
  *     the parts beside the page with the same numbers on both, the precedence ladder on screen for
  *     the first time, the pinned save row, and plain words throughout.
@@ -95,7 +96,7 @@ function RightNow({ facts, number, onOpenPage, onClearCache }) {
     </div>`;
   return html`
     <section class="og-sec og-sec--first" id="adm-pt-now">
-      <div class="og-sec-h"><h2>${P('now.title')}<small>${number}</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${P('now.title')}<small>${number}</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${onOpenPage}>${P('now.openPage')}</button>
           <button type="button" class="og-door og-door--quiet" onClick=${onClearCache}>${P('now.clearCache')}</button>
@@ -446,10 +447,10 @@ export default function PortalTab({ data, reload }) {
       <p class="adm-pt-intro">${P('intro', { url: meta.base_url || '/' })}</p>
 
       ${isLb && html`
-        <div class="og-box" style="margin-bottom: 16px">
+        <div class="og-box adm-pt-lb-note">
           <span class="og-box-label">${P('lb.title')}</span>
           ${P('lb.lead', { origin: escHtml(meta.lb_mode.origin_url || '-') })}
-          <div class="og-doors" style="margin-top: 10px">
+          <div class="og-doors adm-pt-lb-doors">
             <button type="button" class="og-door og-door--quiet" onClick=${doLbSync}>${P('lb.sync')}</button>
             <span class="adm-pt-note">${meta.lb_mode.last_sync ? P('lb.lastSync', { when: dt(meta.lb_mode.last_sync) }) : P('lb.never')}</span>
           </div>
@@ -480,7 +481,7 @@ export default function PortalTab({ data, reload }) {
       <${RightNow} facts=${facts} number=${n()} onOpenPage=${openPage} onClearCache=${doClearCache} />
 
       <section class="og-sec" id="adm-pt-parts">
-        <div class="og-sec-h"><h2>${P('parts.title')}<small>${n()}</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('parts.title')}<small>${n()}</small></h2>
           <div class="og-doors">
             <button type="button" class="og-door og-door--quiet" onClick=${startFromDefault}>${P('parts.startDefault')}</button>
             ${source === 'stored' && html`
@@ -495,9 +496,9 @@ export default function PortalTab({ data, reload }) {
         <p class="adm-pt-tabnote">${P('surface.' + surface + 'Note')}</p>
 
         ${problems.length > 0 && html`
-          <div class="og-box" style="margin-bottom: 14px">
+          <div class="og-box adm-pt-problems">
             <span class="og-box-label">${P('parts.leftOut')}</span>
-            <ul style="margin: 0; padding-left: 18px">
+            <ul class="adm-pt-problems-list">
               ${problems.map((pr, i) => html`<li key=${i}>${pr}</li>`)}
             </ul>
           </div>`}
