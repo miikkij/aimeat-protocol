@@ -17,6 +17,7 @@
  *   - Line                   -- the session-history chart with a reading under the cursor
  *   - MetricsTab (default)   -- the five sections
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose shared B1 headings; measured shares use SVG width data.
  *   v2.0.0 — 2026-09-12 — The poster face. Three blue sparklines with no scale become one line of
  *     the number that matters, with its ends labelled and a reading under the cursor; every share
  *     column names its own maximum in the header (share of the OS reserve, share of every call),
@@ -143,10 +144,8 @@ export default function MetricsTab() {
   const samplesRef = useRef({ prev: null, curr: null });
   const historyRef = useRef({ real: [] });
 
-  // useToast returns fresh function identities every render. Reaching showErr through a ref
-  // keeps `load` stable ([] deps below): with showErr as a dependency, every completed poll
-  // re-rendered, rebuilt `load`, restarted the poll effect, and its immediate load() call made
-  // the 10 s poll a continuous one — measured at 250 requests in 60 s before this guard.
+  // This ref kept `load` stable before useToast memoized its callbacks. Previously every
+  // completed poll restarted the effect, measured at 250 requests in 60 s before this guard.
   const showErrRef = useRef(showErr);
   showErrRef.current = showErr;
 
@@ -197,7 +196,7 @@ export default function MetricsTab() {
   if (state.status === 'disabled' || state.status === 'denied') {
     return html`<div class="og adm-mx">
       <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2>${M('nowTitle')}<small>01</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('nowTitle')}<small>01</small></h2></div>
         <div class="adm-mx-wait">
           <p>${state.status === 'disabled' ? M('disabled') : M('denied')}</p>
           ${state.status === 'disabled' && html`<p>${M('disabledHint')} <code>AIMEAT_METRICS_ENABLED=true</code></p>`}
@@ -306,7 +305,7 @@ export default function MetricsTab() {
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
       <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2>${M('nowTitle')}<small>01</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('nowTitle')}<small>01</small></h2>
           <span class="adm-mx-live"><i></i>${M('pollNote')}</span></div>
 
         <div class="adm-mx-top">
@@ -344,7 +343,7 @@ export default function MetricsTab() {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${M('ledgerTitle')}<small>02</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('ledgerTitle')}<small>02</small></h2></div>
         <p class="adm-mx-lead">${M('ledgerIntro')}</p>
         <div class="adm-mx-rows adm-mx-ledger">
           <div class="adm-mx-hrow">
@@ -355,20 +354,20 @@ export default function MetricsTab() {
             <div class="adm-mx-row" key=${r.key}>
               <span class="adm-mx-part">${r.label}</span>
               <span class="adm-mx-val r">${fmtBytes(r.value)}</span>
-              <span class="adm-mx-bar"><i style=${`width:${r.pct.toFixed(1)}%`}></i></span>
+              <span class="adm-mx-bar"><svg width=${r.pct.toFixed(1) + '%'} aria-hidden="true"></svg></span>
               <span class="adm-mx-what">${r.hint}</span>
             </div>`)}
           <div class="adm-mx-row adm-mx-row--sum">
             <span class="adm-mx-part">${M('rss')}</span>
             <span class="adm-mx-val r">${fmtBytes(rss)}</span>
-            <span class="adm-mx-bar"><i style="width:100%"></i></span>
+            <span class="adm-mx-bar"><svg width="100%" aria-hidden="true"></svg></span>
             <span class="adm-mx-what">${M('ledgerRssHint')}</span>
           </div>
         </div>
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${M('routesTitle')}<small>03</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('routesTitle')}<small>03</small></h2></div>
         <p class="adm-mx-lead">${M('routesLead')}</p>
         <div class="adm-mx-rows adm-mx-routes">
           <div class="adm-mx-hrow">
@@ -380,7 +379,7 @@ export default function MetricsTab() {
               <span class="adm-mx-route">${r.route}</span>
               <span class="adm-mx-val r">${num(Math.round(r.n))}</span>
               <span class="adm-mx-rate r">${r.rate === null ? '—' : r.rate.toFixed(2)}</span>
-              <span class="adm-mx-bar"><i style=${`width:${r.pct.toFixed(1)}%`}></i></span>
+              <span class="adm-mx-bar"><svg width=${r.pct.toFixed(1) + '%'} aria-hidden="true"></svg></span>
             </div>`)}
         </div>
         <div class="adm-mx-foot">
@@ -390,7 +389,7 @@ export default function MetricsTab() {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${M('refusedTitle')}<small>04</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('refusedTitle')}<small>04</small></h2></div>
         <p class="adm-mx-lead">${M('refusedLead')}</p>
         <div class="adm-mx-refusals">
           ${refusals.map(r => html`
@@ -403,7 +402,7 @@ export default function MetricsTab() {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${M('allMetrics')}<small>05</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('allMetrics')}<small>05</small></h2>
           <div class="og-doors"><a class="og-door" href="/v1/metrics" target="_blank" rel="noopener">${M('openScrape')}</a></div></div>
         <p class="adm-mx-lead">${M('allLead')}</p>
         <div class="adm-mx-find">
