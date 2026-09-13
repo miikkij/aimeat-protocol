@@ -23,6 +23,7 @@
  *   - askGrant / askRevoke / askDisable / askEnable — the question each act asks first
  *
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-12 — The poster face: the flat six-column table becomes a section that names
  *     the operators, a strip of four figures, a searchable list with five filters, and the two
  *     acts said out loud. The role column goes, the doors follow the row, and the doors the node
@@ -174,7 +175,7 @@ export default function OwnersTab({ data, session, reload, switchPage }) {
 
       <section class="og-sec og-sec--first">
         <div class="og-sec-h">
-          <h2>${R('who')}<small>01</small></h2>
+          <h2 class="poster-section-title">${R('who')}<small>01</small></h2>
           <div class="og-doors">
             <button type="button" class="og-door og-door--quiet" onClick=${() => {
     document.querySelector('.adm-own-acts-sec')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -217,7 +218,7 @@ export default function OwnersTab({ data, session, reload, switchPage }) {
 
       <section class="og-sec">
         <div class="og-sec-h">
-          <h2>${R('every')}<small>02</small></h2>
+          <h2 class="poster-section-title">${R('every')}<small>02</small></h2>
           <div class="og-doors">
             <button type="button" class="og-door og-door--quiet" onClick=${() => setNewestFirst(v => !v)}>
               ${newestFirst ? R('orderOldest') : R('orderNewest')}</button>
@@ -261,7 +262,7 @@ export default function OwnersTab({ data, session, reload, switchPage }) {
       </section>
 
       <section class="og-sec adm-own-acts-sec">
-        <div class="og-sec-h"><h2>${R('acts')}<small>03</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${R('acts')}<small>03</small></h2></div>
         <div class="adm-own-two">
           <div class="og-box">
             <span class="og-box-label">${R('grantLabel')}</span>
