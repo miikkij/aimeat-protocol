@@ -13,6 +13,7 @@
  *   - GroupSend({ recipients }) — section 04, operators or everyone, subject and message
  *
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose shared poster send-section headings.
  *   v1.0.0 — 2026-09-12 — Initial, with the Email page in the poster face.
  */
 import { h } from 'preact';
@@ -58,7 +59,7 @@ export function TestSend({ locale }) {
 
   return html`
     <section class="og-sec">
-      <div class="og-sec-h"><h2>${E('test.title')}<small>02</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${E('test.title')}<small>02</small></h2></div>
       <p class="adm-em-lead">${E('test.lead')}</p>
       <div class="adm-em-two">
         <div>
@@ -126,7 +127,7 @@ export function GroupSend({ recipients }) {
 
   return html`
     <section class="og-sec">
-      <div class="og-sec-h"><h2>${E('group.title')}<small>04</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${E('group.title')}<small>04</small></h2></div>
       <p class="adm-em-lead">${E('group.lead')}</p>
       <div class="adm-em-two">
         <div>

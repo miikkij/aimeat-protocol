@@ -9,12 +9,15 @@
  *   strip and the badges come from admin.css and organism.css; only what this page adds lives here.
  *   Every value is a theme.css token, so the page flips with the theme.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Own existing reset-note spacing formerly declared in markup.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 
 .adm-pr-intro { margin: 0 0 .9rem; font-size: .88rem; line-height: 1.55; color: var(--text-dim); max-width: 76ch; }
 .adm-pr-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
 .adm-pr-note { margin: 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-pr-reset-note { margin-top: 16px; }
+.adm-pr-reset-doors { margin-top: 10px; }
 .adm-pr .adm-mrow--last { border-bottom: 0; }
 .adm-pr .adm-mrow .adm-mval { overflow-wrap: anywhere; }
 .adm-pr .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
