@@ -2828,7 +2828,7 @@
       "source": "ast-grep",
       "severity": "warning",
       "verdict": "confirm",
-      "reason": "Haku itse on kunnossa, mutta rivin 363 omistajatarkistuksesta puuttuu `!req.auth.federated`, joka ovilla /v1/work/inbox ja /v1/work/overview on, joten toiselta palvelimelta kirjautunut samanniminen vierailija näkee paikallisen tilin agenttien lähettämät työt, jos vertaispalvelimelle on annettu work:read-oikeus.",
+      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "decidedBy": "ai",
       "date": "2026-09-13",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
@@ -2854,7 +2854,7 @@
       "source": "ast-grep",
       "severity": "warning",
       "verdict": "confirm",
-      "reason": "Ovi vaatii vain `requireRole('owner')`, jonka toiselta palvelimelta kirjautunut vierailija läpäisee roolillaan ['owner'], ja avain kirjaa `params.owner`-kenttään samannimisen paikallisen tilin, jolle kirjautumaton /v1/agents/connect sitten luo agentin, kun taas POST /v1/agents -ovella on `requireLocalSession()` ja tältä vanhentuneelta mutta yhä toimivalta reitiltä se puuttuu.",
+      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "decidedBy": "ai",
       "date": "2026-09-13",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
@@ -2893,7 +2893,7 @@
       "source": "ast-grep",
       "severity": "warning",
       "verdict": "confirm",
-      "reason": "Istuntorivin tunnus vastaa kirjautumista, mutta saman reitin viimeinen else-haara (rivit 439-441) ei tunnista toiselta palvelimelta kirjautunutta vierailijaa, vaan antaa sille samannimisen paikallisen tilin roolit, ja uusi token myönnetään ilman `federated`-merkintää ja ilman oikeuslistaa, jolloin vierailijasta tulee paikallisen tilin täysivaltainen omistaja.",
+      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "decidedBy": "ai",
       "date": "2026-09-13",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
@@ -2906,7 +2906,7 @@
       "source": "ast-grep",
       "severity": "warning",
       "verdict": "confirm",
-      "reason": "Palvelimen yhteinen `optionalAuth()` antaa anonyymissä tilassa kirjautumattomalle jaetun anonyymin tunnuksen, joten `!req.auth` ei koskaan täsmää ja asetuksella `authenticated` tilastot näkyvät kenelle tahansa, ellei tarkistus torju myös `req.auth.anonymous`-tunnusta.",
+      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "decidedBy": "ai",
       "date": "2026-09-13",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
@@ -2919,7 +2919,7 @@
       "source": "ast-grep",
       "severity": "warning",
       "verdict": "confirm",
-      "reason": "Sama puute kuin tilastoissa: anonyymissä tilassa kirjautumaton saa jaetun anonyymin tunnuksen, joten `!req.auth` ei täsmää ja asetuksella `authenticated` käyttöluvut näkyvät kenelle tahansa.",
+      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "decidedBy": "ai",
       "date": "2026-09-13",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
@@ -2932,7 +2932,7 @@
       "source": "ast-grep",
       "severity": "warning",
       "verdict": "confirm",
-      "reason": "Instanssi ei ole tili, mutta ovella on vain `requireAuth()` eikä `requireLocalSession()`-tarkistusta, joten vertailu `instance.owner !== owner` päästää läpi toiselta palvelimelta kirjautuneen vierailijan, jolla on sama nimi kuin paikallisella omistajalla, ja myös omistajan agentin ilman mitään oikeutta.",
+      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "decidedBy": "ai",
       "date": "2026-09-13",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
@@ -2945,7 +2945,7 @@
       "source": "ast-grep",
       "severity": "warning",
       "verdict": "confirm",
-      "reason": "`reviewedBy` on pelkkä kirjaus, mutta ovella on vain `requireAuth()` ja ylläpitäjyys ratkaistaan haulla `getGHIIByOwner(req.auth.owner)`, joten organisaation ylläpitäjän agentti ilman oikeutta ja toiselta palvelimelta kirjautunut samanniminen vierailija voivat kumpikin ratkaista ilmoituksia ylläpitäjän nimissä.",
+      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "decidedBy": "ai",
       "date": "2026-09-13",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
@@ -2958,7 +2958,7 @@
       "source": "ast-grep",
       "severity": "warning",
       "verdict": "confirm",
-      "reason": "Else-haara on kunnossa, mutta rivin 222 omistajatarkistuksesta puuttuu `!req.auth.federated`, joten toiselta palvelimelta kirjautunut samanniminen vierailija listaa paikallisen tilin ja sen agenttien tiedostot, jos vertaispalvelimelle on annettu storage:read-oikeus.",
+      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "decidedBy": "ai",
       "date": "2026-09-13",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
@@ -2971,7 +2971,7 @@
       "source": "ast-grep",
       "severity": "warning",
       "verdict": "confirm",
-      "reason": "`requireOwnerPrincipal()` torjuu agentit ja sovellukset mutta ei toiselta palvelimelta kirjautunutta vierailijaa, jonka roolit ovat ['owner'] ja jonka `owner` on sama nimi kuin paikallisella tilillä, joten samanniminen vierailija voi poistaa paikallisen tilin kokonaan.",
+      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "decidedBy": "ai",
       "date": "2026-09-13",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
@@ -2984,7 +2984,7 @@
       "source": "ast-grep",
       "severity": "warning",
       "verdict": "confirm",
-      "reason": "Sama aukko kuin tilin poistossa: `requireOwnerPrincipal()` päästää läpi toiselta palvelimelta kirjautuneen vierailijan roolilla ['owner'], ja nimivertailu täsmää samannimiseen paikalliseen tiliin, joten vierailija voi viedä sen kaikki tiedot.",
+      "reason": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "decidedBy": "ai",
       "date": "2026-09-13",
       "commit": "085a6df379d4550da76c37b5ee04443c2ec914bc"
@@ -3100,7 +3100,7 @@
     {
       "invariant": 5,
       "file": "aimeat/src/config.ts",
-      "note": "Tiedostossa config.ts federationRelayClaim on oletuksena 'optional', jolloin relay-gate.ts tarkistaa relay-väitteen allekirjoituksen vain silloin, kun otsake on mukana, ja päästää sellaisen välitetyn pyynnön läpi, josta otsake puuttuu kokonaan (paitsi vertaisilta, jotka ovat joskus allekirjoittaneet), eli hyökkääjä ohittaa tarkistuksen jättämällä allekirjoituksen pois, ja juuri tämän kaavan invariantti 5 kieltää.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "9c44f40fc696",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3109,7 +3109,7 @@
     {
       "invariant": 16,
       "file": "aimeat/src/config-types.ts",
-      "note": "Tiedostossa config-types.ts allekirjoittamattoman relayn läpipäästö on nimetty siirtymävaiheen ratkaisuksi eikä suojaukseksi, ja lipun ja oletuksen nimet ovat mukana, mutta mitään versiota ei ole nimetty, jossa 'optional' poistuu tai oletus vaihtuu 'required'-arvoon, joten siirtymätila jää voimaan pysyvästi.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "fce8838521f0",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3118,7 +3118,7 @@
     {
       "invariant": 13,
       "file": "aimeat/src/data/builtin-extensions/living-hooks-lib.ts",
-      "note": "Tiedoston livingHost poimii sallittujen osoitteiden listaa varten isännän käsin raa'asta merkkijonosta, mutta ctx.fetch ja safeFetch lähettävät kutsun sinne, minne new URL sen jäsentää; näin osoite http://evil.example\\.allowed.example/ läpäisee listan merkinnän .allowed.example, vaikka kutsu lähtee oikeasti osoitteeseen evil.example (tarkistettu Nodella), eli sallittujen osoitteiden tarkistus ei katso samaa isäntää, johon kutsu lopulta menee.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "b66190f1bb65",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3127,7 +3127,7 @@
     {
       "invariant": 14,
       "file": "aimeat/src/mcp/core-memory-bin.ts",
-      "note": "aimeat_memory_delete poistaa tietueen kutsumalla deleteMemoryRecordia suoraan, eikä se ensin aja checkDeleteGuard-tarkistusta eikä workspaceAccess-vartijaa, jotka DELETE /v1/memory/:key ajaa ennen poistoa, joten tämän MCP-työkalun kautta voi poistaa vain lisäyksiä sallivan työtilan .latest- tai .version-tapahtuman, jonka REST-reitti torjuisi.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "66bddd362bc9",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3136,7 +3136,7 @@
     {
       "invariant": 14,
       "file": "aimeat/src/mcp/dm-messages.ts",
-      "note": "Tiedostossa aimeat/src/mcp/dm-messages.ts työkalu aimeat_dm_broadcast kirjoittaa AI-alkuperätietueen (provenanceForWrite) ennen kuin broadcastFromPrincipal ehtii hylätä vain operaattorille sallitun yleisön tai tyhjän vastaanottajajoukon, joten hylätystäkin lähetyksestä jää tietokantaan rivi kutsujan sisällöstä.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "e9c6e4efb23d",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3145,7 +3145,7 @@
     {
       "invariant": 13,
       "file": "aimeat/src/mcp/oauth.ts",
-      "note": "Suostumuksen hyväksyvä ovi antaa isOwnerPrincipal-tarkistukselle JWT:n omat oikeudet sellaisinaan eikä withCurrentScopes-funktion rajaamia voimassa olevia oikeuksia, joten agentti, jolta omistaja on jo poistanut tilin turvallisuusoikeuden, voi yhä hyväksyä OAuth-suostumuksen ja saada uuden valtuutuksen, kunnes sen vanha tunniste vanhenee.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "80b838db4855",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3154,7 +3154,7 @@
     {
       "invariant": 14,
       "file": "aimeat/src/services/workspace-tool-ops.ts",
-      "note": "writeWorkspaceDraftsOp, jota mcp/workspaces.ts:n aimeat_workspace_write nyt kutsuu, avaa dokumenttiin upotettujen tiedostojen näkyvyyden työtilan jäsenille normalizeDocValueImages-kutsulla ennen skeematarkistusta, arkistointitarkistuksia ja kokorajoja, joten näkyvyysmuutos jää voimaan myös silloin, kun luonnos hylätään.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "cd163bbd24a7",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3163,7 +3163,7 @@
     {
       "invariant": 5,
       "file": "aimeat/src/middleware/relay-gate.ts",
-      "note": "relayGate tarkistaa välitetyn pyynnön allekirjoituksen vain, jos pyynnössä on relay-väite, ja oletusasetuksella federation.relay_claim=optional se päästää allekirjoittamattoman pyynnön läpi, mikä on juuri invariantin 5 kieltämä ehdollinen tarkistus: hyökkääjä jättää otsakkeen pois.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "9044f82ef284",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3172,7 +3172,7 @@
     {
       "invariant": 14,
       "file": "aimeat/src/routes/apps/fork-manage.ts",
-      "note": "Kun PATCH /v1/apps/:filename tulee delegoidulta kehittäjältä, reitti tallentaa ensin nimen, kuvauksen, pääsykoodin sekä parked-, forkable-, protection- ja seo-kentät ja hylkää vasta niiden jälkeen saman pyynnön marks- tai author-osan uudella `delegated === null` -ehdolla 403-vastauksella, joten hylätystä pyynnöstä jää osa muutoksista voimaan.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "41b93ca99e1c",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3181,7 +3181,7 @@
     {
       "invariant": 13,
       "file": "aimeat/src/routes/apps/read.ts",
-      "note": "Kuvakaappauksen kolme ovea (capture, POST ja DELETE) hakevat sovelluksen `:owner`-segmentistä, josta on leikattu pois kaikki `@`-merkin jälkeinen, mutta oikeustarkistus `appTarget` käsittelee saman raa'an segmentin `bareOwner`-funktiolla, joka ottaa ensin `#`-merkin jälkeisen osan, eikä kumpikaan vertaa kutsujaa sovellustietueen `app.ownerName`-arvoon, joten polku `/v1/apps/bob@x%23mallory/app.html/screenshot` löytää Bobin sovelluksen, hyväksyy Malloryn sen omistajaksi ja antaa hänen korvata, tyhjentää tai renderöidä Bobin kuvakaappauksen.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "fe1f03fb7069",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3190,7 +3190,7 @@
     {
       "invariant": 13,
       "file": "aimeat/src/routes/cortex.ts",
-      "note": "Tiedoston callerOf antaa canSeeCortex-näkyvyystarkistukselle, used_by-listan visibleAppRefs-kutsulle ja upsertCortexin omistajatarkistukselle raa'an req.auth.owner-kentän, joka toisella palvelimella kirjautuneelle istunnolla on sen kotitunnuksen paikallinen osa, joten ilman contacts.ts:n tapaista requireLocalSession-rajausta tällainen istunto näkee samannimisen paikallisen tilin yksityiset cortex-laajennukset ja sovellusnimet ja voi cortex:write-oikeudella korvata ne.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "5e1e5c1a63fe",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3199,7 +3199,7 @@
     {
       "invariant": 14,
       "file": "aimeat/src/routes/cortex/activation.ts",
-      "note": "Tiedostossa aimeat/src/routes/cortex/activation.ts julkisten taulujen kattotarkistus (publicBoardCeiling) ajetaan vasta komponenttisilmukan board-template-kohdassa, joten manifestissa sitä ennen olevat skeemat, julkinen ontologiamuisti, promptit ja actionit on jo kirjoitettu, kun aktivointi kaatuu virheeseen, eikä mikään peru niitä: activateCortex ei ehdi tallentaa activationArtifacts-listaa, ja upsertCortexin päivityspolussa kirjastot ja manifesti on jo vaihdettu ja vanhat sivuvaikutukset purettu ennen kieltäytymistä.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "84412e7a6741",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3208,7 +3208,7 @@
     {
       "invariant": 14,
       "file": "aimeat/src/routes/messages.ts",
-      "note": "POST /v1/messages/broadcast kutsuu provenanceForWrite-funktiota, joka tallentaa agentin lähettämälle viestille provenance-tietueen, ennen kuin broadcastFromPrincipal tarkistaa yleisön, joten muulle kuin operaattorille jää kantaan orpo tietue, vaikka pyyntö koko solmun tai federaation yleisölle hylätään 403-vastauksella tai tyhjä vastaanottajalista 400-vastauksella (ennen muutosta molemmat hylkäykset tehtiin ennen kirjoitusta).",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "d76c5fb32593",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3217,7 +3217,7 @@
     {
       "invariant": 5,
       "file": "aimeat/src/routes/packages.ts",
-      "note": "Uusi GET /v1/packages/:groupId/upstream-check kutsuu checkUpstreamia (services/package-pull.ts), joka tarkistaa lähdesolmun allekirjoituksen vain silloin, kun paketille on kiinnitetty avain: käsin tuodun ZIPin tarkistamaton allekirjoitus jättää avaimen tyhjäksi, jolloin palvelu hakee tiedon ZIPin itse ilmoittamasta osoitteesta, vastaa silti `signerUnchanged: true` ja tarjoaa uudemman version vetämistä.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "09094ef387d5",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3226,7 +3226,7 @@
     {
       "invariant": 14,
       "file": "aimeat/src/routes/passkeys.ts",
-      "note": "Tiedoston aimeat/src/routes/passkeys.ts reitti POST /v1/ghii/login/passkey/verify kutsuu ensin finishLogin-funktiota, joka tallentaa laitteen laskurin ja viimeisen käyttöajan (touchPasskey), ja tarkistaa vasta sen jälkeen, onko tili olemassa, ja onko se poistettu käytöstä (completeOwnerLogin), joten torjuttukin kirjautuminen jättää laitteelle merkinnän viimeisestä käytöstä.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "005111c01128",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3235,7 +3235,7 @@
     {
       "invariant": 13,
       "file": "aimeat/src/routes/work.ts",
-      "note": "Reitti GET /v1/work/sent päättää pelkistä rooleista, onko kyse omistajan istunnosta, eikä siinä ole `!req.auth.federated`-ehtoa, jonka saman muutoksen inbox- ja overview-reitit saivat, joten toisen solmun vierailija hakee agentit pelkän omistajanimen perusteella ja näkee paikallisen samannimisen omistajan agenttien lähettämät työt.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "b4063449dd36",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3244,7 +3244,7 @@
     {
       "invariant": 5,
       "file": "aimeat/src/services/config-schema.ts",
-      "note": "Uuden federation.relay_claim-asetuksen oletus on 'optional', jolloin relay-gate.ts tarkistaa välitetyn pyynnön allekirjoituksen vain, jos vertainen sen lähettää, joten vertainen, jolta välittäminen on kielletty (allowRouting), pääsee läpi jättämällä otsakkeen pois, ellei se ole joskus aiemmin allekirjoittanut, eikä asetukselle ole nimetty versiota, jossa 'optional' poistuu.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "16b1b069ddd3",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3253,7 +3253,7 @@
     {
       "invariant": 14,
       "file": "aimeat/src/routes/cortex/activation.ts",
-      "note": "Tiedoston aimeat/src/routes/cortex/activation.ts julkisten taulujen katto (publicBoardCeiling), jonka activateCortex nyt saa käyttöönsä isOperator-parametrin kautta, tarkistetaan vasta komponenttisilmukan board-template-kohdassa, joten jos manifestissa on ennen sitä skeema-, ontologia-, kehote- tai action-komponentteja, ne on jo kirjoitettu solmulle ennen kieltoa, eikä activateCortex kirjaa niitä activationArtifactsiin, joten skeemalukot ja actionit jäävät orvoiksi ilman mitään, mikä purkaisi ne.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "ab9a0278b0c0",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3262,7 +3262,7 @@
     {
       "invariant": 13,
       "file": "aimeat/src/services/gate-policy.ts",
-      "note": "Muutos estää kutsujaa ohittamasta omistajan autonomiatasoa `rule: 'auto'` -kentällä, mutta shouldGate saa yhä riskin kutsujan omana ilmoituksena pyynnön rungosta (routes/organisms/gates.ts rajaa `risk`-arvon vain sallittuihin sanoihin), joten agentti voi lähettää `risk: 'low'` ja saada L2- tai L3-organismissa automaattisen hyväksynnän, joka kirjataan järjestelmän päätökseksi.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "0180c9e2940d",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3271,7 +3271,7 @@
     {
       "invariant": 14,
       "file": "aimeat/src/services/package-migrate.ts",
-      "note": "Toiminnoissa replace ja custom deleteComponent poistaa asennetun komponentin ennen kuin registerComponent ehtii hylätä uuden sisällön, eikä etukäteistarkistus validateComponentContent katso muuta kuin extension-tyypin manifestia, joten sovelluksen lint-, crew-def- tai kiintiöhylkäys tai extensionin ODPS-hylkäys jättää omistajan toimivan kopion poistetuksi, ja instanssi kirjataan silti kohdeversioon.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "8f037ebde7a0",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3280,7 +3280,7 @@
     {
       "invariant": 5,
       "file": "aimeat/src/services/package-pull.ts",
-      "note": "checkUpstream tarkistaa lähdesolmun allekirjoituksen vain ehdolla `up.publicKey.length > 0`, joten ZIP-tuonnin kautta tallennettu upstream (upstreamFromZip jättää avaimen tyhjäksi, kun lähde ei ole vertaissolmu, ja ottaa osoitteen allekirjoittamattomasta source_url-kentästä) saa vastauksen `updateAvailable` ja `signerUnchanged: true` ilman yhtään allekirjoituksen tarkistusta, vaikka funktion kommentti lupaa tarkistuksen aina.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "aa3566aabbd0",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3289,7 +3289,7 @@
     {
       "invariant": 13,
       "file": "aimeat/src/services/package-read.ts",
-      "note": "listPackagesFor ottaa näkyvyysrajauksen suoraan pyynnön kentästä (`query.visibility ?? 'public'`, jonka reitti välittää `req.query.visibility`-arvona), joten kuka tahansa kirjautumaton kutsuja saa kyselyllä `GET /v1/packages?visibility=private` kaikkien tekijöiden yksityiset paketit, vaikka tiedoston kommentti väittää, ettei toisten yksityisiä paketteja voi näin lukea.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "be6d7382cd1a",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
@@ -3298,7 +3298,7 @@
     {
       "invariant": 14,
       "file": "aimeat/src/services/workspace-tool-ops.ts",
-      "note": "writeWorkspaceDraftsOp ajaa normalizeDocValueImages-kutsun suunnitteluvaiheessa, ja se vaihtaa upotettujen tiedostojen näkyvyydeksi työtilan (updateFileVisibility) ennen kuin myöhempien erän kohteiden skeematarkistus, arkistointikielto (archivedRefusal) ja kokorajat (checkWorkspaceWriteLimits) on tehty, joten torjuttu kirjoitus voi silti jättää tiedostot työtilan jäsenten luettaviksi.",
+      "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "f41de998c424",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
       "date": "2026-09-13",
