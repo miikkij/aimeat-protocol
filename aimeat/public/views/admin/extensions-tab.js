@@ -20,6 +20,7 @@
  *   - Sections 03 and 04 are in extensions-tab.add.js, the record in extensions-tab.record.js
  *
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face, the name Extensions, and the three numbers an operator
  *     could not see: what calls each extension, which run on a clock, and which do neither.
  *   v1.2.0 — 2026-07-13 — Split sub-components into siblings for max-file-lines.
@@ -80,7 +81,7 @@ function countAll(list) {
 function RightNow({ c, oldestIdle }) {
   return html`
     <section class="og-sec og-sec--first">
-      <div class="og-sec-h"><h2>${X('now.title')}<small>01</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${X('now.title')}<small>01</small></h2></div>
       <div class="adm-ov-grid">
         <div>
           <div class="adm-ov-status">${X('now.word', { n: num(c.active) })}</div>
@@ -169,7 +170,7 @@ export default function ExtensionsTab({ data, reload }) {
 
       <section class="og-sec">
         <div class="og-sec-h">
-          <h2>${X('list.title')}<small>02</small></h2>
+          <h2 class="poster-section-title">${X('list.title')}<small>02</small></h2>
           <div class="og-doors"><span class="og-door og-door--quiet">${X('list.sorted')}</span></div>
         </div>
 

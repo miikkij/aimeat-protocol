@@ -12,6 +12,7 @@
  *   - Scaffold({ onReload }) — section 04, the form and what an action script may do
  *
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial, with the page renamed from Services to Extensions.
  */
 import { h } from 'preact';
@@ -60,7 +61,7 @@ export function Bundled({ installedNames, onReload }) {
     <section class="og-sec">
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
       <div class="og-sec-h">
-        <h2>${X('bundled.title')}<small>03</small></h2>
+        <h2 class="poster-section-title">${X('bundled.title')}<small>03</small></h2>
         <div class="og-doors"><span class="og-door og-door--quiet">${X('bundled.count', { n: num(notIn), total: num(list.length) })}</span></div>
       </div>
       <p class="adm-ex-lead">${X('bundled.lead')}</p>
@@ -80,7 +81,7 @@ export function Bundled({ installedNames, onReload }) {
 export function Scaffold({ onReload }) {
   return html`
     <section class="og-sec">
-      <div class="og-sec-h"><h2>${X('write.title')}<small>04</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${X('write.title')}<small>04</small></h2></div>
       <p class="adm-ex-lead">${X('write.lead')}</p>
       <div class="adm-ex-grid">
         <div>

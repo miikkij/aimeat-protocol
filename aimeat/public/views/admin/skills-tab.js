@@ -15,6 +15,7 @@
  *   - frontmatterOf / bumpPatch: reading a name and a version out of the text being edited
  * @usage registered in views/admin.js NAV_GROUPS
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face, and five things the page held and never showed.
  *     `builtin` is computed by listSkills and was dropped, so nothing said which skills came with
  *     the build; `updatedAt` was dropped too, so a skill untouched since July looked current.
@@ -279,7 +280,7 @@ export default function SkillsAdminTab() {
 
       <section class="og-sec og-sec--first">
         <div class="og-sec-h">
-          <h2>${S('title')}<small>01</small></h2>
+          <h2 class="poster-section-title">${S('title')}<small>01</small></h2>
           <button type="button" class="adm-btn" onClick=${startNew}>${S('write')}</button>
         </div>
 

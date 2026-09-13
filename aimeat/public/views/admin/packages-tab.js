@@ -14,6 +14,7 @@
  *   - ReviewBoard lives in packages-tab.review.js
  *
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face. The four sub-tabs go: with six packages, six listings
  *     and one instance the whole page fits on one screen, and hiding three quarters of it cost a
  *     click for nothing. The package row shows the description and the parts inside it, which is
@@ -202,7 +203,7 @@ export default function PackagesAdminTab() {
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
       <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2>${P('now')}<small>01</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('now')}<small>01</small></h2></div>
         <div class="adm-ov-grid">
           <div>
             <div class="adm-ov-status">${P('statusPackages', { n: num(totals.packages) })}</div>
@@ -234,7 +235,7 @@ export default function PackagesAdminTab() {
       </div>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${P('packages')}<small>02</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('packages')}<small>02</small></h2></div>
         <p class="adm-pk-lead">${P('packagesLead')}</p>
         ${!packages.length
     ? html`<p class="adm-pk-quiet">${P('noPackages')}</p>`
@@ -264,7 +265,7 @@ export default function PackagesAdminTab() {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${P('installed')}<small>03</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('installed')}<small>03</small></h2></div>
         ${!instances.length
     ? html`<p class="adm-pk-quiet">${P('noInstances')}</p>`
     : html`
@@ -286,7 +287,7 @@ export default function PackagesAdminTab() {
 
       <section class="og-sec">
         <div class="og-sec-h">
-          <h2>${P('store')}<small>04</small></h2>
+          <h2 class="poster-section-title">${P('store')}<small>04</small></h2>
           <div class="og-doors">
             <span class="adm-pk-chips">
               ${STORE_FILTERS.map((s) => html`<button type="button" class="adm-pk-chip ${storeStatus === s ? 'on' : ''}"
@@ -339,14 +340,14 @@ export default function PackagesAdminTab() {
 
       <section class="og-sec">
         <div class="og-sec-h">
-          <h2>${P('review')}<small>05</small></h2>
+          <h2 class="poster-section-title">${P('review')}<small>05</small></h2>
           ${pendingCount > 0 && html`<span><${Badge} type="watch" label=${P('nWaiting', { n: num(pendingCount) })} /></span>`}
         </div>
         <${ReviewBoard} pending=${pending} history=${history} onReload=${loadData} />
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${P('examples')}<small>06</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('examples')}<small>06</small></h2></div>
         <p class="adm-pk-lead">${P('examplesLead')}</p>
         <${Row} title=${P('rowArchives')} why=${P('rowArchivesWhy')} value=${P('systemPackages')} />
         <${Row} title=${P('rowDeletes')} why=${P('rowDeletesWhy')}
@@ -355,7 +356,7 @@ export default function PackagesAdminTab() {
         <div class="adm-pk-acts">
           <button class="adm-btn" disabled=${seeding} onClick=${askSeed}>
             ${seeding ? t('dashboard.loading') : P('seedBtn')}</button>
-          <span class="adm-pk-note" style="margin: 0">${P('seedAsks')}</span>
+          <span class="adm-pk-note adm-pk-note--flush">${P('seedAsks')}</span>
         </div>
         ${said && html`<p class="adm-pk-said ${said.ok ? 'is-ok' : 'is-bad'}">${said.msg}</p>`}
       </section>
