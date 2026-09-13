@@ -19,6 +19,7 @@
  *   - Record / Reach: imported from memory-tab.record.js
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.1.0 -- 2026-09-13 -- Compose the results heading and audience row from poster.css.
  *   v2.0.0 — 2026-09-12 — Rebuilt around the question. The node-wide content search the FTS
  *     primitive has always backed and no admin surface called; a record opened whole instead of
  *     nine of its twenty fields; the audience named rather than the visibility word printed; the
@@ -301,7 +302,7 @@ export default function MemoryTab() {
       </div>
 
       <!-- who can read what, before anything is asked -->
-      <div class="adm-mem-strip">
+      <div class="adm-mem-strip poster-row--thing">
         <div><b>${total}</b><span>${S('records')}</span></div>
         <div><b class="hot">${counts?.public ?? 0}</b><span>${S('stripPublic')}</span></div>
         <div><b>${counts?.members ?? 0}</b><span>${S('stripMembers')}</span></div>
@@ -361,7 +362,7 @@ export default function MemoryTab() {
       <!-- results -->
       <div class="adm-mem-results">
         <div class="adm-mem-rhead2">
-          <h2>${bin ? S('binTitle') : searching ? S('matches') : S('theRecords')}<small>${total}</small></h2>
+          <h2 class="poster-section-title">${bin ? S('binTitle') : searching ? S('matches') : S('theRecords')}<small>${total}</small></h2>
           <span>${bin ? S('binNote', { days: grace })
             : searching ? S('searchedNote')
             : oldest ? S('byKey') : S('newestFirst')}</span>

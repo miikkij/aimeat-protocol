@@ -9,6 +9,7 @@
  *   the lines already fetched, and "Show the next 200" asks the refusals door for a longer tail.
  * @structure credentialWord · whenText · matches · RefusalsSection
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose the shared B1 heading; encode bar lengths as SVG data.
  *   v1.0.0 — 2026-09-05 — Initial (the Security page in the poster face).
  */
 import { h } from 'preact';
@@ -68,7 +69,7 @@ function Grouping({ label, rows, keyOf, hotKeys, words }) {
     ${rows.map((r, i) => html`
       <div class="adm-sec-krow ${i === rows.length - 1 ? 'adm-sec-krow--last' : ''}" key=${r.key}>
         <span class="adm-sec-key ${words ? 'adm-sec-key--words' : ''}">${keyOf ? keyOf(r) : r.key}</span>
-        ${words ? null : html`<span class="adm-sec-bar ${hotKeys && hotKeys.includes(r.key) ? 'adm-sec-bar--hot' : ''}" style=${`width:${Math.max(4, Math.round(r.count / max * BAR_MAX_PX))}px`}></span>`}
+        ${words ? null : html`<svg class="adm-sec-bar ${hotKeys && hotKeys.includes(r.key) ? 'adm-sec-bar--hot' : ''}" width=${Math.max(4, Math.round(r.count / max * BAR_MAX_PX))} aria-hidden="true"></svg>`}
         <span class="adm-sec-n">${num(r.count)}</span>
       </div>`)}
   </div>`;
@@ -115,7 +116,7 @@ export function RefusalsSection({ ov, switchPage, onError }) {
 
   return html`
     <section class="og-sec" id="adm-sec-02">
-      <div class="og-sec-h"><h2>${S('title')}<small>02</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('title')}<small>02</small></h2>
         <div class="og-doors">
           ${log.enabled && lines.length ? html`<button type="button" class="og-door og-door--quiet" onClick=${download}>${S('download')}</button>` : null}
           <button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('config')}>${S('logSettings')}</button>
