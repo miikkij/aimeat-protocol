@@ -10,6 +10,7 @@
  *   column is bounded so a long tracking code or label wraps inside its cell. NOTE: this file must
  *   be linked in spa.html.
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose detail frames from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose the pace explanation with the shared ink frame.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
@@ -77,7 +78,7 @@
 .wal-row--head > .wal-amt { font-family: inherit; font-size: .66rem; }
 .wal-row > .wal-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
 .wal-go .og-door { font-size: .72rem; }
-.wal-row > .wal-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.wal-row > .wal-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; box-shadow: 8px 8px 0 var(--sun); font-size: .9rem; line-height: 1.55; color: var(--text); }
 .wal-open .og-doors { margin-top: .9rem; }
 .wal-kv { display: grid; grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr); gap: .5rem 1.2rem; align-items: start; }
 .wal-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); line-height: 1.8; padding-top: .2rem; }

@@ -10,6 +10,7 @@
  *   two roads. Every column is bounded so a long key or name wraps inside its cell. NOTE: this file
  *   must be linked in spa.html.
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose detail frames from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose explanations and the export row with the shared ink frame.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
@@ -59,7 +60,7 @@
 .dw-row--head > .dw-n { font-family: inherit; font-size: .66rem; }
 .dw-row > .dw-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
 .dw-go .og-door { font-size: .72rem; }
-.dw-row > .dw-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.dw-row > .dw-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; box-shadow: 8px 8px 0 var(--sun); font-size: .9rem; line-height: 1.55; color: var(--text); }
 .dw-open .og-doors { margin-top: .9rem; }
 .dw-open .og-label { display: block; margin: .9rem 0 .3rem; }
 .dw-open code, .dw-v code { display: inline-block; max-width: 100%; font-family: var(--font-mono); font-size: .72rem; background: var(--bg-dim); padding: .05rem .35rem; overflow-wrap: anywhere; }
@@ -68,6 +69,8 @@
 
 /* the grants inside an opened target, and the keys inside an opened group */
 .dw-grants { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 7rem 8rem auto; gap: 0 1rem; margin-top: .4rem; }
+.dw-grants.dw-grants--target { grid-template-columns: minmax(0, 1.4fr) 7rem 8rem auto; }
+.dw-para.dw-revoked { margin: 0; }
 .dw-grants--keys { grid-template-columns: minmax(0, 1.6fr) 8rem; }
 .dw-grants--rows { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 9rem; }
 .dw-grants > div { padding: .45rem 0; border-bottom: 1px solid var(--border); font-size: .85rem; line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }

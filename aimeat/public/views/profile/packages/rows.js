@@ -12,6 +12,7 @@
  * @structure instanceRow · offerRow · ownRow · loadingRow
  * @usage import { instanceRow, offerRow, ownRow } from './rows.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose detail frames from poster.css.
  *   v1.1.0 — 2026-09-05 — An offer says what it did NOT carry, so an extension that has to be
  *     installed separately is known before install rather than after. An installed row says how many
  *     parts the owner has edited before the update button rather than after it. A draft of the
@@ -53,7 +54,7 @@ function instanceOpen(ctx, inst, comps, app, source) {
   const upd = ctx.updates[inst.id];
   const customized = comps.filter((c) => c.customized).length;
   return html`
-    <div class="pk-open">
+    <div class="pk-open poster-frame">
       <p class="pk-lead">${x('instanceLead', { date: dateWord(inst.installedAt), name: source?.title || inst.packageGroupId.split('::')[0], version: inst.packageVersion })} ${customized ? x('instanceCustomized', { n: customized }) : x('instanceUntouched', { n: comps.length })}</p>
       <span class="og-label">${x('partsLabel')}</span>
       <div class="pk-comp">
@@ -134,7 +135,7 @@ function offerOpen(ctx, o, key) {
   const inst = ctx.installForm && ctx.installForm.key === key ? ctx.installForm : { label: '' };
   const l = o.listing;
   return html`
-    <div class="pk-open">
+    <div class="pk-open poster-frame">
       <p class="pk-lead">${o.description}</p>
       ${o.components.length ? html`
         <span class="og-label">${x('partsCount', { n: o.components.length })}</span>
@@ -193,7 +194,7 @@ function ownOpen(ctx, p, key, listing, state, installed) {
   const inst = ctx.installForm && ctx.installForm.key === key ? ctx.installForm : { label: '' };
   const versions = ctx.versions[p.packageGroupId];
   return html`
-    <div class="pk-open">
+    <div class="pk-open poster-frame">
       <p class="pk-lead">${p.description || ''}</p>
       <span class="og-label">${x('partsCount', { n: (p.components || []).length })}</span>
       <div class="pk-comp pk-comp--offer">
