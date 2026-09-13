@@ -10,6 +10,7 @@
  *   origin in the rail. Reads the public endpoints; the Art. 50(4) label stays under the headline.
  * @structure PublicKnowledgeViewer · BrowseView · DetailView · entryToMarkdown · buildFullMarkdown
  * @version-history
+ *   v2.3.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v2.2.0 -- 2026-09-13 -- V2: compose public reader section headlines with poster-section-title.
  *   v2.1.0 -- 2026-09-13 -- V2: use the shared ink rule on the public search row.
  *   v2.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Tietopankin sivu", direction A):
@@ -183,7 +184,7 @@ function BrowseView({ onSelect }) {
     ${crumbPublic([], null)}
     <div class="og-mast">
       <div class="og-mast-words">
-        <h1 class="og-title">${t('pkv.title')}</h1>
+        <h1 class="og-title poster-page-title">${t('pkv.title')}</h1>
         <div class="og-chips">
           <span class="og-chip">${c('pubChipPackages', { n: total || packages.length })}</span>
           ${publishers.size ? html`<span class="og-chip">${c('pubChipPublishers', { n: publishers.size })}</span>` : null}
@@ -285,7 +286,7 @@ function DetailView({ packageId, onBack }) {
     ${crumbPublic([manifest.name], onBack)}
     <div class="og-mast og-mast--page">
       <div class="og-mast-words">
-        <h1 class="og-title kp-title--page">${manifest.name}</h1>
+        <h1 class="og-title poster-page-title kp-title--page">${manifest.name}</h1>
         <div class="og-chips">
           ${manifest.content_type ? html`<span class="og-chip">${ctWord(manifest.content_type)}</span>` : null}
           ${manifest.maturity ? html`<span class="og-chip">${maturityWord(manifest.maturity)}</span>` : null}

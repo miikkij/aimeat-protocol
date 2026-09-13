@@ -8,6 +8,7 @@
  * @structure renderList · listRow
  * @usage import { renderList } from './list.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Kalibraattori-sivu", direction A).
  */
 import { h } from 'preact';
@@ -29,7 +30,7 @@ export function renderList(ctx) {
       ${crumb()}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('profile.calibrator.tabLabel')}<small>${x('titleSub')}</small></h1>
+          <h1 class="og-title poster-page-title">${t('profile.calibrator.tabLabel')}<small>${x('titleSub')}</small></h1>
           <div class="og-chips">
             ${ctx.projects ? chip(x('chipCalibrations', { n: live.length }), 'og-chip--sun') : null}
             ${scored.length ? chip(x('chipScored', { n: scored.length })) : null}

@@ -10,6 +10,7 @@
  * @structure renderPage · shelf · secAI
  * @usage import { renderPage } from './libraries/page.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { h } from 'preact';
@@ -53,7 +54,7 @@ export function renderPage(ctx) {
       ${crumb()}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('librariesTab.tabLabel')}<small>${x('titleSub')}</small></h1>
+          <h1 class="og-title poster-page-title">${t('librariesTab.tabLabel')}<small>${x('titleSub')}</small></h1>
           <div class="og-chips">
             ${packs ? chip(x('chipAll', { n: all.length }), 'og-chip--sun') : null}
             ${packs ? chip(x('chipInUse', { n: inUse })) : null}

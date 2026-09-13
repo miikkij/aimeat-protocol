@@ -12,6 +12,7 @@
  * @structure renderPage · secStart · secLearned · secProposals · secCurated · secHow
  * @usage import { renderPage } from './appdev/page.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { h } from 'preact';
@@ -61,7 +62,7 @@ export function renderPage(ctx) {
       ${crumb()}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('profile.tabs.appDev')}<small>${a('titleSub')}</small></h1>
+          <h1 class="og-title poster-page-title">${t('profile.tabs.appDev')}<small>${a('titleSub')}</small></h1>
           <div class="og-chips">
             ${none ? chip(a('chipNone'), 'og-chip--coral') : L ? chip(a('chipFiled', { n: filed })) : null}
             ${!none && critical ? chip(a('chipCritical', { n: critical }), 'og-chip--coral') : null}

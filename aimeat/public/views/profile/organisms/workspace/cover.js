@@ -15,6 +15,7 @@
  * @structure renderWorkspaceView (cover or page) · renderCover · renderPage · renderRail · renderTree
  * @usage import { renderWorkspaceView } from './workspace/cover.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-29 — Initial. Replaces the tab block (21 tabs in three rows), the overview
  *     accordion and the README/map/toc stack that stood above every space.
  */
@@ -248,7 +249,7 @@ function renderCover(ctx) {
       ${crumb(ctx, null)}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${ws.manifest?.name || ctx.wsName || ctx.org.name}</h1>
+          <h1 class="og-title poster-page-title">${ws.manifest?.name || ctx.wsName || ctx.org.name}</h1>
           <div class="og-chips">
             <span class="og-chip">${ws.manifest?.status || 'active'}</span>
             ${newChip(unseen)}
@@ -323,7 +324,7 @@ function renderPage(ctx, { id, last, title, sub, doors = null, children }) {
       ${crumb(ctx, last)}
       <div class="og-mast og-mast--page">
         <div class="og-mast-words">
-          <h1 class="og-title">${title}${sub ? html`<small>${sub}</small>` : null}</h1>
+          <h1 class="og-title poster-page-title">${title}${sub ? html`<small>${sub}</small>` : null}</h1>
         </div>
         ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
       </div>

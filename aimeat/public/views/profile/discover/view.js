@@ -12,6 +12,7 @@
  * @structure renderDiscoverView · renderCover · secKinds · secRecent · secPlaces · secBookkeeping · renderResults · renderKind · renderPlace
  * @usage import { renderDiscoverView } from './discover/view.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.1 — 2026-08-30 — Says it is counting, searching or loading rows instead of an ellipsis.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces the scope buttons, the thirteen type chips and the
  *     newest-first dump of every record.
@@ -51,7 +52,7 @@ function renderCover(ctx) {
       ${crumb(ctx, [])}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('discover.title')}</h1>
+          <h1 class="og-title poster-page-title">${t('discover.title')}</h1>
           <div class="og-chips">
             <span class="og-chip">${c('chipItems', { n: num(total) })}</span><span class="og-chip">${c('chipKinds', { n: kinds.length })}</span>
             ${orgs.size ? html`<span class="og-chip">${c('chipOrgs', { n: orgs.size })}</span>` : null}

@@ -12,6 +12,7 @@
  * @structure renderSchedulerView · renderCover · secNext · secRhythm · secContinuous · secRare · secAll · secAgents · registerTable · pages
  * @usage import { renderSchedulerView } from './scheduler/cover.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces the seven-column week grid and the wall of cards.
  */
 import { h } from 'preact';
@@ -69,7 +70,7 @@ function renderCover(ctx) {
       ${crumb(ctx, [])}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('profile.scheduler.title')}</h1>
+          <h1 class="og-title poster-page-title">${t('profile.scheduler.title')}</h1>
           <div class="og-chips">
             ${chip(m.all.length, 'chipAll')}${chip(m.rhythm.length, 'chipWeekly')}${chip(m.continuous.length, 'chipCont')}${chip(m.rare.length, 'chipRare')}
             ${chip(m.paused.length, 'chipPaused', 'og-chip--dim')}${chip(m.failed.length, 'chipFailed', m.failed.length ? 'og-chip--coral' : 'og-chip--dim')}

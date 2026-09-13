@@ -11,6 +11,7 @@
  * @structure renderCompany · secFacts · secFront · secActors · secEvents · smtpFold · chatFold
  * @usage import { renderCompany } from './companies/company.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-31 — Initial. The organism link had lived only in the API until this page.
  */
 import { h } from 'preact';
@@ -41,7 +42,7 @@ export function renderCompany(ctx) {
       <div class="og-mast">
         <div class="og-mast-words">
           <span class="og-label">${c('companyWord')} · ${host}</span>
-          <h1 class="og-title">${co.name}</h1>
+          <h1 class="og-title poster-page-title">${co.name}</h1>
           <div class="og-chips">
             ${facts.done < facts.total ? chip(c('factsShort', { n: `${facts.done}/${facts.total}` }), 'og-chip--coral') : chip(c('factsDone'))}
             ${chip(c('chipFront', { kind: kindWord(co.frontPage?.kind) }))}

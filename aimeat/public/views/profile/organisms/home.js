@@ -13,6 +13,7 @@
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
+ *   v3.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v3.0.1 — 2026-08-29 — Section, Fold, tr and scrollTo moved to poster-parts.js so the workspace cover is
  *     built from the same pieces; pure extraction.
  *   v3.0.0 — 2026-08-29 — The poster face. Before this the AI instruction block, the README, the map,
@@ -162,7 +163,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
 
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${org.name || org.id}</h1>
+          <h1 class="og-title poster-page-title">${org.name || org.id}</h1>
           <div class="og-chips">
             <span class="og-chip">${typeLabel}</span>
             <span class="og-chip">${t(`organisms.vis${(org.visibility || 'public')[0].toUpperCase()}${(org.visibility || 'public').slice(1)}`) || org.visibility}</span>

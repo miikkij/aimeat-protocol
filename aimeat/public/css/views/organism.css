@@ -11,6 +11,7 @@
  *   views/profile/organisms/home.js and read by home-settings.js. The inner panels (workspace list,
  *   roster, agents, board, map, timeline) keep their own pj- rules; a few are quieted here.
  * @version-history
+ *   v1.4.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.3.0 -- 2026-09-13 -- Compose B1 section titles from poster.css; retain rules on folded rows.
  *   v1.2.0 — 2026-09-06 — The visibility chips in a table of spaces go to the far end of the name
  *     cell (.og-tbl-marks), so they line up against the size column down the whole table.
@@ -20,7 +21,7 @@
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 
-.og { --poster-section-size: 1.6rem; font-family: var(--font-showroom-body); color: var(--text); }
+.og { --poster-page-size: 2.8rem; --poster-section-size: 1.6rem; font-family: var(--font-showroom-body); color: var(--text); }
 .og-crumb { display: flex; gap: 8px; align-items: center; font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); }
 .og-crumb-link { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--accent); }
 .og-crumb-link:hover { color: var(--text); }
@@ -29,11 +30,7 @@
 /* ── Masthead ──────────────────────────────────────────────────────────────────────────────── */
 .og-mast { display: flex; align-items: flex-start; justify-content: space-between; gap: 2rem; margin-top: .6rem; }
 .og-mast-words { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
-.og-title {
-  margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 2.8rem;
-  line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text);
-  overflow-wrap: anywhere;
-}
+.og-title { margin: 0; overflow-wrap: anywhere; }
 .og-title small { display: inline-flex; flex-wrap: wrap; gap: .8rem; margin-left: .8rem; font-family: var(--font-mono); font-size: .8rem; text-transform: none; letter-spacing: 0; color: var(--text-dim); vertical-align: middle; }
 .og-chips { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .og-chip { font-family: var(--font-mono); font-weight: 500; font-size: .68rem; line-height: 1.5; padding: 1px 7px; border: 2px solid var(--text); color: var(--text); text-transform: lowercase; }
