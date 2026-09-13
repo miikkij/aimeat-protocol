@@ -6,6 +6,8 @@
  * A committed baseline (gitleaks-baseline.json next to this file) suppresses findings a human has
  * reviewed and accepted; anything outside it is a NEW finding and turns the report red.
  * @version-history
+ *  - 1.1.0 (2026-09-13): the repository's own .gitleaks.toml is passed to the scan, so a recurring
+ *    false-positive SHAPE is forgiven once instead of one finding at a time in the baseline.
  *  - 1.0.0 (2026-08-23): first version — pinned download, redacted history scan, baseline support.
  */
 import { execFileSync, execSync } from 'node:child_process';
@@ -16,6 +18,14 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const GITLEAKS_VERSION = '8.30.1';
 const BASELINE = resolve(HERE, 'gitleaks-baseline.json');
+/**
+ * The repository's own rules. Without it gitleaks ran on its defaults, and a false positive could
+ * only be forgiven by pinning that one finding in that one commit into the baseline — so every new
+ * test file carrying a test account password came back as a NEW unacknowledged hit. Twenty-nine had
+ * piled up by 2026-09-13, two weeks after the last top-up. The config forgives the SHAPES, so the
+ * class stops growing; the baseline keeps the entries it already holds.
+ */
+const CONFIG = resolve(HERE, '..', '..', '.gitleaks.toml');
 
 function platformAsset() {
   const os = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'darwin' : 'linux';
@@ -65,6 +75,7 @@ export async function runSecretsScan(repoRoot, outDir) {
   rmSync(reportPath, { force: true });
   const args = ['git', '--redact', '--no-banner', '--exit-code', '2',
     '--report-format', 'json', '--report-path', reportPath];
+  if (existsSync(CONFIG)) args.push('--config', CONFIG);
   if (existsSync(BASELINE)) args.push('--baseline-path', BASELINE);
   args.push(repoRoot);
   let exitCode = 0;
