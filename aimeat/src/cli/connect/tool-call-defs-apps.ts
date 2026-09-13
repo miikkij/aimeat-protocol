@@ -8,6 +8,7 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.7.1 -- 2026-09-13 -- aimeat_appdev_overview's model parameter is described as ordering, not filtering.
  *   v1.7.0 -- 2026-09-06 -- Review item 6.3: aimeat_extension_invoke puts the instance in the PATH.
  *     It appended ?instance_id= to the extension-scoped route, which reads no query, so an
  *     instance-scoped call ran against the shared namespace and answered ok.
@@ -552,7 +553,7 @@ export const appTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_appdev_overview',
         description: 'One-call AppDev research surface: your apps, library packs (with proofs), templates, learned pitfalls.',
         input: {
-            model: { type: 'string', description: 'Indicative model filter for proofs + learned pitfalls.' },
+            model: { type: 'string', description: 'Your own model (indicative): marks proven packs and orders learned pitfalls; filters nothing.' },
             sections: { type: 'string', description: 'Comma-separated section filter (apps,library_packs,templates,pitfalls,...).' },
         },
         handler: ({ client }, input) => client.get(`/v1/appdev/overview${query({ model: optionalString(input, 'model'), sections: optionalString(input, 'sections') })}`),

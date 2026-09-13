@@ -8,7 +8,10 @@
  *   (owner B sees A's SHARED entries in platform scope, never A's private ones).
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-appdev-pitfalls).
- * @version-history v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 4).
+ * @version-history
+ *   v1.1.0 — 2026-09-13 — The list's hint names a door that opens a shared entry, the row carries the
+ *     owner that door needs, and B reads A's shared body through it.
+ *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 4).
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -262,6 +265,15 @@ await test('share=true publishes an entry platform-wide; owner B sees it (and ON
     const learnedShared = platOut.pitfalls.filter((p: any) => p.source === 'learned-shared');
     assert(learnedShared.some((p: any) => p.slug === 'keyboard-gap'), 'shared entry not visible to B');
     assert(!platOut.pitfalls.some((p: any) => p.slug === 'batching'), 'A private entry leaked to B');
+
+    // The hint names the door that opens a shared entry, and the row carries what that door needs.
+    assert(!/knowledge_get/.test(platOut.hint), `hint still names aimeat_knowledge_get: ${platOut.hint}`);
+    const row = learnedShared.find((p: any) => p.slug === 'keyboard-gap');
+    assert(typeof row.owner === 'string' && row.owner.length > 0, `shared row carries no owner: ${JSON.stringify(row)}`);
+    const body = await B.call('aimeat_memory_read_public', { gaii: row.owner, key: row.key });
+    const text = body.result?.content?.[0]?.text ?? '';
+    assert(body.result?.isError !== true && /dvh already excludes the keyboard/.test(text),
+        `the hinted door did not open the shared entry: ${text.slice(0, 200)}`);
 });
 
 await test('status=outdated hides an entry from default lists (kept, retrievable)', async () => {

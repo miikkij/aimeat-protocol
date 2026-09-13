@@ -14,6 +14,11 @@
  *   import { buildAppdevOverview } from '../services/appdev-overview.js';
  *   const overview = await buildAppdevOverview(storage, config, identity, { model, sections });
  * @version-history
+ *   v1.3.0 — 2026-09-13 — The learned-pitfall section lists every active entry the caller can read,
+ *     own and shared by other owners, critical first; `model` orders it and marks `same_model`
+ *     instead of filtering to the entries that model wrote. The drill-down names the doors that can
+ *     open one entry (aimeat_knowledge_get cannot: it reads only the calling agent's namespace). The
+ *     owner-scope listing is appdev-kb's, not a copy kept here.
  *   2026-09-06 — `secrets_note` beside `scope_note`: a key for an outside service is named as
  *     `{{secret:NAME}}` in an extension's header and filled from the person's vault, never held
  *     by the app; the note says where the person stores it and which tools an agent uses.
@@ -25,11 +30,12 @@
  */
 
 import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { getLibraryPacks } from '../data/library-packs.js';
 import { getAppTemplateIndex } from '../data/app-templates.js';
 import { getAppdevPitfallIndex, getAppdevPitfallFacets } from '../data/appdev-pitfalls.js';
+import { filterPitfalls, listLearnedPitfalls, listOwnerScopeMemory } from './appdev-kb.js';
 import { listSkills, type SkillAccessor } from './skills.js';
 import { dependencyIndex, appRef as depAppRef } from './dependency-map.js';
 import { logger } from '../utils/logger.js';
@@ -43,7 +49,7 @@ export const OVERVIEW_SECTIONS = [
 export type OverviewSection = (typeof OVERVIEW_SECTIONS)[number];
 
 export interface AppdevOverviewOpts {
-    /** Indicative model filter — marks matching pack proofs and filters learned pitfalls. */
+    /** The builder's own model, indicative: marks matching pack proofs and orders learned pitfalls. Never hides one. */
     model?: string;
     /** Subset of sections to build (token economy); default all. */
     sections?: string[];
@@ -61,26 +67,6 @@ function ownerOf(callerGaii: string, config: AimeatConfig): { owner: string | nu
         return { owner: callerGaii.split('@')[0], ownerGhii: callerGaii };
     }
     return { owner: null, ownerGhii: callerGaii };
-}
-
-/** Owner-scope memory aggregation (GHII + all same-owner agents), deduped by key. */
-async function listOwnerScope(
-    storage: Storage, config: AimeatConfig, callerGaii: string,
-    opts: { prefix?: string; tags?: string[] },
-): Promise<MemoryRecord[]> {
-    const { owner, ownerGhii } = ownerOf(callerGaii, config);
-    if (!owner) return storage.listMemory(callerGaii, opts);
-    const agents = await storage.getAgentsByOwner(owner);
-    const owners = [ownerGhii, ...agents.map(a => a.gaii)];
-    const priority = new Map(owners.map((g, i) => [g, i]));
-    const rows = await storage.listMemoryForOwners(owners, opts);
-    rows.sort((x, y) => (priority.get(x.ownerGaii) ?? 0) - (priority.get(y.ownerGaii) ?? 0));
-    const seen = new Set<string>();
-    const out: MemoryRecord[] = [];
-    for (const rec of rows) {
-        if (!seen.has(rec.key)) { seen.add(rec.key); out.push(rec); }
-    }
-    return out;
 }
 
 export async function buildAppdevOverview(
@@ -200,32 +186,37 @@ export async function buildAppdevOverview(
         };
     }
 
-    // ── Learned pitfalls (owner scope, model-faceted) ──
+    // ── Learned pitfalls: every active entry the caller can read, critical first ──
+    // The caller's owner scope plus what other owners shared platform-wide, through the same
+    // filter-and-sort step the list tool and the AppDev page use. The named model only ORDERS the
+    // list. It used to filter it to entries that model had written, and only in the caller's own
+    // scope: on aimeat.io on 2026-09-13 a builder naming gemini-2.5-pro got 0 of 123 entries, and
+    // no other owner saw any of the 118 shared ones. An entry is about the platform far more often
+    // than about the model that happened to meet it.
     if (wanted.has('pitfalls_learned')) {
-        const records = (await listOwnerScope(storage, config, callerGaii, {
-            prefix: 'packages/appdev-pitfalls/', tags: ['pitfall'],
-        })).filter(r => r.key !== 'packages/appdev-pitfalls/manifest');
-        const modelFacets: Record<string, number> = {};
-        const entries = records.map(r => {
-            const v = r.value as { title?: string; category?: string; slug?: string; model?: string; severity?: string; status?: string } | null;
-            if (v?.model) modelFacets[v.model] = (modelFacets[v.model] ?? 0) + 1;
-            return {
-                key: r.key, title: v?.title ?? r.key, category: v?.category ?? null,
-                model: v?.model ?? null, severity: v?.severity ?? 'warn',
-                status: v?.status ?? 'active', shared: r.visibility === 'public',
-            };
-        }).filter(e => e.status === 'active')
-            .filter(e => !model || e.model === model);
+        const entries = await listLearnedPitfalls(storage, config, callerGaii, { includeShared: true });
+        const page = filterPitfalls(entries, { status: 'active', sort: 'severity', preferModel: model, limit: CAP });
         out.pitfalls_learned = {
-            ...capped(entries),
-            model_facets: modelFacets,
-            drill_down: 'aimeat_appdev_pitfall_list (scope/category/model filters, pagination); full entries via aimeat_knowledge_get package_id=appdev-pitfalls',
+            items: page.pitfalls.map(e => ({
+                key: e.key, title: e.title, category: e.category ?? null, model: e.model ?? null,
+                severity: e.severity, status: e.status, shared: e.shared, source: e.source,
+                // A shared entry lives under another identity, and its body is read by naming it.
+                ...(e.source === 'shared' ? { owner: e.owner } : {}),
+                ...(model ? { same_model: e.model === model } : {}),
+            })),
+            total: page.total,
+            truncated: page.total > CAP,
+            sources: page.filtered_facets.source,
+            model_facets: page.filtered_facets.model,
+            order: 'critical first; inside a severity, entries written by the model you named first, then newest',
+            drill_down: 'aimeat_appdev_pitfall_list (paging, category/applies_to/model filters). One full entry: '
+                + 'aimeat_memory_read {key, owner_scope: true} for your own, aimeat_memory_read_public {gaii: owner, key} for a shared one',
         };
     }
 
     // ── Agent-proposed template proposals (owner scope) ──
     if (wanted.has('template_proposals')) {
-        const records = (await listOwnerScope(storage, config, callerGaii, {
+        const records = (await listOwnerScopeMemory(storage, config, callerGaii, {
             prefix: 'template.catalog.', tags: ['template'],
         })).filter(r => /\.manifest$/.test(r.key));
         const entries = records.map(r => {

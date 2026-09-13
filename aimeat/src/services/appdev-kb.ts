@@ -13,6 +13,9 @@
  *   pitfallEntryKey · PITFALL_* constants
  * @usage import { listLearnedPitfalls, setPitfallFlags } from './appdev-kb.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- filterPitfalls() takes preferModel: ordering inside a severity class,
+ *     never a filter. The research overview now builds its learned section from this step instead of
+ *     keeping only the entries the caller's own model had written.
  *   v1.2.0 -- 2026-09-03 -- filterPitfalls() and pitfallFacets(): the filter, sort, facet and page
  *     step the MCP list tool had inline, now shared with the REST route through
  *     queryLearnedPitfalls() (AppDev page, poster face). The page used to fetch every entry with
@@ -257,6 +260,12 @@ export interface PitfallListQuery {
     q?: string;
     /** Default 'updated' (newest first); 'severity' ranks critical first, newest first within a class. */
     sort?: 'updated' | 'severity';
+    /**
+     * Ordering only, never a filter: with sort 'severity', entries written by this model come first
+     * inside each severity class. The research overview passes the builder's own model here, because
+     * an entry is about the platform far more often than about the model that happened to hit it.
+     */
+    preferModel?: string;
     limit?: number;
     offset?: number;
 }
@@ -309,8 +318,13 @@ export function filterPitfalls<T extends PitfallLike>(entries: T[], query: Pitfa
             .some(v => typeof v === 'string' && v.toLowerCase().includes(q)));
     }
     const byUpdated = (a: PitfallLike, b: PitfallLike) => String(b.updated ?? '').localeCompare(String(a.updated ?? ''));
+    const preferred = query.preferModel?.trim().toLowerCase();
+    const byPreferred = (a: PitfallLike, b: PitfallLike) => preferred
+        ? Number(b.model === preferred) - Number(a.model === preferred)
+        : 0;
     out = [...out].sort(query.sort === 'severity'
-        ? (a, b) => ((SEVERITY_RANK[a.severity ?? 'warn'] ?? 1) - (SEVERITY_RANK[b.severity ?? 'warn'] ?? 1)) || byUpdated(a, b)
+        ? (a, b) => ((SEVERITY_RANK[a.severity ?? 'warn'] ?? 1) - (SEVERITY_RANK[b.severity ?? 'warn'] ?? 1))
+            || byPreferred(a, b) || byUpdated(a, b)
         : byUpdated);
     const limit = Number.isFinite(query.limit) ? Math.min(Math.max(query.limit as number, 1), LIST_MAX_LIMIT) : 25;
     const offset = Number.isFinite(query.offset) && (query.offset as number) > 0 ? (query.offset as number) : 0;

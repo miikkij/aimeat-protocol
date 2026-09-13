@@ -5,6 +5,9 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.4.1 — 2026-09-13 — aimeat_appdev_overview says its model orders learned pitfalls and hides
+ *     none; aimeat_appdev_pitfall_list names the doors that open one entry instead of
+ *     aimeat_knowledge_get, which cannot find this package from most agents.
  *   v1.4.0 — 2026-09-06 — The owner's secrets vault: aimeat_secret_list / _set / _delete.
  *   v1.3.0 — 2026-09-03 — aimeat_skill_update: visibility without a republish (the PATCH door).
  *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
@@ -335,11 +338,11 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_appdev_overview',
-        description: 'THE research call before building an app ON AIMEAT — one compact "big picture": the owner\'s existing apps (often the best template to fork/copy), library packs with per-model AEB proof summaries, T1/T2/T3 app-shell templates, loadable skills (node:aimeat-app-builder first), curated + learned pitfalls (model-faceted), and prior template proposals. Indexes only with drill-down pointers; pass sections=[...] for a partial fetch and model=<YOUR OWN model id — self-identify, never ask the user> to mark proven packs and filter learned pitfalls. Flow: research (this) → frame → propose to the user → build.',
+        description: 'THE research call before building an app ON AIMEAT — one compact "big picture": the owner\'s existing apps (often the best template to fork/copy), library packs with per-model AEB proof summaries, T1/T2/T3 app-shell templates, loadable skills (node:aimeat-app-builder first), curated pitfalls, every active learned pitfall you can read (your own and those other owners shared, critical first), and prior template proposals. Indexes only with drill-down pointers; pass sections=[...] for a partial fetch and model=<YOUR OWN model id — self-identify, never ask the user> to mark proven packs and list the pitfalls your model wrote first (it never hides one). Flow: research (this) → frame → propose to the user → build.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            model: { type: 'string', description: 'Your primary model (indicative), e.g. claude-haiku-4.5.' },
+            model: { type: 'string', description: 'Your primary model (indicative), e.g. claude-haiku-4.5. Marks proven packs and orders learned pitfalls; filters nothing.' },
             sections: { type: 'array', description: 'Subset: apps, library_packs, app_templates, skills, pitfalls_curated, pitfalls_learned, template_proposals.' },
         },
     },
@@ -364,7 +367,7 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_appdev_pitfall_list',
-        description: 'List appdev pitfalls before building an app ON AIMEAT — merged from your own learned entries, the node\'s curated registry, and other owners\' shared entries. scope: own (your bubble) | platform (curated + shared) | all (default). Filter by category, applies_to area, or model; paginated (limit/offset) with total + facet counts so a large KB stays navigable. Outdated entries are hidden by default. Full learned entries via aimeat_knowledge_get package_id=appdev-pitfalls; curated detail via GET /v1/appdev/pitfalls/{id}.',
+        description: 'List appdev pitfalls before building an app ON AIMEAT — merged from your own learned entries, the node\'s curated registry, and other owners\' shared entries. scope: own (your bubble) | platform (curated + shared) | all (default). Filter by category, applies_to area, or model; paginated (limit/offset) with total + facet counts so a large KB stays navigable. Outdated entries are hidden by default. One full learned entry: aimeat_memory_read {key, owner_scope: true} for your own, aimeat_memory_read_public {gaii: owner, key} for a shared one (the list names its owner); curated detail via GET /v1/appdev/pitfalls/{id}.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
