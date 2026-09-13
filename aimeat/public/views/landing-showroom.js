@@ -22,6 +22,7 @@
  * @structure ShowroomHero · WallIntro · ShowroomClose · AgentDoor (private)
  * @usage import { ShowroomHero, WallIntro, ShowroomClose } from '/views/landing-showroom.js';
  * @version-history
+ *   2026-09-13 -- V2ag: compose the agent registration prompt aside from poster.css.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.0.1 — 2026-08-29 — The connect door leads to the connect story (/v1/connect-your-ai): a signed-out
  *     visitor used to land on an empty profile that said sign in.
@@ -60,7 +61,7 @@ function AgentDoor({ open }) {
   }, [open, prompt]);
   if (!open) return null;
   return html`
-    <div class="ld-sh-agentdoor">
+    <div class="ld-sh-agentdoor poster-aside">
       <p class="ld-sh-agentdoor-sub">
         ${tr('landing.agentDoorSub', 'Copy the prompt into your own AI chat. If it can, a link arrives in your email and your account is done.')}
       </p>
