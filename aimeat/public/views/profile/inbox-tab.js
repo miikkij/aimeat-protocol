@@ -14,6 +14,7 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.4.0 -- 2026-09-13 -- Compose inbox top rules from poster.css.
  *   v2.3.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v2.2.0 -- 2026-09-13 -- The list is in sections the server places (people, own agents, a rule's
  *     heading, the archive), each closable, with archive and restore on a row, a group and a
@@ -700,7 +701,7 @@ export default function InboxTab({ showToast }) {
 
       ${isPage ? html`
         <div class="og-grid og-ib-page">
-          <div class="og-main">
+          <div class="og-main poster-row--thing">
             ${broadcastForm}
             ${mode === 'results' ? html`<${ResultsPanel} resultsId=${resultsId} recentBroadcasts=${recentBroadcasts}
               results=${results} openResults=${openResults} setResultsId=${setResultsId} setResults=${setResults} />` : null}
@@ -718,7 +719,7 @@ export default function InboxTab({ showToast }) {
             <button type="button" class=${`og-rail-link ${mode === 'organize' ? 'on' : ''}`} onClick=${openOrganize}><i>·</i>${t('inbox.org.door')}<em>→</em></button>
           </nav>
         </div>` : html`
-      <div class=${`inbox-body${mode !== 'idle' ? ' inbox-body--panel' : ''}`}>
+      <div class=${`inbox-body poster-row--thing${mode !== 'idle' ? ' inbox-body--panel' : ''}`}>
         <button class="inbox-back" onClick=${goIdle}>← ${t('inbox.back')}</button>
         <${ListPanel} requests=${requests} conversations=${conversations} activeConv=${activeConv}
           peerDisplay=${peerDisplay} accept=${accept} block=${block} openConversation=${openConversation}

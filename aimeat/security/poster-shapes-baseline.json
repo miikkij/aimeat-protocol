@@ -1,16 +1,16 @@
 {
   "_note": "Copied design-language declarations, recorded debt rather than approval. This files map may only shrink. After migration, lower the affected counts or remove cleared files. Only an explicit developer decision permits re-seeding with pnpm check:poster-shapes --record.",
   "_measured": {
-    "date": "2026-09-13T01:45:00.000Z",
+    "date": "2026-09-13T02:01:00.000Z",
     "files": 78,
-    "declarations": 714,
+    "declarations": 710,
     "patterns": {
       "headline": 133,
       "sun": 129,
       "box2": 189,
-      "frame3": 66,
+      "frame3": 65,
       "record": 31,
-      "rule": 50,
+      "rule": 47,
       "action": 73,
       "slab": 8,
       "aside": 23,
@@ -357,7 +357,6 @@
     },
     "public/css/views/inbox-poster.css": {
       "headline": 1,
-      "rule": 3,
       "action": 1,
       "sun": 3,
       "box2": 3
@@ -459,7 +458,7 @@
       "action": 7,
       "sun": 12,
       "box2": 15,
-      "frame3": 6,
+      "frame3": 5,
       "record": 3,
       "slab": 1,
       "label": 2

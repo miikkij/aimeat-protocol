@@ -7,6 +7,7 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.19.0 -- 2026-09-13 -- Compose inbox top rules from poster.css.
  *   v1.18.0 — 2026-09-13 — The markdown viewer's and the AI popovers' own overlays, frames and heads
  *     leave for the site's one dialog (/css/dialog.css); the modes are poster tabs.
  *   v1.17.0 -- 2026-09-13 -- The list's sections and closable groups (.inbox-sec*, .inbox-chev,
@@ -113,7 +114,6 @@
   grid-template-columns: minmax(260px, 340px) 1fr;
   height: var(--inbox-desk-avail, calc(100vh - 300px));
   min-height: 320px;
-  border: 1px solid var(--card-border);
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--card-bg);
@@ -164,7 +164,7 @@
   /* --inbox-avail = measured visual-viewport height (set by the tab's useMobileComposerKeyboard). With the
      viewport meta's interactive-widget=resizes-content, 100dvh already tracks the keyboard, so it's the
      fallback; either way the composer sits right on the keyboard with the thread filling the rest. */
-  .inbox--panel .inbox-body { height: var(--inbox-avail, 100dvh); border: none; border-radius: 0; }
+  .inbox--panel .inbox-body { height: var(--inbox-avail, 100dvh); border-radius: 0; }
   /* Home-indicator / gesture-bar clearance under the composer. */
   .inbox--panel .inbox-composer { padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
 
@@ -205,6 +205,9 @@
   overflow: hidden;
   background: var(--card-bg-alt);
 }
+.inbox-avatar--28 { width: 28px; height: 28px; }
+.inbox-avatar--36 { width: 36px; height: 36px; }
+.inbox-avatar--40 { width: 40px; height: 40px; }
 .inbox-avatar svg { width: 100%; height: 100%; }
 
 /* ── Left list ── */
@@ -567,7 +570,6 @@
 
 .inbox-compose-fields { padding: 12px 12px 0; }
 .inbox-composer {
-  border-top: 1px solid var(--border-subtle);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
