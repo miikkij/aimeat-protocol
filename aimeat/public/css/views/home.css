@@ -17,6 +17,8 @@
  *   one section ended. The rule now means a row; the slab means a section. The onboarding steps
  *   keep their plain card shape: one job at a time, nothing pulling the eye away from the open step.
  * @version-history
+ *   v3.4.0 — 2026-09-13 — The settings dialog is sized by the site's one dialog, and its door out is a
+ *     row under the ink rule instead of a rounded grey card.
  *   v3.3.0 — 2026-09-12 — Band titles on an ink slab with a 6px sun stripe (design canvas "Osioiden
  *     rajat kotisivulla", B1); the rows under them keep their 3px rule, which now means "row".
  *   v3.2.1 — 2026-08-29 — The margin-pattern preview box (.koti-settings-pattern-preview) above the chips.
@@ -686,10 +688,8 @@ a.koti-feed-line:hover { color: var(--accent); }
 }
 
 /* ── The settings dialog ──
-   Three things, stacked: the achievements toggle, the start-page setting, the door to settings and
-   controls. Short enough that the shared .modal's own scrolling (max-height 85vh) is all it needs;
-   the column-with-scrolling-panel layout the four-tab version had went with the tabs. */
-.koti-settings-modal { width: 34rem; }
+   Two sections and the door to settings and controls, inside the site's one dialog (/css/dialog.css),
+   which sizes it and scrolls its body. */
 .koti-settings { display: flex; flex-direction: column; width: 100%; }
 .koti-settings-switch {
   display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
@@ -715,21 +715,15 @@ a.koti-feed-line:hover { color: var(--accent); }
 }
 .koti-settings-pattern-choice:hover { box-shadow: 3px 3px 0 var(--text); }
 .koti-settings-pattern-choice.active { background: var(--sun); color: var(--on-sun); box-shadow: 3px 3px 0 var(--text); }
+/* The door out: a row that is the thing, under the 3px ink rule (poster-row--thing). */
 .koti-settings-door {
   display: flex; flex-direction: column; gap: 0.2rem;
-  margin-top: 1.4rem; padding: 0.85rem 1rem;
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--bg-dim);
+  margin-top: 2rem; padding: 0.9rem 0 0;
   text-decoration: none; color: inherit;
 }
-.koti-settings-door:hover { border-color: var(--accent); }
-.koti-settings-door-title { font-weight: 600; color: var(--text); }
-.koti-settings-door-hint { font-size: 0.85rem; color: var(--muted); }
-
-@media (max-width: 560px) {
-  /* The dialog goes edge to edge rather than keeping a 34rem box on a phone. */
-  .koti-settings-modal { width: 100%; }
-}
+.koti-settings-door:hover .koti-settings-door-title { color: var(--accent); }
+.koti-settings-door-title { font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: .04em; font-size: .9rem; }
+.koti-settings-door-hint { font-size: 0.85rem; color: var(--text-dim); }
 
 /* ── Open items. One list of what you are going to do here; the prompt that takes the whole list
    into a chat sits at the TOP, not on every row (P16). Rows carry the state control and nothing

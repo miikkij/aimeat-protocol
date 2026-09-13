@@ -8,6 +8,9 @@
  *   chat.commands), SchedulePanel (own-agent scheduler), and ReplyWithAiPopover (TARGET-031). Each is
  *   self-contained (owns its own hooks). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.15.0 — 2026-09-13 — The markdown viewer and the two AI popovers open in the site's one dialog
+ *     (components/Modal.js) instead of overlays of their own; their modes are poster tabs, and what
+ *     the chosen one decides sits under the sun bar.
  *   v1.14.0 — 2026-09-08 — A bubble says when a model wrote it, not only which model. The node has
  *     served `ai` on every message since August, and the inbox read only `ai.model` — so an agent's
  *     message that named no model looked exactly like one a person typed, on the surface Article 50
@@ -67,6 +70,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { Modal } from '/components/Modal.js';
 import { Markdown } from '/components/Markdown.js';
 import { MessageLinkPreviews } from '/components/LinkPreview.js';
 import { AiInteractionNotice } from '/components/ai-label.js';
@@ -149,23 +153,14 @@ export function MarkdownViewer({ url, name, onClose }) {
     return () => { alive = false; };
   }, [url]);
   return html`
-    <div class="inbox-mdviewer-overlay" onClick=${onClose}>
-      <div class="inbox-mdviewer" onClick=${e => e.stopPropagation()}>
-        <div class="inbox-mdviewer-head">
-          <span class="inbox-mdviewer-title">📄 ${escHtml(name)}</span>
-          <div class="inbox-mdviewer-actions">
-            <a class="btn-ghost btn-sm" href=${url} target="_blank" rel="noopener">${t('inbox.attachmentOpenRaw')}</a>
-            <a class="btn-ghost btn-sm" href=${url} download=${name}>${t('inbox.attachmentDownload')}</a>
-            <button class="btn-ghost btn-sm" onClick=${onClose} title=${t('inbox.close')}>✕</button>
-          </div>
-        </div>
-        <div class="inbox-mdviewer-body">
-          ${failed ? html`<div class="inbox-empty-sm">${t('inbox.attachmentLoadError')}</div>`
-            : text === null ? html`<div class="inbox-empty-sm">…</div>`
-            : html`<${Markdown} text=${text} />`}
-        </div>
-      </div>
-    </div>`;
+    <${Modal} open=${true} onClose=${onClose} title=${name} size="lg" guard=${false} className="inbox-mdviewer"
+      footer=${html`
+        <a class="btn-ghost" href=${url} target="_blank" rel="noopener">${t('inbox.attachmentOpenRaw')}</a>
+        <a class="btn-ghost" href=${url} download=${name}>${t('inbox.attachmentDownload')}</a>`}>
+      ${failed ? html`<div class="inbox-empty-sm">${t('inbox.attachmentLoadError')}</div>`
+        : text === null ? html`<div class="inbox-empty-sm">…</div>`
+        : html`<${Markdown} text=${text} />`}
+    <//>`;
 }
 
 
@@ -655,30 +650,25 @@ export function SchedulePanel({ agentName, onClose, showToast }) {
 export function ReplyWithAiPopover({ title, build, onClose, showToast }) {
   const [mode, setMode] = useState(MODES.COPY);
   const text = build(mode);
+  // The two ways are tabs; what the chosen one decides sits under a sun bar (poster-panel).
   return html`
-    <div class="inbox-ai-overlay" onClick=${onClose}>
-      <div class="inbox-ai-modal" onClick=${(e) => e.stopPropagation()}>
-        <div class="inbox-ai-head">
-          <span class="inbox-ai-title">✨ ${title}</span>
-          <button class="btn-ghost btn-sm" onClick=${onClose} title=${t('inbox.close')}>✕</button>
-        </div>
-        <div class="inbox-ai-modes">
-          <button class=${`inbox-ai-mode${mode === MODES.COPY ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode(MODES.COPY)}>
-            📋 ${t('common.copyPrompt')}
-          </button>
-          <button class=${`inbox-ai-mode${mode === MODES.MCP ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode(MODES.MCP)}>
-            🔌 ${t('inbox.ai.modeMcp')}
-          </button>
-        </div>
+    <${Modal} open=${true} onClose=${onClose} title=${title} size="lg" guard=${false} className="inbox-ai-modal"
+      footer=${html`<${CopyButton} text=${text} className="btn-primary"
+        label=${t('common.copy')} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
+        onCopied=${() => showToast?.(t('inbox.ai.copied'))} />`}>
+      <div class="inbox-ai-modes" role="tablist">
+        <button type="button" role="tab" aria-selected=${mode === MODES.COPY} class=${`poster-tab${mode === MODES.COPY ? ' is-on' : ''}`} onClick=${() => setMode(MODES.COPY)}>
+          ${t('common.copyPrompt')}
+        </button>
+        <button type="button" role="tab" aria-selected=${mode === MODES.MCP} class=${`poster-tab${mode === MODES.MCP ? ' is-on' : ''}`} onClick=${() => setMode(MODES.MCP)}>
+          ${t('inbox.ai.modeMcp')}
+        </button>
+      </div>
+      <div class="poster-panel">
         <div class="inbox-ai-hint">${mode === MODES.COPY ? t('inbox.ai.hintCopy') : t('inbox.ai.hintMcp')}</div>
         <textarea class="inbox-ai-text" readOnly rows="14" value=${text}></textarea>
-        <div class="inbox-ai-actions">
-          <${CopyButton} text=${text} className="btn-primary btn-sm"
-            label=${'📋 ' + t('common.copy')} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
-            onCopied=${() => showToast?.(t('inbox.ai.copied'))} />
-        </div>
       </div>
-    </div>`;
+    <//>`;
 }
 
 /* ── Conversation → Notebook — capture a WHOLE thread (with its images) into the notebook for later
@@ -718,18 +708,17 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
     catch (e) { showToast?.(e?.message || t('inbox.failed'), true); setParking(false); }
   };
 
+  const tab = (id, label) => html`<button type="button" role="tab" aria-selected=${mode === id}
+    class=${`poster-tab${mode === id ? ' is-on' : ''}`} onClick=${() => setMode(id)}>${label}</button>`;
+  // A summary being written or pasted is a half-written form: Modal's guard keeps it open.
   return html`
-    <div class="inbox-ai-overlay" onClick=${onClose}>
-      <div class="inbox-ai-modal" onClick=${(e) => e.stopPropagation()}>
-        <div class="inbox-ai-head">
-          <span class="inbox-ai-title">📓 ${title}</span>
-          <button class="btn-ghost btn-sm" onClick=${onClose} title=${t('inbox.close')}>✕</button>
+    <${Modal} open=${true} onClose=${onClose} title=${title} size="lg" className="inbox-ai-modal">
+        <div class="inbox-ai-modes" role="tablist">
+          ${tab('ai', t('inbox.notebook.modeAi'))}
+          ${tab('copy', t('common.copyPrompt'))}
+          ${tab('raw', t('inbox.notebook.modeRaw'))}
         </div>
-        <div class="inbox-ai-modes">
-          <button class=${`inbox-ai-mode${mode === 'ai' ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode('ai')}>✨ ${t('inbox.notebook.modeAi')}</button>
-          <button class=${`inbox-ai-mode${mode === 'copy' ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode('copy')}>📋 ${t('common.copyPrompt')}</button>
-          <button class=${`inbox-ai-mode${mode === 'raw' ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode('raw')}>📥 ${t('inbox.notebook.modeRaw')}</button>
-        </div>
+        <div class="poster-panel">
         ${mode === 'ai' ? html`
           <div class="inbox-ai-hint">${t('inbox.notebook.hintAi')}</div>
           ${!aiSummary ? html`
@@ -763,6 +752,6 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
             <button class="btn-primary btn-sm" disabled=${parking} onClick=${() => doPark('')}>${parking ? '…' : '📥 ' + t('inbox.notebook.parkRaw')}</button>
           </div>
         `}
-      </div>
-    </div>`;
+        </div>
+    <//>`;
 }

@@ -13,6 +13,8 @@
  * @structure CommandPalette({ navigate })
  * @usage import { CommandPalette } from '/views/command-palette.js';  html`<${CommandPalette} navigate=${navigate} />`
  * @version-history
+ *   v1.0.2 — 2026-09-13 — Escape closes the palette after a query has been typed too: a search box is
+ *     not a half-written form, so the dialog's guard is off here ("↵ open · Esc close" stays true).
  *   v1.0.1 — 2026-08-29 — A free-text organism type shows as written, not as a raw locale key.
  *   v1.0.0 — 2026-06-22 — Initial: Cmd-K quick-switcher over librarian search + organism names + recents.
  */
@@ -131,7 +133,8 @@ export function CommandPalette({ navigate }) {
     </button>`; };
 
   return html`
-    <${Modal} open=${open} onClose=${() => setOpen(false)} title=${t('search.paletteTitle') || 'Search everything'} className="cmdk-modal">
+    <${Modal} open=${open} onClose=${() => setOpen(false)} title=${t('search.paletteTitle') || 'Search everything'} className="cmdk-modal"
+      guard=${false}>
       <div class="cmdk" ref=${inputRef} onKeyDown=${onInputKey}>
         <${SearchBar} value=${q} onInput=${e => setQ(e.target.value)} placeholder=${t('search.palettePlaceholder') || 'Search organisms, workspaces, records…'} />
         <div class="cmdk-hint section-desc">${t('search.openHint') || '↵ open · Esc close'}</div>

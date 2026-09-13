@@ -6,6 +6,8 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v3.13.0 — 2026-09-13 — The account and presence dialogs' own overlay, frame, header, X and footer
+ *     rules leave: they open in the site's one dialog (/css/dialog.css). Their fields stay.
  *   v3.12.0 -- 2026-09-13 -- V2: shared poster classes own the crumb and avatar frame.
  *   v3.11.0 — 2026-09-13 — V1: retire underlying section-title values; shared poster classes own headings.
  *   v3.10.0 — 2026-09-06 — The signed-out wall's rules (.login-prompt, .bg-aurora, .aurora-wave, pfAurora)
@@ -519,11 +521,8 @@
 .pf .brd-member-remove:hover{color:var(--danger,#ef4444)}
 .pf .brd-member-add{display:flex;gap:.5rem;align-items:center}
 .pf .brd-member-add .input-field{flex:1}
-/* Modal overlay/box/title are canonical in theme.css (.modal-overlay / .modal /
-   .modal-header). The former .pf .modal* overrides were drift (hardcoded rgba
-   scrim, blur(4px), 1px border, --bg/--radius, accent-red title) — removed so
-   profile modals match the rest of the app. Width modifiers (.pf .scope-modal,
-   .pf .ext-modal-narrow) still layer on top of the canonical .modal base. */
+/* The dialog itself (frame, header, X, body, footer) is /css/dialog.css, for every dialog on the
+   site. Width modifiers (.pf .scope-modal, .pf .ext-modal-narrow) still layer on top of it. */
 .pf .star-rating{display:flex;gap:.25rem}
 .pf .star{font-size:1.5rem;cursor:pointer;color:var(--text-dim,#6B7280);transition:color .15s}
 .pf .star:hover,.pf .star.active{color:var(--warn,#f59e0b)}
@@ -1878,32 +1877,10 @@
 }
 .pf .pf-expand-trigger:hover { color: var(--accent, #E8564A); }
 
-/* --- Edit Profile Modal --- */
-.pf-edit-overlay {
-  position: fixed; inset: 0; z-index: 1000;
-  background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center;
-  animation: pf-fade-in .2s ease;
-}
-@keyframes pf-fade-in { from { opacity: 0; } to { opacity: 1; } }
-.pf-edit-modal {
-  background: var(--card, #fff); border-radius: 16px; width: 92%; max-width: 440px;
-  box-shadow: 0 16px 48px rgba(0,0,0,.18); animation: pf-modal-in .25s ease;
-  max-height: 90vh; overflow-y: auto;
-}
-@keyframes pf-modal-in { from { opacity: 0; transform: translateY(16px) scale(.97); } to { opacity: 1; transform: none; } }
-.pf-edit-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 22px 14px; border-bottom: 1px solid var(--border-soft, #f0f0ec);
-}
-.pf-edit-title { font-size: 1.1rem; font-weight: 700; margin: 0; letter-spacing: -.2px; }
-.pf-edit-close {
-  width: 32px; height: 32px; border: none; background: transparent;
-  font-size: 1rem; cursor: pointer; border-radius: 8px; color: var(--text-dim, #9CA3AF);
-  display: flex; align-items: center; justify-content: center; transition: all .15s;
-}
-.pf-edit-close:hover { background: var(--accent-soft, #FFF0EE); color: var(--accent, #E8564A); }
+/* --- Edit Profile, Change Password and Presence dialogs ---
+   The frame, header, X and footer are the site's one dialog (/css/dialog.css); these are the fields. */
 .pf-edit-loading { padding: 40px 22px; text-align: center; }
-.pf-edit-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; }
+.pf-account-modal .dlg-body, .pf-presence-modal .dlg-body { display: flex; flex-direction: column; gap: 14px; }
 .pf-edit-label {
   display: flex; flex-direction: column; gap: 5px;
   font-size: .81rem; font-weight: 600; color: var(--text, #1a1a1a);
@@ -1931,10 +1908,6 @@
 .pf-edit-check > span { display: flex; flex-direction: column; gap: .15rem; }
 .pf-edit-check-title { font-size: .9rem; }
 .pf-edit-error { font-size: .81rem; color: var(--danger, #ef4444); padding: 8px 12px; background: var(--danger-soft, #FEF2F2); border-radius: 8px; }
-.pf-edit-footer {
-  display: flex; justify-content: flex-end; gap: 10px;
-  padding: 14px 22px 18px; border-top: 1px solid var(--border-soft, #f0f0ec);
-}
 
 /* --- Inline Preview Panels --- */
 .pf .pf-inline-panel {
@@ -3032,7 +3005,6 @@
 .pf-avatar-preview { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-dim); display: inline-flex; align-items: center; justify-content: center; font-size: 1.3rem; flex: none; }
 .pf-edit-link { font-size: 0.82rem; color: var(--accent); cursor: pointer; text-decoration: none; }
 .pf-edit-link:hover { text-decoration: underline; }
-.pf-edit-footer-left { margin-right: auto; }
 .pf-pw-wrap { position: relative; }
 .pf-pw-wrap .pf-edit-input { padding-right: 4.2rem; }
 .pf-pw-eye { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.76rem; padding: 0.15rem 0.3rem; }

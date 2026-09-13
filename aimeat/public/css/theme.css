@@ -12,6 +12,9 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.38.0 — 2026-09-13 — The classic .modal-overlay / .modal / .modal-header / .modal-close / .modal-footer
+       rules leave: components/Modal.js renders a native <dialog class="dlg"> styled by /css/dialog.css, and
+       nothing else on the site used them.
      v1.37.0 — 2026-08-29 — html { overflow: clip }: a scrollIntoView() inside .page-content could scroll the
        WINDOW by the header's height (the static agent-footer makes the document taller than the
        viewport, and overflow: hidden does not stop programmatic scrolling), which hid the top bar and
@@ -1733,25 +1736,9 @@ select.input-field { cursor: pointer; }
 @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(16px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 @keyframes toastOut { from { opacity: 1; } to { opacity: 0; pointer-events: none; } }
 
-/* ── Modal ── */
-.modal-overlay {
-  position: fixed; inset: 0; z-index: 1000;
-  background: var(--overlay-scrim); backdrop-filter: blur(8px);
-  display: flex; align-items: center; justify-content: center;
-  padding: 24px;
-  animation: fadeIn 0.2s ease;
-}
-.modal {
-  background: var(--bg-card); border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xl); padding: 1.5rem;
-  min-width: 320px; max-width: 90vw; max-height: 85vh; overflow-y: auto;
-}
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.modal-header h3 { font-size: 1.1rem; font-weight: 700; }
-.modal-close { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 1.2rem; padding: 0.25rem; opacity: 0.7; }
-.modal-close:hover { opacity: 1; }
+/* ── Modal ── the dialog itself is /css/dialog.css (components/Modal.js); what stays here is the
+   confirm question's text and the solid danger button other places use too. */
 .modal-confirm-message { color: var(--text-dim); margin: 0 0 1.25rem; line-height: 1.5; }
-.modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 0.5rem; }
 .btn-danger-solid { padding: 8px 20px; background: var(--danger,#ef4444); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 0.84rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
 .btn-danger-solid:hover { background: #dc2626; }
 
