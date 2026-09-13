@@ -12,6 +12,8 @@
  * @structure registerAppdevPitfallTools() — aimeat_appdev_pitfall_report / _list / _delete
  * @usage registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated);
  * @version-history
+ *   v1.3.1 -- 2026-09-13 -- A shared entry in the list carries its `owner`, and the hint names the
+ *     doors that can open one entry instead of aimeat_knowledge_get, which could not.
  *   v1.3.0 -- 2026-09-03 -- The list's filter, sort, facet and page step is services/appdev-kb.ts
  *     filterPitfalls(), shared with the REST route the AppDev page reads; the tool keeps merging
  *     the curated registry in before it. Same output shape.
@@ -64,6 +66,8 @@ function asIndexEntry(source: 'learned' | 'learned-shared', rec: MemoryRecord): 
         status: v?.status ?? 'active',
         updated: v?.updated ?? rec.updatedAt,
         shared: rec.visibility === 'public',
+        // Another owner's entry is read by naming its holder (aimeat_memory_read_public {gaii, key}).
+        ...(source === 'learned-shared' ? { owner: rec.ownerGaii } : {}),
     };
 }
 
@@ -227,7 +231,9 @@ export function registerAppdevPitfallTools(
                         offset: page.offset,
                         limit: page.limit,
                         facets: page.filtered_facets,
-                        hint: 'Full learned entries: aimeat_knowledge_get package_id=appdev-pitfalls. Curated detail: GET /v1/appdev/pitfalls/{id}.',
+                        // aimeat_knowledge_get was named here and answers "Package not found" for any
+                        // agent that did not write the package manifest itself: it reads one namespace.
+                        hint: 'One full learned entry: aimeat_memory_read {key, owner_scope: true} for your own, aimeat_memory_read_public {gaii: owner, key} for a shared one. Curated detail: GET /v1/appdev/pitfalls/{id}.',
                     }, null, 2),
                 }],
             };

@@ -14,6 +14,7 @@
  *   to attachProofOverHttp() in tool-call-defs-apps.ts, which the shell path calls as well.
  * @usage registerAppdevTools(mcp, registry);
  * @version-history
+ *   v1.1.1 -- 2026-09-13 -- appdev_overview's model parameter is described as ordering, not filtering.
  *   v1.1.0 -- 2026-08-11 -- proof_attach takes the node's own parameters (subject_type, verdict,
  *     evidence, test_set, tokens) and appends a ContributionProof to the ledger instead of setting a
  *     one-entry array in a shape the reader ignores. The append itself is shared with the shell door.
@@ -38,7 +39,7 @@ export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): vo
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
   mcp.tool('aimeat_appdev_overview', descriptionFor('aimeat_appdev_overview'), {
-    model: z.string().optional().describe('Indicative model filter for proofs + learned pitfalls.'),
+    model: z.string().optional().describe('Your own model (indicative): marks proven packs and orders learned pitfalls; filters nothing.'),
     sections: z.string().optional().describe('Comma-separated section filter (apps,library_packs,templates,pitfalls,...).'),
   }, annotationsFor('aimeat_appdev_overview'), async ({ model, sections }) => {
     const params = new URLSearchParams();

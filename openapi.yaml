@@ -12880,10 +12880,12 @@ paths:
       description: >-
         One compact research surface for building apps ON AIMEAT: the caller's existing apps,
         library packs (per-model proof summaries), T1/T2/T3 app-shell templates, loadable
-        skills (node:aimeat-app-builder first), curated + learned pitfalls (model-faceted),
-        and prior template proposals. Indexes only with drill-down pointers; ?sections= for a
-        partial fetch, ?model= for indicative model marking/filtering. Authenticated
-        (owner or agent session).
+        skills (node:aimeat-app-builder first), curated pitfalls, every active learned pitfall
+        the caller can read (their own owner scope and other owners' shared entries, critical
+        first), and prior template proposals. Indexes only with drill-down pointers; ?sections=
+        for a partial fetch, ?model= marks proven packs and lists the learned pitfalls that model
+        wrote first inside each severity (same_model: true). The model never removes an entry.
+        Authenticated (owner or agent session).
       tags:
         - Discovery
       security:
