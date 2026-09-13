@@ -22,6 +22,7 @@
  *   - ByDay (03) — one chart, two series, with a hover readout and the numbers behind a door
  * @usage Imported by views/admin/usage-tab.js.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose shared B1 headings; SVG data carries chart ratios and readings.
  *   v1.0.0 — 2026-09-12 — Initial (the Usage page in the poster face).
  */
 import { h } from 'preact';
@@ -64,8 +65,8 @@ function ModelRow({ name, why, cost, calls, unpriced, share, widest, tail, last 
       <span class="adm-us-num">${num(calls)}</span>
       <span class="adm-us-num">${unpriced ? num(unpriced) : '—'}</span>
       <span class="adm-us-bar">
-        <i class=${tail ? 'adm-us-bar-fill adm-us-bar-fill--tail' : 'adm-us-bar-fill'}
-           style=${`width:${width}%`}></i>
+        <svg class=${tail ? 'adm-us-bar-fill adm-us-bar-fill--tail' : 'adm-us-bar-fill'}
+           width=${width + '%'} aria-hidden="true"></svg>
         <span>${pct(share)}%</span>
       </span>
     </div>`;
@@ -81,7 +82,7 @@ export function WhereItWent({ models }) {
   if (!rows.length) {
     return html`
       <section class="og-sec" id="adm-us-02">
-        <div class="og-sec-h"><h2>${S('went.title')}<small>02</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${S('went.title')}<small>02</small></h2></div>
         <div class="adm-us-empty">${S('went.empty')}</div>
       </section>`;
   }
@@ -89,7 +90,7 @@ export function WhereItWent({ models }) {
   return html`
     <section class="og-sec" id="adm-us-02">
       <div class="og-sec-h">
-        <h2>${S('went.title')}<small>02</small></h2>
+        <h2 class="poster-section-title">${S('went.title')}<small>02</small></h2>
       </div>
       <p class="adm-us-lead">${S('went.lead', { n: rows.length })}</p>
 
@@ -148,7 +149,7 @@ export function ByDay({ days }) {
   return html`
     <section class="og-sec" id="adm-us-03">
       <div class="og-sec-h">
-        <h2>${S('day.title')}<small>03</small></h2>
+        <h2 class="poster-section-title">${S('day.title')}<small>03</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${() => setNumbers(v => !v)}>
             ${numbers ? S('day.showChart') : S('day.showNumbers')}
@@ -189,10 +190,8 @@ export function ByDay({ days }) {
           ${list.map((d, i) => html`
             <div class="adm-us-day" onMouseEnter=${() => setHover(i)} onMouseLeave=${() => setHover(null)}>
               <div class="adm-us-pair">
-                <i class="adm-us-bar-house" style=${`height:${height(d.house_usd)}%`}
-                   title=${`${d.date} · ${S('day.house')} ${usd(d.house_usd)}`}></i>
-                <i class="adm-us-bar-own" style=${`height:${height(d.own_usd)}%`}
-                   title=${`${d.date} · ${S('day.own')} ${usd(d.own_usd)}`}></i>
+                <svg class="adm-us-bar-house" height=${height(d.house_usd) + '%'}><title>${`${d.date} · ${S('day.house')} ${usd(d.house_usd)}`}</title></svg>
+                <svg class="adm-us-bar-own" height=${height(d.own_usd) + '%'}><title>${`${d.date} · ${S('day.own')} ${usd(d.own_usd)}`}</title></svg>
               </div>
             </div>`)}
         </div>

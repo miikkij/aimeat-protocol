@@ -8,6 +8,7 @@
  *   dashed aside come from admin.css; only what this page adds lives here, and every value is a
  *   theme.css token.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose the results heading and ink row boundaries from poster.css.
  *   v1.0.0 — 2026-09-12 — Initial. Replaces the filter bar and the seven-column table.
  */
 
@@ -20,7 +21,7 @@
 .adm-mem-lead { margin: 0; padding-top: 22px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
 
 /* ── Who can read what, before anything is asked ── */
-.adm-mem-strip { display: flex; border-top: 3px solid var(--text); border-bottom: 3px solid var(--text); margin-top: 20px; }
+.adm-mem-strip { display: flex; border-bottom: 3px solid var(--text); margin-top: 20px; }
 .adm-mem-strip > div { flex: 1 1 0; box-sizing: border-box; display: flex; align-items: baseline; flex-wrap: wrap; gap: .5rem; padding: .85rem 1rem .85rem 0; border-right: 1px solid var(--border); min-width: 0; }
 .adm-mem-strip > div + div { padding-left: 1rem; }
 .adm-mem-strip > div:last-child { border-right: 0; align-items: center; }
@@ -63,9 +64,8 @@
 .adm .adm-mem-door.is-quiet { color: var(--text-dim); border-bottom-color: var(--border); }
 
 /* ── Results ── */
-.adm-mem-results { border-top: 3px solid var(--text); margin-top: 26px; padding-top: 15px; }
+.adm-mem-results { margin-top: 26px; --poster-section-size: 1.6rem; }
 .adm-mem-rhead2 { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 4px; flex-wrap: wrap; }
-.adm .adm-mem-rhead2 h2 { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.6rem; line-height: 1.05; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text); }
 .adm .adm-mem-rhead2 h2 small { font-family: var(--font-mono); font-size: .8rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--accent); margin-left: .6rem; }
 .adm-mem-rhead2 > span { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
 
@@ -94,7 +94,7 @@
 .adm-mem-crumb { font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); margin-bottom: 15px; }
 .adm .adm-mem-crumb button { background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; padding: 0 0 1px; font: inherit; font-size: .74rem; font-weight: 500; color: var(--text); cursor: pointer; }
 .adm .adm-mem-crumb button:hover { color: var(--accent); border-bottom-color: var(--accent); }
-.adm-mem-rhead { border-top: 3px solid var(--text); padding-top: 16px; }
+.adm-mem-rhead { padding-top: 16px; }
 .adm-mem-rkey { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 700; line-height: 1.25; color: var(--text); overflow-wrap: anywhere; }
 .adm .adm-mem-rtitle { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 2.3rem; line-height: 1.04; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text); }
 .adm-mem-rlead { margin: .7rem 0 0; font-size: .88rem; line-height: 1.6; color: var(--text-dim); max-width: 92ch; }
@@ -122,7 +122,7 @@
 .adm-mem-actnote { margin: 11px 0 0; font-size: .78rem; line-height: 1.55; color: var(--text-dim); }
 
 /* ── Who can read what ── */
-.adm-mem-ladder { border-top: 3px solid var(--text); margin-top: 24px; }
+.adm-mem-ladder { margin-top: 24px; }
 .adm-mem-rung { display: grid; grid-template-columns: 128px 76px minmax(0, 1fr) 130px; gap: 0 24px; padding: 14px 0; border-bottom: 1px solid var(--border); align-items: baseline; }
 .adm-mem-rung-n { font-family: var(--font-mono); font-size: .84rem; font-weight: 700; color: var(--accent); }
 .adm-mem-rung-c { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.7rem; line-height: 1; letter-spacing: var(--font-poster-tracking); text-align: right; color: var(--accent); }

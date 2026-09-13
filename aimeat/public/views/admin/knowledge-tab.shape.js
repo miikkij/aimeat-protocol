@@ -21,6 +21,7 @@
  *   - WhatIsHere (02) — the facets, each part with a bar
  * @usage Imported by views/admin/knowledge-tab.js.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose shared B1 headings; facet ratios use SVG width data.
  *   v1.0.0 — 2026-09-12 — Initial (the Knowledge page in the poster face).
  */
 import { h } from 'preact';
@@ -43,8 +44,8 @@ function Part({ name, note, packages, widest, tone, onPick }) {
     : html`<span>${name}</span>`}
         ${note ? html`<b class="adm-kn-flagword">${note}</b>` : null}
       </span>
-      <span class="adm-kn-track"><i class=${tone ? 'adm-kn-fill adm-kn-fill--' + tone : 'adm-kn-fill'}
-        style=${`width:${width}%`}></i></span>
+      <span class="adm-kn-track"><svg class=${tone ? 'adm-kn-fill adm-kn-fill--' + tone : 'adm-kn-fill'}
+        width=${width + '%'} aria-hidden="true"></svg></span>
       <span class="adm-kn-part-n">${num(packages)}</span>
     </span>`;
 }
@@ -82,7 +83,7 @@ export function RightNow({ data, onShowFlagged }) {
   return html`
     <section class="og-sec og-sec--first" id="adm-kn-01">
       <div class="og-sec-h">
-        <h2>${S('now.title')}<small>01</small></h2>
+        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${() => onShowFlagged()}>${S('now.addOwn')}</button>
         </div>
@@ -199,7 +200,7 @@ export function WhatIsHere({ data, onPickAuthor, onPickKind }) {
   return html`
     <section class="og-sec" id="adm-kn-02">
       <div class="og-sec-h">
-        <h2>${S('shape.title')}<small>02</small></h2>
+        <h2 class="poster-section-title">${S('shape.title')}<small>02</small></h2>
       </div>
       <p class="adm-kn-lead">${S('shape.lead')}</p>
 

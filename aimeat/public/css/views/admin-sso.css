@@ -12,6 +12,7 @@
  *   or it is not, and a company can sign in or it cannot. Those are statuses, so they wear the
  *   status tokens and nothing else is coloured.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose ink row boundaries from poster.css.
  *   v1.0.0 — 2026-09-12 — Initial. Replaces the classic-shell cards the tab used.
  */
 
@@ -90,7 +91,7 @@
 
 /* The detail's head, its two columns, and the troubleshooting table. */
 .adm-sso-detail-h { margin-bottom: 16px; }
-.adm-sso-two { display: grid; grid-template-columns: minmax(0, 1fr) 520px; gap: 0 44px; align-items: start; margin-top: 26px; padding-top: 20px; border-top: 3px solid var(--text); }
+.adm-sso-two { display: grid; grid-template-columns: minmax(0, 1fr) 520px; gap: 0 44px; align-items: start; margin-top: 26px; padding-top: 20px; }
 .adm-sso-ai { display: grid; grid-template-columns: minmax(0, 1fr) 560px; gap: 0 44px; align-items: start; }
 .adm-sso-two > *, .adm-sso-ai > * { min-width: 0; }
 .adm-sso-paste { white-space: pre-wrap; font-size: .85rem; line-height: 1.55; color: var(--text); }

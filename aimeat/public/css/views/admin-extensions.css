@@ -8,6 +8,7 @@
  *   sections, the metric rows, the numeral strip, the doors and the slab come from admin.css and
  *   organism.css; only what this page adds lives here.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose the record action rule and own instance-form layout.
  *   v1.0.0 — 2026-09-12 — Initial, with the page renamed from Services to Extensions.
  */
 
@@ -76,8 +77,12 @@
 .adm-ex-box-row span { font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--text-dim); flex: none; }
 .adm-ex-box-row em { font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm-ex-hint { margin: .6rem 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
-.adm-ex-acts { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 3px solid var(--text); }
+.adm-ex-acts { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; }
 .adm-ex-acts p { margin: 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); max-width: 34ch; }
+
+.adm-ex-inst-row { border: 0; padding: 0; }
+.adm-ex-inst-actions { padding-top: 12px; }
+.adm-ex-inst-field { max-width: 260px; }
 
 /* The instance and script editors keep their own shapes; they only lose the card around them. */
 .adm-ex-panel { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }

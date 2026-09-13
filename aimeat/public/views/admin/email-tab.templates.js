@@ -14,6 +14,7 @@
  *   - buildAiPrompt(tpl, locale) — the paste for the operator's own AI, tags kept intact
  *
  * @version-history
+ *   v2.2.0 -- 2026-09-13 -- Compose ink row boundaries from the shared poster class.
  *   v2.1.0 — 2026-09-13 — Compose the shared template heading and external spacing.
  *   v2.0.0 — 2026-09-12 — The poster face, and the plain statement that a saved template does not
  *     reach a recipient yet. The AI prompt names the third shipped language instead of calling
@@ -144,7 +145,7 @@ function Editor({ tpl, locale, onSave, onReset }) {
         ${view === 'text' && html`<textarea spellcheck="false" value=${editText} onInput=${e => setEditText(e.target.value)}></textarea>`}
       </div>
 
-      <div class="adm-em-tacts">
+      <div class="adm-em-tacts poster-row--thing">
         <button class="adm-btn" onClick=${save} disabled=${saving || !changed}>${E('tpl.save')}</button>
         <${CopyButton} text=${buildAiPrompt(tpl, locale)} className="og-door og-door--quiet"
           label=${E('tpl.aiPrompt')} copiedLabel=${E('tpl.aiPromptCopied')} />

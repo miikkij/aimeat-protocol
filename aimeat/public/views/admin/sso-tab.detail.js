@@ -24,6 +24,7 @@
  *   - ConnectionDetail — the six steps, the walkthroughs, troubleshooting, the danger zone
  * @usage Imported by views/admin/sso-tab.js.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose ink row boundaries from the shared poster class.
  *   v1.0.0 — 2026-09-12 — Initial (the Organisation sign-in page in the poster face).
  */
 import { h } from 'preact';
@@ -243,7 +244,7 @@ export function ConnectionDetail({ id, node, onBack, onChanged, showErr, confirm
         <//>
       </div>
 
-      <div class="adm-sso-two">
+      <div class="adm-sso-two poster-row--thing">
         <div>
           <div class="adm-sso-lbl">${S('detail.troubleTitle')}</div>
           <div class="adm-sso-scroll">

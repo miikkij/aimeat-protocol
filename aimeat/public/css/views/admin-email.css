@@ -8,6 +8,7 @@
  *   the numeral strip, the doors, the slab and the dashed box come from admin.css and
  *   organism.css; only what this page adds lives here. Every value is a theme.css token.
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose ink row boundaries from poster.css.
  *   v1.1.0 — 2026-09-13 — Own existing template-list and unchanged-hint spacing.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
@@ -105,7 +106,7 @@
   padding: .7rem .8rem; font-family: var(--font-mono); font-size: .76rem; line-height: 1.6; color: var(--text); outline: none; resize: vertical;
 }
 .adm-em-stage textarea:focus { border-color: var(--accent); }
-.adm-em-tacts { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-top: 18px; padding-top: 16px; border-top: 3px solid var(--text); }
+.adm-em-tacts { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-top: 18px; padding-top: 16px; }
 
 @media (max-width: 1100px) {
   .adm-em-two { grid-template-columns: 1fr; gap: 24px 0; }
