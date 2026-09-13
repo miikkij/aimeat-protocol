@@ -10,6 +10,7 @@
  * @structure WorkspaceList
  * @usage import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   v1.0.1 — 2026-08-29 — The description line above the bar is gone: the organism home's Workspaces
  *     section carries it under the list, where it reads as a note rather than a preface.
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split; the hidden file
@@ -370,7 +371,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
           // below (restorable, not reorderable). Ordering is a per-user preference (see activeSorted).
           const archived = archivedList;
           return html`
-            <div class="pj-org-list">${activeSorted.map(w => renderWsRow(w, true))}</div>
+            <div class="pj-org-list poster-row--thing">${activeSorted.map(w => renderWsRow(w, true))}</div>
             ${sortMode === 'custom' && activeSorted.length > 1 ? html`
               <div class="pj-org-hint">${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}</div>` : null}
             ${archived.length > 0 ? html`
@@ -378,7 +379,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
                 <span class="pj-struct-caret">${archivedOpen ? '▾' : '▸'}</span>
                 <span>${'🗄️ '}${(t('organisms.archivedWorkspacesSection') || 'Archived workspaces ({n})').replace('{n}', String(archived.length))}</span>
               </button>
-              ${archivedOpen ? html`<div class="pj-org-list">${archived.map(w => renderWsRow(w, false))}</div>` : null}` : null}
+              ${archivedOpen ? html`<div class="pj-org-list poster-row--thing">${archived.map(w => renderWsRow(w, false))}</div>` : null}` : null}
           `;
         })()}
 

@@ -7,6 +7,7 @@
  *   internal (the agent's self-reported mirror, read-only). Lets the owner create
  *   a new schedule targeting this agent (reusing the master view's CreateForm).
  * @version-history
+ *   v1.5.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   v1.4.0 -- 2026-08-30 -- CreateForm now lives in scheduler/create-form.js (poster face); same props.
  *   v1.3.0 -- 2026-08-24 -- Live update listens on 'scheduler'; 'schedules' is emitted by nobody.
  *   v1.2.0 -- 2026-07-17 -- Dispatched / agent-internal groups become pf-agd-cards.
@@ -69,7 +70,7 @@ export default function TabSchedules({ agentName, allAgents = [], showToast }) {
         <div class="pf-agd-section-title">${t('profile.scheduler.dispatchedTitle')}</div>
         ${managed.length === 0
           ? html`<div class="pf-agd-empty">${t('profile.scheduler.noDispatched')}</div>`
-          : html`<div class="sch-card-list">${managed.map(j => html`<${ScheduleItem} key=${j.id} schedule=${j} onChanged=${loadData} showToast=${showToast} />`)}</div>`}
+          : html`<div class="sch-card-list poster-row--thing">${managed.map(j => html`<${ScheduleItem} key=${j.id} schedule=${j} onChanged=${loadData} showToast=${showToast} />`)}</div>`}
       </div>
 
       <div class="sch-section pf-agd-card">

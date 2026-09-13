@@ -6,6 +6,7 @@
  *   expandable agent cards with Two-Zone Header + 8-tab interface,
  *   device auth flow, scope management modal.
  * @version-history
+ *   v3.13.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v3.12.0 -- 2026-09-08 -- The new-agent panel below the basic-agents one: an agent of the
  *     person's own, the proposals their agents have made, and the attach control for any agent that
@@ -525,7 +526,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
         <p class="text-caption mb-half"><strong>${t('profile.agents.connectRecommendedTitle')}</strong> ${t('profile.agents.connectRecommendedDesc')}</p>
         <${McpSetupGuide} />
 
-        <div class="pf-agent-divider mt-1">
+        <div class="pf-agent-divider poster-row--thing mt-1">
           <button class="expand-btn" onClick=${() => setCliExpanded(!cliExpanded)}>
             <span>${t('profile.agents.connectDeveloperTitle')}</span>
             <span class="pf-chevron ${cliExpanded ? 'pf-chevron-open' : ''}">\u25BC</span>
@@ -557,7 +558,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
                 label=${t('profile.agents.copyAgentInstruction')}
                 />
 
-              <div class="pf-agent-divider mt-1">
+              <div class="pf-agent-divider poster-row--thing mt-1">
                 <button class="expand-btn" onClick=${() => setPlatExpand(!platExpand)}>
                   <span>${t('profile.agents.noNodejs')}</span>
                   <span class="pf-chevron ${platExpand ? 'pf-chevron-open' : ''}">\u25BC</span>
@@ -578,7 +579,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
           `}
         </div>
 
-        <div class="pf-agent-divider mt-1">
+        <div class="pf-agent-divider poster-row--thing mt-1">
           <button class="expand-btn" onClick=${() => setPasteExpanded(!pasteExpanded)}>
             <span>${t('profile.agents.pasteAlt')}</span>
             <span class="pf-chevron ${pasteExpanded ? 'pf-chevron-open' : ''}">\u25BC</span>
@@ -596,7 +597,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
           `}
         </div>
 
-        <div class="pf-agent-divider mt-1">
+        <div class="pf-agent-divider poster-row--thing mt-1">
           <button class="expand-btn" onClick=${() => setTaskRunnerExpanded(!taskRunnerExpanded)}>
             <span>${t('profile.agents.taskRunner.title')}</span>
             <span class="pf-chevron ${taskRunnerExpanded ? 'pf-chevron-open' : ''}">\u25BC</span>

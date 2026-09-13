@@ -19,6 +19,7 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.8.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v2.7.0 — 2026-09-06 — The counts and the date always render, empty cell and all, because the
  *     row's trailing block is now a fixed grid and a missing cell would slide the rest into the
@@ -651,7 +652,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
             ${activeMine.length === 0
               ? html`<div class="empty">${t('organisms.allArchived') || 'All your organisms are archived.'}</div>`
               : html`
-                <div class="pj-org-list">${activeMine.map(org => renderOrgRow(org, true))}</div>
+                <div class="pj-org-list poster-row--thing">${activeMine.map(org => renderOrgRow(org, true))}</div>
                 ${sortMode === 'custom' && activeMine.length > 1 ? html`
                   <div class="pj-org-hint">${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}</div>` : null}`}
             ${archivedMine.length > 0 ? html`
@@ -659,7 +660,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
                 <span class="pj-struct-caret">${archivedOpen ? '▾' : '▸'}</span>
                 <span>${'🗄️ '}${(t('organisms.archivedSection') || 'Archived ({n})').replace('{n}', String(archivedMine.length))}</span>
               </button>
-              ${archivedOpen ? html`<div class="pj-org-list">${archivedMine.map(org => renderOrgRow(org, true))}</div>` : null}` : null}
+              ${archivedOpen ? html`<div class="pj-org-list poster-row--thing">${archivedMine.map(org => renderOrgRow(org, true))}</div>` : null}` : null}
           `}
       `;
     })()}
@@ -667,7 +668,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     <!-- Discover -->
     ${publicOrganisms.length > 0 && html`
       <div class="poster-section-title section-title-spaced">${t('organisms.discover') || 'Discover'}</div>
-      <div class="pj-org-list">${publicOrganisms.map(org => renderOrgRow(org, false))}</div>
+      <div class="pj-org-list poster-row--thing">${publicOrganisms.map(org => renderOrgRow(org, false))}</div>
     `}
     `}
     <${ConfirmUI} />

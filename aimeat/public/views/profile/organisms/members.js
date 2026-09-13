@@ -10,6 +10,7 @@
  * @structure OrgMemberManager; MemberAccessEditor (inline per-member workspace-role editor)
  * @usage import { OrgMemberManager } from '/views/profile/organisms/members.js';
  * @version-history
+ *   v2.1.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   v2.0.0 — 2026-07-16 — Unified add/invite panel (direct add default, invitation optional, email
  *     auto-detected); pending invites as editable rows; roster kebab gains Make/Remove admin +
  *     Edit access (per-workspace none/viewer/contributor). Email form moved to invite-panel.js.
@@ -242,7 +243,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
         </div>
       `) : null}
 
-      <div class="pj-org-list">
+      <div class="pj-org-list poster-row--thing">
         ${(members || []).map(m => {
           const acc = accessLine(m);
           const bare = String(m.ghii || '').split('@')[0];
