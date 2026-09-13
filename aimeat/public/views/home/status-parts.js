@@ -15,6 +15,7 @@
  * @structure MailboxRow · FleetLine · ChatDoor · NamedRow · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   2026-09-13: Compose the existing home shapes with shared poster classes.
  *   v1.5.0 — 2026-08-28 — The poster home: the mailbox and fleet lines carry their number as a
  *     big numeral (bigNumber() splits the translated sentence at its placeholder, so every
  *     language keeps its own word order), and the chat door is the coral band.
@@ -74,7 +75,7 @@ export function MailboxRow({ mail }) {
   if (!mail) return null;
   const unread = mail.unread ?? 0;
   return html`
-    <a class="koti-mailbox ${unread > 0 ? 'koti-mailbox--full' : ''}" href="/v1/profile?tab=messages">
+    <a class="poster-stat koti-mailbox ${unread > 0 ? 'koti-mailbox--full' : ''}" href="/v1/profile?tab=messages">
       <span class="koti-mailbox-icon" aria-hidden="true">${unread > 0 ? '📬' : '📪'}</span>
       <span class="koti-mailbox-text">
         ${unread > 0
@@ -95,7 +96,7 @@ export function FleetLine({ agent }) {
   const problems = agent.problems ?? 0;
   const ok = problems === 0;
   return html`
-    <a class="koti-fleet ${ok ? 'koti-fleet--ok' : 'koti-fleet--trouble'}" href="/v1/profile?tab=agents">
+    <a class="poster-stat koti-fleet ${ok ? 'koti-fleet--ok' : 'koti-fleet--trouble'}" href="/v1/profile?tab=agents">
       <span class="koti-fleet-dot" aria-hidden="true"></span>
       <span class="koti-fleet-text">
         ${total === 1
@@ -138,7 +139,7 @@ export function ChatDoor({ chatStatus, mcpNames }) {
         </p>
         ${ai && html`<p class="koti-chatdoor-ai">${ai}</p>`}
       </div>
-      <a class="btn-primary koti-chatdoor-cta" href="/v1/chat">
+      <a class="btn-primary poster-slab poster-slab--large koti-chatdoor-cta" href="/v1/chat">
         ${tr('home.chatDoor.cta', 'Continue in the chat')}
       </a>
     </section>`;
@@ -152,8 +153,8 @@ export function ChatDoor({ chatStatus, mcpNames }) {
  */
 export function NamedRow({ label, title, className, children }) {
   return html`
-    <div class="koti-row ${className || ''}">
-      <span class="koti-things-cat koti-row-label" title=${title || undefined}>${label}</span>
+    <div class="poster-row--thing koti-row ${className || ''}">
+      <span class="poster-label koti-things-cat koti-row-label" title=${title || undefined}>${label}</span>
       <div class="koti-things-row koti-row-body">${children}</div>
     </div>`;
 }
