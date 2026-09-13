@@ -15,6 +15,7 @@
  *   - whoOf / readWord: how a row says whose a board is and who may read it
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose the board-list section heading from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face, and the missing field that broke three things. A board
  *     has no slug — the record carries an id and GET /v1/boards never sent one — so "Slug:" was
  *     blank on every row, Show Posts fetched /v1/boards/undefined/posts and console.warned, and the
@@ -163,7 +164,7 @@ export default function BoardsTab({ data, reload }) {
 
   if (boards.length === 0) {
     return wrap(html`<section class="og-sec og-sec--first">
-      <div class="og-sec-h"><h2>${S('title')}<small>01</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('title')}<small>01</small></h2>
         <button type="button" class="adm-btn" onClick=${() => setView('make')}>${S('make')}</button></div>
       <${Empty} text=${S('empty')} />
     </section>`);
@@ -193,7 +194,7 @@ export default function BoardsTab({ data, reload }) {
 
     <section class="og-sec og-sec--first">
       <div class="og-sec-h">
-        <h2>${S('title')}<small>01</small></h2>
+        <h2 class="poster-section-title">${S('title')}<small>01</small></h2>
         <button type="button" class="adm-btn" onClick=${() => setView('make')}>${S('make')}</button>
       </div>
 
