@@ -24,8 +24,8 @@
  *     here, while POST /v1/memory, the SDK's writeDraft and both publish doors stored the record and
  *     answered success, and the workspace read, which lists declared spaces only, never showed it.
  *     A production CRM ran a month and forty-four releases with four such spaces. Warned rather than
- *     refused on those doors, because live apps may keep keys there today (ruling 2026-09-13; whether
- *     to refuse later is open). readPublishSpace() is the manifest read both publish paths made inline.
+ *     refused on those doors, because live apps may keep keys there today (the 2026-09-13 default;
+ *     whether to refuse later is the developer's decision). readPublishSpace() is the manifest read both publish paths made inline.
  *   v1.1.0 — 2026-09-02 — resolveSpace() split out of resolveWriteItem(), which now calls it. The
  *     in-place document edits need the same manifest lookup and the same two refusals, and a second
  *     copy of "No space named X" is a second sentence to keep true.

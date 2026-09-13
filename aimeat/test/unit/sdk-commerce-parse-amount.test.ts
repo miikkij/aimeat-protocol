@@ -4,7 +4,7 @@
  *   it, and refuses the one shape nobody can read. microsFromInput was
  *   `parseFloat(String(str).replace(',', '.'))`, a STRING replace of the first comma, so '1,500.00'
  *   became 1.5 and '12,000.00' became 12 with no warning (appdev pitfall
- *   amount-parser-reads-thousands-separator-as-decimal, 2026-08-19). The ruling for the fix: decide
+ *   amount-parser-reads-thousands-separator-as-decimal, 2026-08-19). The rule the fix follows: decide
  *   the decimal mark first; an input a thousand-fold apart under the two readings ('1,000',
  *   '1.000') is null, because on money a wrong guess costs a factor of a thousand.
  * @version-history

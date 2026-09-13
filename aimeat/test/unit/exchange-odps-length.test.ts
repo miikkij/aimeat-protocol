@@ -5,7 +5,7 @@
  *   while the authoring schemas accept far more. `license.scope.restrictions` is the one that bit: it is
  *   the node's own usage sentences (0 to 120 characters) joined with the provider's usageTerms.note and
  *   odps.license.restrictions, capped at 255, and an outside validator refused the document while the
- *   node said nothing. Ruled 2026-09-13: warn, never refuse and never truncate. These tests hold the
+ *   node said nothing. The 2026-09-13 default, open for the developer: warn, never refuse and never truncate. These tests hold the
  *   limits table to the vendored schema, the check to what a real JSON Schema validator refuses, and the
  *   warning to the reconcile report a publish reads.
  * @usage cd aimeat && pnpm exec vitest run test/unit/exchange-odps-length.test.ts

@@ -131,7 +131,7 @@ async function main() {
     // A workspace keeps the manifest it was created with, so an app that later adds a space writes
     // into a namespace an older workspace does not declare. Every door stored the record and answered
     // success, and the workspace read, which lists declared spaces only, never showed it. The MCP
-    // write door refuses; these doors warn (ruling 2026-09-13: live apps may keep keys there today).
+    // write door refuses; these doors warn (the 2026-09-13 default: live apps may keep keys there today).
     // Appdev pitfalls group-apps/new-space-needs-a-heal-step and data/heal-step-catch-hides-a-
     // workspace-a-version-behind.
     type Warn = { code?: string; namespace?: string; declared_spaces?: Array<{ namespace: string }>; how_to_fix?: string };

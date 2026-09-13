@@ -685,8 +685,9 @@ const MARK_TAG_LOOKBACK = 400;
  * The node skips a mark that is already in the document, which is what makes a re-serve idempotent,
  * and it is also why publishing a served copy goes wrong quietly: a baked-in badge ignores the owner
  * switching it off, and a baked-in AI-disclosure block suppresses the one for the version actually
- * published. Nothing is stripped and nothing is refused (the owner's ruling, 2026-09-13); the builder
- * is told where the source is.
+ * published. Nothing is stripped and nothing is refused (the default chosen on 2026-09-13 because it
+ * changes no contract; whether to strip or refuse is the developer's decision); the builder is told
+ * where the source is.
  *
  * Read backwards from each occurrence rather than with one `<tag[^>]*mark` pattern, for the reason
  * hasColorSchemeMediaQuery gives: an unbounded run that restarts at every `<` is quadratic on bytes a

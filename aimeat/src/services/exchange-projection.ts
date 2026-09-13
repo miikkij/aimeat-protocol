@@ -40,7 +40,7 @@
  *   v1.5.0 — 2026-09-13 — The report reaches the writer and says more. reconcileAfterSourceWrite returns
  *     it (it was dropped, so a skipped tool read exactly like a listed one), exchangeOutcome() is the
  *     shape a door answers with, and two warning rows join it: ALSO_LISTED_AS when a bound app-tool and
- *     the extension action it calls are both flagged (both stay listed, by ruling), and
+ *     the extension action it calls are both flagged (both stay listed for now), and
  *     ODPS_FIELD_TOO_LONG when a listing's ODPS document breaks a schema length cap.
  *   v1.4.0 — 2026-07-27 — Combined price: money + morsels declared together project ONE money listing
  *     whose pacing toll is the morsel figure, instead of two rival listings a buyer could choose between.
@@ -541,7 +541,9 @@ type Resolved = { d: DesiredListing; offering: Offering };
 /**
  * ALSO_LISTED_AS. A bound app-tool and the extension action it calls sit on different coordinates, so
  * DUPLICATE_OF (which compares keys) never sees them, and an owner who flagged both got two listings for
- * one call with nothing said. Ruled 2026-09-13: both stay listed and the report names the pair, on each
+ * one call with nothing said. The default chosen on 2026-09-13, because delisting either would take a
+ * live listing off the market (whether they should list once is the developer's decision): both stay
+ * listed and the report names the pair, on each
  * side this pass is about. `others` are the owner's listings this pass leaves listed without touching, so
  * a scoped pass still sees the half that lives in another source.
  */
@@ -580,7 +582,7 @@ async function warnAlsoListed(
   }
 }
 
-/** ODPS_FIELD_TOO_LONG: a warning, never a refusal and never a truncation (ruled 2026-09-13). One row per field of a label. */
+/** ODPS_FIELD_TOO_LONG: a warning, never a refusal and never a truncation (the 2026-09-13 default, open for the developer). One row per field of a label. */
 function warnOdpsOverruns(changes: ReconcileChange[], resolved: Resolved[]): void {
   const said = new Set<string>();
   for (const { d, offering } of resolved) {
