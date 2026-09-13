@@ -6,6 +6,10 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.7.0 -- 2026-09-13 -- publish-draft answers with `served_marks_removed` / `served_marks_note`
+ *     when the draft was a served copy, which the promotion now stores without the node's serve
+ *     marks (the developer's decision; services/app-serve-marks-strip.ts). The four draft-slot
+ *     writes render the same two fields from whatever the slot reports, one function for every door.
  *   v2.6.0 -- 2026-09-07 -- Require app:write before promoting or consuming a saved draft.
  *   v2.5.0 — 2026-08-24 — The draft-publish response carries `data_map` / `data_map_hints` too, so
  *     the third publish door says the same thing as the other two.
@@ -53,6 +57,7 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection } from '../../utils/app-protect.js';
 import { stageAppDraft, discardAppDraft, publishAppDraft } from '../../services/app-lifecycle.js';
+import { servedMarksResponse } from '../../services/app-serve-marks-strip.js';
 import {
     writeAppDraft, replaceInAppDraft, readAppDraft, seedAppDraft,
 } from '../../services/app-draft-edit.js';
@@ -127,6 +132,10 @@ export function registerDraftRoutes(
             has_live_version: staged.hasLiveVersion,
             live_version_number: staged.liveVersionNumber,
             note: 'Draft saved. The live app is unchanged. Mint a preview token to test it, then publish the draft when ready.',
+            // Rendered when the draft slot reports serve marks it took out of a served copy. The
+            // promotion takes them out regardless (publish-draft below), so nothing reaches the
+            // live app with them either way.
+            ...servedMarksResponse(staged),
         }, [
             { description: 'Get a preview URL', method: 'POST', url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/preview-token` },
             { description: 'Publish the draft', method: 'POST', url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/publish-draft` },
@@ -181,6 +190,7 @@ export function registerDraftRoutes(
             updated_at: out.updatedAt,
             has_live_version: out.hasLiveVersion,
             live_version_number: out.liveVersionNumber,
+            ...servedMarksResponse(out),
         }, [
             { description: 'Publish the draft', method: 'POST', url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/publish-draft` },
         ]));
@@ -214,6 +224,7 @@ export function registerDraftRoutes(
             replacements: out.replacements,
             size: out.size,
             updated_at: out.updatedAt,
+            ...servedMarksResponse(out),
         }, [
             { description: 'Publish the draft', method: 'POST', url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/publish-draft` },
         ]));
@@ -284,6 +295,7 @@ export function registerDraftRoutes(
             seeded_version: out.seededVersion,
             size: out.size,
             updated_at: out.updatedAt,
+            ...servedMarksResponse(out),
         }, [
             { description: 'Read a range to edit', method: 'GET', url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/lines` },
         ]));
@@ -492,6 +504,8 @@ export function registerDraftRoutes(
             ...(out.dataMap ? { data_map: out.dataMap } : {}),
             spec_check: out.specCheck,
             ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
+            // A draft staged from a served copy is stored live as its source; what came out, and why.
+            ...servedMarksResponse(out),
             ...(out.nextSteps ? { next_steps: out.nextSteps } : {}),
         }, [
             { description: 'View all versions', method: 'GET', url: `${out.downloadUrl}/versions` },

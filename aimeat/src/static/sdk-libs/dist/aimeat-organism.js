@@ -29,10 +29,11 @@
   }
   function fail(res, fallback) {
     var e = (
-      /** @type {Error & { code?: string, envelope?: unknown }} */
+      /** @type {Error & { code?: string, details?: unknown, envelope?: unknown }} */
       new Error(res && res.error && (res.error.message || res.error.code) || fallback)
     );
     e.code = res && res.error && res.error.code;
+    e.details = res && res.error && res.error.details;
     e.envelope = res;
     return e;
   }
@@ -275,6 +276,8 @@
     },
     // Write/overwrite an object's draft. Embeds the instance id into the value (SPA convention)
     // unless opts.embedId === false (needed for locked schemas that reject an id property).
+    // Throws UNDECLARED_SPACE when the workspace manifest does not declare `namespace` (nothing is
+    // written): declare the space in the workspace first, then write.
     async writeDraft(orgId, wsId, namespace2, id, value, opts) {
       opts = opts || {};
       var v = stripMeta(value);

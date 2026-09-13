@@ -7,9 +7,12 @@
  *   collapse. Extracted from ./shared.ts by pure move on 2026-08-11 when that file passed the
  *   800-line limit; the bodies are byte-identical and ./shared.ts re-exports the public ones, so
  *   every existing import (including src/mcp/workspaces.ts) resolves unchanged.
- * @structure canWriteNamespaceRule · roleSatisfies · fresherRec · ownerGhiiOf · collapseKeyTo
+ * @structure canWriteNamespaceRule · roleSatisfies · fresherRec · ownerGhiiOf · collapseKeyTo · revertRecordToDraft
  * @usage import { fresherRec, ownerGhiiOf } from './record-helpers.js';
  * @version-history
+ *   v1.1.0 — 2026-09-13 — revertRecordToDraft(): the body of shared.ts revertToDraft, moved unchanged
+ *     (max-file-lines) when the UNDECLARED_SPACE refusal took that file past 800 lines. The closure
+ *     in shared.ts keeps the refusal and calls this.
  *   v1.0.0 — 2026-08-11 — Extracted from shared.ts (max-file-lines); no behaviour change.
  */
 import type { MemoryRecord, Storage } from '../../storage/interface.js';
@@ -47,6 +50,29 @@ export function fresherRec(a: MemoryRecord | null | undefined, b: MemoryRecord):
  *  Workspace current-state records (.draft/.latest) are owned by this so a key never forks per-agent. */
 export function ownerGhiiOf(identity: string): string {
   return identity.includes('#') ? identity.slice(identity.indexOf('#') + 1) : identity;
+}
+
+// Reopen a published record for editing: copy organism.{id}.{ns}.{instance}.latest → .draft so the
+// existing edit → publish flow applies. The published .latest stays live (and keeps serving readers)
+// until the edited draft is re-published. Refuses to clobber an in-progress draft.
+export async function revertRecordToDraft(
+  storage: Storage, organismId: string, ws: string | undefined, namespace: string, instance: string, reverter: string,
+): Promise<{ ok: true } | { ok: false; code: 'NO_LATEST' | 'DRAFT_EXISTS' }> {
+    const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
+    const base = `${wsRoot}.${namespace}.${instance}`;
+    // Reopening needs only .draft/.latest/bare — never the `.version.N` history values.
+    const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000, excludeVersionRows: true });
+    if (items.find(r => r.key === `${base}.draft`)) return { ok: false, code: 'DRAFT_EXISTS' };
+    // Mirror the workspace read: the published current state is .latest, or the bare key as fallback.
+    const latest = items.find(r => r.key === `${base}.latest`) ?? items.find(r => r.key === base);
+    if (!latest) return { ok: false, code: 'NO_LATEST' };
+    const now = new Date().toISOString();
+    await storage.setMemory({
+      key: `${base}.draft`, ownerGaii: reverter, value: latest.value,
+      visibility: latest.visibility, tags: latest.tags ?? [], ttlHours: null,
+      version: 1, createdAt: now, updatedAt: now,
+    });
+    return { ok: true };
 }
 
 /** Delete every copy of `key` NOT owned by `keepOwner` — collapses a forked key back to a single owner. */

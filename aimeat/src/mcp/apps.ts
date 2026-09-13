@@ -11,6 +11,10 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.17.0 — 2026-09-13 — aimeat_app_publish and aimeat_app_draft_publish return
+ *     `served_marks_removed` / `served_marks_note` when the HTML was a served copy, which the shared
+ *     publish now stores without the node's serve marks (the developer's decision). The draft save
+ *     renders the same fields from the slot, through the same servedMarksResponse the REST doors use.
  *   v1.16.0 — 2026-09-13 — aimeat_app_publish validates cortex_agents before either mode and carries
  *     them through the upload token. Upload mode had accepted them, checked nothing and published
  *     the app without its agents.
@@ -91,6 +95,7 @@ import { annotationsFor } from './annotations.js';
 import { requirementsOf, appRef as depAppRef } from '../services/dependency-map.js';
 import { descriptionFor } from './catalog/shape.js';
 import { publishApp } from '../services/app-publish.js';
+import { servedMarksResponse } from '../services/app-serve-marks-strip.js';
 import {
     appFilenameRefusal, resolveAppOwnerScope, resolveAppTargetScope, stageAppDraft, discardAppDraft,
     publishAppDraft, deleteOwnedApp,
@@ -310,6 +315,7 @@ export function registerAppsTools(
                             ...(await writeProvenanceEcho(storage, config, out.aiProvenanceId)),
                             spec_check: out.specCheck,
                             ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
+                            ...servedMarksResponse(out),
                             next_steps: out.nextSteps,
                         }, null, 2),
                     }],
@@ -376,6 +382,7 @@ export function registerAppsTools(
                             preview_url: previewUrl,
                             preview_expires_in_seconds: 600,
                             note: 'Draft saved — the LIVE app is unchanged. Open preview_url in a browser to test this next version on a real origin (mic/camera prompts work). When it is good, call aimeat_app_draft_publish to make it live; to throw it away call aimeat_app_draft_discard. To ship straight to live without staging, use aimeat_app_publish instead.',
+                            ...servedMarksResponse(staged),
                         }, null, 2),
                     }],
                 };
@@ -453,6 +460,7 @@ export function registerAppsTools(
                             ...(await writeProvenanceEcho(storage, config, out.aiProvenanceId)),
                             spec_check: out.specCheck,
                             ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
+                            ...servedMarksResponse(out),
                             next_steps: out.nextSteps,
                         }, null, 2),
                     }],

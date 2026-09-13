@@ -6,12 +6,16 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-13 — The developer decided: a space the workspace manifest does not declare is
+ *     REFUSED with 422 UNDECLARED_SPACE on the single publish (before a publish-gate approval is filed,
+ *     too), the batch publish, an approval that would publish, and a revert, which writes a draft.
+ *     The refusal is publishDraft's / readPublishSpace's, rendered as it comes; the warnings are gone.
  *   v1.1.0 — 2026-09-13 — The three publish answers (single, batch, an approved publish gate) carry
  *     `warnings: [UNDECLARED_SPACE]` when the workspace manifest declares no space for the namespace.
  *     Those records were stored and answered as published, and the workspace read never listed them.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  */
-import type { Router } from 'express';
+import type { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, PendingApprovalRecord } from '../../storage/interface.js';
@@ -24,11 +28,16 @@ import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { canReadWorkspace } from '../../services/workspace-access.js';
+import { readPublishSpace, type UndeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
 import { roleSatisfies, type OrganismHelpers } from './shared.js';
 import { logger } from '../../utils/logger.js';
 
 export function registerOrganismGateRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, publishDraftsBatch, revertToDraft } = H;
+  /** The shared UNDECLARED_SPACE refusal (services/workspace-write-items.ts), sent as it comes. */
+  const sendRefusal = (res: Response, r: UndeclaredSpaceRefusal): void => {
+    res.status(r.status).json(error(config.nodeId, r.code, r.message, r.status, r.details));
+  };
 
   // POST /v1/organisms/:id/approvals — request approval for an action (gate or auto-run).
   router.post('/v1/organisms/:id/approvals', requireAuth(), requireScope('organism:write'), async (req, res) => {
@@ -140,6 +149,10 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     const cfg = await readConfig(id);
     const pg = (cfg?.gates as Record<string, { enabled?: boolean; approverRole?: string }> | undefined)?.publish;
     if (pg?.enabled === true) {
+      // A space the manifest does not declare is refused before an approval is filed: approving it
+      // could only end in the same refusal, after a person had spent the review on it.
+      const { refusal } = await readPublishSpace(storage, id, wsId, namespace);
+      if (refusal) { sendRefusal(res, refusal); return; }
       const approverRole = ['owner', 'admin', 'member'].includes(pg.approverRole as string) ? pg.approverRole! : 'owner';
       const now = new Date().toISOString();
       const aid = uuidv4();
@@ -160,7 +173,9 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
 
     const result = await publishDraft(id, wsId, namespace, instance, publisher, expectedVersion);
     if (!result.ok) {
-      if (result.code === 'NO_DRAFT') {
+      if (result.code === 'UNDECLARED_SPACE') {
+        sendRefusal(res, result.refusal);
+      } else if (result.code === 'NO_DRAFT') {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to publish at ${namespace}.${instance}`));
       } else {
         // A write-guard refusal is a CONFLICT (the record moved, or the space is append-only) —
@@ -175,20 +190,17 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       }
       return;
     }
-    // UNDECLARED_SPACE: published, and no workspace read will list it, because the manifest declares no
-    // such space. Said on the answer rather than refused: live apps may publish there today.
-    const warned = result.warning ? { warnings: [result.warning] } : {};
     if (result.skipped) {
       // No-op re-publish (draft identical to the live .latest) — no new version, no decision-log or
       // structure-snapshot churn. The stale draft was still consumed.
-      res.json(success(config.nodeId, { published: true, namespace, id: instance, version: result.version, skipped: true, ...warned }, [
+      res.json(success(config.nodeId, { published: true, namespace, id: instance, version: result.version, skipped: true }, [
         { description: 'View the workspace', method: 'GET', url: `/v1/organisms/${id}/workspace` },
       ]));
       emitChange('organisms');
       return;
     }
     await writeDecision(id, publisher, `published ${namespace}.${instance} v${result.version}`, [`${namespace}.${instance}`]);
-    res.json(success(config.nodeId, { published: true, namespace, id: instance, version: result.version, ...warned }, [
+    res.json(success(config.nodeId, { published: true, namespace, id: instance, version: result.version }, [
       { description: 'View the workspace', method: 'GET', url: `/v1/organisms/${id}/workspace` },
       { description: 'List version history', method: 'GET', url: `/v1/memory?prefix=${encodeURIComponent(`organism.${id}.${namespace}.${instance}.version.`)}` },
     ]));
@@ -267,7 +279,9 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     } else {
       ids = (instances as unknown[]).filter((x): x is string => typeof x === 'string' && !!x);
     }
-    const { results, warning } = await publishDraftsBatch(id, wsId, namespace, ids, publisher, expMap, directValues);
+    const { results, refusal } = await publishDraftsBatch(id, wsId, namespace, ids, publisher, expMap, directValues);
+    // The whole batch is one namespace, so a space the manifest does not declare refuses all of it.
+    if (refusal) { sendRefusal(res, refusal); return; }
 
     const published = results.filter(r => r.ok && !r.skipped);
     if (published.length > 0) {
@@ -280,8 +294,6 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       skipped: results.filter(r => r.ok && r.skipped).length,
       failed: results.filter(r => !r.ok).length,
       results,
-      // The whole batch went into one namespace, so one warning covers it (see the single publish).
-      ...(warning ? { warnings: [warning] } : {}),
     }));
   });
 
@@ -322,7 +334,9 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     }
     const result = await revertToDraft(id, wsId, namespace, instance, reverter);
     if (!result.ok) {
-      if (result.code === 'NO_LATEST') {
+      if (result.code === 'UNDECLARED_SPACE') {
+        sendRefusal(res, result.refusal);
+      } else if (result.code === 'NO_LATEST') {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No published record at ${namespace}.${instance} to reopen`));
       } else {
         res.status(409).json(error(config.nodeId, 'DRAFT_EXISTS', `A draft already exists for ${namespace}.${instance} — edit it directly`));
@@ -375,7 +389,6 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
 
     // A publish gate executes the publish on approve/edit BEFORE the decision is recorded, so a
     // failed publish (no draft / invalid) leaves the approval pending rather than falsely approved.
-    let publishWarning: unknown;
     if (approval.action === 'publish' && d !== 'reject') {
       const pargs = approval.arguments as Record<string, unknown> | undefined;
       const ns = typeof pargs?.namespace === 'string' ? pargs.namespace : undefined;
@@ -385,14 +398,17 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
         const pexp = typeof pargs?.expected_version === 'number' ? pargs.expected_version : null;
         const pub = await publishDraft(id, pws, ns, inst, decider, pexp);
         if (!pub.ok) {
-          if (pub.code === 'NO_DRAFT') {
+          // The approval stays pending on every refusal, an undeclared space included: the space can
+          // be declared and the same approval approved again.
+          if (pub.code === 'UNDECLARED_SPACE') {
+            sendRefusal(res, pub.refusal);
+          } else if (pub.code === 'NO_DRAFT') {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to publish at ${ns}.${inst}`));
           } else {
             res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED', 'Draft does not match the schema', 422, { violations: pub.violations }));
           }
           return;
         }
-        publishWarning = pub.warning;
       }
     }
 
@@ -405,7 +421,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     const verb = d === 'approve' ? 'approved' : d === 'reject' ? 'rejected' : 'edited & approved';
     await writeDecision(id, decider, `${verb} gate: ${approval.action}`, [aid]);
 
-    res.json(success(config.nodeId, { approval: updated, decision: d, ...(publishWarning ? { warnings: [publishWarning] } : {}) }, [
+    res.json(success(config.nodeId, { approval: updated, decision: d }, [
       { description: 'View the decision log', method: 'GET', url: `/v1/organisms/${id}/workspace` },
     ]));
     emitChange('organisms');

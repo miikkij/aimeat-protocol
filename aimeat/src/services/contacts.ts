@@ -25,6 +25,9 @@
  *   resolveContactEmail; resolveOwnerByVerifiedEmail; promoteContactsForVerifiedEmail.
  * @usage const { contacts } = await listContactsMerged(storage, config, ownerGhii, { q });
  * @version-history
+ *   v2.3.0 — 2026-09-13 — sendToContact passes a failed send on as SEND_FAILED (502, or 503 when the
+ *     node has no transport) with the send-log row in `details`, the answer POST /v1/outbound/send
+ *     gives since the same day. The app is told the row, never the address.
  *   v2.2.0 — 2026-09-06 — Pure extraction: the identity classification (`contactKind`, now
  *     `identityKind`) and the local existence check move to services/local-identity.ts, so the DM
  *     send path can ask the same question instead of checking only the owner. No behaviour here.
@@ -70,7 +73,7 @@ const MAX_PERSON_ROWS = 2000;
 
 /** A validation/precondition failure the caller maps to its own error shape (HTTP envelope / MCP text). */
 export class ContactsError extends Error {
-  constructor(public status: number, public code: string, message: string) {
+  constructor(public status: number, public code: string, message: string, public details?: unknown) {
     super(message);
     this.name = 'ContactsError';
   }
@@ -572,7 +575,12 @@ export async function sendToContact(
     });
     return { channel: result.channel, status: result.status, message_id: result.log.id };
   } catch (e) {
-    if (e instanceof OutboundError) throw new ContactsError(e.statusCode, e.code, e.message);
+    if (e instanceof OutboundError) {
+      // The app never learns the address, so a failed send names the logged row and nothing more.
+      throw new ContactsError(e.statusCode, e.code,
+        e.code === 'SEND_FAILED' ? 'Not sent: nothing reached the recipient. The attempt is in the owner\'s send log.' : e.message,
+        e.details ? { message_id: e.details.message_id, status: e.details.status, channel: e.details.channel } : undefined);
+    }
     throw e;
   }
 }

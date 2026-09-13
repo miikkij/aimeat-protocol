@@ -365,8 +365,10 @@ export const organismTools: ConnectCliToolDefinition[] = [
             // half-written batch the caller retries would duplicate whatever already landed.
             const planned: { key: string; v: unknown; item: ResolvedWriteItem }[] = [];
             for (const [i, want] of norm.items.entries()) {
-                const item = resolveWriteItem(want, types, batch ? `items[${i}]` : undefined);
-                if ('error' in item) return { ok: false, error: { code: 'NO_SPACE', message: item.error } };
+                const item = resolveWriteItem(want, types, batch ? `items[${i}]` : undefined, { organismId: orgId, ws });
+                if ('error' in item) {
+                    return { ok: false, error: { code: item.refusal?.code ?? 'NO_SPACE', message: item.error, ...(item.refusal ? { details: item.refusal.details } : {}) } };
+                }
                 const key = `${wsRoot(orgId, ws)}.${item.namespace}.${item.instanceId}.draft`;
                 planned.push({ key, v: stampValue(coerceObject(item.value), item.instanceId), item });
             }

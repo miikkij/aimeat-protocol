@@ -4,11 +4,14 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 -- 2026-09-13 -- UNDECLARED_SPACE is no longer a warning here: the shared write refuses a
+ *     workspace record whose space the manifest does not declare, 422, nothing stored (the developer's
+ *     decision), and this door renders that refusal like every other one. AIMEAT.organism.writeDraft,
+ *     the connector and the CLI dispatch all see it as a refusal.
  *   v1.5.0 -- 2026-09-13 -- POST /v1/memory answers `warnings` (and `shadowed_by`) from the shared
  *     write. It passed ownerScoped:true for every caller, so an agent writing a key its owner also
  *     held was never told its copy is hidden behind the owner's, on this door or on the connector and
- *     CLI doors that post here. UNDECLARED_SPACE rides the same list, which is how
- *     AIMEAT.organism.writeDraft learns its space is missing from an older workspace. A write to an
+ *     CLI doors that post here. A write to an
  *     EXCHANGE listing source answers `exchange` (what listed, what was skipped and why).
  *   v1.4.0 -- 2026-09-08 -- The write caller carries `federated`, so memory-write can refuse a
  *     federated session the write scope its owner role used to bypass.
@@ -187,9 +190,10 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       created_at: record.createdAt,
       updated_at: record.updatedAt,
       // Stored, and something about it needs a person: an owner copy that owner-scope reads show
-      // instead of this one (SHADOWED_BY_OWNER_COPY), or a workspace space the manifest does not
-      // declare (UNDECLARED_SPACE). The status stays 200/201 because the write did happen; an agent,
-      // the connector and the CLI dispatch all post here, so this is where they learn it.
+      // instead of this one (SHADOWED_BY_OWNER_COPY). The status stays 200/201 because the write did
+      // happen; an agent, the connector and the CLI dispatch all post here, so this is where they
+      // learn it. A workspace record in a space the manifest does not declare never gets here: the
+      // shared write refuses it with 422 UNDECLARED_SPACE, rendered by the refusal branch above.
       ...(written.shadowedBy ? { shadowed_by: written.shadowedBy } : {}),
       ...(written.warnings.length ? { warnings: written.warnings } : {}),
       // An app tool manifest or an offers document is an EXCHANGE listing source. The connector and

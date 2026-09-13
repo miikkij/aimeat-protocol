@@ -9,6 +9,10 @@
  *   spend; the consumer's pause/revoke off-switch blocks calls; and re-accepting resumes (spend carried).
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange.ts
  * @version-history
+ *   v1.5.0 — 2026-09-13 — The ODPS length case asserted the behaviour the write refusal replaced: a new
+ *     flagged app-tool manifest past the cap is now refused with 422 ODPS_FIELD_TOO_LONG naming the room
+ *     (156) and the length, stored unflagged it passes, and flagged again with the text unchanged it
+ *     updates; the reconcile warning, the validator check and the uncut text are asserted as before.
  *   v1.4.0 — 2026-09-13 — ODPS length caps: a usage note that pushes license restrictions past 255
  *     characters still lists, is published whole, draws an ODPS_FIELD_TOO_LONG warning in the reconcile
  *     report, and the schema validator refuses exactly that field.
@@ -897,20 +901,30 @@ await test('Offering DETAIL points at the ODPS projection (discoverable without 
   assert(r.body.data.odps.url === `/v1/exchange/offerings/${odpsOfferingId}/odps.yaml`, 'detail carries the odps url');
 });
 
-// ── ODPS length caps (2026-09-13): warned, never refused, never truncated ──
+// ── ODPS length caps (2026-09-13): refused on write when the text is new, warned when it is already
+//    stored, never truncated ──
 // `license.scope.restrictions` is capped at 255 and holds the node's own usage sentences before the
 // provider's note, so a note that fits the authoring schema (10 000) produced a document an outside
-// validator refused, and the node said nothing. Last in the file: the projected tool binds the `free`
-// capability, and a sold capability is paywalled on its raw route for everyone after this.
-await test('A usage note past the ODPS restrictions cap lists, is published whole, and the reconcile report warns', async () => {
+// validator refused, and the node said nothing. A flagged source whose changed text would do that is
+// now refused with 422 ODPS_FIELD_TOO_LONG (services/exchange-odps-write.ts); text the stored record
+// already carries keeps publishing with the warning. Last in the file: the projected tool binds the
+// `free` capability, and a sold capability is paywalled on its raw route for everyone after this.
+await test('A usage note past the ODPS restrictions cap is refused on write, and an already-stored one lists whole with a warning', async () => {
   const LONG_APP = `longnote-${Date.now()}.html`;
   const note = Array(5).fill('Attribute the Finnish Patent and Registration Office as the source').join('; ');
-  const w = await json('/v1/memory', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({
+  const write = (exchange: boolean) => json('/v1/memory', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({
     key: `apps.${LONG_APP}.tools`, visibility: 'public',
     value: { version: 1, tools: [{ name: 'brief', action_id: capId, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA,
-      price: { morsels: 6 }, exchange: true, usageTerms: { derivatives: true, resale: false, attribution: true, note } }] },
+      price: { morsels: 6 }, exchange, usageTerms: { derivatives: true, resale: false, attribution: true, note } }] },
   }) });
-  assert(w.status === 201, `a new manifest key is created with 201, got ${w.status}: ${JSON.stringify(w.body?.error)}`);
+  // Nothing is stored under the key yet, so the text is new and refused, with the room the note has (255 - 99).
+  const refused = await write(true);
+  assert(refused.status === 422 && refused.body.error?.code === 'ODPS_FIELD_TOO_LONG'
+    && refused.body.error.details?.fields?.[0]?.room === 156 && refused.body.error.details.fields[0].length === 99 + note.length,
+    `a new flagged manifest past the cap is refused with the numbers: ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+  assert((await write(false)).status === 201, 'stored while not for sale');
+  const w = await write(true);
+  assert(w.status === 200, `flagged with the text unchanged, it passes: ${w.status}: ${JSON.stringify(w.body?.error)}`);
 
   const dry = await json('/v1/exchange/reconcile', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ dry_run: true, app_id: LONG_APP }) });
   assert(dry.status === 200, `reconcile ${dry.status}: ${JSON.stringify(dry.body?.error)}`);

@@ -9,6 +9,9 @@
  * @structure buildPromptSessionSections(nodeUrl) → the markdown for both sections
  * @usage body += buildPromptSessionSections(nodeUrl);
  * @version-history
+ *   v1.0.2 — 2026-09-13 — ADDITIVE, one sentence in "read `ok` before `data`": what `UNDECLARED_SPACE`
+ *     means (a space the workspace manifest does not declare, refused and not stored, the developer's
+ *     decision) and that it goes to someone who can declare the space rather than into a retry.
  *   v1.0.1 — 2026-09-13 — The auth sentence names AIMEAT.auth.signIn(), which now exists, instead of
  *     telling a custom button to click the login bar's own button (whose first control is the
  *     language or mode switch).
@@ -61,7 +64,7 @@ export function buildPromptSessionSections(nodeUrl: string): string {
   body += 'if (!r.ok) { showProblem(r.error); return; }   // never silently render an empty state\n';
   body += 'render(r.data.items);\n';
   body += '```\n';
-  body += '`error.code === "SCOPE_DENIED"` means the owner\'s approval is missing a permission word: say that to the user and point them at re-approving the app. Retrying cannot fix it. If you write your own wrapper around session.fetch, it MUST pass the refusal through — a wrapper that returns `r.data` regardless makes every call site in the app fail silently. The result is already parsed, so never call `.json()` on it.\n\n';
+  body += '`error.code === "SCOPE_DENIED"` means the owner\'s approval is missing a permission word: say that to the user and point them at re-approving the app. Retrying cannot fix it. `error.code === "UNDECLARED_SPACE"` (422) means the workspace\'s manifest does not declare the space the record was written or published into, and nothing was stored: show `error.message` to someone who can declare the space (the GROUP application section says who can), and do not retry until it is declared. If you write your own wrapper around session.fetch, it MUST pass the refusal through — a wrapper that returns `r.data` regardless makes every call site in the app fail silently. The result is already parsed, so never call `.json()` on it.\n\n';
 
   return body;
 }

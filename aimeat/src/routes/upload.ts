@@ -24,6 +24,11 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.17.1 — 2026-09-13 — The extension ZIP upload refuses a flagged action whose changed text would
+ *     break an ODPS length cap, 422 ODPS_FIELD_TOO_LONG, as the other install doors do.
+ *   v1.17.0 — 2026-09-13 — handleAppUpload answers with `served_marks_removed` and
+ *     `served_marks_note` when the PUT body was a served copy, which publishApp now stores without
+ *     the node's serve marks (the developer's decision; services/app-serve-marks-strip.ts).
  *   v1.16.1 — 2026-09-13 — Replacing an existing cortex by ZIP refuses a lib the manifest names that
  *     neither arrives nor is stored (INVALID_MANIFEST), as the install doors do.
  *   v1.16.0 — 2026-09-13 — handleStorageUpload answers with versioned_url, the /v1/pub address plus
@@ -119,6 +124,7 @@ import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.j
 import { publishSkill, type SkillScope } from '../services/skills.js';
 import { parseGAII } from '../utils/gaii.js';
 import { publishApp } from '../services/app-publish.js';
+import { servedMarksResponse } from '../services/app-serve-marks-strip.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { effectiveDevLevel, mayAct } from '../services/app-dev-grant.js';
 import { accountOf } from '../services/app-members.js';
@@ -131,6 +137,7 @@ import { versionedAddress } from '../utils/http-range.js';
 import { getEncryptionKey } from '../services/encryption.js';
 import { getExtSecretKeys, encryptSecretFields } from '../services/extension-secrets.js';
 import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
+import { odpsWriteRefusal, extensionOdpsKey } from '../services/exchange-odps-write.js';
 import { emitChange } from '../services/event-bus.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
@@ -356,6 +363,8 @@ async function handleAppUpload(
         ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
         spec_check: out.specCheck,
         ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
+        // The same two fields POST /v1/apps renders, from the same function.
+        ...servedMarksResponse(out),
         ...(out.nextSteps ? { next_steps: out.nextSteps } : {}),
     });
 }
@@ -466,6 +475,11 @@ async function handleExtensionUpload(
         });
         return;
     }
+
+    // A flagged action whose changed text would break an ODPS length cap is refused before the write,
+    // as writeExtensionRecord refuses it on the other install doors (2026-09-13).
+    const odps = odpsWriteRefusal(extensionOdpsKey(record.name), record, existing);
+    if (odps) { res.status(odps.status).json({ success: false, error: odps.code, message: odps.message, details: odps.details }); return; }
 
     // Encrypt `type: secret` config values before they are stored, exactly as POST/PUT
     // /v1/extensions do. Without this a ZIP install was a way to write an API key to the database
