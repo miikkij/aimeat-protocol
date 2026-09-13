@@ -15,6 +15,7 @@
  *   - askBody: the confirm dialog's body — the line people read and the doors that stay open
  *
  * @version-history
+ *   v2.1.0 -- 2026-09-13 -- Compose the four section headings from the shared B1 shape.
  *   v2.0.0 — 2026-09-12 — The poster face: two cards become four sections, the full-width red
  *     button and the purple restore button become one ink slab and two underlined words, the
  *     message field gets the preview that shows what it actually writes, and taking the node
@@ -142,7 +143,7 @@ export default function MaintenanceTab({ data, reload, switchPage }) {
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
       <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2>${M('now')}<small>01</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('now')}<small>01</small></h2>
           <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('config')}>${M('nowToConfig')}</button></div></div>
         <div class="adm-ov-grid">
           <div>
@@ -175,7 +176,7 @@ export default function MaintenanceTab({ data, reload, switchPage }) {
       </div>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${m.enabled ? M('bring') : M('take')}<small>02</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${m.enabled ? M('bring') : M('take')}<small>02</small></h2></div>
         <p class="adm-maint-lead">${m.enabled ? M('bringLead') : M('takeLead')}</p>
         <div class="adm-maint-two">
           <div>
@@ -200,7 +201,7 @@ export default function MaintenanceTab({ data, reload, switchPage }) {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${M('backup')}<small>03</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('backup')}<small>03</small></h2>
           <div class="og-doors"><button type="button" class="og-door" onClick=${doBackup}>${t('dashboard.downloadBackup')}</button></div></div>
         ${row(M('backupWhat'), M('backupWhatWhy'), html`<${Badge} type="muted" label="json" />`, M('backupOneFile'))}
         ${row(M('backupName'), M('backupNameWhy'), null, 'aimeat-backup-' + new Date().toISOString().slice(0, 10) + '.json', true)}
@@ -208,7 +209,7 @@ export default function MaintenanceTab({ data, reload, switchPage }) {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${M('restore')}<small>04</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${M('restore')}<small>04</small></h2>
           <div class="og-doors"><button type="button" class="og-door og-door--danger" onClick=${pickRestore}>${t('dashboard.restoreFromFile')}</button></div></div>
         <div class="adm-maint-warn"><b>${M('restoreWarnLead')}</b> ${M('restoreWarn')}</div>
         <p class="adm-maint-note">${M('restoreNote')}</p>
