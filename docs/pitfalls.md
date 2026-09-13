@@ -1,35 +1,123 @@
-# Pitfalls — "when something breaks badly, look here first"
+# Pitfalls: traps in platform code we have actually hit
 
-A running catalogue of traps we've actually hit, so we don't hit them twice. **Organised by the KIND of problem** (what it relates to), not by product area — when something goes wrong, jump to the category that matches the *symptom* and scan.
+This file is for someone changing THIS repository: the node, its tests, its tooling. A trap that bites
+someone BUILDING AN APP, an extension or a cortex on a node lives on the node instead, in the curated
+registry (`aimeat/src/data/appdev-pitfalls.ts`, served at `GET /v1/appdev/pitfalls`) and the learned
+knowledge base (`aimeat_appdev_pitfall_list`). The app-builder bullets that used to sit in §4, §6, §8,
+§12, §15, §16 and §16b moved there on 2026-09-13; the registry entry ids are named where they left.
 
-**How to use:** Ctrl-F the symptom, or scan the category that fits. **How to grow it:** when a bug turns out to be a repeatable trap (not a one-off), add a one-line entry under the right category — symptom first, then cause → fix. Keep entries short and scannable; link the commit/file. This is a living doc; it's fine for a category to be thin.
+**How to use it.** Find your symptom in the index below and read that section. Before a change is
+called done, read the diff once against the five shapes: they are what most of this file turned out
+to be about.
 
-> Related: `CLAUDE.md` (mandatory rules + architecture), `docs/known_gaps.md` (deferred gaps — developer-approved only, Rule 9), `docs/coding-guidelines/` (the full guides).
+**How to add to it.** A new section goes at the END, numbered after the highest number on
+`origin/main` (two sessions numbered the same section in one hour, which is why 38b, 77b and 78b
+exist). In the same commit, add its row to the index: what the reader SEES, in under fifteen words,
+and its shape. Symptom first in the section too, then cause, then the rule.
 
-## Categories
+> Related: `CLAUDE.md` (mandatory rules + architecture), `docs/known_gaps.md` (deferred gaps, developer-approved only), `docs/coding-guidelines/` (the full guides). The gatekeeper agent reads a diff against the five shapes (`.claude/agents/gatekeeper.md`).
 
-1. [Build, bundling & generated files](#1-build-bundling--generated-files)
-2. [Routing (Express + SPA)](#2-routing-express--spa)
-3. [Frontend ↔ backend contract drift](#3-frontend--backend-contract-drift)
-4. [Frontend rendering, cache & modules](#4-frontend-rendering-cache--modules)
-5. [i18n & locales](#5-i18n--locales)
-6. [Identity, auth & scopes](#6-identity-auth--scopes)
-7. [Storage & multi-backend](#7-storage--multi-backend)
-8. [Extensions / Cortex / Memory namespaces](#8-extensions--cortex--memory-namespaces)
-8b. [Package components that are apps](#8b-package-components-that-are-apps)
-9. [AI / LLM calls](#9-ai--llm-calls)
-10. [Crypto & signatures](#10-crypto--signatures)
-11. [Organisms & workspaces (LOOM / MACHINE ROOM)](#11-organisms--workspaces-loom--machine-room)
-12. [Deploy, release & node-hosted apps](#12-deploy-release--node-hosted-apps)
-13. [Concurrency & shared checkout](#13-concurrency--shared-checkout)
-14. [Environment & tooling (Windows)](#14-environment--tooling-windows)
-15. [Mobile, viewport & on-screen keyboard](#15-mobile-viewport--on-screen-keyboard)
-16. [Realtime & multiplayer apps (AimeatRealtime)](#16-realtime--multiplayer-apps-aimeatrealtime)
-16b. [Outbound publishing & idempotency gates (connections)](#16b-outbound-publishing--idempotency-gates-connections)
-17. [Tests that cannot fail](#17-tests-that-cannot-fail)
-18. [Measuring whether you broke something](#18-measuring-whether-you-broke-something)
-19. [A test that fails is one of three things](#19-a-test-that-fails-is-one-of-three-things-and-saying-which-is-the-work)
-20. [Two sessions, one working tree](#20-two-sessions-one-working-tree)
+## The five shapes
+
+1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §1, 4, 5, 9, 16b, 28, 31, 36, 61, 63, 64, 65, 67, 73, 74, 75, 76, 77, 78b, 80, 82, 84
+2. **A test or a measurement that cannot fail.** A test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run on sqlite only, a flag tested switched on only, a sweep total read as a regression. *Ask which line of the change turns the test red when it is reverted.* §12, 17, 18, 19, 21, 26, 34, 35, 37, 38, 45, 46, 50, 51, 54, 56, 57, 69, 72, 79
+3. **One rule, N doors, and one forgets.** A rule changed in one place while other doors reach the same capability: the REST route, the node MCP tool, the connector MCP tool, the CLI dispatch, an operator door, a second writer of the same record, a second backend. *Grep the capability's name and ask whether every door goes through the changed code.* §3, 7, 8b, 25, 33, 41, 44, 47, 48, 52, 58, 78, 81
+4. **A name is not a principal.** A comparison or a storage key built from `req.auth.owner`, `sub`, a bare account name, a delivery target or a display identity where the holder or the addressed principal is meant. *Ask what the value holds for an agent, an app grant, a federated session and a namesake.* §6, 22, 43, 53, 66, 83
+5. **Parallel sessions and the machine.** A hardcoded port, a probe that binds narrower than the server, a file or a log used as state, a path from the other shell's world, a recursive delete near a link. *Ask what happens when a second session runs the same thing on this machine at the same moment.* §13, 14, 23, 32, 38b, 39, 60, 71, 77b
+
+## Symptom index
+
+| § | What you see | Shape |
+|---|---|---|
+| 1 | ReferenceError on a click for a function that exists; an edit that does not take | 1 |
+| 2 | 404 on a route that exists, or F5 404 on a SPA view | · |
+| 3 | A form that always 400s after a route gained a required field | 3 |
+| 4 | Stale open view, a tab with no door in the menu, spacing silently collapsed to zero | 1 |
+| 5 | A raw key on screen, or an edited string that still shows the old word | 1 |
+| 6 | Owner data disappears from lists; a cross-owner leak; anonymous treated as authed | 4 |
+| 7 | Works on SQLite, silently wrong on Postgres; an upgrade crash-loop | 3 |
+| 8 | (moved to the node: app, extension and cortex namespace traps) | · |
+| 8b | A freshly installed package app's listing link 404s | 3 |
+| 9 | Truncated completions or a long SPA call aborting mid-flight | 1 |
+| 10 | Sync Ed25519 sign throws about ed.etc; a filtered signed document fails | · |
+| 11 | Publish refused, 409 WRITE_CONFLICT, a red unavailable reference chip | · |
+| 12 | Fixed it and prod still shows the bug; a syntax pass for nothing | 2 |
+| 13 | node_modules emptied under the main checkout; a worktree dev server kills another | 5 |
+| 14 | Login 500s on the dev node, native DLL EPERM on install | 5 |
+| 15 | A portal view's overlay stays under the top nav on a phone | · |
+| 16 | (moved to the node: realtime app traps) | · |
+| 16b | Nothing went out, and the schedule reported success and disabled itself | 1 |
+| 17 | A green suite over a bug that is still there | 2 |
+| 18 | Sweep totals swing by hundreds; fails in the sweep, passes alone | 2 |
+| 19 | A suite goes green after a change nobody can justify | 2 |
+| 20 | A hook fails on a file you never touched; two writers' edits interleaved in one file | 5 |
+| 21 | A revoked token keeps authenticating; the gate's test passes in isolation | 2 |
+| 22 | 'You:' over an agent's words; an agent told its thread has 0 messages | 4 |
+| 23 | A scratch server writes test data into the developer's dev database | 5 |
+| 24 | Onboarding stuck one step short with the later step ticked | · |
+| 25 | 'Start from the built-in layout' is refused by the node | 3 |
+| 26 | Signature changed, typecheck green, tests pass comparing two empty results | 2 |
+| 27 | Parse error on an innocent SQL line; lint errors on untouched view lines | · |
+| 28 | locale:merge reports keys merged while translation coverage falls | 1 |
+| 29 | One element keeps the old look; a visible phone rule does nothing | · |
+| 30 | Page 400px too wide on a phone, nothing looks wide | · |
+| 31 | A button shows 'nothing here yet' to every owner for weeks | 1 |
+| 32 | A commit swept another session's staged files; cannot lock ref HEAD | 5 |
+| 33 | The hook refuses a new MCP file that delegates its emit; a built lib 404s | 3 |
+| 34 | A showcase page passes every metric and looks flat and generic | 2 |
+| 35 | The published npm package contains a GPL asset the repo excluded | 2 |
+| 36 | Headline words stack one per line; story scenes painted white | 1 |
+| 37 | A compare-and-swap test green on sqlite even with the guard deleted | 2 |
+| 38 | A canvas game ignores Playwright key presses that a hand's press moves | 2 |
+| 38b | Federation suites fail more in a correct worktree, deterministically | 5 |
+| 39 | A correct-looking path gives an empty listing or a 'missing' verdict | 5 |
+| 40 | Cannot access 'tunnel' before initialization, only on the newer path | · |
+| 41 | Create-if-absent says 'already exists' for a key every read calls absent | 3 |
+| 42 | Agents stop, saying 'no stored token', while holding valid keys | · |
+| 43 | Calls attributed to the wrong agent, always the same one | 4 |
+| 44 | limit=1 and no limit return byte-identical responses | 3 |
+| 45 | A fresh token answers 401 right after another node boots | 2 |
+| 46 | listDetail folds on a phone and the detail is 40% wide | 2 |
+| 47 | Less motion pressed, and the page keeps moving | 3 |
+| 48 | A tool refuses a parameter the route has always accepted | 3 |
+| 49 | A calculating document built as route plus page, then reverted whole | · |
+| 50 | A gate fails naming something that exists only in a comment | 2 |
+| 51 | A workflow fails 'agent offline' while the idle agent is reachable | 2 |
+| 52 | A guard added to the canonical ctx.fetch has no runtime effect | 3 |
+| 53 | A DM to an unregistered agent name answers delivered | 4 |
+| 54 | An audit calls a stored flag unenforced; it was enforced all along | 2 |
+| 55 | (merged into §77b: the sandbox port probe) | 5 |
+| 56 | The admin security suite fails in your tree, passes in a fresh worktree | 2 |
+| 57 | An npm-installed node answers NOT_FOUND for /app-catalog.html | 2 |
+| 58 | A nightly workflow runs 0 of 6 steps with everything reporting healthy | 3 |
+| 59 | brace_expansion_1.default is not a function in a new tool | · |
+| 60 | Coverage directory empty for stopped nodes; lanes exit code 0 mid-run | 5 |
+| 61 | Closing the tab never aborts the model's streamed answer | 1 |
+| 62 | check:notices red on every commit for a version nobody touched | · |
+| 63 | A CI lane says Server failed to start and nothing else | 1 |
+| 64 | A subscription written through its own door vanishes at the next sync | 1 |
+| 65 | Two peers' entries with the same id collapse into one | 1 |
+| 66 | An attachment arrives greyed and unopenable; the sender was told delivered | 4 |
+| 67 | A retry job runs every minute and never retries the held item | 1 |
+| 68 | A download saves a file named 23ea6d2c with no extension | · |
+| 69 | An inventory says a method has no callers; it has four | 2 |
+| 70 | A test written from the source expects 403 and gets 404 | · |
+| 71 | A single-suite run refused: the port belongs to a suite that binds nothing | 5 |
+| 72 | A unit test passes alone and times out at 5000 ms inside the gate | 2 |
+| 73 | Every IndexNow run shows 202 accepted; the search engine knows nothing | 1 |
+| 74 | A pre_ hook on an unresolvable host lets everything through | 1 |
+| 75 | An operator page shows a plausible 0 that never moves | 1 |
+| 76 | A legend names eighteen series in twelve distinguishable colours | 1 |
+| 77 | Every SSO setup step done, nobody can sign in, the page sees nothing wrong | 1 |
+| 77b | The first pnpm sandbox dies 409 NAME_TAKEN; --reset changes nothing | 5 |
+| 78 | A value the schema forbids is all over production | 3 |
+| 78b | A public read hands out a field the redaction claims to strip | 1 |
+| 79 | A disabled feature answers 404 where the spec promises 503 | 2 |
+| 80 | A pending count drops to zero while the added peer stays inert | 1 |
+| 81 | A Finnish page prints 9/12/2026, 3:11 PM; date copies disagree | 3 |
+| 82 | An edited cortex library never reaches nodes that already have it | 1 |
+| 83 | A visitor from a peer reads the local namesake account's private data | 4 |
+| 84 | Settings back to defaults after a storage hiccup or a badly timed save | 1 |
 
 ---
 
@@ -37,9 +125,9 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 *Symptoms: "works locally but errors in the built file", a `ReferenceError` for a function that exists, edits that don't take effect.*
 
 - **`ReferenceError: X is not defined` for a function that clearly exists (app-catalog).** The app-catalog is a **modular esbuild build** (`aimeat/src/static/app-catalog/js/*.js` → generated `app-catalog.html`). A function CALLED but not imported from its owning module is **not a build error** — esbuild treats the unknown name as a free global, so it only throws at runtime, on the click. *(Bit us: `apps-io.js` called `getCortexOwnerToken` without importing from `cortex.js`; `+ → Add app` threw. Fixed `bb3946d0`.)* → After editing any module, run a **missing-import audit** (static: "name called here, exported by another module, but not imported/injected/local" — first strip string literals + comments so `window._launcher.X(...)` onclick strings and comment mentions aren't false positives; exclude `.X(` method access) **and** click every interactive path in the browser.
-- **`app-catalog.html` is GENERATED — never edit it directly.** Edit the sources under `aimeat/src/static/app-catalog/`, then `pnpm build:app-catalog`. A freshness gate (`check:app-catalog`) in the pre-commit hook + CI fails if the built file is stale.
+- **`app-catalog.html` is GENERATED — never edit it directly.** Edit the sources under `aimeat/src/static/app-catalog/`, then `pnpm build:app-catalog`. A freshness gate (`check:app-catalog`) runs in `pnpm gate` (check:fast) and CI and fails if the built file is stale; the pre-commit hook does not run it.
 - **New shared `/js` module → add it to the importmap** in `public/spa.html` (identity entry `"/js/services/foo.js": "/js/services/foo.js"`), or `check:importmap` fails and it 404s at runtime. Relative imports, bare specifiers, and CSS need no entry. `portal.ts` stamps `?v=BUILD_ID`.
-- **Public JS edits seem to have no effect.** `pnpm dev` is NOT a watcher for everything — `BUILD_ID` cache-busting means a public JS change needs a `pnpm dev` restart; `src/static/*` + `public/*` are served fresh on F5, but backend `src/` edits need a restart.
+- **An edit seems to have no effect.** Three different reloads: a file under `public/` is served `no-cache` with an ETag, so F5 is enough; a served SDK lib (`src/static/sdk-libs/`) and `app-catalog.html` are BUILT, so they need `pnpm build:sdk` / `pnpm build:app-catalog` first; a backend `src/` change needs a `pnpm dev` restart, because the dev server does not watch it.
 - **App-building guidance lives in ONE place — the node service, not a catalog copy.** The canonical app-building prompt is NODE-SERVED at `GET /v1/prompts/build-app` (source `src/services/build-app-prompt.ts` — the single source of truth). Its consumers: the **app-catalog "Create new app"** flow (which fetches it; `src/static/app-catalog/js/cortex.js` keeps only an offline fallback that may lag) and the **OpenHands app-builder** (`tools/aimeat-openhands/`, fetches the same spec at runtime). Agent-facing discovery: `/llms.txt` + the bootstrap `app_building` block point to the build prompt + `/v1/app-templates`. When improving app-building guidance, edit the NODE service, never the catalog fallback. *(The old SPA "service generator" `generator-prompts-*.js` was removed 2026-07-18 — don't reference `generator-*` files.)*
 
 ## 2. Routing (Express + SPA)
@@ -62,19 +150,17 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 - **Tabs showing server data must re-fetch on the `aimeat-live-update` window event** (except static-data, pure-nav, push-pref tabs). Missing this = the tab shows stale data after an SSE update. Subscribe/unsubscribe in a `useEffect`.
 - **A live-update handler that skips its data reload while an input/editor is focused leaves the OPEN view stale while you type.** A common (over-broad) "don't yank scroll mid-typing" guard tests `document.activeElement` (INPUT/TEXTAREA/contentEditable) and skips the whole re-fetch when composing — so the *list* refreshes (unread badge ticks up) but the *open detail view* never shows the incoming data until you send/reopen. Reads as "SSE is broken / not wired" when the wire is fine. → **Never gate the DATA reload on focus.** Always re-fetch on the event; push any "don't move the scroll while typing" concern into the scroll effect instead (suppress the one-time auto-jump when the composer is focused — near-bottom *follow* still applies), so new items render without stealing the caret/scroll. *(Bit us on the Messages thread: the `messages` handler reloaded the conversation list but skipped `loadThread` whenever the composer was focused; verified fixed over real SSE in `inbox-tab.js` + `inbox-tab/use-thread-ux.js`.)*
 - **A new profile tab needs TWO registrations, and only one of them is enforced by anything.** `TABS` in `public/views/profile.js` makes `?tab=<id>` render; `SIDEBAR_GROUPS` in `public/views/profile/landing-page.cards.js` gives it a door in the menu. Register only the first and the feature is complete, correct, tested, deployed — and invisible: nothing errors, no test fails, and the only way in is typing the query string. **Verifying by navigating straight to `?tab=<id>` cannot catch this** — the URL you type is exactly the door a user does not have. Navigate from the sidebar instead. Consider `BASIC_TAB_IDS` too: a menu entry outside the basic set is hidden until "Show all tools" is toggled on. `pnpm check:profile-tabs` now gates both directions (orphan tab, dead menu item) with documented exceptions in the script. *(Bit us three times: `generator` 2026-07-19, then `pnl` and `companies` 2026-08-07 — the last one shipped to production and cost the owner ten minutes of hunting for a feature that had no entry point.)*
-- **A background gradient cannot live on `body`.** The `body` background propagates to the canvas, so `background-size: 100% 100%` resolves against the ROOT element's box rather than the body's. On a page taller than the window the gradient runs out and draws a hard horizontal seam at exactly one viewport height; `background-attachment: fixed` produces the same thing by a different route. Put the background on an ordinary element that grows with the content (`#app { min-height: 100dvh }`). *(NOSTE art-direction pass, 2026-07-29.)*
-- **`overflow-x: clip` hides overflow from `scrollWidth`, so the standard check proves nothing.** `scrollWidth - clientWidth === 0` is meaningless in any app that sets it, which is most mobile-hardened ones. Measure per element instead: `[...document.querySelectorAll('#app *')].filter(e => e.getBoundingClientRect().right > document.documentElement.clientWidth + 0.5)`.
+- **Moved to the node registry (app-builder traps):** a background gradient on `body` (`body-background-seam`) and `overflow-x: clip` hiding overflow from `scrollWidth` (`overflow-clip-hides-scrollwidth`; the per-element check is also in skill `aimeat-frontend-verify`).
 - **A new view that calls `useViewCSS()` and adds no `<link>` to `spa.html` renders with no styling at all.** `useViewCSS()` has been a no-op since 2026-07-13: view stylesheets are preloaded as `<link rel="stylesheet">` in `public/spa.html`. The call site still reads like it loads the sheet, so the omission looks like nothing is missing. Everything else agrees: the page renders, the console is clean, the CSS file returns 200 to anyone who fetches it, and `getComputedStyle` on an element returns real values — the browser's defaults. What it looks like is a list with bullets instead of cards, which reads as an unfinished view rather than a broken one, so a screenshot is what catches it and a metric is not. `pnpm check:importmap` now refuses a `useViewCSS('/css/…')` with no matching link. *(The Agents section shipped this way in the first browser round, 2026-09-01.)*
 - **A tab-module edit looks stale** because of the SPA module registry / bfcache — F5 for a fresh load; navigate via `about:blank` to defeat bfcache when verifying.
 - **Empty panels read as "broken" to users** — prefer always-populated counters/empty-states over a blank region.
-- **`buildComponentPrompt()` is async** — every call site must `await` it.
-- **Platform UI API shapes:** `Tabs` uses `onChange` (not `onSelect`); `DataTable` has no `onRowClick`; `Input`/`Select` return `{el, getValue()}`.
+- **The AIMEAT.ui component shapes** (`Tabs` takes `onChange`, `DataTable` has no row-click callback, `Input`/`Select` return `{ el, getValue() }`) moved to the node registry as `ui-component-shapes`.
 - **`var(--space-N)` has no definition on this theme — always write the fallback.** There is no `--space-1..8` (nor `--space-xs/sm/md/lg`) in `theme.css`'s `:root`; the file's own two uses carry fallbacks (`var(--space-4, 1rem)`). An undefined custom property makes the whole declaration invalid, so `gap: var(--space-3)` computes to `normal` and `margin: var(--space-3) 0` computes to `0px` — **silently**. Nothing errors, nothing warns, and the page still renders; it just has no spacing, which reads as "the section is one wall of fields" rather than as a bug. Scale to use: `--space-1, 0.25rem` … `--space-8, 2rem`. *(Shipped this way in the P&L and Companies profile tabs — 27 declarations, all collapsed to zero — and was only caught by measuring `getBoundingClientRect()` gaps between siblings rather than looking at a screenshot. `getComputedStyle(document.documentElement).getPropertyValue('--space-3')` returning `''` is the one-line check.)*
 
 ## 5. i18n & locales
 *Symptoms: a raw key rendered instead of text, a key present in one language only.*
 
-- **`en.json` + `fi.json` are updated together** (Rule 4) — never add a key to one only. If unsure of the Finnish, use the English with a `[TODO:fi]` prefix.
+- **`locales/en.json` is the source of truth for which keys exist.** A key missing from `fi.json` or `es.json` falls back to English on its own, which is how a language is filled in over several passes; a `[TODO:xx]` placeholder is refused by `check:locales`. Use `pnpm locale:extract` / `pnpm locale:merge` (skill `aimeat-writing`).
 - **`t()` silently returns the raw key on a miss** — if you see `profile.apps.foo` on screen, the key is missing or the path is wrong. Locales mix **flat dotted keys and nested objects**; check the PARSED path, not a grep (a flat `"a.b.c"` and a nested `a:{b:{c}}` look the same to grep but resolve differently). The generator emits flat keys (`"tab.search": "Haku"`), so `t()` must check the flat key before the nested path.
 - **One key can exist TWICE in the same file, nested and flat, and only the later one renders.** `public/js/i18n.js` flattens the file into one map, so a flat `"profile.landing.home"` near the end of `en.json` overwrites the nested `profile.landing.home` a few thousand lines above it. On 2026-08-27 the nested value was edited, the served file carried the edit, `check:locales` was green, and the screen still showed the old word. Before editing a key, find every occurrence with a parsed walk (`node -e` over the JSON collecting every path that ends in the key), not with a grep for the nested line, and edit the flat one; it is the one that wins.
 
@@ -90,12 +176,10 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 - **New identity-touching feature → ship cross-owner and cross-scope "→403" E2E tests** (Rule 1 + Rule 10).
 - **Replacing an old path with a new one (batched endpoint, DB-service reroute) MUST reproduce the old path's FULL guard chain — middleware AND inline checks.** A refactor that optimises the *data* operation (batched reads/writes, a service layer) is exactly where authorization silently regresses: the guards read as boilerplate, so a new bulk/batched handler is written with `requireAuth() + requireScope()` and the *inline* checks (`requireExternalPrincipal()`, an `existing.archived` read-only 409, a `storage_ref` existence check, `requireScope('memory:delete')`) get dropped because they were one line among many. **Before merging a replacement, diff old-vs-new guard chains line by line** — enumerate the OLD handler's middleware list + every inline `if (…) return 403/409/422` + every per-item guard, and assert the NEW path runs each one. This is not optional polish; a dropped guard on the storage layer is the highest-blast-radius bug in the whole redesign. *(Bit us Phase 1/2 of the data-access redesign 2026-07-15: `/v1/memory/bulk` shipped without `requireExternalPrincipal`, without the archived-record read-only guard, and without `storage_ref` validation; the batched record delete shipped without `requireScope('memory:delete')`. All caught by an after-the-fact audit and fixed — but they should never have shipped.)*
 - **Security is FREE in the layered model — do it efficiently, don't skip it.** Authorization splits into two classes and NEITHER needs an extra DB round-trip when done right: (1) **batch-invariant** (principal role/scope, membership, publish gate, per-namespace policy, external-principal) → resolve ONCE per request (in-memory role/scope checks, or one read amortised across the whole batch); (2) **per-item** (reserved-key, anonymous-namespace, same-owner, archived-record, schema-lock) → all resolvable from data the operation ALREADY loaded — the batched existing-row read feeds the reserved-key/anonymous/same-owner/archived checks, the cached schema-lock feeds validation. So the same batched read that makes the DB fast also makes per-item auth ~0 extra queries. The one exception is `storage_ref` file-existence, which needs a `getStorageFile` — gate it to run ONLY for storage_ref entries (a normal write pays nothing), and batch it if bulk storage_refs ever become common. Security and performance ALIGN here; a "we skipped the check for speed" is never justified.
-- **On an app origin `AIMEAT.auth.login()` is SILENT-only** — it restores an existing session (via the H-2 SSO bridge) and returns `null` otherwise; it never opens UI. The ONLY interactive sign-in path is the login bar's own click handler (`mountLoginButton`). A hand-rolled "Sign in" button that calls `login()` does nothing when silent SSO fails — a custom button must delegate its click to the bar's button. *(Bit us in PULSE v2.0.1, found by the user on first prod use.)*
-- **`*.apps.localhost` is CROSS-SITE with `localhost`** (eTLD+1 `apps.localhost` ≠ `localhost`), so the silent-SSO iframe carries no apex cookie locally and app-origin auto-login fails — while working fine in prod (`*.apps.aimeat.io` is same-site with `aimeat.io`). Local app-origin verification: sign in with `AIMEAT.auth.loginWithPassword(...)` evaluated on the app origin, and don't reload (app-origin `login()` ignores the persisted session — bridge-only by design).
+- **Moved to the node registry (app-builder traps):** `AIMEAT.auth.login()` restores and never opens anything, and `AIMEAT.auth.signIn()` is the interactive call a button makes (`login-is-silent-only`); `*.apps.localhost` is cross-site with `localhost`, so silent SSO fails locally (`apps-localhost-cross-site`); app-grant tokens are role `app` and agent role gates refuse them (`app-grant-role-limits`).
 - **A NEW required permission cannot be applied to consent already given.** Adding a scope gate to a route that had none refuses every grant issued before the scope existed — those owners approved the app under rules that had no such question, and the first they learn of the new one is their app answering 403 mid-use. Ship the gate WITH a grandfather clause (a grant created before the permission existed passes) and let it expire by RE-CONSENT rather than by date: reapproving reissues the grant with whatever scopes it now asks for, so the exception removes itself. *(Bit us 2026-07-27: `contract:spend` shipped bare and broke NUOTTA for a live user who had changed nothing. The risk was identified, then set aside on "we do not know whether any app spends today" — which was not a reason to proceed, it was the reason to find out first.)*
 - **A scope enforced on a route must also be REQUESTABLE.** `requireScope('x')` gives no owner bypass to a role-`app` principal, so if `x` is missing from `APP_GRANTABLE_SCOPES` the app can never obtain it and its owner has no way to fix that — the permission it needs cannot be asked for. Adding a scope means adding it in BOTH places, and deciding deliberately whether it belongs in `DEFAULT_SCOPES` (spending money and giving away what you sell do not). *(Caught 2026-07-28 while wiring an app's approve button to `POST /v1/exchange/grants`, before it shipped.)*
 - **A rule that must hold on every path belongs at the chokepoint they share, not on each path.** Settlement was already shared; the DECISIONS around it were not — owner-free lived in four places and was missing from a fifth, "is this priced" in two that disagreed, and every door re-derived the sequence before calling the shared part. All six money defects found on 2026-07-27 were one door forgetting a step the others remembered, which is a property of the shape rather than of any author. The fix is a function that returns a DECISION and writes no HTTP: `services/metered-access.ts`. A gate that takes an Express `Response` cannot be shared — the MCP path had to fabricate a fake one to reach it.
-- **App-grant tokens are role `app`, strictly** — they never pass `requireRole('agent')` gates (organism create/join, workspace structure ops), regardless of scopes. Published apps needing server-side rules use an extension (`ext:` namespace + action checks), not organism primitives.
 - **A field a route ACCEPTS but never stores is granted by whatever the default is, and nobody is told.** `POST /v1/agents/device-authorize` took a `scopes` list, read it in the same-owner auto-approval branch and never wrote it to the record — so on the ordinary path (the owner approves in a browser) it ceased to exist when the handler returned. The consent card could not show what was being asked for, and an approval naming no scopes fell back to `config.defaultAgentScopes`: an agent asking for `task:read`/`task:write` was connected holding `catalogue:read` + `memory:read/write/delete`, could take no work at all, and looked perfectly connected. No error anywhere. Reported from the outside with three measurements, 2026-08-29; the same route had already lost `mode` the same way, one field over. **When a request field decides something a person later approves, check it reaches storage — the destructuring line is not the evidence, the INSERT is.** Keep the request in its own column (`requestedScopes`) rather than the one the approval writes (`scopes`): collapsing them leaves the record unable to say that what was asked for and what was granted differ, which is exactly what the owner needs to see. *(Fixed 2026-08-29; `test/e2e-device-auth-requested-scopes.ts`.)*
 
 - **A capability behind `requireOwnerPrincipal()` can never have an MCP tool that DOES it, and the fix is not to widen the gate.** An MCP tool is called by an agent acting in the owner's name, and that gate exists precisely to refuse everything acting in a person's name (invariant 11). So "add a tool for this" and "keep the account safe" look like a contradiction, and the tempting resolution — relax the gate to `requireRole('owner')`, which the agent's token satisfies — deletes the protection entirely. Split the act instead, the way device authorization already does: the agent READS what would happen and gets the address the human opens, the human presses, and the agent polls the read until the state flips. Nothing new to build, and the creating door does not move. Where a read gate has to relax to make the tool reachable at all, check what the caller could already see by other means — if the answer is "all of it", the relaxation is a shape change and not a widening, and it belongs in the same commit with that reasoning written down. *(Agent v2 basic agents, 2026-08-31: `aimeat_agent_basics_get`, `services/basic-agents.ts`.)*
@@ -115,15 +199,12 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 - **Record owner-forks → stale badge:** the same key can fork into duplicate-owner copies (a GHII `.latest` vs a legacy agent GAII `.latest`); read paths must keep the freshest, or a stale lower-version copy surfaces.
 
 ## 8. Extensions / Cortex / Memory namespaces
-*Symptoms: an ext call 404s, `resp.json is not a function`, a cortex install rejected, translations not found.*
-
-- **Three namespaces, never confuse them:** Owner (`owner@node`, user-written, auth-read) · Extension (`ext:{name}`, only the ext writes, anyone reads). The extension is sovereign; cortex trusts the ext API; the app trusts cortex — no layer bypasses the one below.
-- **callExt path is `/v1/ext/name/action`** — NOT `/v1/extensions/name/actions/action`.
-- **`session.fetch` returns PARSED JSON** — use `resp.data`; do NOT call `resp.json()`.
-- **Cortex register API is `{ libs: { "file.js": code } }`** — not `{ lib: {...} }`.
-- **Cortex re-activate = deactivate first, then activate.**
-- **Extension manifests are strict:** identity fields live under `metadata:` (`name/version/description/author` all required) and EVERY action needs `id` + `method` + `path` + `script` — a missing `method`/`path` fails the whole install. Cortex manifests are k8s-style: `apiVersion: cortex.aimeat.org/v1`, `kind: Extension`, `metadata.name` + `metadata.namespace`, libs as `spec.components` `type: lib` entries (with `exports` + `api_surface`, or agents can't discover the lib). Copy the examples from `docs/guides/building-extension-cortex-app-stack.md` (fixed 2026-07-13) — older guide copies drift.
-- **Translations + settings are USER data** — cortex reads them via `AIMEAT.data.get('service.i18n.fi')`, NEVER via `getPublic('ext:...')`.
+*Moved to the node registry on 2026-09-13.* Every bullet here was a trap for someone writing an app, an
+extension or a cortex, and each now lives in `aimeat/src/data/appdev-pitfalls.ts`: the owner, extension
+and instance namespaces (`three-namespaces`), the action path (`callext-path`), what session.fetch
+resolves to (`session-fetch-parsed`), the cortex install shape and PUT for new code
+(`cortex-register-reactivate`), and manifest strictness (`ext-manifest-strict`). The layering rule
+itself is in `CLAUDE.md` and `docs/coding-guidelines/extension-memory-architecture.md`.
 
 ## 8b. Package components that are apps
 *Symptoms: the link a listing gives for a freshly installed app 404s, and the app has no subdomain until somebody opens it some other way.*
@@ -156,9 +237,9 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 ## 9. AI / LLM calls
 *Symptoms: truncated completions, a non-English prompt in code, a long call timing out.*
 
-- **Never set `max_tokens`** on an LLM call — remove it on sight.
+- **Never set `max_tokens`** on an LLM call in node code; `check:no-max-tokens` refuses it. What an APP is told is the registry entry `no-max-tokens` (a cut answer now says `truncated`).
 - **Prompts in code are always English** — the AI converses in the user's language, but the prompt strings are English.
-- **Long AI calls use `api(path, { timeoutMs: 1_800_000, retries: 0 })`, not `apiPost`** — `apiPost`'s default timeout/retries will abort or double-fire a long completion.
+- **Long AI calls from the SPA use `api(path, { timeoutMs: 1_800_000, retries: 0 })`, not `apiPost`** — `apiPost`'s default timeout/retries will abort or double-fire a long completion. (An app has no such helper; its road is `AIMEAT.ai.job`, registry entry `long-ai-calls-timeout`.)
 
 ## 10. Crypto & signatures
 *Symptoms: a sync sign/verify throws about `ed.etc`, a signature mismatch.*
@@ -177,24 +258,23 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 ## 12. Deploy, release & node-hosted apps
 *Symptoms: "I fixed it but prod still shows the bug", an app's source not in the repo, an accidental release.*
 
-- **The MACHINE ROOM apps (LOOM / M-ROOM / DROP / PRESS / AGENCY …) are node-hosted, NOT in the repo.** To change one: `aimeat_app_get` to fetch its source, edit locally, republish via `aimeat_app_publish` **upload mode** (omit content → get `upload_url` → PUT the raw HTML). Keep the old download for rollback; syntax-check the inline JS before republishing (`cd aimeat && pnpm check:js-syntax <file>.html` parses every inline `<script>` body).
+- **The MACHINE ROOM apps (LOOM / M-ROOM / DROP / PRESS / AGENCY …) are node-hosted, NOT in the repo.** Change one the way any published app is changed (registry entry `edit-published-app`: `aimeat_app_draft_seed`, draft read/replace, `aimeat_app_draft_publish` under the same filename). A local copy comes from the app's `download_url`, never the inline page; `cd aimeat && pnpm check:js-syntax <file>.html` parses every inline `<script>` body before you publish.
 - **A syntax check that can be handed nothing will one day report a pass for nothing.** `node --check bad.js` does exit 1 — but `node --check $FILE` with `$FILE` empty or unset reads empty stdin, parses that, and exits **0 printing nothing**, which is indistinguishable from a real pass. One unset variable and every "SYNTAX OK" in a session is worthless. `pnpm check:js-syntax` treats no input as an error and re-proves its own sentinels on every run. *(Found 2026-08-01: a phase reported "SYNTAX OK" for files nobody had parsed.)*
 - **Static node assets (`app-catalog.html`, the `public/` SPA, locales) reach prod only via a NODE redeploy** — there is NO per-file MCP shortcut for them (unlike the node-hosted apps above). A committed fix to these is live on `main` but not on prod until the node is redeployed.
 - **Release discipline:** never push release tags / trigger CI builds / cut releases on your own initiative — commit to `main` freely, but stage releases and let the developer ship. Node = manual `gh release`; the Python package = tag-triggered PyPI. Don't bump `openapi` version for a release.
 - **Never assume "not deployed" — and never trust a reading you took earlier.** Verify prod state (`curl https://aimeat.io/v1/build`, grep a live asset) AT THE MOMENT of the claim. A build id read an hour ago is a memory, not a measurement; someone else deploys while you work. *(Bit us 2026-07-27: checked once, concluded "my change is not live", kept saying so for hours, and it had been deployed in between — the change was breaking a live app the whole time. This entry already existed and was not read, which is its own lesson: the catalogue only helps if it is opened when something feels surprising, not after.)*
-- **Node-hosted apps must use VENDORED libs, never a CDN.** `<script src="https://cdn.jsdelivr.net/…">` works today but a hardened/CSP node blocks external hosts — the app is one CSP tightening away from a blank screen. Use the self-hosted equivalents under `/lib/` (`/lib/tailwindcss@4.js`, `/lib/daisyui@5.css` + `/lib/aimeat-daisyui-bridge.css`, `/lib/chartjs@4.js`, …; registry + incantation in `aimeat/public/lib/VENDORED.md`). *(Band Jam v1 pulled daisyUI+Tailwind from jsdelivr; fixed in v2 — all libs now load same-origin.)*
-- **A standalone app that hardcodes colors ignores the auth-pill theme toggle (looks broken).** The `aimeat-auth` pill's light/dark switch flips `<html data-theme>`, writes `localStorage['aimeat-theme']`, and fires an `aimeat-theme-change` window event — but an app whose CSS hardcodes `#07090f` etc. never repaints, so users report "the dark/light button does nothing." Fix: drive chrome colors off `data-theme` — either load `/lib/daisyui@5.css` + `/lib/aimeat-daisyui-bridge.css` and use daisyUI / `var(--card)` tokens, or define your own `:root` + `:root[data-theme="light"]` variables — and restore the saved theme before first paint (tiny inline script reading `localStorage['aimeat-theme']`). Intentionally-dark "device screens" (a tracker grid, a canvas) can stay dark in both themes; just make that a deliberate choice, not an accident. *(Band Jam v1's toggle was dead; fixed v2.)*
+- **Moved to the node registry (app-builder traps):** vendored libs instead of a CDN (`cdn-libs-blocked`) and an app that hardcodes colours under the pill's mode switch (`hardcoded-theme-colors`). A new file under `public/lib/` still needs its `licenses.json` entry (§35).
 
-## 13. Concurrency & shared checkout
-*Symptoms: another session's files show up in your `git status`, a commit that absorbs unrelated work.*
+## 13. Concurrency & worktrees
+*Symptoms: `node_modules` emptied under the main checkout, a worktree's dev server killing another session's, a hook failing on a file you never touched.*
 
-- **Two Claude sessions can share one working tree.** Before committing, check `git status`/`git log`. Stage ONLY your files explicitly — **never `git add -A`**. For a file BOTH sessions touch (common collision points: `openapi.yaml`, `test/run-e2e-ci.ts`), stage just your hunk with `git apply --cached` (forward-apply your extracted hunk against a clean base, or stage-all then reverse-apply theirs) — do not absorb their in-flight lines.
-- **Parallel dev servers used to kill each other on `pnpm dev`** (fixed 2026-07-17): `scripts/kill-port.ts` step 2 killed EVERY node process whose command line matched `src/index.ts` — regardless of port — so a worktree server on 40733 died the moment another session ran `pnpm dev` on 40050 (symptom: full clean boot, then a silent `exit 1` with no error). It is now strictly port-scoped (a PID must own a socket on THIS port to be killed). If you see the silent-death symptom again, check who ran an OLD checkout's kill-port.
+Every session works in its own worktree (`CLAUDE.md`); the two bullets about sharing one checkout and about the kill-port that killed any node process were history by 2026-09-13 and are gone. What a shared tree costs when it happens anyway is §20 and §32.
+
 - **Worktree dev server: set `AIMEAT_PORT` in the SHELL env** (`AIMEAT_PORT=40733 pnpm dev`), not only in a `.env` — kill-port reads `process.env.AIMEAT_PORT` and defaults to 40050, so without the shell var a worktree's `pnpm dev` kill-ports the MAIN session's server on 40050 before your own boots.
-- **Worktree installs are per-package:** a root `pnpm install` in a fresh worktree does NOT populate `aimeat/node_modules` — run `cd aimeat && pnpm install` too, or typecheck fails with "Cannot find name 'process'" / missing `node:*` modules, and `pnpm dev` dies on `.env: not found` (copy `.env` from the main checkout as well; it is gitignored).
+- **Worktree installs are per-package:** a root `pnpm install` in a fresh worktree does NOT populate `aimeat/node_modules` — run `cd aimeat && pnpm install` too, or typecheck fails with "Cannot find name 'process'" / missing `node:*` modules, and `pnpm dev` dies on `.env: not found` (copy `.env` from the main checkout as well; it is gitignored). The E2E env files are NOT copied: `cd aimeat && pnpm test:env:init` writes them with this worktree's own port and database.
 - **ANY recursive delete run from or through a worktree that links into the shared `node_modules` destroys it — not just `rm -rf`.** The rule used to name one command, and the next session reached for a different one: `git worktree remove --force` walked the link and emptied hundreds of packages in the real checkout. `rm -rf`, `git worktree remove --force`, `git clean -xdf`, a script that recurses — Windows junctions and symlinks are followed by all of them, so the class is "a recursive delete plus a link out of the tree", and the command name is not the thing to remember. **Do not link into `aimeat/node_modules` from a worktree at all**: a worktree that needs deps runs its own `cd aimeat && pnpm install` (per-package, see above), which is slower once and safe every time. *Symptom when it has already happened:* `ERR_MODULE_NOT_FOUND` for a package that is plainly listed in `package.json`, and `ls node_modules/.pnpm/<pkg>@<ver>/node_modules/<pkg>/` shows an EMPTY directory — the symlink survives, the files are gone. *Recovery, known and cheap:* `cd aimeat && pnpm install --force` relinks everything from the pnpm store (a plain `pnpm install` will NOT — it sees the directories and reports "Already up to date"). The lockfile and manifests are untouched, so nothing needs committing afterwards; verify with `ls node_modules/.pnpm/express@*/node_modules/express/` and a `pnpm typecheck`. *(Bit us 2026-09-01 while taking an E2E baseline at HEAD; 718 packages relinked in 16s.)*
 - **`git worktree remove --force` that answers "Directory not empty", followed by `rm -rf` on what it left, is the same delete in two steps** — and it is what happened again on 2026-09-03, tearing out the main checkout's `aimeat/node_modules` while removing two throwaway worktrees that had each run their own `pnpm install`. Git deregistered both worktrees and gave up on the directories; the `rm -rf` that finished the job is what did the damage. The mechanism was not established afterwards, because the evidence went with the directories — which is itself the lesson: **inspect before you delete, not after**. The check that had been run was `dir /AL /S` over the worktree's TOP-level `node_modules` only, and the tree has a second one at `aimeat/node_modules`; a check that does not cover every `node_modules` under the worktree proves nothing. Recovery was the documented one and cost 12 seconds.
-- **The pre-commit hook runs over the whole working tree** (not just staged files), so your commit passes only if the other session's in-flight code also compiles. If the hook fails on code you didn't write, the other session is mid-edit.
+- **The pre-commit hook runs over the whole working tree** (not just staged files), so your commit passes only if everything else in that tree also compiles. That still bites inside your own worktree when subagents are editing it in parallel: a lint error in a file one of them has half-written refuses your commit. Wait for them, or commit before you start them.
 
 ## 14. Environment & tooling (Windows)
 *Symptoms: login 500s, a native-DLL EPERM, a hung command.*
@@ -204,33 +284,17 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 - **Login 500s on the dev node** usually mean the WSL docker (the database container) died — ask the user to restart it, then restart `pnpm dev`.
 - **`pnpm dev` is not a full watcher** — backend `src/` edits need a restart; `src/static/*` + `public/*` are served fresh on F5.
 
-## 15. Mobile, viewport & on-screen keyboard
-*Symptoms: a "mobile-optimized" view still feels cramped, a bottom input hides behind the keyboard, a big dead gap above the keyboard, an overlay that can't cover the app nav.*
+## 15. Mobile, viewport & on-screen keyboard (the portal)
+*Symptoms: a portal view's full-screen overlay still paints under the top nav on a phone.*
 
 Full how-to (the pattern, not just the traps): **`docs/frontend-development-guide.md` → Mobile & Responsive UX**. Reference impl: the Messages tab (`public/views/profile/inbox-tab/`, `public/css/views/inbox.css`).
 
-- **"Mobile-optimized" ≠ stacked columns.** Trimming chrome (hide a header, widen bubbles) is usually NOT enough — the user means a **native full-screen** experience. A focused view (chat/editor/wizard) should take the whole screen (`position: fixed; inset: 0` under `@media (max-width:760px)`, gated on an is-active class) with a Back affordance to return the app. *(Bit us on Messages: incremental CSS left the app shell eating ~half the screen; only the full-screen overlay satisfied.)*
+The general phone traps moved to the node registry on 2026-09-13, where every app builder reads them: `mobile-means-fullscreen`, `keyboard-viewport` (the dead gap, and verifying by shrinking the viewport height), `heavy-widgets-on-a-phone`, `auth-pill-overflow` (compact is the default wherever the pill is mounted; the SPA passes `compact: false` because its top nav folds the pill itself), `grid-track-blowout`, `flex-nav-wrap`, `fixed-fab-drift` and `overflow-clip-hides-scrollwidth`. What stays here is the portal's own:
+
 - **A `z-index` overlay does NOT cover the sticky `.topnav`.** The nav sits in a **higher stacking context** (an ancestor of the profile subtree), so a fixed overlay at `z-index:1000` still paints *under* a `z-index:100` nav. **Hide the nav instead** while full-screen: `body:has(.your-fullscreen-class) .topnav { display: none; }` (+ `body:has(...) { overflow: hidden; }` to lock background scroll). z-index wars won't win this.
-- **A bottom-pinned input hides behind the on-screen keyboard.** Android Chrome / iOS Safari shrink the *visual* viewport but NOT the *layout* viewport / `100dvh`, and `position:fixed;bottom:0` anchors to the layout viewport → the input ends up under the keyboard. Fix: add **`interactive-widget=resizes-content`** (+`viewport-fit=cover`) to the `spa.html` viewport meta (iOS16+/Android — makes the keyboard resize the layout viewport so `dvh`/fixed-bottom track it), with a **`visualViewport`-measured height** var as the older-engine fallback.
-- **Dead gap above the keyboard = double-counting or center-scroll.** Two causes: (1) `calc(100dvh − keyboardHeight)` — with `resizes-content`, `dvh` ALREADY excludes the keyboard, so subtracting it again collapses the pane; use the measured height OR `dvh`, not both. (2) `el.scrollIntoView({ block: 'center' })` on the composer focus — it centers the input and leaves emptiness below; keep the message list pinned to the bottom instead. *(Both bit us; fixed by measuring `body-top → visualViewport-bottom` and dropping the center-scroll.)*
-- **Heavy desktop widgets are miserable on a phone.** The Toast UI rich editor (Write/Preview + WYSIWYG toolbar) behind a keyboard is unusable — open a plain auto-growing `<textarea>` on `≤760px` and don't even load Toast UI there (detect once via `matchMedia('(max-width:760px)')` at mount).
-- **Verify by shrinking the viewport.** Playwright MCP can't pop a real keyboard, but resizing the viewport height (e.g. 780 → 440 after focusing the input) emulates the layout-viewport shrink; assert the composer bottom ≈ viewport bottom (0 gap) and the thread still scrolls.
-- **A fixed-width widget in a flex header overflows portrait → the WHOLE page shrinks to unreadable text.** Android Chrome / mobile Safari do a shrink-to-fit when any element is wider than the layout viewport: the page zooms out so the overflow fits, so EVERY font renders tiny — the symptom reads as "my mobile CSS made the text too small" when the real cause is one un-shrinkable element forcing horizontal overflow. The classic offender is the **golden `aimeat-auth` login pill** (`.aimeat-auth-pill`, `display:inline-flex` with a fixed intrinsic width ~340px) sitting in the header row next to the brand + a lang toggle — the three together exceed a ~390px portrait width. Fixes, together: (1) on mobile fold the lang toggle + `#login` pill out of the header row into a **hamburger dropdown** (`position:absolute` panel toggled by a menu button; the row becomes just brand + button and can't overflow); (2) let the pill wrap inside the panel — `#login .aimeat-auth-pill{display:flex!important;flex-wrap:wrap!important;max-width:100%!important}` (the pill's inline styles need `!important` to override); (3) `body{overflow-x:clip}` as a belt-and-braces guard (**`clip`, not `hidden`** — `hidden` makes body a scroll container and breaks `position:sticky` headers; `clip` doesn't). Verify by measuring `document.documentElement.scrollWidth === clientWidth` at 390px AND at phone-landscape (≈844px) — 0 overflow at both. *(Bit us on the Experience Center app, portrait unreadable + width broken; fixed v0.13.0 / store 1.0.21 — node-hosted, not in the repo.)*
-- **ONE view overflows on mobile while its siblings are fine → a CSS-grid track blowout, not that view's CSS.** A `grid-template-columns: … 1fr` track is `minmax(auto, 1fr)`, and the `auto` minimum = the widest grid item's **min-content** — grid/flex items default to `min-width:auto` and *won't* shrink below their content. So a single wide, non-wrapping descendant (a `.tbl-wrap` table of `white-space:nowrap` cells, a `<pre>`, a long inline `code`) inflates the whole track and pushes the page wider **even though it sits in an `overflow-x:auto` wrapper** — the wrapper never gets to scroll because the track grew to fit it. The victim view looks broken; the sibling views (only wrapping text) look fine. Fix: **`grid-template-columns: … minmax(0,1fr)` and/or `min-width:0` on the grid children** (`.layout>*{min-width:0}`) so the track can shrink and the inner `overflow-x:auto` finally scrolls. *(Bit us: Experience Center L0 alone overflowed — its 9-column MCP connection table — while Welcome/L1 were fine; fixed v0.14.1.)*
-- **A flex nav row with a variable item count overflows once the count is high enough.** `.deck-nav{display:flex}` holding prev/next + counter + one dot per slide fit fine at 3 slides but overflowed at 9 (no wrap). Add `flex-wrap:wrap` (+ a `row-gap`) so it folds instead of pushing the page wide. *(Same L0 fix: the 9-dot slide-deck nav.)*
-- **The reusable fix for the golden pill lives in the library now: `AIMEAT.auth.mountLoginButton(sel, { compact:true })`** (aimeat-auth.js v1.1.0). With `compact:true`, on ≤600px the pill renders as a small gold "account" button (green dot + initials) that opens the full pill (name/theme/logout) as an anchored popover — so any app avoids the overflow without hand-rolling a hamburger. It's **opt-in** (default off) so bespoke navs (the SPA top-nav, which compacts the pill its own way at ≤1180px) are untouched. Apps can feature-detect support via `AIMEAT.auth.compactPill` and adapt their header (e.g. drop a hamburger for a clean native bar once the flag is present) — but remember the lib is served by the node, so `compactPill` only becomes true on prod after a **node redeploy**; keep the old fallback path behind `html:not(.lib-compact)` so there's no regression window. *(Experience Center v0.14.0 does exactly this: native bar when the flag is present, hamburger fallback otherwise.)*
-- **A `position:fixed` FAB gets parked off-screen when the body scrolls horizontally.** The same auth-pill overflow above makes the BODY horizontally scrollable; a `position:fixed; right:16px` floating button then anchors to the (wider) scroll area and drifts off the visible right edge on a phone. Kill the overflow at the source rather than chasing the FAB: `html,body{overflow-x:hidden;max-width:100vw}`, let flex children shrink (`.navbar>*{min-width:0}`), and clip the auth widget (`#header-auth{max-width:60vw;overflow:hidden}`). *(Band Jam v1 fixed exactly this; the hardening carried into v2.)*
 
 ## 16. Realtime & multiplayer apps (AimeatRealtime)
-*Symptoms: peers never appear, notes stop after a while, "room not found" on reconnect, timing drifts between browsers.*
-
-Full protocol (agent-facing): the `band-jam` skill's `references/jam-protocol.md`. Client lib: `aimeat/public/lib/realtime.js` (`/lib/realtime.js`). Backend: `src/routes/realtime.ts` + `src/services/realtime-manager.ts`.
-
-- **Register `rt.on(...)` handlers BEFORE `rt.connect()`.** The `joined` / `peer-joined` frames arrive the instant the socket opens; handlers added after `connect()` miss them and the peer list never populates.
-- **The WS is rate-limited — batch per tick, never one frame per event.** A looping sequencer (e.g. 9 tracks × 16 steps) or an agent voicing several notes at once trips the limit if each note is its own `broadcast`. Send ONE message per step carrying all the notes for that step (`{type:'notes-batch', notes:[…]}`). *(Band Jam batches every step; so does the jam skill's runner.)*
-- **Rooms are garbage-collected after inactivity — reconnect must be able to RECREATE, not just re-dial.** On WS close, `getRoom(id)` may 404 (reaped). Robust recovery: try `getRoom`; if it's gone, `createRoom` again with the same name/tags; then reconnect with a **fresh** `AimeatRealtime` instance (the dead socket's object can hold stale state). Back off exponentially and reset the delay on a successful `joined`. *(Band Jam's `tryReconnect` is the reference.)*
-- **Sync a shared timeline off ONE anchor, not each client's own clock.** Broadcast a `t0` (unix ms of "step 0") + `bpm`; every client computes `step = floor((Date.now()-t0)/stepMs) % N` — so all browsers land on the same step. On join, send a `sync-request` and adopt the returned `t0`/`bpm` so late joiners come in phase. On a tempo change, **re-anchor** `t0 = Date.now() - currentStep*newStepMs` so the beat doesn't jump. Deriving timing from a local incrementing `setInterval` counter drifts — don't.
-- **Any authenticated principal can create/join a room and broadcast — including a GAII agent.** `/v1/realtime/rooms` (create/list/get) and the WS (`/v1/realtime/ws?room=&token=&nick=`) are `requireAuth()` only, no role gate. So an AI bandmate / co-editor / co-player is simply an agent that opens the WS with its own JWT and sends the same payloads a browser does — there is **no special server path** to build for "let an AI join." Design the app's realtime messages as a clean public protocol and the agent surface comes for free. *(This is exactly how the `band-jam` skill lets a real Claude agent join a jam.)*
+*Moved to the node registry on 2026-09-13.* Client lib: `aimeat/public/lib/realtime.js`. Backend: `src/routes/realtime.ts` + `src/services/realtime-manager.ts`. Full protocol (agent-facing): the `band-jam` skill's `references/jam-protocol.md`. The five app traps are registry entries now, with the numbers they lacked: `realtime-handlers-before-connect` (since realtime.js v1.3.0 a late `joined` handler gets the join and a broadcast sent while the socket opens is queued), `realtime-batch-per-tick` (50 frames a second per peer, refusals on `rt.on('error')`), `realtime-room-gc-recreate` (an empty room goes after an hour), `realtime-anchor-clock` (use `window.SharedClock`) and `an-ai-co-player-is-an-agent`.
 
 ---
 
@@ -242,11 +306,9 @@ Found in production in LÄHETIN, 2026-08-08. Every one of these is the SAME shap
 nothing on the way to the person carried it.
 
 - **A content-derived idempotency key makes one failure permanent.** `sha256(publisher, connection, file, caption)` is what stops a double post — and with no expiry and no reopen, a caption that failed once collides with its own dead row forever: every retry is answered `replay: true` pointing at an attempt that reached nobody, and there is no way out from the app. Fix: `claimDeadAttempt()` in `publish-gate.ts` reopens a `failed` / `rejected` row, and an `in_flight` one older than an hour. **The guard prevents a double POST; a row that published nothing cannot become one.**
-- **`replay: true` is not "it is out there".** It means "nothing was published just now". Whether that is good news depends entirely on `attempt.status`. An app that built a "you already sent this" message from `replay` alone, and read only `url` for the rest, printed a sentence ending in a colon followed by nothing.
-- **An empty `externalRef` is not a link.** LinkedIn answers a *successful* share with no URN header, so `''` flows out; `'' ?? undefined` stays `''`, and every truthiness check downstream renders a link to nothing. Test for `||`, not `??`.
+- **What an app does with the answer moved to the node registry:** `replay: true` is not "it is out there", and an empty `externalRef` is not a link (`outbound-replay-is-not-a-send`); a schedule list filtered on `enabled` hides what fired (`schedule-list-hides-what-fired`); a failed one-shot's next run needs the year (`schedule-next-run-needs-the-year`, the app half of the bullet below).
 - **A scheduler run that published nothing must not return success.** The gate can legitimately answer replay / `held` / `queued`; returning normally made the scheduler count the run, write a green `ExecutionLog` row and — for the one-shot `max_runs: 1` LÄHETIN creates — auto-disable the schedule and push "finished" to the owner, for a post that never left. Return `{ skipped: true, skipReason }`: it keeps the reason in the run log and leaves `runCount` and the budget untouched. **Note the consequence for a reader: a skip never touches `lastRunResult`, so it is visible only through `GET /v1/schedules/{id}` → `runs[]`.**
 - **A failed one-shot silently reschedules itself a YEAR out.** A failure does not advance `runCount` and does not auto-disable, but `nextRunAt` is rewritten to `cron.nextRun()` — and a `min hour dayOfMonth month *` cron has no year field. The row stays `enabled` with a date twelve months away, and "04.08. klo 21.00" reads exactly like this week. Any UI showing a schedule's own next-run time outside a month grid must print the year.
-- **Filtering a schedule list on `enabled` deletes your own history.** The scheduler disables a one-shot the moment it fires, so `j.enabled && j.nextRunAt` erases every schedule that did its job — the post falls back to looking like an untouched draft and the send exists nowhere on screen. `lastRunAt`, `lastRunResult`, `lastRunError` and `runCount` are in the same response.
 - **Advertise metric readability; do not discover it by calling.** LinkedIn publishes and cannot report analytics at the Consumer tier, so an app with no way to ask renders "read the numbers" whose only possible answer is a 409 — and on X each discovery costs money. Providers now carry `read-metrics` in `capabilities` exactly when a reader can succeed.
 - **An SDK writer that returns a hardcoded success is a lie by construction.** `connect.attach()` and `connect.revoke()` returned `{connected: true}` / `{revoked: true}` without consulting the envelope, so a 403 for an app holding only `connections:use` read back as success and announced a change that never happened. Every reader on that surface already went through `must()`; the two writers did not.
 
@@ -282,8 +344,10 @@ nothing on the way to the person carried it.
 - **A seeded record must be waited for, never raced.** Several boot seeders are fired WITHOUT `await` in `server-bootstrap/service-init.ts` (built-in skills, bundled cortexes, example packages). A suite reading one immediately wins on sqlite and loses on postgres, where the migrations run first: `e2e-appdev-overview` passed two runs in three. A flake is worse than a missing test, because it teaches everyone to re-run until green, which is how a real regression gets waved through.
 - **Deleting a route deletes its assertions too.** Removing the three Tier 0.5 write paths left five assertions describing behaviour that no longer exists; they were deleted rather than rewritten to expect a 404, because a 404 assertion on a deleted route proves only that Express has no such route.
 
-## 20. Two sessions, one working tree
+## 20. Two writers, one working tree
 *Symptoms: a pre-commit hook failing on a file you never touched; a gate demanding an npm release for somebody else's change; your edits and theirs interleaved inside one file.*
+
+Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below is history for sessions. It is not history for subagents: a session that runs several agents in its own worktree meets every one of these, and meets them the same way.
 
 - **`CLAUDE.md` says parallel sessions work in a worktree. This is what it costs when they do not.** The pre-commit hook reads the WORKTREE rather than the index, so another session's half-finished file with three unused imports failed `lint` and blocked a commit of sixty-two unrelated files. `check:liaison-surface` then demanded an npm version bump because THEIR change had altered the connector's tool surface, which is a release decision and not mine to make.
 - **Interleaving happens inside a file, not only between files.** `locales/en.json` held one line of mine and forty of theirs; `config.ts` held an audit default and an unrelated extraction. Classify every modified file before staging: grep each diff for markers from your own work and from theirs, and stage by explicit path. `git add -A` is already forbidden and this is why.
@@ -438,7 +502,7 @@ nothing on the way to the person carried it.
 - **Playwright's keyboard.press sends keydown and keyup in the same tick, and a game that reads key state once per frame never sees the key down.** aimeat-phaser's controls() reads Phaser's Key.isDown on the scene update, which is how a held arrow moves a hero; a press that is up again before the next frame is invisible to it. On 2026-09-03 the Design Book's dialogue box stood still through five scripted presses and advanced on the first held one.
 - **Hold the key across a frame when scripting: dispatch keydown, wait 100 ms, dispatch keyup** (a KeyboardEvent with code, key and keyCode; Phaser 4 reads keyCode). Or drive the on-screen touch pad, which is a pointer press with a real duration. The same rule covers any per-frame input reader, not only Phaser.
 - **A focused button eats the key first.** Space or Enter on a focused button is a click: the demo's own Talk button, focused by the scripted click that opened the dialogue, re-opened it on every scripted Space. Blur the button (or click the canvas) before pressing.
-## 38. A worktree's test port is a port some suite hardcodes
+## 38b. A worktree's test port is a port some suite hardcodes
 
 *Symptoms: a worktree set up correctly, with its own port and its own database, and three federation suites fail more than they do on the commit you started from — deterministically, so it does not read as flakiness either.*
 
@@ -599,13 +663,7 @@ nothing on the way to the person carried it.
 
 ## 55. A free-port probe that binds 127.0.0.1 says nothing about a port already held
 
-*Symptoms: `pnpm sandbox` starts "on :40600", the node comes up, and seeding dies on `register sandbox: 409 NAME_TAKEN` on what should be an empty database. `--reset` deletes the file and fails identically. The db file has this minute's timestamp, so the data cannot be old.*
-
-- **The case.** Port 40600 was held by another session's sandbox node. `pickPort()` probes with `probe.listen(port, '127.0.0.1')` and treats a successful bind as "free"; on Windows that bind SUCCEEDED while a live server was already listening on the same port. So the script reported the port free, started a second node against its own fresh database — and every HTTP call the seeder then made was answered by the FIRST node, which already had the owner `sandbox` in it. The 409 was true; it was about someone else's data.
-- **Why every reading looked wrong.** The db file is created by the new node before any request, so its timestamp says "brand new". `curl /v1/build` answers, because a node is there. `--reset` and `--stop` know nothing about the neighbour's process (they read `.sandbox.json`, which the crash never wrote), so they delete a database nobody is serving and the next run repeats. Two of the three signals a person checks are consistent with a working sandbox.
-- **How to see it in one command.** `Get-NetTCPConnection -LocalPort <port> -State Listen` and then the owning process's command line: it names the worktree the node was started from, which is the whole diagnosis. Two `sandbox-40600.db` paths under different `.worktrees/` directories is what a collision looks like.
-- **The way out, and the way to avoid it.** `AIMEAT_SANDBOX_PORT=<something else>` and kill ONLY your own orphaned node — never the neighbour's, which is a live session's world. A session that names its own port has no collision to detect.
-- **The general rule.** A bind test is a test of what THIS process may bind, not of what the port is doing, and the two differ per platform. Any "is it free" probe that then talks HTTP should confirm it reached its OWN server — a build id, a marker, an empty-database read — before concluding anything from the answer. The same shape as trusting a 200 without asking who sent it.
+*Merged into §77b on 2026-09-13.* The two sections were written the same day about the same trap, the sandbox port probe; §77b has the cause and the fix (2528ecd72), and what only this one carried (why every reading looked wrong, and the one command that names the neighbour's worktree) moved there. The number stays so older references still land.
 
 
 ## 56. A suite that reads a top-N of an append-only LOG fails for whoever ran the most tests
@@ -813,18 +871,19 @@ nothing on the way to the person carried it.
 - **And the operator's own packages were invisible to two of their own doors.** Review and delete both searched `listMemoryForOwners(allAgents…)`, while the operator's import stores under the OPERATOR's gaii. The list route read both namespaces and these two never did, so a package the page showed answered 404 when you tried to act on it.
 - **The rule.** When one capability has a privileged door and an ordinary one, the privileged door runs the SAME validator, and it runs it on the assembled object rather than on the request body. Compile a schema once, in its own module, and import it: a schema compiled inside the one route that uses it is a schema the second route will not find. And when a handler assembles a record by hand rather than taking it from the caller, list every namespace that record can live in — the read path having two and the write path having one is invisible until somebody acts on a row they can see.
 - **The tell:** a locale string that exists to make an impossible value render nicely. Somebody met the data, believed it, and patched the display. Follow it back to the door that wrote it.
-## 77. `pnpm sandbox` picks a port another session already holds, and then seeds into that session's node
+## 77b. `pnpm sandbox` picks a port another session already holds, and then seeds into that session's node
 
 *Symptoms: a first `pnpm sandbox` on a fresh worktree dies with `register sandbox: 409 NAME_TAKEN` on a database that cannot possibly hold an owner yet. `--reset` does it again, and so does an explicitly chosen port.*
 
 - **What is actually happening.** `canBind()` in `aimeat/scripts/sandbox.ts` probes with `probe.listen(port, '127.0.0.1')`, which binds the IPv4 loopback only. A node already running on that port is bound to `::` (Node's default when no host is given), and on Windows the two stacks are separate sockets: binding `127.0.0.1:40600` succeeds while `[::1]:40600` is taken. So the probe says free, the script's own node fails to bind and dies, `waitUntilUp` is satisfied by the OTHER session's node answering, and every call after that — including the seed — goes to a sandbox somebody else is working in. Measured 2026-09-12 with four sessions' sandboxes listening on `::` at 40600, 40607, 40621 and 40631.
-- **Why it reads as a bug in your own tree.** The error names your fresh database, the port is the one your log line printed, and `--reset` deletes your file and changes nothing. Nothing says another process is involved.
+- **Why it reads as a bug in your own tree.** The error names your fresh database, the port is the one your log line printed, and `--reset` deletes your file and changes nothing. Nothing says another process is involved. The db file carries this minute's timestamp because the new node created it before any request, `curl /v1/build` answers because a node IS there, and `--reset` / `--stop` read `.sandbox.json`, which the crashed run never wrote, so they delete a database nobody is serving and the next run repeats.
+- **The one command that names the neighbour.** `Get-NetTCPConnection -LocalPort <port> -State Listen`, then the owning process's command line: it names the worktree that node was started from. Two `sandbox-<port>.db` paths under different `.worktrees/` directories is what the collision looks like. Kill only your own orphan, never the neighbour's node, which is a live session's world. *(Merged from §55, written the same day about the same trap.)*
 - **Why it hid.** Every part is individually right. The probe really did bind. The node really did start. The health check really did get a 200 from that port. Only the inference between them is wrong, and it is invisible because a shared port produces *plausible* results rather than errors: the peer's node answers everything, so it surfaces as a puzzling conflict in the data rather than as a connection problem. It cannot happen on a machine running one session, which is where port pickers are written and tested. One name earlier and the seed would have written accounts into somebody else's sandbox instead of failing.
 - **Fixed 2026-09-12** in `2528ecd72`: the probe binds what the node binds, and a port that ANSWERS counts as taken whoever holds it (`canBind` follows the bind with `isUp`). Before that commit, or when a picker elsewhere does the same thing: `Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -ge 40600 -and $_.LocalPort -le 40700 }` names the ports actually in use, whatever address they are bound to; pick one nobody holds and pass it.
 - **The environment variable has to reach the script rather than the pnpm shim**, so `$env:AIMEAT_SANDBOX_PORT='40645'; pnpm sandbox --reset` from PowerShell, not an inline `VAR=… pnpm …` in Git Bash, which this setup drops. The same drop makes `AIMEAT_E2E_PORT=… pnpm test:env:init` silently keep the derived port — check the `AIMEAT_PORT` line in the `.env.test.*` it wrote and put THAT number on your claim, because it is the one your suites will use.
 - **The rule.** A free-port probe binds what the server will bind. Anything narrower answers a different question than the one being asked. And when a tool picks a port for you and the data looks like somebody else's, read the pid's command line before deleting anything.
 
-## 78. A redaction that names the raw spelling, over a value the parser already normalised
+## 78b. A redaction that names the raw spelling, over a value the parser already normalised
 
 *Symptoms: none. The code reads as if it works, the comment above it says what it protects, and the field it was meant to remove is in every answer.*
 

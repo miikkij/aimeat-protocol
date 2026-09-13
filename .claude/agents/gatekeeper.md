@@ -28,6 +28,16 @@ You run checks and report what they said. You do not fix, you do not soften, and
 - No total at all means the server did not boot: report it as a boot failure with the first error line.
 - A failure in a suite the change did not touch: run the same suite on a clean worktree of the base commit and say which of the three it is (asserted the hole, source broken, setup drifted; docs/pitfalls.md 19).
 
+## The five shapes, read against the diff
+
+The gates prove what the tests assert. Most of what `docs/pitfalls.md` records got past green gates, and nearly all of it falls into the five shapes listed at the top of that file. After the gates, read `git diff origin/main...HEAD` once per shape. You still fix nothing: for each shape report either "none seen" or the file:line and the one sentence that makes it suspect.
+
+1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work may not have happened: a branch that returns normally after skipping, a `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. Ask what the caller sees when the work did NOT happen.
+2. **A test that cannot fail.** A new test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run only on sqlite, a flag tested only switched on, an identity test with no account of the same name. Ask which line of the change turns the test red when reverted.
+3. **One rule, N doors.** A rule changed in one place while other doors reach the same capability: the REST route, the node MCP tool, the connector MCP tool, the CLI dispatch, an operator door, a second writer of the same record. Grep the capability's name and ask whether every door goes through the changed code.
+4. **A name is not a principal.** A comparison or a storage key built from `req.auth.owner`, `sub`, a bare account name, a delivery target or a display identity where the holder or the addressed principal is meant. Ask what the value holds for an agent, an app grant, a federated session and a namesake.
+5. **Parallel sessions and the machine.** A hardcoded port, a probe that binds narrower than the server, a file or a log used as state, a path from the other shell's world, a recursive delete near a link. Ask what happens when a second session runs the same thing on this machine at the same moment.
+
 ## The report
 
-A table: gate, backend, passed, failed, total. Then each failing assertion's name and its message verbatim. Then one sentence per failure: the change's, pre-existing on main (with the base commit), or an open incident (with its id).
+A table: gate, backend, passed, failed, total. Then each failing assertion's name and its message verbatim. Then one sentence per failure: the change's, pre-existing on main (with the base commit), or an open incident (with its id). Then the five shapes, one line each.
