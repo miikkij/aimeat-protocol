@@ -9,7 +9,7 @@
  */
 import { execSync } from 'node:child_process';
 import { contextDigest, contextFingerprint } from './finding-context.mjs';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
@@ -33,6 +33,25 @@ export function fingerprintOf(finding) {
   return contextFingerprint(finding, scanContext);
 }
 
+/**
+ * WHERE THE PROSE OF AN UNFIXED FINDING LIVES, AND WHY IT IS NOT HERE.
+ *
+ * This repository is PUBLIC. An acknowledgement says "this code is fine, because…", and publishing
+ * it costs nothing: it points at no hole. A finding the triage could NOT acknowledge is the
+ * opposite — one sentence naming an unfixed weakness and how to reach it — and on 2026-09-13 a run
+ * of this pass committed 23 of those, two of them live on aimeat.io, straight to a public remote.
+ * Git history does not take that back.
+ *
+ * So the two halves are split by where they are written. Acknowledgements stay in the tracked
+ * store, because they are the memory that keeps the gate honest and every session needs them. The
+ * prose of anything unacknowledged is written to secaudit/, which is gitignored, and the tracked
+ * store keeps only the pointer: the fingerprint, the file, the verdict. That is enough for the gate
+ * to know a finding is open and for the report to count it, and not enough to be a recipe.
+ */
+const OPEN_DETAIL_PATH = resolve(ROOT, 'secaudit', 'open-findings.json');
+const DETAIL_ELSEWHERE = 'Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: '
+  + 'korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.';
+
 /** The committed triage store: acknowledged findings + open invariant-review findings. */
 export function loadStore() {
   if (!existsSync(STORE_PATH)) {
@@ -44,8 +63,30 @@ export function loadStore() {
   return s;
 }
 
+/**
+ * Write the store, with every unacknowledged finding's prose diverted to the gitignored file.
+ * The caller passes the whole store as it built it; nothing upstream has to remember the rule.
+ */
 export function saveStore(store) {
-  writeFileSync(STORE_PATH, JSON.stringify(store, null, 2) + '\n');
+  const detail = { writtenAt: new Date().toISOString(), entries: [], invariantFindings: [] };
+  const tracked = JSON.parse(JSON.stringify(store));
+
+  for (const e of tracked.entries ?? []) {
+    if (e.verdict === 'legit' || !e.reason) continue;
+    detail.entries.push({ fingerprint: e.fingerprint, file: e.file, line: e.line, reason: e.reason });
+    e.reason = DETAIL_ELSEWHERE;
+  }
+  for (const f of tracked.invariantFindings ?? []) {
+    if (f.status !== 'open' || !f.note) continue;
+    detail.invariantFindings.push({ id: f.id, invariant: f.invariant, file: f.file, note: f.note });
+    f.note = DETAIL_ELSEWHERE;
+  }
+
+  if (detail.entries.length || detail.invariantFindings.length) {
+    mkdirSync(dirname(OPEN_DETAIL_PATH), { recursive: true });
+    writeFileSync(OPEN_DETAIL_PATH, JSON.stringify(detail, null, 2) + '\n');
+  }
+  writeFileSync(STORE_PATH, JSON.stringify(tracked, null, 2) + '\n');
 }
 
 /**
