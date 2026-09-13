@@ -15,6 +15,7 @@
  * @structure BEATS · BeatRail · default export ConnectStory({ navigate })
  * @usage routed at /v1/connect-your-ai by spa.html; listed in routes/portal.ts spaRoutes
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.0.0 — 2026-08-29 — Initial, on the build-story page's shapes (build-story.css, bs- prefix).
  */
@@ -115,7 +116,7 @@ export default function ConnectStory({ navigate }) {
         <${BeatRail} current=${current} />
       </section>
 
-      <section class="bs-beat" id="beat-pick">
+      <section class="bs-beat poster-row--thing" id="beat-pick">
         <div class="bs-beat-copy">
           <span class="bs-num">1</span>
           <h2 class="ld-sh-h2"><span>${tr('connectStory.b1Title1', 'Pick the AI')}</span><span class="ld-sh-accent">${tr('connectStory.b1Title2', 'you already use')}</span></h2>
@@ -133,7 +134,7 @@ export default function ConnectStory({ navigate }) {
           alt=${tr('connectStory.b1Alt', 'A person at a bright showroom counter choosing between four friendly retro robots, each holding up a small name sign')} />
       </section>
 
-      <section class="bs-beat bs-beat--flip" id="beat-plug">
+      <section class="bs-beat bs-beat--flip poster-row--thing" id="beat-plug">
         <img class="bs-picture bs-picture--coral" src="/img/connect-story/beat2-plug.jpg" width="1200" height="900" loading="lazy"
           alt=${tr('connectStory.b2Alt', 'A friendly retro robot plugs a glowing coral cable into a wall socket shaped like a small house while a delighted person watches')} />
         <div class="bs-beat-copy">
@@ -148,7 +149,7 @@ export default function ConnectStory({ navigate }) {
         </div>
       </section>
 
-      <section class="bs-beat" id="beat-prove">
+      <section class="bs-beat poster-row--thing" id="beat-prove">
         <div class="bs-beat-copy">
           <span class="bs-num">3</span>
           <h2 class="ld-sh-h2"><span>${tr('connectStory.b3Title1', 'Prove it')}</span><span class="ld-sh-accent">${tr('connectStory.b3Title2', 'with one prompt')}</span></h2>
@@ -159,7 +160,7 @@ export default function ConnectStory({ navigate }) {
           alt=${tr('connectStory.b3Alt', 'A person types one line into a huge speech bubble while a retro robot holds up a big green check-mark sign')} />
       </section>
 
-      <section class="bs-beat bs-beat--flip" id="beat-run">
+      <section class="bs-beat bs-beat--flip poster-row--thing" id="beat-run">
         <img class="bs-picture bs-picture--sun" src="/img/connect-story/beat4-run.jpg" width="1200" height="900" loading="lazy"
           alt=${tr('connectStory.b4Alt', 'A relaxed person chatting on a phone in a garden chair while a small crew of retro robots carries notes, documents and framed web pages into a bright little house')} />
         <div class="bs-beat-copy">

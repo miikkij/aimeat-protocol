@@ -5,6 +5,7 @@
  * @description Styles for the AI Help Prompt page — warm white aesthetic,
  *   DM Sans body text, JetBrains Mono for the prompt code block.
  * @version-history
+ *   v3.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   v3.0.1 — 2026-08-29 — The prompt block reads var(--font-mono) instead of naming five monospace families.
  *   v3.0.0 — 2026-08-29 — The showroom face (design canvas "AIMEAT Index Pages"): no card, the title in
  *       the display face with the coral offset, the two tabs on a 3px rule with the open one on the
@@ -122,7 +123,7 @@
    The page used to be the agent prompt alone, printed as markdown SOURCE. The
    human tab is the default; the prompt now renders through <Markdown>. */
 /* The tabs: on a 3px ink rule, the open one on the sun with ink words, the display face. */
-.hlp-tabs { display: flex; gap: 0; margin: 1.75rem 0 2.25rem; border-top: 3px solid var(--text); border-bottom: 0; }
+.hlp-tabs { display: flex; gap: 0; margin: 1.75rem 0 2.25rem; border-bottom: 0; }
 .hlp-tab {
   flex: 1; text-align: center;
   background: none; border: none; border-bottom: 3px solid transparent; border-radius: 0;

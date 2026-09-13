@@ -30,6 +30,7 @@
  * @usage routed at /v1/fleet by spa.html and routes/portal.ts, and embedded as the "Your agents"
  *   section of Settings & Controls via views/profile/fleet-tab.js, which passes `embedded`.
  * @version-history
+ *   v1.4.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   v1.3.0 — 2026-09-03 — A row opens the agent. The href is an address and was never an
  *     instruction: embedded in Settings & Controls it pushed a query onto the URL the profile had
  *     already read, so the location bar changed and nothing else did. It primes the name and asks
@@ -443,7 +444,7 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                   : t('fleet.groupCount').replace('{n}', String(g.rows.length))}</span>
               </h2>
               <p class="flt-group-note">${groupNote(g.state, g.kind)}</p>
-              <ul class="flt-list">
+              <ul class="flt-list poster-row--thing">
                 ${g.rows.map(a => html`
                   <li class="flt-row" key=${a.gaii}>
                     <div class="flt-row-main">

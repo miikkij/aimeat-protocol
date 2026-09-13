@@ -13,6 +13,7 @@
  *   - AgentHelp — the copyable prompt + the machine-readable entry points
  * @usage import HelpView from '/views/help.js'
  * @version-history
+ *   v2.4.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   v2.3.1 — 2026-08-29 — "Connection instructions" leads to the connect story (/v1/connect-your-ai).
  *   v2.3.0 — 2026-08-29 — The showroom face (design canvas "AIMEAT Index Pages"): the two actions under
  *       "still stuck" are the sun slab (.hlp-btn) and a door (.hlp-door), styled in help.css.
@@ -131,7 +132,7 @@ export default function HelpView() {
       <div class="hlp-card">
         <h1 class="hlp-title">${tr('help.pageTitle', 'Help')}</h1>
 
-        <div class="hlp-tabs" role="tablist">
+        <div class="hlp-tabs poster-row--thing" role="tablist">
           <button type="button" role="tab" aria-selected=${tab === 'human'}
             class=${`hlp-tab ${tab === 'human' ? 'active' : ''}`} onClick=${() => setTab('human')}>
             ${tr('help.tabHuman', 'For me')}

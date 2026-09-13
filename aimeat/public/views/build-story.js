@@ -19,6 +19,7 @@
  * @structure BEATS · BeatRail · Beat · default export BuildStory({ navigate })
  * @usage routed at /v1/how-an-app-builds by spa.html; listed in routes/portal.ts spaRoutes
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.0.1 — 2026-08-29 — The connect door leads to the connect story (/v1/connect-your-ai), not to a
  *     profile tab that a signed-out reader cannot see.
@@ -122,7 +123,7 @@ export default function BuildStory({ navigate }) {
         <${BeatRail} current=${current} />
       </section>
 
-      <section class="bs-beat" id="beat-say">
+      <section class="bs-beat poster-row--thing" id="beat-say">
         <div class="bs-beat-copy">
           <span class="bs-num">1</span>
           <h2 class="ld-sh-h2"><span>${tr('story.b1Title1', 'Say what')}</span><span class="ld-sh-accent">${tr('story.b1Title2', 'you need')}</span></h2>
@@ -144,7 +145,7 @@ export default function BuildStory({ navigate }) {
           alt=${tr('story.b1Alt', 'A person at a bright workshop counter telling a friendly retro robot what they want; the robot writes it on a paper ticket')} />
       </section>
 
-      <section class="bs-beat bs-beat--flip" id="beat-carry">
+      <section class="bs-beat bs-beat--flip poster-row--thing" id="beat-carry">
         <img class="bs-picture bs-picture--coral" src="/img/build-story/beat2-carry.jpg" width="1200" height="900" loading="lazy"
           alt=${tr('story.b2Alt', 'The person carries a glowing paper ticket across a sunny street toward a huge chat bubble on the wall of a building')} />
         <div class="bs-beat-copy">
@@ -169,7 +170,7 @@ export default function BuildStory({ navigate }) {
         </div>
       </section>
 
-      <section class="bs-beat" id="beat-bring">
+      <section class="bs-beat poster-row--thing" id="beat-bring">
         <div class="bs-beat-copy">
           <span class="bs-num">3</span>
           <h2 class="ld-sh-h2"><span>${tr('story.b3Title1', 'Bring the')}</span><span class="ld-sh-accent">${tr('story.b3Title2', 'file back')}</span></h2>
@@ -191,7 +192,7 @@ export default function BuildStory({ navigate }) {
           alt=${tr('story.b3Alt', 'The person walks back into the showroom carrying a glowing framed web page; a retro robot at a counter stamps it')} />
       </section>
 
-      <section class="bs-beat bs-beat--flip" id="beat-wall">
+      <section class="bs-beat bs-beat--flip poster-row--thing" id="beat-wall">
         <div class="bs-wallmock">
           ${wallCards.map((c, i) => html`
             <div key=${i} class=${`bs-card ${c.mine ? 'bs-card--mine' : ''}`}>
