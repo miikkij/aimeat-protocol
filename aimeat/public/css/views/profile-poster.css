@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.10.0 -- 2026-09-13 -- Compose inbox top rules from poster.css.
  *   v1.9.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   v1.8.0 — 2026-09-13 — The dialog frame, header and footer rules leave for /css/dialog.css, the one
  *     dialog every page uses; only the account dialogs' field rules stay.
@@ -400,8 +401,8 @@
   font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
   font-size: 1.7rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text);
 }
-/* The message tab: an ink frame around the two panes, square bubbles */
-.inbox-body { border: 3px solid var(--text); border-radius: 0; box-shadow: none; }
+/* The message tab: square panes and bubbles; inbox-poster.css sets the face. */
+.inbox-body { border-radius: 0; box-shadow: none; }
 .inbox-bubble { border-radius: 0; border: 2px solid var(--border); }
 .inbox-bubble--mine { border-color: var(--text); border-bottom-right-radius: 0; }
 
