@@ -24,6 +24,7 @@
  *   portal-tab.sections.js · PartsList/AddPart from portal-tab.parts.js · PagePreview
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared poster headings and external note spacing.
  *   v2.0.0 — 2026-09-12 — The poster face: eight numbered sections in the order an operator asks,
  *     the parts beside the page with the same numbers on both, the precedence ladder on screen for
@@ -447,7 +448,7 @@ export default function PortalTab({ data, reload }) {
       <p class="adm-pt-intro">${P('intro', { url: meta.base_url || '/' })}</p>
 
       ${isLb && html`
-        <div class="og-box adm-pt-lb-note">
+        <div class="og-box adm-pt-lb-note poster-aside poster-aside--small">
           <span class="og-box-label">${P('lb.title')}</span>
           ${P('lb.lead', { origin: escHtml(meta.lb_mode.origin_url || '-') })}
           <div class="og-doors adm-pt-lb-doors">
@@ -472,7 +473,7 @@ export default function PortalTab({ data, reload }) {
       </div>
 
       ${showPending && dirty && html`
-        <div class="adm-pt-pin-list">
+        <div class="adm-pt-pin-list poster-aside">
           <ul>
             ${blocks.map((b, i) => html`<li key=${b.key}>${i + 1}. ${b.id}${b.hidden ? ` · ${P('parts.chipHidden')}` : ''}</li>`)}
           </ul>
@@ -496,7 +497,7 @@ export default function PortalTab({ data, reload }) {
         <p class="adm-pt-tabnote">${P('surface.' + surface + 'Note')}</p>
 
         ${problems.length > 0 && html`
-          <div class="og-box adm-pt-problems">
+          <div class="og-box adm-pt-problems poster-aside poster-aside--small">
             <span class="og-box-label">${P('parts.leftOut')}</span>
             <ul class="adm-pt-problems-list">
               ${problems.map((pr, i) => html`<li key=${i}>${pr}</li>`)}

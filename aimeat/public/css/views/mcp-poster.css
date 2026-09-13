@@ -9,6 +9,8 @@
  *   (the setup guide .ast-*, the instruction block .ib-*, the install row .mcpi-*, the managed-
  *   environment note .mgd-*). NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
+ *   2026-09-13 -- Compose the shared initials box; retain only row dimensions and placement.
  *   2026-09-13 -- V2aa: shared B1 class owns the connection proof heading.
  *   v1.0.0 — 2026-09-02 — Initial.
  */
@@ -29,7 +31,7 @@
 .mc-rows > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
 .mc-rows > .mc-head { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 /* The mark is a whole box of its own: the row rule above would otherwise cut its bottom border. */
-.mc-rows > .mc-av { width: 2.2rem; height: 2.2rem; padding: 0; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 2px solid var(--text); font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .85rem; color: var(--text); }
+.mc-rows > .mc-av { width: 2.2rem; height: 2.2rem; }
 .mc-rows > .mc-av--dash { border-style: dashed; color: var(--text-dim); }
 .mc-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
 .mc-nm small { display: block; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; overflow-wrap: anywhere; }
@@ -47,7 +49,7 @@
 .mc-quick-v small { display: block; font-size: .74rem; line-height: 1.4; color: var(--text-dim); margin-top: .15rem; }
 
 /* ── Before you start, the proof, the organism prompt ───────────────────────────────────────── */
-.mc-pre { margin: 1rem 0 0; padding: .8rem 1rem; border: 3px dashed var(--accent); background: var(--card-bg); font-size: .88rem; line-height: 1.55; }
+.mc-pre { margin: 1rem 0 0; }
 .mc-pre p { margin: 0 0 .5rem; }
 .mc-pre p:last-child { margin-bottom: 0; }
 .mc-pre-label { display: block; margin-bottom: .35rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); text-transform: uppercase; font-size: .75rem; letter-spacing: .05em; color: var(--accent); }
@@ -102,7 +104,7 @@
 .og-mcp .ast-docs:hover { color: var(--accent); border-bottom-color: var(--accent); }
 
 .og-mcp .mcpi { gap: .45rem; }
-.og-mcp .mcpi--tool { margin: 0 0 .9rem; padding: .7rem .9rem; border: 3px dashed var(--accent); border-radius: 0; background: var(--card-bg); }
+.og-mcp .mcpi--tool { margin: 0 0 .9rem; }
 .og-mcp .mcpi-head { font-family: var(--font-poster); font-weight: var(--font-poster-weight); text-transform: uppercase; font-size: .75rem; letter-spacing: .05em; color: var(--accent); }
 .og-mcp .mcpi-note { font-size: .78rem; color: var(--text-dim); }
 .og-mcp .mcpi-oneclick, .og-mcp .mcpi-file { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }

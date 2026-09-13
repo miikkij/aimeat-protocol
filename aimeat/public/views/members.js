@@ -8,6 +8,7 @@
  * @structure MembersView (default) — fetch + grid.
  * @usage routed at /v1/members by spa.html.
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.0.0 — 2026-06-23 — Initial node member showcase (published-portfolio owners).
  *   v1.1.0 — 2026-07-28 — Say that the reader can be on this page too. It listed other people
  *     and gave a visitor no way to understand that a page is available to every account, either
@@ -43,7 +44,7 @@ export default function MembersView() {
       <!-- The point of the page is not the list, it is that the reader can join it. Every
            account can have a page, and the second route is the interesting one: the AI writes
            it from what you have actually done here rather than from what you claim. -->
-      <div class="mbr-yours">
+      <div class="mbr-yours poster-aside poster-aside--large">
         <p class="mbr-yours-text">${t('members.yours')}</p>
         <a class="btn-primary mbr-yours-cta" href="/v1/portfolio">${t('members.yoursCta')}</a>
       </div>

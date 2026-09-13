@@ -15,6 +15,7 @@
  *   - whoOf / readWord: how a row says whose a board is and who may read it
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.2.0 -- 2026-09-13 -- Compose remaining section headings and record rules from poster.css.
  *   v2.1.0 — 2026-09-13 — Compose the board-list section heading from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face, and the missing field that broke three things. A board
@@ -437,7 +438,7 @@ function Make({ form, setForm, onMake, busy, onCancel }) {
         </div>
 
         <div>
-          <div class="adm-brd-aside">
+          <div class="adm-brd-aside poster-aside">
             <b>${S('asideTitle')}</b>
             <p>${S('asideBody')}</p>
           </div>

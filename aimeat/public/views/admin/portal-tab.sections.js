@@ -14,6 +14,7 @@
  * @structure WhichVersion · MenuLinks · OwnHtml · SavedTexts · AskAi · WhatChanged
  * @usage html`<${WhichVersion} hasCustom=${false} source="default" parts=${9} />`
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose shared poster headings and external section spacing.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
@@ -100,7 +101,7 @@ export function OwnHtml({ hasCustom, updatedAt, template, onTemplate, onSave, on
           : html`<${Badge} type="muted" label=${P('html.badgeNone')} />`}</span>
         <span class="adm-mval">${hasCustom && updatedAt ? dt(updatedAt) : '__site_template__'}</span>
       </div>
-      <div class="og-box adm-pt-html-warning">
+      <div class="og-box adm-pt-html-warning poster-aside poster-aside--small">
         <span class="og-box-label">${P('html.warnLabel')}</span>
         ${P('html.warn')}
       </div>

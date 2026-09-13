@@ -10,6 +10,7 @@
  * @structure secAgents · secBuild · UploadForm · buildAgentAuthoringPrompt · skillPrompt
  * @usage import { secAgents, secBuild } from './build.js';
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.0.0 — 2026-09-02 — Initial. The crew-definition editor and its prompt moved here from
  *     apps-tab.js v1.8.0, where they sat on every card.
  */
@@ -53,7 +54,7 @@ export function secAgents(ctx) {
         <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.setAgentEditorOpen(!ctx.agentEditorOpen)}>${ctx.agentEditorOpen ? a('agentEditClose') : a('agentEditOpen')}</button>
       </div>
       ${ctx.agentEditorOpen ? html`
-        <div class="ap-panel">
+        <div class="ap-panel poster-aside">
           <p class="ap-panel-lead">${a('agentEditHint')}</p>
           <label class="ap-field">
             <span class="og-label">${a('agentEditPick')}</span>

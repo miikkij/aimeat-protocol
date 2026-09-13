@@ -23,6 +23,7 @@
  *   - FederationTab (default) — one read, six sections, and the actions
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-12 — The poster face. One read (GET /v1/admin/federation/overview) that carries
  *     the standing, what waits on a person, the sign-in reach, what this node offers and the book's
@@ -79,7 +80,7 @@ function AskAi({ overview }) {
           <p class="adm-fed-lead">${S('ai.lead')}</p>
           ${Row({ title: S('ai.tool'), why: S('ai.toolWhy'), chip: null, value: 'aimeat_admin_federation', last: true })}
         </div>
-        <div class="og-box">
+        <div class="og-box poster-aside poster-aside--small">
           <span class="og-box-label">${S('ai.label')}</span>
           <div class="adm-fed-paste">${paste}</div>
         </div>

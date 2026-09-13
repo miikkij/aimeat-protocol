@@ -8,6 +8,7 @@
  *   carries what email adds: the uses list, the mailbox rows with their delegations, the sent log,
  *   the letters rows, the mail log. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-09-13 -- Compose the shared initials box; retain only row dimensions and placement.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
@@ -39,7 +40,7 @@
 .em-mb { display: grid; grid-template-columns: 2.2rem minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 0 1rem; align-items: center; }
 .em-mb > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
 /* The mark is a whole box of its own here: the contacts and notifications rules are scoped to their rows. */
-.em-mb > .nt-av { width: 2.2rem; height: 2.2rem; padding: 0; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 2px solid var(--text); font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .95rem; color: var(--text); }
+.em-mb > .nt-av { width: 2.2rem; height: 2.2rem; }
 .em-mb > .nt-av.ct-av--agent { border-style: dashed; color: var(--text-dim); }
 .em-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
 .em-nm small { display: block; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; overflow-wrap: anywhere; }

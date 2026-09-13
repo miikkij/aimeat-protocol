@@ -19,6 +19,7 @@
  *   - Record / Reach: imported from memory-tab.record.js
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 -- 2026-09-13 -- Compose the results heading and audience row from poster.css.
  *   v2.0.0 — 2026-09-12 — Rebuilt around the question. The node-wide content search the FTS
  *     primitive has always backed and no admin surface called; a record opened whole instead of
@@ -349,7 +350,7 @@ export default function MemoryTab() {
       </div>
 
       <!-- the questions -->
-      <div class="adm-mem-say">
+      <div class="adm-mem-say poster-aside">
         <div class="adm-mem-lbl">${S('startFrom')}</div>
         <div class="adm-mem-qs">
           ${QUESTIONS.map(x => html`

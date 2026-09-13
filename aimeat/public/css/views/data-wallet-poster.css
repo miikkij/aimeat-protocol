@@ -10,6 +10,7 @@
  *   two roads. Every column is bounded so a long key or name wraps inside its cell. NOTE: this file
  *   must be linked in spa.html.
  * @version-history
+ *   2026-09-13 -- Keep the workspace chooser's placement in the view sheet.
  *   v1.2.0 -- 2026-09-13 -- Compose detail frames from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose explanations and the export row with the shared ink frame.
  *   v1.0.0 — 2026-09-04 — Initial.
@@ -30,6 +31,7 @@
 .dw-slab-hint { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); max-width: 18rem; text-align: right; }
 .dw-label { display: block; margin: 1rem 0 .4rem; }
 .dw-box { margin-top: 1.4rem; }
+.dw-workspace-select { margin-top: .4rem; }
 .dw-why { margin-top: .9rem; padding: .8rem 1rem; font-size: .9rem; line-height: 1.55; }
 .dw-why b { font-weight: 800; }
 

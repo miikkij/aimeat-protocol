@@ -13,6 +13,7 @@
  *   warning ink on a part the node cannot vouch for — an author under two spellings, a maturity
  *   word that is not one of ours — and that is a status, so it wears the status token.
  * @version-history
+ *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v1.0.0 — 2026-09-12 — Initial. Replaces the card grid and its inline rgba badges.
  */
 
@@ -102,7 +103,7 @@
 .adm-kn-trail-head { display: flex; gap: 10px; align-items: baseline; font-size: .86rem; flex-wrap: wrap; }
 
 /* The forms: underlined fields, like the Hooks bind form and the sign-in page. */
-.adm-kn-newbox { margin-top: 24px; padding: 16px 18px; border: 3px dashed var(--accent); background: var(--card-bg); }
+.adm-kn-newbox { margin-top: 24px; }
 .adm-kn-newlabel { display: block; margin-bottom: 12px; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: .75rem; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
 .adm-kn-form { display: flex; flex-direction: column; gap: 16px; max-width: 640px; }
 .adm-kn-fld { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }

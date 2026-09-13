@@ -9,6 +9,7 @@
  *   with the panel that opens under one row, and the how-it-accrues facts.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 
@@ -47,7 +48,8 @@
 /* ── The list: a severity mark, the title, area and model, the doors; a panel under one row ── */
 .ad-pl { display: grid; grid-template-columns: 5.6rem minmax(0, 1fr) minmax(8rem, 12rem) auto; gap: 0 .9rem; align-items: stretch; }
 .ad-p { display: contents; }
-.ad-p > div { padding: .65rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
+.ad-p > div { min-width: 0; display: grid; align-content: center; }
+.ad-p > div:where(:not(.poster-aside)) { padding: .65rem 0; border-bottom: 1px solid var(--border); }
 .ad-p--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .ad-p--dim > div { opacity: .6; }
 .ad-sv b { display: inline-block; justify-self: start; padding: .1rem .45rem; border: 2px solid var(--text); font-family: var(--font-mono); font-size: .64rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text); white-space: nowrap; }
@@ -59,7 +61,7 @@
 .ad-me b { display: block; font-weight: 700; color: var(--text); }
 .ad-p > .ad-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
 .ad-go .og-door { font-size: .72rem; text-decoration: none; }
-.ad-p > .ad-open { grid-column: 1 / -1; display: block; margin: 0 0 .2rem 6.5rem; padding: .8rem 1rem .9rem; border: 3px dashed var(--accent); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.ad-p > .ad-open { grid-column: 1 / -1; display: block; margin: 0 0 .2rem 6.5rem; }
 .ad-open .og-label { display: block; margin: .6rem 0 .2rem; }
 .ad-open .og-label:first-child { margin-top: 0; }
 .ad-open p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }

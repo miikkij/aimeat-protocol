@@ -21,6 +21,7 @@
  *   - RealtimeTab({ data, reload }) — the three sections, the four empty states, the close question
  *   - dur / heard — the durations a row prints instead of a timestamp
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-12 — The poster face: all eight counters, the document count summed from the
  *     rooms it actually lives in, the three empties told apart, one room openable with its peers and
@@ -137,7 +138,7 @@ export default function RealtimeTab({ data, reload }) {
                 <dt>${R('theSwitch')}</dt>
                 <dd><code>AIMEAT_REALTIME_ENABLED=false</code><em>${R('theSwitchWhy')}</em></dd>
               </dl>
-              <div class="og-box og-box--solid adm-rt-offbox">
+              <div class="og-box og-box--solid adm-rt-offbox poster-aside poster-aside--small poster-aside--irreversible">
                 <span class="og-box-label">${R('offLabel')}</span>
                 <p>${R('offBody')}</p>
               </div>
@@ -263,12 +264,12 @@ export default function RealtimeTab({ data, reload }) {
           <div class="adm-rt-cnt"><span>${R('cntRefused')}</span><b class=${f.refused ? 'is-bad' : ''}>${num(f.refused)}</b></div>
         </div>
         <div class="adm-rt-two">
-          <div class="og-box">
+          <div class="og-box poster-aside poster-aside--small">
             <span class="og-box-label">${R('memLabel')}</span>
             <p>${f.uptimeSeconds !== null ? R('memBody', { time: dur(f.uptimeSeconds * 1000) }) : R('memBodyNoUptime')}</p>
             <p class="adm-rt-rule">${R('memRule')}</p>
           </div>
-          <div class="og-box og-box--solid">
+          <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible">
             <span class="og-box-label">${R('gonLabel')}</span>
             <p>${f.idleMs ? R('gonBody', { time: dur(f.idleMs) }) : R('gonBodyNoIdle')}</p>
             <p class="adm-rt-rule">${R('gonRule')}</p>

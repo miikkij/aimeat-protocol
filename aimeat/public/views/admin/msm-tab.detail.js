@@ -17,6 +17,7 @@
  * @structure MsmDetail (default export) · fieldRows()
  * @usage <${MsmDetail} msm=${detail} row=${row} onBack=${...} ... />
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose shared B1 headings and preserve spacing through view classes.
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
@@ -181,7 +182,7 @@ export default function MsmDetail({ msm, row, busy, editing, draft, onBack, onEd
               </button>
             </div>`}
 
-        <div class="og-box adm-msm-edit-note">
+        <div class="og-box adm-msm-edit-note poster-aside poster-aside--small">
           <span class="og-box-label">${M('detail.editLabel')}</span>
           ${M('detail.editWhat')}
         </div>

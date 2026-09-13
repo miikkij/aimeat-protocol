@@ -9,6 +9,7 @@
  * @structure renderPage · secRows · secSuggest
  * @usage import { renderPage } from './mcp/page.js';
  * @version-history
+ *   2026-09-13 -- Compose the shared initials-box role and its measured size cut.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-02 — Initial.
  */
@@ -87,7 +88,7 @@ function secRows(ctx, rows) {
           ${rows.map((r) => {
             const may = r.agent ? mayWord(r.agent) : null;
             return html`
-            <div class=${`mc-av ${r.kind === 'tool' && r.gone ? 'mc-av--dash' : ''}`} key=${'a' + r.id} aria-hidden="true">${r.gone ? '?' : initials(r.tool)}</div>
+            <div class=${`mc-av poster-box poster-box--avatar poster-box--small ${r.kind === 'tool' && r.gone ? 'mc-av--dash' : ''}`} key=${'a' + r.id} aria-hidden="true">${r.gone ? '?' : initials(r.tool)}</div>
             <div class="mc-nm" key=${'n' + r.id}>${r.tool}<small>${r.name || m('agentNone')}</small></div>
             <div class="mc-w" key=${'m' + r.id}>${may ? html`<b class=${may.full ? 'mc-coral' : ''}>${may.word}</b><small>${may.note}</small>` : html`<b>${m('agentGone')}</b><small>${m('agentGoneNote')}</small>`}</div>
             <div class="mc-w" key=${'w' + r.id}><b>${r.when ? rel(r.when) : m('neverUsed')}</b><small>${m('since', { date: day(r.since) })}</small></div>

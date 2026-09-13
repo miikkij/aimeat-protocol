@@ -14,6 +14,7 @@
  *   - buildAiPrompt(tpl, locale) — the paste for the operator's own AI, tags kept intact
  *
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.2.0 -- 2026-09-13 -- Compose ink row boundaries from the shared poster class.
  *   v2.1.0 — 2026-09-13 — Compose the shared template heading and external spacing.
  *   v2.0.0 — 2026-09-12 — The poster face, and the plain statement that a saved template does not
@@ -219,7 +220,7 @@ export default function Templates({ locale }) {
         </div>
       </div>
 
-      <div class="og-box">
+      <div class="og-box poster-aside poster-aside--small">
         <b>${E('tpl.warnLead')}</b> ${E('tpl.warn')}
       </div>
 

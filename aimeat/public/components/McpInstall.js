@@ -17,11 +17,12 @@
  *   WHAT IT SHOWS COMES FROM THE NODE, not from a list here. GET /v1/ai-tools says which tools have
  *   an install link and which have a file, and a tool with neither simply does not appear in the
  *   quick row. A second list in the browser would be the drift the served table exists to prevent.
- * @structure McpInstallRow({ tool, serverName }) · McpQuickConnect({ serverName, guideHref, title, lead })
+ * @structure McpInstallRow({ tool, serverName, className }) · McpQuickConnect({ serverName, guideHref, title, lead })
  * @usage
  *   import { McpQuickConnect } from '/components/McpInstall.js';
  *   html`<${McpQuickConnect} serverName=${agentName} />`
  * @version-history
+ *   2026-09-13 -- Let the caller compose the install row's shared poster shape by class.
  *   v1.1.0 — 2026-09-02 — The double-click install scripts (`install.scripts`, GET /v1/connect/install)
  *     render beside the one-click links, in the setup guide and in the quick row alike.
  *   v1.0.0 — 2026-08-27 — Initial.
@@ -59,12 +60,12 @@ function withInstall(tools) {
  * One tool's short way in, for the setup guide. Renders nothing for a tool that has neither, which
  * is most of them: a chat app is attached through its own connector form and there is no file.
  */
-export function McpInstallRow({ tool, serverName }) {
+export function McpInstallRow({ tool, serverName, className = '' }) {
   const install = tool?.mcp?.install;
   if (!install || (!install.link && !install.file && !install.scripts?.length)) return null;
 
   return html`
-    <div class="mcpi mcpi--tool">
+    <div class=${`mcpi mcpi--tool ${className}`}>
       <div class="mcpi-head">${tr('mcpInstall.title', 'The short way in')}</div>
       ${install.link ? html`
         <div class="mcpi-oneclick">

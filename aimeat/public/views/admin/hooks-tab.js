@@ -15,6 +15,7 @@
  *     files: moments (02), bind (03), runs (04), and AskAi (05) here.
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared section headings and externalize spacing.
  *   v2.0.0 — 2026-09-12 — The poster face and its own read: the status word, the metric rows, the
  *     strip and five numbered sections. Binding is possible from the page for the first time, and
@@ -132,7 +133,7 @@ function AskAi() {
           ${Row({ title: S('ai.write'), why: S('ai.writeWhy'), chip: null, value: 'aimeat_admin_hook_set' })}
           ${Row({ title: S('ai.publish'), why: S('ai.publishWhy'), chip: null, value: 'POST /v1/actions', last: true })}
         </div>
-        <div class="og-box">
+        <div class="og-box poster-aside poster-aside--small">
           <span class="og-box-label">${S('ai.label')}</span>
           <div class="adm-hook-paste">${paste}</div>
         </div>

@@ -24,6 +24,7 @@
  *   - the opened organism is organism-ownership-tab.detail.js
  * @usage registered in views/admin.js under the Identity group
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared poster headings and externalize column alignment.
  *   v2.0.0 — 2026-09-12 — The poster face, and the listing that makes the page usable: sections
  *     that say whether anything is stuck, every organism with the state of each owner, filters, and
@@ -227,7 +228,7 @@ export default function OrganismOwnershipTab({ data, reload }) {
         </div>
 
         ${listing && listing.complete === false && html`
-          <p class="adm-oo-warn">${O('partial', { count: num(listing.count) })}</p>`}
+          <p class="adm-oo-warn poster-aside">${O('partial', { count: num(listing.count) })}</p>`}
 
         <div class="adm-oo-find">
           <div class="adm-oo-fld">
@@ -290,12 +291,12 @@ export default function OrganismOwnershipTab({ data, reload }) {
       <section class="og-sec adm-oo-acts-sec">
         <div class="og-sec-h"><h2 class="poster-section-title">${O('actsTitle')}<small>${openRow ? '04' : '03'}</small></h2></div>
         <div class="adm-oo-two">
-          <div class="og-box">
+          <div class="og-box poster-aside poster-aside--small">
             <span class="og-box-label">${O('crossLabel')}</span>
             <p>${O('crossBody')}</p>
             <p class="adm-oo-rule">${O('crossRule')}</p>
           </div>
-          <div class="og-box og-box--solid">
+          <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible">
             <span class="og-box-label">${O('addsLabel')}</span>
             <p>${O('addsBody')}</p>
             <p class="adm-oo-rule">${O('addsRule')}</p>

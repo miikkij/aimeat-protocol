@@ -27,6 +27,7 @@
  *   - UsageTab (default) — the reads, and the six sections
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face and six numbered sections, over one read that says whose
  *     money each figure is. The eighteen-series stacked charts are gone (the palette cycled at
@@ -219,7 +220,7 @@ function AskAi({ from, to }) {
           ${Row({ title: S('ai.provider'), why: S('ai.providerWhy'), chip: null, value: 'ask_provider: true' })}
           ${Row({ title: S('ai.own'), why: S('ai.ownWhy'), chip: null, value: 'aimeat_usage_report', last: true })}
         </div>
-        <div class="og-box">
+        <div class="og-box poster-aside poster-aside--small">
           <span class="og-box-label">${S('ai.label')}</span>
           <div class="adm-us-paste">${paste}</div>
         </div>

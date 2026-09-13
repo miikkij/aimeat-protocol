@@ -15,6 +15,7 @@
  *   - frontmatterOf / bumpPatch: reading a name and a version out of the text being edited
  * @usage registered in views/admin.js NAV_GROUPS
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.2.0 -- 2026-09-13 -- Compose remaining section headings and record rules from poster.css.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face, and five things the page held and never showed.
@@ -462,10 +463,10 @@ function Write({ editing, setEditing, skills, onPublish, busy }) {
             </dl>
           </div>
 
-          ${!fm.name && html`<div class="adm-sk-warn"><b>${S('warnNoNameTitle')}</b>${S('warnNoName')}</div>`}
-          ${replaces && html`<div class="adm-sk-warn"><b>${S('warnReplaceTitle')}</b>${S('warnReplace', { name: fm.name })}</div>`}
-          ${forks && html`<div class="adm-sk-warn"><b>${S('warnForkTitle')}</b>${S('warnFork', { was: editing.was.name, now: fm.name })}</div>`}
-          ${!editing.was && fm.name && existing && html`<div class="adm-sk-warn"><b>${S('warnTakenTitle')}</b>${S('warnTaken', { name: fm.name })}</div>`}
+          ${!fm.name && html`<div class="adm-sk-warn poster-aside"><b>${S('warnNoNameTitle')}</b>${S('warnNoName')}</div>`}
+          ${replaces && html`<div class="adm-sk-warn poster-aside"><b>${S('warnReplaceTitle')}</b>${S('warnReplace', { name: fm.name })}</div>`}
+          ${forks && html`<div class="adm-sk-warn poster-aside"><b>${S('warnForkTitle')}</b>${S('warnFork', { was: editing.was.name, now: fm.name })}</div>`}
+          ${!editing.was && fm.name && existing && html`<div class="adm-sk-warn poster-aside"><b>${S('warnTakenTitle')}</b>${S('warnTaken', { name: fm.name })}</div>`}
 
           <div class="adm-sk-field">
             <div class="adm-sk-lbl">${S('whoMayRead')}</div>

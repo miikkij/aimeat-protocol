@@ -11,6 +11,7 @@
  * @usage Rendered by views/profile.js when there is no session; tabLabel is the asked tab's
  *   translated name, or null when the URL names no tab the registry knows.
  * @version-history
+ *   2026-09-13 -- Compose the canonical aside for the signed-out explanation.
  *   v1.0.0 — 2026-09-06 — Initial. Replaces the "Your AIMEAT Profile / Sign in to see your agents,
  *     wallet…" wall: the classic shell's words under an aurora theme.css had already turned off, so a
  *     visitor got a title on a blank page, no footer, and no word on where the address led.
@@ -70,7 +71,7 @@ export default function SignedOutDoor({ navigate, tabLabel }) {
           </div>
           <p class="pf-door-after">${t('profile.door.after')}</p>
         </div>
-        <aside class="pf-door-what">
+        <aside class="pf-door-what poster-aside">
           <div class="pf-door-what-head">
             <span class="pf-door-label">${t('profile.door.whatLabel')}</span>
             <span class="pf-door-what-title">${t('profile.door.whatTitle')}</span>
