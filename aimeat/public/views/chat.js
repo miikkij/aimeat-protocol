@@ -16,6 +16,7 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-09-13 -- V2z: compose the welcome section heading with the shared B1 class.
  *   v2.0.1 — 2026-09-03 — The bring-your-own-key link goes to ?tab=ai, the AI page's route id.
  *   v2.0.0 — 2026-08-28 — The poster chat, vertical space first (Jouni: "the chat space is what
  *     matters, and the input at the bottom"). Everything that is not the conversation moves into
@@ -609,7 +610,7 @@ export default function ChatView() {
                 <div class="chat-scroll" onScroll=${onScrollArea}>
                     ${turns.length === 0 && !busy ? html`
                         <div class="chat-welcome">
-                            <h2>${tr('chat.welcomeTitle', 'Your first agent')}</h2>
+                            <h2 class="poster-section-title">${tr('chat.welcomeTitle', 'Your first agent')}</h2>
                             <p>${tr('chat.welcomeBody', 'It works here the way your own AI tool would, with the same permissions and the same record of what it did. Ask it for something.')}</p>
                             <p class="chat-welcome-trust">${tr('chat.welcomeTrust', 'Everything you make here lands in your own account, and nothing becomes public until you publish it yourself.')}</p>
                             <!-- One concrete thing to ask for, not a menu. An empty box asks a person
