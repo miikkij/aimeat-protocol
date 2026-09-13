@@ -106,14 +106,6 @@ it: the admin pages, federation administration, the start wizard, the CLI.
 
 **Node.js keeps its name**, and a `{placeholder}` is not prose. The gate knows both.
 
-**An English technical noun bent into a Finnish one.** `sviitti` for a test suite is the measured
-case: ruled out on 2026-09-12 after it had reached published records, and written again on
-2026-09-13 by a session that was fixing a bug and never opened this skill. The form is neither an
-established loan nor the English word, so the reader meets a term that exists nowhere else and
-cannot look it up. Say `testisarja` (or `testijoukko`), and when you do not know the settled
-Finnish word, keep the English one. The short version of this now sits in CLAUDE.md, where a
-session that is not writing prose still reads it.
-
 **The house / talo / la casa, for whoever pays.** No gate catches this one; it is a ruling
 (2026-09-13), and the developer's words for it were *there is no house*. The metaphor carried
 nothing in any of the three languages. Finnish has the idiom *talon piikkiin* but derives no noun
@@ -213,10 +205,6 @@ service, the directory, the token, the identifier and the username: the test nam
 - **2026-09-12, same day** — five concept rows, the heading rule and the placeholder rule added,
   each one named by the A/B test above rather than thought up.
 - **2026-09-13** — conversation, archive and rule, with the Messages list's sections and archive.
-- **2026-09-13** — the inflected English noun joins the forbidden list, and its short version moves
-  to CLAUDE.md. The rule was already here and already right; it was broken the day after it was
-  written, by a session whose task was a bug fix and which therefore never loaded this skill. A
-  rule only the writing task reads does not bind the report a debugging session writes in Finnish.
   *Keskustelu* and *conversación* are what the Messages page already shipped; *arkistoitu* and
   *archivar* were already the words on other pages (organisms, packages, the calibrator), and
   *sääntö* is what the Libraries and Capabilities pages call a rule.
