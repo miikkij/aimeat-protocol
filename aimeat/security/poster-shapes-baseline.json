@@ -1,11 +1,11 @@
 {
   "_note": "Copied design-language declarations, recorded debt rather than approval. This files map may only shrink. After migration, lower the affected counts or remove cleared files. Only an explicit developer decision permits re-seeding with pnpm check:poster-shapes --record.",
   "_measured": {
-    "date": "2026-09-13T05:28:09.483Z",
+    "date": "2026-09-13T05:34:45.166Z",
     "files": 78,
-    "declarations": 683,
+    "declarations": 682,
     "patterns": {
-      "headline": 128,
+      "headline": 127,
       "sun": 128,
       "box2": 187,
       "frame3": 61,
@@ -390,7 +390,7 @@
       "record": 1
     },
     "public/css/views/mcp-poster.css": {
-      "headline": 4,
+      "headline": 3,
       "action": 1,
       "sun": 2,
       "box2": 7,

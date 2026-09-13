@@ -10,6 +10,7 @@
  * @structure secConnect · quickWays · proofBlock · failList
  * @usage import { secConnect } from './connect.js';
  * @version-history
+ *   2026-09-13 -- V2aa: compose the proof section headline with the shared B1 class.
  *   v1.0.0 — 2026-09-02 — Initial (design canvas "AIMEAT MCP-sivu", direction A).
  */
 import { h } from 'preact';
@@ -46,7 +47,6 @@ export function secConnect(ctx, proven) {
           <p>${m('preTime')}</p>
         </div>
         ${quickWays(ctx)}
-        <h3 class="mc-h3">${m('proofTitle')}</h3>
         ${proofBlock(ctx, false)}`}
     <//>`;
 }
@@ -81,6 +81,7 @@ function quickWays(ctx) {
 function proofBlock(ctx, again) {
   return html`
     <div class="mc-proof">
+      ${!again && html`<h3 class="mc-h3 poster-section-title">${m('proofTitle')}</h3>`}
       <p>${again ? m('proofLeadAgain') : m('proofLead')}</p>
       <pre class="mc-code">${ctx.prompt || t('helloMcp.proof.loading')}</pre>
       <div class="og-doors mc-proof-doors">
