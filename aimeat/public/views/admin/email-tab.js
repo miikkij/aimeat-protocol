@@ -19,6 +19,7 @@
  *   - Sections 02 and 04 are in email-tab.send.js, section 05 in email-tab.templates.js
  *
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose shared poster section headings.
  *   v2.0.0 — 2026-09-12 — The poster face. The page now shows the setting that decides whether a
  *     new account must confirm its address (the status route has always returned it and no screen
  *     showed it), all six messages the node sends rather than three, how many people a group send
@@ -71,7 +72,7 @@ function RightNow({ email }) {
   return html`
     <section class="og-sec og-sec--first">
       <div class="og-sec-h">
-        <h2>${E('now.title')}<small>01</small></h2>
+        <h2 class="poster-section-title">${E('now.title')}<small>01</small></h2>
       </div>
       <div class="adm-ov-grid">
         <div>
@@ -130,7 +131,7 @@ function Automatic({ email }) {
 
   return html`
     <section class="og-sec">
-      <div class="og-sec-h"><h2>${E('auto.title')}<small>03</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${E('auto.title')}<small>03</small></h2></div>
       <p class="adm-em-lead">${E('auto.lead')}</p>
       <div class="adm-em-row adm-em-row--head">
         <div>${E('auto.colMessage')}</div><div class="adm-em-when">${E('auto.colWhen')}</div>
@@ -158,7 +159,7 @@ function NotConfigured() {
   return html`
     <div class="og adm-em">
       <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2>${E('now.title')}<small>01</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${E('now.title')}<small>01</small></h2></div>
         <div class="adm-ov-grid">
           <div>
             <div class="adm-ov-status danger">${E('off.word')}</div>
@@ -179,7 +180,7 @@ function NotConfigured() {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${E('off.setTitle')}<small>02</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${E('off.setTitle')}<small>02</small></h2></div>
         <p class="adm-em-lead">${E('off.setLead')}</p>
         <div class="adm-em-envbox">
           <div class="adm-em-envbox-t">${E('off.envLabel')}</div>
