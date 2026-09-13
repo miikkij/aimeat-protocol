@@ -8,6 +8,7 @@
  *   map of kinds, the rows of entries with the query words marked, the place cards and the result
  *   groups. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 -- 2026-09-13 -- V2: compose the search row's top rule from poster.css.
  *   v1.0.1 — 2026-08-30 — The loading mark: a blinking coral square before the counting line.
@@ -41,7 +42,7 @@
 .dv-kinds { display: grid; grid-template-columns: 4.4rem minmax(0, 1fr) minmax(0, 1fr) 3.5rem; gap: 0 1.1rem; align-items: center; }
 .dv-kinds > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
 .dv-kinds--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.dv-kinds .dv-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.5rem; line-height: 1; text-align: right; color: var(--text); }
+.dv-kinds .dv-n { text-align: right; margin-right: 0; }
 .dv-kinds .dv-nm { font-weight: 800; font-size: .97rem; }
 .dv-kinds .dv-nm small { display: block; font-size: .8rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; }
 .dv-kinds .dv-where { font-family: var(--font-mono); font-size: .75rem; line-height: 1.5; color: var(--text-dim); }
@@ -52,7 +53,7 @@
 .dv-rows > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
 .dv-rows--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .dv-rows--hits { grid-template-columns: minmax(0, 1fr) minmax(0, 13rem) 3.5rem; }
-.dv-at { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.35rem; line-height: 1; color: var(--text); }
+.dv-at { margin-right: 0; }
 .dv-at small { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: .2rem; }
 .dv-rows .dv-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
 .dv-rows .dv-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }

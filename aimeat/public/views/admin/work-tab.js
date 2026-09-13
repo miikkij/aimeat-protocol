@@ -20,6 +20,7 @@
  *   - WorkTab({ data, switchPage }) — the three sections
  *   - dur / deadlineWords — the countdown a row prints instead of a timestamp
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.2.0 — 2026-09-13 — Compose shared poster headings in the populated view.
  *   v2.1.0 -- 2026-09-13 -- Compose the empty state's frame and B1 heading from poster.css.
@@ -192,7 +193,7 @@ export default function WorkTab({ data, switchPage }) {
         </div>
 
         <div class="adm-work-row adm-work-row--head">
-          <div class="adm-work-n">#</div>
+          <div class="adm-work-n poster-stat-number poster-stat-number--small">#</div>
           <div>${W('colCode')}</div>
           <div>${W('colStatus')}</div>
           <div>${W('colAction')}</div>
@@ -207,7 +208,7 @@ export default function WorkTab({ data, switchPage }) {
       const when = deadlineWords(r);
       return html`
           <div class="adm-work-row ${r.overdue ? 'is-over' : ''}">
-            <div class="adm-work-n">${String(oldestFirst ? found.length - i : i + 1).padStart(2, '0')}</div>
+            <div class="adm-work-n poster-stat-number poster-stat-number--small">${String(oldestFirst ? found.length - i : i + 1).padStart(2, '0')}</div>
             <div class="adm-work-tc" title=${r.trackingCode}>${r.trackingCode}</div>
             <div class="adm-work-st adm-work-st--${TONE[r.status] || 'gone'}">${r.status}</div>
             <div class="adm-work-act">${r.action}</div>

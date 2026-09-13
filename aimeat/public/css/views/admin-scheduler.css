@@ -8,6 +8,7 @@
  *   admin.css and organism.css; only what this page adds lives here, and every value is a
  *   theme.css token.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.0.0 — 2026-09-12 — Initial. Replaces the two bordered tables and the four stat cards.
  */
 
@@ -22,7 +23,7 @@
 /* ── 01 · what broke ── */
 .adm-sch-top { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 0 48px; align-items: start; }
 .adm-sch-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
-.adm-sch-hero { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3.2rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); color: var(--text); }
+.adm-sch-hero { margin-right: 0; }
 .adm-sch-hero-sub { margin: .7rem 0 0; font-size: .88rem; line-height: 1.6; color: var(--text-dim); }
 .adm-sch-fails { border-top: 2px solid var(--text); margin-top: 1.5rem; }
 .adm-sch-frow { display: grid; grid-template-columns: 300px minmax(0, 1fr) 200px; gap: 0 24px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--border); }
@@ -114,7 +115,6 @@
 
 @media (max-width: 900px) {
   .adm-sch-top { grid-template-columns: 1fr; gap: 1.2rem; }
-  .adm-sch-hero { font-size: 2.3rem; }
   .adm-sch-frow { grid-template-columns: 1fr; gap: 8px 0; }
   .adm-sch-facts { justify-content: flex-start; }
   .adm-sch-tools { flex-direction: column; align-items: stretch; gap: 14px; }

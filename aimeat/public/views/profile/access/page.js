@@ -19,6 +19,7 @@
  *   secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.4.0 -- 2026-09-13 -- Compose the recovery frame from poster.css.
  *   v1.3.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
@@ -162,7 +163,7 @@ function secSignIn(ctx) {
         ${!s.managed_by && tf.available ? html`
           ${row(x('row.twoStep'), tf.enabled ? x('row.twoStepOn', { n: tf.backup_codes_left }) : tf.pending ? x('row.twoStepPending') : x('row.twoStepOff'), html`<span class=${`og-chip ${tf.enabled ? '' : 'og-chip--coral'}`}>${tf.enabled ? x('twoStep.onShort') : x('twoStep.offShort')}</span>`, 'is-last')}
           <div class="ac-panel"><${TwoFactorSection} twoFactor=${tf} managed=${!!s.managed_by} showToast=${ctx.showToast} onChanged=${() => ctx.load()} /></div>` : null}
-        ${row(x('row.sessions'), x('row.sessionsSub', { mine: s.sessions.mine.total, agents: s.sessions.agents.total }), html`<span class="ac-n">${n(s.sessions.mine.total)}</span>${s.sessions.mine.total > 1 ? html`<button type="button" class="og-door" disabled=${ctx.busy === 'sessions'} onClick=${() => ctx.signOutOthers()}>${x('doorSignOutOthers')}</button>` : null}`, 'is-last')}
+        ${row(x('row.sessions'), x('row.sessionsSub', { mine: s.sessions.mine.total, agents: s.sessions.agents.total }), html`<span class="ac-n poster-stat-number poster-stat-number--small">${n(s.sessions.mine.total)}</span>${s.sessions.mine.total > 1 ? html`<button type="button" class="og-door" disabled=${ctx.busy === 'sessions'} onClick=${() => ctx.signOutOthers()}>${x('doorSignOutOthers')}</button>` : null}`, 'is-last')}
         ${s.sessions.mine.total ? sessionsBlock(ctx) : null}
         ${row(x('row.federation'), ctx.fed.all ? x('row.federationAll') : ctx.fed.nodes.length ? x('row.federationList', { n: ctx.fed.nodes.length }) : x('row.federationNone'), html`<span class="og-chip">${ctx.fed.all ? x('fed.allChip') : x('fed.listChip', { n: ctx.fed.nodes.length })}</span><button type="button" class="og-door" disabled=${ctx.busy === 'fed'} onClick=${() => ctx.toggleFedAll()}>${ctx.fed.all ? x('fed.restrict') : x('fed.allowAll')}</button>`, 'is-last')}
         ${federationBlock(ctx)}

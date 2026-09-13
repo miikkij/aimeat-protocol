@@ -15,6 +15,7 @@
  *   renderRecord · renderPage
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.4.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.3.0 -- 2026-09-13 -- Compose the record value's top rule from poster.css.
@@ -131,7 +132,7 @@ function spaceTable(ctx, list, { head = true, id = '' } = {}) {
     ${head ? html`<div class="og-tbl og-tbl--head mp-tbl"><div></div><div>${c('colSpace', 'Key space')}</div><div>${c('colSize', 'Size')}</div><div>${c('colLatest', 'Latest')}</div><div></div></div>` : null}
     <div class="og-tbl mp-tbl">
       ${shown.map(s => html`
-        <div class="og-tbl-n" key=${'n' + s.id}>${s.items.length}</div>
+        <div class="og-tbl-n poster-stat-number poster-stat-number--small" key=${'n' + s.id}>${s.items.length}</div>
         <div class="og-tbl-nm" key=${'m' + s.id}>
           <button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'space', id: s.id })}>${s.label}</button>
           ${s.publicN || s.membersN ? html`<span class="og-tbl-marks">

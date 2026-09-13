@@ -13,6 +13,7 @@
  *   - Instances: create, pause, delete, edit config and translations for a multi-instance extension
  *
  * @version-history
+ *   2026-09-13 -- Compose the shared compact record title.
  *   v1.1.0 -- 2026-09-13 -- Compose the action rule and replace inline instance layout with classes.
  *   v1.0.0 — 2026-09-12 — Initial. What an extension exposes and what calls it were both invisible
  *     before: the list showed a name, a version and a HEALTHY badge that only meant "active".
@@ -166,7 +167,7 @@ export default function ExtensionRecord({ ext, onClose, onUninstall, onReload })
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
       <div class="adm-ex-rec-h">
         <div>
-          <h3>${ext.name}</h3>
+          <h3 class="poster-record-title poster-record-title--small">${ext.name}</h3>
           <span class="adm-ex-rec-sub">${ext.description || X('noDescription')}</span>
           <div class="adm-ex-rec-chips">
             <span class=${active ? 'is-live' : 'is-off'}>${active ? X('active') : X('switchedOff')}</span>

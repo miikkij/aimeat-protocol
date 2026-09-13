@@ -12,6 +12,7 @@
  * @structure renderDetail · limitsOf · runRows
  * @usage import { renderDetail } from './detail.js';
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import { h } from 'preact';
@@ -40,7 +41,7 @@ function limitsOf(s) {
 function runRows(runs) {
   return html`<div class="sc-agenda sc-agenda--runs">
     ${runs.map((r, i) => { const d = new Date(r.createdAt); return html`
-      <div class="sc-at" key=${'a' + i}>${hhmm(d)}<small>${dayLabel(d)}</small></div>
+      <div class="sc-at poster-stat-number poster-stat-number--small" key=${'a' + i}>${hhmm(d)}<small>${dayLabel(d)}</small></div>
       <div class="sc-nm sc-nm--run" key=${'n' + i}>
         <b class=${`sc-res sc-res--${r.result}`}>${resultWord(r.result)}</b> · ${c('trigger.' + (r.trigger || 'cron'))}${r.durationMs ? ` · ${(r.durationMs / 1000).toFixed(1)} s` : ''}
         ${r.errorMessage ? html`<small class="sc-err">${r.errorMessage}</small>` : null}
@@ -118,7 +119,7 @@ export function renderDetail(ctx, s) {
       <//>
       <${Section} id="sc-coming" num="03" title=${c('secComing')}>
         ${coming.length ? html`<div class="sc-agenda sc-agenda--coming">
-          ${coming.map((o, i) => html`<div class="sc-at" key=${'a' + i}>${hhmm(o.at)}<small>${dayLabel(o.at)}</small></div><div class="sc-who" key=${'w' + i}>${zoneOf(s)}</div>`)}
+          ${coming.map((o, i) => html`<div class="sc-at poster-stat-number poster-stat-number--small" key=${'a' + i}>${hhmm(o.at)}<small>${dayLabel(o.at)}</small></div><div class="sc-who" key=${'w' + i}>${zoneOf(s)}</div>`)}
         </div>` : html`<p class="og-empty">${s.enabled === false ? t('profile.scheduler.paused') : (s.nextRunAt ? `${dayLabel(new Date(s.nextRunAt))} ${hhmm(new Date(s.nextRunAt))}` : c('noneNext'))}</p>`}
       <//>
       ${s.readOnly ? null : html`<${Fold} id="sc-edit" num="04" title=${t('profile.scheduler.edit')} sub=${c('editSub')} open=${ctx.editOpen} onToggle=${() => ctx.setEditOpen(v => !v)}>

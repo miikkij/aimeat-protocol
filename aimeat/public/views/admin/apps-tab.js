@@ -19,6 +19,7 @@
  * @structure AppsAdminTab (default) · RightNow · FourStates · TakenDown
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared poster headings and external spacing.
  *   v2.0.1 — 2026-09-13 — The take-down and delete dialogs' actions sit in the dialog's footer.
@@ -113,7 +114,7 @@ function RightNow({ facts, number, onFilter }) {
 function FourStates({ facts, number }) {
   const step = (n, key, value, last) => html`
     <div class=${'adm-ap-step' + (last ? ' adm-ap-step--last' : '')}>
-      <span class="adm-ap-stepn">${n}</span>
+      <span class="adm-ap-stepn poster-stat-number poster-stat-number--small poster-stat-number--step">${n}</span>
       <span><b>${A('states.' + key)}</b><span class="adm-why">${A('states.' + key + 'Why')}</span></span>
       <span class="adm-mval">${value}</span>
     </div>`;

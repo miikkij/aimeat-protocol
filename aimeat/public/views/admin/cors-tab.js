@@ -13,6 +13,7 @@
  * @structure CorsTab({ data, switchPage }) — load · RightNow · Strip · the two ListSections from
  *   cors-tab.form.js · OrderSection · AskAiSection · the actions (save, clear)
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 -- 2026-09-13 -- Compose section headings from the shared B1 shape.
  *   v2.0.0 — 2026-09-08 — The poster face and the one read: the three cards become five sections,
@@ -125,7 +126,7 @@ function Strip({ ov, toSection }) {
 function OrderSection({ ov, switchPage }) {
   const step = (n, key, value, last) => html`
     <div class="adm-cors-step ${last ? 'adm-cors-step--last' : ''}">
-      <span class="adm-cors-step-num">${n}</span>
+      <span class="adm-cors-step-num poster-stat-number poster-stat-number--small poster-stat-number--step">${n}</span>
       <span><b>${C('order.' + key)}</b><span class="adm-why">${C('order.' + key + 'Why', { value: ov.default.origins.join(', ') || '—' })}</span></span>
       ${value}
     </div>`;

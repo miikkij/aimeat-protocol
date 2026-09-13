@@ -8,6 +8,7 @@
  *   sections, the metric rows, the numeral strip, the doors and the slab come from admin.css and
  *   organism.css; only what this page adds lives here.
  * @version-history
+ *   2026-09-13 -- Compose the shared compact record title.
  *   v1.1.0 -- 2026-09-13 -- Compose the record action rule and own instance-form layout.
  *   v1.0.0 — 2026-09-12 — Initial, with the page renamed from Services to Extensions.
  */
@@ -52,7 +53,7 @@
 /* ── The record a row opens into ───────────────────────────────────────────────────────────── */
 .adm-ex-rec { border: 3px solid var(--text); background: var(--card-bg); box-shadow: 8px 8px 0 var(--sun); padding: 20px 22px 22px; margin: 12px 0 20px; }
 .adm-ex-rec-h { display: flex; align-items: flex-start; justify-content: space-between; gap: 30px; padding-bottom: 14px; border-bottom: 3px solid var(--text); }
-.adm-ex-rec-h h3 { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400); font-size: 1.8rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em); text-transform: uppercase; color: var(--text); overflow-wrap: anywhere; }
+.adm-ex-rec-h h3 { overflow-wrap: anywhere; }
 .adm-ex-rec-sub { display: block; margin-top: 8px; font-size: .9rem; line-height: 1.5; color: var(--text-dim); max-width: 72ch; }
 .adm-ex-rec-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
 .adm-ex-rec-chips span { font-family: var(--font-mono); font-size: .68rem; line-height: 1.6; padding: 1px 7px; border: 2px solid var(--text); color: var(--text); }

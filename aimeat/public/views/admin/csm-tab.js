@@ -17,6 +17,7 @@
  *   - fieldsOf / bounds: reading one field's rule out of the definition
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.2.0 -- 2026-09-13 -- Compose remaining section headings and record rules from poster.css.
  *   v2.1.0 — 2026-09-13 — Compose shared poster list and empty-state headings.
@@ -238,7 +239,7 @@ export default function CsmTab({ data, reload }) {
       <div class="adm-csm-top">
         <div>
           <div class="adm-csm-lbl">${S('heroLabel')}</div>
-          <div class="adm-csm-hero">${S('hero', { n: num(m.total) })}</div>
+          <div class="adm-csm-hero poster-stat-number">${S('hero', { n: num(m.total) })}</div>
           <p class="adm-csm-hero-sub">${S('heroSub')}</p>
         </div>
         <div><p class="adm-csm-lead">${S('lead')}</p></div>
@@ -288,7 +289,7 @@ function Empty({ examples, loadExamples, onWrite, onTake, onPrompt }) {
       <div class="adm-csm-two adm-csm-two--empty">
         <div>
           <div class="adm-csm-lbl">${S('emptyLabel')}</div>
-          <div class="adm-csm-hero adm-csm-hero--empty">${S('emptyHero')}</div>
+          <div class="adm-csm-hero adm-csm-hero--empty poster-stat-number">${S('emptyHero')}</div>
           <p class="adm-csm-lead">${S('emptyLead1')}</p>
           <p class="adm-csm-lead">${S('emptyLead2')}</p>
 
@@ -349,7 +350,7 @@ function One({ csm, onBack, onDelete }) {
       </div>
 
       <div class="adm-csm-head poster-row--thing">
-        <h2>${csm.name}<i>${svc.version ? 'v' + svc.version + ' · ' : ''}${csm.json_schema_key}</i></h2>
+        <h2 class="poster-record-title">${csm.name}<i>${svc.version ? 'v' + svc.version + ' · ' : ''}${csm.json_schema_key}</i></h2>
         <div class="adm-csm-doors">
           <button type="button" class="adm-csm-door" onClick=${() => setShowYaml(!showYaml)}>
             ${showYaml ? S('hideDefinition') : S('theDefinition')}

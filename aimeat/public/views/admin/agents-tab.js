@@ -21,6 +21,7 @@
  *   - agents-tab.derive.js does the counting, .list.js is section 02, .record.js is an opened row
  *
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose the remaining B1 headings; fleet ratios use SVG width data.
  *   v2.0.0 — 2026-09-12 — The poster face: one table of 143 unsearchable rows becomes three
@@ -114,7 +115,7 @@ function Fleets({ fleets, total, onOwners }) {
       ${fleets.top.map(o => html`
         <div class="adm-ag-orow">
           <div class="adm-ag-onm">${o.owner}</div>
-          <div><span class="adm-ag-onum ${o.count === fleets.biggest.count ? 'adm-ag-onum--coral' : ''}">${num(o.count)}</span></div>
+          <div><span class="adm-ag-onum ${o.count === fleets.biggest.count ? 'adm-ag-onum--coral' : ''} poster-stat-number poster-stat-number--small">${num(o.count)}</span></div>
           <div><span class="adm-ag-osm">${num(o.awake)}</span></div>
           ${bar(o.count)}
           <div class="adm-ag-go"><button type="button" class="og-door og-door--quiet" onClick=${onOwners}>${A('open')}</button></div>
@@ -122,7 +123,7 @@ function Fleets({ fleets, total, onOwners }) {
       ${fleets.rest && html`
         <div class="adm-ag-orow">
           <div class="adm-ag-onm">${A('restOwners', { n: num(fleets.rest.owners) })}<small>${A('restWhy', { most: num(fleets.rest.most) })}</small></div>
-          <div><span class="adm-ag-onum">${num(fleets.rest.count)}</span></div>
+          <div><span class="adm-ag-onum poster-stat-number poster-stat-number--small">${num(fleets.rest.count)}</span></div>
           <div><span class="adm-ag-osm">${num(fleets.rest.awake)}</span></div>
           ${bar(fleets.rest.count)}
           <div class="adm-ag-go"><button type="button" class="og-door og-door--quiet" onClick=${onOwners}>${A('open')}</button></div>

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 — Compose overview B1 headings and row rules from shared poster classes.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.3.0 -- 2026-09-13 -- V2: compose the avatar with the shared poster frame.
@@ -215,7 +216,7 @@ export function UsageCard({ switchTab, initialUsage }) {
           <span class="pf-usage-label">${label}</span>
           <span class="text-meta-sm">${usedText}</span>
         </div>
-        <div class="pf-usage-bar"><div class="pf-usage-fill ${pct >= 90 ? 'pf-usage-fill--danger' : ''}" style=${`width:${pct}%`}></div></div>
+        <div class="pf-usage-bar poster-box poster-box--meter poster-box--quota ${pct >= 90 ? 'is-full' : ''}"><svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="100%" aria-hidden="true"><rect width=${pct} height="100" /></svg></div>
       </div>`;
   };
 
@@ -269,7 +270,7 @@ export function UsageCard({ switchTab, initialUsage }) {
 
   const chip = (label, value, tab) => html`
     <button class="pf-usage-chip" onClick=${tab ? () => switchTab(tab) : undefined} disabled=${!tab}>
-      <span class="pf-usage-chip-val">${value}</span>
+      <span class="pf-usage-chip-val poster-stat-number poster-stat-number--small">${value}</span>
       <span class="pf-usage-chip-label">${label}</span>
     </button>`;
 
@@ -339,7 +340,7 @@ export function CommerceCard() {
   const chip = (label, main, sub) => html`
     <div class="pf-ai-win">
       <span class="pf-ai-win-label">${label}</span>
-      <span class="pf-ai-win-cost">${main}</span>
+      <span class="pf-ai-win-cost poster-stat-number">${main}</span>
       <span class="pf-ai-win-sub">${sub}</span>
     </div>`;
   const morsels = t('profile.landing.commerceMorsels') || 'morsels';
@@ -386,7 +387,7 @@ export function AiSpendCard() {
   const win = (label, w) => html`
     <div class="pf-ai-win">
       <span class="pf-ai-win-label">${label}</span>
-      <span class="pf-ai-win-cost">${fmtUsd(w && w.cost_usd)}</span>
+      <span class="pf-ai-win-cost poster-stat-number">${fmtUsd(w && w.cost_usd)}</span>
       <span class="pf-ai-win-sub">${fmtCompact(w && w.tokens)} ${t('profile.landing.aiTokensWord') || 'tokens'}</span>
     </div>`;
 
@@ -410,7 +411,7 @@ export function AiSpendCard() {
             const pct = totalCost > 0 ? Math.round((m.cost_usd / totalCost) * 100) : 0;
             return html`
               <div class="pf-ai-app-row" key=${app}>
-                <span class="pf-ai-app-dot" style=${`background:${colorForIndex(apps.indexOf(app))}`}></span>
+                <svg class="pf-ai-app-dot" viewBox="0 0 14 14" aria-hidden="true"><rect width="14" height="14" fill=${colorForIndex(apps.indexOf(app))} /></svg>
                 <span class="pf-ai-app-name">${app}</span>
                 <span class="pf-ai-app-cost">${fmtUsd(m.cost_usd)}</span>
                 <span class="pf-ai-app-pct">${pct}%</span>
@@ -442,7 +443,7 @@ export function AgentLedgerCard() {
   const tile = (label, value) => html`
     <div class="pf-ai-win">
       <span class="pf-ai-win-label">${label}</span>
-      <span class="pf-ai-win-cost">${value}</span>
+      <span class="pf-ai-win-cost poster-stat-number">${value}</span>
     </div>`;
 
   return html`
@@ -498,7 +499,7 @@ export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) 
   const stat = (icon, val, labelKey, tabId, green) => html`
     <button class="pf-lp-stat pf-lp-stat-link" onClick=${() => switchTab?.(tabId)}>
       <span class="pf-lp-stat-ico" aria-hidden="true">${icon}</span>
-      <span class="pf-lp-stat-val${green ? ' pf-lp-stat-green' : ''}">${val}</span>
+      <span class="pf-lp-stat-val poster-stat-number poster-stat-number--band${green ? ' pf-lp-stat-green' : ''}">${val}</span>
       <span class="pf-lp-stat-label">${t(labelKey)}</span>
     </button>`;
 

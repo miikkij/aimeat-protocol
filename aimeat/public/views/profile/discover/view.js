@@ -12,6 +12,7 @@
  * @structure renderDiscoverView · renderCover · secKinds · secRecent · secPlaces · secBookkeeping · renderResults · renderKind · renderPlace
  * @usage import { renderDiscoverView } from './discover/view.js';
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.1 — 2026-08-30 — Says it is counting, searching or loading rows instead of an ellipsis.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces the scope buttons, the thirteen type chips and the
@@ -99,7 +100,7 @@ function secKinds(ctx, kinds) {
       <div class="dv-kinds dv-kinds--head"><div></div><div>${c('colKind')}</div><div>${c('colWhere')}</div><div></div></div>
       <div class="dv-kinds">
         ${kinds.map(k => html`
-          <div class="dv-n" key=${'n' + k.value}>${num(k.count)}${capped && k.count >= 50 ? '+' : ''}</div>
+          <div class="dv-n poster-stat-number poster-stat-number--small" key=${'n' + k.value}>${num(k.count)}${capped && k.count >= 50 ? '+' : ''}</div>
           <div class="dv-nm" key=${'m' + k.value}><button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'kind', type: k.value })}>${kindName(k.value)}</button><small>${kindSub(k.value)}</small></div>
           <div class="dv-where" key=${'w' + k.value}>${whereOf(f, k.value)}</div>
           <div class="og-tbl-door" key=${'d' + k.value}><button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'kind', type: k.value })}>${c('browse')}</button></div>`)}

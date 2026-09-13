@@ -17,6 +17,7 @@
  *   - Field / readWord / openJson: the pieces both views share
  * @usage Imported by memory-tab.js; not mounted on its own.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 -- 2026-09-13 -- Compose record and audience row boundaries from poster.css.
  *   v1.0.0 — 2026-09-12 — Initial, with the page rebuilt around the question.
@@ -175,7 +176,7 @@ export function Reach({ counts, total, originCount, onPick, onBack }) {
           return html`
             <div class=${'adm-mem-rung' + (n > 0 ? '' : ' is-none')} key=${v}>
               <div class="adm-mem-rung-n">${v}</div>
-              <div class="adm-mem-rung-c">${n}</div>
+              <div class="adm-mem-rung-c poster-stat-number poster-stat-number--small">${n}</div>
               <div>
                 <div class="adm-mem-rung-w">${S('vis_' + v)}</div>
                 <div class="adm-mem-rung-note">${S('visNote_' + v)}</div>

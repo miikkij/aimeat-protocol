@@ -8,6 +8,7 @@
  *   from admin.css and organism.css; only what this page adds lives here, and every value is a
  *   theme.css token.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v1.1.0 -- 2026-09-13 -- Compose section slabs and record row boundaries from poster.css.
  *   v1.0.0 — 2026-09-12 — Initial. Replaces the three-column card wall.
@@ -25,7 +26,7 @@
 /* ── The headline beside the sentence that explains it ── */
 .adm-brd-top { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 0 48px; align-items: start; }
 .adm-brd-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
-.adm-brd-hero { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3.1rem; line-height: 1.02; letter-spacing: var(--font-poster-tracking); color: var(--text); }
+.adm-brd-hero { margin-right: 0; }
 .adm-brd-hero-sub { margin: .7rem 0 0; font-size: .88rem; line-height: 1.6; color: var(--text-dim); }
 
 /* ── Search and the five chips ── */
@@ -68,7 +69,6 @@
 .adm .adm-brd-crumb button:hover { color: var(--accent); border-bottom-color: var(--accent); }
 .adm-brd-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1.5rem; padding-top: 1.3rem; margin-bottom: .3rem; flex-wrap: wrap; }
 .adm-brd-head:has(> .poster-section-title) { padding-top: 0; }
-.adm-brd-head h2:where(:not(.poster-section-title)) { margin: 0; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.9rem; line-height: 1.05; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text); }
 .adm-brd-head h2 i { font-style: normal; font-family: var(--font-mono); font-size: .8rem; font-weight: 400; color: var(--text-dim); margin-left: 12px; text-transform: none; letter-spacing: 0; overflow-wrap: anywhere; }
 .adm-brd-head h2 small { font-family: var(--font-mono); font-size: .8rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--accent); margin-left: .6rem; }
 .adm-brd-what { margin: 1rem 0 0; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
@@ -145,7 +145,6 @@
 
 @media (max-width: 900px) {
   .adm-brd-top { grid-template-columns: 1fr; gap: 1.2rem; }
-  .adm-brd-hero { font-size: 2.3rem; }
   .adm-brd-tools { flex-direction: column; align-items: stretch; gap: 14px; }
   .adm-brd-hrow { display: none; }
   .adm-brd-row { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }

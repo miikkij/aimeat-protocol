@@ -12,6 +12,7 @@
  * @structure renderPage · secWaiting · secKunto · secNewest · secFirst
  * @usage import { renderPage } from './apps/page.js';
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   2026-09-13 -- Compose the shared initials-box role and its measured size cut.
  *   v1.3.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
@@ -194,7 +195,7 @@ function secKunto(ctx, num) {
         : !k.rows.length ? html`<p class="ap-empty"><b>${a('kuntoAllGood')}</b></p>` : html`
         <div class="ap-kn">
           ${k.rows.map((r) => html`
-            <div class=${`ap-kn-n ${r.loud ? 'ap-kn-n--loud' : ''}`} key=${'n' + r.key}>${r.n}</div>
+            <div class=${`ap-kn-n poster-stat-number poster-stat-number--small ${r.loud ? 'ap-kn-n--loud' : ''}`} key=${'n' + r.key}>${r.n}</div>
             <div class="ap-kn-w" key=${'w' + r.key}><b>${a('kunto.' + r.key + '.what')}</b><small>${sub(r.key)}</small></div>
             <div class="ap-kn-go" key=${'g' + r.key}><a class="og-door og-door--quiet" href=${catalogUrl({ filter: r.key })} target="_blank" rel="noopener">${a('kuntoShow', { n: r.n })}</a></div>`)}
         </div>`}

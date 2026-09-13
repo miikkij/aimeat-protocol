@@ -8,6 +8,7 @@
  *   dashed aside come from admin.css; only what this page adds lives here, and every value is a
  *   theme.css token.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v1.1.0 -- 2026-09-13 -- Compose the results heading and ink row boundaries from poster.css.
  *   v1.0.0 — 2026-09-12 — Initial. Replaces the filter bar and the seven-column table.
@@ -126,7 +127,7 @@
 .adm-mem-ladder { margin-top: 24px; }
 .adm-mem-rung { display: grid; grid-template-columns: 128px 76px minmax(0, 1fr) 130px; gap: 0 24px; padding: 14px 0; border-bottom: 1px solid var(--border); align-items: baseline; }
 .adm-mem-rung-n { font-family: var(--font-mono); font-size: .84rem; font-weight: 700; color: var(--accent); }
-.adm-mem-rung-c { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.7rem; line-height: 1; letter-spacing: var(--font-poster-tracking); text-align: right; color: var(--accent); }
+.adm-mem-rung-c { text-align: right; margin-right: 0; }
 .adm-mem-rung.is-none .adm-mem-rung-n, .adm-mem-rung.is-none .adm-mem-rung-c { color: var(--text-muted); }
 .adm-mem-rung-w { font-size: .88rem; line-height: 1.5; font-weight: 600; color: var(--text); }
 .adm-mem-rung-note { font-size: .8rem; line-height: 1.5; color: var(--text-dim); margin-top: 3px; }

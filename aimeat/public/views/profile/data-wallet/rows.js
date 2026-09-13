@@ -11,6 +11,7 @@
  * @structure targetRow · targetOpen · personRow · revokedRow · groupRow · groupOpen · eventRow
  * @usage import { targetRow, groupRow, eventRow } from './rows.js';
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.1.0 -- 2026-09-13 -- Compose detail frames from poster.css.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
@@ -121,7 +122,7 @@ export function groupRow(ctx, g) {
     <div class=${`dw-row ${open ? 'is-open' : ''}`} key=${id}>
       <div class="dw-nm"><button type="button" class="og-tbl-name" onClick=${() => ctx.toggleGroup(id)}>${w.who.name}</button>${w.who.sub ? html`<small>${w.who.sub}</small>` : null}</div>
       <div class="dw-w">${w.what}${w.sub ? html`<small>${w.sub}</small>` : null}</div>
-      <div class=${`dw-n ${denied ? 'is-low' : 'is-good'}`}>${n(g.count)}<small>${x('outcome.' + w.outcome)}</small></div>
+      <div class=${`dw-n poster-stat-number poster-stat-number--small ${denied ? 'is-low' : 'is-good'}`}>${n(g.count)}<small>${x('outcome.' + w.outcome)}</small></div>
       <div class="dw-when">${spanWord(g.first, g.last)}</div>
       <div class="dw-go"><button type="button" class="og-door" onClick=${() => ctx.toggleGroup(id)}>${doorWord(open)}</button></div>
       ${open ? groupOpen(ctx, g, id, w) : null}
@@ -173,7 +174,7 @@ export function eventRow(ctx, ev) {
     <div class="dw-row" key=${`${ev.kind}|${ev.consent.id}`}>
       <div class="dw-nm">${byYou ? x('you') : ev.by}</div>
       <div class="dw-w">${text}</div>
-      <div class="dw-n is-good">1<small>${x('outcome.' + ev.kind)}</small></div>
+      <div class="dw-n is-good poster-stat-number poster-stat-number--small">1<small>${x('outcome.' + ev.kind)}</small></div>
       <div class="dw-when">${dateWord(ev.at)} ${timeWord(ev.at)}</div>
       <div class="dw-go"></div>
     </div>`;

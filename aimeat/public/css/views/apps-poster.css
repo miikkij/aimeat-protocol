@@ -9,6 +9,7 @@
  *   apps that changed last, the agents-and-skills facts, the form for a finished file.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   2026-09-13 -- Compose the shared initials box; retain only row dimensions and placement.
  *   v1.0.0 — 2026-09-02 — Initial.
@@ -45,7 +46,7 @@
 /* ── The condition rows ────────────────────────────────────────────────────────────────────── */
 .ap-kn { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto; gap: 0 1rem; align-items: stretch; }
 .ap-kn > div { padding: .75rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
-.ap-kn-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.9rem; line-height: 1; letter-spacing: .01em; color: var(--text); }
+.ap-kn-n { margin-right: 0; }
 .ap-kn-n--loud { color: var(--accent); }
 .ap-kn-w b { font-size: .95rem; font-weight: 800; color: var(--text); }
 .ap-kn-w small { display: block; margin-top: .2rem; font-size: .82rem; line-height: 1.45; color: var(--text-dim); }
@@ -90,7 +91,6 @@
 /* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 860px) {
   .ap-kn { grid-template-columns: 3.6rem minmax(0, 1fr); }
-  .ap-kn-n { font-size: 1.5rem; }
   .ap-kn-go { grid-column: 2; justify-items: start; padding-top: 0; }
   .ap-list { grid-template-columns: 2.2rem minmax(0, 1fr); }
   .ap-list > .ap-head { display: none; }

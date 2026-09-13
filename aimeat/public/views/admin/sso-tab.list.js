@@ -22,6 +22,7 @@
  *   - Organisations — section 02 with connections, and the create form
  * @usage Imported by views/admin/sso-tab.js.
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Organisation sign-in page in the poster face).
@@ -59,7 +60,7 @@ export function BeforeYouStart({ node, onCreate, busy }) {
       <p class="adm-sso-lead">${S('before.lead')}</p>
       ${GATHER.map((k, i) => html`
         <div class="adm-sso-step ${i === GATHER.length - 1 ? 'adm-sso-step--last' : ''}">
-          <span class="adm-sso-step-n">${i + 1}</span>
+          <span class="adm-sso-step-n poster-stat-number poster-stat-number--small">${i + 1}</span>
           <span>
             <b>${S('before.' + k)}</b>
             <p>${S('before.' + k + 'Why')}</p>

@@ -15,6 +15,7 @@
  *   - whoOf / readWord: how a row says whose a board is and who may read it
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.2.0 -- 2026-09-13 -- Compose remaining section headings and record rules from poster.css.
  *   v2.1.0 — 2026-09-13 — Compose the board-list section heading from shared poster B1.
@@ -203,7 +204,7 @@ export default function BoardsTab({ data, reload }) {
       <div class="adm-brd-top">
         <div>
           <div class="adm-brd-lbl">${S('heroLabel')}</div>
-          <div class="adm-brd-hero">${S('hero', { n: num(m.silent), total: num(m.total) })}</div>
+          <div class="adm-brd-hero poster-stat-number">${S('hero', { n: num(m.silent), total: num(m.total) })}</div>
           <p class="adm-brd-hero-sub">${S('heroSub')}</p>
         </div>
         <div><p class="adm-brd-lead">${S('lead')}</p></div>
@@ -272,7 +273,7 @@ function One({ board, posts, authors, total, busy, onBack, onFlip, onDelete, onA
       </div>
 
       <div class="adm-brd-head poster-row--thing">
-        <h2>${board.name || board.id}<i>${board.id}${total ? ' · ' + S('nNotices', { n: num(total) }) : ''}</i></h2>
+        <h2 class="poster-record-title">${board.name || board.id}<i>${board.id}${total ? ' · ' + S('nNotices', { n: num(total) }) : ''}</i></h2>
         <div class="adm-brd-doors">
           <button type="button" class="adm-brd-door is-quiet" onClick=${onDelete}>${S('delete')}</button>
         </div>
