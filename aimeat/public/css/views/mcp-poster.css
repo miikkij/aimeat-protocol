@@ -9,6 +9,7 @@
  *   (the setup guide .ast-*, the instruction block .ib-*, the install row .mcpi-*, the managed-
  *   environment note .mgd-*). NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-09-13 -- V2aa: shared B1 class owns the connection proof heading.
  *   v1.0.0 — 2026-09-02 — Initial.
  */
 
@@ -16,7 +17,7 @@
 .og-mcp .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
 .og-mcp .mc-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); display: block; }
 .og-mcp .mc-lead { margin: 0 0 .9rem; font-size: .95rem; line-height: 1.6; color: var(--text); }
-.og-mcp .mc-h3 { margin: 1.6rem 0 .6rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.25rem; line-height: 1.05; letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text); }
+.og-mcp .mc-proof { --poster-section-size: 1.25rem; }
 .og-mcp .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .og-mcp .og-doors > a { text-decoration: none; }
 .og-mcp .og-door:disabled { opacity: .5; cursor: default; }
