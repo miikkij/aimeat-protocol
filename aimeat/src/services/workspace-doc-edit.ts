@@ -34,6 +34,10 @@
  *   const res = await appendToDocument({ storage, config }, caller,
  *     { organismId, wsId, space: 'notes', id: 'doc-x', markdown: '## Found\n\n…' });
  * @version-history
+ *   v1.1.0 — 2026-09-13 — A space the manifest does not declare is the shared 422 UNDECLARED_SPACE
+ *     refusal (the developer's decision, the same answer every workspace write door gives), where it
+ *     was 404 NO_SPACE with a sentence of its own. A caller the access rule refuses is told that
+ *     first, so the refusal's list of declared spaces reaches only someone who may write here.
  *   v1.0.0 — 2026-09-02 — Initial (wish-workspace-append-ja-osiomuokkaus).
  */
 import type { AimeatConfig } from '../config.js';
@@ -182,7 +186,8 @@ function requireMarkdown(markdown: unknown): string {
  * The gates, the read, the compute and the compare-and-swap that both operations share.
  *
  * THE ORDER IS THE DESIGN, and it is "refuse before you write":
- *   1. the space exists in the manifest, is memory-backed, and holds documents
+ *   1. the space exists in the manifest, is memory-backed, and holds documents (UNDECLARED_SPACE
+ *      otherwise, after the access rule has had its say)
  *   2. the caller may write this organism namespace at all — the SAME rule the memory door runs,
  *      reached with the record's own key
  *   3. the workspace is not archived
@@ -204,8 +209,17 @@ async function editDocument(
         throw new WorkspaceDocError('WS_NOT_FOUND', 404,
             `No manifest for workspace ${target.wsId} — an empty workspace, the wrong id, or no access to it.`);
     }
-    const space = resolveSpace(target.space, (manifest.objectTypes ?? []) as WriteObjectType[]);
-    if ('error' in space) throw new WorkspaceDocError('NO_SPACE', 404, space.error);
+    const space = resolveSpace(target.space, (manifest.objectTypes ?? []) as WriteObjectType[], undefined,
+        { organismId: target.organismId, ws: target.wsId });
+    if ('error' in space) {
+        // The shared UNDECLARED_SPACE refusal, which lists the spaces the manifest declares. That is
+        // manifest content, so a caller who may not write this workspace is refused for THAT first,
+        // with the key the access rule would read for any content space here.
+        const denied = await checkOrganismNamespaceAccess(deps,
+            { principal: caller.principal, owner: caller.owner, roles: caller.roles }, `${root}.probe`, 'write');
+        if (denied) throw new WorkspaceDocError(denied.code, denied.status, denied.message);
+        throw new WorkspaceDocError(space.refusal.code, space.refusal.status, space.refusal.message, space.refusal.details);
+    }
     if (!space.isDoc) {
         throw new WorkspaceDocError('NOT_A_DOCUMENT_SPACE', 400,
             `Space "${space.name}" holds records, not documents, and a record has no markdown to append to. Write the whole record with aimeat_workspace_write.`);

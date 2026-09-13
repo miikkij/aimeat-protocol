@@ -21,6 +21,9 @@
  *   import { registerAppDraftEditTools } from './apps-draft-edit.js';
  *   registerAppDraftEditTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.1.0 — 2026-09-13 — The write, replace and seed results render `served_marks_removed` /
+ *     `served_marks_note` from whatever the draft slot reports, through the servedMarksResponse every
+ *     app door uses. The promotion (aimeat_app_draft_publish) strips the node's serve marks either way.
  *   v1.0.0 — 2026-08-16 — Initial implementation.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -35,6 +38,7 @@ import {
     writeAppDraft, replaceInAppDraft, readAppDraft, seedAppDraft,
     DRAFT_READ_DEFAULT_LINES, DRAFT_READ_MAX_LINES,
 } from '../services/app-draft-edit.js';
+import { servedMarksResponse } from '../services/app-serve-marks-strip.js';
 
 /** MCP has one error channel, plain text, so the refusal code travels in the sentence. */
 function refusalMessage(refusal: { status: number; code: string; message: string }): string {
@@ -99,6 +103,7 @@ export function registerAppDraftEditTools(
                     note: 'The LIVE app is unchanged. Keep appending until the file is complete, then '
                         + 'aimeat_app_draft_publish. Pass this size_bytes back as expected_size_bytes on '
                         + 'the next append if you want the write refused should anything else touch the draft.',
+                    ...servedMarksResponse(out),
                 });
             } catch (err) {
                 return fail(`Failed to write draft: ${(err as Error).message}`);
@@ -142,6 +147,7 @@ export function registerAppDraftEditTools(
                     replacements: out.replacements,
                     size_bytes: out.size,
                     note: 'The LIVE app is unchanged until aimeat_app_draft_publish.',
+                    ...servedMarksResponse(out),
                 });
             } catch (err) {
                 return fail(`Failed to edit draft: ${(err as Error).message}`);
@@ -226,6 +232,7 @@ export function registerAppDraftEditTools(
                     note: 'The published app is now in the draft slot. Read the part you want to change '
                         + 'with aimeat_app_draft_read, change it with aimeat_app_draft_replace, then '
                         + 'aimeat_app_draft_publish. The LIVE app is unchanged until you do.',
+                    ...servedMarksResponse(out),
                 });
             } catch (err) {
                 return fail(`Failed to seed draft: ${(err as Error).message}`);

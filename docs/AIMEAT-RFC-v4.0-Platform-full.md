@@ -250,7 +250,8 @@ moment the page is summarised.
 
 **HTML marks are applied at SERVE time, never at store time.** A published bundle stays the author's
 bytes; a served copy is those bytes plus the node's marks. Storing marked bytes would break the
-content hash the record depends on.
+content hash the record depends on. A publish that receives a served copy removes the node's own
+marks before it hashes and stores the bytes, and names them in its response.
 
 #### 3.6.3 Detection
 

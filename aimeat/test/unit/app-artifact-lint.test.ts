@@ -19,6 +19,10 @@
  *   is about a destination and nothing short of a listening socket proves it.
  * @usage cd aimeat && pnpm test -- app-artifact-lint
  * @version-history
+ *   v1.6.0 — 2026-09-13 — The served-copy warning is replaced by the publish-time strip (the
+ *     developer's decision): its two cases now assert the lint says nothing about serve marks, and
+ *     failed against the warning before it was removed. The strip itself is proven in
+ *     test/unit/app-serve-marks-strip.test.ts and test/unit/app-publish-served-copy.test.ts.
  *   v1.5.0 — 2026-09-13 — Five cases from appdev pitfall triage, each seen failing first: an
  *     aimeat-scopes word the node cannot grant is named (and a grantable list, spaced or
  *     comma-separated, stays quiet); an empty aimeat-scopes counts as none; a served copy made by
@@ -227,23 +231,16 @@ describe('lintAppArtifact — the head declarations', () => {
 
 describe('lintAppArtifact — a served copy published as source', () => {
   // 2026-09-13, appdev pitfall served-app-html-contains-injected-badge. The node adds its marks on
-  // the way OUT and skips any mark already present, so a republished served copy keeps a badge the
-  // owner may have switched off and an AI-disclosure block for a version that no longer exists.
-  it('warns when the upload carries the marks the node adds at serve time, and names the raw download', async () => {
-    const served = applyServeMarks(CLEAN, { badge: true }).toString('utf-8');
-    const { blocking, warnings } = await lintAppArtifact(served, config);
+  // the way OUT and skips any mark already present, so a republished served copy kept a badge the
+  // owner may have switched off and an AI-disclosure block for a version that no longer existed.
+  // The developer decided the same day: the publish takes the marks out before it lints, hashes and
+  // stores (services/app-serve-marks-strip.ts) and names them in the response. The lint therefore
+  // has nothing to say about them; the served-copy WARNING it carried earlier that day is gone.
+  it('says nothing about the serve marks, which the publish removes before this check runs', async () => {
+    const served = applyServeMarks(CLEAN, { badge: true, reviewedBy: 'Jane Reviewer', isDocument: true }).toString('utf-8');
+    const { blocking, ids } = await findings(served);
     expect(blocking).toEqual([]);
-    const copy = warnings.filter(f => f.pitfall === 'edit-published-app');
-    expect(copy).toHaveLength(1);
-    expect(copy[0]?.severity).toBe('warn');
-    expect(copy[0]?.message).toContain('aimeat-app-badge');
-    expect(copy[0]?.message).toContain('download_url');
-  });
-
-  it('knows the reviewer tag the node writes into the head', async () => {
-    const served = applyServeMarks(CLEAN, { reviewedBy: 'Jane Reviewer' }).toString('utf-8');
-    const { ids } = await findings(served);
-    expect(ids).toContain('edit-published-app');
+    expect(ids).not.toContain('edit-published-app');
   });
 
   it('stays quiet when the app only names a mark from its own script', async () => {

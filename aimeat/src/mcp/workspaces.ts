@@ -17,6 +17,11 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   v1.23.0 -- 2026-09-13 -- _write, _publish and _revert_to_draft answer the shared UNDECLARED_SPACE
+ *     refusal (the developer's decision: a space the workspace manifest does not declare is refused
+ *     on every door) as `{ error, message, namespace, declared_spaces, how_to_fix }`, the shape
+ *     aimeat_memory_write gives it. _write answered a sentence of its own for the same case; _revert
+ *     wrote a draft into such a space.
  *   v1.22.0 -- 2026-09-05 -- The bodies of _read, _write and _publish move to
  *     services/workspace-tool-ops.ts, a pure extraction, so the extension sandbox's ctx.workspace
  *     runs the same three operations as its caller instead of a fourth copy of who may write a
@@ -189,6 +194,13 @@ export function registerWorkspaceTools(
 
     const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
     const fail = (msg: string): TextResult => ({ content: [{ type: 'text', text: msg }], isError: true });
+    /** A refusal from the shared services. The UNDECLARED_SPACE refusal is rendered with its code and
+     *  fields, as aimeat_memory_write renders it, so an agent reads the same answer on every door;
+     *  every other refusal keeps the plain sentence these tools have always answered with. */
+    const failRefusal = (r: { code: string; message: string; details?: Record<string, unknown> }): TextResult =>
+        r.code === 'UNDECLARED_SPACE'
+            ? fail(JSON.stringify({ error: r.code, message: r.message, ...(r.details ?? {}) }, null, 2))
+            : fail(r.message);
 
     /** Parse a possibly-JSON-stringified object param (manifest / schemas) back to an object. */
     const parseObj = (v: unknown): unknown => {
@@ -362,7 +374,7 @@ export function registerWorkspaceTools(
                 aiProvenance: toDeclaredProvenance(ai_provenance), aiProvenanceId: ai_provenance_id,
                 pipeline: 'mcp.workspace_write',
             });
-            return r.ok ? ok(r.data) : fail(r.message);
+            return r.ok ? ok(r.data) : failRefusal(r);
         });
 
     // ── aimeat_workspace_publish ──
@@ -376,7 +388,7 @@ export function registerWorkspaceTools(
             // publish gate (read across every owner), then the same publishDraft POST
             // /v1/organisms/:id/publish calls, the decision-log entry and the timeline snapshot.
             const r = await publishWorkspaceOp({ storage, config }, opsCaller, { organismId: organism_id, ws, namespace, id, expectedVersion: expected_version ?? null });
-            return r.ok ? ok(r.data) : fail(r.message);
+            return r.ok ? ok(r.data) : failRefusal(r);
         });
 
     // ── aimeat_workspace_revert_to_draft ──
@@ -405,6 +417,7 @@ export function registerWorkspaceTools(
             // identity here, which is why a web-reopened draft can land under an agent GAII.
             const result = await H.revertToDraft(organism_id, ws, namespace, id, ownerGhii);
             if (!result.ok) {
+                if (result.code === 'UNDECLARED_SPACE') return failRefusal(result.refusal);
                 return fail(result.code === 'DRAFT_EXISTS'
                     ? `A draft already exists at ${base}.draft — edit it directly instead of reopening.`
                     : `No published record at ${base}.latest to reopen.`);

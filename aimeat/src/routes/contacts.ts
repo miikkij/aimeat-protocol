@@ -15,6 +15,8 @@
  *   gate); POST /v1/contacts/resolve (email → GHII exact match, or invite fallback signal).
  * @usage app.use(contactsRouter(config, storage))
  * @version-history
+ *   v1.3.1 — 2026-09-13 — A refusal carries its `details` (the handle send's failed attempt names its
+ *     send-log row).
  *   v1.3.0 — 2026-09-13 — Every door here takes requireLocalSession(). A session signed in from
  *     another node carries the local part of its home GHII as `owner`, so the address book each door
  *     reached was the local account sharing that name, invitations included. Same fix, same reason
@@ -85,7 +87,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
   const sendErr = (res: Parameters<Parameters<Router['get']>[1]>[1], e: unknown): boolean => {
-    if (e instanceof ContactsError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return true; }
+    if (e instanceof ContactsError) { res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details)); return true; }
     return false;
   };
 

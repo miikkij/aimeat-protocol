@@ -13,6 +13,12 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-organism.js"></script>
  *   const ws = await AIMEAT.organism.read(orgId, wsId); ws.spaces[0].items[0].value
  * @version-history
+ *   v1.2.0 — 2026-09-13 — A write or publish into a space the workspace manifest does not declare is
+ *     refused by the node (422 UNDECLARED_SPACE, the developer's decision), so writeDraft, publish and
+ *     publishRecords THROW it like any refusal: `err.code === 'UNDECLARED_SPACE'`, `err.message` says
+ *     what to do, and `err.details` carries `namespace`, `declared_spaces` and `how_to_fix`. Every
+ *     thrown refusal now carries `details`. The console line stays for the warnings a successful
+ *     write still carries (SHADOWED_BY_OWNER_COPY).
  *   v1.1.0 — 2026-09-13 — writeDraft, publish and publishRecords log the node's warnings
  *     (UNDECLARED_SPACE: stored, and no workspace read lists it) to the console; the value returned is
  *     unchanged.
@@ -33,17 +39,23 @@ async function authFetch(path, opts) {
   if (res && typeof res.json === 'function') res = await res.json();
   return res;
 }
+/**
+ * The node's refusal as an Error the app can act on. `code` is the node's code; `details` is what the
+ * refusal says in fields, e.g. for UNDECLARED_SPACE (a space the workspace manifest does not declare,
+ * refused before anything is written) the `namespace`, the `declared_spaces` and `how_to_fix`.
+ */
 function fail(res, fallback) {
-  var e = /** @type {Error & { code?: string, envelope?: unknown }} */ (new Error((res && res.error && (res.error.message || res.error.code)) || fallback));
+  var e = /** @type {Error & { code?: string, details?: unknown, envelope?: unknown }} */ (new Error((res && res.error && (res.error.message || res.error.code)) || fallback));
   e.code = res && res.error && res.error.code;
+  e.details = res && res.error && res.error.details;
   e.envelope = res;
   return e;
 }
 
 /**
- * The answer's data, with any warnings the node attached said out loud in the console. A write into a
- * space the workspace manifest does not declare is stored and listed by no read (UNDECLARED_SPACE);
- * the node says so in `warnings`, and an app that only reads the value would never see it.
+ * The answer's data, with any warnings the node attached to a SUCCESSFUL write said out loud in the
+ * console (an owner copy that shadows this one, SHADOWED_BY_OWNER_COPY), since an app that only reads
+ * the value would never see them. A refusal is not a warning: it throws through fail() above.
  * @param {any} res
  */
 function withWarnings(res) {
@@ -276,6 +288,8 @@ var organism = {
 
   // Write/overwrite an object's draft. Embeds the instance id into the value (SPA convention)
   // unless opts.embedId === false (needed for locked schemas that reject an id property).
+  // Throws UNDECLARED_SPACE when the workspace manifest does not declare `namespace` (nothing is
+  // written): declare the space in the workspace first, then write.
   async writeDraft(orgId, wsId, namespace, id, value, opts) {
     opts = opts || {};
     var v = stripMeta(value);

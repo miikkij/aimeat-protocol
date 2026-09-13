@@ -11,6 +11,9 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.26.0 — 2026-09-13 — aimeat_memory_write renders the shared write's UNDECLARED_SPACE refusal
+ *     (`{ error, message, namespace, declared_spaces, how_to_fix }`, isError) where it used to carry
+ *     the same case as a warning on a stored record: the developer's decision for every door.
  *   v1.25.0 — 2026-09-13 — aimeat_memory_write answers `warnings` from the shared write, and its
  *     SHADOWED_BY_OWNER_COPY fields take their words from there. The shadowing check ran only on the
  *     agent's first write of a key, so the warning went quiet once the owner had saved the same key.
@@ -529,7 +532,8 @@ export function registerCoreTools(
             const aiProvenanceId = record.aiProvenanceId;
             // The flat `warning` / `warning_detail` / `shadowed_by` fields are this tool's published
             // shape for the shadowing case and stay; their words now come from the shared write, which
-            // also fills `warnings` with the same text for every door (UNDECLARED_SPACE included).
+            // also fills `warnings` with the same text for every door. A workspace record in a space
+            // the manifest does not declare is a refusal (422 UNDECLARED_SPACE), rendered above.
             const shadow = warnings.find(w => w.code === 'SHADOWED_BY_OWNER_COPY');
             return {
                 content: [{

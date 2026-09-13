@@ -8,6 +8,9 @@
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
+ *   v2.8.0 -- 2026-09-13 -- The response carries `served_marks_removed` and `served_marks_note` when
+ *     the upload was a served copy: the publish stored it without the node's serve marks (the
+ *     developer's decision; services/app-serve-marks-strip.ts) instead of warning in `app_hints`.
  *   v2.7.0 -- 2026-09-13 -- `cortex.agents` is validated before either mode and rides the presigned
  *     token as `cortex_agents`. The mint used to skip the check and leave them out, so the upload
  *     published the app without its agents.
@@ -61,6 +64,7 @@ import { generateUploadToken, buildUploadMeta } from '../../services/upload-toke
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { publishApp } from '../../services/app-publish.js';
+import { servedMarksResponse } from '../../services/app-serve-marks-strip.js';
 import { isSharedApp } from '../../services/app-dev-grant.js';
 import { roadmapGate } from '../../services/app-roadmap.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
@@ -316,6 +320,8 @@ export function registerPublishRoutes(
             ...(out.dataMap ? { data_map: out.dataMap } : {}),
             spec_check: out.specCheck,
             ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
+            // A served copy was stored as its source: which of the node's marks came out, and why.
+            ...servedMarksResponse(out),
             ...(out.nextSteps ? { next_steps: out.nextSteps } : {}),
         }, [
             { description: 'View all versions', method: 'GET', url: `${out.downloadUrl}/versions` },

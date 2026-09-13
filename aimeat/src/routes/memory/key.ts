@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key, CORS management, and the public GET /v1/memory/:gaii/:key read. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.1 — 2026-09-13 — PUT refuses an EXCHANGE listing source whose changed text would break an
+ *     ODPS length cap, 422 ODPS_FIELD_TOO_LONG, through odpsWriteRefusal like every other write door.
+ *   v1.4.0 — 2026-09-13 — PUT /v1/memory/:key refuses a workspace record whose space the workspace
+ *     manifest does not declare, 422 UNDECLARED_SPACE, before it stamps or writes anything: the
+ *     developer's decision, and the same refusal POST /v1/memory and every workspace door answer.
  *   v1.3.0 — 2026-08-11 — The cross-owner read resolves the accessor's identity instead of passing
  *     the raw JWT `sub`. An owner session carries a bare account name, so no sharing-group
  *     membership and no consent grant could match it: a person could not read what had been shared
@@ -23,7 +28,9 @@ import { success, error } from '../../middleware/envelope.js';
 import { MemoryUpdateSchema, validateBody } from '../../models/schemas.js';
 import { checkMemoryQuota, chargeOverage } from '../../services/quota.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
+import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import { checkDeleteGuard } from '../../services/write-guards.js';
+import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { enqueueMemoryReplication } from '../../services/memory-replication.js';
 import { authorizeRead } from '../../services/access-guard.js';
@@ -328,6 +335,18 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
+    // A workspace record whose space the workspace manifest does not declare is refused before the
+    // provenance stamp and the write below, with the same 422 POST /v1/memory answers (the
+    // developer's decision, 2026-09-13; services/workspace-write-items.ts). A record stored there
+    // before the decision can be read and deleted, and changed again once the space is declared.
+    if (key.startsWith('organism.')) {
+      const undeclared = await undeclaredSpaceForKey(storage, key, { audience: req.auth!.roles.includes('ecosystem') ? 'writer' : 'member' });
+      if (undeclared) {
+        res.status(undeclared.status).json(error(config.nodeId, undeclared.code, undeclared.message, undeclared.status, undeclared.details));
+        return;
+      }
+    }
+
     // Per-value size limit & quota check — only when value is being changed
     const effectiveValue = value !== undefined ? value : existing.value;
     const newValueSize = Buffer.byteLength(JSON.stringify(effectiveValue), 'utf8');
@@ -357,6 +376,9 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
         }));
         return;
       }
+      // An EXCHANGE listing source whose changed text would break an ODPS length cap (2026-09-13).
+      const odps = odpsWriteRefusal(key, value, existing.value);
+      if (odps) { res.status(odps.status).json(error(config.nodeId, odps.code, odps.message, odps.status, odps.details)); return; }
     }
 
     const now = new Date().toISOString();

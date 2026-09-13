@@ -7,6 +7,9 @@
  *   seven tools locally. Thin proxies over the shared REST routes, so both surfaces behave
  *   identically and neither can drift into being the permissive one.
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- aimeat_mail_send also reads the SEND_FAILED error (502 or 503) a current
+ *     node answers for a send that did not go out, through refuseUnsentSend(), and names the send-log
+ *     id and the reason whichever node answered.
  *   v1.1.0 -- 2026-09-13 -- aimeat_mail_send returns an error result when the node says the send did
  *     not go out, through refuseUnsentSend() from the CLI dispatch. The 200 envelope used to pass
  *     through as a success.
@@ -92,9 +95,9 @@ export function registerConnectionTools(mcp: McpServer, registry: AgentRegistry)
     ai_disclosure: z.enum(['none', 'ai-assisted', 'ai-generated', 'autonomous']).optional()
       .describe('Say in a header that a machine wrote this. Declare it if you wrote the body.'),
   }, annotationsFor('aimeat_mail_send'), async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure, theme }) => out(
-    // The outbound door, not around it: every gate lives behind this one route. The route answers
-    // 200 for a send that did not go out; refuseUnsentSend turns that into an error result, the same
-    // one the CLI dispatch returns.
+    // The outbound door, not around it: every gate lives behind this one route. A send that did not
+    // go out is SEND_FAILED from a current node (502 or 503) and a 200 'failed' from an older one;
+    // refuseUnsentSend makes both the same error result the CLI dispatch returns.
     refuseUnsentSend(await client.post('/v1/outbound/send', {
       contact_id, subject, body,
       kind: kind ?? 'transactional',

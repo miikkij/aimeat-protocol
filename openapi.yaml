@@ -1536,18 +1536,10 @@ components:
       required: [code, message]
       additionalProperties: true
       properties:
-        code: { type: string, enum: [SHADOWED_BY_OWNER_COPY, UNDECLARED_SPACE] }
+        code: { type: string, enum: [SHADOWED_BY_OWNER_COPY] }
         message: { type: string }
         how_to_fix: { type: string }
         shadowed_by: { type: string, description: 'SHADOWED_BY_OWNER_COPY: the owner GHII whose copy owner-scope reads resolve to' }
-        namespace: { type: string, description: 'UNDECLARED_SPACE: the namespace the workspace manifest does not declare' }
-        declared_spaces:
-          type: array
-          items:
-            type: object
-            properties:
-              name: { type: string }
-              namespace: { type: string }
 
     MemoryWriteResult:
       description: A written memory entry, with what the write has to tell the caller.
@@ -3537,6 +3529,17 @@ components:
           description: Written for whoever built the app — what is wrong and what to do instead.
         url: { type: string, example: /v1/appdev/pitfalls/hardcoded-theme-colors }
       required: [pitfall, severity, message, url]
+
+    ServedMarkRemoval:
+      type: object
+      description: >-
+        One kind of node serve mark an uploaded served copy carried, removed before the app was
+        stored. The node adds its marks again every time it serves the app.
+      properties:
+        mark: { type: string, enum: [badge, chrome-reserve, ai-disclosure, ai-label, agent-discovery, app-ref, reviewed-by] }
+        marker: { type: string, description: The exact marker the block was recognised by., example: 'id="aimeat-app-badge"' }
+        bytes: { type: integer, description: How many bytes of the upload this mark accounted for. }
+      required: [mark, marker, bytes]
 
     AppPlaytestResult:
       type: object
@@ -5587,6 +5590,79 @@ components:
                     properties:
                       code:
                         example: INVALID_STATUS
+
+    OdpsFieldTooLong:
+      description: >
+        ODPS_FIELD_TOO_LONG. The write would publish an EXCHANGE listing whose ODPS v4.1 document breaks a
+        schema maxLength, in text the stored record did not already carry. Nothing was written and nothing is
+        truncated. `error.details` is `{ key, fields[] }`, one row per field the owner wrote: `entry` (the
+        listing, e.g. `shop.html/find`), `source_field` (where it was written, e.g. `tools[find].usageTerms.note`),
+        `odps_field`, `length`, `max_length` and `room`, the most characters that field can hold with the rest of
+        the ODPS field as it is (license.scope.restrictions starts with the node's own usage-terms sentences, so
+        its room is 255 minus what the node adds). Text a stored record already carries keeps publishing, with an
+        ODPS_FIELD_TOO_LONG warning in the reconcile report.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/AimeatEnvelope'
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code: { example: ODPS_FIELD_TOO_LONG }
+                      details:
+                        type: object
+                        properties:
+                          key: { type: string }
+                          fields:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                entry: { type: string }
+                                source_field: { type: string }
+                                odps_field: { type: string }
+                                length: { type: integer }
+                                max_length: { type: integer }
+                                room: { type: integer }
+
+    UndeclaredSpace:
+      description: >
+        UNDECLARED_SPACE. The workspace manifest declares no space that holds records for this namespace, or
+        declares it with backing tasks or rows, whose data does not live in workspace records. A workspace with
+        no manifest declares nothing and is refused the same way. Nothing was written. `error.details` is
+        `{ namespace, declared_spaces[{ name, namespace }], how_to_fix }`; for a space declared with another
+        backing it is `{ namespace, backing, how_to_fix }`. An ecosystem app gets no `declared_spaces`, and an
+        anonymous intake submitter gets only `how_to_fix`. The repair is to declare the space with
+        PUT /v1/organisms/{id}/workspace?ws={ws} `{ add_object_types, schemas }` or aimeat_workspace_update
+        `{ add_spaces }`, which only the workspace creator or an organism admin may do. Workspace keys in
+        `meta.*`, `skills.*` and `access.*` are not spaces and are never refused.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/AimeatEnvelope'
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code: { example: UNDECLARED_SPACE }
+                      details:
+                        type: object
+                        properties:
+                          namespace: { type: string }
+                          declared_spaces:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                namespace: { type: string }
+                          backing: { type: string }
+                          how_to_fix: { type: string }
 
     FeatureDisabled:
       description: Feature is disabled on this node
@@ -11040,7 +11116,7 @@ paths:
         of their agents. Validated against the offer descriptor; stored as memory `agents.{name}.offers`
         under the agent's GAII and consumed by both the Offers UI and the mesh (delegate selection).
         The answer is `{ agent, count, version, exchange }`: `exchange` is `{ known: true, listed[],
-        delisted[], skipped[{ label, kind, reason }], warnings[] }` for the agent-work listings this
+        delisted[], skipped[{ label, kind, reason, message? }], warnings[] }` for the agent-work listings this
         publish projected, or `{ known: false, note }` naming the reconcile request to run when the
         projection did not report.
       tags: [Identity]
@@ -11090,6 +11166,7 @@ paths:
         '400': { description: 'INVALID_OFFERS — descriptor failed validation.' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/OdpsFieldTooLong' }
     get:
       operationId: getAgentOffers
       summary: Read an agent's published offers
@@ -13221,6 +13298,16 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '413':
           description: Memory quota exceeded
+        '422':
+          description: >
+            Nothing was written. UNDECLARED_SPACE: a workspace record whose space the workspace manifest does
+            not declare (see components/responses/UndeclaredSpace). ODPS_FIELD_TOO_LONG: an EXCHANGE listing
+            source whose changed text would publish an ODPS document past a schema maxLength (see
+            components/responses/OdpsFieldTooLong). SCHEMA_VALIDATION_FAILED: the value does not match the
+            key's schema.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '429':
           $ref: '#/components/responses/RateLimited'
 
@@ -13557,6 +13644,16 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '409':
           description: Version conflict (optimistic lock failure)
+        '422':
+          description: >
+            Nothing was written. UNDECLARED_SPACE: a workspace record whose space the workspace manifest does
+            not declare (see components/responses/UndeclaredSpace). ODPS_FIELD_TOO_LONG: an EXCHANGE listing
+            source whose changed text would publish an ODPS document past a schema maxLength (see
+            components/responses/OdpsFieldTooLong). SCHEMA_VALIDATION_FAILED: the new value does not match
+            the key's schema.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
 
     delete:
       operationId: deleteMemory
@@ -13679,7 +13776,15 @@ paths:
             QUOTA_EXCEEDED — the MERGED value exceeds the per-value size cap, or the principal is at
             its key or byte quota.
         '422':
-          description: SCHEMA_VALIDATION_FAILED — the merged value does not match the key's schema.
+          description: >
+            Nothing was written. SCHEMA_VALIDATION_FAILED: the merged value does not match the key's
+            schema. UNDECLARED_SPACE: a workspace record whose space the workspace manifest does not
+            declare (see components/responses/UndeclaredSpace). ODPS_FIELD_TOO_LONG: an EXCHANGE listing
+            source whose changed text would publish an ODPS document past a schema maxLength (see
+            components/responses/OdpsFieldTooLong).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
 
   /v1/memory/search:
     get:
@@ -13821,7 +13926,10 @@ paths:
                   description: Write under a specific agent GAII (owner sessions only)
       responses:
         '200':
-          description: 'Summary: { created, updated, skipped, failed[] }'
+          description: >-
+            Summary: { created, updated, skipped, failed[] }. An EXCHANGE listing source whose changed
+            text would publish an ODPS document past a schema maxLength is not written and is listed
+            under failed[] with a reason starting "ODPS_FIELD_TOO_LONG:".
           content:
             application/json:
               schema:
@@ -13876,7 +13984,12 @@ paths:
                   description: Import under a specific agent GAII (owner sessions only)
       responses:
         '200':
-          description: 'Import summary: { created, updated, skipped, failed[] }'
+          description: >-
+            Import summary: { created, updated, skipped, failed[{ key, reason }] }. A workspace record
+            whose space the workspace manifest does not declare is not written and is listed under
+            failed[] with a reason starting "UNDECLARED_SPACE:" (see components/responses/UndeclaredSpace).
+            An EXCHANGE listing source whose changed text would publish an ODPS document past a schema
+            maxLength is listed the same way, with a reason starting "ODPS_FIELD_TOO_LONG:".
           content:
             application/json:
               schema:
@@ -16426,11 +16539,14 @@ paths:
         skipped, warnings }` (+ `orphans`, `flagged` when migrating); each change carries `action` (created,
         updated, adopted, delisted, unchanged, skipped, warning), `offeringId`, `kind`, `label`, `unit`,
         `currency` and a `reason`: for a skip SCHEMA_REQUIRED, NOT_PRICED, NO_ASSIGNEE, ASSIGNEE_NOT_FOUND,
-        NOT_PUBLIC, INVALID_TOOL_MANIFEST, INVALID_OFFERS_DOC or `DUPLICATE_OF {label}`; for a warning
-        `ALSO_LISTED_AS {label}` (a bound app-tool and the extension action it calls are both flagged; both
-        stay listed; `otherListing` names the other) or `ODPS_FIELD_TOO_LONG {path}` (the listing's ODPS
-        document is past a schema maxLength; published as written; `odpsField` gives path, length,
-        maxLength). A warning row carries a `message` for the owner.
+        NOT_PUBLIC, INVALID_TOOL_MANIFEST, INVALID_OFFERS_DOC or `DUPLICATE_OF {label}` (two sources want the same
+        listing, or LIST ONCE: an extension action that a flagged app-tool without `lockedInput` calls is skipped as
+        that tool's duplicate and a listing it had is delisted; contracts signed on it keep their agreed price);
+        for a warning `ALSO_LISTED_AS {label}` (a bound app-tool and the extension action it calls are both listed,
+        because the tool fixes part of its input or one listing was made by hand; `otherListing` names the other)
+        or `ODPS_FIELD_TOO_LONG {path}` (text a stored source already carries puts the listing's ODPS document past
+        a schema maxLength; published as written; `odpsField` gives path, length, maxLength). A warning row and a
+        list-once skip carry a `message` for the owner.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -17308,6 +17424,7 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404':
           $ref: '#/components/responses/AimeatError'
+        '422': { $ref: '#/components/responses/OdpsFieldTooLong' }
 
   /v1/memory/pull:
     post:
@@ -17771,6 +17888,8 @@ paths:
           description: >-
             Upload processed successfully. A storage upload answers with key, owner_gaii, size,
             mime_type, visibility, embed_url, embed_markdown and versioned_url (see POST /v1/storage).
+            An app upload answers with the publish fields, including `served_marks_removed` and
+            `served_marks_note` when the body was a served copy.
           content:
             application/json:
               schema:
@@ -17800,6 +17919,12 @@ paths:
             the token meta — an extension of that name is already installed (`ALREADY_EXISTS`).
         '410':
           description: Token expired (60 min TTL)
+        '422':
+          description: >-
+            `ODPS_FIELD_TOO_LONG` (extension uploads): an action flagged for EXCHANGE has changed text that
+            would publish an ODPS document past a schema maxLength. Nothing was installed. The body is
+            `{ success: false, error, message, details }`, with `details` in the shape
+            components/responses/OdpsFieldTooLong describes.
         '413':
           description: |
             `FILE_TOO_LARGE` — the body exceeds the per-file size limit encoded in the token, or
@@ -23703,6 +23828,13 @@ paths:
             declarations, unscoped reads of agent-written data), each with the id of the curated
             pitfall that explains it. Findings that PROVE the app cannot run — an inline script that
             does not parse, an asset URL this node answers 404 for — are a 422 instead; see below.
+
+            `data.served_marks_removed` and `data.served_marks_note` appear when the uploaded HTML was
+            a copy of the app as the node serves it: the node's own marks were removed before the
+            checks, the provenance hash and storing. The publish is never refused for it. The head
+            metadata the node fills in when it serves an app from its own origin (description, og
+            tags, canonical and the like) carries no marker of its own, so it is not removed and stays
+            in the stored file.
           content:
             application/json:
               schema:
@@ -23741,6 +23873,11 @@ paths:
                                   Non-blocking artifact findings, each naming the curated pitfall
                                   that explains it (GET /v1/appdev/pitfalls/{pitfall}).
                                 items: { $ref: '#/components/schemas/AppArtifactFinding' }
+                              served_marks_removed:
+                                type: array
+                                description: The node's serve marks this upload carried and the publish removed before storing. Absent when there were none.
+                                items: { $ref: '#/components/schemas/ServedMarkRemoval' }
+                              served_marks_note: { type: string, description: The same, in one sentence for whoever published. }
                               next_steps:
                                 type: object
                                 description: >-
@@ -25653,6 +25790,11 @@ paths:
                           has_live_version: { type: boolean }
                           live_version_number: { type: integer }
                           note: { type: string }
+                          served_marks_removed:
+                            type: array
+                            description: The node's serve marks this upload carried and the save removed before writing the draft slot. Absent when there were none.
+                            items: { $ref: '#/components/schemas/ServedMarkRemoval' }
+                          served_marks_note: { type: string, description: The same, in one sentence for whoever saved. }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '413': { description: Draft exceeds the app size limit }
@@ -25803,6 +25945,15 @@ paths:
                           updated_at: { type: string, format: date-time }
                           has_live_version: { type: boolean }
                           live_version_number: { type: integer }
+                          served_marks_removed:
+                            type: array
+                            description: >-
+                              The node's serve marks the draft carried once this piece was written, removed
+                              before the slot was stored. Absent when there were none. The slot can then be
+                              smaller than the bytes sent, so pass the returned `size` as the next
+                              `expected_size_bytes`.
+                            items: { $ref: '#/components/schemas/ServedMarkRemoval' }
+                          served_marks_note: { type: string, description: The same, in one sentence for whoever wrote. }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409':
@@ -25860,6 +26011,11 @@ paths:
                           replacements: { type: integer }
                           size: { type: integer }
                           updated_at: { type: string, format: date-time }
+                          served_marks_removed:
+                            type: array
+                            description: The node's serve marks the draft carried after the replacement, removed before the slot was stored. Absent when there were none.
+                            items: { $ref: '#/components/schemas/ServedMarkRemoval' }
+                          served_marks_note: { type: string, description: The same, in one sentence for whoever edited. }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404':
@@ -25971,6 +26127,11 @@ paths:
                           seeded_version: { type: integer }
                           size: { type: integer }
                           updated_at: { type: string, format: date-time }
+                          served_marks_removed:
+                            type: array
+                            description: The node's serve marks the published version carried in its stored bytes, removed before the slot was written. Absent when there were none.
+                            items: { $ref: '#/components/schemas/ServedMarkRemoval' }
+                          served_marks_note: { type: string, description: The same, in one sentence for whoever seeded. }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404':
           description: NOT_FOUND - no published app, or no such version, to copy from
@@ -26133,6 +26294,11 @@ paths:
                             type: array
                             description: Non-blocking data-map findings. Never a reason to reject a publish.
                             items: { type: string }
+                          served_marks_removed:
+                            type: array
+                            description: The node's serve marks this upload carried and the publish removed before storing. Absent when there were none.
+                            items: { $ref: '#/components/schemas/ServedMarkRemoval' }
+                          served_marks_note: { type: string, description: The same, in one sentence for whoever published. }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { description: No draft to publish }
         '403': { description: The scoped principal lacks app:write; the draft and live app are unchanged }
@@ -31093,7 +31259,16 @@ paths:
         '400': { description: Invalid input (missing fields, meta.* namespace, bad slug) }
         '403': { description: Not the workspace creator / org admin }
         '404': { description: Organism or workspace not found }
-        '422': { description: 'INTAKE_SCHEMA_MISMATCH: the destination''s closed schema does not list "id", an allowed field or a default. error.details.missing_properties names each; how_to_fix says how to re-lock the schema in place.' }
+        '422':
+          description: >
+            Nothing was stored. INTAKE_SCHEMA_MISMATCH: the destination's closed schema does not list "id", an
+            allowed field or a default. error.details.missing_properties names each; how_to_fix says how to
+            re-lock the schema in place. UNDECLARED_SPACE: the workspace manifest declares no space for the
+            destination namespace, so every submission would be refused (see
+            components/responses/UndeclaredSpace).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
     get:
       operationId: listIntakeForms
       summary: List a workspace's intake forms (owner)
@@ -31156,7 +31331,15 @@ paths:
         '200': { description: 'Accepted → { ok, id, mode } (id is null when a honeypot silently dropped it)' }
         '400': { description: Missing required field / too many or oversized fields }
         '404': { description: Form not found or disabled }
-        '422': { description: Submission does not match the destination schema }
+        '422':
+          description: >
+            Nothing was saved. SCHEMA_VALIDATION_FAILED: the submission does not match the destination
+            schema. UNDECLARED_SPACE: the form's destination is not a space its workspace manifest
+            declares (see components/responses/UndeclaredSpace); an anonymous submitter is told neither
+            the namespace nor the declared spaces, only `how_to_fix`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '429': { description: Rate limit exceeded }
   /v1/organisms/{id}/workspaces:
     post:
@@ -31519,7 +31702,7 @@ paths:
                   description: 'Optional per-instance optimistic lock (required by requires_expected_version namespaces): { <instance>: <version> }'
       responses:
         '200':
-          description: 'Result: { published, skipped, failed, results: [{ instance, ok, version?, skipped?, code?, violations?: [{ path, message, schema_rule, params }] }], warnings?: [UNDECLARED_SPACE] }. A violation message names the property it is about.'
+          description: 'Result: { published, skipped, failed, results: [{ instance, ok, version?, skipped?, code?, violations?: [{ path, message, schema_rule, params }] }] }. A violation message names the property it is about.'
           content:
             application/json:
               schema:
@@ -31534,6 +31717,8 @@ paths:
           description: organism not found
         '409':
           description: the organism/workspace is archived, or the publish review gate is enabled
+        '422':
+          $ref: '#/components/responses/UndeclaredSpace'
 
   /v1/organisms/{id}/workspace/records/delete:
     post:
@@ -31610,7 +31795,40 @@ paths:
               properties:
                 zip_base64: { type: string, description: The workspace export ZIP, base64-encoded }
       responses:
-        '201': { description: Imported — returns the new workspace id + counts }
+        '201':
+          description: >-
+            Imported. Returns { ws, objects, documents, images, images_deduped, schemas }, and
+            skipped_undeclared when the bundle carried records in spaces its own manifest does not
+            declare.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ws: { type: string, description: The new workspace id }
+                          objects: { type: integer }
+                          documents: { type: integer }
+                          images: { type: integer }
+                          images_deduped: { type: integer }
+                          schemas: { type: integer }
+                          skipped_undeclared:
+                            type: array
+                            description: >-
+                              Records the bundle carried in spaces its own manifest does not declare. They
+                              were not written, because a write into an undeclared space is refused on every
+                              door; the import itself still succeeds. Absent when there were none.
+                            items:
+                              type: object
+                              required: [namespace, id, role]
+                              properties:
+                                namespace: { type: string }
+                                id: { type: string }
+                                role: { type: string, description: 'The record key suffix: draft, latest, version.N, or empty for a bare key' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -32044,10 +32262,18 @@ paths:
         '400': { description: No `markdown`, no `ws`, or the space holds records rather than documents }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not a member, no consent, or not approved to write this workspace }
-        '404': { description: No such workspace, space or document, or no heading matching `section` }
+        '404': { description: No such workspace or document, or no heading matching `section` }
         '409': { description: The document is archived, or it kept changing under six retries }
         '413': { description: The edited document is over the memory value ceiling or the owner's byte quota }
-        '422': { description: The instance is not stored as a document, or the result fails the space's locked schema }
+        '422':
+          description: >
+            Nothing was written. The instance is not stored as a document, or the result fails the space's
+            locked schema. UNDECLARED_SPACE: the workspace manifest declares no space by that name or
+            namespace that holds workspace records (see components/responses/UndeclaredSpace); access is
+            checked first, so a non-member gets 403 and never the declared spaces.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
 
   /v1/organisms/{id}/workspace/documents/{space}/{docId}/section:
     post:
@@ -32092,10 +32318,18 @@ paths:
         '400': { description: No `section` or `markdown`, a replacement not starting with a heading, or a records space }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not a member, no consent, or not approved to write this workspace }
-        '404': { description: No such workspace, space or document, or no heading matching `section` }
+        '404': { description: No such workspace or document, or no heading matching `section` }
         '409': { description: The document is archived, an ambiguous heading, or six lost retries }
         '413': { description: The edited document is over the memory value ceiling or the owner's byte quota }
-        '422': { description: The instance is not stored as a document, or the result fails the space's locked schema }
+        '422':
+          description: >
+            Nothing was written. The instance is not stored as a document, or the result fails the space's
+            locked schema. UNDECLARED_SPACE: the workspace manifest declares no space by that name or
+            namespace that holds workspace records (see components/responses/UndeclaredSpace); access is
+            checked first, so a non-member gets 403 and never the declared spaces.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
 
   /v1/organisms/{id}/export:
     get:
@@ -32481,12 +32715,20 @@ paths:
                 id: { type: string, description: The instance id whose .draft to publish }
                 ws: { type: string, description: "Workspace id — publishes the draft under organism.{id}.w.{ws}.* (omit for the legacy organism-level root)" }
       responses:
-        '200': { description: 'Published (version returned). data.warnings carries UNDECLARED_SPACE when the workspace manifest declares no space for the namespace: stored, and no workspace read lists it until add_object_types declares it.' }
+        '200': { description: 'Published (version returned).' }
         '202': { description: Publish requires approval — a pending approval was created }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { description: The target organism/workspace is archived (read-only) }
-        '422': { description: Draft does not match the schema }
+        '422':
+          description: >
+            Nothing was published and the draft is kept. SCHEMA_VALIDATION_FAILED: the draft does not
+            match the schema. UNDECLARED_SPACE: the workspace manifest declares no space for the namespace
+            (see components/responses/UndeclaredSpace); with the publish gate on, this is refused before
+            an approval is filed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
 
   /v1/organisms/{id}/archive:
     post:
@@ -32583,6 +32825,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: No published record at that instance to reopen }
         '409': { description: A draft already exists for that instance — edit it directly }
+        '422': { $ref: '#/components/responses/UndeclaredSpace' }
 
   /v1/organisms/{id}/approvals:
     post:
@@ -32663,6 +32906,15 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { description: Already resolved }
+        '422':
+          description: >
+            Approving a `publish` action did not publish, and the approval stays pending, so it can be
+            approved again once the cause is fixed. SCHEMA_VALIDATION_FAILED: the draft does not match the
+            schema. UNDECLARED_SPACE: the workspace manifest no longer declares a space for the namespace
+            (see components/responses/UndeclaredSpace).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
 
   /v1/organisms/{id}/join-requests:
     get:
@@ -35453,6 +35705,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/OdpsFieldTooLong'
 
   /v1/extensions/{name}:
     get:
@@ -35535,6 +35789,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           description: Install limit exceeded.
+        '422':
+          $ref: '#/components/responses/OdpsFieldTooLong'
         '429':
           description: Per-owner extension limit exceeded.
 
@@ -44252,7 +44508,9 @@ paths:
                     refused for a recipient who has opted out.
       responses:
         '200':
-          description: Sent (or logged with the outcome)
+          description: >-
+            The message went out: handed to the AIMEAT inbox or the mail provider. A send that did
+            not go out never answers 200; it answers 502 or 503 SEND_FAILED.
           content:
             application/json:
               schema:
@@ -44264,11 +44522,59 @@ paths:
                         type: object
                         properties:
                           channel: { type: string, enum: [inbox, email] }
-                          status: { type: string, enum: [sent, failed, suppressed, skipped] }
+                          status: { type: string, enum: [sent] }
                           message_id: { type: string }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '502':
+          description: >-
+            SEND_FAILED: the channel that carries the message refused or failed it, the same outcome
+            POST /v1/outbound/send answers 502 for. Nothing reached the recipient. The attempt is in
+            the owner's send log, and error.details names the row and nothing more, because the app
+            never learns the address.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code: { type: string, enum: [SEND_FAILED] }
+                          details:
+                            type: object
+                            required: [message_id, status, channel]
+                            properties:
+                              message_id: { type: string, description: 'The send-log row, as GET /v1/outbound/log lists it' }
+                              status: { type: string, enum: [failed] }
+                              channel: { type: string, enum: [inbox, email] }
+        '503':
+          description: >-
+            SEND_FAILED: this node had nothing to send through, the same outcome POST
+            /v1/outbound/send answers 503 for. Retrying changes nothing until a transport is
+            configured. The attempt is in the owner's send log and error.details names it, in the
+            same shape as 502.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code: { type: string, enum: [SEND_FAILED] }
+                          details:
+                            type: object
+                            required: [message_id, status, channel]
+                            properties:
+                              message_id: { type: string }
+                              status: { type: string, enum: [failed] }
+                              channel: { type: string, enum: [inbox, email] }
 
   /v1/contacts/resolve:
     post:
@@ -56541,7 +56847,7 @@ paths:
       operationId: sendOutboundMessage
       tags: [Outbound]
       summary: Send a message through the policied door
-      description: 'The one send path. Recipient is a SAVED contact id, never a free address. Policy chain: suppression (422 SUPPRESSED) → marketing opt-out (422 OPTED_OUT) → rolling 24 h daily limit (429 DAILY_LIMIT) → channel selection (AIMEAT inbox first when the recipient has an identity here, email fallback; marketing email carries the unsubscribe link). Compose directly (subject+body), from a template (memory record outbound.template.{template_id} with {{var}} substitution), or from an invoice (invoice_id attaches the PDF + Finvoice XML and updates the invoice''s deliveryStatus). Every outcome lands in the send log.'
+      description: 'The one send path. Recipient is a SAVED contact id, never a free address. Policy chain: suppression (422 SUPPRESSED) → marketing opt-out (422 OPTED_OUT) → rolling 24 h daily limit (429 DAILY_LIMIT) → channel selection (AIMEAT inbox first when the recipient has an identity here, email fallback; marketing email carries the unsubscribe link). Compose directly (subject+body), from a template (memory record outbound.template.{template_id} with {{var}} substitution), or from an invoice (invoice_id attaches the PDF + Finvoice XML and updates the invoice''s deliveryStatus). Every outcome lands in the send log. Only a send that went out answers 200; one that did not answers 502 or 503 SEND_FAILED, and is still in the send log.'
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
@@ -56626,13 +56932,9 @@ paths:
       responses:
         '200':
           description: >-
-            The attempt reached channel selection and is in the send log. This is not a delivery and
-            not always a send: `data.status` says what happened. `sent` means it was handed to the
-            AIMEAT inbox or the mail provider (a bounce shows up on the contact afterwards). `failed`
-            means the provider refused it or this node had no transport, with the reason in
-            `data.message.error` (EMAIL_DISABLED, SMTP_SEND_FAILED, MAILBOX_SEND_FAILED, or the
-            provider's own text). Suppression and opt-out do not arrive here; they are 422. The
-            aimeat_mail_send tool answers a `failed` outcome as an error result.
+            The message went out: handed to the AIMEAT inbox or the mail provider. This is not a
+            delivery; a bounce shows up on the contact afterwards. A send that did not go out never
+            answers 200.
           content:
             application/json:
               schema:
@@ -56643,22 +56945,80 @@ paths:
                       data:
                         type: object
                         properties:
-                          status: { type: string, enum: [sent, failed] }
+                          status: { type: string, enum: [sent] }
                           channel: { type: string, enum: [inbox, email] }
                           message:
                             type: object
                             description: The send-log row.
                             properties:
                               id: { type: string }
-                              status: { type: string, enum: [sent, failed] }
+                              status: { type: string, enum: [sent] }
                               error: { type: string, nullable: true }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/AimeatError' }
+        '422':
+          description: >-
+            SUPPRESSED or OPTED_OUT. The refused attempt is in the send log, and error.details names
+            it: { message_id, status (suppressed | skipped), channel, reason }.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '429': { $ref: '#/components/responses/AimeatError' }
+        '502':
+          description: >-
+            SEND_FAILED: the channel that carries the message refused or failed it. That is the node's
+            SMTP server (SMTP_SEND_FAILED), a company's own server (its own words), the connected
+            mailbox's provider (MAILBOX_NOT_PERMITTED, MAILBOX_RATE_LIMITED, MAILBOX_NEEDS_REAUTH,
+            MAILBOX_UNREACHABLE, MAILBOX_HTTP_<status>), or the recipient's AIMEAT inbox (BLOCKED,
+            RECIPIENT_NOT_FOUND). Nothing reached the recipient. The attempt is in the send log and
+            error.details names it.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code: { type: string, enum: [SEND_FAILED] }
+                          details:
+                            type: object
+                            required: [message_id, status, channel, reason]
+                            properties:
+                              message_id: { type: string, description: 'The send-log row, as GET /v1/outbound/log lists it' }
+                              status: { type: string, enum: [failed] }
+                              channel: { type: string, enum: [inbox, email] }
+                              reason: { type: string }
+        '503':
+          description: >-
+            SEND_FAILED: this node had nothing to send through. No shared transport is configured,
+            and neither connection_id nor a company with its own server was named. Reason
+            EMAIL_DISABLED. Retrying changes nothing until one is configured. The attempt is in the
+            send log and error.details names it, in the same shape as 502.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code: { type: string, enum: [SEND_FAILED] }
+                          details:
+                            type: object
+                            required: [message_id, status, channel, reason]
+                            properties:
+                              message_id: { type: string }
+                              status: { type: string, enum: [failed] }
+                              channel: { type: string, enum: [inbox, email] }
+                              reason: { type: string, enum: [EMAIL_DISABLED] }
   /v1/outbound/themes:
     get:
       operationId: listOutboundThemes

@@ -416,9 +416,8 @@ await test("18. a send as the company goes through the company's own server, not
       subject: 'Lasku 1001', body: 'Liitteenä lasku.',
     }),
   });
-  assert(sent.status === 200, `send failed: ${sent.status} ${JSON.stringify(sent.body)}`);
-  assert(sent.body.data.status === 'failed', `expected a delivery failure against 127.0.0.1:1, got ${sent.body.data.status}`);
-  const err = String(sent.body.data.message.error ?? '');
+  assert(sent.status === 502 && sent.body.error?.code === 'SEND_FAILED', `expected 502 SEND_FAILED against 127.0.0.1:1, got ${sent.status} ${JSON.stringify(sent.body)}`);
+  const err = String(sent.body.error.details?.reason ?? '');
   assert(err !== 'EMAIL_DISABLED', "the node's shared transport answered — the company sender was not used");
   assert(/ECONNREFUSED|connect|127\.0\.0\.1/i.test(err), `expected a connection error from the company server, got: ${err}`);
 });
@@ -436,9 +435,9 @@ await test('19. removing the settings puts the company back on the shared sender
       subject: 'Lasku 1002', body: 'Liitteenä lasku.',
     }),
   });
-  assert(sent.status === 200, `send failed: ${sent.status}`);
-  assert(sent.body.data.message.error === 'EMAIL_DISABLED',
-    `without company settings the node's own (disabled) transport must answer, got: ${sent.body.data.message.error}`);
+  assert(sent.status === 503 && sent.body.error?.code === 'SEND_FAILED', `send: ${sent.status} ${JSON.stringify(sent.body)}`);
+  assert(sent.body.error.details?.reason === 'EMAIL_DISABLED',
+    `without company settings the node's own (disabled) transport must answer, got: ${sent.body.error.details?.reason}`);
 });
 
 console.log("\nPhase 6 — the company's own page");

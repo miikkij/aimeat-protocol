@@ -188,8 +188,8 @@ await test('6. the colleague sending as the company reaches that same recipient'
       subject: 'Kevät', body: 'Terveisiä', company_id: companyId,
     }),
   });
-  assert(r.status === 200, `expected the send to be accepted, got ${r.status} ${JSON.stringify(r.body)}`);
-  assert(r.body.data.status === 'failed', `expected a delivery failure against the fake host, got ${r.body.data.status}`);
+  assert(r.status === 502 && r.body.error?.code === 'SEND_FAILED', `expected the send to pass every gate and fail at the fake host, got ${r.status} ${JSON.stringify(r.body)}`);
+  assert(typeof r.body.error.details?.message_id === 'string', 'the failed attempt must name its send-log row');
 });
 
 await test("6b. the colleague's send lands in the COMPANY's log, attributed to her", async () => {

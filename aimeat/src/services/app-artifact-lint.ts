@@ -35,12 +35,16 @@
  *   - AppArtifactFinding / AppArtifactLintResult — the shapes a publish response carries
  *   - lintAppArtifact(html, config) — the whole check: blocking[] + warnings[]
  *   - checkInlineScripts / checkUnparsedModules / collectAssetRefs / probeNodeAssets / checkRegister /
- *     checkTheme / checkMetas / checkAgentDataReads / checkServedCopy — one concern each
+ *     checkTheme / checkMetas / checkAgentDataReads — one concern each
  * @usage
  *   import { lintAppArtifact } from './app-artifact-lint.js';
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   v1.5.0 — 2026-09-13 — checkServedCopy is gone. The developer decided that a served copy is
+ *     stored as its source: services/app-publish.ts removes the node's serve marks before this check
+ *     runs and names them in the publish response (services/app-serve-marks-strip.ts), which
+ *     replaces the warning that told the builder to fetch the raw download instead.
  *   v1.4.0 — 2026-09-13 — Four warnings the publish response owed its builders, all from appdev
  *     pitfall triage. An aimeat-scopes word the node cannot grant is named (one such word refuses
  *     the whole sign-in, so nobody could sign in and the publish said nothing), and an empty
@@ -80,11 +84,6 @@ import type { AimeatConfig } from '../config.js';
 import { extractInlineScripts, moduleGoalAvailable, parseSource, selfTest } from '../utils/inline-script-parse.js';
 import { logger } from '../utils/logger.js';
 import { APP_GRANTABLE_SCOPES } from '../routes/app-grant-vocabulary.js';
-import { BADGE_MARK } from '../utils/app-badge.js';
-import { RESERVE_MARK } from '../utils/app-chrome-reserve.js';
-import { DISCOVERY_MARK } from '../utils/app-agent-discovery.js';
-import { PROVENANCE_HTML_MARK } from './ai-provenance-marks.js';
-import { REVIEWED_MARK } from './app-serve-marks.js';
 
 /**
  * One finding, shaped so an agent can act on it without prose parsing: a curated pitfall id, the
@@ -139,7 +138,9 @@ export async function lintAppArtifact(html: string, config: AimeatConfig): Promi
   warnings.push(...checkAgentDataReads(html));
   warnings.push(...checkDeclaredButUnused(html));
   warnings.push(...checkTrackMixing(html));
-  warnings.push(...checkServedCopy(html));
+  // No served-copy check: services/app-publish.ts strips the node's serve marks before this runs and
+  // names them in its own result (services/app-serve-marks-strip.ts), so there is nothing left here
+  // to warn about.
 
   return { blocking, warnings };
 }
@@ -659,61 +660,6 @@ function declaredScopeWords(head: string): string[] {
     at = lower.indexOf('<meta', end + 1);
   }
   return [];
-}
-
-// ── Warning: a served copy uploaded as source ───────────────────────────────────────────────────
-
-/**
- * The marks the node adds to an app on its way OUT (services/app-serve-marks.ts), each with the tag
- * it has to sit in. Matched in tag context so an app that merely names one from its own script
- * (`getElementById('aimeat-app-badge')`) is not told it published a served copy.
- */
-const SERVE_MARKS: ReadonlyArray<{ mark: string; tag: RegExp }> = [
-  { mark: BADGE_MARK, tag: /^[a-z]/i },
-  { mark: RESERVE_MARK, tag: /^[a-z]/i },
-  { mark: PROVENANCE_HTML_MARK, tag: /^[a-z]/i },
-  { mark: DISCOVERY_MARK, tag: /^[a-z]/i },
-  { mark: REVIEWED_MARK, tag: /^meta\b/i },
-];
-
-/** How far back from a mark its opening `<` may sit. The node's own tags carry a few attributes. */
-const MARK_TAG_LOOKBACK = 400;
-
-/**
- * Does this upload carry the node's own serve marks?
- *
- * The node skips a mark that is already in the document, which is what makes a re-serve idempotent,
- * and it is also why publishing a served copy goes wrong quietly: a baked-in badge ignores the owner
- * switching it off, and a baked-in AI-disclosure block suppresses the one for the version actually
- * published. Nothing is stripped and nothing is refused (the default chosen on 2026-09-13 because it
- * changes no contract; whether to strip or refuse is the developer's decision); the builder is told
- * where the source is.
- *
- * Read backwards from each occurrence rather than with one `<tag[^>]*mark` pattern, for the reason
- * hasColorSchemeMediaQuery gives: an unbounded run that restarts at every `<` is quadratic on bytes a
- * stranger uploaded.
- */
-function checkServedCopy(html: string): AppArtifactFinding[] {
-  const found: string[] = [];
-  for (const { mark, tag } of SERVE_MARKS) {
-    for (let at = html.indexOf(mark); at !== -1; at = html.indexOf(mark, at + 1)) {
-      const before = html.slice(Math.max(0, at - MARK_TAG_LOOKBACK), at);
-      const open = before.lastIndexOf('<');
-      if (open === -1 || before.indexOf('>', open) !== -1) continue;
-      if (!tag.test(before.slice(open + 1))) continue;
-      found.push(mark);
-      break;
-    }
-  }
-  if (found.length === 0) return [];
-
-  return [finding('edit-published-app', 'warn',
-    `This document carries marks the node adds when it serves an app (${found.map(m => `\`${m}\``).join(', ')}), `
-    + 'so it is a served copy rather than the source. The node skips a mark that is already present, so '
-    + 'a copy published with them keeps an attribution badge the owner may have switched off and an '
-    + 'AI-disclosure block that describes an older version. Take the source from the `download_url` '
-    + 'aimeat_app_get returns (GET /v1/apps/<owner>/<filename> without mode=inline answers the stored '
-    + 'bytes as uploaded), edit that, and publish it.')];
 }
 
 /**

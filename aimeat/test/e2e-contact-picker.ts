@@ -208,18 +208,20 @@ async function main() {
     await test('5. The app spends the handle and the NODE sends; the send log records it', async () => {
         aToken = await appToken(A, appTarget, `${appOrigin}/cb`, 'outbound:send');
         const r = await spend(aToken, handle);
-        assert(r.status === 200, `spend ${r.status}: ${JSON.stringify(r.body.error)}`);
-        assert(r.body.data.channel === 'email', `channel: ${r.body.data.channel}`);
-        assert(!!r.body.data.message_id, 'a send-log id came back');
+        // No transport on the test node, so the node's send fails and says so (502/503 SEND_FAILED
+        // since 2026-09-13), naming the send-log row and never the address.
+        assert(r.status === 503 && r.body.error?.code === 'SEND_FAILED', `spend ${r.status}: ${JSON.stringify(r.body.error)}`);
+        assert(r.body.error.details?.channel === 'email', `channel: ${r.body.error.details?.channel}`);
+        assert(typeof r.body.error.details?.message_id === 'string', 'a send-log id came back');
         // The owner can see what left; the app cannot see the address it went to.
         const log = await json('/v1/outbound/log', { headers: auth(A) });
         assert(log.status === 200 && log.body.data.messages.length >= 1, `send log: ${log.status}`);
-        assert(!JSON.stringify(r.body.data).includes(personEmail), 'the address is not echoed to the app');
+        assert(!JSON.stringify(r.body).includes(personEmail), 'the address is not echoed to the app');
     });
 
     await test('6. The handle is reusable inside its window (a permission that dies after one use is not one)', async () => {
         const r = await spend(aToken, handle, { subject: 'Second', body: 'Still allowed.' });
-        assert(r.status === 200, `second spend ${r.status}: ${JSON.stringify(r.body.error)}`);
+        assert(r.status === 503 && r.body.error?.code === 'SEND_FAILED', `second spend ${r.status}: ${JSON.stringify(r.body.error)}`);
     });
 
     await test('7. ANOTHER app cannot spend this handle, even for the same owner (403)', async () => {

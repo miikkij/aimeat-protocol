@@ -23,6 +23,10 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.2.0 — 2026-09-13 — aimeat_mail_send reads the failed send from the SEND_FAILED error
+ *     sendOutbound now throws (the REST route answers the same error with 502 or 503), and returns
+ *     its code, the send-log row and the reason. A suppressed or opted-out recipient names its
+ *     logged row the same way. The tool's answers are otherwise unchanged.
  *   v1.1.0 — 2026-09-13 — aimeat_mail_send returns an error result when the send did not go out
  *     (the provider refused it, or the node had no transport), with the reason and the send-log id.
  *     It used to return a success result with a "Not sent" note, which an agent reported as sent.
@@ -226,6 +230,9 @@ export function registerConnectionTools(
                     // THE OUTBOUND DOOR, NOT AROUND IT. Saved contact, suppression, opt-out, the
                     // daily allowance, the unsubscribe link and the append-only log all happen in
                     // there, once, for every door.
+                    // Only a send that went out comes back from here. One the channel refused, or one
+                    // with no transport, is thrown as SEND_FAILED with the send-log row in details,
+                    // the same error the REST route answers with 502 or 503.
                     const result = await sendOutbound(config, storage, principal(), {
                         contactId: contact_id,
                         kind: kind ?? 'transactional',
@@ -236,32 +243,27 @@ export function registerConnectionTools(
                         ...(ai_disclosure ? { aiDisclosure: { level: ai_disclosure } } : {}),
                         ...(theme ? { theme } : {}),
                     });
-                    // A SEND THAT DID NOT GO OUT IS AN ERROR RESULT on this door. The REST route
-                    // answers 200 with the outcome in data.status, and its callers read that field;
-                    // an agent reads isError, and a "Not sent" note inside a success result was
-                    // reported to people as a sent message (appdev pitfall
-                    // send-200-is-not-a-delivery). The attempt is in the send log either way, so
-                    // the answer names the row.
-                    if (result.status !== 'sent') {
-                        const reason = result.log.error ?? result.status;
-                        return {
-                            content: [{
-                                type: 'text',
-                                text: JSON.stringify({
-                                    status: result.status, channel: result.channel, message_id: result.log.id, reason,
-                                    note: `Not sent (${reason}). Nothing reached the recipient; the attempt is in the send log as ${result.log.id}.`,
-                                }, null, 2),
-                            }],
-                            isError: true,
-                        };
-                    }
                     return ok({
                         status: result.status, channel: result.channel, message_id: result.log.id,
                         note: 'Handed over to the provider. Delivery is theirs from here; a bounce shows up on the contact.',
                     });
                 } catch (err) {
-                    if (err instanceof OutboundError) return fail(`${err.code}: ${err.message}`);
-                    throw err;
+                    if (!(err instanceof OutboundError)) throw err;
+                    // A REFUSAL THAT WROTE A ROW NAMES IT. An agent reads isError, and a "Not sent"
+                    // note inside a success result was reported to people as a sent message (appdev
+                    // pitfall send-200-is-not-a-delivery). The fields are the ones the REST error
+                    // carries in details, beside the code and the sentence, so every door says the
+                    // same thing about the same attempt.
+                    if (err.details) {
+                        return {
+                            content: [{
+                                type: 'text',
+                                text: JSON.stringify({ code: err.code, ...err.details, note: err.message }, null, 2),
+                            }],
+                            isError: true,
+                        };
+                    }
+                    return fail(`${err.code}: ${err.message}`);
                 }
             });
     }

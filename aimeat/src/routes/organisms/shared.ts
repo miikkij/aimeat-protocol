@@ -8,9 +8,12 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.9.0 — 2026-09-13 — publishDraft and publishDraftsBatch REFUSE a space the workspace manifest
+ *     does not declare (the developer's decision): `{ code: 'UNDECLARED_SPACE', refusal }`, returned
+ *     before the scan, the image scoping or any write. The warning they carried is gone.
  *   v1.8.0 — 2026-09-13 — publishDraft and publishDraftsBatch return `warning` (UNDECLARED_SPACE) when
  *     the workspace manifest declares no space for the namespace: the record is stored and no
- *     workspace read lists it. Not refused, since live apps may publish there today. The batch
+ *     workspace read lists it. The batch
  *     publish's schema violations carry path, rule and params, so they name the refused property.
  *   v1.7.0 — 2026-08-23 — Publishing consumes EVERY copy of the draft, not only the freshest one.
  *     A draft is stored under whoever wrote it, so a record an agent proposed and its owner then
@@ -52,7 +55,7 @@ import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../../service
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from '../../services/workspace-roles.js';
 import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from '../../services/workspace-versions.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
-import { readPublishSpace, type UndeclaredSpaceWarning } from '../../services/workspace-write-items.js';
+import { readPublishSpace, type UndeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
 import { logger } from '../../utils/logger.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
@@ -77,7 +80,7 @@ export async function readOrganismConfig(
 // Moved to ./record-helpers.ts on 2026-08-11 (max-file-lines). Re-exported so every existing
 // import of these from ./shared.js keeps resolving, including src/mcp/workspaces.ts.
 export { canWriteNamespaceRule, roleSatisfies, fresherRec, ownerGhiiOf, collapseKeyTo } from './record-helpers.js';
-import { fresherRec, ownerGhiiOf, collapseKeyTo, canWriteNamespaceRule } from './record-helpers.js';
+import { fresherRec, ownerGhiiOf, collapseKeyTo, canWriteNamespaceRule, revertRecordToDraft } from './record-helpers.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
 
 export type ShareAccess = 'open' | 'password' | 'account';
@@ -182,10 +185,14 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   const publishDraft = async (
     organismId: string, ws: string | undefined, namespace: string, instance: string, publisher: string,
     expectedVersion?: number | null,
-  ): Promise<{ ok: true; version: number; skipped?: boolean; warning?: UndeclaredSpaceWarning } | { ok: false; code: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> => {
+  ): Promise<{ ok: true; version: number; skipped?: boolean } | { ok: false; code: 'NO_DRAFT' | 'INVALID'; violations?: unknown } | { ok: false; code: 'UNDECLARED_SPACE'; refusal: UndeclaredSpaceRefusal }> => {
     const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
     const base = `${wsRoot}.${namespace}.${instance}`;
     const ownerGhii = ownerGhiiOf(publisher);
+    // A space the workspace manifest does not declare is refused first, before the image scoping
+    // below changes a single file's visibility (the developer's decision, 2026-09-13).
+    const { ot: pubOt, refusal } = await readPublishSpace(storage, organismId, ws, namespace);
+    if (refusal) return { ok: false, code: 'UNDECLARED_SPACE', refusal };
     // Value-free version handling: skip `.version.N` rows in the scan (their full values were loaded
     // just to find maxN) — the version numbers come from the key names alone (listVersionRefs below).
     const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000, excludeVersionRows: true });
@@ -205,16 +212,13 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const vis = draft.visibility;
     const tags = draft.tags ?? [];
     const existingLatest = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
-    // Read before the change-guard, so a no-op re-publish into an undeclared space still says so.
-    const { ot: pubOt, warning } = await readPublishSpace(storage, organismId, ws, namespace);
-    const warned = warning ? { warning } : {};
 
     // Change-guard: an unchanged re-publish (contract agents re-publish the same draft on every poll
     // cycle) must NOT append a byte-identical .version.N. Consume the draft and return without touching
     // .latest or firing the Tracked-Response side effect.
     if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draftValue)) {
       for (const d of draftCopies(items, base)) await storage.deleteMemory(d.ownerGaii, `${base}.draft`);
-      return { ok: true, version: maxN, skipped: true, ...warned };
+      return { ok: true, version: maxN, skipped: true };
     }
     // Honour the manifest's `versioned` flag (default true): a `versioned:false` space (e.g. a request
     // queue) keeps only .latest — no immutable per-publish history.
@@ -264,7 +268,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // .latest. Re-editing the published instance starts a fresh draft. (Without this the workspace
     // shows a stale draft alongside the identical published copy.) EVERY copy: see draftCopies.
     for (const d of draftCopies(items, base)) await storage.deleteMemory(d.ownerGaii, `${base}.draft`);
-    return { ok: true, version: n, ...warned };
+    return { ok: true, version: n };
   };
 
   // BATCH publish (data-access redesign, Phase 2): publish MANY drafts in ONE workspace+namespace as one
@@ -283,16 +287,19 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // consume). An import has the final values, so this collapses N draft-writes + N publishes into ONE
     // request. Interactive edits still use the draft flow (no directValues).
     directValues?: Record<string, { value: unknown; visibility?: MemoryRecord['visibility'] }>,
-  ): Promise<{ results: Array<{ instance: string; ok: boolean; version?: number; skipped?: boolean; code?: 'NO_DRAFT' | 'INVALID'; violations?: unknown }>; warning?: UndeclaredSpaceWarning }> => {
+  ): Promise<{ results: Array<{ instance: string; ok: boolean; version?: number; skipped?: boolean; code?: 'NO_DRAFT' | 'INVALID'; violations?: unknown }>; refusal?: UndeclaredSpaceRefusal }> => {
     const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
     const ownerGhii = ownerGhiiOf(publisher);
     const nsPrefix = `${wsRoot}.${namespace}.`;
-    // ONE scan of the whole namespace + ONE manifest read (`versioned`, UNDECLARED_SPACE) for the entire batch.
+    // ONE manifest read (`versioned`, the UNDECLARED_SPACE refusal) + ONE scan of the namespace for the
+    // entire batch. The whole batch is one namespace, so an undeclared space refuses all of it, before
+    // the scan and before any record is touched (the developer's decision, 2026-09-13).
+    const { ot: pubOt, refusal } = await readPublishSpace(storage, organismId, ws, namespace);
+    if (refusal) return { results: [], refusal };
     // excludeVersionRows: the batch needs each record's .draft/.latest VALUES but only the version
     // NUMBERS — those come from ONE value-free key scan (versionRefsByBase below).
     const { items: allRows } = await storage.listAllMemory({ prefix: nsPrefix, limit: 100000, excludeVersionRows: true });
     const versionsByBase = await versionRefsByBase(storage, nsPrefix);
-    const { ot: pubOt, warning } = await readPublishSpace(storage, organismId, ws, namespace);
     const versioned = pubOt?.versioned !== false;
     // Retention window for this namespace (0 = keep all; append-only spaces resolve to 0).
     const pruneWindow = effectiveMaxVersions(config, pubOt);
@@ -398,30 +405,18 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     }
     // Fire Tracked-Response evaluation for each published record (gated O(1) in the subscriber).
     for (const e of toEmit) emitMemoryWritten(e.owner, e.key);
-    return { results, ...(warning ? { warning } : {}) };
+    return { results };
   };
 
-  // Reopen a published record for editing: copy organism.{id}.{ns}.{instance}.latest → .draft so the
-  // existing edit → publish flow applies. The published .latest stays live (and keeps serving readers)
-  // until the edited draft is re-published. Refuses to clobber an in-progress draft.
+  // Reopen a published record for editing (copy .latest → .draft): ./record-helpers.ts
+  // revertRecordToDraft, moved there unchanged on 2026-09-13 (max-file-lines). Reopening WRITES a
+  // draft, so a space the manifest does not declare is refused here first, as a publish is.
   const revertToDraft = async (
     organismId: string, ws: string | undefined, namespace: string, instance: string, reverter: string,
-  ): Promise<{ ok: true } | { ok: false; code: 'NO_LATEST' | 'DRAFT_EXISTS' }> => {
-    const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
-    const base = `${wsRoot}.${namespace}.${instance}`;
-    // Reopening needs only .draft/.latest/bare — never the `.version.N` history values.
-    const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000, excludeVersionRows: true });
-    if (items.find(r => r.key === `${base}.draft`)) return { ok: false, code: 'DRAFT_EXISTS' };
-    // Mirror the workspace read: the published current state is .latest, or the bare key as fallback.
-    const latest = items.find(r => r.key === `${base}.latest`) ?? items.find(r => r.key === base);
-    if (!latest) return { ok: false, code: 'NO_LATEST' };
-    const now = new Date().toISOString();
-    await storage.setMemory({
-      key: `${base}.draft`, ownerGaii: reverter, value: latest.value,
-      visibility: latest.visibility, tags: latest.tags ?? [], ttlHours: null,
-      version: 1, createdAt: now, updatedAt: now,
-    });
-    return { ok: true };
+  ): Promise<{ ok: true } | { ok: false; code: 'NO_LATEST' | 'DRAFT_EXISTS' } | { ok: false; code: 'UNDECLARED_SPACE'; refusal: UndeclaredSpaceRefusal }> => {
+    const { refusal } = await readPublishSpace(storage, organismId, ws, namespace);
+    if (refusal) return { ok: false, code: 'UNDECLARED_SPACE', refusal };
+    return revertRecordToDraft(storage, organismId, ws, namespace, instance, reverter);
   };
 
   // ── Workspace access (per-workspace, creator-controlled, consent-backed) ──

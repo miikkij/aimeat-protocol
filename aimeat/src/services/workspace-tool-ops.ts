@@ -28,6 +28,12 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.2.0 — 2026-09-13 — UNDECLARED_SPACE is a refusal on both operations, decided by the developer
+ *     on 2026-09-13. The draft write answers 422 UNDECLARED_SPACE from the shared decision
+ *     (workspace-write-items.ts undeclaredSpaceRefusal) with the same message POST /v1/memory sends,
+ *     where it answered 400 INVALID_INPUT with a sentence of its own; the space is resolved against
+ *     every copy of the manifest, as the memory door resolves it. The publish passes publishDraft's
+ *     refusal through, and no longer carries a warning.
  *   v1.1.0 — 2026-09-13 — publishWorkspaceOp carries publishDraft's UNDECLARED_SPACE warning as
  *     `warnings`, as POST /v1/organisms/:id/publish does.
  *   v1.0.0 — 2026-09-05 — Extracted from src/mcp/workspaces.ts (a pure move of the three tool
@@ -123,12 +129,18 @@ async function memberRoleOf(storage: Storage, caller: WorkspaceOpsCaller, orgId:
     return org?.agentGaiis?.includes(caller.principal) ? 'member' : null;
 }
 
-/** The manifest from whichever member created the workspace. */
-async function readManifest(storage: Storage, orgId: string, ws: string): Promise<Manifest | null> {
+/**
+ * The spaces a write may resolve against: the objectTypes of EVERY copy of the manifest, in scan
+ * order. A key is unique per owner, so a workspace can hold more than one manifest, and a space any of
+ * them declares is declared. The memory door decides on the same union (readPublishSpace), so the two
+ * doors cannot disagree about one write.
+ */
+async function readManifestTypes(storage: Storage, orgId: string, ws: string): Promise<ObjType[]> {
     const key = `${wsRoot(orgId, ws)}.meta.manifest`;
-    const { items } = await storage.listAllMemory({ prefix: key, limit: 100 });
-    const rec = items.find(r => r.key === key);
-    return rec ? (rec.value as Manifest) : null;
+    // Archived copies too: an archived workspace is refused below as ARCHIVED, which is the truth,
+    // rather than here as a workspace that declares nothing.
+    const { items } = await storage.listAllMemory({ prefix: key, limit: 100, archived: 'include' });
+    return items.filter(r => r.key === key).flatMap(r => (r.value as Manifest | null)?.objectTypes ?? []);
 }
 
 /** A draft value should be an object; tolerate a JSON string, then stamp the instance id. */
@@ -289,11 +301,19 @@ export async function writeWorkspaceDraftsOp(
     const batch = args.items !== undefined && args.items !== null;
     if (batch && args.ifVersion !== undefined) return refuse(400, 'INVALID_INPUT', 'ifVersion applies to a single record, not to a batch');
     const root = wsRoot(organismId, ws);
-    const types = (await readManifest(storage, organismId, ws))?.objectTypes ?? [];
-    const planned: { key: string; v: unknown; item: ResolvedWriteItem }[] = [];
+    const types = await readManifestTypes(storage, organismId, ws);
+    // Every item's space is settled before any item is touched: normalising a document's images
+    // changes the visibility of the files it embeds, which is a write.
+    const resolved: ResolvedWriteItem[] = [];
     for (const [i, want] of norm.items.entries()) {
-        const item = resolveWriteItem(want, types, batch ? `items[${i}]` : undefined);
-        if ('error' in item) return refuse(400, 'INVALID_INPUT', item.error);
+        const item = resolveWriteItem(want, types, batch ? `items[${i}]` : undefined, { organismId, ws });
+        // A space the manifest does not declare is the shared UNDECLARED_SPACE refusal (422), the
+        // same one POST /v1/memory answers; a missing id is this door's own 400.
+        if ('error' in item) return item.refusal ?? refuse(400, 'INVALID_INPUT', item.error);
+        resolved.push(item);
+    }
+    const planned: { key: string; v: unknown; item: ResolvedWriteItem }[] = [];
+    for (const [i, item] of resolved.entries()) {
         const key = `${root}.${item.namespace}.${item.instanceId}.draft`;
         let v = coerceValue(item.value, item.instanceId);
         if (item.isDoc) v = await normalizeDocValueImages(storage, config, v, caller.ownerName, `${organismId}/${ws}`);
@@ -370,7 +390,7 @@ export interface PublishWorkspaceArgs { organismId: string; ws: string; namespac
  */
 export async function publishWorkspaceOp(
     deps: WorkspaceOpsDeps, caller: WorkspaceOpsCaller, args: PublishWorkspaceArgs,
-): Promise<WorkspaceOpResult<{ published: string; version: number; skipped?: boolean; warnings?: unknown[] }>> {
+): Promise<WorkspaceOpResult<{ published: string; version: number; skipped?: boolean }>> {
     const { storage, config } = deps;
     const { organismId, ws, namespace, id } = args;
     const H = createOrganismHelpers(config, storage);
@@ -387,20 +407,20 @@ export async function publishWorkspaceOp(
     const base = `${wsRoot(organismId, ws)}.${namespace}.${id}`;
     const result = await H.publishDraft(organismId, ws, namespace, id, caller.writerGaii, args.expectedVersion ?? null);
     if (!result.ok) {
+        // A space the manifest does not declare: publishDraft's own refusal, the shared 422
+        // UNDECLARED_SPACE every publish door answers, made before anything was published.
+        if (result.code === 'UNDECLARED_SPACE') return result.refusal;
         return result.code === 'NO_DRAFT'
             ? refuse(404, 'NOT_FOUND', `No draft at ${base}.draft`)
             : refuse(409, 'PUBLISH_REFUSED', 'Publish refused: ' + JSON.stringify(result.violations), { violations: result.violations });
     }
     emitChange('organisms');
-    // UNDECLARED_SPACE: stored, and no workspace read lists it. The web door answers it; this one
-    // dropped it, so an agent publishing over MCP into an older workspace was never told.
-    const warned = result.warning ? { warnings: [result.warning] } : {};
     // A no-op re-publish leaves no new version, so it earns no audit entry and no snapshot either.
-    if (result.skipped) return { ok: true, data: { published: base, version: result.version, skipped: true, ...warned } };
+    if (result.skipped) return { ok: true, data: { published: base, version: result.version, skipped: true } };
     await H.writeDecision(organismId, caller.writerGaii, `published ${namespace}.${id} v${result.version}`, [`${namespace}.${id}`]);
     void updateOrganismStructure(storage, config, organismId, { event: 'content published', actor: caller.writerGaii }).catch(err => { logger.warn('publish: timeline best-effort', { error: String(err) }); });
     void import('./onboarding-funnel.js')
         .then(m => m.recordActivation(storage, config, caller.ownerName, 'workspace'))
         .catch(err => { logger.warn('publish: activation marker is best-effort', { error: String(err) }); });
-    return { ok: true, data: { published: base, version: result.version, ...warned } };
+    return { ok: true, data: { published: base, version: result.version } };
 }

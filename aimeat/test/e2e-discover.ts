@@ -7,6 +7,8 @@
  *   → 401, scope=shared → 501); and the ratified agent read-scope rule (§11.3) — an agent WITHOUT
  *   `memory:read` does NOT see the owner's private content, an agent WITH it does.
  * @version-history
+ *   v0.2.0 — 2026-09-13 — Setup no longer matched production: the workspace document was written
+ *     before the manifest declaring its space, which UNDECLARED_SPACE now refuses. The manifest is written first.
  *   v0.1.0 — 2026-06-23 — Phase 1: discovery endpoint coverage (design doc 2026-06-23).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=discover
@@ -134,9 +136,11 @@ const hasId = (entries: any[], id: string) => entries.some((e: any) => e.id === 
     const K_DOC_V1 = `organism.${ORG_ID}.w.ws1.docs.plans.doc1.version.1`;
     const K_DOC_META = `organism.${ORG_ID}.w.ws1.meta.manifest`;
     await putMem(a.token, K_BOOK, { reviews: 0 }, 'private', ['agent-statistics']);
+    // The manifest first: a workspace record in a space the manifest does not declare is refused with
+    // 422 UNDECLARED_SPACE, so the document and its version need docs.plans declared before they land.
+    await putMem(a.token, K_DOC_META, { manifestVersion: '1.0', id: ORG_ID, name: 'Plans', kind: 'project', status: 'active', objectTypes: [{ name: 'plans', schemaRef: 'schema:doc@1', namespace: 'docs.plans', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'document' }] }, 'private');
     await putMem(a.token, K_DOC, JSON.stringify({ title: 'Titled doc', body: '# Heading\n**bold** words' }), 'private');
     await putMem(a.token, K_DOC_V1, JSON.stringify({ title: 'Titled doc', body: 'older' }), 'private');
-    await putMem(a.token, K_DOC_META, { manifestVersion: '1.0', id: ORG_ID, name: 'Plans', kind: 'project', status: 'active', objectTypes: [{ name: 'plans', schemaRef: 'schema:doc@1', namespace: 'docs.plans', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'document' }] }, 'private');
 
     await test('a workspace document is one entry: its version and meta keys are not listed', async () => {
         const r = await discover('scope=own&type=document&per_page=100', a.token);
