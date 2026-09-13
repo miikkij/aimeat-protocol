@@ -118,6 +118,8 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 82 | An edited cortex library never reaches nodes that already have it | 1 |
 | 83 | A visitor from a peer reads the local namesake account's private data | 4 |
 | 84 | Settings back to defaults after a storage hiccup or a badly timed save | 1 |
+| 85 | A shape change reaches one page and leaves its copies behind | 3 |
+| 86 | An idle admin page floods reads while its screen looks stable | 1 |
 
 ---
 
@@ -956,3 +958,19 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **Why nothing notices.** Every read logs a warning and returns a well-formed record. The write succeeds. The page shows the record it just saved. The loss is only visible to the person who remembers what they had set.
 - **The rule.** A read that falls back to defaults is for DECIDING or DISPLAYING, never for writing back. Anything that reads in order to write takes the strict read and lets the failure throw, and it reads immediately before writing, inside a per-owner queue (`utils/serial-by-key.ts`), changing only its own fields on top of what it just read: `updateNotificationSettings(storage, ghii, cur => ({ ...cur, lastDigestAt }))`. A door that feeds an editor refuses (503) rather than serve defaults the editor would save, and the editor refuses to save without a loaded record. When a module has both reads, name them apart (`readX` / `readXStrict`) so a caller has to choose.
 - **The tell:** a `try { read } catch { return defaults }` whose result later flows into a `setMemory`, or a write built from a record read before an `await` that sends mail, calls a provider or waits on anything slow.
+
+## 85. A design token does not give a copied shape one home
+
+*Symptoms: a new section treatment reaches one page, while another page still draws the old rule. A font or colour change works everywhere, making the shapes appear shared too.*
+
+- **The case.** The September 2026 poster migration found headline declarations in fifty view sheets. Each sheet read the same tokens but assembled the headline, frame, sun selection and offset shadow itself. The surface renderer even documented that its band title was matched to the home's by hand. A week of copying shapes made the next design change a search across pages.
+- **The rule.** Tokens name values; `public/css/poster.css` owns complete shapes. Markup composes `poster-*` and `showroom-*` classes, while a view sheet owns its layout. Only the page and section headline sizes accept per-view properties. A modifier needs a named design cut; finding another size in a sheet is a question, not a new class.
+- **The guard.** `check:poster-shapes` scans view and component sheets for eleven copied declaration patterns and refuses any per-file increase. Its baseline records debt and may only shrink without an explicit forgiveness decision. Passing the gate does not mean the debt is gone. Compare real before/after screenshots in both themes and all three viewports: a class substitution can gain a margin or lose to a more specific legacy selector while every count falls.
+
+## 86. A fresh callback can turn an effect into an invisible request loop
+
+*Symptoms: an idle admin page issues thousands of reads, yet the open form stays visually still and keeps its draft.*
+
+- **The case.** During poster verification, the admin toast hook returned a fresh error callback on every render. A loader depended on it; an effect depended on the loader; the load wrote state and started the cycle again. The local page made 63,309 GET requests in 87.079 seconds with zero observed form mutations. A screenshot and a repaint counter both missed it.
+- **The fix.** Stabilize the shared callbacks at their source with `useCallback`, rather than removing real effect dependencies at each caller. The repaired observation had one overview GET in 67.975 seconds and zero form mutations, with the draft retained.
+- **The rule.** Measure both DOM mutations and the idle request log. A callback returned by a shared hook is part of that hook's dependency contract; decide whether its identity should change before making every consumer compensate. The source fix is `views/admin/shared.js` v1.5.

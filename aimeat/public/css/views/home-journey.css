@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Useful work and account settings on the home, in the poster face.
  * @version-history
+ *   2026-09-13: Compose the existing home shapes with shared poster classes.
  *   v1.2.0 — 2026-09-13 — The account section in the settings dialog opens on the slab, so its 2px
  *     bottom rule goes; the dialog's X is sized by /css/dialog.css.
  *   v1.1.0 — 2026-09-12 — The section starts with the band title's ink slab (home.css), so the rule
@@ -21,13 +22,13 @@
 .koti-journey-choices button { min-height: 44px; }
 /* The sun bar starts under the chosen tab and ends with the last line the choice governs. */
 .koti-journey-panel { border-left: 4px solid var(--sun); padding-left: 1.25rem; margin-block: 0 1.5rem; min-width: 0; }
-.koti-journey-status { justify-content: space-between; border-block: 1px solid var(--border); padding-block: 1rem; }
+.koti-journey-status { justify-content: space-between; }
 .koti-journey-connect { border: 2px solid var(--text); padding: 1rem; margin-block: 1rem; min-width: 0; }
 .koti-journey-connect .ast-tools { flex-wrap: wrap; }
 .koti-journey-connect .ast-code, .koti-journey-connect pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .koti-journey-details { border-top: 1px solid var(--border); padding-block: 1rem; }
 .koti-journey-details summary { cursor: pointer; min-height: 44px; font-weight: var(--font-poster-strong-weight); }
-.koti-journey-result { border: 2px solid var(--text); background: var(--card-bg); padding: 1rem; margin-block: 1rem; overflow-wrap: anywhere; }
+.koti-journey-result { overflow-wrap: anywhere; }
 .koti-journey-result p { white-space: pre-wrap; }
 .koti-account-settings { display: flex; flex-direction: column; align-items: flex-start; gap: .8rem; }
 .koti-account-settings > .poster-section-title { align-self: stretch; }

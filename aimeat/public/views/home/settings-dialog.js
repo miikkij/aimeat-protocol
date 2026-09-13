@@ -20,6 +20,7 @@
  *   import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
  *   html`<${HomeSettingsDialog} open=${open} onClose=${close} />`
  * @version-history
+ *   2026-09-13: Compose the existing home shapes with shared poster classes.
  *   2026-09-13: The dialog is the site's one dialog at its medium size; its two sections open on the
  *     page's own slab (poster-section-title) and the door out is a row under an ink rule.
  *   2026-09-09: Account actions use the same underlined control as the home header.
@@ -142,9 +143,9 @@ export function HomeSettingsDialog({ open, onClose, session, showToast }) {
         ${/* Inside a dialog a section starts the way it does on the page: the slab, a size smaller. */''}
         <section class="poster-section koti-account-settings">
           <h3 class="poster-section-title">${t('homeJourney.account')}</h3>
-          <button type="button" class="koti-link" onClick=${() => setPanel('password')}>${t('profile.landing.changePasswordBtn')}</button>
-          <button type="button" class="koti-link" onClick=${() => setPanel('profile')}>${t('homeJourney.profileLanguage')}</button>
-          <a class="koti-link" href="/v1/profile?tab=access">${t('homeJourney.security')} →</a>
+          <button type="button" class="poster-action koti-link" onClick=${() => setPanel('password')}>${t('profile.landing.changePasswordBtn')}</button>
+          <button type="button" class="poster-action koti-link" onClick=${() => setPanel('profile')}>${t('homeJourney.profileLanguage')}</button>
+          <a class="poster-action koti-link" href="/v1/profile?tab=access">${t('homeJourney.security')} →</a>
           <p class="koti-hint">${t('homeJourney.securityHint')}</p>
         </section>
         <section class="poster-section">

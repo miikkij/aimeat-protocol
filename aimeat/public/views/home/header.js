@@ -18,6 +18,7 @@
  *   import { HomeHeader } from '/views/home/header.js';
  *   html`<${HomeHeader} name=${name} onOpenSettings=${() => setOpen(true)} />`
  * @version-history
+ *   2026-09-13: Compose the existing home shapes with shared poster classes.
  *   v1.4.0 — 2026-08-28 — The poster home: the two actions are ink-underlined links (.koti-link)
  *     rather than ghost buttons, so the nameplate's masthead has one register.
  *   v1.3.0 — 2026-08-27 — The door to settings and controls beside the settings button, and the
@@ -51,7 +52,7 @@ export function HomeHeader({ name, owner, identity, onOpenSettings }) {
   const avatarSvg = minidenticon(typeof owner === 'string' && owner ? owner : (name || 'user'));
   return html`
     <div class="koti-header">
-      <span class="koti-avatar" aria-hidden="true" dangerouslySetInnerHTML=${{ __html: avatarSvg }}></span>
+      <span class="koti-avatar poster-frame" aria-hidden="true" dangerouslySetInnerHTML=${{ __html: avatarSvg }}></span>
       <span class="koti-nameplate">
         <span class="koti-name">${name}</span>
         ${identity && html`
@@ -64,10 +65,10 @@ export function HomeHeader({ name, owner, identity, onOpenSettings }) {
         ${/* The door to everything behind the home. The header carries the same link, but a person
               reading the nameplate is not reading the header, and the relationship (home in front,
               controls behind) has to be visible on the page itself. */''}
-        <a class="koti-link koti-controls-link" href="/v1/profile">
+        <a class="poster-action koti-link koti-controls-link" href="/v1/profile">
           ${tr('home.settings.allControls', 'All settings and controls')} →
         </a>
-        <button type="button" class="koti-link koti-settings-btn" onClick=${onOpenSettings}>
+        <button type="button" class="poster-action koti-link koti-settings-btn" onClick=${onOpenSettings}>
           ${Cog}
           <span>${tr('home.settings.open', 'Home settings')}</span>
         </button>

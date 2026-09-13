@@ -2,8 +2,8 @@
 name: aimeat-design-language
 description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.3.1
-  updated: 2026-08-29
+  version: 1.4.0
+  updated: 2026-09-13
   owner: Jouni Miikki
 ---
 
@@ -16,9 +16,10 @@ the type, the colours, the shapes and the rules; they differ in how loud they ar
 the **classic shell** (rounded controls, cards), remains under the admin dashboard and the oldest
 views and is not extended; it reads the same type tokens.
 
-Every value in this document is a token in `aimeat/public/css/theme.css`. A view sheet reads the
-token; it never writes a face or a colour out in full. When a value changes, it changes in that one
-file, and the map at the end says which surfaces follow.
+Type and colour tokens live in `aimeat/public/css/theme.css`; the shared shapes live in
+`aimeat/public/css/poster.css`. A view composes a shape by class and owns its layout. Change the
+token or shape at its home; the maps below show which surfaces follow. Existing copies are
+recorded migration debt, not examples for a new view.
 
 ## The faces
 
@@ -59,7 +60,7 @@ whatever face the headlines wear; a headline change never reaches it.
 Sizes that recur (rem, at 16px): showroom front hero `clamp(2.4rem, 6.6vw, 6rem)` with a coral
 offset text-shadow of `.075em`; showroom index hero `clamp(2rem, 3.6vw, 2.9rem)`; showroom section
 headline `clamp(1.5rem, 2.6vw, 2rem)`; poster page title `2.8rem` at the poster tracking and
-leading tokens; poster section headline `1.9rem`; the small coral label `.72rem`, 700, tracking `.1em`,
+leading tokens; poster section headline `1.9rem`; the small coral label `.72rem`, 800, tracking `.1em`,
 uppercase; body `.95rem` to `1.1rem`, line-height `1.6`.
 
 ## The colours
@@ -83,23 +84,26 @@ is written for a palette.
 
 ## The four shapes
 
-1. **A section under a rule.** Poster: a 3px ink rule on top, no fill, no frame; a row inside it
-   sits over a 1px `--border` line (2px ink when the row is the thing). Showroom: a 3px ink frame
-   with a solid offset shadow, `6px 6px 0`, the shadow colour turning down the row: coral, ink, sun.
+1. **A section starts with a slab (B1).** Poster: paper words on an ink headline slab, a 6px sun
+   stripe below it; the selected tab's content has a 4px sun left edge. A row inside the section
+   keeps its 1px `--border` line, or a 3px ink top rule when the row is the thing. Showroom: a 3px ink frame
+   with a solid offset shadow, `8px 8px 0`, in the named sun or coral cut.
    Nothing is tilted. Nothing has a radius.
-2. **A box for a thing that must read as one object.** 2px ink frame on `--bg-dim` for a sample,
+2. **A box for a thing that must read as one object.** 2px ink frame on `--card-bg` for a sample,
    a schema, a command; 3px ink frame with a `12px 12px 0 --sun` shadow for a dialog; `8px 8px 0
    --sun` for an opened record. The aside that says the thing out loud is a **3px dashed coral
    box** on `--card-bg`.
 3. **One loud action, and underlined words for the rest.** Poster: an ink slab, paper text,
-   `4px 4px 0 --sun`, `.8rem` uppercase 600; hover moves it into its shadow. Showroom: a slab in
+   `4px 4px 0 --sun`, `.8rem` uppercase 600; hover moves it into its shadow. The home's one large
+   chat door is `.poster-slab--large`, `1.02rem`, with an `8px 8px 0 --sun` shadow. Showroom: a slab in
    the display face, `3px` ink frame, `6px 6px 0` ink shadow; the hot one is coral with white
    words, the sun one is sun with ink words. One hot slab per page. Every other way on is a word
-   with an underline: 2px ink under a poster action, 3px coral under a showroom door; hover turns
+   with an underline: 3px ink under a poster action, 3px coral under a showroom door; hover turns
    it coral.
-4. **A chip is square and mono.** 2px frame in the current colour, JetBrains Mono `.68rem` to
-   `.72rem`, weight 500, no radius. The selected chip, tab or row sits on the sun with ink words
-   and a 2px ink rule under it.
+4. **A chip is square and mono.** The shared chip has a 1px ink frame, JetBrains Mono `.68rem`,
+   weight 500, no radius. The selected tab sits on the sun with ink words and the action's 3px
+   underline. These are the source cuts selected for the shared classes; existing sheets with
+   other chip sizes remain migration questions.
 
 Fields on the poster face are one 3px ink underline (coral on focus), a placeholder in `--text-dim`
 at 600; a many-line field is the 2px box. The small coral label above a field is the only place
@@ -154,6 +158,42 @@ by hand; the list here is the checklist.
 | `--font-mono` | every sheet that shows an address, a command, an id or a key; no sheet spells a monospace family |
 | `--font-headline` again, through the palette bridge | `lib/aimeat-theme.css` gives every `h1`-`h6` the palette's display face, and the house palette's display face is `var(--font-headline, 'Archivo Black', …)`: on the node the classic shell's headings follow the token; a published app without `theme.css` keeps the vendored Archivo Black; a chosen palette (paper, circuit, …) keeps its own face on purpose |
 | `--sun`, `--on-sun`, `--accent`, `--text`, `--bg` | every sheet; the auth pill and dialog read them with a fallback so an app origin without the tokens still gets the design |
+
+### Shape to class: one CSS home
+
+`poster.css` is linked after `theme.css` in the SPA. Its current declarations are the executable
+values of these shapes. Compose them in markup; a view sheet keeps its grid, placement and
+dimensions. It does not re-declare the shape's font, rule, fill, padding or shadow.
+
+| Shape | Class |
+|---|---|
+| Page title | `.poster-page-title` |
+| Section and B1 headline | `.poster-section`, `.poster-section-title` |
+| Area governed by the selected tab | `.poster-panel` |
+| Hairline row; row that is the thing | `.poster-row`; `.poster-row--thing` |
+| Small coral label | `.poster-label` |
+| Underlined action | `.poster-action` |
+| Tab and selected tab | `.poster-tab`, `.poster-tab.is-on` |
+| Loud action and the home's large door | `.poster-slab`, `.poster-slab--large` |
+| Box; frame; dialog; opened record | `.poster-box`; `.poster-frame`; `.poster-dialog`; `.poster-record` |
+| Dashed coral aside | `.poster-aside` |
+| Mono chip; crumb | `.poster-chip`; `.poster-crumb` |
+| Numeral row and its number | `.poster-stat`, `.poster-stat-number` |
+| Showroom ink band and sun band | `.showroom-band`, `.showroom-band--sun` |
+| Showroom section and coral shadow | `.showroom-section`, `.showroom-section--coral` |
+| Showroom underlined door | `.showroom-door` |
+| Showroom slab and its named colours | `.showroom-slab`, `--hot`, `--sun`, `--ink` modifiers |
+
+Only page and section headline sizes take per-view properties: `--poster-page-size` and
+`--poster-section-size`, set on the view root. A shared modifier is allowed only for a cut named
+by this skill or a recorded design decision. A third size found in a sheet is a question in the
+wish's notes, not permission to add another modifier or override the shared shape.
+
+Run `pnpm check:poster-shapes` from `aimeat/`. It scans view and component sheets and refuses
+any new per-file pattern count. `pnpm debt` shows the remaining copies. Lower the baseline after
+a migration; `--record` requires an explicit decision to forgive debt. A green gate proves no
+new copies, not that the remaining baseline is zero. Verify migrations at all three viewports
+in both themes; only the B1 headline/panel and the reflow caused by the headline may differ.
 
 ### The kit an app is built from has its own contract
 
