@@ -10,6 +10,11 @@
  *     MCP, which the HTTP door has always had and this one did not. Activating registers the
  *     manifest's schedules, deactivating removes them, an identical redeploy answers "unchanged",
  *     and deleting takes the extension's ext: memory with it.
+ *   v1.4.0 — 2026-09-13 — Phase 9: include_source returns the installer's scripts and refuses another
+ *     owner's agent; read, add an action and redeploy with update:true; aimeat_cortex_install names
+ *     lib_urls, refuses a second install with the redeploy named, replaces in place with update:true
+ *     (active, re-initialised, new bytes), answers unchanged for identical bytes, refuses update with
+ *     no manifest, and refuses another owner's agent.
  *   v1.3.0 — 2026-08-16 — Test 19: a manifest-declared schedule carries the installer's owner scope,
  *     and the owner can trigger it. Test 15 proved the job EXISTS, which stayed true while every one
  *     of its runs refused with "has no owner scope" and "Run now" answered 403.
@@ -720,6 +725,229 @@ await test('20. aimeat_extension_delete takes the ext: namespace memory with it'
 
     const gone = await json(`/v1/extensions/${lifeName}`);
     assert(gone.status === 404, `extension must be gone, got ${gone.status}`);
+});
+
+// ─── Phase 9: Reading back what you installed, and redeploying it, over MCP ───
+// Until 2026-09-13 an installed extension's scripts were readable over HTTP only, and a cortex could
+// only be created: the tool's description sent an agent to PUT /v1/cortex/{name}, which an agent
+// that has nothing but MCP cannot reach. The install answer did not say where a cortex lib is served.
+console.log('\nPhase 9 — Source Read-Back and Redeploy via MCP');
+
+interface ToolAnswer { isError: boolean; text: string; data: any }
+
+/** One MCP session with its own token and session id, for a party other than the suite's agent. */
+async function openSession(owner: string, token: string, agent: string, scopes: string[]) {
+    const ag = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: agent, owner, capabilities: ['extensions'], model: 'gpt-4o', scopes }),
+    });
+    assert(ag.status === 201, `agent for ${owner}: ${ag.status} ${JSON.stringify(ag.body)}`);
+    const gaii = ag.body.data.agent.gaii;
+    const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: `ext ${owner}`, redirect_uris: [] }) });
+    const ts = new Date().toISOString();
+    const q = new URLSearchParams({
+        response_type: 'code', client_id: client.body.client_id, gaii,
+        signature: await signMsg(ag.body.data.private_key, gaii + NODE_ID + ts), timestamp: ts,
+    });
+    const auth = await json(`/v1/mcp/authorize?${q}`);
+    const tok = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret }),
+    });
+    assert(tok.status === 200, `mcp token for ${owner}: ${tok.status}`);
+    const bearer = tok.body.access_token;
+    let sid = '';
+    const send = async (payload: Record<string, unknown>) => {
+        const res = await fetch(`${BASE}/v1/mcp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${bearer}`,
+                ...(sid ? { 'mcp-session-id': sid, 'mcp-protocol-version': '2025-03-26' } : {}),
+            },
+            body: JSON.stringify(payload),
+        });
+        sid = res.headers.get('mcp-session-id') ?? sid;
+        const ct = res.headers.get('content-type') ?? '';
+        if (ct.includes('text/event-stream')) return parseSSE(await res.text()).find(m => m.id === payload.id) ?? {};
+        return ct.includes('json') ? await res.json() as any : {};
+    };
+    await send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'ext e2e', version: '1.0.0' } } });
+    await send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+    let next = 10;
+    return async (name: string, args: Record<string, unknown>): Promise<ToolAnswer> => {
+        const body = await send({ jsonrpc: '2.0', id: next++, method: 'tools/call', params: { name, arguments: args } });
+        return toolAnswer(body);
+    };
+}
+
+function toolAnswer(body: any): ToolAnswer {
+    const text: string = body.result?.content?.[0]?.text ?? '';
+    let data: any;
+    // A refusal is prose, not JSON; `data` is null then and the caller reads `text`.
+    try { data = JSON.parse(text); } catch { data = null; }
+    return { isError: body.result?.isError === true, text, data };
+}
+
+/** The suite's own agent: the installer of everything in this phase. */
+async function asInstaller(name: string, args: Record<string, unknown>, id: number): Promise<ToolAnswer> {
+    const { body } = await mcpRpc('tools/call', { name, arguments: args }, id);
+    return toolAnswer(body);
+}
+
+const srcName = `mcp-ext-src-${Date.now()}`;
+const srcManifest = (withSecond: boolean) => `
+metadata:
+  name: ${srcName}
+  version: ${withSecond ? '1.1.0' : '1.0.0'}
+  description: MCP source read-back E2E extension
+  author: e2e-test
+actions:
+  - id: first
+    method: POST
+    path: /first
+    script: first_script
+    input:
+      type: object
+    output:
+      type: object
+${withSecond ? `  - id: second
+    method: POST
+    path: /second
+    script: second_script
+    input:
+      type: object
+    output:
+      type: object
+` : ''}limits:
+  memory_mb: 16
+  timeout_ms: 5000
+  max_api_calls: 10
+`.trim();
+const firstScript = `export default async function(ctx, input) { return { first: true }; }`;
+const secondScript = `export default async function(ctx, input) { return { second: true }; }`;
+
+let strangerCall: ((name: string, args: Record<string, unknown>) => Promise<ToolAnswer>) | null = null;
+
+await test('21. aimeat_extension_get include_source hands the installer\'s agent every script it installed', async () => {
+    const inst = await asInstaller('aimeat_extension_install', { manifest: srcManifest(false), scripts: { first_script: firstScript } }, 400);
+    assert(!inst.isError, `install failed: ${inst.text}`);
+
+    const plain = await asInstaller('aimeat_extension_get', { name: srcName }, 401);
+    assert(!plain.isError, `get failed: ${plain.text}`);
+    assert(plain.data.actions[0].script_content === undefined, 'without include_source the scripts stay out of the answer');
+
+    const full = await asInstaller('aimeat_extension_get', { name: srcName, include_source: true }, 402);
+    assert(!full.isError, `get with include_source refused the installer: ${full.text}`);
+    const first = full.data.actions.find((a: any) => a.id === 'first');
+    assert(first?.script_content === firstScript, `the installed script comes back byte for byte: ${JSON.stringify(first)}`);
+});
+
+await test('22. Another owner\'s agent holding ext:write is refused the source, and still reads the record', async () => {
+    strangerCall = await openSession(targetName, targetToken, 'mcpextstranger', ['ext:write', 'cortex:write', 'memory:read']);
+    const refused = await strangerCall('aimeat_extension_get', { name: srcName, include_source: true });
+    assert(refused.isError, `another owner read the source: ${refused.text.slice(0, 200)}`);
+    assert(!refused.text.includes('first: true'), 'the refusal carries no script text');
+
+    const plain = await strangerCall('aimeat_extension_get', { name: srcName });
+    assert(!plain.isError, `the record itself is readable: ${plain.text}`);
+    assert(plain.data.name === srcName, `name: ${plain.data?.name}`);
+});
+
+await test('23. Read the source, add an action, redeploy with update:true: both scripts are installed', async () => {
+    const before = await asInstaller('aimeat_extension_get', { name: srcName, include_source: true }, 403);
+    const scripts: Record<string, string> = { first_script: before.data.actions.find((a: any) => a.id === 'first').script_content, second_script: secondScript };
+    const up = await asInstaller('aimeat_extension_install', { manifest: srcManifest(true), scripts, update: true }, 404);
+    assert(!up.isError, `redeploy failed: ${up.text}`);
+    assert(up.data.action === 'updated', `action: ${up.data.action}`);
+
+    const after = await asInstaller('aimeat_extension_get', { name: srcName, include_source: true }, 405);
+    assert(after.data.version === '1.1.0', `version: ${after.data.version}`);
+    assert(after.data.actions.find((a: any) => a.id === 'first')?.script_content === firstScript, 'the first script survived the redeploy');
+    assert(after.data.actions.find((a: any) => a.id === 'second')?.script_content === secondScript, 'the added script is installed');
+
+    const del = await asInstaller('aimeat_extension_delete', { name: srcName }, 406);
+    assert(!del.isError, `cleanup delete: ${del.text}`);
+});
+
+const cxName = `mcpcx${Date.now()}`;
+const cxManifest = (version: string) => `apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: ${cxName}
+  namespace: community
+  description: MCP cortex redeploy E2E
+spec:
+  version: "${version}"
+  components:
+    - type: lib
+      name: greeter
+      filename: greeter.js
+      exports: [hello]
+      api_surface: hello()
+`;
+const cxLibV1 = 'window.__cxProbe = "v1";';
+const cxLibV2 = 'window.__cxProbe = "v2";';
+let cxLibPath = '';
+
+/** What the lib address serves right now, as a <script> tag would get it: no credential. */
+async function servedLib(): Promise<{ status: number; text: string }> {
+    const res = await fetch(`${BASE}${cxLibPath}`);
+    return { status: res.status, text: await res.text() };
+}
+
+await test('24. aimeat_cortex_install names each lib\'s address, and that address serves the lib once active', async () => {
+    const inst = await asInstaller('aimeat_cortex_install', { manifest: cxManifest('1.0.0'), libs: { 'greeter.js': cxLibV1 } }, 410);
+    assert(!inst.isError, `cortex install failed: ${inst.text}`);
+    const url = inst.data.lib_urls?.['greeter.js'];
+    assert(typeof url === 'string' && url.endsWith(`/v1/cortex/${encodeURIComponent(cxName)}/libs/greeter.js`),
+        `lib_urls names the served address: ${JSON.stringify(inst.data.lib_urls)}`);
+    cxLibPath = new URL(url).pathname;
+
+    const on = await asInstaller('aimeat_cortex_activate', { name: cxName }, 411);
+    assert(!on.isError, `activate failed: ${on.text}`);
+    const served = await servedLib();
+    assert(served.status === 200 && served.text === cxLibV1, `the named address serves the lib: ${served.status} ${served.text.slice(0, 80)}`);
+});
+
+await test('25. Installing the same name again without update is refused, and says how to redeploy', async () => {
+    const again = await asInstaller('aimeat_cortex_install', { manifest: cxManifest('1.0.0'), libs: { 'greeter.js': cxLibV1 } }, 412);
+    assert(again.isError, 'a second install of an installed name must be refused');
+    assert(again.text.includes('update: true'), `the refusal names the redeploy: ${again.text}`);
+});
+
+await test('26. update:true replaces the lib in place: still active, re-initialised, new bytes at the same address', async () => {
+    const up = await asInstaller('aimeat_cortex_install', { manifest: cxManifest('1.1.0'), libs: { 'greeter.js': cxLibV2 }, update: true }, 413);
+    assert(!up.isError, `redeploy failed: ${up.text}`);
+    assert(up.data.action === 'updated', `action: ${up.data.action}`);
+    assert(up.data.status === 'active', `an active cortex stays active: ${up.data.status}`);
+    assert(up.data.reinitialized === true, `an active cortex re-runs its initialisation: ${up.data.reinitialized}`);
+    assert(up.data.version === '1.1.0', `version: ${up.data.version}`);
+    assert(typeof up.data.lib_urls?.['greeter.js'] === 'string', `the update answer names the address too: ${JSON.stringify(up.data.lib_urls)}`);
+    const served = await servedLib();
+    assert(served.status === 200 && served.text === cxLibV2, `the address serves the new bytes: ${served.status} ${served.text.slice(0, 80)}`);
+});
+
+await test('27. update:true with identical bytes answers unchanged', async () => {
+    const same = await asInstaller('aimeat_cortex_install', { manifest: cxManifest('1.1.0'), libs: { 'greeter.js': cxLibV2 }, update: true }, 414);
+    assert(!same.isError, `identical redeploy refused: ${same.text}`);
+    assert(same.data.action === 'unchanged', `action: ${same.data.action}`);
+});
+
+await test('28. update:true without a manifest is refused instead of answering with an upload URL', async () => {
+    const r = await asInstaller('aimeat_cortex_install', { update: true }, 415);
+    assert(r.isError, `update with no manifest must refuse: ${r.text.slice(0, 200)}`);
+    assert(!r.text.includes('upload_url'), 'no upload URL is handed out for a redeploy the ZIP road cannot do');
+});
+
+await test('29. Another owner\'s agent holding cortex:write cannot replace the cortex, and the lib stays', async () => {
+    assert(strangerCall !== null, 'the stranger session from test 22 exists');
+    const r = await strangerCall!('aimeat_cortex_install', { manifest: cxManifest('9.9.9'), libs: { 'greeter.js': 'window.__cxProbe = "hijack";' }, update: true });
+    assert(r.isError, `another owner replaced the cortex: ${r.text.slice(0, 200)}`);
+    const served = await servedLib();
+    assert(served.text === cxLibV2, `the served lib is untouched: ${served.text.slice(0, 80)}`);
+
+    const del = await asInstaller('aimeat_cortex_delete', { name: cxName }, 416);
+    assert(!del.isError, `cleanup delete: ${del.text}`);
 });
 
 // ─── Summary ───

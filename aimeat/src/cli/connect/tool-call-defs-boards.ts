@@ -8,11 +8,14 @@
  * @structure boardTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { boardTools } from './tool-call-defs-boards.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- aimeat_board_create forwards `rules`, and aimeat_board_rules_set joins the
+ *     table. The catalog now publishes both, and a parameter published there and not handled here is
+ *     refused by withDeclaredInputOnly, so the two land together.
  *   v1.0.0 -- 2026-09-06 -- Extracted from tool-call-defs-core.ts (max-file-lines). The two entries
  *     that had been sitting apart from the rest (board_read, board_post) join them here.
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, optionalNumber, optionalArray, optionalRecord } from './tool-call-helpers.js';
+import { query, requiredString, optionalString, optionalNumber, optionalArray, optionalRecord, requiredRecord } from './tool-call-helpers.js';
 
 export const boardTools: ConnectCliToolDefinition[] = [
     {
@@ -47,8 +50,20 @@ export const boardTools: ConnectCliToolDefinition[] = [
             // Without this a shared or private board is created with nobody on it, which reads as
             // "the board is broken" rather than "the guest list never left your machine".
             if (allowedGaiis) body.allowed_gaiis = allowedGaiis;
+            // The board's own rules. Left out, the board runs on the defaults, and its posts are
+            // removed seven days after they are written.
+            const rules = optionalRecord(input, 'rules');
+            if (rules) body.rules = rules;
             return client.post('/v1/boards', body);
         },
+    },
+    {
+        // → PATCH /v1/boards/:id/rules. The route's keeper rule decides who may; this door forwards.
+        name: 'aimeat_board_rules_set',
+        handler: ({ client }, input) => client.patch(
+            `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/rules`,
+            { rules: requiredRecord(input, 'rules') },
+        ),
     },
     {
         name: 'aimeat_board_subscribe',

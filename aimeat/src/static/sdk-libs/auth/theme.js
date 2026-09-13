@@ -9,6 +9,10 @@
  *   modeSwitchHtml/wireModeSwitch · ensureAuthPillStyles · pillInitials.
  * @usage import { escHtml, modeSwitchHtml, wireModeSwitch } from './theme.js';
  * @version-history
+ *   v1.6.0 — 2026-09-13 — The signed-out pill has a compact form. At ≤600px its language, light/dark
+ *     and palette controls fold into a popover behind a settings button, hung from the row's right
+ *     edge, and Sign In stays in the row. Signed out had no small-screen rule at all, so a visitor
+ *     on a phone got the full row (appdev pitfall login-pill-is-295px-and-will-not-shrink).
  *   v1.5.0 — 2026-09-06 — THE PAGE DECLARES ITS OWN LIGHT. v1.4.0 read the register prefix, and
  *     that was the wrong question: the register names what a page IS, while keeping a hardcoded
  *     palette is a separate fact about how it was built. The two came apart on the first genre
@@ -165,9 +169,11 @@ export function wireModeSwitch(container) {
 // on paper in the shell, light on a dark page and whatever a palette says: --text for the frame
 // and the words, --accent for the name, --success for the live dot, --sun for the sign-in slab's
 // shadow. A page may override any of it through the --aimeat-pill-* variables without touching
-// the lib. On viewports ≤600px (compact mode, the default on app origins) the row folds behind a
-// small account button (dot + initials + caret) that opens it as an anchored popover; the
-// show/hide is pure CSS media so it reflows on rotation.
+// the lib. On viewports ≤600px (compact mode, the default wherever the pill is mounted) the row
+// folds behind one small button that opens it as an anchored popover: signed in, the account
+// button (dot + initials + caret) holds the whole pill; signed out, a settings button holds the
+// language, light/dark and palette controls and Sign In stays in the row. The show/hide is pure CSS
+// media so it reflows on rotation.
 export function ensureAuthPillStyles() {
   if (document.getElementById('aimeat-auth-pill-css')) return;
   var st = document.createElement('style');
@@ -210,12 +216,23 @@ export function ensureAuthPillStyles() {
     '.aimeat-auth-compact .cini{font-weight:800;letter-spacing:.3px;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.aimeat-auth-compact .ccar{font-size:9px;opacity:.75;transition:transform .18s}',
     '.aimeat-auth-wrap.aimeat-open .aimeat-auth-compact .ccar{transform:rotate(180deg)}',
+    '.aimeat-auth-compact .cico{display:block;flex:0 0 auto}',
     '@media (max-width:600px){',
       '.aimeat-auth-compact{display:inline-flex}',
       '.aimeat-auth-wrap>.aimeat-auth-pill{position:absolute;top:calc(100% + 8px);right:0;z-index:1000;',
         'display:none!important;flex-wrap:wrap!important;justify-content:flex-start;row-gap:9px;padding:10px 12px;',
         'min-width:210px;max-width:calc(100vw - 24px);box-shadow:6px 6px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E))}',
       '.aimeat-auth-wrap.aimeat-open>.aimeat-auth-pill{display:flex!important}',
+      /* Signed out: the controls fold behind the settings trigger and Sign In keeps its place. The
+         popover hangs from the whole row's right edge (the wrap stands aside as a positioning box),
+         because the trigger sits left of Sign In and a panel hung from it ran off the left edge. */
+      '.aimeat-auth-out{position:relative}',
+      '.aimeat-auth-out>.aimeat-auth-wrap{position:static}',
+      '.aimeat-auth-wrap>.aimeat-ctl{position:absolute;top:calc(100% + 8px);right:0;z-index:1000;',
+        'display:none!important;flex-wrap:wrap;gap:8px;padding:10px 12px;',
+        'background:' + paper + ';color:' + ink + ';border:2px solid ' + ink + ';border-radius:var(--aimeat-pill-radius,0);',
+        'max-width:calc(100vw - 24px);box-shadow:6px 6px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E))}',
+      '.aimeat-auth-wrap.aimeat-open>.aimeat-ctl{display:flex!important}',
     '}',
   ].join('');
   (document.head || document.documentElement).appendChild(st);

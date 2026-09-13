@@ -10,6 +10,10 @@
  * @structure appdevPitfallsRouter(config, storage) → Router
  * @usage app.use(appdevPitfallsRouter(config, storage)) from the routes loader.
  * @version-history
+ *   v1.3.0 — 2026-09-13 — POST /learned reports (upserts) an entry through reportLearnedPitfall(),
+ *     the node MCP tool's own function, so the connector doors stop writing raw memory. PATCH
+ *     /learned/:category/:slug takes `verified: true`, stamping the entry with now and this node's
+ *     software version. Curated entries carry verifiedAt/verifiedVersion.
  *   v1.2.0 — 2026-09-03 — GET /learned pages, filters (status, severity, category, model, area,
  *     shared, q text search), sorts and returns facets + the community count, through the same
  *     step the MCP list tool uses (AppDev page, poster face). It served every entry with its full
@@ -29,8 +33,9 @@ import {
   getAppdevPitfalls, getAppdevPitfallFacets,
 } from '../data/appdev-pitfalls.js';
 import {
-  queryLearnedPitfalls, setPitfallFlags, deletePitfallEntry,
+  queryLearnedPitfalls, setPitfallFlags, deletePitfallEntry, reportLearnedPitfall,
 } from '../services/appdev-kb.js';
+import { getSoftwareVersion } from '../utils/version.js';
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 25;
@@ -70,17 +75,62 @@ export function appdevPitfallsRouter(config: AimeatConfig, storage: Storage): Ro
     res.json(success(config.nodeId, page));
   });
 
+  // POST /v1/appdev/pitfalls/learned — report (upsert) one learned pitfall. The same function the
+  // node's MCP tool runs, and the door both connector surfaces now call: they used to write
+  // POST /v1/memory themselves, which skipped the manifest and could fork a second copy of an entry
+  // another of the owner's identities already held.
+  router.post('/v1/appdev/pitfalls/learned', requireAuth(), requireScope('memory:write'), async (req, res) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const str = (v: unknown, max: number) => typeof v === 'string' && v.length <= max ? v : undefined;
+    const model = str(b.model, 64)?.trim();
+    const category = str(b.category, 40);
+    const title = str(b.title, 160);
+    const symptom = str(b.symptom, 10_000);
+    const resolution = str(b.resolution, 40_000);
+    if (!model || !category || !title || title.length < 3 || !symptom || symptom.length < 5 || !resolution || resolution.length < 5) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'model, category, title (3-160), symptom (5-10000) and resolution (5-40000) are required'));
+      return;
+    }
+    const severity = b.severity === 'info' || b.severity === 'warn' || b.severity === 'critical' ? b.severity : undefined;
+    const status = b.status === 'active' || b.status === 'outdated' ? b.status : undefined;
+    const appliesTo = Array.isArray(b.applies_to)
+      ? (b.applies_to as unknown[]).filter((a): a is string => typeof a === 'string' && a.length <= 20).slice(0, 8)
+      : undefined;
+    const r = await reportLearnedPitfall(storage, config, {
+      principal: resolveIdentity(req.auth!, config.nodeId),
+      scopes: req.auth!.scopes ?? [],
+      roles: req.auth!.roles,
+    }, {
+      model, category, title, symptom, resolution,
+      slug: str(b.slug, 64), applies_to: appliesTo, severity, status,
+      app_ref: str(b.app_ref, 200),
+      share: typeof b.share === 'boolean' ? b.share : undefined,
+    }, getSoftwareVersion());
+    if (!r.ok) {
+      res.status(r.status).json(error(config.nodeId, r.code, r.message));
+      return;
+    }
+    res.status(r.updated ? 200 : 201).json(success(config.nodeId, {
+      key: r.key, category: r.category, slug: r.slug, updated: r.updated, version: r.version,
+      visibility: r.visibility, shared: r.visibility === 'public',
+      verified_at: r.verified_at, verified_version: r.verified_version,
+    }));
+  });
+
   // PATCH /v1/appdev/pitfalls/learned/:category/:slug — toggle share (visibility) / status.
   router.patch('/v1/appdev/pitfalls/learned/:category/:slug', requireAuth(), requireScope('memory:write'), async (req, res) => {
     const identity = resolveIdentity(req.auth!, config.nodeId);
     const share = typeof req.body?.share === 'boolean' ? req.body.share as boolean : undefined;
     const status = req.body?.status === 'active' || req.body?.status === 'outdated'
       ? req.body.status as 'active' | 'outdated' : undefined;
-    if (share === undefined && status === undefined) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide share (boolean) and/or status (active|outdated)'));
+    // `verified: true` records that somebody checked the entry against this node again, on the
+    // version the node is running now. The version is the node's own, never the caller's word.
+    const verified = req.body?.verified === true ? { version: getSoftwareVersion() } : undefined;
+    if (share === undefined && status === undefined && verified === undefined) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide share (boolean), status (active|outdated) and/or verified (true)'));
       return;
     }
-    const entry = await setPitfallFlags(storage, config, identity, req.params.category as string, req.params.slug as string, { share, status });
+    const entry = await setPitfallFlags(storage, config, identity, req.params.category as string, req.params.slug as string, { share, status, verified });
     if (!entry) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such learned pitfall in your scope'));
       return;

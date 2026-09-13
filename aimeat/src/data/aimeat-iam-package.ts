@@ -20,6 +20,13 @@
  *   default role · no relationship to app-grant scopes · server-side enforcement.
  *   See docs/internal/aimeat-iam-design.md.
  * @version-history
+ *   v1.4.0 — 2026-09-13 — admin write ops REFUSE a missing or malformed field with ok:false naming
+ *     what the op takes and any field it did not read (assign { user } now says it needs ghii).
+ *     Each op used to skip the write when its field was absent and still answer ok:true with the
+ *     state it already had, so a misnamed parameter looked applied and governed nothing. setRoles
+ *     also refuses a list or a role that is not a list of strings (an array was stored as the role
+ *     map), revoke returns `removed`, and an unknown op lists the ops. Extension manifest 1.3.0.
+ *     A copy installed before this keeps its old script until its instance is updated.
  *   v1.0.0 — 2026-06-26 — initial: extension (enforcement) + dashboard app.
  *   v1.1.0 — 2026-06-26 — dashboard v2: plain fetch+JWT (fix load), structured role editor,
  *     assignments list, "use in your app / tell your AI" snippet, help text, default-role select.
@@ -192,46 +199,89 @@ ${RESOLVE_FN}
     return { ok: true, ownerGhii: config.ownerGhii || null, isOwner: true, config: config, roles: roles, levels: levels, commands: commands, assignments: assignments, subject: subject };
   }
   if (!canAdmin) return { ok: false, error: 'forbidden: owner only' };
+  // Every write op checks the field it reads and REFUSES when it is missing or the wrong shape. Each
+  // op used to be written as "if the field is there, apply it" and then answer ok:true either way,
+  // with the state it already had, so assign sent as { user, role } or setConfig with its settings
+  // at the top level looked done and changed nothing. The refusal names what the op takes and any
+  // field it does not read, because a misnamed field is the usual cause. A field it does not read is
+  // NOT a refusal on its own: the shared iam panel sends owner and note beside ghii.
+  const OP_FIELDS = {
+    setSubject: ['subject'], setConfig: ['config'], setRoles: ['roles'], setLevels: ['levels'],
+    setCommands: ['commands'], assign: ['ghii', 'role'], revoke: ['ghii'],
+  };
+  const isMap = function (v) { return !!v && typeof v === 'object' && !Array.isArray(v); };
+  const isText = function (v) { return typeof v === 'string' && v.trim().length > 0; };
+  const refuse = function (problem) {
+    const takes = OP_FIELDS[op] || [];
+    const ignored = Object.keys(input || {}).filter(function (k) { return k !== 'op' && takes.indexOf(k) === -1; });
+    return {
+      ok: false,
+      error: op + ' ' + problem + (ignored.length ? ' (this op does not read: ' + ignored.join(', ') + ')' : '')
+        + '. It takes: ' + takes.join(', ') + '.',
+      takes: takes, ignored: ignored,
+    };
+  };
   if (op === 'setSubject') {
-    if (input.subject === 'owner' || input.subject === 'gaii' || input.subject === 'both') {
-      config = Object.assign({}, config, { subject: input.subject });
-      await ctx.memory.set('iam.config', config, PRIV);
+    if (!(input.subject === 'owner' || input.subject === 'gaii' || input.subject === 'both')) {
+      return refuse('needs subject set to owner, gaii or both, got ' + JSON.stringify(input.subject === undefined ? null : input.subject));
     }
-    return { ok: true, subject: config.subject || 'owner' };
+    config = Object.assign({}, config, { subject: input.subject });
+    await ctx.memory.set('iam.config', config, PRIV);
+    return { ok: true, subject: config.subject };
   }
   if (op === 'setConfig') {
-    config = Object.assign({}, config, input.config || {});
+    if (!isMap(input.config)) return refuse('needs config as a map of settings, e.g. { config: { defaultRole: "viewer" } }');
+    config = Object.assign({}, config, input.config);
     await ctx.memory.set('iam.config', config, PRIV);
     return { ok: true, config: config };
   }
   if (op === 'setRoles') {
-    if (input.roles && typeof input.roles === 'object') { roles = input.roles; await ctx.memory.set('iam.roles', roles); }
+    if (!isMap(input.roles)) return refuse('needs roles as a map of role name to a list of permissions');
+    const badRole = Object.keys(input.roles).filter(function (r) {
+      const p = input.roles[r];
+      return !Array.isArray(p) || p.some(function (x) { return typeof x !== 'string'; });
+    });
+    if (badRole.length) return refuse('needs every role to be a list of permission strings; not a list: ' + badRole.join(', '));
+    roles = input.roles; await ctx.memory.set('iam.roles', roles);
     return { ok: true, roles: roles };
   }
   if (op === 'setLevels') {
-    if (input.levels && typeof input.levels === 'object') { levels = input.levels; await ctx.memory.set('iam.levels', levels); }
+    if (!isMap(input.levels)) return refuse('needs levels as a map of role name to a number');
+    const badLevel = Object.keys(input.levels).filter(function (r) { return typeof input.levels[r] !== 'number' || !isFinite(input.levels[r]); });
+    if (badLevel.length) return refuse('needs every level to be a number; not a number: ' + badLevel.join(', '));
+    levels = input.levels; await ctx.memory.set('iam.levels', levels);
     return { ok: true, levels: levels };
   }
   if (op === 'setCommands') {
-    if (Array.isArray(input.commands)) { commands = input.commands; await ctx.memory.set('iam.commands', commands); }
+    if (!Array.isArray(input.commands)) return refuse('needs commands as a list of { id, capability, tier, description }');
+    const badCmd = input.commands.findIndex(function (c) { return !isMap(c) || !isText(c.id) || !isText(c.capability); });
+    if (badCmd !== -1) return refuse('needs every command to carry an id and a capability; entry ' + badCmd + ' does not');
+    commands = input.commands; await ctx.memory.set('iam.commands', commands);
     return { ok: true, commands: commands };
   }
   if (op === 'assign') {
-    if (input.ghii && input.role) { assignments[input.ghii] = input.role; await ctx.memory.set('iam.assignments', assignments, PRIV); }
+    const missing = ['ghii', 'role'].filter(function (f) { return !isText(input[f]); });
+    if (missing.length) return refuse('needs ' + missing.join(' and ') + ' as a non-empty string');
+    assignments[input.ghii] = input.role; await ctx.memory.set('iam.assignments', assignments, PRIV);
     return { ok: true, assignments: assignments };
   }
   if (op === 'revoke') {
-    if (input.ghii) { delete assignments[input.ghii]; await ctx.memory.set('iam.assignments', assignments, PRIV); }
-    return { ok: true, assignments: assignments };
+    if (!isText(input.ghii)) return refuse('needs ghii as a non-empty string');
+    // removed says whether that key held a role. A revoke of a key spelled differently from the
+    // assignment (a bare name against an owner@node row) removes nothing, and ok alone hid that.
+    const removed = Object.prototype.hasOwnProperty.call(assignments, input.ghii);
+    if (removed) { delete assignments[input.ghii]; await ctx.memory.set('iam.assignments', assignments, PRIV); }
+    return { ok: true, removed: removed, assignments: assignments };
   }
-  return { ok: false, error: 'unknown op' };
+  return { ok: false, error: 'unknown op ' + JSON.stringify(op === undefined ? null : op)
+    + '. Ops: claim, getState, setSubject, setConfig, setRoles, setLevels, setCommands, assign, revoke.' };
 }`;
 
 const EXTENSION_IAM = JSON.stringify({
   manifest: [
     'metadata:',
     '  name: iam',
-    '  version: 1.2.0',
+    '  version: 1.3.0',
     '  description: In-app role & permission management with server-side enforcement. A role is keyed to the caller OWNER by default, so a member who works through an agent is covered by one entry and one revoke removes it from all of their agents; subject gaii or both change that. BBS levels + command manifest.',
     '  author: operator',
     'required_apis:',
@@ -249,7 +299,7 @@ const EXTENSION_IAM = JSON.stringify({
     '    path: /admin',
     '    description: "Role, assignment and config management, multiplexed by op (claim, getState, setConfig, setSubject, setRoles, setLevels, setCommands, assign, revoke). Gated by capability: the human owner always qualifies, and so does any caller whose resolved role holds *, which is what lets the owner manage members through their own agent."',
     '    input: { type: object, properties: { op: { type: string }, ghii: { type: string }, role: { type: string }, subject: { type: string }, roles: { type: object }, levels: { type: object }, config: { type: object }, commands: { type: array } }, required: [op] }',
-    '    output: { type: object, properties: { ok: { type: boolean }, isOwner: { type: boolean }, ownerGhii: { type: string }, subject: { type: string }, assignments: { type: object }, roles: { type: object }, levels: { type: object }, commands: { type: array }, config: { type: object }, error: { type: string } } }',
+    '    output: { type: object, properties: { ok: { type: boolean }, isOwner: { type: boolean }, ownerGhii: { type: string }, subject: { type: string }, assignments: { type: object }, roles: { type: object }, levels: { type: object }, commands: { type: array }, config: { type: object }, removed: { type: boolean }, takes: { type: array }, ignored: { type: array }, error: { type: string } } }',
     '    script: admin.js',
   ].join('\n'),
   scripts: {

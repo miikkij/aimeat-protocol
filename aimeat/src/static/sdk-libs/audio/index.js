@@ -12,11 +12,15 @@
  *   findNearestSample/playSample; createCustomSynth; realtime bridge; the `audio` API; attach('audio', …).
  * @usage <script src="/v1/libs/aimeat-audio.js"></script>  AIMEAT.audio.play('piano', 'C4');
  * @version-history
+ *   v1.1.0 — 2026-09-13 — A sample-only instrument (strings, organ, epiano, trumpet, guitar-steel,
+ *     guitar-el) played before its bank has loaded sounds through the nearest built-in voice, with
+ *     one console note naming loadSamples, instead of "Unknown instrument" and silence (appdev
+ *     pitfall aimeat-audio-sample-only-instruments-silent-until-loaded). A loaded bank still wins.
  *   v1.0.0 — 2026-07-19 — Migrated + merged from lib-audio.ts + audio-lib-part2.ts (SDK-libs migration Phase 2).
  */
 import { NODE_URL } from '../_core/config.js';
 import { attach } from '../_core/namespace.js';
-import { ctx, noteToFreq, masterNode, master, registerActive, stopActive, instruments, sampleBuffers, customSynths } from './core.js';
+import { ctx, noteToFreq, masterNode, master, registerActive, rekeyActive, stopActive, instruments, sampleBuffers, customSynths } from './core.js';
 import './instruments.js'; // side-effect: registers the 6 built-in instruments onto the shared registry
 
 // ══════════════════════════════════════════════════════
@@ -341,6 +345,26 @@ function disconnectRealtime() {
 // Public API
 // ══════════════════════════════════════════════════════
 
+/**
+ * The built-in voice a SAMPLE-ONLY instrument plays until its bank has loaded.
+ *
+ * These six have a sample map (SAMPLE_NOTES) and no synth voice of their own. Before this map,
+ * play() on one of them before loadSamples() resolved found nothing, logged "Unknown instrument"
+ * and made no sound, both at boot (the bank is still downloading) and in any app that never called
+ * loadSamples at all. A near voice is audible and honest about being a stand-in; silence reads as a
+ * broken app. The voice is the closest one in character: electric piano and the two guitars to their
+ * acoustic cousins, the sustained instruments to the synth.
+ */
+var STAND_IN = {
+  epiano: 'piano',
+  'guitar-steel': 'guitar',
+  'guitar-el': 'guitar',
+  strings: 'synth',
+  organ: 'synth',
+  trumpet: 'synth',
+};
+var _standInWarned = {};
+
 var audio = {
   play: function (instrument, note, opts) {
     if (sampleBuffers[instrument] && Object.keys(sampleBuffers[instrument]).length > 0) {
@@ -351,6 +375,17 @@ var audio = {
       return;
     }
     var inst = instruments[instrument];
+    var standIn = !inst && STAND_IN[instrument] ? STAND_IN[instrument] : null;
+    if (standIn && instruments[standIn]) {
+      if (!_standInWarned[instrument]) {
+        _standInWarned[instrument] = true;
+        console.warn('[aimeat-audio] ' + instrument + ' samples are not loaded; playing the ' + standIn
+          + " voice until AIMEAT.audio.loadSamples('" + instrument + "') resolves.");
+      }
+      instruments[standIn].play(note, opts);
+      rekeyActive(standIn, instrument, note);
+      return;
+    }
     if (!inst) { console.warn('[aimeat-audio] Unknown instrument:', instrument); return; }
     inst.play(note, opts);
   },

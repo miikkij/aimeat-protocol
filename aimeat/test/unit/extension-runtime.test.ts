@@ -331,6 +331,85 @@ describe('executeExtensionAction', () => {
         expect(after).toEqual({ ok: true });
     });
 
+    // The bridge used to read every argument with getString, so `undefined` crossed as the four
+    // characters "undefined": a script that forgot `input.key` wrote a real file under that name and
+    // returned normally, which a scheduled run records as a success (appdev pitfall
+    // ext/sandbox-host-bridge-stringifies-every-argument, 2026-09-13).
+    it('refuses an undefined argument instead of handing the host the string "undefined"', async () => {
+        const seen: unknown[] = [];
+        const script = `export default async function(ctx, input) {
+            const r = await ctx.files.write(input.key, input.b64);
+            return { ok: true, wrote: r };
+        }`;
+        const ctx = makeCtx({
+            files: {
+                async read() { return null; },
+                async write(key: string, b64: string) {
+                    seen.push([key, b64]);
+                    return { key, gaii: 'owner@test-node', owner: 'owner@test-node', url: '', size: 1 };
+                },
+            },
+        });
+
+        await expect(executeExtensionAction(script, ctx, {}, defaultLimits()))
+            .rejects.toThrow(/ctx\.files\.write: argument 1 is undefined/);
+        expect(seen).toEqual([]);
+    });
+
+    it('refuses a null argument the same way, naming the call and the position', async () => {
+        const keys: unknown[] = [];
+        const script = `export default async function(ctx, input) {
+            await ctx.memory.getPublic('ext:other', input.key);
+            return { ok: true };
+        }`;
+        const base = makeCtx();
+        const ctx = makeCtx({
+            memory: { ...base.memory, async getPublic(ns: string, key: string) { keys.push([ns, key]); return null; } },
+        });
+
+        await expect(executeExtensionAction(script, ctx, { key: null }, defaultLimits()))
+            .rejects.toThrow(/ctx\.memory\.getPublic: argument 2 is null/);
+        expect(keys).toEqual([]);
+    });
+
+    it('refuses a missing string argument on the wrappers that used to coerce it with String()', async () => {
+        const refs: unknown[] = [];
+        const script = `export default async function(ctx, input) {
+            await ctx.datapackage.open(input.ref);
+            return { ok: true };
+        }`;
+        const noop = async () => null;
+        const ctx = makeCtx({
+            datapackage: {
+                async open(ref: string) { refs.push(ref); return null; },
+                publish: noop, validate: noop, inferSchema: noop, rows: noop, fail: async () => {},
+            },
+        });
+
+        await expect(executeExtensionAction(script, ctx, {}, defaultLimits()))
+            .rejects.toThrow(/ctx\.datapackage\.open: argument 1 is undefined/);
+        expect(refs).toEqual([]);
+    });
+
+    it('still passes a number or a string through, and an omitted consume reason arrives empty', async () => {
+        const calls: unknown[] = [];
+        const script = `export default async function(ctx, input) {
+            await ctx.memory.get(42);
+            await ctx.memory.get('plain');
+            await ctx.wallet.consume(3);
+            return { ok: true };
+        }`;
+        const base = makeCtx();
+        const ctx = makeCtx({
+            memory: { ...base.memory, async get(key: string) { calls.push(['get', key]); return null; } },
+            wallet: { async consume(amount: number, reason: string) { calls.push(['consume', amount, reason]); return { success: true }; } },
+        });
+
+        const result = await executeExtensionAction(script, ctx, {}, defaultLimits());
+        expect(result).toEqual({ ok: true });
+        expect(calls).toEqual([['get', '42'], ['get', 'plain'], ['consume', 3, '']]);
+    });
+
     it('calls ctx.log methods', async () => {
         const logInfo = vi.fn();
         const logWarn = vi.fn();

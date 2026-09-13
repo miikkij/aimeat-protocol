@@ -2,14 +2,22 @@
  * @file auth/pill.js
  * @description aimeat-auth login pill (SDK-libs migration Phase 3). mountPill() renders the
  *   login/logout pill (with the in-pill theme toggle, the H-2 permissions gear for external-app
- *   grants, and the compact account-button + popover that is the mobile-safe default on app origins)
+ *   grants, and the compact button + popover that is the mobile-safe default everywhere)
  *   into a container, wires logout / manage-grant / theme / compact-popover, and re-renders on the
- *   'login'/'logout'/'session-updated' events. On an app origin with no session it kicks the silent
- *   SSO bridge itself. Extracted from mountLoginButton in auth-lib-part2.ts; receives `auth` so it
- *   never touches module state directly (reads via auth.getSession()).
+ *   'login'/'logout'/'session-updated' events. With a stored session and no live one it confirms it
+ *   itself: the silent SSO bridge on an app origin, auth.login() elsewhere. Extracted from
+ *   mountLoginButton in auth-lib-part2.ts; receives `auth` so it never touches module state
+ *   directly (reads via auth.getSession()).
  * @structure mountPill(auth, selector, opts) → render() + event wiring.
  * @usage import { mountPill } from './pill.js';  (auth.mountLoginButton delegates here)
  * @version-history
+ *   v1.5.0 — 2026-09-13 — Four appdev pitfalls. Compact is the default wherever the pill is mounted,
+ *     not only on an app origin (`compact: false` keeps the full row). A signed-out pill gets a
+ *     compact form too: its controls fold behind a settings button and Sign In stays in the row.
+ *     Sign In calls auth.signIn(), the public interactive sign-in an app's own button can call.
+ *     And off an app origin a stored session with no live one is confirmed through auth.login(),
+ *     so the pill stops drawing "logged in" for a session no call has. onLogin is still not called
+ *     on a restore; that stays open for the developer.
  *   v1.4.0 — 2026-08-29 — The gold is gone. The pill is an ink-framed row that reads the page's own
  *     tokens (--text, --bg, --accent, --sun, --success, with fallbacks for a page that defines none),
  *     so it is ink on paper in the shell, light on a dark page, and follows every palette. All of it
@@ -28,7 +36,6 @@
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part2.ts (SDK-libs migration Phase 3).
  */
 import { isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
-import { showLoginModal } from './modal.js';
 import { escHtml, modeSwitchHtml, wireModeSwitch, ensureAuthPillStyles, pillInitials } from './theme.js';
 import { readLocales, langSwitchHtml, wireLangSwitch, aimeatReadLang } from './locale.js';
 import { pillStrings } from './pill-strings.js';
@@ -36,6 +43,12 @@ import { paletteControlHtml, wirePaletteControl } from './palette.js';
 import { ensureClusterStyles, clampPopover } from './cluster.js';
 import { load, remove } from './crypto.js';
 import { emit } from './events.js';
+
+// The signed-out compact trigger: three sliders, the usual mark for "adjust how this looks". Inline
+// SVG in currentColor, so it follows the pill's ink in every theme and palette.
+var SETTINGS_ICON = '<svg class="cico" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" '
+  + 'stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/>'
+  + '<path d="M5 2.5v3M11 6.5v3M7 10.5v3"/></svg>';
 
 export function mountPill(auth, selector, opts = {}) {
   // Resolve the mount container. Tolerate three call shapes so a common misuse doesn't crash:
@@ -60,8 +73,28 @@ export function mountPill(auth, selector, opts = {}) {
   // getting an English "Logout" under a Spanish page. Recomputed per render, because the pill's own
   // switch can change the language while the page is open.
   let i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ['en'])), opts.i18n);
-  // Compact pill (account button + popover on ≤600px) is the mobile-safe DEFAULT on app origins.
-  const useCompact = opts.compact !== undefined ? !!opts.compact : isAppOrigin();
+  // Compact pill (≤600px: one small button, the rest in a popover) is the mobile-safe DEFAULT at
+  // every address. It was the default on an app origin only, so the same app opened on the node's
+  // own /v1/apps/ path, or on a node without app origins, got the full row on a phone and pushed the
+  // page sideways (appdev pitfall auth-pill-compact-not-default-off-app-origin). Above 600px the
+  // compact markup looks exactly like the full row. `compact: false` keeps the full row everywhere.
+  const useCompact = opts.compact !== undefined ? !!opts.compact : true;
+
+  // The compact trigger toggles its popover, signed in or out. The outside-click / Escape closers
+  // are registered ONCE per mount (below, after render()), not here, so re-renders don't stack them.
+  function wireCompactTrigger() {
+    var compactBtn = document.getElementById('aimeat-auth-compact');
+    if (compactBtn) compactBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      var w = container.querySelector('.aimeat-auth-wrap');
+      if (!w) return;
+      var open = w.classList.toggle('aimeat-open');
+      compactBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      // Keep the opened panel on the screen when the pill does not sit at the right edge.
+      var pop = /** @type {HTMLElement|null} */ (w.querySelector(':scope > .aimeat-ctl, :scope > .aimeat-auth-pill'));
+      if (open && pop) clampPopover(pop);
+    });
+  }
 
   function render() {
     i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ['en'])), opts.i18n);
@@ -106,31 +139,34 @@ export function mountPill(auth, selector, opts = {}) {
         // A revoke routes through auth.logout() → the 'logout' event handles render + onLogout.
         auth.manageGrant().then(() => { render(); }).catch(() => {});
       });
-      // Compact trigger toggles the popover. The outside-click / Escape closers are registered ONCE
-      // per mount (below, after render()) — not here — so re-renders don't stack them.
-      var compactBtn = document.getElementById('aimeat-auth-compact');
-      if (compactBtn) compactBtn.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        var w = container.querySelector('.aimeat-auth-wrap');
-        if (!w) return;
-        var open = w.classList.toggle('aimeat-open');
-        compactBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      });
+      wireCompactTrigger();
     } else {
       ensureAuthPillStyles();
+      // Keep the whole cluster (language + mode + palette) reachable even when signed out.
+      var clusterHtml = '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span>';
       container.innerHTML = ''
-        // Keep the whole cluster (language + mode + palette) reachable even when signed out.
         + '<span class="aimeat-auth-out">'
-        + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span>'
+        // Compact: on a phone the cluster folds behind one settings button and Sign In stays in the
+        // row. Signed out had no compact form at all, so a first-time visitor on a phone got the full
+        // row of controls (appdev pitfall login-pill-is-295px-and-will-not-shrink). The wrap and the
+        // trigger reuse the signed-in popover's classes, so one set of closers serves both.
+        + (useCompact
+          ? '<span class="aimeat-auth-wrap">'
+            + '<button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" '
+            + 'aria-label="' + escHtml(i.pageSettings || 'Settings') + '" title="' + escHtml(i.pageSettings || 'Settings') + '">'
+            + SETTINGS_ICON + '<span class="ccar" aria-hidden="true">▾</span></button>'
+            + clusterHtml + '</span>'
+          : clusterHtml)
         + '<button id="aimeat-login-btn" class="aimeat-sign-btn">'
         + (opts.buttonText || i.signInBtn || '❤️ Sign In') + '</button>'
         + '</span>';
       document.getElementById('aimeat-login-btn').addEventListener('click', () => {
-        // On an app origin, the Sign In click is the user gesture that opens the consent popup for a
-        // non-owned app (interactive). On the apex it's the normal owner login modal.
-        if (isAppOrigin()) { restoreSessionFromAppOrigin(true).then((s) => { if (s) render(); }).catch(() => {}); }
-        else { showLoginModal(opts, render); }
+        // The one public interactive sign-in (session.js auth.signIn), so the pill and an app's own
+        // button take the same road: on an app origin this click is the user gesture that opens the
+        // consent popup; elsewhere it opens the sign-in modal with the pill's options.
+        auth.signIn(opts).then((s) => { if (s) render(); }).catch(() => {});
       });
+      wireCompactTrigger();
     }
     wireModeSwitch(container); // the cluster is present in both signed-in and signed-out markup
     wireLangSwitch(container, i, locales);
@@ -191,5 +227,18 @@ export function mountPill(auth, selector, opts = {}) {
     restoreSessionFromAppOrigin(false).then((s) => {
       if (!s && load('session')) { remove('session'); emit('logout'); }
     }).catch(() => {});
+  } else if (!auth.getSession() && load('session')) {
+    // Anywhere else the stored blob is the same UI cache, and it used to be the only thing the pill
+    // looked at: it drew "logged in" while getSession() stayed null and every call in the app had no
+    // session (appdev pitfall pill-alone-does-not-sign-the-app-in). Confirm it the way the app-origin
+    // branch does. auth.login() shares one restore with a page that calls it too; a restore that
+    // lands re-renders through the 'login' event, and one that finds nothing draws the truth. onLogin
+    // is still not called on a restore, and that is deliberate here: whether it should be is an open
+    // question for the developer (docs/pitfalls.md §6), not something this branch decides.
+    auth.login().catch(() => null).then((s) => {
+      if (s) return;
+      if (load('session')) { remove('session'); emit('logout'); }
+      else render();
+    });
   }
 }

@@ -8,6 +8,9 @@
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
+ *   v2.7.0 -- 2026-09-13 -- `cortex.agents` is validated before either mode and rides the presigned
+ *     token as `cortex_agents`. The mint used to skip the check and leave them out, so the upload
+ *     published the app without its agents.
  *   v2.6.0 -- 2026-09-08 -- `roadmap`: one sentence saying what this version changed. A warning on
  *     your own app and a REFUSAL on one somebody else helps build, because there the person who
  *     loses by the silence is not the person who chose it. The line rides in this call, so
@@ -130,6 +133,28 @@ export function registerPublishRoutes(
             return;
         }
 
+        // Agent-Bundled Apps (Slice 1): an app may declare its own agent(s) as DECLARATIVE
+        // crew-defs under `cortex.agents`. Validation is the publish gate — a non-conforming
+        // agents[] REJECTS the publish with the real errors, so a malformed crew-def never
+        // reaches a fleet. The node never executes these; it stores data and routes a pointer.
+        // Asked before BOTH modes: the presigned mint used to skip this and leave the crew-defs out
+        // of the token, so the upload published the app without them and nothing said so.
+        let cortexAgents: Record<string, unknown>[] | undefined;
+        if (cortex !== undefined) {
+            if (cortex === null || typeof cortex !== 'object' || Array.isArray(cortex)) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'cortex must be an object (e.g. { "agents": [ ... ] })'));
+                return;
+            }
+            if ((cortex as Record<string, unknown>).agents !== undefined) {
+                const check = validateCortexAgents((cortex as Record<string, unknown>).agents);
+                if (!check.ok) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_CREW_DEF', check.errors.join('; ')));
+                    return;
+                }
+                cortexAgents = check.agents as unknown as Record<string, unknown>[];
+            }
+        }
+
         // --- PRESIGNED MODE: return upload URL instead of requiring content ---
         if (req.body.mode === 'presigned') {
             const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
@@ -153,6 +178,7 @@ export function registerPublishRoutes(
                     ...(typeof req.body.name === 'string' ? { name: req.body.name } : {}),
                     ...(typeof semver === 'string' ? { version: semver } : {}),
                     ai_provenance, ai_provenance_id, spec_token, spec_ack, roadmap,
+                    cortex_agents: cortexAgents,
                 }),
                 maxBytes: MAX_APP_SIZE,
                 contentType: 'text/html',
@@ -186,26 +212,6 @@ export function registerPublishRoutes(
         if (data.length > MAX_APP_SIZE) {
             res.status(413).json(error(config.nodeId, 'TOO_LARGE', `App file exceeds ${config.appMaxSizeMb}MB limit (${data.length} bytes)`));
             return;
-        }
-
-        // Agent-Bundled Apps (Slice 1): an app may declare its own agent(s) as DECLARATIVE
-        // crew-defs under `cortex.agents`. Validation is the publish gate — a non-conforming
-        // agents[] REJECTS the publish with the real errors, so a malformed crew-def never
-        // reaches a fleet. The node never executes these; it stores data and routes a pointer.
-        let cortexAgents: Record<string, unknown>[] | undefined;
-        if (cortex !== undefined) {
-            if (cortex === null || typeof cortex !== 'object' || Array.isArray(cortex)) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'cortex must be an object (e.g. { "agents": [ ... ] })'));
-                return;
-            }
-            if ((cortex as Record<string, unknown>).agents !== undefined) {
-                const check = validateCortexAgents((cortex as Record<string, unknown>).agents);
-                if (!check.ok) {
-                    res.status(400).json(error(config.nodeId, 'INVALID_CREW_DEF', check.errors.join('; ')));
-                    return;
-                }
-                cortexAgents = check.agents as unknown as Record<string, unknown>[];
-            }
         }
 
         const accessCode = typeof access_code === 'string' && access_code.length > 0 ? access_code : undefined;

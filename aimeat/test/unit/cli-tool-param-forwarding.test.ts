@@ -26,6 +26,11 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   v1.2.0 — 2026-09-13 — The routes, not only the values: update and activate on the extension
+ *     install reach PUT and the activate route, include_source reaches the scripts read, update on the
+ *     cortex install reaches PUT, and board rules reach the create and the rules route, on the CLI
+ *     dispatch and on the connector's MCP. Both installs hold a real manifest in PROBE_SETUP, because
+ *     the old handlers JSON-parsed a YAML manifest and so could never reach the node at all.
  *   v1.1.0 — 2026-09-06 — Ask the whole-tool question too: nothing on the wire for ANY declared
  *     parameter is uncallable, not unmeasurable. PROBE_SETUP carries the shaped values and the
  *     companions a format-checking handler needs; DOES_NOT_CALL_THE_NODE is the only way to say a
@@ -93,6 +98,13 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     aimeat_workspace_transfer: { always: { direction: 'export', zip_base64: 'cHJvYmU=' } },
     // action='decide' needs a requester; the other two actions ignore it.
     aimeat_workspace_access: { always: { requester: 'probe-owner' } },
+    // An inline install is a manifest AND its code, and `update` addresses the installed record by
+    // the manifest's own metadata.name, so a manifest that names something is held constant. Without
+    // it `update` would be measured only on the upload branch, which never reaches the redeploy door.
+    aimeat_extension_install: { always: { manifest: 'metadata:\n  name: zqxprobezqx\n' } },
+    // The cortex door has no upload branch over HTTP: every call carries a manifest, and `update`
+    // turns the POST into a PUT on the name the manifest declares.
+    aimeat_cortex_install: { always: { manifest: 'metadata:\n  name: zqxprobezqx\n' } },
 };
 
 /**
@@ -223,7 +235,7 @@ async function record(tool: { handler: (ctx: never, input: JsonObject) => Promis
         config: { agent: 'probe', owner: 'prober', node_url: 'http://node.test' },
         agentPath: 'probe',
     };
-    let refused = false;
+    let refused: boolean;
     try {
         const result = await tool.handler(ctx as never, input) as { ok?: boolean } | undefined;
         refused = result?.ok === false;
@@ -330,5 +342,108 @@ describe('every parameter the catalog publishes reaches the node from /local/cal
 
     it('reports the whole set in one place when anything is dropped', () => {
         expect(gaps, gaps.join('\n')).toEqual([]);
+    });
+});
+
+/**
+ * FORWARDED IS NOT THE SAME AS ARRIVING AT THE RIGHT DOOR. The probe above proves a value leaves the
+ * process; it cannot tell a redeploy sent to the redeploy route from one sent to the install route,
+ * which answers 409 and reads neither flag. These cases name the route each parameter must reach, on
+ * the CLI dispatch and on the connector's MCP registration, because both doors forward to HTTP and
+ * both lost the same flags.
+ */
+describe('the redeploy, source and board-rules parameters reach the route that reads them', () => {
+    const manifest = 'metadata:\n  name: probe-ext\n  version: 1.0.0\n';
+    const cli = (name: string) => {
+        const tool = CONNECT_CLI_TOOLS.find(t => t.name === name);
+        if (!tool) throw new Error(`${name} is not on the CLI dispatch`);
+        return tool as unknown as { handler: (ctx: never, input: JsonObject) => Promise<unknown> };
+    };
+
+    /** The connector's MCP tools, registered against a fake server and a recording client. */
+    function connectorTools(register: (mcp: never, registry: never) => void, sent: Sent[]) {
+        const tools = new Map<string, { shape: Record<string, unknown>; handler: (args: Record<string, unknown>) => Promise<{ isError?: boolean }> }>();
+        const mcp = {
+            tool: (...args: unknown[]) => {
+                const shape = (typeof args[1] === 'string' ? args[2] : args[1]) as Record<string, unknown>;
+                tools.set(args[0] as string, { shape, handler: args[args.length - 1] as never });
+            },
+        };
+        const client = recordingClient(sent);
+        register(mcp as never, { resolve: () => ({ client, agent: 'probe', owner: 'prober' }) } as never);
+        return tools;
+    }
+
+    it('CLI aimeat_extension_install update:true redeploys through PUT /v1/extensions/:name', async () => {
+        const run = await record(cli('aimeat_extension_install'), { manifest, scripts: { a: 'x' }, update: true } as never);
+        expect(run.refused, wire(run.sent)).toBe(false);
+        expect(run.sent[0]?.method).toBe('PUT');
+        expect(run.sent[0]?.path).toBe('/v1/extensions/probe-ext');
+        expect(run.sent[0]?.body).toEqual({ manifest, scripts: { a: 'x' } });
+    });
+
+    it('CLI aimeat_extension_install activate:true activates what it installed', async () => {
+        const run = await record(cli('aimeat_extension_install'), { manifest, scripts: { a: 'x' }, activate: true } as never);
+        expect(wire(run.sent)).toContain('POST /v1/extensions ');
+        expect(wire(run.sent)).toContain('POST /v1/extensions/probe-ext/activate');
+    });
+
+    it('CLI aimeat_extension_install with no manifest asks for an upload URL that carries both flags', async () => {
+        const run = await record(cli('aimeat_extension_install'), { update: true, activate: true } as never);
+        expect(run.sent).toEqual([{ method: 'POST', path: '/v1/extensions', body: { mode: 'presigned', update: true, activate: true } }]);
+    });
+
+    it('CLI aimeat_extension_get include_source reads the scripts behind the installer check', async () => {
+        const run = await record(cli('aimeat_extension_get'), { name: 'probe-ext', include_source: true } as never);
+        expect(run.sent.map(s => `${s.method} ${s.path}`)).toEqual(['GET /v1/extensions/probe-ext?full=true']);
+    });
+
+    it('CLI aimeat_cortex_install update:true redeploys through PUT /v1/cortex/:name', async () => {
+        const run = await record(cli('aimeat_cortex_install'), { manifest, libs: { 'a.js': 'x' }, update: true } as never);
+        expect(run.refused, wire(run.sent)).toBe(false);
+        expect(run.sent).toEqual([{ method: 'PUT', path: '/v1/cortex/probe-ext', body: { manifest, libs: { 'a.js': 'x' } } }]);
+    });
+
+    it('CLI aimeat_board_create sends the board rules, and aimeat_board_rules_set changes them', async () => {
+        const rules = { default_ttl_hours: 8760, posting: 'anyone' };
+        const made = await record(cli('aimeat_board_create'), { name: 'b', visibility: 'public', rules } as never);
+        expect((made.sent[0]?.body as JsonObject | undefined)?.rules).toEqual(rules);
+        const set = await record(cli('aimeat_board_rules_set'), { board_id: 'board-1', rules } as never);
+        expect(set.sent).toEqual([{ method: 'PATCH', path: '/v1/boards/board-1/rules', body: { rules } }]);
+    });
+
+    it('connector MCP aimeat_extension_install declares and routes update, activate and upload mode', async () => {
+        const { registerExtensionsTools } = await import('../../src/cli/connect/mcp/tools/extensions.js');
+        const sent: Sent[] = [];
+        const tools = connectorTools(registerExtensionsTools as never, sent);
+        const install = tools.get('aimeat_extension_install')!;
+        expect(Object.keys(install.shape).sort()).toEqual(['activate', 'manifest', 'scripts', 'update']);
+        await install.handler({ manifest, scripts: { a: 'x' }, update: true, activate: true });
+        expect(wire(sent)).toContain('PUT /v1/extensions/probe-ext');
+        expect(wire(sent)).toContain('POST /v1/extensions/probe-ext/activate');
+        sent.length = 0;
+        await install.handler({});
+        expect(sent).toEqual([{ method: 'POST', path: '/v1/extensions', body: { mode: 'presigned' } }]);
+
+        const get = tools.get('aimeat_extension_get')!;
+        expect(Object.keys(get.shape)).toContain('include_source');
+        sent.length = 0;
+        await get.handler({ name: 'probe-ext', include_source: true });
+        expect(sent.map(s => s.path)).toEqual(['/v1/extensions/probe-ext?full=true']);
+    });
+
+    it('connector MCP aimeat_board_create declares rules, and aimeat_board_rules_set exists', async () => {
+        const { registerBoardsTools } = await import('../../src/cli/connect/mcp/tools/boards.js');
+        const sent: Sent[] = [];
+        const tools = connectorTools(registerBoardsTools as never, sent);
+        const rules = { default_ttl_hours: 8760 };
+        expect(Object.keys(tools.get('aimeat_board_create')!.shape)).toContain('rules');
+        await tools.get('aimeat_board_create')!.handler({ name: 'b', visibility: 'public', rules });
+        expect((sent[0]?.body as JsonObject | undefined)?.rules).toEqual(rules);
+        const setRules = tools.get('aimeat_board_rules_set');
+        expect(setRules, 'aimeat_board_rules_set is registered on the connector').toBeDefined();
+        sent.length = 0;
+        await setRules!.handler({ board_id: 'board-1', rules });
+        expect(sent).toEqual([{ method: 'PATCH', path: '/v1/boards/board-1/rules', body: { rules } }]);
     });
 });

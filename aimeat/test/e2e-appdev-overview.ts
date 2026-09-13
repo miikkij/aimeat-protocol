@@ -7,6 +7,12 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-overview).
  * @version-history
+ *   v1.2.0 — 2026-09-13 — +the overview's learned section under ?model=: every active entry the
+ *     caller can read (own and other owners' shared), critical first, the named model's entries
+ *     first inside a severity, a private entry of another owner never; the drill-down names a door
+ *     that can open an entry. +POST /learned reports and upserts with a verification stamp, PATCH
+ *     verified re-checks without changing `updated`, cross-owner 404; every active curated entry
+ *     carries verifiedAt/verifiedVersion.
  *   v1.1.0 — 2026-09-03 — +the learned list as a page: paging, status default, severity/model/
  *     category/shared/q filters, scope vs filtered facets, severity sort, the community count and
  *     cross-owner isolation on the paged door (AppDev page, poster face).
@@ -277,6 +283,129 @@ await test('learned KB REST: pages, filters, searches, counts facets and says ho
     assert(bDel === 200, `cleanup B: ${bDel}`);
     const { body: after } = await json('/v1/appdev/pitfalls/learned?status=all&include_shared=1', { headers: a });
     assert(!after.data.pitfalls.some((p: any) => String(p.slug).startsWith('page-')), 'seeded entries survived cleanup');
+});
+
+// ── The research call hands every builder the whole learned list, whatever model it names ──
+
+await test('overview learned pitfalls: ?model= orders and never hides; shared entries included; critical first', async () => {
+    // Until 2026-09-13 the overview kept only entries whose AUTHOR was the model the caller named,
+    // and only the caller's own owner scope. On aimeat.io that answered a Gemini builder with 0 of
+    // 123 entries, and gave no other owner any of the 118 that had been shared platform-wide.
+    const seed = async (token: string, slug: string, extra: Record<string, unknown>) => {
+        const now = new Date().toISOString();
+        const { visibility, ...rest } = extra;
+        const value = {
+            title: `Overview ${slug}`, symptom: `symptom of ${slug}`, resolution: `resolution of ${slug}`,
+            model: 'goose', category: 'data', slug, applies_to: ['app'], severity: 'warn', status: 'active',
+            reported_by: 'overview-e2e', created: now, updated: now, ...rest,
+        };
+        const { status } = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+                key: `packages/appdev-pitfalls/data/${slug}`, value,
+                visibility: visibility ?? 'owner', tags: ['knowledge-entry', 'pitfall', `model:${value.model}`],
+            }),
+        });
+        assert(status === 200 || status === 201, `seed ${slug}: ${status}`);
+    };
+    await seed(tokenA, 'ov-a-warn-goose', { model: 'goose' });
+    await seed(tokenA, 'ov-a-warn-haiku', { model: 'claude-haiku-4.5', updated: '2026-01-02T00:00:00.000Z' });
+    await seed(tokenA, 'ov-a-crit-kimi', { model: 'kimi-k2.7-code', severity: 'critical' });
+    await seed(tokenA, 'ov-a-outdated', { model: 'claude-haiku-4.5', status: 'outdated' });
+    await seed(tokenB, 'ov-b-shared', { model: 'gemini-2.5-pro', visibility: 'public' });
+    await seed(tokenB, 'ov-b-private', { model: 'gemini-2.5-pro' });
+
+    const { status, body } = await json('/v1/appdev/overview?model=claude-haiku-4.5&sections=pitfalls_learned', {
+        headers: { Authorization: `Bearer ${tokenA}` },
+    });
+    assert(status === 200, `overview ${status}`);
+    const section = body.data.pitfalls_learned;
+    const mine = section.items.filter((p: any) => String(p.key).includes('/ov-'));
+    const slugs = mine.map((p: any) => String(p.key).split('/').pop());
+
+    for (const s of ['ov-a-warn-goose', 'ov-a-warn-haiku', 'ov-a-crit-kimi', 'ov-b-shared']) {
+        assert(slugs.includes(s), `${s} missing from the overview under ?model=claude-haiku-4.5: ${slugs.join(',')}`);
+    }
+    assert(!slugs.includes('ov-a-outdated'), 'an outdated entry was listed');
+    assert(!slugs.includes('ov-b-private'), 'another owner\'s PRIVATE entry leaked into the overview');
+
+    assert(slugs[0] === 'ov-a-crit-kimi', `critical entry should lead, got ${slugs.join(',')}`);
+    assert(slugs.indexOf('ov-a-warn-haiku') < slugs.indexOf('ov-a-warn-goose'),
+        `inside one severity the caller's own model comes first, even when older: ${slugs.join(',')}`);
+
+    const haiku = mine.find((p: any) => String(p.key).endsWith('/ov-a-warn-haiku'));
+    const goose = mine.find((p: any) => String(p.key).endsWith('/ov-a-warn-goose'));
+    assert(haiku.same_model === true && goose.same_model === false, 'same_model mark wrong');
+    const shared = mine.find((p: any) => String(p.key).endsWith('/ov-b-shared'));
+    assert(shared.source === 'shared' && typeof shared.owner === 'string' && shared.owner.includes(ownerB),
+        `shared entry must say whose it is, so its body can be read: ${JSON.stringify(shared)}`);
+    assert(section.total >= 4 && section.sources && section.sources.shared >= 1, `section counts wrong: ${JSON.stringify({ total: section.total, sources: section.sources })}`);
+    assert(!/knowledge_get/.test(section.drill_down), 'drill_down still points at aimeat_knowledge_get, which cannot open this package');
+
+    // Without ?model= nothing changes but the mark.
+    const { body: plain } = await json('/v1/appdev/overview?sections=pitfalls_learned', { headers: { Authorization: `Bearer ${tokenA}` } });
+    const plainSlugs = plain.data.pitfalls_learned.items.map((p: any) => String(p.key).split('/').pop());
+    assert(['ov-a-warn-goose', 'ov-a-warn-haiku', 'ov-a-crit-kimi', 'ov-b-shared'].every(s => plainSlugs.includes(s)), 'entries missing without ?model=');
+    assert(plain.data.pitfalls_learned.items.every((p: any) => p.same_model === undefined), 'same_model marked without a model');
+
+    for (const slug of ['ov-a-warn-goose', 'ov-a-warn-haiku', 'ov-a-crit-kimi', 'ov-a-outdated']) {
+        const { status: d } = await json(`/v1/appdev/pitfalls/learned/data/${slug}`, { method: 'DELETE', headers: { Authorization: `Bearer ${tokenA}` } });
+        assert(d === 200, `cleanup ${slug}: ${d}`);
+    }
+    for (const slug of ['ov-b-shared', 'ov-b-private']) {
+        const { status: d } = await json(`/v1/appdev/pitfalls/learned/data/${slug}`, { method: 'DELETE', headers: { Authorization: `Bearer ${tokenB}` } });
+        assert(d === 200, `cleanup ${slug}: ${d}`);
+    }
+});
+
+// ── Reporting over REST, and the verification stamp every report and re-check writes ──
+
+await test('learned KB REST: POST reports and stamps verification; PATCH verified re-checks without touching the words', async () => {
+    const a = { Authorization: `Bearer ${tokenA}` };
+    const body = {
+        model: 'Kimi-K2.7-Code', category: 'data', slug: 'rest-report', title: 'Reported over REST',
+        symptom: 'a thing a builder observed', resolution: 'the better way to do it', applies_to: ['app'],
+    };
+    const first = await json('/v1/appdev/pitfalls/learned', { method: 'POST', headers: a, body: JSON.stringify(body) });
+    assert(first.status === 201, `first report ${first.status}: ${JSON.stringify(first.body)}`);
+    assert(first.body.data.key === 'packages/appdev-pitfalls/data/rest-report' && first.body.data.visibility === 'owner', `report shape: ${JSON.stringify(first.body.data)}`);
+    assert(typeof first.body.data.verified_at === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(first.body.data.verified_at), 'no verified_at on a report');
+    assert(typeof first.body.data.verified_version === 'string' && /^\d+\.\d+\.\d+/.test(first.body.data.verified_version), `verified_version: ${first.body.data.verified_version}`);
+
+    const again = await json('/v1/appdev/pitfalls/learned', { method: 'POST', headers: a, body: JSON.stringify({ ...body, title: 'Reported over REST, reworded' }) });
+    assert(again.status === 200 && again.body.data.updated === true && again.body.data.version === 2, `upsert: ${again.status} ${JSON.stringify(again.body.data)}`);
+
+    const { body: listed } = await json('/v1/appdev/pitfalls/learned?q=rest-report&status=all', { headers: a });
+    const rows = listed.data.pitfalls.filter((p: any) => p.slug === 'rest-report');
+    assert(rows.length === 1, `one entry expected after two reports, got ${rows.length}`);
+    assert(rows[0].title === 'Reported over REST, reworded' && rows[0].model === 'kimi-k2.7-code', `row: ${JSON.stringify(rows[0])}`);
+    const wordsUpdated = rows[0].updated;
+
+    await new Promise(r => setTimeout(r, 20));
+    const recheck = await json('/v1/appdev/pitfalls/learned/data/rest-report', { method: 'PATCH', headers: a, body: JSON.stringify({ verified: true }) });
+    assert(recheck.status === 200, `PATCH verified ${recheck.status}: ${JSON.stringify(recheck.body)}`);
+    const p = recheck.body.data.pitfall;
+    assert(p.verified_at > again.body.data.verified_at, `re-check did not move verified_at: ${p.verified_at} vs ${again.body.data.verified_at}`);
+    assert(p.updated === wordsUpdated, 'a re-check changed the entry\'s updated date, which is about its words');
+
+    const missing = await json('/v1/appdev/pitfalls/learned', { method: 'POST', headers: a, body: JSON.stringify({ category: 'data', title: 'no model' }) });
+    assert(missing.status === 400, `a report without model/symptom/resolution: ${missing.status}`);
+    const anon = await json('/v1/appdev/pitfalls/learned', { method: 'POST', body: JSON.stringify(body) });
+    assert(anon.status === 401, `anonymous report: ${anon.status}`);
+
+    // B cannot re-check A's entry.
+    const bCheck = await json('/v1/appdev/pitfalls/learned/data/rest-report', { method: 'PATCH', headers: { Authorization: `Bearer ${tokenB}` }, body: JSON.stringify({ verified: true }) });
+    assert(bCheck.status === 404, `B re-checked A's entry: ${bCheck.status}`);
+
+    const del = await json('/v1/appdev/pitfalls/learned/data/rest-report', { method: 'DELETE', headers: a });
+    assert(del.status === 200, `cleanup ${del.status}`);
+});
+
+await test('curated registry: every active entry says when it was last checked and on which version', async () => {
+    const { status, body } = await json('/v1/appdev/pitfalls?limit=100');
+    assert(status === 200, `curated ${status}`);
+    const unchecked = body.data.pitfalls.filter((p: any) => !p.verifiedAt || !p.verifiedVersion).map((p: any) => p.id);
+    assert(unchecked.length === 0, `curated entries with no verification: ${unchecked.join(', ')}`);
 });
 
 await test('templates REST: seed manifest → list/get with source app → cross-owner 404 → DELETE', async () => {

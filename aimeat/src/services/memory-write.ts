@@ -29,6 +29,13 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.6.0 — 2026-09-13 — A successful write carries `warnings`, worded here once for every door.
+ *     SHADOWED_BY_OWNER_COPY now runs on every write into an agent namespace, keyed on the target:
+ *     it ran only on an agent's FIRST write of a key, so an agent that created a key the owner then
+ *     saved from an app was shadowed on every later write with no word (appdev pitfall
+ *     data/owner-copy-shadows-agent-write). UNDECLARED_SPACE names a workspace record whose space
+ *     the manifest does not declare (group-apps/new-space-needs-a-heal-step). afterMemoryWrite()
+ *     returns the EXCHANGE projection's report and the write result carries it as `exchange`.
  *   v1.5.0 — 2026-09-08 — A federated session is a scoped principal: no owner bypass on the write
  *     scope. The caller carries `federated` so the gate can tell.
  *   v1.4.0 — 2026-08-28 — A crews.registry.* / crews.runtime.* key is refused unless it lands in the
@@ -70,6 +77,7 @@ import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { misdirectedCrewKey } from './crew-def-store.js';
 import { parseGAII } from '../utils/gaii.js';
+import { undeclaredSpaceForKey, type UndeclaredSpaceWarning } from './workspace-write-items.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
 export interface MemoryWriteFanout {
@@ -118,7 +126,11 @@ export interface MemoryWriteInput {
     declaredProvenance?: Parameters<typeof provenanceForWrite>[1]['declared'];
     /** Which road this came down, for the provenance record: 'mcp.memory_write', 'rest.memory' … */
     pipeline: string;
-    /** Skip the shadowing check when the caller already knows the write is owner-scoped. */
+    /**
+     * Skip the shadowing check when the caller already knows the write lands in the owner's own
+     * namespace. Only a shortcut: the check reads the TARGET namespace and never runs for an owner
+     * GHII anyway, so a door that is not sure leaves this unset rather than guessing true.
+     */
     ownerScoped?: boolean;
     /**
      * The permission that authorises THIS write, when it is not `memory:write`.
@@ -134,6 +146,27 @@ export interface MemoryWriteInput {
     authorisingScope?: string;
 }
 
+/**
+ * What the EXCHANGE projection reports about a write to one of its listing sources (an app-tool
+ * manifest, an agent's offers document): what listed and what was skipped, and why. Its shape
+ * belongs to services/exchange-projection.ts; this file only carries it out of the write, so the
+ * type follows whatever that function returns and is `never` while it returns nothing.
+ */
+export type ExchangeReconcileReport =
+    Exclude<Awaited<ReturnType<typeof reconcileAfterSourceWrite>>, void | undefined | null>;
+
+/** A warning a successful write carries: the record was stored, and something about it needs a person. */
+export interface MemoryWriteWarning {
+    code: 'SHADOWED_BY_OWNER_COPY' | 'UNDECLARED_SPACE';
+    message: string;
+    [detail: string]: unknown;
+}
+
+/** What everything a write sets off has to say back to the door that made the write. */
+export interface AfterMemoryWriteReport {
+    exchange?: ExchangeReconcileReport;
+}
+
 export type MemoryWriteResult =
     | {
         ok: true;
@@ -142,6 +175,13 @@ export type MemoryWriteResult =
          *  owner-scope reads will resolve to theirs and this one is invisible. A warning, not a
          *  refusal: writing your own copy is legitimate, it just does not update somebody else's. */
         shadowedBy: string | null;
+        /** Set when the key is a workspace record in a namespace the workspace manifest does not
+         *  declare. Stored, and no workspace read lists it. */
+        undeclaredSpace?: UndeclaredSpaceWarning;
+        /** Every warning above in one list, worded once, for a door to hand back as it is. */
+        warnings: MemoryWriteWarning[];
+        /** The EXCHANGE projection's report, when this key is a listing source and it made one. */
+        exchange?: ExchangeReconcileReport;
     }
     | {
         ok: false;
@@ -302,13 +342,23 @@ export async function writeMemoryRecord(
 
     // 4. Is the owner already holding this key while this copy lands in an agent namespace? Silently
     //    succeeding here is how "I saved it" turns into "the app never showed it".
+    //
+    //    On EVERY write into an agent namespace, not only the first. This used to run only when the
+    //    agent had no copy yet, so the documented sequence went silent at the step that mattered:
+    //    the agent creates the key, the owner saves it from the app, and every later agent write is
+    //    shadowed with no word. It also read the caller rather than the target, and the HTTP door
+    //    switched it off with a comment saying there was no owner copy to shadow, which is false
+    //    for an agent. The TARGET decides: an agent namespace is checked, an owner GHII parses to null.
+    //
+    //    The answer names a record in the OWNER's namespace, which is a read, so it is given only to a
+    //    caller that could read it there: the owner, or a session holding memory:read (an agent reads
+    //    owner scope with that word). An ecosystem app never broadens to owner scope, so its namespace
+    //    (a GEAI, which parseGAII refuses) is not checked, or this would tell it which owner keys exist.
     let shadowedBy: string | null = null;
-    if (!existing && !input.ownerScoped) {
-        const parsed = parseGAII(caller.principal);
-        if (parsed) {
-            const ownerCopy = await storage.getMemory(`${parsed.owner}@${config.nodeId}`, input.key);
-            if (ownerCopy) shadowedBy = ownerCopy.ownerGaii;
-        }
+    const targetAgent = input.ownerScoped ? null : parseGAII(caller.targetGaii);
+    if (targetAgent && (privileged || hasScope(caller.scopes, 'memory:read'))) {
+        const ownerCopy = await storage.getMemory(`${targetAgent.owner}@${config.nodeId}`, input.key);
+        if (ownerCopy) shadowedBy = ownerCopy.ownerGaii;
     }
 
     // 5. Provenance names WHO WROTE it, not whose namespace it lands in.
@@ -351,9 +401,45 @@ export async function writeMemoryRecord(
     //    runs here rather than in each caller's tail — which is where it used to live, on one door
     //    only. A caller that cannot offer an optional piece (a node with no peers has no replication
     //    queue; a tool call has no HTTP response) simply omits it, and the rest still happens.
-    await afterMemoryWrite(deps, caller.targetGaii, input.key, !!existing, caller.principal);
+    const after = await afterMemoryWrite(deps, caller.targetGaii, input.key, !!existing, caller.principal);
 
-    return { ok: true, record, shadowedBy };
+    // 8. A workspace record whose space the workspace manifest does not declare. Stored, answered as
+    //    a success, and never listed, because the workspace read builds its spaces from the manifest.
+    //    The MCP workspace door refuses that write; this door warns instead, because live apps may
+    //    keep keys there today (the 2026-09-13 default; refusing is the developer's call). Only `organism.*.w.*` record keys pay the read.
+    //    The warning lists the workspace's declared spaces, which is manifest content, and an
+    //    ecosystem app may hold a write area without the read area the manifest needs, so it is not
+    //    told (services/ecosystem-access.ts: a GEAI reads organism data only through a read area).
+    const undeclaredSpace = input.key.startsWith('organism.') && !caller.roles.includes('ecosystem')
+        ? await undeclaredSpaceForKey(storage, input.key)
+        : null;
+
+    const warnings: MemoryWriteWarning[] = [];
+    if (shadowedBy) warnings.push(shadowWarning(input.key, caller.targetGaii, shadowedBy));
+    if (undeclaredSpace) warnings.push({ ...undeclaredSpace });
+
+    return {
+        ok: true, record, shadowedBy, warnings,
+        ...(undeclaredSpace ? { undeclaredSpace } : {}),
+        ...(after.exchange !== undefined ? { exchange: after.exchange } : {}),
+    };
+}
+
+/**
+ * The SHADOWED_BY_OWNER_COPY warning, worded once for every door. `landedIn` is the namespace this
+ * copy was written to; `ownerCopy` is the owner GHII holding the copy owner-scope reads resolve to.
+ */
+export function shadowWarning(key: string, landedIn: string, ownerCopy: string): MemoryWriteWarning {
+    return {
+        code: 'SHADOWED_BY_OWNER_COPY',
+        message: `Saved under ${landedIn}, but "${key}" also exists under ${ownerCopy}. `
+            + 'Owner-scope reads resolve the owner\'s copy first, so an app reading with ownerScope '
+            + 'and an owner-scope listing show that copy and not this one: this write did not update it.',
+        shadowed_by: ownerCopy,
+        how_to_fix: 'Write the owner\'s record itself with owner_scope: true (aimeat_memory_write, or POST '
+            + '/v1/memory), which needs the memory:write-as-owner permission the owner grants per agent in '
+            + 'Profile -> Agents. Without that permission, tell the person what you meant to write so they can save it.',
+    };
 }
 
 
@@ -374,6 +460,10 @@ export async function writeMemoryRecord(
  * are the same act.
  *
  * Best-effort and isolated throughout: none of it may fail a write that already happened.
+ *
+ * It returns what one of those steps has to tell the writer: the EXCHANGE projection's report, so a
+ * tool that was priced and flagged but skipped from the listing can say why instead of looking
+ * identical to one that listed. A caller that has no use for it ignores the return.
  */
 export async function afterMemoryWrite(
     deps: MemoryWriteFanout,
@@ -387,7 +477,7 @@ export async function afterMemoryWrite(
      * write — records nothing rather than a placeholder, which would be worse than silence.
      */
     writerPrincipal?: string,
-): Promise<void> {
+): Promise<AfterMemoryWriteReport> {
     const { storage, config } = deps;
 
     // Who has had their hands on this key. Synchronous, unawaited by contract, and the first sighting
@@ -415,8 +505,10 @@ export async function afterMemoryWrite(
     emitMemoryWritten(gaii, key, existed ? 'updated' : 'created');
 
     // An app-tool manifest / agent offers doc IS the source of truth for its EXCHANGE listing —
-    // reprice a tool and the market follows, with no separate listing step.
-    await reconcileAfterSourceWrite(storage, gaii, key);
+    // reprice a tool and the market follows, with no separate listing step. Its report is carried out
+    // as `unknown` and narrowed by type only, so this compiles whether the projection returns a
+    // report or nothing: the shape is exchange-projection.ts's to decide.
+    const exchangeReport: unknown = await reconcileAfterSourceWrite(storage, gaii, key);
 
     // Organism content lives under organism.{id}.*; the organism views listen on 'organisms' only,
     // rather than on the global 'memory' firehose of every agent's every write.
@@ -444,4 +536,6 @@ export async function afterMemoryWrite(
             .then(m => m.recordActivation(storage, config, deps.ownerName!, 'agent'))
             .catch(e => logger.warn('memory write: activation marker is best-effort', { error: String(e) }));
     }
+
+    return exchangeReport == null ? {} : { exchange: exchangeReport as ExchangeReconcileReport };
 }

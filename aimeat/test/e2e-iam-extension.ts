@@ -11,6 +11,8 @@
  *   v1.1.0 — 2026-07-29 — Add a second owner and point it at the admin surface: the in-script
  *            `isOwner` check is the ONLY gate there (the route is requireAuth() only), and batch 01
  *            mutation I2 deleted it with the suite still 7/7 green.
+ *   v1.2.0 — 2026-09-13 — Test 11: an admin op with a missing or misnamed field refuses by name and
+ *            writes nothing, while the shared panel's { ghii, role, owner, note } shape still assigns.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=iam-extension
 
@@ -314,6 +316,56 @@ await test('10. subject=gaii: an agent is enrolled on its OWN, and inherits noth
     await admin('setSubject', { subject: 'owner' });
     const restored = data(await asAgent({ permission: 'read' }));
     assert(restored.via === 'owner', `switching back restores inheritance: ${JSON.stringify(restored)}`);
+});
+
+/**
+ * Every admin write op used to skip a missing field and still answer ok:true with the state it
+ * already had, so a parameter under the wrong name looked applied and governed nothing (appdev
+ * pitfall iam/admin-ops-ignore-unknown-fields, 2026-09-13). Each must refuse, say what it takes,
+ * name the field it did not read, and leave the stored state exactly as it was.
+ */
+await test('11. an admin op with a missing or misnamed field refuses by name and writes nothing', async () => {
+    const before = data(await admin('getState'));
+    assert(before.isOwner === true, `A administers: ${JSON.stringify(before.isOwner)}`);
+
+    const asUser = data(await admin('assign', { user: 'bob', role: 'editor' }));
+    assert(asUser.ok === false, `assign with user instead of ghii must refuse, got ${JSON.stringify(asUser)}`);
+    assert(/ghii/.test(asUser.error || '') && /user/.test(asUser.error || ''),
+        `the refusal names the field it needs and the one it did not read: ${JSON.stringify(asUser.error)}`);
+
+    const cases: [string, Record<string, unknown>, RegExp][] = [
+        ['assign', { ghii: `iam-probe-nobody@${NODE_ID}` }, /role/],
+        ['revoke', { owner: A.name }, /ghii/],
+        ['setConfig', { defaultRole: 'admin' }, /config/],
+        ['setRoles', { roles: ['admin'] }, /roles/],
+        ['setRoles', { roles: { viewer: 'read' } }, /viewer/],
+        ['setLevels', {}, /levels/],
+        ['setCommands', { commands: { id: 'x', capability: 'read' } }, /commands/],
+        ['setSubject', { subject: 'person' }, /owner, gaii or both/],
+    ];
+    for (const [op, extra, names] of cases) {
+        const r = data(await admin(op, extra));
+        assert(r.ok === false, `${op} ${JSON.stringify(extra)} must refuse, got ${JSON.stringify(r)}`);
+        assert(names.test(r.error || ''), `${op} refusal must say ${names}: ${JSON.stringify(r.error)}`);
+    }
+
+    // The proof is the stored state, not the answers above.
+    const after = data(await admin('getState'));
+    for (const field of ['assignments', 'roles', 'levels', 'commands', 'subject'] as const) {
+        assert(JSON.stringify(after[field]) === JSON.stringify(before[field]),
+            `${field} must be untouched: before ${JSON.stringify(before[field])}, after ${JSON.stringify(after[field])}`);
+    }
+    assert(after.config.defaultRole === before.config.defaultRole, `defaultRole must be untouched: ${JSON.stringify(after.config)}`);
+
+    // A field an op does not read is not a refusal on its own: the shared iam panel sends owner and
+    // note beside ghii, and that shape must keep assigning.
+    const bob = `iam-probe-bob@${NODE_ID}`;
+    const panel = data(await admin('assign', { ghii: bob, role: 'editor', owner: bob, note: 'panel shape' }));
+    assert(panel.ok === true && panel.assignments[bob] === 'editor', `the panel's assign shape still assigns: ${JSON.stringify(panel)}`);
+    const gone = data(await admin('revoke', { ghii: bob }));
+    assert(gone.ok === true && gone.removed === true && gone.assignments[bob] === undefined, `revoke removes: ${JSON.stringify(gone)}`);
+    const again = data(await admin('revoke', { ghii: bob }));
+    assert(again.ok === true && again.removed === false, `a revoke that matched no row says so: ${JSON.stringify(again)}`);
 });
 
 console.log(`\naimeat-iam Extension Evolution E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);

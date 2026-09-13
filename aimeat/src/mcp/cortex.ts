@@ -10,6 +10,11 @@
  *   import { registerCortexTools } from './cortex.js';
  *   registerCortexTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.7.0 -- 2026-09-13 -- aimeat_cortex_install takes update:true and redeploys through
+ *     upsertCortex(), the function PUT /v1/cortex/:name runs, and both answers carry lib_urls. The
+ *     tool was create-only and told the agent to use the HTTP route, so an MCP-only agent could
+ *     update a live cortex only by deleting it, which breaks every app loading its lib until the
+ *     new one is active. update without a manifest is refused: the ZIP road cannot replace.
  *   v1.0.0 - 2026-05-02 - Initial creation: 5 tools for cortex lifecycle management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -41,6 +46,7 @@ import {
     installCortex, activateCortex, deactivateCortex, deleteCortex,
     visibleCortexes, type CortexCaller, type CortexRefusal,
 } from '../services/cortex-lifecycle.js';
+import { upsertCortex, cortexLibUrls } from '../routes/cortex.js';
 import { annotationsFor } from './annotations.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -133,10 +139,25 @@ export function registerCortexTools(
         {
             manifest: z.string().optional().describe('YAML manifest string. Omit to get an upload URL for a ZIP bundle.'),
             libs: z.record(z.string(), z.string()).optional().describe('Map of filename to JavaScript source code for lib files.'),
+            update: z.boolean().optional().describe('Replace your installed cortex of the manifest\'s metadata.name in place (inline mode only). Without it an existing name is refused.'),
         },
         annotationsFor('aimeat_cortex_install'),
-        async ({ manifest, libs }) => {
+        async ({ manifest, libs, update }) => {
             const agentGaii = getAgentGaii();
+
+            // The ZIP road creates only: its upload handler takes no options, so a flag minted into
+            // the token would be carried and then ignored. Refused here, where the caller still has
+            // the manifest in hand, instead of answering with an upload URL that cannot do the job.
+            if (!manifest && update) {
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: 'update:true redeploys inline only: send the manifest YAML and the libs map in this call. '
+                            + 'The ZIP upload creates a new cortex and cannot replace an installed one.',
+                    }],
+                    isError: true,
+                };
+            }
 
             // --- UPLOAD MODE: no manifest provided, return presigned upload URL ---
             if (!manifest) {
@@ -174,13 +195,44 @@ export function registerCortexTools(
             // (routes/auth.ts:265-267), so the role is read off the owner record. It buys one thing
             // here: a namespace this owner does not own.
             const ownerRec = await storage.getOwner(callerOwner);
-            const out = await installCortex(
-                { storage, config },
-                agentCaller(ownerRec?.roles.includes('operator') ?? false),
-                { manifest, libs },
-            );
+            const caller = agentCaller(ownerRec?.roles.includes('operator') ?? false);
+
+            // --- REDEPLOY: the same upsert PUT /v1/cortex/:name performs (routes/cortex.ts). ---
+            // The operator role buys the namespace claim here, as it does on install, and NOT the
+            // replacement of another owner's cortex: that stays with the HTTP door, like the
+            // lifecycle tools below. A cortex that is not yours is refused in the words the install
+            // branch already uses for a name another owner holds.
+            if (update) {
+                const up = await upsertCortex({ storage, config }, caller, { manifest, libs }, false);
+                if (!up.ok) {
+                    return { content: [{ type: 'text' as const, text: refusalText(up.refusal) }], isError: true };
+                }
+                const done = up.value;
+                emitResourceListChanged(agentGaii);
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                            name: done.record.name,
+                            namespace: done.record.namespace,
+                            version: done.record.version,
+                            status: done.record.status,
+                            action: done.action,
+                            ...(done.action === 'updated' ? { reinitialized: done.reinitialized } : {}),
+                            component_count: done.record.components.length,
+                            ...(done.action !== 'unchanged' ? { warnings: done.warnings } : {}),
+                            lib_urls: cortexLibUrls(config.baseUrl, done.record),
+                        }, null, 2),
+                    }],
+                };
+            }
+
+            const out = await installCortex({ storage, config }, caller, { manifest, libs });
             if (!out.ok) {
-                return { content: [{ type: 'text' as const, text: refusalText(out.refusal) }], isError: true };
+                // An installed name of your own is a redeploy the caller did not ask for; say how.
+                const hint = out.refusal.code === 'CONFLICT'
+                    ? ' Pass update: true with the same manifest and libs to replace it in place.' : '';
+                return { content: [{ type: 'text' as const, text: refusalText(out.refusal) + hint }], isError: true };
             }
 
             const { record, warnings } = out.value;
@@ -198,6 +250,9 @@ export function registerCortexTools(
                         installed_by: record.installedBy,
                         component_count: record.components.length,
                         warnings,
+                        // The exact script src for each lib. The address follows the record's name,
+                        // and an author who guessed the namespaced form got a 404 inside the app.
+                        lib_urls: cortexLibUrls(config.baseUrl, record),
                     }, null, 2),
                 }],
             };

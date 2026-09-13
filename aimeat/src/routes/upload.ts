@@ -24,6 +24,15 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.16.1 — 2026-09-13 — Replacing an existing cortex by ZIP refuses a lib the manifest names that
+ *     neither arrives nor is stored (INVALID_MANIFEST), as the install doors do.
+ *   v1.16.0 — 2026-09-13 — handleStorageUpload answers with versioned_url, the /v1/pub address plus
+ *     ?v=<this write>, the same field POST /v1/storage and aimeat_storage_upload now carry. A
+ *     re-upload to the same key was served from browsers' five-minute copies (appdev pitfall
+ *     pub-file-cache-stale-assets).
+ *   v1.15.0 — 2026-09-13 — handleAppUpload publishes the crew-defs the token carries
+ *     (`cortex_agents`), re-validated, and refuses the upload with INVALID_CREW_DEF when they no
+ *     longer pass instead of publishing the app without them.
  *   v1.14.0 — 2026-08-23 — handleExtensionUpload derives the owner BEFORE parsing the manifest and
  *     passes it to parseExtensionZip. The builder was being handed the literal string `upload` as
  *     the installer, and config.app compares the named app's owner against exactly that, so a
@@ -103,13 +112,14 @@ import type { Storage, ExtensionRecord, StorageFileRecord, CortexExtensionRecord
 import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
 import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
 import { validateNamespaceOwnership } from '../services/cortex-manifest.js';
-import { installCortex } from '../services/cortex-lifecycle.js';
+import { installCortex, libsWithoutContent, missingLibsMessage } from '../services/cortex-lifecycle.js';
 import { writeStorageFile } from '../services/storage-file-write.js';
 import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
 import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.js';
 import { publishSkill, type SkillScope } from '../services/skills.js';
 import { parseGAII } from '../utils/gaii.js';
 import { publishApp } from '../services/app-publish.js';
+import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { effectiveDevLevel, mayAct } from '../services/app-dev-grant.js';
 import { accountOf } from '../services/app-members.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
@@ -117,6 +127,7 @@ import type { DeclaredProvenance } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
+import { versionedAddress } from '../utils/http-range.js';
 import { getEncryptionKey } from '../services/encryption.js';
 import { getExtSecretKeys, encryptSecretFields } from '../services/extension-secrets.js';
 import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
@@ -262,6 +273,19 @@ async function handleAppUpload(
         }
     }
 
+    // The crew-defs the mint validated, checked once more and REFUSED rather than dropped if they no
+    // longer pass: a malformed crew-def must never reach a fleet, and publishing the app without the
+    // agents its author declared is the silent drop this token used to make on every upload.
+    let cortexAgents: Record<string, unknown>[] | undefined;
+    if (meta.cortex_agents !== undefined) {
+        const check = validateCortexAgents(meta.cortex_agents);
+        if (!check.ok) {
+            res.status(400).json({ success: false, error: 'INVALID_CREW_DEF', message: check.errors.join('; ') });
+            return;
+        }
+        cortexAgents = check.agents as unknown as Record<string, unknown>[];
+    }
+
     // Everything from here to the response is services/app-publish.ts, shared with POST /v1/apps and
     // publish-draft. This door's own business is only the token meta → requested-manifest mapping:
     // a presigned publish that omits a field must NEVER blank what the live app declares, and
@@ -285,8 +309,10 @@ async function handleAppUpload(
                 ? (meta.tags as unknown[]).filter((t): t is string => typeof t === 'string')
                 : undefined,
             icon: typeof meta.icon === 'string' ? meta.icon : undefined,
-            // The presigned meta cannot express cortex refs, crew-defs, pricing, per-locale
-            // descriptions or protection — so every one of them is left unmentioned and carried.
+            // Crew-defs were validated at the mint; the re-check above is for a schema that moved
+            // inside the token's hour. Cortex refs, pricing, per-locale descriptions and protection
+            // are still not in the presigned meta, so each is left unmentioned and carried.
+            cortexAgents,
         },
         accessCode: { mode: 'carry' },
         source: 'presigned',
@@ -386,6 +412,9 @@ async function handleStorageUpload(
         // that workspace's members on save (never the public internet) — use it, not /v1/storage/<key>.
         embed_url: pubEmbedUrl(file.ownerGaii, file.key),
         embed_markdown: pubEmbedMarkdown(file.ownerGaii, file.key),
+        // The same address with ?v=<this write>, as POST /v1/storage answers: a re-upload under this
+        // key is a new URL to every cache, and GET /v1/pub ignores the query.
+        versioned_url: versionedAddress(pubEmbedUrl(file.ownerGaii, file.key), file),
     });
 }
 
@@ -672,6 +701,18 @@ async function handleCortexUpload(
     }
     if (existing.installedBy !== ownerName) {
         res.status(403).json({ success: false, error: 'FORBIDDEN', message: 'Not your cortex extension' });
+        return;
+    }
+
+    // Every lib the new manifest names arrives in this ZIP or is already stored; otherwise the
+    // replace would record a component the node never serves (the install door refuses the same).
+    const stored = new Set<string>();
+    for (const c of existing.components) {
+        if (c.type === 'lib' && (await storage.getCortexLibFile(incoming.name, c.filename)) !== null) stored.add(c.filename);
+    }
+    const missing = libsWithoutContent(incoming.components, result.libs ?? {}, stored);
+    if (missing.length) {
+        res.status(400).json({ success: false, error: 'INVALID_MANIFEST', message: missingLibsMessage(missing) });
         return;
     }
 

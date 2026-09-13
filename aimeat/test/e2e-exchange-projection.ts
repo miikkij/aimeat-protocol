@@ -10,6 +10,11 @@
  *   projection-aware delist guard.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange-projection.ts
  * @version-history
+ *   v1.2.0 — 2026-09-13 — What a publish says back: aimeat_app_tools_publish over MCP and PUT
+ *     /v1/agents/:name/offers name what listed, what was skipped and why, and the warnings
+ *     (ALSO_LISTED_AS for a tool that duplicates a flagged extension action, ODPS_FIELD_TOO_LONG for a
+ *     restriction past 255 characters, published whole). Both listings of a duplicate stay listed.
+ *     Another owner's PUT onto the agent's offers is refused 403 and delists nothing.
  *   v1.1.0 — 2026-07-25 — ODPS: app-level defaults on the manifest root inherit into every tool, a tool
  *     overrides field by field, and both reach the listing's ODPS v4.1 document.
  *   v1.0.0 — 2026-07-25 — Initial projection proof (TARGET-050 slices 1 + 3).
@@ -57,6 +62,47 @@ async function agentToken(gaii: string, priv: string): Promise<string> {
   return body.data.token as string;
 }
 const hasKeys = (v: unknown): boolean => !!v && typeof v === 'object' && Object.keys(v as Record<string, unknown>).length > 0;
+
+/** One agent MCP session over /v1/mcp (OAuth code grant signed with the agent key), with a tools/call helper. */
+async function mcpSession(gaii: string, priv: string) {
+  const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'Projection E2E', redirect_uris: [] }) });
+  assert(reg.status === 201, `oauth register ${reg.status}`);
+  const ts = new Date().toISOString();
+  const q = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii, signature: await sign(priv, gaii + NODE_ID + ts), timestamp: ts });
+  const code = (await json(`/v1/mcp/authorize?${q}`)).body.code;
+  assert(typeof code === 'string', 'authorize returned no code');
+  const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: reg.body.client_id, client_secret: reg.body.client_secret }) });
+  assert(tok.status === 200, `token ${tok.status}`);
+  let sessionId = ''; let id = 0;
+  const rpc = async (method: string, params: Record<string, unknown> = {}, notify = false) => {
+    const res = await fetch(`${BASE}/v1/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${tok.body.access_token}`,
+        ...(sessionId ? { 'mcp-session-id': sessionId, 'mcp-protocol-version': '2025-03-26' } : {}),
+      },
+      body: JSON.stringify(notify ? { jsonrpc: '2.0', method } : { jsonrpc: '2.0', id: ++id, method, params }),
+    });
+    sessionId = res.headers.get('mcp-session-id') ?? sessionId;
+    const text = await res.text();
+    const frames = (res.headers.get('content-type') ?? '').includes('event-stream')
+      ? text.split('\n').filter(l => l.startsWith('data: ')).map(l => { try { return JSON.parse(l.slice(6)); } catch { return null; } }).filter(Boolean)
+      : (text ? [JSON.parse(text)] : []);
+    return frames.find((f: any) => f.id === id) ?? frames[0] ?? {};
+  };
+  const init = await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'Projection E2E', version: '1.0.0' } });
+  assert(init.result !== undefined, `initialize: ${JSON.stringify(init).slice(0, 200)}`);
+  await rpc('notifications/initialized', {}, true);
+  return {
+    call: async (name: string, args: Record<string, unknown>) => {
+      const body = await rpc('tools/call', { name, arguments: args });
+      const text = body.result?.content?.[0]?.text ?? '';
+      let data: any = null;
+      try { data = JSON.parse(text); } catch { /* a refusal is plain text */ }
+      return { isError: !!body.result?.isError, text, data };
+    },
+  };
+}
 
 console.log('\n=== AIMEAT EXCHANGE PROJECTION E2E (TARGET-050 — the source owns the listing) ===\n');
 
@@ -576,6 +622,78 @@ await test('An EXTENSION ACTION carries its own ODPS descriptor from the manifes
     'and the ODPS document carries it');
 });
 
+// ── What a publish says back (2026-09-13). The shared write reconciled the listings and dropped the
+// report, so a tool flagged and priced but skipped answered `priced: true` like one that listed; a tool
+// bound to an extension action that was itself flagged made two listings and said nothing; and a long
+// usage note produced an ODPS document outside the schema without a word.
+await test('MCP app_tools_publish names what listed, what was skipped and why, and the warnings', async () => {
+  const XDUP = `xdup${Date.now()}`;
+  const DUP_APP = `dup-${Date.now()}.html`;
+  const ins = await json('/v1/extensions', {
+    method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({
+      manifest: JSON.stringify({
+        metadata: { name: XDUP, version: '1.0.0', description: 'flagged twice', author: 'e2e' },
+        actions: [{ id: 'search', method: 'POST', path: '/search', script: 'echo', input: IN_SCHEMA, output: OUT_SCHEMA,
+          commercial: { payMorsels: 3, exchange: true, usageTerms: TERMS } }],
+      }),
+      scripts: { echo: 'export default async function(ctx, input){ return { echo: input }; }' },
+    }),
+  });
+  assert(ins.status === 201, `a new extension installs with 201, got ${ins.status}: ${JSON.stringify(ins.body?.error)}`);
+  await json(`/v1/extensions/${XDUP}/activate`, { method: 'POST', headers: auth(provider.token) });
+  assert((await myOfferings(provider.token)).some(o => o.ext === XDUP && o.action === 'search' && o.state === 'listed'),
+    'the flagged extension action is listed before the tool is published');
+
+  const reg = await json('/v1/agents', {
+    method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ name: `seller${Date.now()}`.slice(0, 28), owner: provider.name, capabilities: ['commerce'], scopes: ['commerce:sell', 'memory:read', 'memory:write'] }),
+  });
+  assert(reg.status === 201, `register seller agent ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+  const mcp = await mcpSession(reg.body.data.agent.gaii, reg.body.data.private_key);
+  const note = 'n'.repeat(200);
+  const r = await mcp.call('aimeat_app_tools_publish', {
+    app_id: DUP_APP,
+    tools: [
+      { name: 'find', action_id: `ext:${XDUP}:search`, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, price: { morsels: 5 }, exchange: true,
+        usageTerms: { derivatives: true, resale: false, attribution: true, note } },
+      { name: 'noout', action_id: `ext:${XDUP}:search`, inputSchema: IN_SCHEMA, price: { morsels: 5 }, exchange: true },
+    ],
+  });
+  assert(!r.isError, `publish: ${r.text.slice(0, 300)}`);
+  const ex = r.data?.exchange;
+  assert(ex?.known === true, `the answer carries the projection's outcome: ${JSON.stringify(ex).slice(0, 300)}`);
+  const listed = (ex.listed as any[]).find(l => l.label === `${DUP_APP}/find`);
+  assert(!!listed && typeof listed.offeringId === 'string', `the listed tool is named with its offering: ${JSON.stringify(ex.listed)}`);
+  assert((ex.skipped as any[]).some(s => s.label === `${DUP_APP}/noout` && s.reason === 'SCHEMA_REQUIRED'),
+    `the skipped tool is named with its reason: ${JSON.stringify(ex.skipped)}`);
+  const warns = ex.warnings as any[];
+  assert(warns.some(w => w.label === `${DUP_APP}/find` && w.reason === `ALSO_LISTED_AS ${XDUP}/search` && w.otherListing?.kind === 'ext-action'),
+    `the duplicate of the flagged extension action is named: ${JSON.stringify(warns)}`);
+  const long = warns.find(w => w.reason === 'ODPS_FIELD_TOO_LONG product.license.scope.restrictions');
+  assert(!!long && long.odpsField?.maxLength === 255 && long.odpsField?.length === 299 && String(long.message).includes('usageTerms.note'),
+    `the ODPS overrun is named with its numbers: ${JSON.stringify(warns)}`);
+
+  // Warned, never delisted: both listings stay on the market.
+  const mine = await myOfferings(provider.token);
+  assert(mine.filter(o => o.ext === XDUP && o.action === 'search' && o.state === 'listed').length === 1, 'the extension action is still listed');
+  assert(mine.filter(o => o.ext === `apptool:${provider.name}/${DUP_APP}` && o.action === 'find' && o.state === 'listed').length === 1, 'and so is the tool');
+
+  // The full reconcile report says it on both sides.
+  const dry = await json('/v1/exchange/reconcile', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ dry_run: true }) });
+  assert(dry.status === 200, `dry run ${dry.status}`);
+  const rows = (dry.body.data.changes as any[]).filter(c => c.action === 'warning' && String(c.reason).startsWith('ALSO_LISTED_AS'));
+  assert(rows.some(c => c.label === `${XDUP}/search` && c.reason === `ALSO_LISTED_AS ${DUP_APP}/find`)
+    && rows.some(c => c.label === `${DUP_APP}/find` && c.reason === `ALSO_LISTED_AS ${XDUP}/search`),
+    `both sides are warned: ${JSON.stringify(rows)}`);
+  assert(typeof dry.body.data.warnings === 'number' && dry.body.data.warnings >= 3, `the warning count: ${dry.body.data.warnings}`);
+
+  // Never truncated: the published document keeps the note whole.
+  const doc = await json(`/v1/exchange/offerings/${listed.offeringId}/odps`);
+  const restrictions = String(doc.body.data?.odps?.product?.license?.scope?.restrictions ?? '');
+  assert(restrictions.length === 299 && restrictions.endsWith(note), `the restriction text is published as written (${restrictions.length})`);
+});
+
 await test('Adopting a hand-authored listing never erases an attestation its source cannot express', async () => {
   // Turning `exchange` on for a capability that already had a hand-authored listing must keep the
   // provenance the provider stated: an emptied legal basis is worse than a stale one.
@@ -637,6 +755,39 @@ await test('Setup: the provider has an agent that can receive fulfillment tasks'
     body: JSON.stringify({ name: AGENT, owner: provider.name, capabilities: ['memory'], scopes: ['*'] }),
   });
   assert(reg.status === 201, `register agent ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+});
+
+await test('PUT offers answers which offers listed, and names the skipped ones with their reason', async () => {
+  const offer = (id: string, over: Record<string, unknown> = {}) => ({
+    id, title: `Offer ${id}`, ask: 'Send a business id; I write the brief.', deliverable: { format: 'document', sample: 'untested' },
+    inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, price: { morsels: 4 }, exchange: true, visibility: 'public', ...over,
+  });
+  const r = await json(`/v1/agents/${encodeURIComponent(AGENT)}/offers`, {
+    method: 'PUT', headers: auth(provider.token),
+    body: JSON.stringify({ offers: [offer('sold'), offer('hidden', { visibility: 'private' }), offer('noout', { outputSchema: undefined })] }),
+  });
+  assert(r.status === 200, `publish offers ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const ex = r.body.data.exchange;
+  assert(ex?.known === true, `the answer carries the projection's outcome: ${JSON.stringify(r.body.data).slice(0, 300)}`);
+  assert((ex.listed as any[]).some(l => l.label === `${AGENT}:sold` && l.kind === 'agent-work' && l.offeringId),
+    `the listed offer is named: ${JSON.stringify(ex.listed)}`);
+  const why = Object.fromEntries((ex.skipped as any[]).map(s => [s.label, s.reason]));
+  assert(why[`${AGENT}:hidden`] === 'NOT_PUBLIC' && why[`${AGENT}:noout`] === 'SCHEMA_REQUIRED',
+    `each skipped offer says why: ${JSON.stringify(ex.skipped)}`);
+  // Another owner cannot rewrite this agent's offers: an empty list from them would delist what sold.
+  // Addressed by the full GAII, because a bare name resolves under the caller's own account.
+  const soldId = (ex.listed as any[]).find(l => l.label === `${AGENT}:sold`).offeringId;
+  const other = await setupOwner('px');
+  const agentGaii = `${AGENT}#${provider.name}@${NODE_ID}`;
+  const denied = await json(`/v1/agents/${encodeURIComponent(agentGaii)}/offers`, { method: 'PUT', headers: auth(other.token), body: JSON.stringify({ offers: [] }) });
+  assert(denied.status === 403 && denied.body.error?.code === 'ACCESS_DENIED',
+    `another owner's PUT is refused with 403 ACCESS_DENIED, got ${denied.status}: ${JSON.stringify(denied.body?.error)}`);
+  assert((await myOfferings(provider.token)).some(o => o.offeringId === soldId && o.state === 'listed'),
+    'and the listing it would have removed is still on the market');
+  // Leave the agent with no offers, so the task-shape tests below read only what they wrote.
+  const clear = await json(`/v1/agents/${encodeURIComponent(AGENT)}/offers`, { method: 'PUT', headers: auth(provider.token), body: JSON.stringify({ offers: [] }) });
+  assert(clear.status === 200 && (clear.body.data.exchange?.delisted as any[])?.some(d => d.offeringId),
+    `clearing the offers delists the one that sold, and says so: ${JSON.stringify(clear.body.data.exchange)}`);
 });
 
 await test('An unbound tool with a named agent lists as AGENT-WORK carrying its taskSpec', async () => {

@@ -39,6 +39,8 @@
  *   - phase 9: the living-document pulse's derive loop, its gate, its stop and its guards
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-provider-stub.ts
  * @version-history
+ *   v1.2.0 — 2026-09-13 — 6b3: a completion cut at a length limit answers finish_reason length and
+ *     truncated true; a finished one stop and false.
  *   v1.1.0 — 2026-09-09 — 6b asserted the defect: an empty completion answered as '' at 200. It now
  *     proves the retry (one empty, then the answer, two requests) and 6b2 the failure after the
  *     retries (502 EMPTY_COMPLETION naming finish_reason=length, three attempts).
@@ -555,6 +557,21 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(/finish_reason=length/.test(r.body.error?.message ?? ''), `the reason is named: ${r.body.error?.message}`);
         const seen = provider.requestsFor('chat').filter(carries('MARK-COMPLETE-EMPTY3')).length - before;
         assert(seen === 3, `three attempts, got ${seen}`);
+    });
+
+    // A completion the provider cut at a length limit arrived as an ordinary 200 with the first half
+    // of an answer: the node had finish_reason in hand and dropped it before the response, so an app
+    // could not tell a finished answer from a truncated one (curated pitfall no-max-tokens).
+    await test('6b3. A completion cut at a length limit says so: finish_reason length and truncated true', async () => {
+        provider.queue('chat', chatJson('The first half of an ans', { finishReason: 'length' }), carries('MARK-COMPLETE-CUT'));
+        const r = await complete({ prompt: 'MARK-COMPLETE-CUT', app_id: 'e2e-ai-stub' });
+        assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.finish_reason === 'length' && r.body.data.truncated === true,
+            `a cut answer must say it was cut: ${JSON.stringify({ finish_reason: r.body.data.finish_reason, truncated: r.body.data.truncated })}`);
+        provider.queue('chat', chatJson('A whole answer.'), carries('MARK-COMPLETE-WHOLE'));
+        const whole = await complete({ prompt: 'MARK-COMPLETE-WHOLE', app_id: 'e2e-ai-stub' });
+        assert(whole.body.data.finish_reason === 'stop' && whole.body.data.truncated === false,
+            `a finished answer says it finished: ${JSON.stringify({ finish_reason: whole.body.data.finish_reason, truncated: whole.body.data.truncated })}`);
     });
 
     await test('6c. An image attachment turns the user turn into a multimodal content array', async () => {

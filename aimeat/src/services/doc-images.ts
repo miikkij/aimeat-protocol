@@ -20,6 +20,8 @@
  *   import { normalizeDocValueImages } from '../services/doc-images.js';
  *   const v = await normalizeDocValueImages(storage, config, draft.value, ownerName, `${orgId}/${ws}`);
  * @version-history
+ *   v1.1.0 — 2026-09-13 — An embed URL's query and fragment are dropped before the key is read, so a
+ *     versioned_url (?v=) pasted into a document is scoped like its unversioned twin.
  *   v1.0.0 — 2026-07-11 — Extracted so the MCP write, MCP publish, and REST publish paths share one
  *     image-URL normalizer. Embedded images are scoped to the doc's workspace (members-only), never made
  *     public — mirrors the frontend applyImageVisibilityUrls + the authed workspace-file-tier design.
@@ -63,7 +65,10 @@ export function pubEmbedMarkdown(ownerGaii: string, key: string): string {
 }
 
 /** Parse an embed URL into { key, ownerInUrl? }, or null if it isn't a recognised storage form. */
-function parseEmbedUrl(url: string): { key: string; ownerInUrl?: string } | null {
+function parseEmbedUrl(rawUrl: string): { key: string; ownerInUrl?: string } | null {
+  // An upload answer's versioned_url carries ?v=<write>; the query is not part of the key, and read
+  // into it the image would load but never be scoped to the document's workspace.
+  const url = rawUrl.split(/[?#]/)[0];
   let m: RegExpMatchArray | null;
   if ((m = url.match(/^\/v1\/storage\/(.+)$/))) return { key: decodeKey(m[1]) };
   if ((m = url.match(/^\/v1\/memory\/files\/(.+)$/))) return { key: decodeKey(m[1]) };

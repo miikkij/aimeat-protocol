@@ -39,6 +39,11 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   v1.4.0 — 2026-09-13 — The `#aimeat-app-ref` identity block is written at the start of the head
+ *     (headStart(): past the doctype and the `<html>` and `<head>` opening tags, never into
+ *     content) instead of at the end of the body, so an app's inline script can read it at parse
+ *     time; the rest of the discovery block stays in the body. Its JSON is script-safe rather than
+ *     HTML-escaped. The nine goldens that carry a discovery block were re-captured.
  *   v1.3.0 — 2026-09-11 — `spec.isDocument`: a caller that has already checked the media type may
  *     say so, instead of this pass sniffing for a closing tag the author never had to write.
  *     Three live apps open with a comment or a `<meta charset>` and close nothing, so they were
@@ -62,7 +67,9 @@ import type { Locale } from '../i18n.js';
 import { findOpenTag, injectBeforeClosingTag } from '../utils/html-inject.js';
 import { BADGE_MARK, badgeSnippet } from '../utils/app-badge.js';
 import { RESERVE_MARK, reserveSnippet } from '../utils/app-chrome-reserve.js';
-import { DISCOVERY_MARK, agentDiscoverySnippet, type AppDiscoverySpec } from '../utils/app-agent-discovery.js';
+import {
+  APP_REF_MARK, DISCOVERY_MARK, agentDiscoverySnippet, appRefSnippet, type AppDiscoverySpec,
+} from '../utils/app-agent-discovery.js';
 import { applyAppHeadMeta, type AppHeadSpec } from '../utils/app-head-meta.js';
 import {
   PROVENANCE_HTML_MARK, aiDisclosureParts, markDocumentElement, type ServedProvenance,
@@ -81,6 +88,45 @@ function injectIntoHead(html: string, snippet: string): string {
   const body = findOpenTag(html, 'body');
   if (body) return html.slice(0, body.end) + snippet + html.slice(body.end);
   return snippet + html;
+}
+
+/**
+ * Where the head's first child goes: past the document's prolog and nothing else. That is leading
+ * whitespace and comments, then a doctype, then the `<html>` and `<head>` opening tags, each only
+ * when it is the next thing in the text. Every element the author wrote comes after this point, a
+ * script in the head included, and the scan never reads into content, so a `<head>` written inside
+ * an app's JavaScript cannot be taken for the real one. A document with none of the prolog gets
+ * the snippet at its front, where the parser opens the head for it.
+ */
+function headStart(html: string): number {
+  const lower = html.toLowerCase();
+  let at = 0;
+  const skipBlankAndComments = (): void => {
+    for (;;) {
+      while (at < html.length && /\s/.test(html[at])) at++;
+      if (!lower.startsWith('<!--', at)) return;
+      const end = lower.indexOf('-->', at + 4);
+      if (end < 0) return;
+      at = end + 3;
+    }
+  };
+  /** One past the `>` of a `<name …>` opening tag starting exactly at `at`, or -1. */
+  const openTagEnd = (name: string): number => {
+    const needle = `<${name}`;
+    if (!lower.startsWith(needle, at)) return -1;
+    const after = lower[at + needle.length];
+    if (after === undefined || (after !== '>' && after !== '/' && !/\s/.test(after))) return -1;
+    const gt = lower.indexOf('>', at);
+    return gt < 0 ? -1 : gt + 1;
+  };
+  skipBlankAndComments();
+  const doctype = openTagEnd('!doctype');
+  if (doctype > 0) { at = doctype; skipBlankAndComments(); }
+  const htmlTag = openTagEnd('html');
+  if (htmlTag > 0) { at = htmlTag; skipBlankAndComments(); }
+  const headTag = openTagEnd('head');
+  if (headTag > 0) at = headTag;
+  return at;
 }
 
 /** Which marks this response carries. Every member is optional; omitting one leaves it off. */
@@ -161,6 +207,13 @@ export function applyServeMarks(data: Buffer | Uint8Array | string, spec: ServeM
     if (spec.discovery && !text.includes(DISCOVERY_MARK)) parts.push(agentDiscoverySnippet(spec.discovery));
     // ONE splice, through the one helper that knows about the last-`</body>` rule.
     if (parts.length) out = injectBeforeClosingTag(out, parts.join(''));
+    // The app's own identity block goes to the START of the head instead, because an app reads it
+    // from its first line of script (AIMEAT.atelier.appRef(), the mosaic's own boot). At the end of
+    // the body it arrived after every inline script and read as null at parse time.
+    if (spec.discovery && !text.includes(APP_REF_MARK)) {
+      const at = headStart(out);
+      out = out.slice(0, at) + appRefSnippet(spec.discovery) + out.slice(at);
+    }
     // The reviewer's name, machine-readable, in the head. Before the head pass so a head-less
     // document gets it inside the `<head>` that pass opens, and so that pass's own "already has
     // an author" checks see it. Two tags: the standard one every crawler reads, and the one that

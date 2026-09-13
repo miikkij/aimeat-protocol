@@ -10,6 +10,7 @@
  * @structure registerAppdevResearchTools() — aimeat_appdev_overview
  * @usage registerAppdevResearchTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.0.1 — 2026-09-13 — The model parameter's description: it orders learned pitfalls, never filters.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 5).
  */
 
@@ -33,7 +34,7 @@ export function registerAppdevResearchTools(
         'aimeat_appdev_overview',
         descriptionFor('aimeat_appdev_overview'),
         {
-            model: z.string().max(64).optional().describe('Your OWN model id (e.g. claude-fable-5, kimi-k2.7-code) — self-identify from your own configuration, never ask the user. Marks packs proven for it and filters learned pitfalls. Indicative'),
+            model: z.string().max(64).optional().describe('Your OWN model id (e.g. claude-fable-5, kimi-k2.7-code) — self-identify from your own configuration, never ask the user. Marks packs proven for it and lists the learned pitfalls it wrote first; hides none. Indicative'),
             sections: z.array(z.enum(OVERVIEW_SECTIONS)).optional().describe('Subset of sections to fetch (default all): apps, library_packs, app_templates, skills, pitfalls_curated, pitfalls_learned, template_proposals'),
         },
         annotationsFor('aimeat_appdev_overview'),

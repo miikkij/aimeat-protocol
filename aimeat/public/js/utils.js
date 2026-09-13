@@ -25,7 +25,10 @@ import { relative } from '/js/format.js';
  *   v1.2.0 — 2026-08-23 — downloadBlob() and toCsvBlob(). The download idiom was inlined in nine
  *     views and had no home; the CSV writer had none at all on the browser side, so the compliance
  *     export would have been the tenth copy of one and the first copy of the other.
+ *   v1.3.0 — 2026-09-13 — microsFromInput reads through parseAmount (/js/amount.js): it replaced the
+ *     first comma, so "1,500.00" became 1.50 on the offer price form.
  */
+import { parseAmount } from '/js/amount.js';
 
 /** Micros per whole currency unit — money amounts are 6-decimal micro-units (matches USDC/x402). */
 export const MONEY_UNIT = 1_000_000;
@@ -36,10 +39,13 @@ export function fmtMoney(micros, currency) {
   return currency ? `${s} ${currency}` : s;
 }
 
-/** Parse a major-unit input ("1.50", "0,002") into integer money micro-units; null if not positive. */
+/**
+ * Parse a major-unit input ("1.50", "0,002", "1,500.00") into integer money micro-units; null when it
+ * is not positive or cannot be read. An ambiguous "1,000" is null, so the form asks again.
+ */
 export function microsFromInput(str) {
-  const n = parseFloat(String(str).replace(',', '.'));
-  if (!Number.isFinite(n) || n <= 0) return null;
+  const n = parseAmount(str);
+  if (n === null || !(n > 0)) return null;
   return Math.round(n * MONEY_UNIT);
 }
 

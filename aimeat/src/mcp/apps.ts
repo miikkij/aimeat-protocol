@@ -11,6 +11,9 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.16.0 — 2026-09-13 — aimeat_app_publish validates cortex_agents before either mode and carries
+ *     them through the upload token. Upload mode had accepted them, checked nothing and published
+ *     the app without its agents.
  *   v1.15.0 — 2026-09-03 — app_get carries `requires` (the dependency map).
  *   v1.14.0 — 2026-08-24 — Both publish tools return `data_map` / `data_map_hints`, so an agent
  *     publishing an app is told where the node believes that app puts things.
@@ -190,6 +193,19 @@ export function registerAppsTools(
                 return { content: [{ type: 'text' as const, text: badName.refusal.message }], isError: true };
             }
 
+            // Agent-Bundled Apps: validate declared crew-defs fail-loud — a malformed agents[]
+            // rejects the publish so it never reaches a fleet. Asked BEFORE either mode, because
+            // upload mode used to mint its URL first and carry nothing: the crew-def was neither
+            // checked nor published, and the app went live without its agents.
+            let cortexAgents: Record<string, unknown>[] | undefined;
+            if (cortex_agents !== undefined) {
+                const check = validateCortexAgents(cortex_agents);
+                if (!check.ok) {
+                    return { content: [{ type: 'text' as const, text: `Invalid cortex_agents (crew-def validation failed):\n${check.errors.join('\n')}` }], isError: true };
+                }
+                cortexAgents = check.agents as unknown as Record<string, unknown>[];
+            }
+
             // --- UPLOAD MODE: no content provided, return presigned upload URL ---
             if (!content_base64) {
                 const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
@@ -202,11 +218,13 @@ export function registerAppsTools(
                     actor: agentGaii,
                     utype: 'app',
                     // buildUploadMeta, not a hand-written object: the hand-written one is what
-                    // dropped `ai_provenance` (and `cortex_agents` before it). The carry-over list
-                    // lives with the token, so a new option is covered by declaring it there once.
+                    // dropped `ai_provenance`. The carry-over list lives with the token, so a new
+                    // option is covered by declaring it there once AND passing it here; the
+                    // crew-defs were declared in neither place until 2026-09-13.
                     meta: buildUploadMeta('app', {
                         filename, name, description, category, tags, icon, version,
                         ai_provenance, ai_provenance_id, spec_token, spec_ack, roadmap,
+                        cortex_agents: cortexAgents,
                     }),
                     maxBytes: MAX_APP_SIZE,
                     contentType: 'text/html',
@@ -238,18 +256,6 @@ export function registerAppsTools(
                     content: [{ type: 'text' as const, text: `App file exceeds ${config.appMaxSizeMb}MB limit (${data.length} bytes)` }],
                     isError: true,
                 };
-            }
-
-            // Agent-Bundled Apps: validate declared crew-defs fail-loud — a malformed agents[]
-            // rejects the publish so it never reaches a fleet. This stays HERE because it is
-            // validation of an MCP parameter, not part of the publish itself.
-            let cortexAgents: Record<string, unknown>[] | undefined;
-            if (cortex_agents !== undefined) {
-                const check = validateCortexAgents(cortex_agents);
-                if (!check.ok) {
-                    return { content: [{ type: 'text' as const, text: `Invalid cortex_agents (crew-def validation failed):\n${check.errors.join('\n')}` }], isError: true };
-                }
-                cortexAgents = check.agents as unknown as Record<string, unknown>[];
             }
 
             // From here it is services/app-publish.ts — the same function POST /v1/apps, the

@@ -10,10 +10,12 @@ metadata:
     domain: ui
 
 spec:
+  # 1.2.0: a '12,000.00' cell sums as twelve thousand, not twelve. num() reads through parseAmount
+  # (the same parser as AIMEAT.commerce.parseAmount), and an ambiguous '1,000' counts as 0.
   # 1.1.1 — a number is written the reader's way, not the app language's. The version is what makes
   # an ALREADY-INSTALLED cortex refresh: the seeder skips one whose stored version matches, so
   # changing the code without moving this line leaves every existing node serving the old file.
-  version: "1.1.1"
+  version: "1.2.0"
   license: MIT
   components:
     - type: prompt
@@ -80,7 +82,13 @@ spec:
         brief cannot invent data.
 
         Helpers you may want directly: AIMEAT.surface.flatten(obj), .autoColumns(rows),
-        .agg(rows, key, how), .num(v); on an engine, .fmtNum(n, 'usd'|'eur') and .specHint().
+        .agg(rows, key, how), .num(v), .parseAmount(v); on an engine, .fmtNum(n, 'usd'|'eur') and
+        .specHint().
+
+        AMOUNTS WRITTEN AS TEXT. num() and agg() read '12,000.00', '1.234,56' and '1 500 000' the
+        way their writer meant them. An ambiguous cell such as '1,000' (a thousand in English, one
+        in Finnish) counts as 0 rather than as a guess; parseAmount(v) returns null for it, so a
+        host that wants to show "rows we could not read" can count them.
 
         The engine does NOT persist anything. Store specs where they belong for your product —
         an app memory key, a workspace record, a board — and pass them back in.
@@ -97,7 +105,9 @@ spec:
           -> { KINDS, registerSource(type, def), resolve(spec, ctx), renderBody(box, spec, rows, opts?),
                specHint(), normalizeSpec(out, intent), compose(text, ctx), reshape(spec, text),
                refine(spec, rows), writeBrief(spec, rows), autoColumns(rows), fmtNum(n, format), t(key) }
-        AIMEAT.surface.{ KINDS, flatten, autoColumns, agg, num, VERSION }
+        AIMEAT.surface.{ KINDS, flatten, autoColumns, agg, num, parseAmount, VERSION }
+        parseAmount(v) -> number | null: '12,000.00' -> 12000, '1.234,56' -> 1234.56, '1,000' -> null
+          (ambiguous); num(v) is parseAmount(v) with null counted as 0.
 
         Panel spec: { id, title, kind, intent, source, view, needsYou, updatedAt, author }
         kind: stats | table | chart | timeline | brief | options

@@ -865,8 +865,13 @@
       }
     },
     /**
-     * Run a single completion. Returns { content, model, usage, budget }.
+     * Run a single completion. Returns { content, model, usage, budget, finish_reason, truncated }.
+     * `truncated` is true when the provider cut the answer at a token limit (finish_reason 'length'):
+     * show it as unfinished or ask again, never as the whole answer.
      * Throws an Error with .code set on quota/permission/auth failures.
+     *
+     * `images`: an array of data: or https: URLs (at most 8; downscale first) turns the call into a
+     * vision request, answered by the owner's vision model.
      *
      * This spends the signed-in user's own OpenRouter money, so two guards ride along:
      *   • repeats collapse — while an identical call (same app_id + model + prompts) is in flight,
@@ -899,7 +904,11 @@
         temperature: opts.temperature,
         top_p: opts.top_p,
         max_tokens: opts.max_tokens,
-        app_id: opts.app_id
+        app_id: opts.app_id,
+        // Pictures for a vision request: data: or https: URLs, at most 8 (the route refuses more).
+        // POST /v1/ai/complete has read this since 2026-06-24 and this body never carried it, so a
+        // question about a picture went out as text alone and the model answered it anyway.
+        images: Array.isArray(opts.images) ? opts.images : void 0
       };
       const call = async () => {
         if (opts.confirm) {
@@ -933,7 +942,14 @@
         return r.meta && r.meta.provenance ? { ...r.data, provenance: r.meta.provenance } : r.data;
       };
       if (opts.allowDuplicate) return call();
-      const key = keyOf(["ai", opts.app_id, opts.model || opts.modelRole, opts.systemPrompt, opts.prompt]);
+      const key = keyOf([
+        "ai",
+        opts.app_id,
+        opts.model || opts.modelRole,
+        opts.systemPrompt,
+        opts.prompt,
+        Array.isArray(opts.images) ? opts.images.join("\n") : ""
+      ]);
       return once(key, call, { ttlMs: opts.dedupeMs || 0 });
     },
     /**

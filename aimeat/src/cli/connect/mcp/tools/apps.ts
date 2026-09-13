@@ -5,6 +5,8 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   v1.8.1 -- 2026-09-13 -- aimeat_app_publish declares cortex_agents and sends them as cortex.agents,
+ *     as the node's own tool has since 2026-07-16.
  *   v1.8.0 -- 2026-09-11 -- aimeat_seo_announce over POST /v1/admin/seo/indexnow (plan: true reads
  *     GET /v1/admin/seo/indexnow/plan): the whole site to the search engines, one batch per host.
  *   v1.7.0 -- 2026-08-29 -- aimeat_app_legal_set over PATCH and GET /v1/apps/me/:filename/legal,
@@ -49,6 +51,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     tags: z.array(z.string()).optional().describe('Tags for search and filtering'),
     icon: z.string().optional().describe('Emoji icon'),
     version: z.string().optional().describe('Semver display version. Generated if omitted.'),
+    cortex_agents: z.array(z.record(z.string(), z.unknown())).optional().describe('Declarative crew-defs this app ships (manifest.cortex.agents), validated at publish. Omit on update to carry them forward; [] clears.'),
     ...aiProvenanceInputs,
   }, annotationsFor('aimeat_app_publish'), async (a) => {
     const targetOwner = a.owner;
@@ -65,6 +68,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     };
     for (const f of ['description', 'category', 'icon', 'version'] as const) if (a[f]) body[f] = a[f];
     if (a.tags) body.tags = a.tags;
+    if (a.cortex_agents) body.cortex = { agents: a.cortex_agents };
     if (a.ai_provenance_id) body.ai_provenance_id = a.ai_provenance_id;
     const resp = await client.post('/v1/apps', body);
     return provenanceEchoedResult(client,

@@ -5,6 +5,8 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.7.1 — 2026-09-13 — aimeat_app_publish declares cortex_agents, which the node's tool has taken
+ *     since 2026-07-16 and no other surface did.
  *   v1.7.0 — 2026-09-06 — workspace_access.action/decision/role, workspace_member_grant.role and
  *     workspace_transfer.direction declare their enums. Every one of them names its allowed values
  *     in prose and published `type: string`, so a caller reading the schema had to guess and the
@@ -522,6 +524,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             tags: { type: 'array', description: 'Tags for search and filtering.' },
             icon: { type: 'string', description: 'Emoji icon.' },
             version: { type: 'string', description: 'Semver display version. Generated if omitted.' },
+            cortex_agents: { type: 'array', description: 'Declarative crew-defs this app ships (manifest.cortex.agents), validated at publish in both modes. Omit on update to carry them forward; [] clears.' },
         },
     },
     {

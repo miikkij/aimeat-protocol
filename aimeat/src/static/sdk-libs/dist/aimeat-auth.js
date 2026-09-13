@@ -343,12 +343,23 @@
       ".aimeat-auth-compact .cini{font-weight:800;letter-spacing:.3px;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
       ".aimeat-auth-compact .ccar{font-size:9px;opacity:.75;transition:transform .18s}",
       ".aimeat-auth-wrap.aimeat-open .aimeat-auth-compact .ccar{transform:rotate(180deg)}",
+      ".aimeat-auth-compact .cico{display:block;flex:0 0 auto}",
       "@media (max-width:600px){",
       ".aimeat-auth-compact{display:inline-flex}",
       ".aimeat-auth-wrap>.aimeat-auth-pill{position:absolute;top:calc(100% + 8px);right:0;z-index:1000;",
       "display:none!important;flex-wrap:wrap!important;justify-content:flex-start;row-gap:9px;padding:10px 12px;",
       "min-width:210px;max-width:calc(100vw - 24px);box-shadow:6px 6px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E))}",
       ".aimeat-auth-wrap.aimeat-open>.aimeat-auth-pill{display:flex!important}",
+      /* Signed out: the controls fold behind the settings trigger and Sign In keeps its place. The
+         popover hangs from the whole row's right edge (the wrap stands aside as a positioning box),
+         because the trigger sits left of Sign In and a panel hung from it ran off the left edge. */
+      ".aimeat-auth-out{position:relative}",
+      ".aimeat-auth-out>.aimeat-auth-wrap{position:static}",
+      ".aimeat-auth-wrap>.aimeat-ctl{position:absolute;top:calc(100% + 8px);right:0;z-index:1000;",
+      "display:none!important;flex-wrap:wrap;gap:8px;padding:10px 12px;",
+      "background:" + paper2 + ";color:" + ink2 + ";border:2px solid " + ink2 + ";border-radius:var(--aimeat-pill-radius,0);",
+      "max-width:calc(100vw - 24px);box-shadow:6px 6px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E))}",
+      ".aimeat-auth-wrap.aimeat-open>.aimeat-ctl{display:flex!important}",
       "}"
     ].join("");
     (document.head || document.documentElement).appendChild(st);
@@ -360,6 +371,541 @@
     var parts = s.split(/\s+/).filter(Boolean);
     if (parts.length >= 2) return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
     return s.slice(0, 2).toUpperCase();
+  }
+
+  // src/static/sdk-libs/auth/cluster.js
+  function ensureClusterStyles() {
+    if (document.getElementById("aimeat-cluster-css")) return;
+    var st = document.createElement("style");
+    st.id = "aimeat-cluster-css";
+    st.textContent = [
+      /* The cluster row. Inherits text colour from its host (gold pill or page header). */
+      ".aimeat-ctl{display:inline-flex;align-items:center;gap:6px}",
+      /* Segmented group: one bordered pill, every option a button. */
+      ".aimeat-seg{display:inline-flex;align-items:stretch;height:26px;flex:0 0 auto;",
+      "border:2px solid currentColor;border-radius:var(--aimeat-pill-radius,0);",
+      "overflow:hidden;background:transparent}",
+      ".aimeat-seg button{appearance:none;border:0;background:transparent;color:currentColor;",
+      'opacity:.6;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
+      "padding:0 10px;margin:0;cursor:pointer;display:inline-flex;align-items:center;gap:4px;",
+      "transition:opacity var(--motion-fast,120ms) ease,background var(--motion-fast,120ms) ease}",
+      ".aimeat-seg button:hover{opacity:.9}",
+      ".aimeat-seg button:focus-visible{outline:2px solid currentColor;outline-offset:-2px;opacity:1}",
+      '.aimeat-seg button[aria-pressed="true"]{opacity:1;',
+      "background:var(--aimeat-ink);color:var(--aimeat-paper)}",
+      ".aimeat-seg button+button{border-left:0}",
+      ".aimeat-seg .seg-ico{font-size:13px;line-height:1}",
+      /* A control that has stood down. The group keeps its frame so it still reads as an
+         instrument that exists, and the whole thing dims and takes the arrow cursor so nobody
+         aims at it twice — the reason is on the group's title, because a native tooltip on a
+         disabled button never appears. Used by a page that keeps its own palette (a genre body). */
+      ".aimeat-seg--fixed{opacity:.55;cursor:default}",
+      ".aimeat-seg button[disabled]{cursor:default;opacity:.6}",
+      ".aimeat-seg button[disabled]:hover{opacity:.6}",
+      /* Popover trigger (palette picker; language picker when 4+ languages). */
+      ".aimeat-pop-wrap{position:relative;display:inline-flex;flex:0 0 auto}",
+      ".aimeat-pop-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;",
+      "gap:5px;height:26px;min-width:26px;padding:0 6px;background:transparent;",
+      "border:2px solid currentColor;border-radius:var(--aimeat-pill-radius,0);",
+      'cursor:pointer;color:currentColor;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
+      "transition:background var(--motion-fast,120ms) ease}",
+      ".aimeat-pop-btn:hover{background:color-mix(in oklab,currentColor 12%,transparent)}",
+      ".aimeat-pop-btn:focus-visible{outline:2px solid currentColor;outline-offset:-2px}",
+      /* The popover panel: a real themed surface (not the host pill), so swatches read true. */
+      ".aimeat-pop{position:absolute;top:calc(100% + 8px);right:0;z-index:1200;display:none;",
+      "background:var(--color-base-200,#ffffff);color:var(--color-base-content,#1a1a2e);",
+      "border:1px solid var(--color-base-300,#d9dbe1);border-radius:var(--radius-box,14px);",
+      "box-shadow:var(--elev-pop,0 4px 10px rgb(15 18 25 / .1),0 18px 44px rgb(15 18 25 / .16));",
+      "padding:8px;width:max-content;max-width:calc(100vw - 24px)}",
+      ".aimeat-pop-wrap.aimeat-open .aimeat-pop{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}",
+      ".aimeat-pop.aimeat-pop-list{grid-template-columns:minmax(0,1fr)}",
+      ".aimeat-pop button{appearance:none;display:flex;align-items:center;gap:8px;padding:7px 9px;margin:0;",
+      "background:transparent;border:1px solid transparent;border-radius:calc(var(--radius-box,14px) - 6px);",
+      'cursor:pointer;color:inherit;font:600 12px/1.1 "Inter","Segoe UI",system-ui,sans-serif;text-align:left;',
+      "transition:background var(--motion-fast,120ms) ease}",
+      ".aimeat-pop button:hover{background:color-mix(in oklab,currentColor 8%,transparent)}",
+      ".aimeat-pop button:focus-visible{outline:2px solid var(--color-primary,#e8564a);outline-offset:-2px}",
+      '.aimeat-pop button[aria-pressed="true"]{border-color:var(--color-primary,#e8564a)}',
+      /* Palette swatch chips: page/card/accent of the palette IN THE CURRENT MODE. The three
+         colours are data (they vary per palette), so they arrive as inline background values on
+         these spans — layout and everything else stays here. */
+      ".aimeat-pal-chip{position:relative;flex:0 0 auto;width:26px;height:20px;border-radius:5px;",
+      "border:1px solid color-mix(in oklab,currentColor 25%,transparent);overflow:hidden}",
+      ".aimeat-pal-chip .pc-card{position:absolute;inset:5px 5px 3px 5px;border-radius:3px}",
+      ".aimeat-pal-chip .pc-acc{position:absolute;right:3px;bottom:3px;width:7px;height:7px;border-radius:50%}",
+      /* The trigger's miniature: the active palette's accent as a dot. */
+      ".aimeat-pal-dot{width:12px;height:12px;border-radius:50%;flex:0 0 auto;",
+      "border:1px solid color-mix(in oklab,currentColor 30%,transparent)}"
+    ].join("");
+    (document.head || document.documentElement).appendChild(st);
+  }
+  function clampPopover(pop) {
+    pop.style.transform = "";
+    var r = pop.getBoundingClientRect();
+    var pad = 12;
+    var shift = 0;
+    if (r.left < pad) shift = pad - r.left;
+    else if (r.right > window.innerWidth - pad) shift = window.innerWidth - pad - r.right;
+    if (shift) pop.style.transform = "translateX(" + Math.round(shift) + "px)";
+  }
+
+  // src/static/sdk-libs/auth/locale.js
+  var AIMEAT_LANG_KEY = "aimeat-lang";
+  function readLocales(opts) {
+    var list = opts && Array.isArray(opts.locales) ? opts.locales : null;
+    if (!list) {
+      try {
+        var m = (
+          /** @type {HTMLMetaElement|null} */
+          document.querySelector('meta[name="aimeat-locales"]')
+        );
+        if (m && m.content) list = m.content.split(/[\s,]+/);
+      } catch {
+      }
+    }
+    if (!list) return [];
+    var seen = {}, out = [];
+    for (var i = 0; i < list.length; i++) {
+      var c = String(list[i] || "").trim().toLowerCase();
+      if (/^[a-z]{2}$/.test(c) && !seen[c]) {
+        seen[c] = 1;
+        out.push(c);
+      }
+    }
+    return out.length > 1 ? out : [];
+  }
+  function aimeatReadLang(locales) {
+    var ok = function(v) {
+      return v && locales.indexOf(v) >= 0 ? v : null;
+    };
+    try {
+      var u = ok(new URLSearchParams(location.search).get("lang"));
+      if (u) return u;
+      var s = ok(localStorage.getItem(AIMEAT_LANG_KEY));
+      if (s) return s;
+      var c = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
+      if (c && ok(c[1])) return c[1];
+    } catch {
+    }
+    var nav = ok((navigator.language || "").slice(0, 2).toLowerCase());
+    return nav || locales[0];
+  }
+  function aimeatApplyLang(lang) {
+    try {
+      localStorage.setItem(AIMEAT_LANG_KEY, lang);
+      document.cookie = "aimeat-lang=" + lang + ";path=/;max-age=31536000;SameSite=Lax";
+    } catch {
+    }
+    try {
+      document.documentElement.setAttribute("lang", lang);
+    } catch {
+    }
+    try {
+      window.dispatchEvent(new CustomEvent("aimeat-lang-change", { detail: { lang } }));
+    } catch {
+    }
+  }
+  function langName(code) {
+    try {
+      var dn = new Intl.DisplayNames([code], { type: "language" });
+      var n = dn.of(code);
+      if (n && n !== code) return n.charAt(0).toUpperCase() + n.slice(1);
+    } catch {
+    }
+    return code.toUpperCase();
+  }
+  var SEGMENT_MAX = 3;
+  function langSwitchHtml(i, locales) {
+    if (!locales.length) return "";
+    var cur = aimeatReadLang(locales);
+    var group = i && i.switchLanguage ? i.switchLanguage : "Language";
+    if (locales.length <= SEGMENT_MAX) {
+      return '<span id="aimeat-lang-switch" class="aimeat-seg" role="group" aria-label="' + escHtml(group) + '">' + locales.map(function(c) {
+        return '<button type="button" data-lang="' + escHtml(c) + '" aria-pressed="' + (c === cur) + '" title="' + escHtml(langName(c)) + '" aria-label="' + escHtml(langName(c)) + '">' + escHtml(c.toUpperCase()) + "</button>";
+      }).join("") + "</span>";
+    }
+    return '<span id="aimeat-lang-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + escHtml(group) + '" aria-label="' + escHtml(group) + '">' + escHtml(cur.toUpperCase()) + ' <span aria-hidden="true">▾</span></button><span class="aimeat-pop aimeat-pop-list" role="listbox">' + locales.map(function(c) {
+      return '<button type="button" role="option" data-lang="' + escHtml(c) + '" aria-pressed="' + (c === cur) + '">' + escHtml(c.toUpperCase()) + " · " + escHtml(langName(c)) + "</button>";
+    }).join("") + "</span></span>";
+  }
+  function wireLangSwitch(container, i, locales) {
+    var root = container.querySelector("#aimeat-lang-switch");
+    if (!root || !locales.length) return;
+    var trigger = root.querySelector(".aimeat-pop-btn");
+    function sync(cur) {
+      root.querySelectorAll("button[data-lang]").forEach(function(b) {
+        b.setAttribute("aria-pressed", String(b.getAttribute("data-lang") === cur));
+      });
+      if (trigger) trigger.childNodes[0].textContent = cur.toUpperCase() + " ";
+    }
+    root.querySelectorAll("button[data-lang]").forEach(function(b) {
+      b.addEventListener("click", function() {
+        aimeatApplyLang(b.getAttribute("data-lang"));
+        sync(b.getAttribute("data-lang"));
+        root.classList.remove("aimeat-open");
+        if (trigger) trigger.setAttribute("aria-expanded", "false");
+      });
+    });
+    if (trigger) trigger.addEventListener("click", function(ev) {
+      ev.stopPropagation();
+      var open = root.classList.toggle("aimeat-open");
+      trigger.setAttribute("aria-expanded", String(open));
+      if (open) clampPopover(root.querySelector(".aimeat-pop"));
+    });
+    window.addEventListener("aimeat-lang-change", function(ev) {
+      var e = (
+        /** @type {CustomEvent} */
+        ev
+      );
+      var lang = e && e.detail && e.detail.lang;
+      if (lang && locales.indexOf(lang) >= 0) sync(lang);
+    });
+  }
+
+  // src/static/sdk-libs/auth/pill-strings.js
+  var PILL_STRINGS = {
+    en: {
+      loggedIn: "logged in",
+      logoutBtn: "Logout",
+      signInBtn: "❤️ Sign In",
+      account: "Account",
+      federated: "Federated",
+      manageAccess: "Manage permissions",
+      lightMode: "Light mode",
+      darkMode: "Dark mode",
+      themeLabel: "Theme",
+      fixedRegister: "This register keeps its own light",
+      chooseLook: "Choose look",
+      switchLanguage: "Language",
+      pageSettings: "Settings"
+    },
+    fi: {
+      loggedIn: "kirjautuneena",
+      logoutBtn: "Kirjaudu ulos",
+      signInBtn: "❤️ Kirjaudu",
+      account: "Tili",
+      federated: "Federoitu",
+      manageAccess: "Hallitse oikeuksia",
+      lightMode: "Vaalea tila",
+      darkMode: "Tumma tila",
+      themeLabel: "Teema",
+      fixedRegister: "Tämä rekisteri pitää oman valonsa",
+      chooseLook: "Valitse tyyli",
+      switchLanguage: "Kieli",
+      pageSettings: "Asetukset"
+    },
+    es: {
+      loggedIn: "sesión iniciada",
+      logoutBtn: "Cerrar sesión",
+      signInBtn: "❤️ Entrar",
+      account: "Cuenta",
+      federated: "Federado",
+      manageAccess: "Gestionar permisos",
+      lightMode: "Modo claro",
+      darkMode: "Modo oscuro",
+      themeLabel: "Tema",
+      fixedRegister: "Este registro conserva su propia luz",
+      chooseLook: "Elige el aspecto",
+      switchLanguage: "Idioma",
+      pageSettings: "Ajustes"
+    }
+  };
+  function pillStrings(lang) {
+    var base = PILL_STRINGS.en;
+    var over = PILL_STRINGS[lang] || {};
+    var out = {};
+    for (var k in base) if (Object.prototype.hasOwnProperty.call(base, k)) out[k] = over[k] || base[k];
+    return out;
+  }
+
+  // src/static/sdk-libs/auth/palette.js
+  var AIMEAT_PALETTE_KEY = "aimeat-palette";
+  var PALETTES = [
+    { id: "aimeat", label: "AIMEAT", swatch: {
+      light: { bg: "#eaeef7", card: "#ffffff", accent: "#e8564a" },
+      dark: { bg: "#14151a", card: "#21232e", accent: "#ff6f62" }
+    } },
+    { id: "paper", label: "Paper", swatch: {
+      light: { bg: "#eae2cf", card: "#fdfaf1", accent: "#a03040" },
+      dark: { bg: "#151110", card: "#282017", accent: "#e08590" }
+    } },
+    { id: "circuit", label: "Circuit", swatch: {
+      light: { bg: "#e9edf1", card: "#ffffff", accent: "#0e7290" },
+      dark: { bg: "#0a0f14", card: "#18202b", accent: "#4fd2f2" }
+    } },
+    { id: "contrast", label: "Contrast", swatch: {
+      light: { bg: "#e9e9e9", card: "#ffffff", accent: "#1d4ed8" },
+      dark: { bg: "#000000", card: "#17171c", accent: "#99c2ff" }
+    } },
+    { id: "mist", label: "Mist", swatch: {
+      light: { bg: "#e6eae4", card: "#fbfcfa", accent: "#47695a" },
+      dark: { bg: "#141715", card: "#252b27", accent: "#9cc0ae" }
+    } },
+    { id: "voltage", label: "Voltage", swatch: {
+      light: { bg: "#f1e4d2", card: "#ffffff", accent: "#c2187e" },
+      dark: { bg: "#150d20", card: "#2c1d3f", accent: "#ff4fa8" }
+    } }
+  ];
+  function aimeatReadPalette() {
+    var ids = PALETTES.map(function(p) {
+      return p.id;
+    });
+    try {
+      var u = new URLSearchParams(location.search).get("palette");
+      if (u && ids.indexOf(u) >= 0) return u;
+    } catch {
+    }
+    try {
+      var s = localStorage.getItem(AIMEAT_PALETTE_KEY);
+      if (s && ids.indexOf(s) >= 0) return s;
+    } catch {
+    }
+    var attr = document.documentElement.getAttribute("data-palette");
+    return attr && ids.indexOf(attr) >= 0 ? attr : PALETTES[0].id;
+  }
+  function aimeatApplyPalette(id) {
+    if (id === PALETTES[0].id) document.documentElement.removeAttribute("data-palette");
+    else document.documentElement.setAttribute("data-palette", id);
+    try {
+      localStorage.setItem(AIMEAT_PALETTE_KEY, id);
+    } catch {
+    }
+    try {
+      window.dispatchEvent(new CustomEvent("aimeat-palette-change", { detail: { palette: id } }));
+    } catch {
+    }
+  }
+  function aimeatRestorePalette() {
+    var cur = aimeatReadPalette();
+    if (cur !== PALETTES[0].id) document.documentElement.setAttribute("data-palette", cur);
+    else document.documentElement.removeAttribute("data-palette");
+    try {
+      window.addEventListener("storage", function(e) {
+        if (e.key === AIMEAT_PALETTE_KEY && e.newValue) aimeatApplyPalette(e.newValue);
+      });
+    } catch {
+    }
+  }
+  function paletteControlHtml(i) {
+    var cur = aimeatReadPalette();
+    var mode = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    var curAcc = (PALETTES.find(function(p) {
+      return p.id === cur;
+    }) || PALETTES[0]).swatch[mode].accent;
+    var label = i && i.chooseLook || "Choose look";
+    return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + esc(label) + '" aria-label="' + esc(label) + '"><span class="aimeat-pal-dot" style="background:' + esc(curAcc) + '"></span></button><span class="aimeat-pop" role="listbox">' + PALETTES.map(function(p) {
+      var s = p.swatch[mode];
+      return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-pressed="' + (p.id === cur) + '"><span class="aimeat-pal-chip" style="background:' + esc(s.bg) + '"><span class="pc-card" style="background:' + esc(s.card) + '"></span><span class="pc-acc" style="background:' + esc(s.accent) + '"></span></span>' + esc(p.label) + "</button>";
+    }).join("") + "</span></span>";
+  }
+  function wirePaletteControl(container, clampPopover2) {
+    var root = container.querySelector("#aimeat-palette-switch");
+    if (!root) return;
+    var trigger = (
+      /** @type {HTMLElement} */
+      root.querySelector(".aimeat-pop-btn")
+    );
+    function syncDot() {
+      var cur = aimeatReadPalette();
+      var mode = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+      var p = PALETTES.find(function(x) {
+        return x.id === cur;
+      }) || PALETTES[0];
+      var dot = (
+        /** @type {HTMLElement|null} */
+        root.querySelector(".aimeat-pal-dot")
+      );
+      if (dot) dot.style.background = p.swatch[mode].accent;
+      root.querySelectorAll("button[data-palette]").forEach(function(b) {
+        b.setAttribute("aria-pressed", String(b.getAttribute("data-palette") === cur));
+        var pp = PALETTES.find(function(x) {
+          return x.id === b.getAttribute("data-palette");
+        });
+        if (!pp) return;
+        var s = pp.swatch[mode];
+        var chip = (
+          /** @type {HTMLElement|null} */
+          b.querySelector(".aimeat-pal-chip")
+        );
+        var card = (
+          /** @type {HTMLElement|null} */
+          b.querySelector(".pc-card")
+        );
+        var acc = (
+          /** @type {HTMLElement|null} */
+          b.querySelector(".pc-acc")
+        );
+        if (chip) chip.style.background = s.bg;
+        if (card) card.style.background = s.card;
+        if (acc) acc.style.background = s.accent;
+      });
+    }
+    root.querySelectorAll("button[data-palette]").forEach(function(b) {
+      b.addEventListener("click", function() {
+        aimeatApplyPalette(b.getAttribute("data-palette") || PALETTES[0].id);
+        syncDot();
+        root.classList.remove("aimeat-open");
+        trigger.setAttribute("aria-expanded", "false");
+      });
+    });
+    trigger.addEventListener("click", function(ev) {
+      ev.stopPropagation();
+      var open = root.classList.toggle("aimeat-open");
+      trigger.setAttribute("aria-expanded", String(open));
+      if (open) clampPopover2(
+        /** @type {HTMLElement} */
+        root.querySelector(".aimeat-pop")
+      );
+    });
+    window.addEventListener("aimeat-palette-change", syncDot);
+    window.addEventListener("aimeat-theme-change", syncDot);
+  }
+  function esc(s) {
+    var d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // src/static/sdk-libs/auth/pill.js
+  var SETTINGS_ICON = '<svg class="cico" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/><path d="M5 2.5v3M11 6.5v3M7 10.5v3"/></svg>';
+  function mountPill(auth2, selector, opts = {}) {
+    let container;
+    if (selector && typeof selector === "object" && selector.nodeType === 1) {
+      container = selector;
+    } else if (selector && typeof selector === "object") {
+      opts = selector;
+      container = document.getElementById("aimeat-auth-bar");
+      if (!container) {
+        container = document.createElement("div");
+        container.id = "aimeat-auth-bar";
+        document.body.appendChild(container);
+      }
+    } else {
+      container = document.querySelector(selector);
+      if (!container) {
+        console.error("AIMEAT: mountLoginButton container not found for selector:", selector, "— pass a CSS selector string, a DOM element, or an options object.");
+        return;
+      }
+    }
+    const locales = readLocales(opts);
+    let i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ["en"])), opts.i18n);
+    const useCompact = opts.compact !== void 0 ? !!opts.compact : true;
+    function wireCompactTrigger() {
+      var compactBtn = document.getElementById("aimeat-auth-compact");
+      if (compactBtn) compactBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        var w = container.querySelector(".aimeat-auth-wrap");
+        if (!w) return;
+        var open = w.classList.toggle("aimeat-open");
+        compactBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        var pop = (
+          /** @type {HTMLElement|null} */
+          w.querySelector(":scope > .aimeat-ctl, :scope > .aimeat-auth-pill")
+        );
+        if (open && pop) clampPopover(pop);
+      });
+    }
+    function render() {
+      i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ["en"])), opts.i18n);
+      const stored = auth2.getSession() || load("session");
+      if (stored) {
+        var pillHtml = '<div class="aimeat-auth-pill"><span class="aimeat-auth-dot" aria-hidden="true"></span><span class="aimeat-auth-label">' + escHtml(i.loggedIn || "logged in") + '</span><span class="aimeat-auth-ghii">' + escHtml(stored.displayName || stored.ghii || stored.owner) + "</span>" + (stored.federated ? '<span class="aimeat-auth-fed">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" class="aimeat-auth-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-logout-btn" class="aimeat-auth-logout">' + escHtml(i.logoutBtn || "Logout") + "</button></div>";
+        ensureAuthPillStyles();
+        if (useCompact) {
+          var ini = pillInitials(stored.displayName || stored.ghii || stored.owner);
+          container.innerHTML = '<div class="aimeat-auth-wrap"><button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" aria-label="' + escHtml(i.account || "Account") + '"><span class="cdot" aria-hidden="true"></span><span class="cini">' + escHtml(ini) + '</span><span class="ccar" aria-hidden="true">▾</span></button>' + pillHtml + "</div>";
+        } else {
+          container.innerHTML = pillHtml;
+        }
+        document.getElementById("aimeat-logout-btn").addEventListener("click", () => {
+          auth2.logout();
+        });
+        var gearBtn = document.getElementById("aimeat-grant-gear");
+        if (gearBtn) gearBtn.addEventListener("click", () => {
+          auth2.manageGrant().then(() => {
+            render();
+          }).catch(() => {
+          });
+        });
+        wireCompactTrigger();
+      } else {
+        ensureAuthPillStyles();
+        var clusterHtml = '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + "</span>";
+        container.innerHTML = '<span class="aimeat-auth-out">' + (useCompact ? '<span class="aimeat-auth-wrap"><button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" aria-label="' + escHtml(i.pageSettings || "Settings") + '" title="' + escHtml(i.pageSettings || "Settings") + '">' + SETTINGS_ICON + '<span class="ccar" aria-hidden="true">▾</span></button>' + clusterHtml + "</span>" : clusterHtml) + '<button id="aimeat-login-btn" class="aimeat-sign-btn">' + (opts.buttonText || i.signInBtn || "❤️ Sign In") + "</button></span>";
+        document.getElementById("aimeat-login-btn").addEventListener("click", () => {
+          auth2.signIn(opts).then((s) => {
+            if (s) render();
+          }).catch(() => {
+          });
+        });
+        wireCompactTrigger();
+      }
+      wireModeSwitch(container);
+      wireLangSwitch(container, i, locales);
+      wirePaletteControl(container, clampPopover);
+    }
+    ensureClusterStyles();
+    render();
+    window.addEventListener("aimeat-lang-change", render);
+    document.addEventListener("click", (ev) => {
+      container.querySelectorAll(".aimeat-pop-wrap.aimeat-open").forEach((w) => {
+        if (!w.contains(
+          /** @type {Node} */
+          ev.target
+        )) {
+          w.classList.remove("aimeat-open");
+          var b = w.querySelector(".aimeat-pop-btn");
+          if (b) b.setAttribute("aria-expanded", "false");
+        }
+      });
+    });
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Escape") return;
+      container.querySelectorAll(".aimeat-pop-wrap.aimeat-open").forEach((w) => {
+        w.classList.remove("aimeat-open");
+        var b = w.querySelector(".aimeat-pop-btn");
+        if (b) b.setAttribute("aria-expanded", "false");
+      });
+    });
+    if (useCompact) {
+      var closeCompact = () => {
+        var w = container.querySelector(".aimeat-auth-wrap.aimeat-open");
+        if (!w) return;
+        w.classList.remove("aimeat-open");
+        var cb = w.querySelector(".aimeat-auth-compact");
+        if (cb) cb.setAttribute("aria-expanded", "false");
+      };
+      document.addEventListener("click", (ev) => {
+        var w = container.querySelector(".aimeat-auth-wrap.aimeat-open");
+        if (w && !w.contains(ev.target)) closeCompact();
+      });
+      document.addEventListener("keydown", (ev) => {
+        if (ev.key === "Escape") closeCompact();
+      });
+    }
+    auth2.on("login", render);
+    auth2.on("logout", () => {
+      render();
+      if (opts.onLogout) opts.onLogout();
+    });
+    auth2.on("session-updated", render);
+    if (isAppOrigin() && !auth2.getSession()) {
+      restoreSessionFromAppOrigin(false).then((s) => {
+        if (!s && load("session")) {
+          remove("session");
+          emit("logout");
+        }
+      }).catch(() => {
+      });
+    } else if (!auth2.getSession() && load("session")) {
+      auth2.login().catch(() => null).then((s) => {
+        if (s) return;
+        if (load("session")) {
+          remove("session");
+          emit("logout");
+        } else render();
+      });
+    }
   }
 
   // src/static/sdk-libs/auth/i18n.js
@@ -666,6 +1212,14 @@
   async function authApi(path, jwt, opts = {}) {
     return api(path, { ...opts, headers: { ...opts.headers, "Authorization": "Bearer " + jwt } });
   }
+  function sessionHeaders(given, jwt, body) {
+    const headers = new Headers(given || void 0);
+    if (!headers.has("Authorization")) headers.set("Authorization", "Bearer " + jwt);
+    if (!headers.has("Content-Type") && (body == null || typeof body === "string")) {
+      headers.set("Content-Type", "application/json");
+    }
+    return headers;
+  }
 
   // src/static/sdk-libs/auth/passkey.js
   function passkeySupported() {
@@ -831,7 +1385,7 @@
   })();
   var HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.8 8.2 3 4.5 6.7 4.5c2 0 3.6 1.1 4.5 2.6.9-1.5 2.5-2.6 4.5-2.6 3.7 0 5.9 3.7 4.3 7.3C19.5 16.4 12 21 12 21z"></path></svg>';
   var RULE_MARKS = '<svg class="r-ok" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3"></path></svg><svg class="r-no" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="8" height="8"></rect></svg>';
-  function showLoginModal(opts, renderBtn) {
+  function showLoginModal(opts, renderBtn, onClosed) {
     var i = opts.i18n || {};
     var lang = currentModalLang();
     var tab = opts.tab === "register" ? "register" : "signin";
@@ -839,6 +1393,13 @@
     if (old) old.remove();
     const modal = document.createElement("div");
     modal.id = "aimeat-modal";
+    if (typeof onClosed === "function") {
+      var removeModal = modal.remove.bind(modal);
+      modal.remove = function() {
+        removeModal();
+        onClosed();
+      };
+    }
     function captureInputs() {
       var g = function(id) {
         var el = (
@@ -1448,523 +2009,6 @@
     }
   }
 
-  // src/static/sdk-libs/auth/cluster.js
-  function ensureClusterStyles() {
-    if (document.getElementById("aimeat-cluster-css")) return;
-    var st = document.createElement("style");
-    st.id = "aimeat-cluster-css";
-    st.textContent = [
-      /* The cluster row. Inherits text colour from its host (gold pill or page header). */
-      ".aimeat-ctl{display:inline-flex;align-items:center;gap:6px}",
-      /* Segmented group: one bordered pill, every option a button. */
-      ".aimeat-seg{display:inline-flex;align-items:stretch;height:26px;flex:0 0 auto;",
-      "border:2px solid currentColor;border-radius:var(--aimeat-pill-radius,0);",
-      "overflow:hidden;background:transparent}",
-      ".aimeat-seg button{appearance:none;border:0;background:transparent;color:currentColor;",
-      'opacity:.6;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
-      "padding:0 10px;margin:0;cursor:pointer;display:inline-flex;align-items:center;gap:4px;",
-      "transition:opacity var(--motion-fast,120ms) ease,background var(--motion-fast,120ms) ease}",
-      ".aimeat-seg button:hover{opacity:.9}",
-      ".aimeat-seg button:focus-visible{outline:2px solid currentColor;outline-offset:-2px;opacity:1}",
-      '.aimeat-seg button[aria-pressed="true"]{opacity:1;',
-      "background:var(--aimeat-ink);color:var(--aimeat-paper)}",
-      ".aimeat-seg button+button{border-left:0}",
-      ".aimeat-seg .seg-ico{font-size:13px;line-height:1}",
-      /* A control that has stood down. The group keeps its frame so it still reads as an
-         instrument that exists, and the whole thing dims and takes the arrow cursor so nobody
-         aims at it twice — the reason is on the group's title, because a native tooltip on a
-         disabled button never appears. Used by a page that keeps its own palette (a genre body). */
-      ".aimeat-seg--fixed{opacity:.55;cursor:default}",
-      ".aimeat-seg button[disabled]{cursor:default;opacity:.6}",
-      ".aimeat-seg button[disabled]:hover{opacity:.6}",
-      /* Popover trigger (palette picker; language picker when 4+ languages). */
-      ".aimeat-pop-wrap{position:relative;display:inline-flex;flex:0 0 auto}",
-      ".aimeat-pop-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;",
-      "gap:5px;height:26px;min-width:26px;padding:0 6px;background:transparent;",
-      "border:2px solid currentColor;border-radius:var(--aimeat-pill-radius,0);",
-      'cursor:pointer;color:currentColor;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
-      "transition:background var(--motion-fast,120ms) ease}",
-      ".aimeat-pop-btn:hover{background:color-mix(in oklab,currentColor 12%,transparent)}",
-      ".aimeat-pop-btn:focus-visible{outline:2px solid currentColor;outline-offset:-2px}",
-      /* The popover panel: a real themed surface (not the host pill), so swatches read true. */
-      ".aimeat-pop{position:absolute;top:calc(100% + 8px);right:0;z-index:1200;display:none;",
-      "background:var(--color-base-200,#ffffff);color:var(--color-base-content,#1a1a2e);",
-      "border:1px solid var(--color-base-300,#d9dbe1);border-radius:var(--radius-box,14px);",
-      "box-shadow:var(--elev-pop,0 4px 10px rgb(15 18 25 / .1),0 18px 44px rgb(15 18 25 / .16));",
-      "padding:8px;width:max-content;max-width:calc(100vw - 24px)}",
-      ".aimeat-pop-wrap.aimeat-open .aimeat-pop{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}",
-      ".aimeat-pop.aimeat-pop-list{grid-template-columns:minmax(0,1fr)}",
-      ".aimeat-pop button{appearance:none;display:flex;align-items:center;gap:8px;padding:7px 9px;margin:0;",
-      "background:transparent;border:1px solid transparent;border-radius:calc(var(--radius-box,14px) - 6px);",
-      'cursor:pointer;color:inherit;font:600 12px/1.1 "Inter","Segoe UI",system-ui,sans-serif;text-align:left;',
-      "transition:background var(--motion-fast,120ms) ease}",
-      ".aimeat-pop button:hover{background:color-mix(in oklab,currentColor 8%,transparent)}",
-      ".aimeat-pop button:focus-visible{outline:2px solid var(--color-primary,#e8564a);outline-offset:-2px}",
-      '.aimeat-pop button[aria-pressed="true"]{border-color:var(--color-primary,#e8564a)}',
-      /* Palette swatch chips: page/card/accent of the palette IN THE CURRENT MODE. The three
-         colours are data (they vary per palette), so they arrive as inline background values on
-         these spans — layout and everything else stays here. */
-      ".aimeat-pal-chip{position:relative;flex:0 0 auto;width:26px;height:20px;border-radius:5px;",
-      "border:1px solid color-mix(in oklab,currentColor 25%,transparent);overflow:hidden}",
-      ".aimeat-pal-chip .pc-card{position:absolute;inset:5px 5px 3px 5px;border-radius:3px}",
-      ".aimeat-pal-chip .pc-acc{position:absolute;right:3px;bottom:3px;width:7px;height:7px;border-radius:50%}",
-      /* The trigger's miniature: the active palette's accent as a dot. */
-      ".aimeat-pal-dot{width:12px;height:12px;border-radius:50%;flex:0 0 auto;",
-      "border:1px solid color-mix(in oklab,currentColor 30%,transparent)}"
-    ].join("");
-    (document.head || document.documentElement).appendChild(st);
-  }
-  function clampPopover(pop) {
-    pop.style.transform = "";
-    var r = pop.getBoundingClientRect();
-    var pad = 12;
-    var shift = 0;
-    if (r.left < pad) shift = pad - r.left;
-    else if (r.right > window.innerWidth - pad) shift = window.innerWidth - pad - r.right;
-    if (shift) pop.style.transform = "translateX(" + Math.round(shift) + "px)";
-  }
-
-  // src/static/sdk-libs/auth/locale.js
-  var AIMEAT_LANG_KEY = "aimeat-lang";
-  function readLocales(opts) {
-    var list = opts && Array.isArray(opts.locales) ? opts.locales : null;
-    if (!list) {
-      try {
-        var m = (
-          /** @type {HTMLMetaElement|null} */
-          document.querySelector('meta[name="aimeat-locales"]')
-        );
-        if (m && m.content) list = m.content.split(/[\s,]+/);
-      } catch {
-      }
-    }
-    if (!list) return [];
-    var seen = {}, out = [];
-    for (var i = 0; i < list.length; i++) {
-      var c = String(list[i] || "").trim().toLowerCase();
-      if (/^[a-z]{2}$/.test(c) && !seen[c]) {
-        seen[c] = 1;
-        out.push(c);
-      }
-    }
-    return out.length > 1 ? out : [];
-  }
-  function aimeatReadLang(locales) {
-    var ok = function(v) {
-      return v && locales.indexOf(v) >= 0 ? v : null;
-    };
-    try {
-      var u = ok(new URLSearchParams(location.search).get("lang"));
-      if (u) return u;
-      var s = ok(localStorage.getItem(AIMEAT_LANG_KEY));
-      if (s) return s;
-      var c = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
-      if (c && ok(c[1])) return c[1];
-    } catch {
-    }
-    var nav = ok((navigator.language || "").slice(0, 2).toLowerCase());
-    return nav || locales[0];
-  }
-  function aimeatApplyLang(lang) {
-    try {
-      localStorage.setItem(AIMEAT_LANG_KEY, lang);
-      document.cookie = "aimeat-lang=" + lang + ";path=/;max-age=31536000;SameSite=Lax";
-    } catch {
-    }
-    try {
-      document.documentElement.setAttribute("lang", lang);
-    } catch {
-    }
-    try {
-      window.dispatchEvent(new CustomEvent("aimeat-lang-change", { detail: { lang } }));
-    } catch {
-    }
-  }
-  function langName(code) {
-    try {
-      var dn = new Intl.DisplayNames([code], { type: "language" });
-      var n = dn.of(code);
-      if (n && n !== code) return n.charAt(0).toUpperCase() + n.slice(1);
-    } catch {
-    }
-    return code.toUpperCase();
-  }
-  var SEGMENT_MAX = 3;
-  function langSwitchHtml(i, locales) {
-    if (!locales.length) return "";
-    var cur = aimeatReadLang(locales);
-    var group = i && i.switchLanguage ? i.switchLanguage : "Language";
-    if (locales.length <= SEGMENT_MAX) {
-      return '<span id="aimeat-lang-switch" class="aimeat-seg" role="group" aria-label="' + escHtml(group) + '">' + locales.map(function(c) {
-        return '<button type="button" data-lang="' + escHtml(c) + '" aria-pressed="' + (c === cur) + '" title="' + escHtml(langName(c)) + '" aria-label="' + escHtml(langName(c)) + '">' + escHtml(c.toUpperCase()) + "</button>";
-      }).join("") + "</span>";
-    }
-    return '<span id="aimeat-lang-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + escHtml(group) + '" aria-label="' + escHtml(group) + '">' + escHtml(cur.toUpperCase()) + ' <span aria-hidden="true">▾</span></button><span class="aimeat-pop aimeat-pop-list" role="listbox">' + locales.map(function(c) {
-      return '<button type="button" role="option" data-lang="' + escHtml(c) + '" aria-pressed="' + (c === cur) + '">' + escHtml(c.toUpperCase()) + " · " + escHtml(langName(c)) + "</button>";
-    }).join("") + "</span></span>";
-  }
-  function wireLangSwitch(container, i, locales) {
-    var root = container.querySelector("#aimeat-lang-switch");
-    if (!root || !locales.length) return;
-    var trigger = root.querySelector(".aimeat-pop-btn");
-    function sync(cur) {
-      root.querySelectorAll("button[data-lang]").forEach(function(b) {
-        b.setAttribute("aria-pressed", String(b.getAttribute("data-lang") === cur));
-      });
-      if (trigger) trigger.childNodes[0].textContent = cur.toUpperCase() + " ";
-    }
-    root.querySelectorAll("button[data-lang]").forEach(function(b) {
-      b.addEventListener("click", function() {
-        aimeatApplyLang(b.getAttribute("data-lang"));
-        sync(b.getAttribute("data-lang"));
-        root.classList.remove("aimeat-open");
-        if (trigger) trigger.setAttribute("aria-expanded", "false");
-      });
-    });
-    if (trigger) trigger.addEventListener("click", function(ev) {
-      ev.stopPropagation();
-      var open = root.classList.toggle("aimeat-open");
-      trigger.setAttribute("aria-expanded", String(open));
-      if (open) clampPopover(root.querySelector(".aimeat-pop"));
-    });
-    window.addEventListener("aimeat-lang-change", function(ev) {
-      var e = (
-        /** @type {CustomEvent} */
-        ev
-      );
-      var lang = e && e.detail && e.detail.lang;
-      if (lang && locales.indexOf(lang) >= 0) sync(lang);
-    });
-  }
-
-  // src/static/sdk-libs/auth/pill-strings.js
-  var PILL_STRINGS = {
-    en: {
-      loggedIn: "logged in",
-      logoutBtn: "Logout",
-      signInBtn: "❤️ Sign In",
-      account: "Account",
-      federated: "Federated",
-      manageAccess: "Manage permissions",
-      lightMode: "Light mode",
-      darkMode: "Dark mode",
-      themeLabel: "Theme",
-      fixedRegister: "This register keeps its own light",
-      chooseLook: "Choose look",
-      switchLanguage: "Language"
-    },
-    fi: {
-      loggedIn: "kirjautuneena",
-      logoutBtn: "Kirjaudu ulos",
-      signInBtn: "❤️ Kirjaudu",
-      account: "Tili",
-      federated: "Federoitu",
-      manageAccess: "Hallitse oikeuksia",
-      lightMode: "Vaalea tila",
-      darkMode: "Tumma tila",
-      themeLabel: "Teema",
-      fixedRegister: "Tämä rekisteri pitää oman valonsa",
-      chooseLook: "Valitse tyyli",
-      switchLanguage: "Kieli"
-    },
-    es: {
-      loggedIn: "sesión iniciada",
-      logoutBtn: "Cerrar sesión",
-      signInBtn: "❤️ Entrar",
-      account: "Cuenta",
-      federated: "Federado",
-      manageAccess: "Gestionar permisos",
-      lightMode: "Modo claro",
-      darkMode: "Modo oscuro",
-      themeLabel: "Tema",
-      fixedRegister: "Este registro conserva su propia luz",
-      chooseLook: "Elige el aspecto",
-      switchLanguage: "Idioma"
-    }
-  };
-  function pillStrings(lang) {
-    var base = PILL_STRINGS.en;
-    var over = PILL_STRINGS[lang] || {};
-    var out = {};
-    for (var k in base) if (Object.prototype.hasOwnProperty.call(base, k)) out[k] = over[k] || base[k];
-    return out;
-  }
-
-  // src/static/sdk-libs/auth/palette.js
-  var AIMEAT_PALETTE_KEY = "aimeat-palette";
-  var PALETTES = [
-    { id: "aimeat", label: "AIMEAT", swatch: {
-      light: { bg: "#eaeef7", card: "#ffffff", accent: "#e8564a" },
-      dark: { bg: "#14151a", card: "#21232e", accent: "#ff6f62" }
-    } },
-    { id: "paper", label: "Paper", swatch: {
-      light: { bg: "#eae2cf", card: "#fdfaf1", accent: "#a03040" },
-      dark: { bg: "#151110", card: "#282017", accent: "#e08590" }
-    } },
-    { id: "circuit", label: "Circuit", swatch: {
-      light: { bg: "#e9edf1", card: "#ffffff", accent: "#0e7290" },
-      dark: { bg: "#0a0f14", card: "#18202b", accent: "#4fd2f2" }
-    } },
-    { id: "contrast", label: "Contrast", swatch: {
-      light: { bg: "#e9e9e9", card: "#ffffff", accent: "#1d4ed8" },
-      dark: { bg: "#000000", card: "#17171c", accent: "#99c2ff" }
-    } },
-    { id: "mist", label: "Mist", swatch: {
-      light: { bg: "#e6eae4", card: "#fbfcfa", accent: "#47695a" },
-      dark: { bg: "#141715", card: "#252b27", accent: "#9cc0ae" }
-    } },
-    { id: "voltage", label: "Voltage", swatch: {
-      light: { bg: "#f1e4d2", card: "#ffffff", accent: "#c2187e" },
-      dark: { bg: "#150d20", card: "#2c1d3f", accent: "#ff4fa8" }
-    } }
-  ];
-  function aimeatReadPalette() {
-    var ids = PALETTES.map(function(p) {
-      return p.id;
-    });
-    try {
-      var u = new URLSearchParams(location.search).get("palette");
-      if (u && ids.indexOf(u) >= 0) return u;
-    } catch {
-    }
-    try {
-      var s = localStorage.getItem(AIMEAT_PALETTE_KEY);
-      if (s && ids.indexOf(s) >= 0) return s;
-    } catch {
-    }
-    var attr = document.documentElement.getAttribute("data-palette");
-    return attr && ids.indexOf(attr) >= 0 ? attr : PALETTES[0].id;
-  }
-  function aimeatApplyPalette(id) {
-    if (id === PALETTES[0].id) document.documentElement.removeAttribute("data-palette");
-    else document.documentElement.setAttribute("data-palette", id);
-    try {
-      localStorage.setItem(AIMEAT_PALETTE_KEY, id);
-    } catch {
-    }
-    try {
-      window.dispatchEvent(new CustomEvent("aimeat-palette-change", { detail: { palette: id } }));
-    } catch {
-    }
-  }
-  function aimeatRestorePalette() {
-    var cur = aimeatReadPalette();
-    if (cur !== PALETTES[0].id) document.documentElement.setAttribute("data-palette", cur);
-    else document.documentElement.removeAttribute("data-palette");
-    try {
-      window.addEventListener("storage", function(e) {
-        if (e.key === AIMEAT_PALETTE_KEY && e.newValue) aimeatApplyPalette(e.newValue);
-      });
-    } catch {
-    }
-  }
-  function paletteControlHtml(i) {
-    var cur = aimeatReadPalette();
-    var mode = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-    var curAcc = (PALETTES.find(function(p) {
-      return p.id === cur;
-    }) || PALETTES[0]).swatch[mode].accent;
-    var label = i && i.chooseLook || "Choose look";
-    return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + esc(label) + '" aria-label="' + esc(label) + '"><span class="aimeat-pal-dot" style="background:' + esc(curAcc) + '"></span></button><span class="aimeat-pop" role="listbox">' + PALETTES.map(function(p) {
-      var s = p.swatch[mode];
-      return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-pressed="' + (p.id === cur) + '"><span class="aimeat-pal-chip" style="background:' + esc(s.bg) + '"><span class="pc-card" style="background:' + esc(s.card) + '"></span><span class="pc-acc" style="background:' + esc(s.accent) + '"></span></span>' + esc(p.label) + "</button>";
-    }).join("") + "</span></span>";
-  }
-  function wirePaletteControl(container, clampPopover2) {
-    var root = container.querySelector("#aimeat-palette-switch");
-    if (!root) return;
-    var trigger = (
-      /** @type {HTMLElement} */
-      root.querySelector(".aimeat-pop-btn")
-    );
-    function syncDot() {
-      var cur = aimeatReadPalette();
-      var mode = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-      var p = PALETTES.find(function(x) {
-        return x.id === cur;
-      }) || PALETTES[0];
-      var dot = (
-        /** @type {HTMLElement|null} */
-        root.querySelector(".aimeat-pal-dot")
-      );
-      if (dot) dot.style.background = p.swatch[mode].accent;
-      root.querySelectorAll("button[data-palette]").forEach(function(b) {
-        b.setAttribute("aria-pressed", String(b.getAttribute("data-palette") === cur));
-        var pp = PALETTES.find(function(x) {
-          return x.id === b.getAttribute("data-palette");
-        });
-        if (!pp) return;
-        var s = pp.swatch[mode];
-        var chip = (
-          /** @type {HTMLElement|null} */
-          b.querySelector(".aimeat-pal-chip")
-        );
-        var card = (
-          /** @type {HTMLElement|null} */
-          b.querySelector(".pc-card")
-        );
-        var acc = (
-          /** @type {HTMLElement|null} */
-          b.querySelector(".pc-acc")
-        );
-        if (chip) chip.style.background = s.bg;
-        if (card) card.style.background = s.card;
-        if (acc) acc.style.background = s.accent;
-      });
-    }
-    root.querySelectorAll("button[data-palette]").forEach(function(b) {
-      b.addEventListener("click", function() {
-        aimeatApplyPalette(b.getAttribute("data-palette") || PALETTES[0].id);
-        syncDot();
-        root.classList.remove("aimeat-open");
-        trigger.setAttribute("aria-expanded", "false");
-      });
-    });
-    trigger.addEventListener("click", function(ev) {
-      ev.stopPropagation();
-      var open = root.classList.toggle("aimeat-open");
-      trigger.setAttribute("aria-expanded", String(open));
-      if (open) clampPopover2(
-        /** @type {HTMLElement} */
-        root.querySelector(".aimeat-pop")
-      );
-    });
-    window.addEventListener("aimeat-palette-change", syncDot);
-    window.addEventListener("aimeat-theme-change", syncDot);
-  }
-  function esc(s) {
-    var d = document.createElement("div");
-    d.textContent = s;
-    return d.innerHTML;
-  }
-
-  // src/static/sdk-libs/auth/pill.js
-  function mountPill(auth2, selector, opts = {}) {
-    let container;
-    if (selector && typeof selector === "object" && selector.nodeType === 1) {
-      container = selector;
-    } else if (selector && typeof selector === "object") {
-      opts = selector;
-      container = document.getElementById("aimeat-auth-bar");
-      if (!container) {
-        container = document.createElement("div");
-        container.id = "aimeat-auth-bar";
-        document.body.appendChild(container);
-      }
-    } else {
-      container = document.querySelector(selector);
-      if (!container) {
-        console.error("AIMEAT: mountLoginButton container not found for selector:", selector, "— pass a CSS selector string, a DOM element, or an options object.");
-        return;
-      }
-    }
-    const locales = readLocales(opts);
-    let i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ["en"])), opts.i18n);
-    const useCompact = opts.compact !== void 0 ? !!opts.compact : isAppOrigin();
-    function render() {
-      i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ["en"])), opts.i18n);
-      const stored = auth2.getSession() || load("session");
-      if (stored) {
-        var pillHtml = '<div class="aimeat-auth-pill"><span class="aimeat-auth-dot" aria-hidden="true"></span><span class="aimeat-auth-label">' + escHtml(i.loggedIn || "logged in") + '</span><span class="aimeat-auth-ghii">' + escHtml(stored.displayName || stored.ghii || stored.owner) + "</span>" + (stored.federated ? '<span class="aimeat-auth-fed">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" class="aimeat-auth-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-logout-btn" class="aimeat-auth-logout">' + escHtml(i.logoutBtn || "Logout") + "</button></div>";
-        ensureAuthPillStyles();
-        if (useCompact) {
-          var ini = pillInitials(stored.displayName || stored.ghii || stored.owner);
-          container.innerHTML = '<div class="aimeat-auth-wrap"><button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" aria-label="' + escHtml(i.account || "Account") + '"><span class="cdot" aria-hidden="true"></span><span class="cini">' + escHtml(ini) + '</span><span class="ccar" aria-hidden="true">▾</span></button>' + pillHtml + "</div>";
-        } else {
-          container.innerHTML = pillHtml;
-        }
-        document.getElementById("aimeat-logout-btn").addEventListener("click", () => {
-          auth2.logout();
-        });
-        var gearBtn = document.getElementById("aimeat-grant-gear");
-        if (gearBtn) gearBtn.addEventListener("click", () => {
-          auth2.manageGrant().then(() => {
-            render();
-          }).catch(() => {
-          });
-        });
-        var compactBtn = document.getElementById("aimeat-auth-compact");
-        if (compactBtn) compactBtn.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          var w = container.querySelector(".aimeat-auth-wrap");
-          if (!w) return;
-          var open = w.classList.toggle("aimeat-open");
-          compactBtn.setAttribute("aria-expanded", open ? "true" : "false");
-        });
-      } else {
-        ensureAuthPillStyles();
-        container.innerHTML = '<span class="aimeat-auth-out"><span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-login-btn" class="aimeat-sign-btn">' + (opts.buttonText || i.signInBtn || "❤️ Sign In") + "</button></span>";
-        document.getElementById("aimeat-login-btn").addEventListener("click", () => {
-          if (isAppOrigin()) {
-            restoreSessionFromAppOrigin(true).then((s) => {
-              if (s) render();
-            }).catch(() => {
-            });
-          } else {
-            showLoginModal(opts, render);
-          }
-        });
-      }
-      wireModeSwitch(container);
-      wireLangSwitch(container, i, locales);
-      wirePaletteControl(container, clampPopover);
-    }
-    ensureClusterStyles();
-    render();
-    window.addEventListener("aimeat-lang-change", render);
-    document.addEventListener("click", (ev) => {
-      container.querySelectorAll(".aimeat-pop-wrap.aimeat-open").forEach((w) => {
-        if (!w.contains(
-          /** @type {Node} */
-          ev.target
-        )) {
-          w.classList.remove("aimeat-open");
-          var b = w.querySelector(".aimeat-pop-btn");
-          if (b) b.setAttribute("aria-expanded", "false");
-        }
-      });
-    });
-    document.addEventListener("keydown", (ev) => {
-      if (ev.key !== "Escape") return;
-      container.querySelectorAll(".aimeat-pop-wrap.aimeat-open").forEach((w) => {
-        w.classList.remove("aimeat-open");
-        var b = w.querySelector(".aimeat-pop-btn");
-        if (b) b.setAttribute("aria-expanded", "false");
-      });
-    });
-    if (useCompact) {
-      var closeCompact = () => {
-        var w = container.querySelector(".aimeat-auth-wrap.aimeat-open");
-        if (!w) return;
-        w.classList.remove("aimeat-open");
-        var cb = w.querySelector(".aimeat-auth-compact");
-        if (cb) cb.setAttribute("aria-expanded", "false");
-      };
-      document.addEventListener("click", (ev) => {
-        var w = container.querySelector(".aimeat-auth-wrap.aimeat-open");
-        if (w && !w.contains(ev.target)) closeCompact();
-      });
-      document.addEventListener("keydown", (ev) => {
-        if (ev.key === "Escape") closeCompact();
-      });
-    }
-    auth2.on("login", render);
-    auth2.on("logout", () => {
-      render();
-      if (opts.onLogout) opts.onLogout();
-    });
-    auth2.on("session-updated", render);
-    if (isAppOrigin() && !auth2.getSession()) {
-      restoreSessionFromAppOrigin(false).then((s) => {
-        if (!s && load("session")) {
-          remove("session");
-          emit("logout");
-        }
-      }).catch(() => {
-      });
-    }
-  }
-
   // src/static/sdk-libs/auth/pkce.js
   function b64url(buf) {
     var bytes = new Uint8Array(buf), s = "";
@@ -2140,6 +2184,7 @@
   var ownerRefreshInFlight = null;
   var _appOriginLoginInFlight = null;
   var focusRefreshInFlight = null;
+  var loginInFlight = null;
   function persistSession(session) {
     save("session", {
       owner: session.owner,
@@ -2208,6 +2253,12 @@
     emit("login", session);
     return session;
   }
+  function reportUngrantableScopes(r) {
+    try {
+      console.error("[aimeat-auth] Nobody can sign in to " + (r.app || "this app") + ': its <meta name="aimeat-scopes"> asks for ' + (r.unknown ? r.unknown : "a word") + ", which this node cannot grant, and one such word refuses the whole sign-in. Take the words from GET /v1/app-grants/scopes and publish the app again.");
+    } catch {
+    }
+  }
   function restoreSessionFromAppOrigin(interactive) {
     if (currentSession) return Promise.resolve(currentSession);
     if (_appOriginLoginInFlight) return _appOriginLoginInFlight;
@@ -2216,7 +2267,11 @@
       var grant = r && r.ok && r.access_token ? r : null;
       var appId = r && r.app || null;
       var own = !!(r && r.own);
-      if (!grant && interactive && r && r.app && (r.error === "consent_required" || r.error === "login_required" || r.error === "invalid_scope")) {
+      if (!grant && r && r.error === "invalid_scope") {
+        reportUngrantableScopes(r);
+        return null;
+      }
+      if (!grant && interactive && r && r.app && (r.error === "consent_required" || r.error === "login_required")) {
         appId = r.app;
         grant = await requestConsentPopup(r.app, r.scope);
         own = !!(grant && grant.own);
@@ -2285,7 +2340,7 @@
             await session.refresh();
           }
           const url = NODE_URL + path;
-          const headers = { "Content-Type": "application/json", "Authorization": "Bearer " + session.jwt, ...opts.headers || {} };
+          const headers = sessionHeaders(opts.headers, session.jwt, opts.body);
           const resp = await fetch(url, { ...opts, headers });
           if (resp.status === 403 && session._appOrigin && !session._scopeHealTried) {
             var missing = appScopeDrift(session);
@@ -2296,7 +2351,9 @@
                 session.jwt = t.access_token;
                 persistSession(session);
                 scheduleAutoRefresh(session);
-                var retry = await fetch(url, { ...opts, headers: { ...headers, "Authorization": "Bearer " + session.jwt } });
+                var retryHeaders = new Headers(headers);
+                retryHeaders.set("Authorization", "Bearer " + session.jwt);
+                var retry = await fetch(url, { ...opts, headers: retryHeaders });
                 return retry.json();
               }
               emit("scopes-stale", { app: session._app || null, missing });
@@ -2427,6 +2484,31 @@
     emit("login", session);
     return session;
   }
+  async function restoreStoredSession(username) {
+    const stored = load("session");
+    if (!stored) return await restoreSessionFromCookie();
+    if (username && stored.owner !== username) return null;
+    await migrateKeysToIndexedDB();
+    if (stored.gaii) {
+      stored.gaii = null;
+    }
+    const cryptoKey = stored.gaii ? await loadKey("agent_key") : await loadKey("owner_key");
+    const session = createSession({ ...stored, _cryptoKey: cryptoKey });
+    const isOwnerLocal = !session.federated && !session.gaii;
+    if (isOwnerLocal || isExpired(session.jwt)) {
+      try {
+        await session.refresh();
+      } catch {
+        remove("session");
+        emit("expired");
+        return null;
+      }
+    }
+    currentSession = session;
+    scheduleAutoRefresh(session);
+    emit("login", session);
+    return session;
+  }
   var auth = {
     nodeUrl: NODE_URL,
     nodeId: NODE_ID,
@@ -2499,29 +2581,42 @@
      */
     async login(username) {
       if (isAppOrigin()) return await restoreSessionFromAppOrigin(false);
-      const stored = load("session");
-      if (!stored) return await restoreSessionFromCookie();
-      if (username && stored.owner !== username) return null;
-      await migrateKeysToIndexedDB();
-      if (stored.gaii) {
-        stored.gaii = null;
+      if (username) return restoreStoredSession(username);
+      if (!loginInFlight) {
+        loginInFlight = (async () => {
+          try {
+            return await restoreStoredSession();
+          } finally {
+            loginInFlight = null;
+          }
+        })();
       }
-      const cryptoKey = stored.gaii ? await loadKey("agent_key") : await loadKey("owner_key");
-      const session = createSession({ ...stored, _cryptoKey: cryptoKey });
-      const isOwnerLocal = !session.federated && !session.gaii;
-      if (isOwnerLocal || isExpired(session.jwt)) {
-        try {
-          await session.refresh();
-        } catch {
-          remove("session");
-          emit("expired");
-          return null;
-        }
-      }
-      currentSession = session;
-      scheduleAutoRefresh(session);
-      emit("login", session);
-      return session;
+      return loginInFlight;
+    },
+    /**
+     * Sign in, interactively. Call it from a click handler: on an app origin it may open the consent
+     * popup, and a browser opens a popup only inside a user gesture.
+     *
+     * On an app origin this is the silent bridge with the visible consent step allowed; anywhere else
+     * it opens the sign-in modal, with `opts` passed to it ({ tab: 'register', onLogin, i18n }).
+     * Resolves to the session, or null when nobody signed in: the popup was closed or blocked, the
+     * modal was dismissed, or the app asks for a scope this node cannot grant. An existing session is
+     * returned as it is.
+     *
+     * Added 2026-09-13. Before it the login pill's own button was the only interactive road, and
+     * apps reached it by clicking `#login button`, which is the theme control that renders first.
+     * @param {object} [opts]
+     * @returns {Promise<object|null>}
+     */
+    signIn(opts) {
+      if (currentSession) return Promise.resolve(currentSession);
+      if (isAppOrigin()) return restoreSessionFromAppOrigin(true);
+      return new Promise(function(resolve) {
+        showLoginModal(opts || {}, function() {
+        }, function() {
+          resolve(currentSession);
+        });
+      });
     },
     /**
      * Login with username + password (works from any device).
@@ -2712,7 +2807,7 @@
               },
               async fetch(path, opts = {}) {
                 const url = effectiveNodeUrl + path;
-                const headers = { "Content-Type": "application/json", "Authorization": "Bearer " + jwt, ...opts.headers || {} };
+                const headers = sessionHeaders(opts.headers, jwt, opts.body);
                 const resp = await fetch(url, { ...opts, headers });
                 return resp.json();
               },

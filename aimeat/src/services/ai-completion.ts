@@ -21,6 +21,8 @@
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.2.0 — 2026-09-13 — The result carries finishReason and truncated (finish_reason === 'length').
+ *     The provider's reason was in hand and dropped, so a cut answer reached an app looking finished.
  *   v3.1.0 — 2026-08-31 — `signal` on the options, threaded to complete(), which composes it with
  *     its own timeout. It is what lets a background AI job be cancelled while it is running instead
  *     of waiting out the transport timeout. Nothing about the settlement changes: a cancel that
@@ -369,6 +371,13 @@ export interface CompleteForOwnerOptions {
 export interface CompleteForOwnerResult {
   content: string;
   model: string;
+  /**
+   * Why the provider stopped ('stop', 'length', 'content_filter', …), or null when it did not say.
+   * `truncated` is finish_reason === 'length': the answer was cut at a token limit, which an app
+   * cannot otherwise tell from a finished answer.
+   */
+  finishReason: string | null;
+  truncated: boolean;
   usage: {
     promptTokens: number;
     completionTokens: number;
@@ -723,6 +732,8 @@ export async function completeForOwner(
   return {
     content: result.content,
     model: result.model,
+    finishReason: result.finish_reason ?? null,
+    truncated: result.finish_reason === 'length',
     usage: { promptTokens: promptTok, completionTokens: completionTok, totalTokens: totalTok, costUsd, costExact },
     budget: {
       dailyBudgetUsd: plan.dailyBudgetUsd,

@@ -12,13 +12,20 @@
  *   So every case here asserts BOTH halves: the same Content-Type across HEAD, GET and 206, and the
  *   number of bytes actually read to produce it. A fake reader counts the reads, because "it did not
  *   load the file" is the entire feature and no assertion about the response body can see it.
+ *
+ *   REVALIDATION (2026-09-13). A re-upload to the same key replaces the row in place, and GET /v1/pub
+ *   answers with `max-age=300` and, until now, no ETag: a browser holding the old response kept
+ *   drawing the old bytes for five minutes and had nothing to revalidate with afterwards (appdev
+ *   pitfall pub-file-cache-stale-assets). The last describe block pins the validator and the 304.
  * @usage cd aimeat && pnpm exec vitest run test/unit/serve-stored-file.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Strong ETag on every representation, If-None-Match / If-Modified-Since
+ *     answered with 304, If-Range honoured, and storedFileVersion() for versioned upload URLs.
  *   v1.0.0 — 2026-08-16 — Initial (TARGET-063: the streaming read path).
  */
 import { describe, it, expect } from 'vitest';
 import type { Response } from 'express';
-import { serveStoredFile, needsBytesForType, type StoredFileReader } from '../../src/utils/http-range.js';
+import { serveStoredFile, needsBytesForType, storedFileVersion, versionedAddress, type StoredFileReader } from '../../src/utils/http-range.js';
 import { setStoredFileHeaders } from '../../src/utils/file-download-headers.js';
 
 /** UTF-8 text, so the charset question has a real answer either way. */
@@ -219,5 +226,139 @@ describe('a file stored before the verdict existed still gets ONE answer', () =>
 
         expect(out.headers['content-type']).toBe('image/png');
         expect(calls.all + calls.range).toBe(0);
+    });
+});
+
+describe('a file written again under the same key is revalidated, never trusted past its validator', () => {
+    // Relative to the real clock and an hour back, so no date here is in the future. The second
+    // write has the SAME size as the first: a validator built from the size alone would miss it.
+    const t0 = Math.floor(Date.now() / 1000) * 1000 - 3_600_000 + 250;
+    const first = { ...withVerdict(UTF8, true), createdAt: new Date(t0).toISOString() };
+    const second = { ...withVerdict(UTF8, true), createdAt: new Date(t0 + 4_000).toISOString() };
+
+    /** One request against `file`, with the given request headers. */
+    const request = async (
+        file: typeof first,
+        headers: Record<string, string>,
+        opts: { range?: string; headOnly?: boolean; data?: Buffer } = {},
+    ) => {
+        const { reader, calls } = countingReader(opts.data ?? UTF8);
+        const { res, out } = fakeRes();
+        await serveStoredFile(res, file, opts.range, reader, { headOnly: opts.headOnly, conditionals: headers });
+        return { out, calls };
+    };
+    const etagOf = async (file: typeof first) => (await request(file, {})).out.headers.etag;
+
+    it('every representation carries the same strong ETag', async () => {
+        const get = (await request(first, {})).out.headers.etag;
+        const head = (await request(first, {}, { headOnly: true })).out.headers.etag;
+        const part = (await request(first, {}, { range: 'bytes=-8' })).out.headers.etag;
+        expect(get, 'a GET of a stored file carried no ETag, so a browser has nothing to revalidate with').toMatch(/^"[^"]+"$/);
+        expect(head).toBe(get);
+        expect(part).toBe(get);
+    });
+
+    it('the ETag changes when the file is written again, even at the same size', async () => {
+        expect(await etagOf(second)).not.toBe(await etagOf(first));
+    });
+
+    it('If-None-Match with the current ETag is a 304 that reads nothing', async () => {
+        const etag = await etagOf(first);
+        const { out, calls } = await request(first, { 'if-none-match': etag });
+        expect(out.status).toBe(304);
+        expect(out.body, 'a 304 carries no body').toBeNull();
+        expect(out.headers.etag, 'and still names the validator').toBe(etag);
+        expect(out.headers['content-length']).toBeUndefined();
+        expect(calls.all + calls.range, 'a 304 read the file').toBe(0);
+    });
+
+    it('a row from before the UTF-8 verdict answers a 304 without reading its bytes either', async () => {
+        const old = { ...legacy(UTF8), createdAt: first.createdAt };
+        const etag = (await request(old, {})).out.headers.etag;
+        const { out, calls } = await request(old, { 'if-none-match': etag });
+        expect(out.status).toBe(304);
+        expect(calls.all + calls.range).toBe(0);
+    });
+
+    it('If-None-Match with the previous ETag gets the new bytes', async () => {
+        const stale = await etagOf(first);
+        const fresh = Buffer.from('uusi sisältö\n'.repeat(40), 'utf8');
+        const { out } = await request({ ...second, size: fresh.length }, { 'if-none-match': stale }, { data: fresh });
+        expect(out.status).toBe(200);
+        expect(out.body!.equals(fresh)).toBe(true);
+    });
+
+    it('a weak form of the ETag still matches If-None-Match, as a compressing proxy sends it', async () => {
+        const etag = await etagOf(first);
+        const { out } = await request(first, { 'if-none-match': `"other", W/${etag}` });
+        expect(out.status).toBe(304);
+    });
+
+    it('If-None-Match: * matches any stored file', async () => {
+        expect((await request(first, { 'if-none-match': '*' })).out.status).toBe(304);
+    });
+
+    it('a HEAD with a matching If-None-Match is a 304 too', async () => {
+        const etag = await etagOf(first);
+        const { out } = await request(first, { 'if-none-match': etag }, { headOnly: true });
+        expect(out.status).toBe(304);
+    });
+
+    it('If-Modified-Since at the write time is a 304, and a second before it sends the file', async () => {
+        const lastModified = (await request(second, {})).out.headers['last-modified'];
+        expect((await request(second, { 'if-modified-since': lastModified })).out.status).toBe(304);
+        const before = new Date(Date.parse(lastModified) - 1000).toUTCString();
+        expect((await request(second, { 'if-modified-since': before })).out.status).toBe(200);
+    });
+
+    it('If-None-Match is decided first, and If-Modified-Since is ignored beside it', async () => {
+        // RFC 9110 §13.2.2: a date says nothing a mismatching entity tag has not already answered.
+        // A same-second rewrite is exactly the case where the date would be wrong.
+        const stale = await etagOf(first);
+        const lastModified = (await request(second, {})).out.headers['last-modified'];
+        const { out } = await request(second, { 'if-none-match': stale, 'if-modified-since': lastModified });
+        expect(out.status).toBe(200);
+    });
+
+    it('an unparseable If-Modified-Since is ignored', async () => {
+        expect((await request(first, { 'if-modified-since': 'yesterday' })).out.status).toBe(200);
+    });
+
+    it('a matching conditional request with a Range is a 304, not a 206', async () => {
+        const etag = await etagOf(first);
+        const { out, calls } = await request(first, { 'if-none-match': etag }, { range: 'bytes=-8' });
+        expect(out.status).toBe(304);
+        expect(calls.all + calls.range).toBe(0);
+    });
+
+    it('If-Range with a stale ETag sends the whole new file instead of a slice of it', async () => {
+        // A range reader that resumes against a file which changed under it would otherwise stitch
+        // a slice of the new bytes onto the old ones.
+        const stale = await etagOf(first);
+        const { out } = await request(second, { 'if-range': stale }, { range: 'bytes=-8' });
+        expect(out.status).toBe(200);
+        expect(out.body!.equals(UTF8)).toBe(true);
+    });
+
+    it('If-Range with the current ETag honours the range', async () => {
+        const etag = await etagOf(second);
+        const { out } = await request(second, { 'if-range': etag }, { range: 'bytes=-8' });
+        expect(out.status).toBe(206);
+    });
+
+    it('storedFileVersion changes on every write and is URL-safe', () => {
+        const a = storedFileVersion(first);
+        const b = storedFileVersion(second);
+        expect(a).toMatch(/^[0-9a-z-]+$/);
+        expect(b).not.toBe(a);
+        expect(storedFileVersion({ size: 3 }), 'no write time, no version').toBeNull();
+    });
+
+    it('versionedAddress puts that version on the address an upload answer hands out', () => {
+        const plain = '/v1/pub/alice%40node/ridge/hero.png';
+        expect(versionedAddress(plain, first)).toBe(`${plain}?v=${storedFileVersion(first)}`);
+        expect(versionedAddress(plain, second)).not.toBe(versionedAddress(plain, first));
+        expect(versionedAddress(`${plain}?mode=x`, first)).toBe(`${plain}?mode=x&v=${storedFileVersion(first)}`);
+        expect(versionedAddress(plain, { size: 3 }), 'nothing to version by, so the address is left alone').toBe(plain);
     });
 });

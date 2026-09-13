@@ -12,12 +12,15 @@
  *
  *   The English column matches `modal.*` in locales/en.json where a key exists there, EXCEPT
  *   `signInBtn`: the pill's button keeps the heart and the shorter wording it has always had, because
- *   it sits in a header row rather than in the modal. `federated`, `manageAccess` and `account` are
- *   pill-only and live here alone.
+ *   it sits in a header row rather than in the modal. `federated`, `manageAccess`, `account` and
+ *   `pageSettings` are pill-only and live here alone.
  * @structure PILL_STRINGS (en/fi/es) · pillStrings(lang)
  * @usage import { pillStrings } from './pill-strings.js';
  *   const i = Object.assign({}, pillStrings(lang), opts.i18n);   // a caller's strings always win
  * @version-history
+ *   v1.2.0 — 2026-09-13 — `pageSettings`: the name of the button a signed-out pill folds its
+ *     language, light/dark and palette controls behind on a phone. The settled word in each
+ *     language (Settings, Asetukset, Ajustes).
  *   v1.1.0 — 2026-09-05 — `fixedRegister`: what the light/dark control says on a page that keeps
  *     its own palette (a genre body), where the switch now stands down instead of doing nothing.
  *   v1.0.0 — 2026-08-13 — Initial. Born from a Spanish CADENCE showing an English "Logout".
@@ -29,21 +32,21 @@ export var PILL_STRINGS = {
     federated: 'Federated', manageAccess: 'Manage permissions',
     lightMode: 'Light mode', darkMode: 'Dark mode', themeLabel: 'Theme',
     fixedRegister: 'This register keeps its own light',
-    chooseLook: 'Choose look', switchLanguage: 'Language',
+    chooseLook: 'Choose look', switchLanguage: 'Language', pageSettings: 'Settings',
   },
   fi: {
     loggedIn: 'kirjautuneena', logoutBtn: 'Kirjaudu ulos', signInBtn: '❤️ Kirjaudu', account: 'Tili',
     federated: 'Federoitu', manageAccess: 'Hallitse oikeuksia',
     lightMode: 'Vaalea tila', darkMode: 'Tumma tila', themeLabel: 'Teema',
     fixedRegister: 'Tämä rekisteri pitää oman valonsa',
-    chooseLook: 'Valitse tyyli', switchLanguage: 'Kieli',
+    chooseLook: 'Valitse tyyli', switchLanguage: 'Kieli', pageSettings: 'Asetukset',
   },
   es: {
     loggedIn: 'sesión iniciada', logoutBtn: 'Cerrar sesión', signInBtn: '❤️ Entrar', account: 'Cuenta',
     federated: 'Federado', manageAccess: 'Gestionar permisos',
     lightMode: 'Modo claro', darkMode: 'Modo oscuro', themeLabel: 'Tema',
     fixedRegister: 'Este registro conserva su propia luz',
-    chooseLook: 'Elige el aspecto', switchLanguage: 'Idioma',
+    chooseLook: 'Elige el aspecto', switchLanguage: 'Idioma', pageSettings: 'Ajustes',
   },
 };
 

@@ -6,6 +6,8 @@
  * @structure Phases 1-11, each a numbered `test()` against a live node on E2E_BASE.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=storage-visibility
  * @version-history
+ *   v1.5.0 — 2026-09-13 — Test 60: a re-upload hands out a new versioned_url and a new strong ETag, an
+ *     unchanged file answers 304, and a stale ETag gets the new bytes.
  *   v1.4.0 — 2026-08-15 — Tests 40a-40d: the `members` visibility tier, which no suite in the corpus
  *     had ever uploaded. access-guard.ts allows it unconditionally and trusts the CALLER to reject
  *     the shared anonymous identity, so the tier rested on one branch in GET /v1/pub that nothing
@@ -1138,6 +1140,33 @@ await test('63. Without a filename the key still names the download, and a hosti
     assert(dl2.headers.get('x-injected') === null, 'a newline in the name must not become a header');
     const cd2 = dl2.headers.get('content-disposition') ?? '';
     assert(!cd2.includes('/'), `path separators must not survive into the name, got: ${cd2}`);
+});
+
+console.log('\nPhase 13 — Re-upload revalidates');
+await test('60. A re-upload is a new versioned address and a new ETag; the old ETag gets the new bytes', async () => {
+    // A public file was served max-age=300 with no validator, so a re-upload under the same key showed
+    // the old bytes for five minutes (appdev pitfall pub-file-cache-stale-assets, 2026-08-05).
+    const key = `reupload-${Date.now()}.txt`;
+    const put = (text: string) => json('/v1/storage', { method: 'POST', headers: { Authorization: `Bearer ${agentAToken}` },
+        body: JSON.stringify({ key, data: Buffer.from(text).toString('base64'), mime_type: 'text/plain', visibility: 'public' }) });
+    const first = await put('first version, same length!');
+    assert(first.status === 201, `first upload: ${first.status} ${JSON.stringify(first.body)}`);
+    const v1 = first.body.data.versioned_url as string;
+    assert(typeof v1 === 'string' && v1.startsWith(first.body.data.embed_url + '?v='), `versioned_url: ${v1}`);
+    const get1 = await rawFetch(v1);
+    assert(get1.status === 200 && await get1.text() === 'first version, same length!', 'the query must not change what /v1/pub serves');
+    const etag1 = get1.headers.get('etag');
+    assert(!!etag1 && /^"[^"]+"$/.test(etag1), `strong ETag expected, got ${etag1}`);
+    assert(get1.headers.get('cache-control') === 'public, max-age=300', `cache-control: ${get1.headers.get('cache-control')}`);
+    assert((get1.headers.get('access-control-expose-headers') ?? '').includes('ETag'), 'ETag readable from script');
+    const same = await rawFetch(first.body.data.embed_url, { headers: { 'If-None-Match': etag1! } });
+    assert(same.status === 304 && (await same.text()) === '', `unchanged file with its ETag: expected 304, got ${same.status}`);
+    await sleep(5);
+    const second = await put('second version, same length');   // same byte length
+    assert(second.status === 201 && second.body.data.versioned_url !== v1, 'a re-upload must hand out a different versioned address');
+    const stale = await rawFetch(first.body.data.embed_url, { headers: { 'If-None-Match': etag1! } });
+    assert(stale.status === 200 && await stale.text() === 'second version, same length', `old ETag after re-upload: ${stale.status}`);
+    assert(stale.headers.get('etag') !== etag1, 'and a new ETag');
 });
 
 // ─── Cleanup ───

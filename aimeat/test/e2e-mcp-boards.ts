@@ -4,6 +4,10 @@
  *   Tests board creation, listing, posting, reactions, replies, subscriptions,
  *   member management, deletion, and the board posts resource.
  * @version-history
+ *   v1.2.0 — 2026-09-13 — Phase 2b: board rules over MCP. The create answer states the seven-day
+ *     default, rules given at creation are stored and give posts their lifetime, a misspelled rule
+ *     is refused, the keeper replaces and clears them with aimeat_board_rules_set, an out-of-range
+ *     lifetime is refused, and another owner's agent is refused by the keeper rule.
  *   v1.1.0 — 2026-08-11 — August 2026 audit step 8. Three refusals the tool surface did not have
  *     before create/react/members went through services/board-write.ts: an empty board name, a
  *     reaction past 32 characters, and a roster call asking for nothing. The HTTP door has refused
@@ -241,6 +245,7 @@ await test('1. Board tools appear in tools/list', async () => {
     assert(toolNames.includes('aimeat_board_reply'), 'has aimeat_board_reply');
     assert(toolNames.includes('aimeat_board_members'), 'has aimeat_board_members');
     assert(toolNames.includes('aimeat_board_delete'), 'has aimeat_board_delete');
+    assert(toolNames.includes('aimeat_board_rules_set'), 'has aimeat_board_rules_set');
 });
 
 // ─── Phase 2: Board CRUD ───
@@ -279,6 +284,154 @@ await test('4. Create a public board succeeds (first owner is operator)', async 
     const result = JSON.parse(body.result.content[0].text);
     assert(result.visibility === 'public', `visibility: ${result.visibility}`);
     assert(typeof result.id === 'string', 'has id');
+});
+
+// ─── Phase 2b: The board's own rules, over MCP ───
+// Rules existed only on the HTTP door until 2026-09-13. A board an agent built over MCP ran on the
+// node defaults, and the default that bit was the lifetime: every post was gone seven days after it
+// was written, and nothing the agent read at creation said so.
+console.log('\nPhase 2b — Board Rules over MCP');
+
+let rulesBoardId = '';
+
+/** Call a tool as the suite's agent and hand back what a caller reads. */
+async function callBoardTool(name: string, args: Record<string, unknown>, id: number) {
+    const { body } = await mcpRpc('tools/call', { name, arguments: args }, id);
+    const text: string = body.result?.content?.[0]?.text ?? '';
+    let data: any;
+    // A refusal is prose, not JSON; `data` is null then and the caller reads `text`.
+    try { data = JSON.parse(text); } catch { data = null; }
+    return { isError: body.result?.isError === true, text, data };
+}
+
+await test('4c. A board created with no rules says what applies: seven days, in numbers and in words', async () => {
+    const r = await callBoardTool('aimeat_board_create', { name: 'rules-default-board', visibility: 'shared' }, 130);
+    assert(!r.isError, `create refused: ${r.text}`);
+    assert(r.data.rules === null, `no rules were set, so rules is null: ${JSON.stringify(r.data.rules)}`);
+    assert(r.data.effective_rules?.default_ttl_hours === 168,
+        `the default lifetime must be stated, got ${JSON.stringify(r.data.effective_rules)}`);
+    assert(r.data.effective_rules?.posting === 'members', `a shared board takes posts from members: ${r.data.effective_rules?.posting}`);
+    assert(typeof r.data.note === 'string' && r.data.note.includes('7 days'), `the note names the lifetime: ${r.data.note}`);
+});
+
+await test('4d. aimeat_board_create takes rules, stores them, and the posts live that long', async () => {
+    const rules = { posting: 'anyone', categories: ['song'], default_ttl_hours: 8760, post_cost: 0 };
+    const r = await callBoardTool('aimeat_board_create', { name: 'rules-catalogue-board', visibility: 'public', rules }, 131);
+    assert(!r.isError, `create with rules refused: ${r.text}`);
+    rulesBoardId = r.data.id;
+    assert(r.data.rules?.default_ttl_hours === 8760, `stored rules in the answer: ${JSON.stringify(r.data.rules)}`);
+    assert(r.data.effective_rules?.post_cost === 0, `a price of 0 is free: ${JSON.stringify(r.data.effective_rules)}`);
+
+    // The HTTP listing reads the same record, so the rules did not stay inside the tool.
+    const listed = await json('/v1/boards');
+    const board = (listed.body.data?.boards ?? []).find((b: any) => b.id === rulesBoardId);
+    assert(board?.rules?.default_ttl_hours === 8760, `GET /v1/boards shows the rules: ${JSON.stringify(board?.rules)}`);
+    assert(JSON.stringify(board?.rules?.categories) === '["song"]', `categories: ${JSON.stringify(board?.rules?.categories)}`);
+
+    // And the lifetime is the one a post actually gets.
+    const posted = await callBoardTool('aimeat_board_post', { board_id: rulesBoardId, title: 'A song', body: 'kept for a year', category: 'song' }, 132);
+    assert(!posted.isError, `post refused: ${posted.text}`);
+    const read = await callBoardTool('aimeat_board_read', { board_id: rulesBoardId }, 133);
+    const post = (read.data ?? []).find((p: any) => p.id === posted.data.id);
+    const daysLeft = (new Date(post?.ttl_expires_at).getTime() - Date.now()) / 86_400_000;
+    assert(daysLeft > 360, `a post on this board lives a year, got ${daysLeft.toFixed(1)} days (${post?.ttl_expires_at})`);
+
+    const offList = await callBoardTool('aimeat_board_post', { board_id: rulesBoardId, title: 'Wrong shelf', body: 'x', category: 'poem' }, 134);
+    assert(offList.isError, 'a category the rules do not name is refused');
+    assert(offList.text.includes('song'), `the refusal names the allowed categories: ${offList.text}`);
+});
+
+await test('4e. A rule the node does not know is refused, not dropped', async () => {
+    const r = await callBoardTool('aimeat_board_create', { name: 'rules-typo-board', visibility: 'shared', rules: { defaultTtl: 8760 } }, 135);
+    assert(r.isError, `a misspelled rule must refuse the call: ${r.text}`);
+    assert(r.text.includes('Input validation'), `refused at the input check: ${r.text}`);
+});
+
+await test('4f. The keeper changes the rules with aimeat_board_rules_set, and {} returns to the defaults', async () => {
+    const set = await callBoardTool('aimeat_board_rules_set', { board_id: rulesBoardId, rules: { default_ttl_hours: 720, categories: ['song', 'album'] } }, 136);
+    assert(!set.isError, `rules_set refused the keeper: ${set.text}`);
+    assert(set.data.rules?.default_ttl_hours === 720, `new lifetime stored: ${JSON.stringify(set.data.rules)}`);
+    // The whole set is replaced: post_cost was 0 and was not sent again, so the node's price is back.
+    assert(set.data.rules?.post_cost === undefined, `rules replace, they do not merge: ${JSON.stringify(set.data.rules)}`);
+
+    const listed = await json('/v1/boards');
+    const board = (listed.body.data?.boards ?? []).find((b: any) => b.id === rulesBoardId);
+    assert(board?.rules?.default_ttl_hours === 720, `GET /v1/boards shows the change: ${JSON.stringify(board?.rules)}`);
+
+    const reset = await callBoardTool('aimeat_board_rules_set', { board_id: rulesBoardId, rules: {} }, 137);
+    assert(!reset.isError, `reset refused: ${reset.text}`);
+    assert(reset.data.rules === null, `{} clears the rules: ${JSON.stringify(reset.data.rules)}`);
+    assert(reset.data.effective_rules?.default_ttl_hours === 168, `back to seven days: ${JSON.stringify(reset.data.effective_rules)}`);
+});
+
+await test('4g. An out-of-range lifetime is refused with the bound', async () => {
+    const r = await callBoardTool('aimeat_board_rules_set', { board_id: rulesBoardId, rules: { default_ttl_hours: 9000 } }, 138);
+    assert(r.isError, 'a lifetime past 8760 hours must be refused');
+    assert(r.text.includes('8760'), `the refusal names the bound: ${r.text}`);
+});
+
+await test('4h. Another owner\'s agent cannot set the rules of a board it does not keep', async () => {
+    // A second person with an agent holding social:write, so the refusal is the keeper rule and not
+    // a missing permission word.
+    const other = `mcpbrdother${Date.now()}`;
+    const reg = await json('/v1/ghii', {
+        method: 'POST',
+        body: JSON.stringify({ username: other, display_name: 'Other Keeper', password: 'McpBrdOther1234' }),
+    });
+    assert(reg.status === 201, `register other: ${reg.status}`);
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: other, timestamp: ts, signature: await signMsg(reg.body.data.private_key, other + NODE_ID + ts) }),
+    });
+    assert(tok.body.ok === true, 'other owner token');
+    const ag = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${tok.body.data.token}` },
+        body: JSON.stringify({ name: 'otherbrdagent', owner: other, capabilities: ['social'], model: 'gpt-4o', scopes: ['social:read', 'social:write'] }),
+    });
+    assert(ag.status === 201, `other agent: ${ag.status} ${JSON.stringify(ag.body)}`);
+    const otherGaii = ag.body.data.agent.gaii;
+
+    const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'MCP Boards Other', redirect_uris: [] }) });
+    const ts2 = new Date().toISOString();
+    const q = new URLSearchParams({
+        response_type: 'code', client_id: client.body.client_id, gaii: otherGaii,
+        signature: await signMsg(ag.body.data.private_key, otherGaii + NODE_ID + ts2), timestamp: ts2,
+    });
+    const auth = await json(`/v1/mcp/authorize?${q}`);
+    const token = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret }),
+    });
+    assert(token.status === 200, `other mcp token: ${token.status}`);
+
+    // Borrow the suite's rpc helper for the other session, and give the suite's own back after.
+    const mine = { mcpToken, sessionId };
+    mcpToken = token.body.access_token;
+    sessionId = '';
+    try {
+        await mcpRpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'MCP Boards Other', version: '1.0.0' } }, 1);
+        await fetch(`${BASE}/v1/mcp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+                Authorization: `Bearer ${mcpToken}`, 'mcp-session-id': sessionId, 'mcp-protocol-version': '2025-03-26',
+            },
+            body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
+        });
+        const r = await callBoardTool('aimeat_board_rules_set', { board_id: rulesBoardId, rules: { default_ttl_hours: 1 } }, 139);
+        assert(r.isError, `another owner's agent set the rules: ${r.text}`);
+        assert(r.text.includes('keeper'), `refused by the keeper rule: ${r.text}`);
+    } finally {
+        mcpToken = mine.mcpToken;
+        sessionId = mine.sessionId;
+    }
+
+    const listed = await json('/v1/boards');
+    const board = (listed.body.data?.boards ?? []).find((b: any) => b.id === rulesBoardId);
+    assert(board?.rules === undefined, `the refused call changed nothing: ${JSON.stringify(board?.rules)}`);
+
+    await json(`/v1/owners/${other}`, { method: 'DELETE', headers: { Authorization: `Bearer ${tok.body.data.token}` } });
 });
 
 await test('4b. A board with an empty name is refused', async () => {

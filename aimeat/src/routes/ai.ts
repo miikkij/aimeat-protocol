@@ -21,6 +21,7 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-09-13 — POST /v1/ai/complete answers finish_reason and truncated beside content.
  *   v1.x — 2026-08-28 — /v1/ai/image answers with the service's fetchUrl: the anonymous /v1/pub/
  *     form for a public image, the owner-authenticated /v1/storage/ form for a private one. The
  *     hand-built public URL answered 401 to every visitor (first imagery-pipeline demo).
@@ -154,6 +155,10 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         res.json(success(config.nodeId, {
           content: r.content,
           model: r.model,
+          // Additive: why the provider stopped, and whether that was a length cut. A cut answer used
+          // to arrive exactly like a finished one.
+          finish_reason: r.finishReason,
+          truncated: r.truncated,
           usage: {
             prompt_tokens: r.usage.promptTokens,
             completion_tokens: r.usage.completionTokens,

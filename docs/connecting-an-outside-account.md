@@ -127,8 +127,10 @@ The connection is resolved and authorised **before the first gate**, so a refuse
 with the sender who attempted it. It must be the caller's own and must carry `send-mail`; otherwise
 the refusal names the repair. Scopes: `outbound:send` and `connections:use`, both.
 
-A successful answer is **not a delivery**. It means the provider accepted the message; a bounce
-shows up on the contact afterwards.
+A send the provider refused, or one the node had no transport for, comes back from the tool as an
+error carrying the reason; over REST it is a 200 with `data.status` "failed". A success means the
+message was handed over, which is still **not a delivery**: a bounce shows up on the contact
+afterwards.
 
 ### The Google alias, which is the button people mean
 

@@ -5,6 +5,7 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- POST /v1/memory/files answers versioned_url, as the storage upload doors do.
  *   v1.2.0 -- 2026-09-06 -- Review item 3.2: the tag PATCH, the listing and the DELETE take the
  *     storage words their siblings already carried, and the DELETE goes through the shared
  *     removeStorageFile -- it had reimplemented the removal inline and skipped the key fence.
@@ -25,6 +26,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { checkStorageQuota, chargeOverage } from '../../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../../services/doc-images.js';
+import { versionedAddress } from '../../utils/http-range.js';
 import { emitChange } from '../../services/event-bus.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sniffedContentType } from '../../utils/app-content-type.js';
@@ -138,6 +140,10 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // that workspace's members on save (never the public internet) — use it, not /v1/memory/files/<key>.
       embed_url: pubEmbedUrl(file.ownerGaii, file.key),
       embed_markdown: pubEmbedMarkdown(file.ownerGaii, file.key),
+      // Point an app at this rather than embed_url: it changes on every write to the key, so a
+      // re-upload is not served from a five-minute browser copy. embed_url stays unversioned
+      // because the document image normaliser reads its path as owner plus key.
+      versioned_url: versionedAddress(pubEmbedUrl(file.ownerGaii, file.key), file),
     }));
     emitChange('memory');
   });

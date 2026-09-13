@@ -17,11 +17,16 @@
  *   The identifiers are stated literally because the app id is a FILENAME and carries its extension
  *   while the app's own subdomain does not: an agent reading `nuotta.apps.aimeat.io` guesses
  *   "nuotta", and every tool lookup for it misses.
- * @structure DISCOVERY_MARK — the idempotency marker; agentDiscoverySnippet(spec) — the markup.
- *   Where it goes and whether the document can take it is decided once, in
- *   services/app-serve-marks.ts.
- * @usage import { agentDiscoverySnippet } from '../utils/app-agent-discovery.js';
+ * @structure DISCOVERY_MARK: the idempotency marker; agentDiscoverySnippet(spec): the body markup;
+ *   APP_REF_MARK + appRefSnippet(spec): the `#aimeat-app-ref` JSON block for the head. Where each
+ *   goes and whether the document can take it is decided once, in services/app-serve-marks.ts.
+ * @usage import { agentDiscoverySnippet, appRefSnippet } from '../utils/app-agent-discovery.js';
  * @version-history
+ *   v2.2.0 — 2026-09-13 — The `#aimeat-app-ref` block leaves the body markup for appRefSnippet(),
+ *     which the marks pass puts at the start of the head. At the end of the body it arrived after
+ *     every inline script of the app, so appRef() at parse time was null and the owner saw the
+ *     visitor view of their own app. Its JSON is escaped with unicode escapes instead of HTML
+ *     entities, because a script element's text is never decoded and JSON.parse threw on `&quot;`.
  *   v2.1.0 — 2026-08-27 — wantsWebmcpBridge() moves here from routes/subdomains.ts, because the
  *     apex inline serve now injects the same discovery block the app origin does (TARGET-074: the
  *     mosaic renderer reads its app identity from #aimeat-app-ref, and a node without a
@@ -87,7 +92,6 @@ function esc(s: string): string {
  */
 export function agentDiscoverySnippet(spec: AppDiscoverySpec): string {
   const base = spec.baseUrl.replace(/\/+$/, '');
-  const appRef = `${spec.owner}/${spec.filename}`;
   const name = spec.appName || spec.filename;
   const tools = (spec.toolNames ?? []).filter(Boolean);
 
@@ -122,15 +126,39 @@ export function agentDiscoverySnippet(spec: AppDiscoverySpec): string {
   return `<link rel="mcp-server" href="/.well-known/mcp.json">`
     + `<link rel="alternate" type="text/markdown" href="?format=md" title="Agent-facing description">`
     + `<noscript ${DISCOVERY_MARK}><pre>${esc(lines.join('\n'))}</pre></noscript>`
-    // A machine-readable twin of the same facts, for a reader that prefers structure to prose.
-    + `<script type="application/json" id="aimeat-app-ref">`
-    + esc(JSON.stringify({ owner: spec.owner, app_id: spec.filename, app: appRef, tools }))
-    + `</script>`
+    // The machine-readable twin of these facts is appRefSnippet(), which goes into the head.
     // The WebMCP bridge, from THIS origin (not the apex): an app author's own
-    // `script-src 'self'` then still allows it. `defer` runs it after the ref block above exists,
-    // and `?expose=app` makes it self-activating — the app needs no code of its own.
+    // `script-src 'self'` then still allows it. `defer` runs it once the document is parsed, and
+    // `?expose=app` makes it self-activating — the app needs no code of its own.
     + (spec.webmcp
       ? `<script src="/v1/libs/aimeat-webmcp.js?expose=app" data-owner="${esc(spec.owner)}"`
         + ` data-app="${esc(spec.filename)}" defer></script>`
       : '');
+}
+
+/** Present in a document that already carries the app-ref block. */
+export const APP_REF_MARK = 'id="aimeat-app-ref"';
+
+/**
+ * The app's own identity as JSON, `#aimeat-app-ref`: a machine-readable twin of the discovery
+ * block's facts, and what `AIMEAT.atelier.appRef()` and the WebMCP bridge read.
+ *
+ * IT BELONGS AT THE START OF THE HEAD, and services/app-serve-marks.ts puts it there. It used to
+ * ride at the end of the body with the rest of this module's markup, which is after every inline
+ * script the app wrote, so an app that read its own identity at parse time read nothing: the owner
+ * was shown the visitor view of their own app, and a public read went to an empty identity.
+ *
+ * The JSON is escaped for a script element, not for HTML. A script's content is raw text that the
+ * parser never decodes, so an HTML entity arrives in `textContent` as the literal `&quot;` and
+ * JSON.parse throws on it. `<`, `>` and `&` become JSON unicode escapes instead, which keep a value
+ * from closing the element early and parse back to the same characters.
+ */
+export function appRefSnippet(spec: AppDiscoverySpec): string {
+  const ref = {
+    owner: spec.owner, app_id: spec.filename, app: `${spec.owner}/${spec.filename}`,
+    tools: (spec.toolNames ?? []).filter(Boolean),
+  };
+  const json = JSON.stringify(ref)
+    .replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+  return `<script type="application/json" ${APP_REF_MARK}>${json}</script>`;
 }

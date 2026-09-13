@@ -24,11 +24,19 @@
  *      there and the document still validates against the official schema.
  * @structure ODPS_VERSION/ODPS_SCHEMA_URL · OdpsDocument types · offeringToOdps() · odpsToYaml() ·
  *   mergeOdpsExtras/mergeProvenance (app-level defaults → tool) ·
- *   helpers (product type · price plans · licence rights · data access · payment gateway)
+ *   helpers (product type · price plans · licence rights · data access · payment gateway) ·
+ *   ODPS_TEXT_LIMITS · odpsLengthOverruns() · offeringOdpsOverruns()
  * @usage
  *   const doc = offeringToOdps({ offering, iface, callRecipe, stats, rakePercent, baseUrl, nodeId });
  *   res.type('text/yaml').send(odpsToYaml(doc));
+ *   const tooLong = odpsLengthOverruns(doc);   // warnings, never a refusal
  * @version-history
+ *   v1.2.0 — 2026-09-13 — Length check against the schema's maxLength values. The authoring schemas
+ *     accept far more text than ODPS allows in a few fields, so a long usageTerms.note produced a
+ *     document an outside validator refused (restrictions is capped at 255, and the node's own usage
+ *     sentences take up to 120 of it) while the node said nothing. The check names every overrun as a
+ *     warning; the document keeps the text as written, because a shortened legal restriction says
+ *     something the provider did not.
  *   v1.1.0 — 2026-07-25 — Pinned to ODPS **v4.1** (what the addendum's Q2 actually named; v4.0 was a
  *     miss on my part). v4.1 is structural, not cosmetic: language-keyed `details` + `pricingPlans`,
  *     `Languages` maps on access/gateway/SLA labels, `governanceProfile`/`portfolioPriority`, TOON format.
@@ -208,13 +216,19 @@ function licenceRights(o: Offering): string[] {
   return rights;
 }
 
+/** The sentences the node itself writes into `license.scope.restrictions` from the three usage flags. */
+function usageRestrictionSentences(t: Offering['usageTerms'] | undefined): string[] {
+  const out: string[] = [];
+  if (t && !t.derivatives) out.push('No derivative works.');
+  if (t && !t.resale) out.push('No resale or redistribution of the raw or derived output.');
+  if (t?.attribution) out.push('Attribution to the provider is required.');
+  return out;
+}
+
 /** The licence block: AIMEAT usage terms as rights + restrictions, provider extras as jurisdiction/exit terms. */
 function licence(o: Offering, extras: OdpsExtras | null): Json {
   const t = o.usageTerms;
-  const restrictions: string[] = [];
-  if (t && !t.derivatives) restrictions.push('No derivative works.');
-  if (t && !t.resale) restrictions.push('No resale or redistribution of the raw or derived output.');
-  if (t?.attribution) restrictions.push('Attribution to the provider is required.');
+  const restrictions: string[] = usageRestrictionSentences(t);
   if (t?.note) restrictions.push(t.note);
   if (extras?.license?.restrictions) restrictions.push(extras.license.restrictions);
 
@@ -473,4 +487,102 @@ export function offeringToOdps(input: OdpsProjectionInput): OdpsDocument {
  */
 export function odpsToYaml(doc: OdpsDocument): string {
   return yamlStringify({ ...doc, schema: ODPS_SCHEMA_URL_YAML }, { lineWidth: 0 });
+}
+
+// ── LENGTH CHECK ─────────────────────────────────────────────────────────────
+
+/** One text field the ODPS schema caps, and where its text comes from in the provider's terms. */
+export interface OdpsTextLimit {
+  /** Path into the generated document; `*` stands for the ISO 639-1 language key. */
+  path: string;
+  /** The `maxLength` the vendored ODPS v4.1 JSON Schema gives the field. */
+  maxLength: number;
+  /** What fills it: the authoring field a provider writes, or the node itself. */
+  source: string;
+}
+
+/**
+ * Every `maxLength` in the ODPS v4.1 JSON Schema this repo vendors (test/fixtures/odps-v4.1.schema.json),
+ * as a path into the document offeringToOdps() writes. test/unit/exchange-odps-length.test.ts walks the
+ * vendored schema and fails when the two disagree, so a schema update cannot add a cap this list misses.
+ */
+export const ODPS_TEXT_LIMITS: readonly OdpsTextLimit[] = [
+  { path: 'product.details.*.valueProposition', maxLength: 512, source: 'odps.valueProposition' },
+  { path: 'product.license.scope.definition', maxLength: 512, source: 'the node, from the three usage flags' },
+  { path: 'product.license.scope.restrictions', maxLength: 255, source: 'the node\'s usage-terms sentences, usageTerms.note and odps.license.restrictions, joined with spaces' },
+  { path: 'product.license.termination.terminationConditions', maxLength: 512, source: 'odps.license.terminationConditions' },
+  { path: 'product.license.termination.continuityConditions', maxLength: 512, source: 'odps.license.continuityConditions' },
+  { path: 'product.license.governance.ownership', maxLength: 512, source: 'the node, from the provider\'s identity' },
+  { path: 'product.license.governance.audit', maxLength: 512, source: 'the node' },
+  { path: 'product.license.governance.warranties', maxLength: 512, source: 'odps.license.warranties' },
+  { path: 'product.license.governance.damages', maxLength: 512, source: 'odps.license.damages' },
+  { path: 'product.license.governance.confidentiality', maxLength: 512, source: 'odps.license.confidentiality' },
+  { path: 'product.license.governance.applicableLaws', maxLength: 512, source: 'odps.license.applicableLaws' },
+  { path: 'product.license.governance.forceMajeure', maxLength: 512, source: 'odps.license.forceMajeure' },
+  { path: 'product.dataHolder.legalName', maxLength: 256, source: 'odps.dataHolder.legalName (the account name when none is declared)' },
+  { path: 'product.dataHolder.description', maxLength: 512, source: 'odps.dataHolder.description' },
+  { path: 'product.dataHolder.slogan', maxLength: 256, source: 'odps.dataHolder.slogan' },
+];
+
+/** A field of a generated document that is longer than the ODPS schema allows. */
+export interface OdpsLengthOverrun {
+  /** The concrete field, language key filled in, e.g. `product.details.en.valueProposition`. */
+  path: string;
+  /** Characters, counted the way JSON Schema counts them: Unicode code points, not UTF-16 units. */
+  length: number;
+  maxLength: number;
+  /** What is too long, what fills it and what happens to the document, in the provider's terms. */
+  message: string;
+}
+
+const charLength = (s: string): number => [...s].length;
+
+/** Every value at a dotted path, with `*` matching each key of an object at that level. */
+function valuesAt(node: unknown, segments: string[], trail: string[]): Array<[string, unknown]> {
+  if (!segments.length) return [[trail.join('.'), node]];
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return [];
+  const [head, ...rest] = segments;
+  const obj = node as Json;
+  const keys = head === '*' ? Object.keys(obj) : [head];
+  return keys.flatMap(k => (Object.hasOwn(obj, k) ? valuesAt(obj[k], rest, [...trail, k]) : []));
+}
+
+function overrunMessage(doc: OdpsDocument, limit: OdpsTextLimit, path: string, length: number): string {
+  const head = `${path} is ${length} characters and ODPS v${ODPS_VERSION} allows ${limit.maxLength}.`;
+  const tail = ' The listing is published with the text as written, and a catalogue that validates against the ODPS schema will refuse the document until it is shortened.';
+  if (limit.path !== 'product.license.scope.restrictions') return `${head} It comes from ${limit.source}.${tail}`;
+  // The one field a provider cannot see whole: the node writes its own sentences in front of theirs.
+  const terms = (doc.product['x-aimeat'] as Json | undefined)?.usage_terms as Offering['usageTerms'] | undefined;
+  const own = usageRestrictionSentences(terms ?? undefined).join(' ');
+  const taken = own ? charLength(own) + 1 : 0;
+  return `${head} The node writes its usage-terms sentences first, and they take ${taken} characters with the space after them,`
+    + ` so usageTerms.note and odps.license.restrictions share the remaining ${Math.max(0, limit.maxLength - taken)}.${tail}`;
+}
+
+/**
+ * The fields of a generated ODPS document that are longer than the schema allows. A WARNING (the
+ * default chosen on 2026-09-13, open for the developer): the authoring schemas accept more than ODPS
+ * does in these fields, and the node neither
+ * refuses the listing nor shortens the text, because a truncated legal restriction states something the
+ * provider never wrote. What it owes the provider is being told, which is what this is for.
+ */
+export function odpsLengthOverruns(doc: OdpsDocument): OdpsLengthOverrun[] {
+  const out: OdpsLengthOverrun[] = [];
+  for (const limit of ODPS_TEXT_LIMITS) {
+    for (const [path, value] of valuesAt(doc, limit.path.split('.'), [])) {
+      if (typeof value !== 'string') continue;
+      const length = charLength(value);
+      if (length > limit.maxLength) out.push({ path, length, maxLength: limit.maxLength, message: overrunMessage(doc, limit, path, length) });
+    }
+  }
+  return out;
+}
+
+/**
+ * The overruns of the document one offering projects to. No capped field reads the rake, the base URL or
+ * the node id (those sit in descriptions and URLs the schema leaves uncapped), so this needs none of the
+ * request context the served document is built with.
+ */
+export function offeringOdpsOverruns(offering: Offering): OdpsLengthOverrun[] {
+  return odpsLengthOverruns(offeringToOdps({ offering, rakePercent: 0, baseUrl: '', nodeId: '' }));
 }
