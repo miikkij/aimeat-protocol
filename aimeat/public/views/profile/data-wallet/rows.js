@@ -11,6 +11,7 @@
  * @structure targetRow · targetOpen · personRow · revokedRow · groupRow · groupOpen · eventRow
  * @usage import { targetRow, groupRow, eventRow } from './rows.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose detail frames from poster.css.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 import { h } from 'preact';
@@ -50,7 +51,7 @@ function targetOpen(ctx, row) {
   const lead = row.kind === 'org' ? x('target.leadOrg', { org: row.title, n: row.grants.length, ws: row.workspaces.filter((w) => w.id).length }) : x('target.leadKey', { key: row.pattern, n: row.grants.length });
   const copy = row.grants.map((c) => `${targetWords(c.data_pattern, ctx.names).title} · ${targetWords(c.data_pattern, ctx.names).sub}\t${whoOf(c.recipient, ctx.names).name}\t${roleWord(roleOf(c))}\t${c.granted_at}\t${c.id}`).join('\n');
   return html`
-    <div class="dw-open">
+    <div class="dw-open poster-frame">
       <p class="dw-lead">${lead} ${x('target.roles')}</p>
       ${row.kind === 'org' ? html`
         <div class="dw-grants">
@@ -59,13 +60,13 @@ function targetOpen(ctx, row) {
             ${i === 0 ? html`<div><b>${w.name}</b></div>` : html`<div></div>`}
             ${grantLine(ctx, c, false)}`))}
         </div>` : html`
-        <div class="dw-grants" style="grid-template-columns: minmax(0, 1.4fr) 7rem 8rem auto;">
+        <div class="dw-grants dw-grants--target">
           <div class="dw-gh">${x('col.whoWhat')}</div><div class="dw-gh">${x('col.since')}</div><div class="dw-gh">${x('col.gaveBy')}</div><div class="dw-gh"></div>
           ${row.grants.map((c) => grantLine(ctx, c, false))}
         </div>`}
       ${row.revoked.length ? html`
         <span class="og-label">${x('target.revokedHere', { n: row.revoked.length })}</span>
-        <div class="dw-para" style="margin: 0;">${row.revoked.slice(0, 5).map((c) => html`<div key=${c.id}>${whoOf(c.recipient, ctx.names).name} · ${roleWord(roleOf(c))}${row.kind === 'org' ? ` · ${targetWords(c.data_pattern, ctx.names).sub}` : ''} · ${spanWord(c.granted_at, c.revoked_at)}</div>`)}${row.revoked.length > 5 ? html`<div>${x('andMore', { n: row.revoked.length - 5 })}</div>` : null}</div>` : null}
+        <div class="dw-para dw-revoked">${row.revoked.slice(0, 5).map((c) => html`<div key=${c.id}>${whoOf(c.recipient, ctx.names).name} · ${roleWord(roleOf(c))}${row.kind === 'org' ? ` · ${targetWords(c.data_pattern, ctx.names).sub}` : ''} · ${spanWord(c.granted_at, c.revoked_at)}</div>`)}${row.revoked.length > 5 ? html`<div>${x('andMore', { n: row.revoked.length - 5 })}</div>` : null}</div>` : null}
       <div class="og-doors">
         ${row.kind === 'org' ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => ctx.openOrganisms()}>${x('target.openOrganism', { org: row.title })}</button>` : null}
         <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.prefillGrant({ orgId: row.organism_id, wsId: row.workspaces[0]?.id || '', key: row.kind === 'key' ? row.pattern : '' })}>${x('target.grantMore')}</button>
@@ -85,7 +86,7 @@ export function personRow(ctx, p) {
       <div class="dw-when">${p.since ? `${dateWord(p.since)} →` : ''}<br /><span>${grantsWord(p.grants.length)}</span></div>
       <div class="dw-go"><button type="button" class="og-door" onClick=${() => ctx.toggleTarget(p.id)}>${doorWord(open)}</button></div>
       ${open ? html`
-        <div class="dw-open">
+        <div class="dw-open poster-frame">
           <div class="dw-grants">
             <div class="dw-gh">${x('col.target')}</div><div class="dw-gh">${x('col.whoWhat')}</div><div class="dw-gh">${x('col.since')}</div><div class="dw-gh">${x('col.gaveBy')}</div><div class="dw-gh"></div>
             ${p.grants.map((c) => grantLine(ctx, c, true))}
@@ -140,7 +141,7 @@ function groupOpen(ctx, g, id, w) {
     return { name: key, sub: '' };
   };
   return html`
-    <div class="dw-open">
+    <div class="dw-open poster-frame">
       <p class="dw-lead">${lead}</p>
       ${g.keys?.length ? html`
         <div class="dw-grants dw-grants--keys">
