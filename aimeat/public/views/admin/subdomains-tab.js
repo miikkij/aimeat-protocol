@@ -15,6 +15,7 @@
  *   - Refusals: the four things the route answers no to, in its own words
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.1.0 -- 2026-09-13 -- Compose list and add-form headings from the shared B1 shape.
  *   v2.0.1 — 2026-09-13 — The delete dialog's actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-12 — The poster face: the table becomes rows, search and filters arrive (a
  *     hundred and fifty mappings had neither), the Type and Created by columns go (one repeated
@@ -185,7 +186,7 @@ export default function SubdomainsAdminTab() {
     <div class="og adm-subs">
 
       <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2>${S('listTitle')}<small>01</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${S('listTitle')}<small>01</small></h2>
           <div class="og-doors">
             <button type="button"
               class=${!showCreate && sites.length > 0 ? 'adm-btn' : 'og-door og-door--quiet'}
@@ -238,7 +239,7 @@ export default function SubdomainsAdminTab() {
 
       ${showCreate && html`
         <section class="og-sec">
-          <div class="og-sec-h"><h2>${S('add')}<small>02</small></h2></div>
+          <div class="og-sec-h"><h2 class="poster-section-title">${S('add')}<small>02</small></h2></div>
           <div class="adm-subs-two">
             <div>
               <div class="adm-subs-field">
