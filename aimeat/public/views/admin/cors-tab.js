@@ -13,6 +13,7 @@
  * @structure CorsTab({ data, switchPage }) — load · RightNow · Strip · the two ListSections from
  *   cors-tab.form.js · OrderSection · AskAiSection · the actions (save, clear)
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 -- 2026-09-13 -- Compose section headings from the shared B1 shape.
  *   v2.0.0 — 2026-09-08 — The poster face and the one read: the three cards become five sections,
  *     the native selects become a picker that narrows as you type, the cookie doors and the
@@ -147,7 +148,7 @@ function AskAiSection() {
       <div class="og-sec-h"><h2 class="poster-section-title">${C('ai.title')}<small>05</small></h2>
         <div class="og-doors"><${CopyButton} text=${paste} label=${C('ai.copy')} className="og-door og-door--quiet" /></div></div>
       <p class="adm-cors-lead">${C('ai.lead')}</p>
-      <div class="og-box">
+      <div class="og-box poster-aside poster-aside--small">
         <span class="og-box-label">${C('ai.label')}</span>
         <div class="adm-cors-paste">${paste}</div>
       </div>

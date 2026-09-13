@@ -21,6 +21,7 @@
  *   - agents-tab.derive.js does the counting, .list.js is section 02, .record.js is an opened row
  *
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose the remaining B1 headings; fleet ratios use SVG width data.
  *   v2.0.0 — 2026-09-12 — The poster face: one table of 143 unsearchable rows becomes three
  *     sections, a search, five filter chips and a record that says what an agent may do and where
@@ -184,7 +185,7 @@ export default function AgentsTab({ data, switchPage }) {
 
       <${Fleets} fleets=${fleets} total=${counts.total} onOwners=${toOwners} />
 
-      <div class="og-box">
+      <div class="og-box poster-aside poster-aside--small">
         <b>${A('asideLead')}</b> ${A('aside', { n: num(counts.silent) })}
       </div>
       <p class="adm-ag-note">${A('asideNote')}</p>

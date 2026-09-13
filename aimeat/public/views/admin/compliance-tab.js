@@ -31,6 +31,7 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-05 — The poster face: the gaps grouped by kind with a door each, the limits in
  *     the dashed box before the numbers, the register as a table with a who-answered column and a
@@ -195,7 +196,7 @@ function Limits({ items }) {
   return html`
     <section class="og-sec" id="adm-cmp-02">
       <div class="og-sec-h"><h2 class="poster-section-title">${C('limitsTitle')}<small>02</small></h2></div>
-      <div class="og-box">
+      <div class="og-box poster-aside poster-aside--small">
         <span class="og-box-label">${C('limitsLabel')}</span>
         <p class="adm-cmp-box-p">${C('limitsNote')}</p>
         ${list.map((s, i) => html`

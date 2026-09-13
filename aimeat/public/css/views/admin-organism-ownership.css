@@ -10,6 +10,7 @@
  *   organism.css; only what this page adds lives here. Every value is a theme.css token, so the page
  *   flips with the theme.
  * @version-history
+ *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v1.2.0 — 2026-09-13 — Own the existing people-column heading alignment.
  *   v1.1.0 — 2026-09-13 — The page's own copy of the poster dialog leaves; /css/dialog.css draws it for
  *     every dialog now.
@@ -22,7 +23,7 @@
 .adm-oo .adm-mrow--last { border-bottom: 0; }
 /* The door that sits in a metric row's value column reads at the value's size. */
 .adm-oo .adm-mval .adm-oo-act { font-size: .76rem; }
-.adm-oo-warn { margin: 0 0 14px; padding: 9px 12px; border: 3px dashed var(--accent); background: var(--card-bg); font-size: .88rem; line-height: 1.5; color: var(--text); }
+.adm-oo-warn { margin: 0 0 14px; }
 
 /* ── 02: the organisms ────────────────────────────────────────────────────────────────────── */
 .adm-oo-row {

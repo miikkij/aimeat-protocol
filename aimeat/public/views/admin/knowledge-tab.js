@@ -24,6 +24,7 @@
  *   - KnowledgeAdminTab (default) — one read, the four sections, and the review panel
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face. One read that carries the count and the shape, a table
  *     with search and real paging in place of the card grid, and the review trail read back.
@@ -67,7 +68,7 @@ function AskAi({ summary }) {
           ${Row({ title: S('ai.get'), why: S('ai.getWhy'), chip: null, value: 'aimeat_knowledge_get' })}
           ${Row({ title: S('ai.links'), why: S('ai.linksWhy'), chip: null, value: 'aimeat_knowledge_links', last: true })}
         </div>
-        <div class="og-box">
+        <div class="og-box poster-aside poster-aside--small">
           <span class="og-box-label">${S('ai.label')}</span>
           <div class="adm-kn-paste">${paste}</div>
         </div>

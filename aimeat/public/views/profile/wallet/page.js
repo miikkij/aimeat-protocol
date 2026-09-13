@@ -13,6 +13,7 @@
  *   secRoads
  * @usage import { renderPage } from './wallet/page.js';
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 -- 2026-09-13 -- V2: select the shared ink frame for the pace explanation.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Lompakko-sivu", direction A).
@@ -74,7 +75,7 @@ function federated(ctx) {
     <div class="og og-wal">
       ${crumb()}
       <div class="og-mast"><div class="og-mast-words"><h1 class="og-title poster-page-title">${t('profile.tabs.wallet')}<small>${x('titleSub')}</small></h1><p class="og-desc">${x('desc')}</p></div></div>
-      <div class="og-box og-box--solid wal-box"><span class="og-box-label">${x('federatedLabel')}</span>${x('federatedBody', { node: ctx.session?.homeNode || '?' })}</div>
+      <div class="og-box og-box--solid wal-box poster-aside poster-aside--small poster-aside--irreversible"><span class="og-box-label">${x('federatedLabel')}</span>${x('federatedBody', { node: ctx.session?.homeNode || '?' })}</div>
     </div>`;
 }
 
@@ -152,7 +153,7 @@ function secSources(ctx) {
       </div>
       <div class="wal-pace poster-frame">
         <div><b>${x('paceTitle')}</b> ${x('paceBody', { pace, cap })} ${Number(w.balance) >= cap ? x('paceAtCap', { balance: w.balance, cap }) : x('paceBelowCap', { balance: w.balance, days: pace ? Math.ceil((cap - Number(w.balance)) / pace) : 0 })} ${l.total_rows ? (l.unrecorded > 0 ? x('paceRows', { sum: signed(l.ledger_sum), unrecorded: morsels(l.unrecorded) }) : l.unrecorded < 0 ? x('paceRowsOver', { sum: signed(l.ledger_sum), n: morsels(-l.unrecorded) }) : x('paceRowsExact', { sum: signed(l.ledger_sum) })) : ''}</div>
-        <div class="wal-bar"><i style=${`width:${pct}%`}></i><span>${w.balance} / ${cap}</span></div>
+        <div class="wal-bar poster-box poster-box--meter"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><rect width=${pct} height="100" /></svg><span>${w.balance} / ${cap}</span></div>
       </div>
       <span class="og-label wal-label">${x('usesTitle')}</span>
       <div class="wal-uses">

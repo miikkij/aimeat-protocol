@@ -24,6 +24,7 @@
  *   - SsoTab (default) — the read, the empty/connected branch, and the per-company detail
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face. One read that says whether anybody can sign in, an
  *     empty state that leads with what the operator gets rather than with SAML and SCIM, a row per
@@ -75,7 +76,7 @@ function AskAi({ node, count }) {
           ${Row({ title: S('ai.metadata'), why: S('ai.metadataWhy'), chip: null, value: 'aimeat_admin_sso_idp_metadata' })}
           ${Row({ title: S('ai.token'), why: S('ai.tokenWhy'), chip: null, value: 'aimeat_admin_sso_scim_token', last: true })}
         </div>
-        <div class="og-box">
+        <div class="og-box poster-aside poster-aside--small">
           <span class="og-box-label">${S('ai.label')}</span>
           <div class="adm-sso-paste">${paste}</div>
         </div>

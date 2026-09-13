@@ -17,6 +17,7 @@
  *   - Field / readWord / openJson: the pieces both views share
  * @usage Imported by memory-tab.js; not mounted on its own.
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 -- 2026-09-13 -- Compose record and audience row boundaries from poster.css.
  *   v1.0.0 — 2026-09-12 — Initial, with the page rebuilt around the question.
  */
@@ -136,7 +137,7 @@ export function Record({ rec, onBack, onDelete, onRestore, busy, graceDays }) {
           </dl>
 
           ${!rec.ai_provenance_id && html`
-            <div class="adm-mem-say">
+            <div class="adm-mem-say poster-aside">
               <p><b>${S('provenanceHeading')}</b> ${S('provenanceBody')}</p>
             </div>`}
 

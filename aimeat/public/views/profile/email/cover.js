@@ -10,6 +10,7 @@
  * @structure renderCover · secAddress · secMailboxes · secSent · lettersFold · chatFold
  * @usage import { renderCover } from './email/cover.js';
  * @version-history
+ *   2026-09-13 -- Compose the shared initials-box role and its measured size cut.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces a page that verified one address and said nothing else.
  */
@@ -116,7 +117,7 @@ function secMailboxes(ctx) {
       ${!ctx.providers.length ? html`<p class="og-empty">${c('noProviders')}</p>` : html`
         <div class="em-mb">
           ${rows.map(({ p, conn }) => html`
-            <div class=${`ct-av nt-av ${conn ? '' : 'ct-av--agent'}`} key=${'a' + p.id} aria-hidden="true">${providerWord(p).slice(0, 1)}</div>
+            <div class=${`ct-av nt-av poster-box poster-box--avatar ${conn ? '' : 'ct-av--agent'}`} key=${'a' + p.id} aria-hidden="true">${providerWord(p).slice(0, 1)}</div>
             <div class="em-nm" key=${'n' + p.id}>${providerWord(p)}<small>${conn ? [conn.accountLabel, ctx.aliases[conn.id]?.length ? c('aliases', { list: ctx.aliases[conn.id].join(', ') }) : null].filter(Boolean).join(' · ') : c('notConnected')}</small></div>
             <div class="em-w" key=${'w' + p.id}>${c(isSender(p) ? 'sendWhat' : 'readWhat')}${conn && (ctx.delegations[conn.id] || []).length ? html`<small>${c('delegationsN', { n: ctx.delegations[conn.id].filter(d => d.enabled !== false).length })}</small>` : null}</div>
             <div class="em-ctl" key=${'c' + p.id}>
@@ -159,7 +160,7 @@ function lettersFold(ctx) {
   const digest = s.emailDigest || { enabled: false, afterHours: 8 };
   const verified = !!ctx.me?.email_verified_at;
   const row = (key, on, ctl) => html`
-    <div class="ct-av nt-av" key=${'a' + key} aria-hidden="true">A</div>
+    <div class="ct-av nt-av poster-box poster-box--avatar" key=${'a' + key} aria-hidden="true">A</div>
     <div class="em-nm" key=${'n' + key}>${c('letter.' + key + 'T')}<small>${c('letter.' + key + 'S')}</small></div>
     <div class="em-w" key=${'w' + key}>${c('letter.' + key + 'D')}</div>
     <div class="em-ctl" key=${'c' + key}>${ctl}</div>`;

@@ -11,9 +11,10 @@
  *   something else or keeps it behind a switch you have not turned on. Every tool carries a link
  *   to its vendor's own documentation, so a reader who does not believe the steps can check them
  *   rather than take our word.
- * @structure McpSetupGuide() · InstructionsDialog({ open, onClose })
+ * @structure McpSetupGuide({ installClassName }) · InstructionsDialog({ open, onClose })
  * @usage import { McpSetupGuide, InstructionsDialog } from '/views/profile/ai-setup-guide.js';
  * @version-history
+ *   2026-09-13 -- Pass the caller's shared install-row shape to McpInstallRow.
  *   v2.2.0 — 2026-08-27 — The short way in (McpInstallRow) renders above the steps for the three
  *     clients that have one, and the module-level table cache moved to ai-tool-setup.js so the
  *     install shortcuts elsewhere on the page share this read instead of opening a second.
@@ -85,7 +86,7 @@ function Params({ params }) {
  * How to attach this node to one AI tool: the steps as things to click or type, every field value,
  * and the vendor's own page.
  */
-export function McpSetupGuide() {
+export function McpSetupGuide({ installClassName = '' } = {}) {
   const tools = useAiTools();
   const [toolId, setToolId] = useState(rememberedTool);
   const pick = (id) => {
@@ -105,7 +106,7 @@ export function McpSetupGuide() {
 
       <!-- The short way in comes first, and removes none of the steps below it: a one-click link is
            blocked on a managed machine and does nothing where the client is not installed. -->
-      <${McpInstallRow} tool=${tool} />
+      <${McpInstallRow} tool=${tool} className=${installClassName} />
 
       ${tool.mcp.plans ? html`<p class="ast-plans">${tool.mcp.plans}</p>` : null}
       ${tool.mcp.warn ? html`<p class="ast-warn">${tool.mcp.warn}</p>` : null}

@@ -1,19 +1,18 @@
 {
   "_note": "Copied design-language declarations, recorded debt rather than approval. This files map may only shrink. After migration, lower the affected counts or remove cleared files. Only an explicit developer decision permits re-seeding with pnpm check:poster-shapes --record.",
   "_measured": {
-    "date": "2026-09-13T15:05:00Z",
-    "files": 78,
-    "declarations": 640,
+    "date": "2026-09-13T16:03:34Z",
+    "files": 77,
+    "declarations": 602,
     "patterns": {
-      "headline": 120,
-      "sun": 128,
-      "box2": 186,
-      "frame3": 49,
+      "headline": 114,
+      "sun": 127,
+      "box2": 178,
       "record": 30,
-      "rule": 15,
       "action": 72,
+      "frame3": 48,
       "slab": 7,
-      "aside": 22,
+      "rule": 15,
       "dialog": 1,
       "label": 10
     }
@@ -47,8 +46,7 @@
       "headline": 2,
       "action": 3,
       "sun": 2,
-      "box2": 2,
-      "aside": 1
+      "box2": 2
     },
     "public/css/views/admin-compliance.css": {
       "headline": 1,
@@ -67,8 +65,7 @@
     },
     "public/css/views/admin-csm.css": {
       "headline": 2,
-      "box2": 4,
-      "aside": 1
+      "box2": 4
     },
     "public/css/views/admin-database.css": {
       "headline": 2,
@@ -114,21 +111,18 @@
       "headline": 1,
       "action": 2,
       "sun": 2,
-      "box2": 1,
-      "aside": 1
+      "box2": 1
     },
     "public/css/views/admin-maintenance.css": {
       "headline": 1,
       "action": 1,
-      "box2": 2,
-      "aside": 1
+      "box2": 2
     },
     "public/css/views/admin-memory.css": {
       "headline": 5,
       "action": 3,
       "sun": 2,
-      "box2": 1,
-      "aside": 1
+      "box2": 1
     },
     "public/css/views/admin-metrics-poster.css": {
       "headline": 2,
@@ -145,8 +139,7 @@
       "headline": 2,
       "action": 1,
       "sun": 2,
-      "box2": 2,
-      "aside": 1
+      "box2": 2
     },
     "public/css/views/admin-owners.css": {
       "headline": 1,
@@ -162,8 +155,7 @@
       "headline": 2,
       "action": 1,
       "sun": 1,
-      "box2": 4,
-      "aside": 1
+      "box2": 4
     },
     "public/css/views/admin-prompts.css": {
       "headline": 3,
@@ -196,13 +188,11 @@
       "headline": 3,
       "action": 1,
       "sun": 2,
-      "box2": 4,
-      "aside": 1
+      "box2": 4
     },
     "public/css/views/admin-sso.css": {
       "headline": 2,
-      "action": 1,
-      "aside": 1
+      "action": 1
     },
     "public/css/views/admin-stats.css": {
       "headline": 1,
@@ -228,8 +218,7 @@
       "headline": 2,
       "rule": 1,
       "action": 1,
-      "sun": 1,
-      "aside": 1
+      "sun": 1
     },
     "public/css/views/agents-detail.css": {
       "sun": 1
@@ -242,13 +231,11 @@
     },
     "public/css/views/appdev-poster.css": {
       "sun": 1,
-      "box2": 1,
-      "aside": 1
+      "box2": 1
     },
     "public/css/views/apps-poster.css": {
-      "headline": 2,
-      "box2": 2,
-      "aside": 1
+      "headline": 1,
+      "box2": 1
     },
     "public/css/views/build-story.css": {
       "sun": 2,
@@ -286,14 +273,12 @@
       "slab": 2
     },
     "public/css/views/companies-poster.css": {
-      "headline": 1,
       "sun": 1,
-      "box2": 2,
+      "box2": 1,
       "label": 4
     },
     "public/css/views/contacts-poster.css": {
-      "headline": 1,
-      "box2": 2
+      "box2": 1
     },
     "public/css/views/data-wallet-poster.css": {
       "headline": 1,
@@ -307,10 +292,6 @@
       "sun": 1,
       "box2": 1
     },
-    "public/css/views/email-poster.css": {
-      "headline": 1,
-      "box2": 1
-    },
     "public/css/views/extensions-poster.css": {
       "sun": 1,
       "box2": 2,
@@ -319,8 +300,7 @@
     "public/css/views/fleet.css": {
       "headline": 1,
       "sun": 1,
-      "box2": 1,
-      "aside": 1
+      "box2": 1
     },
     "public/css/views/help.css": {
       "sun": 2,
@@ -363,8 +343,7 @@
       "action": 3,
       "sun": 2,
       "box2": 1,
-      "frame3": 6,
-      "aside": 3
+      "frame3": 6
     },
     "public/css/views/libraries-poster.css": {
       "sun": 1,
@@ -372,26 +351,23 @@
       "record": 1
     },
     "public/css/views/mcp-poster.css": {
-      "headline": 3,
+      "headline": 2,
       "action": 1,
       "sun": 2,
-      "box2": 7,
-      "aside": 2,
+      "box2": 6,
       "label": 1
     },
     "public/css/views/members.css": {
       "box2": 1,
-      "frame3": 2,
-      "aside": 1
+      "frame3": 2
     },
     "public/css/views/memory.css": {
       "box2": 2,
       "frame3": 1
     },
     "public/css/views/notifications-poster.css": {
-      "headline": 1,
       "sun": 1,
-      "box2": 4
+      "box2": 3
     },
     "public/css/views/offers-poster.css": {
       "headline": 5,
@@ -406,7 +382,6 @@
       "box2": 3,
       "frame3": 1,
       "record": 1,
-      "aside": 1,
       "slab": 2
     },
     "public/css/views/packages-poster.css": {
@@ -417,9 +392,8 @@
     "public/css/views/portal-dev.css": {
       "action": 1,
       "sun": 6,
-      "box2": 14,
-      "frame3": 6,
-      "aside": 1
+      "box2": 13,
+      "frame3": 5
     },
     "public/css/views/portfolio-poster.css": {
       "sun": 1,
@@ -430,8 +404,7 @@
     "public/css/views/profile-door.css": {
       "rule": 1,
       "box2": 2,
-      "frame3": 1,
-      "aside": 1
+      "frame3": 1
     },
     "public/css/views/profile-poster.css": {
       "headline": 3,
@@ -467,8 +440,8 @@
     },
     "public/css/views/wallet-poster.css": {
       "headline": 4,
-      "sun": 2,
-      "box2": 4,
+      "sun": 1,
+      "box2": 3,
       "record": 2
     },
     "public/css/views/workflows-poster.css": {

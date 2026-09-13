@@ -9,6 +9,7 @@
  *   come from admin.css and organism.css; only what this page adds lives here. Every value is a
  *   theme.css token, so the page flips with the theme.
  * @version-history
+ *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 
@@ -65,7 +66,7 @@
 
 /* Restore is the one action that cannot be undone, so it says so in the dashed box the house
    keeps for exactly that. */
-.adm-maint-warn { border: 3px dashed var(--accent); background: var(--card-bg); padding: 1rem 1.2rem; margin: 0 0 12px; font-size: .92rem; line-height: 1.55; color: var(--text); max-width: 74ch; }
+.adm-maint-warn { margin: 0 0 12px; max-width: 74ch; }
 .adm-maint-warn b { font-weight: 700; }
 
 /* What the backup said when it ran. */

@@ -25,6 +25,7 @@
  *   - AddPeerForm / TestNodeForm — the two forms, opened from section 03
  * @usage Imported by views/admin/federation-tab.js.
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.0 — 2026-09-12 — Initial (the Federation page in the poster face).
  */
@@ -112,7 +113,7 @@ export function TheBook({ overview, onRebuild, onMirror }) {
       </p>`}
 
       ${book.present && book.age_days !== null && book.age_days >= 7 && !book.is_primary && html`
-        <div class="og-box adm-fed-box--after">
+        <div class="og-box adm-fed-box--after poster-aside poster-aside--small">
           <span class="og-box-label">${S('book.staleLabel', { n: num(book.age_days) })}</span>
           ${S('book.staleBody', { id: me.node_id })}
         </div>`}
@@ -159,7 +160,7 @@ export function AddPeerForm({ busy, onAdd, onClose }) {
   const [url, setUrl] = useState('');
   const [key, setKey] = useState('');
   return html`
-    <div class="og-box adm-fed-box--after">
+    <div class="og-box adm-fed-box--after poster-aside poster-aside--small">
       <span class="og-box-label">${S('add.label')}</span>
       ${S('add.body')}
       <div class="adm-fed-form">
@@ -183,7 +184,7 @@ export function AddPeerForm({ busy, onAdd, onClose }) {
 export function TestNodeForm({ busy, result, onTest, onClose }) {
   const [url, setUrl] = useState('');
   return html`
-    <div class="og-box adm-fed-box--after">
+    <div class="og-box adm-fed-box--after poster-aside poster-aside--small">
       <span class="og-box-label">${S('test.label')}</span>
       ${S('test.body')}
       <div class="adm-fed-form">

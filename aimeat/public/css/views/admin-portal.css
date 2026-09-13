@@ -9,6 +9,7 @@
  *   the numeral strip and the badges come from admin.css and organism.css; only what this page adds
  *   lives here. Every value is a theme.css token, so the page flips with the theme.
  * @version-history
+ *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v1.1.0 — 2026-09-13 — Own existing section spacing and horizontal menu arrows.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
@@ -38,7 +39,7 @@
 }
 .adm-pt-pin-count { font-size: .85rem; font-weight: 700; color: var(--accent); }
 .adm-pt-pin-note { font-size: .78rem; color: var(--text-dim); }
-.adm-pt-pin-list { margin: 0 0 16px; padding: 10px 14px; border: 3px dashed var(--accent); background: var(--glass-bg); }
+.adm-pt-pin-list { margin: 0 0 16px; }
 .adm-pt-pin-list ul { margin: 0; padding-left: 18px; font-size: .82rem; max-height: 30vh; overflow-y: auto; }
 .adm-pt-pin-list li { margin: 2px 0; color: var(--text); }
 

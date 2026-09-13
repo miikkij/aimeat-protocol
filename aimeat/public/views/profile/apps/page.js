@@ -12,6 +12,8 @@
  * @structure renderPage · secWaiting · secKunto · secNewest · secFirst
  * @usage import { renderPage } from './apps/page.js';
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
+ *   2026-09-13 -- Compose the shared initials-box role and its measured size cut.
  *   v1.3.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-02 — Initial.
  *   v1.2.0 — 2026-09-08 — The builders section: who else may build these apps.
@@ -141,11 +143,11 @@ function draftRow(ctx, app) {
 }
 
 function diffPanel(diff) {
-  if (diff.state === 'loading') return html`<div class="ap-panel"><p class="ap-empty">${a('diffLoading')}</p></div>`;
-  if (diff.state === 'failed') return html`<div class="ap-panel"><p class="ap-empty">${a('diffFailed')}</p></div>`;
+  if (diff.state === 'loading') return html`<div class="ap-panel poster-aside"><p class="ap-empty">${a('diffLoading')}</p></div>`;
+  if (diff.state === 'failed') return html`<div class="ap-panel poster-aside"><p class="ap-empty">${a('diffFailed')}</p></div>`;
   const d = diff.result;
   return html`
-    <div class="ap-panel">
+    <div class="ap-panel poster-aside">
       <p class="ap-panel-lead">${d.addedTotal || d.removedTotal ? a('diffTitle', { added: d.addedTotal, removed: d.removedTotal }) : a('diffNone')}</p>
       ${d.added.length ? html`<span class="og-label">${a('diffAdded')}</span><pre class="ap-code ap-code--add">${d.added.join('\n')}</pre>` : null}
       ${d.removed.length ? html`<span class="og-label">${a('diffRemoved')}</span><pre class="ap-code ap-code--del">${d.removed.join('\n')}</pre>` : null}
@@ -166,7 +168,7 @@ function grantRow(ctx, g) {
         <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.toggleScopes(g)}>${open ? a('hideScopes') : a('viewScopes')}</button>
         <button type="button" class="og-door og-door--quiet" disabled=${busy} onClick=${() => ctx.revokeGrant(g)}>${a('revokeGrant')}</button>
       </div>
-      ${open ? html`<div class="ap-panel"><p class="ap-panel-lead">${a('scopesLead', { origin: g.app_origin || g.app })}</p><div class="ap-scopes">${(g.scopes || []).map((s) => html`<span key=${s}>${s}</span>`)}</div></div>` : null}
+      ${open ? html`<div class="ap-panel poster-aside"><p class="ap-panel-lead">${a('scopesLead', { origin: g.app_origin || g.app })}</p><div class="ap-scopes">${(g.scopes || []).map((s) => html`<span key=${s}>${s}</span>`)}</div></div>` : null}
     </div>`;
 }
 
@@ -215,7 +217,7 @@ function secNewest(ctx, apps) {
           const flags = ctx.kunto?.flags?.[ref] || {};
           const legal = app.manifest?.legal ? Object.keys(app.manifest.legal).length : 0;
           return html`
-            <div class="ap-av" key=${'a' + ref} aria-hidden="true">${initials(nameOf(app))}</div>
+            <div class="ap-av poster-box poster-box--avatar poster-box--small" key=${'a' + ref} aria-hidden="true">${initials(nameOf(app))}</div>
             <div class="ap-nm" key=${'n' + ref}>${nameOf(app)}<small>${a('rowMeta', { version: app.manifest?.version || '', n: app.version_number || 1, date: day(app.created_at), size: kb(app.size) })}</small></div>
             <div class="ap-ds" key=${'d' + ref}>${app.manifest?.descriptions?.[getLocale()] || app.manifest?.description || ''}${requiresLine(app)}</div>
             <div class="ap-st" key=${'s' + ref}>${noteFor(app, flags, grantRefs, legal)}</div>

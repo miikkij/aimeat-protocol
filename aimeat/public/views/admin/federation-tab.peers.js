@@ -22,6 +22,7 @@
  *   - AskingToJoin (05) — the pending requests, and the door to the history
  * @usage Imported by views/admin/federation-tab.js.
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.0 — 2026-09-12 — Initial (the Federation page in the poster face).
  */
@@ -175,7 +176,7 @@ export function AskingToJoin({ overview, historyOpen, onToggleHistory, history, 
 
       ${!pending.length
     ? html`<div class="adm-fed-empty">${S('join.none')}</div>`
-    : html`<div class="og-box">
+    : html`<div class="og-box poster-aside poster-aside--small">
         <span class="og-box-label">${S('join.label', { n: num(pending.length) })}</span>
         ${pending.map(r => html`
           <div class="adm-fed-req" key=${r.id}>

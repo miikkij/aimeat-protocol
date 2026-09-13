@@ -17,6 +17,7 @@
  *   - fieldsOf / bounds: reading one field's rule out of the definition
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.2.0 -- 2026-09-13 -- Compose remaining section headings and record rules from poster.css.
  *   v2.1.0 — 2026-09-13 — Compose shared poster list and empty-state headings.
  *   v2.0.0 — 2026-09-12 — The poster face, and the list that could never show anything: the tab
@@ -415,7 +416,7 @@ function One({ csm, onBack, onDelete }) {
               <div class="adm-csm-fact"><dt>${S('factFederate')}</dt><dd>${S('factFederateOn')}</dd></div>`}
           </dl>
 
-          <div class="adm-csm-warn">
+          <div class="adm-csm-warn poster-aside">
             <b>${S('warnTitle')}</b>${S('warnBody')}
           </div>
         </div>

@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   2026-09-13 -- Let an explicitly composed poster aside own the MCP install row frame.
  *   2026-09-13 -- V2y: compose agent setup panel section headings from poster.css.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2v: compose section top rules from poster.css.
@@ -226,7 +227,7 @@
 .pf .pf-agd-gaii:hover, .pf .pf-agd-gaii:focus-visible { background: var(--sun); color: var(--on-sun); }
 .pf .pf-agd-active-row { border-radius: 0; border-bottom: 1px solid var(--border); }
 /* The attach-this-agent box (components/McpInstall) inside an agent: an ink frame, a mono command. */
-.pf .mcpi--quick, .mcpi--tool { border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); }
+.pf .mcpi--quick, .mcpi--tool:where(:not(.poster-aside)) { border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); }
 .mcpi-cmd-text { border: 2px solid var(--text); border-radius: 0; }
 
 /* ── Raw fields the older tabs still use ───────────────────────────────────────────────── */
