@@ -185,8 +185,8 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       // so a batch that half-lands and is then retried would duplicate what already landed.
       const planned: { key: string; v: unknown; item: ResolvedWriteItem }[] = [];
       for (const [i, want] of norm.items.entries()) {
-        const item = resolveWriteItem(want, types, batch ? `items[${i}]` : undefined);
-        if ('error' in item) return text({ error: item.error }, true);
+        const item = resolveWriteItem(want, types, batch ? `items[${i}]` : undefined, { organismId: organism_id, ws });
+        if ('error' in item) return text({ error: item.error, ...(item.refusal ? { code: item.refusal.code, details: item.refusal.details } : {}) }, true);
         const key = `${root(organism_id, ws)}.${item.namespace}.${item.instanceId}.draft`;
         planned.push({ key, v: coerceValue(parseObj(item.value), item.instanceId), item });
       }

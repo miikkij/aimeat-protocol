@@ -9,6 +9,9 @@
  *   - One-shot compaction: POST /v1/admin/maintenance/compact-workspace-versions applies the same
  *     window to PRE-EXISTING bloat (operator-only; 403 for non-operators, 401 unauthenticated).
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Setup no longer matched production: the bloat was seeded into a workspace
+ *     with no manifest, which UNDECLARED_SPACE now refuses. It is seeded under the same manifest with
+ *     create_only off on shared.logs, then the real manifest is written and read back append-only.
  *   v1.0.0 — 2026-07-16 — Initial: prune-on-publish + maxVersions:0 keep-all + append-only guard +
  *     admin compaction endpoint + auth gates.
  */
@@ -79,17 +82,10 @@ await test('Setup: operator (first owner) + a non-operator', async () => {
     nonOpToken = await registerAndToken(nonOpName);
 });
 
-await test('Create organism + PRE-manifest bloat + manifest with retention spaces', async () => {
+await test('Create organism + pre-existing bloat + manifest with retention spaces', async () => {
     const o = await json('/v1/organisms', { method: 'POST', headers: auth(), body: JSON.stringify({ name: 'Retention Org', type: 'project', join_policy: 'open', visibility: 'public' }) });
     assert(o.status === 201, `org ${o.status}`); orgId = o.body.data.organism.id;
     await writeMem(`organism.${orgId}.meta.workspaces`, { workspaces: [{ id: WS, name: 'Main', createdAt: new Date().toISOString(), createdBy: opName }] });
-
-    // Seed PRE-EXISTING history bloat BEFORE the manifest exists (once shared.logs is declared
-    // create_only, direct .version writes are refused by the write guard — exactly the point).
-    for (let v = 1; v <= 10; v++) await writeMem(`${root()}.shared.bloats.b1.version.${v}`, { id: 'b1', rev: v });
-    await writeMem(`${root()}.shared.bloats.b1.latest`, { id: 'b1', rev: 10 });
-    for (let v = 1; v <= 4; v++) await writeMem(`${root()}.shared.logs.e1.version.${v}`, { id: 'e1', rev: v });
-    await writeMem(`${root()}.shared.logs.e1.latest`, { id: 'e1', rev: 4 });
 
     const manifest = {
         manifestVersion: '1.0', id: orgId, name: 'Main', kind: 'project', status: 'active',
@@ -100,11 +96,33 @@ await test('Create organism + PRE-manifest bloat + manifest with retention space
             { name: 'keep', schemaRef: 'schema:keep@1', namespace: 'shared.keeps', backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'records', maxVersions: 0 },
             // log: APPEND-ONLY — must never be pruned, even with a (bogus) maxVersions declared.
             { name: 'log', schemaRef: 'schema:log@1', namespace: 'shared.logs', backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'records', create_only: true, maxVersions: 2 },
-            // bloat: window 3 — compaction target for the pre-seeded 10-version history above.
+            // bloat: window 3 — compaction target for the pre-seeded 10-version history below.
             { name: 'bloat', schemaRef: 'schema:bloat@1', namespace: 'shared.bloats', backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'records', maxVersions: 3 },
         ],
     };
+
+    // Seed PRE-EXISTING history bloat. The spaces have to be declared first, because a workspace
+    // record in a space the manifest does not declare is refused with 422 UNDECLARED_SPACE; but
+    // shared.logs cannot be create_only yet, because the write guard then refuses direct .version
+    // writes, which is exactly the point. So the seed runs under the same manifest with create_only
+    // turned off on shared.logs (the guard and the retention window both test `=== true`), and the
+    // real manifest replaces it before anything is published or compacted. Direct writes never prune,
+    // so nothing is lost in between.
+    const seedManifest = {
+        ...manifest,
+        objectTypes: manifest.objectTypes.map(ot => (ot.namespace === 'shared.logs' ? { ...ot, create_only: false } : ot)),
+    };
+    await writeMem(`${root()}.meta.manifest`, seedManifest);
+    for (let v = 1; v <= 10; v++) await writeMem(`${root()}.shared.bloats.b1.version.${v}`, { id: 'b1', rev: v });
+    await writeMem(`${root()}.shared.bloats.b1.latest`, { id: 'b1', rev: 10 });
+    for (let v = 1; v <= 4; v++) await writeMem(`${root()}.shared.logs.e1.version.${v}`, { id: 'e1', rev: v });
+    await writeMem(`${root()}.shared.logs.e1.latest`, { id: 'e1', rev: 4 });
+
     await writeMem(`${root()}.meta.manifest`, manifest);
+    // The append-only assertion below tests the manifest compaction reads, so prove that is the real one.
+    const back = await json(`/v1/memory/${encodeURIComponent(`${root()}.meta.manifest`)}`, { headers: auth() });
+    const logs = (back.body.data?.value?.objectTypes as any[] | undefined)?.find(o => o.namespace === 'shared.logs');
+    assert(logs?.create_only === true, `shared.logs is append-only in the stored manifest, got ${JSON.stringify(logs)}`);
 });
 
 // ── Prune on publish ──

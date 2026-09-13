@@ -25,6 +25,9 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   v1.1.0 — 2026-09-13 — A workspace record in a space the manifest does not declare is refused
+ *     with 422 UNDECLARED_SPACE before anything is written, as on every other write door. A merged
+ *     EXCHANGE listing source whose changed text breaks an ODPS length cap answers 422 ODPS_FIELD_TOO_LONG.
  *   v1.0.0 — 2026-08-09 — Initial. Approved 2026-08-09 as the platform half of consolidating
  *     multi-writer pipelines (Sanomat: 44 keys per edition -> 2).
  */
@@ -50,6 +53,8 @@ import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from './owner-target.js';
 import { isKeyArchived } from '../../services/archive.js';
+import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
+import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import { stampAgentWrite } from '../../services/ai-provenance.js';
 import { applyMergePatch } from '../../utils/json-merge-patch.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
@@ -116,6 +121,13 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       const guard = await isKeyArchived(storage, key);
       if (guard.archived) {
         res.status(409).json(error(config.nodeId, 'ARCHIVED', `This ${guard.level} is archived (read-only). Unarchive it before writing.`));
+        return;
+      }
+      // A workspace record in a space the manifest does not declare is refused on every door
+      // (services/workspace-write-items.ts, decided 2026-09-13).
+      const undeclared = await undeclaredSpaceForKey(storage, key, { audience: req.auth!.roles.includes('ecosystem') ? 'writer' : 'member' });
+      if (undeclared) {
+        res.status(undeclared.status).json(error(config.nodeId, undeclared.code, undeclared.message, undeclared.status, undeclared.details));
         return;
       }
     }
@@ -191,6 +203,9 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
         }));
         return;
       }
+      // An EXCHANGE listing source whose changed text would break an ODPS length cap (2026-09-13).
+      const odps = odpsWriteRefusal(key, merged, existing?.value);
+      if (odps) { res.status(odps.status).json(error(config.nodeId, odps.code, odps.message, odps.status, odps.details)); return; }
 
       // Provenance is stamped against the MERGED bytes, because those are the bytes that end up
       // stored. A statement about only the patch would be a statement about something nobody can read

@@ -2,12 +2,23 @@
  * @file test/e2e-outbound.ts
  * @description E2E for the outbound door (company-in-a-box phase 2): the contact
  *   registry (dedupe, GHII resolution, no token leakage), the policied send (AIMEAT
- *   inbox preferred over email, honest failure logging when SMTP is off, opt-out
- *   blocking marketing but not invoices, bounce suppression with explicit clearing,
- *   the rolling daily limit), templates with {{var}} substitution, the invoice
- *   email path (PDF + Finvoice attachments composed), the public unsubscribe
- *   endpoint's no-enumeration behavior, cross-owner isolation and cross-scope 403.
+ *   inbox preferred over email, a send with no transport logged AND answered as
+ *   503 SEND_FAILED naming the logged row, opt-out blocking marketing but not
+ *   invoices, bounce suppression with explicit clearing, the rolling daily limit),
+ *   templates with {{var}} substitution, the invoice email path (PDF + Finvoice
+ *   attachments composed), the public unsubscribe endpoint's no-enumeration
+ *   behavior, cross-owner isolation and cross-scope 403.
+ *
+ *   SMTP is off in this environment, so every plain-email send here ends in 503 SEND_FAILED with
+ *   reason EMAIL_DISABLED. That answer is what "every policy gate passed" looks like: a refusal from
+ *   a gate is 400, 403, 404, 422 or 429 and never reaches the transport.
  * @version-history
+ *   v1.3.0 — 2026-09-13 — POST /v1/outbound/send answers a send that did not go out with SEND_FAILED
+ *     (503 here, where there is no transport) instead of 200, with the send-log id and the reason in
+ *     error.details (the developer's decision of 2026-09-13). Tests 6 and 6b assert the new answer
+ *     and the row it names; 15e, 15f, 15g and 17 read "the gates passed" from it where they read a
+ *     200 'failed' before; 7 and 8 assert that OPTED_OUT and SUPPRESSED name their logged row; 14
+ *     asserts a cross-owner refusal names none.
  *   v1.2.0 — 2026-09-13 — Test 6b pins the fields of a failed send's 200 answer that aimeat_mail_send
  *     on the connector doors reads to answer it as an error (appdev pitfall
  *     send-200-is-not-a-delivery), and that the log row carries the id and reason it names.
@@ -90,6 +101,23 @@ async function makeOwner(name: string): Promise<{ token: string; ghii: string; o
 }
 
 const authed = (token: string): Record<string, string> => ({ Authorization: `Bearer ${token}` });
+
+/**
+ * The answer to a send that passed every gate and had no transport to leave through: 503
+ * SEND_FAILED, no `data`, and the logged row named in `error.details`. Returns the details so a test
+ * can follow the row into the send log.
+ */
+function assertNoTransport(r: { status: number; body: any }, label: string): { message_id: string; status: string; channel: string; reason: string } {
+  assert(r.status === 503, `${label}: expected 503, got ${r.status} ${JSON.stringify(r.body)}`);
+  assert(r.body.ok === false && r.body.data === undefined, `${label}: a send that did not go out must not carry data: ${JSON.stringify(r.body)}`);
+  assert(r.body.error?.code === 'SEND_FAILED', `${label}: expected SEND_FAILED, got ${r.body.error?.code}`);
+  const d = r.body.error.details;
+  assert(typeof d?.message_id === 'string' && d.message_id.length > 0, `${label}: details.message_id: ${JSON.stringify(d)}`);
+  assert(d.status === 'failed', `${label}: details.status: ${d.status}`);
+  assert(d.channel === 'email', `${label}: details.channel: ${d.channel}`);
+  assert(d.reason === 'EMAIL_DISABLED', `${label}: details.reason: ${d.reason}`);
+  return d;
+}
 
 async function makeNarrowAgent(ownerCtx: { token: string; owner: string }): Promise<string> {
   const name = `narrow${Date.now().toString(36).slice(-5)}`;
@@ -194,37 +222,38 @@ await test('5. a recipient with an AIMEAT identity gets the INBOX channel', asyn
   assert(list.includes('Tervetuloa asiakkaaksi') || list.includes('direct_message'), 'recipient notification missing');
 });
 
-await test('6. a plain-email recipient falls to the email channel; no SMTP → honest failed log', async () => {
+await test('6. a plain-email recipient falls to the email channel; no SMTP → 503 SEND_FAILED, not a 200', async () => {
   const r = await json('/v1/outbound/send', {
     method: 'POST', headers: authed(A.token),
     body: JSON.stringify({ contact_id: plainContactId, kind: 'transactional', subject: 'Testiviesti', body: 'Sisältö.' }),
   });
-  assert(r.status === 200, `expected 200 (the send is logged), got ${r.status} ${JSON.stringify(r.body)}`);
-  assert(r.body.data.channel === 'email' && r.body.data.status === 'failed', `expected email/failed, got ${r.body.data.channel}/${r.body.data.status}`);
-  assert(r.body.data.message.error === 'EMAIL_DISABLED', `expected EMAIL_DISABLED, got ${r.body.data.message.error}`);
+  // It answered 200 with data.status 'failed' until 2026-09-13, which a caller reading the status or
+  // `ok` took for a sent message.
+  const d = assertNoTransport(r, 'plain-email send with SMTP off');
+  // The channel is this test's subject: no identity here, so the email channel was the one tried.
+  assert(d.channel === 'email', `expected the email channel, got ${d.channel}`);
 });
 
-await test('6b. a failed send keeps the 200 contract the tool doors read, and its log row says the same', async () => {
-  // The REST answer stays 200 for a failed send (decided 2026-09-13), and aimeat_mail_send on the
-  // connector and CLI doors turns it into an error by reading exactly these fields:
-  // data.status, data.channel, data.message.id and data.message.error (refuseUnsentSend in
-  // cli/connect/tool-call-defs-connections.ts). A rename or a status change here would make those
-  // doors report a refused send as sent again, with nothing else going red.
+await test('6b. a failed send names its send-log row, and the row says the same', async () => {
+  // The id and the reason ride in error.details so a caller can still find the attempt, and the
+  // connector and CLI doors lift exactly these fields into the tool's error (refuseUnsentSend in
+  // cli/connect/tool-call-defs-connections.ts). A rename here would leave those doors answering
+  // SEND_FAILED with no row to point at, with nothing else going red.
   const r = await json('/v1/outbound/send', {
     method: 'POST', headers: authed(A.token),
     body: JSON.stringify({ contact_id: plainContactId, kind: 'transactional', subject: 'Sopimusviesti', body: 'Sisältö.' }),
   });
-  assert(r.status === 200 && r.body.ok === true, `expected 200 ok, got ${r.status} ${JSON.stringify(r.body)}`);
-  const d = r.body.data;
-  assert(d.status === 'failed', `data.status: ${d.status}`);
-  assert(d.channel === 'email', `data.channel: ${d.channel}`);
-  assert(typeof d.message?.id === 'string' && d.message.id.length > 0, `data.message.id: ${JSON.stringify(d.message)}`);
-  assert(d.message.error === 'EMAIL_DISABLED', `data.message.error: ${d.message.error}`);
+  const d = assertNoTransport(r, 'failed send');
+  assert(typeof r.body.error.message === 'string' && r.body.error.message.includes(d.message_id),
+    `the sentence must name the row too, for a caller that reads only the message: ${r.body.error.message}`);
+  const hint = (r.body.hints?.next_actions ?? []).find((h: any) => h.method === 'GET' && String(h.url).startsWith('/v1/outbound/log'));
+  assert(hint?.url === '/v1/outbound/log?status=failed', `the error must point at the log read that lists the row: ${JSON.stringify(r.body.hints)}`);
   const log = await json('/v1/outbound/log?status=failed&per_page=200', { headers: authed(A.token) });
   assert(log.status === 200, `log read: ${log.status}`);
-  const row = (log.body.data.messages as any[]).find(m => m.id === d.message.id);
-  assert(!!row, 'the failed attempt must be in the send log under the id the answer named');
+  const row = (log.body.data.messages as any[]).find(m => m.id === d.message_id);
+  assert(row !== undefined, 'the failed attempt must be in the send log under the id the answer named');
   assert(row.status === 'failed' && row.error === 'EMAIL_DISABLED', `log row: ${JSON.stringify(row)}`);
+  assert(row.subject === 'Sopimusviesti', `the row must be this attempt, got subject ${row.subject}`);
 });
 
 await test('7. opt-out blocks marketing but not transactional', async () => {
@@ -242,9 +271,13 @@ await test('7. opt-out blocks marketing but not transactional', async () => {
     body: JSON.stringify({ contact_id: ghiiContactId, kind: 'transactional', subject: 'Tilausvahvistus', body: 'Tilaus on käsitelty.' }),
   });
   assert(transactional.status === 200 && transactional.body.data.status === 'sent', 'transactional should still deliver');
-  // The refused marketing attempt is in the log as skipped — the record answers "what happened".
+  // The refused marketing attempt is in the log as skipped, so the record answers "what happened",
+  // and the refusal names that row the same way a failed send does.
   const log = await json('/v1/outbound/log?status=skipped', { headers: authed(A.token) });
-  assert(log.body.data.messages.some((m: any) => m.subject === 'Kampanja'), 'skipped marketing missing from log');
+  const skipped = (log.body.data.messages as any[]).find((m: any) => m.subject === 'Kampanja');
+  assert(skipped !== undefined, 'skipped marketing missing from log');
+  assert(marketing.body.error.details?.message_id === skipped.id && marketing.body.error.details?.status === 'skipped',
+    `OPTED_OUT must name its logged row ${skipped.id}, got ${JSON.stringify(marketing.body.error.details)}`);
 });
 
 await test('8. three bounces suppress; suppressed rejects; clear restores', async () => {
@@ -257,6 +290,8 @@ await test('8. three bounces suppress; suppressed rejects; clear restores', asyn
     body: JSON.stringify({ contact_id: plainContactId, kind: 'transactional', subject: 'x', body: 'y' }),
   });
   assert(send.status === 422 && send.body.error?.code === 'SUPPRESSED', `expected 422 SUPPRESSED, got ${send.status}`);
+  assert(send.body.error.details?.status === 'suppressed' && typeof send.body.error.details?.message_id === 'string',
+    `SUPPRESSED must name its logged row: ${JSON.stringify(send.body.error.details)}`);
   const clear = await json(`/v1/outbound/contacts/${plainContactId}/bounce`, { method: 'POST', headers: authed(A.token), body: JSON.stringify({ clear: true }) });
   assert(clear.status === 200 && clear.body.data.contact.bounceCount === 0, 'clear failed');
 });
@@ -355,6 +390,15 @@ await test('14. another owner cannot see or use the contacts (404, empty list)',
     body: JSON.stringify({ contact_id: ghiiContactId, kind: 'transactional', subject: 'x', body: 'y' }),
   });
   assert(send.status === 404, `cross-owner send should be 404, got ${send.status}`);
+  // Refused before any row was written, so there is no send-log id to hand another owner.
+  assert(send.body.error?.details === undefined, `a cross-owner refusal must name no logged row: ${JSON.stringify(send.body.error)}`);
+  // And A's plain-email contact, which would reach the transport for A, is just as absent for B.
+  const plain = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({ contact_id: plainContactId, kind: 'transactional', subject: 'x', body: 'y' }),
+  });
+  assert(plain.status === 404 && plain.body.error?.details === undefined,
+    `cross-owner send to a plain contact should be a bare 404, got ${plain.status} ${JSON.stringify(plain.body.error)}`);
   const list = await json('/v1/outbound/contacts', { headers: authed(B.token) });
   assert(list.body.data.total === 0, "B's contact list should be empty");
   const log = await json('/v1/outbound/log', { headers: authed(B.token) });
@@ -431,20 +475,23 @@ await test('15e. the send log records WHO pressed send, and can be filtered by i
   assert(created.status === 201, `contact: ${created.status} ${JSON.stringify(created.body?.error)}`);
   const bContactId = created.body.data.contact.id as string;
 
+  // SMTP is off, so the attempt is refused at the transport and answered 503; the row it wrote is
+  // what carries the attribution, and the answer names that row.
   const send = await json('/v1/outbound/send', {
     method: 'POST', headers: authed(B.token),
     body: JSON.stringify({ contact_id: bContactId, kind: 'transactional', subject: 'attributed', body: 'y' }),
   });
-  assert(send.status === 200, `send: ${send.status} ${JSON.stringify(send.body?.error)}`);
-  assert(typeof send.body.data.message.sentBy === 'string' && send.body.data.message.sentBy.length > 0,
-    `the log row must name the sender, got ${String(send.body.data.message.sentBy)}`);
+  const attempt = assertNoTransport(send, 'attributed send');
 
   // `me` is resolved server-side: a client composing its own principal string gets it wrong for an
   // agent, whose sends are recorded under the agent's own GAII.
   const mine = await json('/v1/outbound/log?sent_by=me&per_page=200', { headers: authed(B.token) });
   assert(mine.status === 200, `log: ${mine.status}`);
-  const subjects = (mine.body.data.messages as Array<{ subject: string }>).map(m => m.subject);
-  assert(subjects.includes('attributed'), `sent_by=me must find my own send: ${subjects.join(', ')}`);
+  const rows = mine.body.data.messages as Array<{ id: string; subject: string; sentBy: string | null }>;
+  const row = rows.find(m => m.id === attempt.message_id);
+  assert(row !== undefined, `sent_by=me must find my own attempt ${attempt.message_id}: ${rows.map(m => m.subject).join(', ')}`);
+  assert(row!.subject === 'attributed', `the row the answer named is another attempt: ${row!.subject}`);
+  assert(row!.sentBy === B.ghii, `the log row must name the sender ${B.ghii}, got ${String(row!.sentBy)}`);
 
   const someoneElse = await json('/v1/outbound/log?sent_by=nobody@nowhere&per_page=200', { headers: authed(B.token) });
   assert((someoneElse.body.data.messages as unknown[]).length === 0,
@@ -460,11 +507,12 @@ await test('15f. the AI mark is optional, and a word outside the vocabulary is r
 
   // Declaring nothing is the ordinary case and must not be refused: the law does not oblige a mark
   // on a message to one customer, so a node that demanded one would be inventing an obligation.
+  // "Not refused" reads as reaching the transport, which is off here: 503 SEND_FAILED, never a 400.
   const plain = await json('/v1/outbound/send', {
     method: 'POST', headers: authed(B.token),
     body: JSON.stringify({ contact_id: cid, kind: 'transactional', subject: 'plain', body: 'y' }),
   });
-  assert(plain.status === 200, `undeclared send: ${plain.status} ${JSON.stringify(plain.body?.error)}`);
+  assertNoTransport(plain, 'undeclared send');
 
   const declared = await json('/v1/outbound/send', {
     method: 'POST', headers: authed(B.token),
@@ -473,7 +521,7 @@ await test('15f. the AI mark is optional, and a word outside the vocabulary is r
       ai_disclosure: 'ai-generated',
     }),
   });
-  assert(declared.status === 200, `declared send: ${declared.status} ${JSON.stringify(declared.body?.error)}`);
+  assertNoTransport(declared, 'declared send');
 
   const withRecord = await json('/v1/outbound/send', {
     method: 'POST', headers: authed(B.token),
@@ -482,7 +530,7 @@ await test('15f. the AI mark is optional, and a word outside the vocabulary is r
       ai_disclosure: { level: 'ai-assisted', provenance_id: 'prov-1' },
     }),
   });
-  assert(withRecord.status === 200, `declared with record: ${withRecord.status} ${JSON.stringify(withRecord.body?.error)}`);
+  assertNoTransport(withRecord, 'declared with record');
 
   // A near-miss is refused rather than coerced to the nearest word: quietly turning 'ai' into
   // 'ai-generated' would make the field mean whatever the caller happened to type.
@@ -536,19 +584,20 @@ await test('15g. themes are listed already validated, and a bad one never reache
   const cid = created.body.data.contact.id as string;
 
   // Naming that half-broken theme still SENDS: a bad shade of grey is not a reason for somebody's
-  // customer to hear nothing.
+  // customer to hear nothing. Here that means it reaches the transport, which is off: 503
+  // SEND_FAILED for want of SMTP, and not a refusal over the theme.
   const sent = await json('/v1/outbound/send', {
     method: 'POST', headers: authed(B.token),
     body: JSON.stringify({ contact_id: cid, kind: 'transactional', subject: 'themed', body: 'y', theme: 'house' }),
   });
-  assert(sent.status === 200, `themed send: ${sent.status} ${JSON.stringify(sent.body?.error)}`);
+  assertNoTransport(sent, 'themed send');
 
   // And so does a theme nobody has. An unknown id is the default look, not an error.
   const unknown = await json('/v1/outbound/send', {
     method: 'POST', headers: authed(B.token),
     body: JSON.stringify({ contact_id: cid, kind: 'transactional', subject: 'x', body: 'y', theme: 'no-such-theme' }),
   });
-  assert(unknown.status === 200, `unknown theme: ${unknown.status} ${JSON.stringify(unknown.body?.error)}`);
+  assertNoTransport(unknown, 'unknown theme');
 });
 
 await test('15h. another owner does not see or inherit my themes', async () => {
@@ -614,15 +663,13 @@ await test('17. a REAL unsubscribe token opts the recipient out, and the page gi
   const contactId = created.body.data.contact.id as string;
 
   // Positive control: marketing is deliverable BEFORE the unsubscribe, so the 422 further down is
-  // the opt-out and not an unknown contact. 'failed' is the transport (SMTP is off); 200 means
-  // every policy gate passed.
+  // the opt-out and not an unknown contact. 503 SEND_FAILED is the transport (SMTP is off), which
+  // is only reached once every policy gate has passed.
   const before = await json('/v1/outbound/send', {
     method: 'POST', headers: authed(B.token),
     body: JSON.stringify({ contact_id: contactId, kind: 'marketing', subject: 'Kampanja ennen', body: 'x' }),
   });
-  assert(before.status === 200, `marketing before opt-out: expected 200, got ${before.status} ${JSON.stringify(before.body)}`);
-  assert(before.body.data.channel === 'email' && before.body.data.status === 'failed',
-    `expected email/failed, got ${before.body.data.channel}/${before.body.data.status}`);
+  assertNoTransport(before, 'marketing before opt-out');
 
   const token = await readOptOutToken(contactId);
   if (!token) { console.log('    (skip: no readable database for this backend)'); return; }
@@ -655,7 +702,7 @@ await test('17. a REAL unsubscribe token opts the recipient out, and the page gi
     method: 'POST', headers: authed(B.token),
     body: JSON.stringify({ contact_id: contactId, kind: 'transactional', subject: 'Lasku', body: 'x' }),
   });
-  assert(transactional.status === 200, `transactional after opt-out: expected 200, got ${transactional.status} ${JSON.stringify(transactional.body)}`);
+  assertNoTransport(transactional, 'transactional after opt-out');
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

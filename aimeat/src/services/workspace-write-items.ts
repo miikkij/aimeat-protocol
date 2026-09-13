@@ -14,18 +14,26 @@
  *   auto-generated id when the caller gives none, so a half-written batch that the caller retries
  *   would otherwise duplicate the documents that already landed.
  * @structure MAX_BATCH_ITEMS · genDocId() · normalizeWriteItems() · resolveSpace() · resolveWriteItem()
- *   · undeclaredSpaceWarning() · readPublishSpace() · undeclaredSpaceForKey()
+ *   · isPlatformWorkspaceNamespace() · undeclaredSpaceRefusal() · readPublishSpace() · undeclaredSpaceForKey()
  * @usage const norm = normalizeWriteItems({ space, value, id, section, items });
  *   if ('error' in norm) return fail(norm.error);
  *   const resolved = norm.items.map(it => resolveWriteItem(it, objectTypes));
+ *   const refusal = await undeclaredSpaceForKey(storage, key);   // before anything is written
  * @version-history
+ *   v1.3.0 — 2026-09-13 — UNDECLARED_SPACE is a REFUSAL on every door, decided by the developer on
+ *     2026-09-13: 422, nothing written, naming the namespace, the spaces the manifest declares and how
+ *     to declare one. undeclaredSpaceRefusal() is the one decision and the one wording; resolveSpace()
+ *     (the MCP, connector and CLI workspace write, the document edits) and readPublishSpace() /
+ *     undeclaredSpaceForKey() (the memory doors, publishDraft, the batch publish, intake) all return
+ *     it. A workspace with no manifest declares nothing and is refused the same way. The workspace's
+ *     own meta.* keys and the node-owned skills.* and access.* keys are not spaces and are exempt
+ *     (isPlatformWorkspaceNamespace), because a skill file named `notes.draft` parses as a record.
  *   v1.2.0 — 2026-09-13 — UNDECLARED_SPACE: the warning a memory write or a publish carries when the
  *     workspace manifest declares no space for its namespace. The MCP write door refused that write
  *     here, while POST /v1/memory, the SDK's writeDraft and both publish doors stored the record and
  *     answered success, and the workspace read, which lists declared spaces only, never showed it.
- *     A production CRM ran a month and forty-four releases with four such spaces. Warned rather than
- *     refused on those doors, because live apps may keep keys there today (the 2026-09-13 default;
- *     whether to refuse later is the developer's decision). readPublishSpace() is the manifest read both publish paths made inline.
+ *     A production CRM ran a month and forty-four releases with four such spaces.
+ *     readPublishSpace() is the manifest read both publish paths made inline.
  *   v1.1.0 — 2026-09-02 — resolveSpace() split out of resolveWriteItem(), which now calls it. The
  *     in-place document edits need the same manifest lookup and the same two refusals, and a second
  *     copy of "No space named X" is a second sentence to keep true.
@@ -139,35 +147,39 @@ export function normalizeWriteItems(args: {
     };
 }
 
+/** Which workspace a refusal is about, so its repair can name the exact route to call. */
+export interface WorkspaceCoordinate {
+    organismId: string;
+    ws: string;
+}
+
 /**
- * Resolve a space NAME (or its namespace) against the workspace manifest, and refuse a backing whose
- * data does not live in workspace records.
+ * Resolve a space NAME (or its namespace) against the workspace manifest. A space the manifest does
+ * not declare, or declares with a backing whose data does not live in workspace records, is refused
+ * with undeclaredSpaceRefusal(), the one decision every door that writes a workspace record answers to.
  *
- * Shared by the write path below and by the in-place document edits (services/workspace-doc-edit.ts),
- * so "no space named X" and "that backing is not writable here" are one sentence with one meaning
- * however the caller arrived. `at` names the item in a batch, so the caller learns WHICH of twenty
- * documents was wrong instead of that "the batch" failed.
+ * Shared by the write path below and by the in-place document edits (services/workspace-doc-edit.ts).
+ * `at` names the item in a batch, so the caller learns WHICH of twenty documents was wrong instead of
+ * that "the batch" failed. `where` names the workspace for the repair; the connector and CLI doors
+ * that do not pass it get the route with its placeholders left in.
+ *
+ * `error` stays a plain string beside the refusal, because the connector MCP door and the CLI dispatch
+ * render `error` and nothing else.
  */
 export function resolveSpace(
     space: string,
     objectTypes: WriteObjectType[],
     at?: string,
-): ResolvedSpace | { error: string } {
-    const where = at ? `${at}: ` : '';
-    const ot = objectTypes.find(o => o.name === space || o.namespace === space);
+    where?: WorkspaceCoordinate,
+): ResolvedSpace | { error: string; refusal: UndeclaredSpaceRefusal } {
+    const types = (objectTypes ?? []).filter((o): o is WriteObjectType => !!o && typeof o === 'object');
+    const ot = types.find(o => (o.name === space || o.namespace === space) && !!o.namespace && isMemoryBackedSpace(o));
     if (!ot || !ot.namespace) {
-        const names = objectTypes.map(o => o.name).filter(Boolean).join(', ');
-        return { error: `${where}No space named "${space}" in this workspace. Available spaces: ${names || '(none)'}. Pass the space NAME, not its namespace.` };
-    }
-    // A non-memory space's data does NOT live in workspace records — writing it here would store
-    // memory keys that no read surface ever lists. That silent black hole is how 16 published
-    // documents once went invisible, so it is refused loudly instead.
-    if (!isMemoryBackedSpace(ot)) {
-        return {
-            error: ot.backing === 'tasks'
-                ? `${where}Space "${ot.name}" is backed by the task system (backing:'tasks') — create tasks with the task tools, not workspace writes.`
-                : `${where}Space "${ot.name}" has backing '${ot.backing}', which workspace writes do not support. Update the space to backing:'memory' (aimeat_workspace_update); files and knowledge packages attach via workspace Sources or embedded document images.`,
-        };
+        // Built by construction to refuse: no memory-backed space matched by name or namespace.
+        const refusal = undeclaredSpaceRefusal(space, types, {
+            organismId: where?.organismId ?? '{organism_id}', ws: where?.ws ?? '{ws}', acceptName: true, at,
+        }) as UndeclaredSpaceRefusal;
+        return { error: refusal.message, refusal };
     }
     return {
         name: ot.name || space,
@@ -186,86 +198,172 @@ export interface PublishObjectType extends WriteObjectType {
 }
 
 /**
- * What a write or a publish answers, beside its success, when the workspace manifest declares no
- * memory-backed space for the record's namespace. The record IS stored; no workspace read lists it,
- * because the read builds its spaces from the manifest. The usual cause is a workspace created from
- * an older version of an app's manifest, which keeps the spaces it was made with.
+ * Who will read a refusal, which decides how much of the manifest it may show.
+ *   - 'member': a member, an agent or an app grant that passed the organism access rule, and so may
+ *     read the manifest. Told the namespace, the declared spaces and how to declare one.
+ *   - 'writer': an ecosystem app, which may hold a write area without the read area the manifest
+ *     needs (services/ecosystem-access.ts). Told the namespace and how to declare it, not what is declared.
+ *   - 'public': an anonymous submitter (public intake), who is told nothing about the workspace.
  */
-export interface UndeclaredSpaceWarning {
+export type UndeclaredSpaceAudience = 'member' | 'writer' | 'public';
+
+/**
+ * The refusal for a workspace record whose space the manifest does not declare. Its status and code
+ * are what every door sends; `details` carries the same facts as fields a program can act on.
+ * A type alias rather than an interface, so it is assignable to a door's `Record<string, unknown>`.
+ */
+export type UndeclaredSpaceRefusal = {
+    ok: false;
+    status: 422;
     code: 'UNDECLARED_SPACE';
     message: string;
-    namespace: string;
-    declared_spaces: Array<{ name: string; namespace: string }>;
-    how_to_fix: string;
-}
-
-/**
- * The warning for `namespace` against a workspace's objectTypes, or null when a memory-backed space
- * declares it. A `meta.*` namespace is the workspace's own configuration and is never a space.
- */
-export function undeclaredSpaceWarning(
-    namespace: string, objectTypes: WriteObjectType[], organismId: string, ws: string,
-): UndeclaredSpaceWarning | null {
-    if (namespace === 'meta' || namespace.startsWith('meta.')) return null;
-    const types = objectTypes.filter((o): o is WriteObjectType => !!o && typeof o === 'object');
-    if (types.some(o => o.namespace === namespace && isMemoryBackedSpace(o))) return null;
-    const declared = types
-        .filter(o => typeof o.namespace === 'string' && isMemoryBackedSpace(o))
-        .map(o => ({ name: o.name || (o.namespace as string), namespace: o.namespace as string }));
-    const list = declared.map(d => `${d.name} (${d.namespace})`).join(', ') || '(none)';
-    const otherBacking = types.find(o => o.namespace === namespace);
-    return {
-        code: 'UNDECLARED_SPACE',
-        message: otherBacking
-            ? `Stored, but no workspace read will list it: the space "${namespace}" has backing '${otherBacking.backing}', so its data does not live in workspace records. Spaces that do: ${list}.`
-            : `Stored, but no workspace read will list it: this workspace's manifest declares no space "${namespace}". A workspace keeps the spaces it was created with, so one made from an older version of an app's manifest lacks the newer ones. Declared: ${list}.`,
-        namespace,
-        declared_spaces: declared,
-        how_to_fix: `Add the space to this workspace: PUT /v1/organisms/${organismId}/workspace?ws=${ws} with { add_object_types: [{ name, namespace: "${namespace}", mode }], schemas }, or aimeat_workspace_update { organism_id, ws, add_spaces, schemas }. Only the workspace creator or an organism admin may: a plain member is answered 403 NOT_CREATOR, and any other answer is a failure to show someone who can act. Then read the manifest back and compare its objectTypes with the ones the app ships.`,
+    details: {
+        namespace?: string;
+        declared_spaces?: Array<{ name: string; namespace: string }>;
+        backing?: string;
+        how_to_fix: string;
     };
+};
+
+export interface UndeclaredSpaceContext extends WorkspaceCoordinate {
+    /** Match a space by NAME as well as by namespace. Only a caller that names a space (the workspace
+     *  write tools) sets this: a key carries a namespace, and a space whose name happens to equal it
+     *  is not the namespace a workspace read lists. */
+    acceptName?: boolean;
+    audience?: UndeclaredSpaceAudience;
+    /** Which item of a batch this is. */
+    at?: string;
 }
 
 /**
- * Read the manifest entry a publish into `namespace` needs, and the UNDECLARED_SPACE warning.
+ * Not a space at all: the workspace's own configuration (`meta.*`: manifest, readme, sections,
+ * intake forms, comments), the skills published into it (`skills.{name}.manifest | .versions.{semver}
+ * | .files.{path}`) and access requests (`access.request.{owner}`). The node writes these under the
+ * workspace root and no manifest declares them. They must be named here rather than left to the key
+ * parser: a skill file called `notes.draft`, or one under `refs.version.3`, has exactly the shape
+ * parseWorkspaceRecordKey reads as a workspace record, and would be refused as one.
+ */
+export function isPlatformWorkspaceNamespace(namespace: string): boolean {
+    const head = namespace.split('.')[0];
+    return head === 'meta' || head === 'skills' || head === 'access';
+}
+
+/**
+ * THE DECISION. Decided by the developer on 2026-09-13: a workspace record written or published into
+ * a space the workspace manifest does not declare is refused, 422 UNDECLARED_SPACE, before anything is
+ * written. Returns null when a memory-backed space declares `space`, and the refusal otherwise.
  *
- * `ot` comes from the first copy of the manifest the scan returns, which is what both publish paths
- * read inline before this existed. The warning reads EVERY copy: a key is unique per owner, so a
- * workspace can hold more than one manifest, and a space any of them declares is not undeclared.
- * The organism root (no `ws`) has no workspace manifest to compare with and never warns.
+ * Why refuse rather than store: a workspace read builds its spaces from the manifest, so such a record
+ * is stored and listed by nothing. Every door but one answered that write with success, and a
+ * production CRM wrote four such spaces for a month before anyone saw the tab was empty.
+ *
+ * A space declared with a backing whose data lives elsewhere (tasks, rows) is refused too, with the
+ * way to reach that data instead. A workspace with no manifest declares nothing and is refused the
+ * same way. Pure: the caller reads the manifest (readPublishSpace, or its own copy) and passes the
+ * objectTypes of every copy it holds.
+ */
+export function undeclaredSpaceRefusal(
+    space: string, objectTypes: WriteObjectType[], ctx: UndeclaredSpaceContext,
+): UndeclaredSpaceRefusal | null {
+    const types = (objectTypes ?? []).filter((o): o is WriteObjectType => !!o && typeof o === 'object');
+    const matches = (o: WriteObjectType) => o.namespace === space || (ctx.acceptName === true && !!o.name && o.name === space);
+    if (types.some(o => matches(o) && !!o.namespace && isMemoryBackedSpace(o))) return null;
+
+    const at = ctx.at ? `${ctx.at}: ` : '';
+    const audience = ctx.audience ?? 'member';
+    const refusal = (message: string, details: UndeclaredSpaceRefusal['details']): UndeclaredSpaceRefusal =>
+        ({ ok: false, status: 422, code: 'UNDECLARED_SPACE', message: at + message, details });
+
+    if (audience === 'public') {
+        const how = 'Tell whoever runs this form or workspace: its destination has to be declared as a space in the workspace before anything can be saved there.';
+        return refusal(`Nothing was saved: the destination is not a space its workspace declares, so the record could never be listed. ${how}`, { how_to_fix: how });
+    }
+
+    const declareRoute = `PUT /v1/organisms/${ctx.organismId}/workspace?ws=${ctx.ws} with { add_object_types: [{ name, namespace, mode }], schemas }, or aimeat_workspace_update { organism_id, ws, add_spaces, schemas }`;
+    const declareWho = 'Only the workspace creator or an organism admin may: a plain member is answered 403 NOT_CREATOR, and any other answer is a failure to show someone who can act.';
+
+    const other = types.find(o => matches(o) && !isMemoryBackedSpace(o));
+    if (other && audience === 'member') {
+        const label = `"${other.name || space}"${other.namespace && other.namespace !== (other.name || space) ? ` (${other.namespace})` : ''}`;
+        const how = other.backing === 'tasks'
+            ? 'Create tasks with the task tools (aimeat_task_create) instead of writing workspace records.'
+            : other.backing === 'rows'
+                ? `Append rows with aimeat_workspace_rows_append or POST /v1/organisms/${ctx.organismId}/workspace/rows/${other.name || space}?ws=${ctx.ws} instead.`
+                : 'Update the space to backing \'memory\' (aimeat_workspace_update); files and knowledge packages attach through workspace Sources or embedded document images.';
+        return refusal(
+            `Nothing was written: space ${label} has backing '${other.backing}', so its data does not live in workspace records and no workspace read would list this one. ${how}`,
+            { namespace: other.namespace ?? space, backing: String(other.backing), how_to_fix: how },
+        );
+    }
+
+    const declared = types
+        .filter(o => typeof o.namespace === 'string' && !!o.namespace && isMemoryBackedSpace(o))
+        .map(o => ({ name: o.name || (o.namespace as string), namespace: o.namespace as string }));
+    const how = `Declare the space, then write again: ${declareRoute}. ${declareWho}`;
+    const head = `Nothing was written: the manifest of workspace ${ctx.ws} declares no space "${space}" that holds workspace records, and a workspace read lists only the spaces its manifest declares.`;
+    if (audience === 'writer') {
+        return refusal(`${head} Ask the workspace creator or an organism admin to declare it: ${declareRoute}.`, { namespace: space, how_to_fix: how });
+    }
+    const list = declared.length
+        ? declared.map(d => d.name === d.namespace ? d.namespace : `${d.name} (${d.namespace})`).join(', ')
+        : 'none (a workspace without a manifest declares nothing, so check the ws id)';
+    return refusal(
+        `${head} Declared: ${list}. A workspace keeps the spaces it was created with, so one made from an older version of an app's manifest lacks the newer ones. ${how} Read the manifest back afterwards and compare its objectTypes with the ones the app ships.`,
+        { namespace: space, declared_spaces: declared, how_to_fix: how },
+    );
+}
+
+/**
+ * Read the manifest entry a publish into `namespace` needs, and the UNDECLARED_SPACE refusal.
+ *
+ * `ot` comes from the first live copy of the manifest the scan returns, which is what both publish
+ * paths read inline before this existed. The decision reads EVERY copy, archived ones included: a key
+ * is unique per owner, so a workspace can hold more than one manifest, and a space any of them
+ * declares is declared. An archived workspace is refused by the archive guard, which the doors run
+ * separately and which says so; without the archived copies it would be refused here as having no
+ * manifest, which is not true. The organism root (no `ws`) has no workspace manifest and is not refused.
  */
 export async function readPublishSpace(
     storage: Storage, organismId: string, ws: string | undefined, namespace: string,
-): Promise<{ ot: PublishObjectType | undefined; warning: UndeclaredSpaceWarning | null }> {
+    opts?: { audience?: UndeclaredSpaceAudience },
+): Promise<{ ot: PublishObjectType | undefined; refusal: UndeclaredSpaceRefusal | null }> {
     const mkey = `${ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`}.meta.manifest`;
-    const copies = (await storage.listAllMemory({ prefix: mkey, limit: 10 })).items.filter(r => r.key === mkey);
+    const copies = (await storage.listAllMemory({ prefix: mkey, limit: 10, archived: 'include' })).items.filter(r => r.key === mkey);
     const typesOf = (r: MemoryRecord | undefined): PublishObjectType[] =>
         (r?.value as { objectTypes?: PublishObjectType[] } | undefined)?.objectTypes ?? [];
-    const ot = typesOf(copies[0]).find(o => o?.namespace === namespace);
-    const warning = ws && copies.length ? undeclaredSpaceWarning(namespace, copies.flatMap(typesOf), organismId, ws) : null;
-    return { ot, warning };
+    const ot = typesOf(copies.find(r => !r.archived) ?? copies[0]).find(o => o?.namespace === namespace);
+    const refusal = ws && !isPlatformWorkspaceNamespace(namespace)
+        ? undeclaredSpaceRefusal(namespace, copies.flatMap(typesOf), { organismId, ws, audience: opts?.audience })
+        : null;
+    return { ot, refusal };
 }
 
 /**
- * The UNDECLARED_SPACE warning for a memory key, when it is a workspace record
- * (`organism.{org}.w.{ws}.{namespace}.{id}.draft|latest|version.N`); null for every other key.
+ * The UNDECLARED_SPACE refusal for a memory key, when it is a workspace record
+ * (`organism.{org}.w.{ws}.{namespace}.{id}.draft|latest|version.N`) in a space the manifest does not
+ * declare; null for every other key. What the memory doors call before they write.
  */
-export async function undeclaredSpaceForKey(storage: Storage, key: string): Promise<UndeclaredSpaceWarning | null> {
+export async function undeclaredSpaceForKey(
+    storage: Storage, key: string, opts?: { audience?: UndeclaredSpaceAudience },
+): Promise<UndeclaredSpaceRefusal | null> {
     const parts = parseWorkspaceRecordKey(key);
     if (!parts) return null;
-    return (await readPublishSpace(storage, parts.organismId, parts.ws, parts.namespace)).warning;
+    return (await readPublishSpace(storage, parts.organismId, parts.ws, parts.namespace, opts)).refusal;
 }
 
 /**
  * Check one item against the workspace manifest and settle its id. Returns the resolved write or a
- * message written for the agent that has to fix the call.
+ * message written for the agent that has to fix the call; `refusal` is set when the space is the
+ * problem, so a door can answer with its status and code.
  */
 export function resolveWriteItem(
     item: WriteItemInput,
     objectTypes: WriteObjectType[],
     at?: string,
-): ResolvedWriteItem | { error: string } {
-    const where = at ? `${at}: ` : '';
-    const ot = resolveSpace(item.space, objectTypes, at);
+    where?: WorkspaceCoordinate,
+): ResolvedWriteItem | { error: string; refusal?: UndeclaredSpaceRefusal } {
+    const prefix = at ? `${at}: ` : '';
+    const ot = resolveSpace(item.space, objectTypes, at, where);
     if ('error' in ot) return ot;
     const isDoc = ot.isDoc;
     const fromValue = item.value && typeof item.value === 'object' && !Array.isArray(item.value)
@@ -273,7 +371,7 @@ export function resolveWriteItem(
         : '';
     let instanceId = item.id || fromValue;
     if (!instanceId && isDoc) instanceId = genDocId();
-    if (!instanceId) return { error: `${where}A records write needs an id (pass \`id\`, or include \`id\` in \`value\`).` };
+    if (!instanceId) return { error: `${prefix}A records write needs an id (pass \`id\`, or include \`id\` in \`value\`).` };
     return {
         space: ot.name || item.space,
         namespace: ot.namespace,

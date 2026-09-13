@@ -29,8 +29,9 @@
  *   published contracts, and unifying them would be an API break dressed up as a refactor.
  * @structure
  *   - PublishAppInput / PublishAppResult / PublishAppRefusal — the contract
- *   - publishApp(storage, config, input) — resolve version → quota → ARTIFACT CHECK → spec check →
- *     carry forward → lint → stamp → store → subdomain → change log → announce → feed
+ *   - publishApp(storage, config, input) — strip the node's serve marks → resolve version → quota →
+ *     ARTIFACT CHECK → spec check → carry forward → lint → stamp → store → subdomain → change log →
+ *     announce → feed
  * @usage
  *   const out = await publishApp(storage, config, {
  *     ownerName, ownerGhii, callerGaii, filename, data, mimeType: 'text/html',
@@ -39,6 +40,12 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   v1.10.0 — 2026-09-13 — A served copy is stored as its source (the developer's decision): the
+ *     node's own serve marks are removed first (services/app-serve-marks-strip.ts), so the lints, the
+ *     AI posture, the provenance hash, the stored bytes, the size and the dependency map all read
+ *     the author's bytes, and the result names what was removed in `servedMarksRemoved`. Measured
+ *     before the change on a served copy of an app that asks for ai:use and discloses nothing: the
+ *     node's own visible label read as the app's disclosure and hid the gap.
  *   v1.9.1 — 2026-09-11 — The IndexNow notice goes through announceApp: each host under its own key,
  *     and the app stamped with when it was last told.
  *   v1.9.0 — 2026-09-05 — The declared register travels to the publish response beside the track,
@@ -86,6 +93,7 @@ import { recordAccountEvent } from './account-events.js';
 import { provenanceForWrite, type DeclaredProvenance } from './ai-provenance.js';
 import { lintAppAiDisclosure, type AppAiLintResult } from './app-ai-posture.js';
 import { lintAppArtifact, type AppArtifactFinding } from './app-artifact-lint.js';
+import { stripServedMarks, type ServedMarkRemoval } from './app-serve-marks-strip.js';
 import { evaluateSpecCheck, type AppSpecCheck } from './app-spec-gate.js';
 import { buildPublishNextSteps } from './app-publish-next-steps.js';
 import { readAppDataMap } from './data-map/data-map-store.js';
@@ -196,6 +204,12 @@ export interface PublishAppResult {
   specCheck: AppSpecCheck;
   /** Non-blocking artifact findings (HTML only) — the blocking ones became a refusal. */
   artifactWarnings: AppArtifactFinding[];
+  /**
+   * The node's own serve marks this upload carried and the publish took out before storing
+   * (services/app-serve-marks-strip.ts). Empty for a source upload. Doors render it with
+   * servedMarksResponse().
+   */
+  servedMarksRemoved: ServedMarkRemoval[];
   /** Agent face + bound skill, and what to do about each. Best-effort, so it can be undefined. */
   nextSteps?: Record<string, unknown>;
 }
@@ -207,12 +221,24 @@ export interface PublishAppResult {
  * so a refusal leaves no half-published state. The provenance stamp is taken over the bytes **as
  * stored** and before `createApp`, so the hash in the record identifies exactly the bytes a
  * detection query will be asked about — the serve-time marks are added on the way out and cannot
- * change the answer.
+ * change the answer. "As stored" means after the serve marks an uploaded served copy carried were
+ * taken back out, which is the first thing this function does.
  */
 export async function publishApp(
   storage: Storage, config: AimeatConfig, input: PublishAppInput,
 ): Promise<PublishAppResult | PublishAppRefusal> {
-  const { ownerName, ownerGhii, callerGaii, filename, data, mimeType, requested } = input;
+  const { ownerName, ownerGhii, callerGaii, filename, mimeType, requested } = input;
+
+  // A SERVED COPY IS STORED AS ITS SOURCE (the developer's decision, 2026-09-13). The node's own
+  // serve marks are taken out here, before anything reads the bytes, so the artifact check, the AI
+  // posture, the provenance hash, the stored row, the size and the dependency map all see what the
+  // owner wrote rather than what the node added on the way out. It never refuses: the removals are
+  // named in the result, and every serve adds the current marks again. HTML only, since the marks
+  // only ever go into HTML.
+  const isHtml = /html/i.test(mimeType);
+  const { data, removed: servedMarksRemoved } = isHtml
+    ? stripServedMarks(input.data)
+    : { data: input.data, removed: [] };
 
   const delegate = accountOf(callerGaii) !== accountOf(ownerName)
     ? await effectiveDevLevel(storage, { owner: ownerName, filename, principal: callerGaii }) : null;
@@ -248,7 +274,6 @@ export async function publishApp(
   // (the path is /v1/libs/) and threw before drawing anything, while the publish response said
   // "published". Everything else the check notices is a warning further down. Refusing here rather
   // than after createApp is what keeps a rejected publish from leaving a half-written version.
-  const isHtml = /html/i.test(mimeType);
   const html = isHtml ? data.toString('utf8') : '';
   const artifact = isHtml
     ? await lintAppArtifact(html, config)
@@ -582,6 +607,7 @@ export async function publishApp(
     ...(aiProvenanceId ? { aiProvenanceId } : {}),
     specCheck,
     artifactWarnings: artifact.warnings,
+    servedMarksRemoved,
     // Every door returns this now. It used to exist only on the MCP inline branch, so the two
     // things an app most often lacks went unmentioned on the door most apps come through.
     nextSteps: await buildPublishNextSteps(

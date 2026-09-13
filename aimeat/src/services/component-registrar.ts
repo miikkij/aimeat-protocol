@@ -15,6 +15,8 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.5.0 — 2026-09-13 — A package's extension component whose flagged action carries text past an ODPS
+ *     length cap is refused before it is created (ODPS_FIELD_TOO_LONG), as every install door refuses it.
  *   v1.4.0 — 2026-08-23 — An installed app keeps the crew-defs it bundles. The manifest built here
  *     had no `cortex` key at all, so a package whose app shipped agents installed an app with none,
  *     in silence — while the PUBLISH door carried them fine (NOSTE ships two in production). The
@@ -46,6 +48,7 @@ import { parseBundledCrews } from './app-bundled-crews.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { publishApp } from './app-publish.js';
 import { forgetDependencies, appRef } from './dependency-map.js';
+import { odpsWriteRefusal, extensionOdpsKey } from './exchange-odps-write.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -279,6 +282,9 @@ export async function registerComponent(
               + 'digits and hyphens, 3 to 128 characters). The name becomes this extension\'s memory address.',
           };
         }
+
+        const odps = odpsWriteRefusal(extensionOdpsKey(registeredAs), built.record, null);
+        if (odps) return { success: false, componentId, registeredAs, error: `${odps.code}: ${odps.message}` };
 
         await storage.createExtension({
           ...built.record,

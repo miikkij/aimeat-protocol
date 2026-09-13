@@ -15,12 +15,21 @@
  *      unsubscribe link (auto-appended, token-based, no auth needed to opt out)
  *   6. every attempt — sent, failed, suppressed, skipped — lands in the append-only
  *      send log (the GDPR-answerable record)
+ *   7. only a send that went out is returned; every other outcome throws OutboundError,
+ *      and one that wrote a log row names that row in `details`
  *
  *   Invoice sends attach the PDF + Finvoice XML and flip the invoice's deliveryStatus.
  *
- * @structure OutboundError · ensureContact · recordBounce/optOut · sendOutbound
+ * @structure OutboundError · SendAttemptDetails · sendFailedError · ensureContact ·
+ *   recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   v1.4.0 — 2026-09-13 — A send that did not go out THROWS OutboundError SEND_FAILED (502 when the
+ *     channel refused or failed it, 503 when the node had nothing to send through) after it is
+ *     logged, with the send-log id and the reason in `details`. It used to come back as a result with
+ *     status 'failed', and each door had to remember to read that field; the REST route did not
+ *     and answered 200. Suppression and opt-out name their logged row in `details` the same way.
+ *     Decided by the developer on 2026-09-13.
  *   v1.3.0 — 2026-08-23 — Every send log says WHICH COMPANY sent it, and the daily cap counts per
  *     company when one is named (TARGET-072). `company_id` reached the SMTP identity and stopped
  *     there, so an owner with two companies had one sending reputation, one allowance and no way
@@ -62,11 +71,68 @@ import { renderCampaignEmail } from './campaign-email.js';
 import { resolveTheme, isThemeId, themeKey } from './email-theme.js';
 import { disclosureHeaders, type AiDisclosure } from './ai-disclosure.js';
 
+/**
+ * Where a refused or failed attempt was recorded, so a caller can find it again.
+ *
+ * Carried on every OutboundError thrown AFTER a send-log row was written, and on no other: a refusal
+ * that wrote nothing (an unknown contact, a daily allowance that is used up) has no row to name, and
+ * inventing an id would send somebody looking for a record that does not exist.
+ */
+export interface SendAttemptDetails {
+  /** The send-log row, as GET /v1/outbound/log lists it. */
+  message_id: string;
+  status: OutboundStatus;
+  channel: OutboundChannel;
+  /** The code or the provider's own words, exactly as the row's `error` holds it. */
+  reason: string;
+}
+
 export class OutboundError extends Error {
-  constructor(public readonly code: string, public readonly statusCode: number, message: string) {
+  constructor(
+    public readonly code: string,
+    public readonly statusCode: number,
+    message: string,
+    public readonly details?: SendAttemptDetails,
+  ) {
     super(message);
     this.name = 'OutboundError';
   }
+}
+
+/** The error a logged refusal throws: the row it wrote, in `details`. */
+function loggedRefusal(code: string, statusCode: number, message: string, log: OutboundMessageRecord): OutboundError {
+  return new OutboundError(code, statusCode, message, {
+    message_id: log.id, status: log.status, channel: log.channel, reason: log.error ?? log.status,
+  });
+}
+
+/**
+ * A send that reached channel selection and did not go out, as the error every door answers.
+ *
+ * THE MAPPING, decided by the developer on 2026-09-13. Code SEND_FAILED on both, and the HTTP status
+ * says which of the two things the send log can tell apart happened:
+ *
+ *   503: this node had NOTHING TO SEND THROUGH. No shared transport, and neither a company server
+ *        nor a connected mailbox was named. Retrying changes nothing until someone configures one;
+ *        the fix is on the node or in the request, never at the recipient. Reason EMAIL_DISABLED.
+ *   502: the channel that carries the message REFUSED OR FAILED it. The node's SMTP server
+ *        (SMTP_SEND_FAILED), a company's own server (its words), a connected mailbox's provider
+ *        (MAILBOX_*), or the recipient's AIMEAT inbox on this node (BLOCKED, RECIPIENT_NOT_FOUND).
+ *        The node did its part and the channel said no.
+ *
+ * It used to be a result with status 'failed', which every door then had to remember to read. The
+ * REST route did not, and answered 200 for a message nobody received; the three tool doors each
+ * carried their own copy of the check. Thrown from the one function every door calls, it cannot be
+ * forgotten.
+ */
+export function sendFailedError(log: OutboundMessageRecord, noTransport: boolean): OutboundError {
+  const reason = log.error ?? log.status;
+  const repair = noTransport
+    ? 'This node has no mail transport set up: send through a connected mailbox (connection_id) or a company with its own mail server, or ask whoever runs the node to configure one.'
+    : 'The channel refused or failed it: read the reason before sending again, because a refusal from the recipient\'s side does not change on a retry.';
+  return loggedRefusal('SEND_FAILED', noTransport ? 503 : 502,
+    `Not sent (${reason}). Nothing reached the recipient; the attempt is in the send log as ${log.id}. ${repair}`,
+    log);
 }
 
 const SUPPRESS_AFTER_BOUNCES = 3;
@@ -313,10 +379,11 @@ export interface SendInput {
   signalSubject?: string;
 }
 
+/** A send that went out. Every other outcome is thrown, so there is no other status to return. */
 export interface SendResult {
   log: OutboundMessageRecord;
   channel: OutboundChannel;
-  status: OutboundStatus;
+  status: 'sent';
 }
 
 function substitute(text: string, variables: Record<string, string>): string {
@@ -346,7 +413,6 @@ async function loadOwnTheme(storage: Storage, ownerGhii: string, id: string | un
   return rec?.value ?? undefined;
 }
 
-/** The send. Every outcome is logged; only policy violations throw. */
 /**
  * The caller's own mailbox, if they named one, with the context the transport needs.
  *
@@ -368,6 +434,10 @@ async function resolveMailbox(
   return { sender, ctx };
 }
 
+/**
+ * The send. Every attempt that reaches a gate with a recipient is logged; only a send that went out
+ * is returned. A refusal or a failure throws OutboundError, and one that wrote a row names it.
+ */
 export async function sendOutbound(config: AimeatConfig, storage: Storage, ownerGhii: string, input: SendInput): Promise<SendResult> {
   // WHICH COMPANY IS SPEAKING, resolved before anything else, because it decides WHOSE BOOK this
   // send belongs to and every gate below reads that book.
@@ -409,13 +479,13 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   // Gate 2: suppression beats everything.
   if (contact.suppressedAt) {
     const log = await writeLog(storage, bookOwner, contact.id, 'email', input.kind, input.subject ?? '(suppressed)', input.templateId ?? null, 'suppressed', `Address suppressed after ${contact.bounceCount} bounces`, input.invoiceId ?? null, organismId, ownerGhii);
-    throw Object.assign(new OutboundError('SUPPRESSED', 422, 'Recipient address is suppressed (bounces); clear it on the contact first'), { log });
+    throw loggedRefusal('SUPPRESSED', 422, 'Recipient address is suppressed (bounces); clear it on the contact first', log);
   }
 
   // Gate 3: opt-out blocks marketing only.
   if (contact.optedOut && input.kind === 'marketing') {
     const log = await writeLog(storage, bookOwner, contact.id, 'email', input.kind, input.subject ?? '(opted out)', input.templateId ?? null, 'skipped', 'Recipient has opted out of marketing', input.invoiceId ?? null, organismId, ownerGhii);
-    throw Object.assign(new OutboundError('OPTED_OUT', 422, 'Recipient has opted out of marketing messages'), { log });
+    throw loggedRefusal('OPTED_OUT', 422, 'Recipient has opted out of marketing messages', log);
   }
 
   // Gate 4: rolling 24 h daily limit, PER COMPANY when the send names one.
@@ -472,6 +542,10 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   let channel: OutboundChannel;
   let status: OutboundStatus;
   let error: string | null = null;
+  // Set exactly where the node finds it has nothing to send through. It is what tells 503 from 502
+  // (see sendFailedError), and it is a flag rather than a comparison against the reason string so
+  // that renaming a code cannot move a failure from one status to the other without anyone noticing.
+  let noTransport = false;
 
   if (contact.ghii) {
     channel = 'inbox';
@@ -504,6 +578,7 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
     if (!mailbox && !companySender && !emailSvc?.enabled) {
       status = 'failed';
       error = 'EMAIL_DISABLED';
+      noTransport = true;
     } else {
       const unsubscribeUrl = `${config.baseUrl}/v1/outbound/unsubscribe?token=${contact.optOutToken}`;
       // The two halves are built by services/outbound/email-body.ts, which is pure and therefore
@@ -556,6 +631,7 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
       } else {
         status = 'failed';
         error = 'EMAIL_DISABLED';
+        noTransport = true;
       }
     }
   }
@@ -576,6 +652,9 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   // The caller's own surfaces are watching too when the book is somebody else's, and an event that
   // reached only the book would leave the person who pressed send looking at a stale screen.
   if (bookOwner !== ownerGhii) emitChange('outbound', ownerGhii);
+  // LOGGED AND ANNOUNCED FIRST, THEN REFUSED. The row and the change event are what an owner reads
+  // when a send looks wrong, so a failure reaches both before it becomes an error for the caller.
+  if (status !== 'sent') throw sendFailedError(log, noTransport);
   return { log, channel, status };
 }
 

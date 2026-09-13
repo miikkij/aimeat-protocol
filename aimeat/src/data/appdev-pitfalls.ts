@@ -410,7 +410,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'edit-published-app',
     title: 'Editing a published app: seed a draft, change it, publish it under the same filename',
     symptom: 'Rebuilding an app from scratch, publishing under a new filename, or looking for the source in aimeat_app_get (which returns the manifest, not the HTML) loses version history and forks the audience.',
-    fix: 'aimeat_app_draft_seed copies the live app into a draft on the node; change it with aimeat_app_draft_read / aimeat_app_draft_replace, open its preview_url, and publish with aimeat_app_draft_publish under the SAME filename, which bumps the version. When you need a local copy, GET the app\'s download_url (the raw file), never the inline page, which carries the node\'s serve marks.',
+    fix: 'aimeat_app_draft_seed copies the live app into a draft on the node; change it with aimeat_app_draft_read / aimeat_app_draft_replace, open its preview_url, and publish with aimeat_app_draft_publish under the SAME filename, which bumps the version. When you need a local copy, GET the app\'s download_url (the stored file). A copy saved from the inline page carries the node\'s serve marks; publishing one still works, because the publish removes those marks before storing and names them in served_marks_removed, but the stored file is the one to edit.',
     appliesTo: ['publish'],
     severity: 'info',
     source: 'curated',

@@ -13,6 +13,12 @@
  * @structure zod schemas · sendErr mapper · outboundRouter
  * @usage app.use(outboundRouter(config, storage)) in routes-loader
  * @version-history
+ *   v1.3.0 — 2026-09-13 — A send that did not go out answers an error envelope instead of 200: code
+ *     SEND_FAILED, 502 when the channel refused or failed it, 503 when the node had nothing to send
+ *     through, and the send-log id plus the reason in error.details. A send that went out keeps 200
+ *     and its body. A deliberate contract change for REST callers, decided by the developer on
+ *     2026-09-13; the decision lives in sendOutbound, and every OutboundError that names a logged
+ *     attempt (SUPPRESSED and OPTED_OUT too) now carries it in details.
  *   v1.2.1 — 2026-09-13 — The send handler says why a failed send still answers 200 and where the
  *     tool doors turn that outcome into an error. No behaviour change.
  *   v1.2.0 — 2026-08-30 — The log read accepts ?company=<id>: one company's sends, resolved to
@@ -113,9 +119,21 @@ function publicContact(c: import('../models/outbound-schemas.js').OutboundContac
   return safe;
 }
 
+/**
+ * An OutboundError as the envelope. When the refusal wrote a send-log row, `details` names it and the
+ * next action is the log read that lists it, so a caller holding only the error can still find the
+ * attempt: the id to match, and the status filter that narrows the list to rows like it.
+ */
 function sendErr(res: Response, config: AimeatConfig, e: unknown): boolean {
   if (e instanceof OutboundError) {
-    res.status(e.statusCode).json(error(config.nodeId, e.code, e.message));
+    const hints = e.details
+      ? [{
+        description: `Find this attempt (${e.details.message_id}) in the send log`,
+        method: 'GET',
+        url: `/v1/outbound/log?status=${encodeURIComponent(e.details.status)}`,
+      }]
+      : undefined;
+    res.status(e.statusCode).json(error(config.nodeId, e.code, e.message, e.statusCode, e.details, hints));
     return true;
   }
   return false;
@@ -265,11 +283,11 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
         ...(disclosure ? { aiDisclosure: disclosure } : {}),
         links: b.links, signalStreamId: b.signal_stream_id, signalSubject: b.signal_subject,
       });
-      // 200 FOR EVERY OUTCOME, INCLUDING 'failed'. A send the provider refused, or one with no
-      // transport, is logged and answered here with data.status 'failed' and the reason in
-      // data.message.error; callers read that field, so the contract stays (decided 2026-09-13).
-      // The TOOL doors read differently and answer such a send as an error: aimeat_mail_send in
-      // mcp/connections.ts and refuseUnsentSend() in cli/connect/tool-call-defs-connections.ts.
+      // 200 ONLY FOR A SEND THAT WENT OUT. A send the channel refused, or one with no transport,
+      // is logged and then THROWN by sendOutbound as SEND_FAILED (502 or 503, the row and the reason
+      // in details), and sendErr below answers it. It answered 200 with data.status 'failed' until
+      // the developer decided otherwise on 2026-09-13, and a caller reading the status or `ok` took
+      // a message nobody received for a sent one.
       res.json(success(config.nodeId, {
         message: result.log, channel: result.channel, status: result.status,
       }));

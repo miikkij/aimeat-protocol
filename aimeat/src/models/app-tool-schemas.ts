@@ -13,6 +13,8 @@
  *   const rec = await storage.getMemory(sellerGhii, appToolsKey(appId));
  *   const doc = AppToolsDocSchema.parse(rec.value);
  * @version-history
+ *   Comment only — 2026-09-13 — `exchange` states the developer's two decisions: a tool and the flagged
+ *     extension action it calls list once, and changed text past an ODPS cap is refused at the write.
  *   v1.8.0 — 2026-08-01 — TARGET-058 Phase 5: optional `aiProvenance` on a tool and on the manifest
  *     root — an `aimeat.provenance/v1` document describing the tool's OUTPUT, beside the ODPS
  *     `provenance` that describes its data. Permissive (passthrough) and optional on purpose: a
@@ -121,6 +123,9 @@ export const AppToolSchema = z.object({
    * marketplace listing: flag on + a price → the tool is projected onto the market and its price/labels
    * track this manifest; flag off → the projected listing is delisted. Existing CONTRACTS are never
    * affected — they stay pinned to the interface version and price they were signed at.
+   * A tool whose `action_id` names an extension action that is flagged too lists ONCE: the tool is
+   * listed and the action is skipped as its duplicate, unless `lockedInput` makes the tool a different
+   * product. Text past an ODPS cap on a flagged tool is refused at the write when it changed.
    */
   exchange: z.boolean().optional(),
   /** Usage licence surfaced on the projected offering (mandatory to list — the legibility gate). */

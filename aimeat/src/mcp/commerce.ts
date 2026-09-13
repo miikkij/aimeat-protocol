@@ -20,6 +20,10 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.5.0 — 2026-09-13 — A refused write hands back its details with the text, so aimeat_app_tools_publish
+ *     and aimeat_offer_price_set can say which field made an ODPS document too long, its length, the cap
+ *     and the room left (the shared write refuses it, services/exchange-odps-write.ts). The listing
+ *     answer's `skipped` rows carry DUPLICATE_OF when a tool and its extension action list once.
  *   v1.4.0 — 2026-09-13 — aimeat_app_tools_publish answers with an `exchange` block: which tools
  *     listed, which were skipped and why (SCHEMA_REQUIRED, NOT_PRICED, NO_ASSIGNEE ...), and the
  *     warnings (a tool that duplicates a flagged extension action, an ODPS field past its schema cap).
@@ -162,7 +166,10 @@ export function registerCommerceTools(
             ownerScoped: true,
             authorisingScope,
         });
-        return written.ok ? { refusal: null, exchange: written.exchange ?? null } : { refusal: `${written.code}: ${written.message}` };
+        if (written.ok) return { refusal: null, exchange: written.exchange ?? null };
+        // The refusal's details travel with its text: an ODPS_FIELD_TOO_LONG names each field, its length,
+        // the cap and the room left there, and a tool call has no other channel to hand them back on.
+        return { refusal: `${written.code}: ${written.message}${written.details ? `\n${JSON.stringify(written.details)}` : ''}` };
     }
 
     // ── Seller: PSP credentials (secret in, masked status out — NEVER the secret) ──
@@ -360,7 +367,7 @@ export function registerCommerceTools(
                 pipeline: 'mcp.offer_price_set',
                 authorisingScope: 'commerce:sell',
             }, agent_name, offers);
-            if (!published.ok) return fail(`${published.code}: ${published.message}`);
+            if (!published.ok) return fail(`${published.code}: ${published.message}${published.details ? `\n${JSON.stringify(published.details)}` : ''}`);
             return ok({
                 agent: published.agentName, offer: offer_id,
                 price: offer.price ?? null, priceMoney: offer.priceMoney ?? null,
