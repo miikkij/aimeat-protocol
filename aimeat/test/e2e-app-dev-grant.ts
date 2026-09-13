@@ -359,5 +359,40 @@ await test('a blanket right reaches an app that has no roster row of its own', a
     assert((after.body.data.versions as any[]).length === n + 1, "the owner's second app gained the version");
 });
 
+// TWO SPELLINGS OF "WHOSE APP IS THIS", AND THE DOOR OPENED ON THE WRONG ONE. Each of these doors
+// looks the app up with `segment.split('@')[0]` and then asks resolveAppTarget whether the caller
+// may act on it — and resolveAppTarget read the same segment as a PRINCIPAL, so everything after a
+// `#` was the owner. `owner@x#stranger` therefore found the OWNER's app and compared equal to
+// caller `stranger`, which is the "your own app" branch: no grant looked up, no refusal possible.
+// Reproduced on 2026-09-13 against a sandbox node: the plain path answered 403 and this one 200.
+await test('a crafted owner segment cannot make somebody else\'s app read as your own', async () => {
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const crafted = encodeURIComponent(`${owner.name}@x#${stranger.name}`);
+
+    // The honest path first, so the test proves the refusal is not simply always-on.
+    const plain = await json(`/v1/apps/${owner.name}/${APP}/screenshot`, {
+        method: 'POST', headers: auth(stranger.token),
+        body: JSON.stringify({ screenshot: png, screenshot_mime_type: 'image/png' }),
+    });
+    assert(plain.status === 403, `the plain path must refuse a stranger, got ${plain.status}`);
+
+    const shot = await json(`/v1/apps/${crafted}/${APP}/screenshot`, {
+        method: 'POST', headers: auth(stranger.token),
+        body: JSON.stringify({ screenshot: png, screenshot_mime_type: 'image/png' }),
+    });
+    assert(shot.status !== 200, `the crafted segment wrote a screenshot onto ${owner.name}'s app: ${JSON.stringify(shot.body?.data)}`);
+    assert(shot.status === 400 || shot.status === 403 || shot.status === 404,
+        `expected a refusal, got ${shot.status}: ${JSON.stringify(shot.body?.error)}`);
+
+    // The same segment through a draft door, because the fix belongs to every door that asks
+    // resolveAppTarget and not to the one that was found first.
+    const draft = await json(`/v1/apps/${crafted}/${APP}/draft`, {
+        method: 'PUT', headers: auth(stranger.token),
+        body: JSON.stringify({ content: html('taken') }),
+    });
+    assert(draft.status !== 200 && draft.status !== 201,
+        `the crafted segment wrote a draft onto ${owner.name}'s app: ${draft.status}`);
+});
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);
