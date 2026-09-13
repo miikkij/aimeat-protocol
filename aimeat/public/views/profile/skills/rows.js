@@ -11,6 +11,7 @@
  * @structure skillRow · skillOpen · loadingRow
  * @usage import { skillRow } from './rows.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose catalogue detail frames from poster.css.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { h } from 'preact';
@@ -57,7 +58,7 @@ function skillOpen(ctx, s, who) {
   const picker = ctx.picker && ctx.picker.ref === s.ref ? ctx.picker : null;
   const publicIndex = s.scope === 'node' && s.visibility === 'public';
   return html`
-    <div class="sk-open">
+    <div class="sk-open poster-frame">
       <p class="sk-lead">${s.description || ''}</p>
       <div class="sk-kv">
         <div class="sk-k">${x('ref')}</div><div class="sk-v"><code>${s.ref}</code> · <${CopyButton} text=${s.ref} className="og-crumb-link" label=${x('copy')} copiedLabel=${x('copied')} /><br /><code>${pinned}</code> · <${CopyButton} text=${pinned} className="og-crumb-link" label=${x('copyPinned')} copiedLabel=${x('copied')} /><small>${x('refSub')}</small></div>

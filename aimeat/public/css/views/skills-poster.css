@@ -10,6 +10,7 @@
  *   with the editor, and the AI rule box.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose catalogue detail frames from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose the agent rule with the shared ink frame.
  *   v1.0.0 — 2026-09-03 — Initial (replaces the .pf-skl-* rules in profile.css).
  */
@@ -52,7 +53,7 @@
 .sk-me .og-crumb-link { font-size: inherit; font-weight: 600; }
 .sk-p > .sk-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
 .sk-go .og-door { font-size: .72rem; }
-.sk-p > .sk-open { grid-column: 1 / -1; display: block; margin: 0 0 .4rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.sk-p > .sk-open { grid-column: 1 / -1; display: block; margin: 0 0 .4rem; padding: 1rem 1.2rem 1.1rem; box-shadow: 8px 8px 0 var(--sun); font-size: .9rem; line-height: 1.55; color: var(--text); }
 .sk-lead { margin: 0 0 .5rem; font-size: .95rem; line-height: 1.55; }
 .sk-open code { display: inline-block; max-width: 100%; margin: .1rem 0; font-family: var(--font-mono); font-size: .74rem; background: var(--bg-dim); padding: .1rem .35rem; overflow-wrap: anywhere; }
 .sk-open-doors { margin-top: 1rem; }
