@@ -17,6 +17,7 @@
  *   square mono chip, 2px framed, selected on the sun; and the ink slab, which comes from
  *   .btn-primary rather than from here.
  * @version-history
+ *   v2.3.0 -- 2026-09-13 -- Compose state section headings from the shared B1 shape.
  *   v2.2.0 -- 2026-09-13 -- Compose the standalone page title from poster.css.
  *   v2.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   v2.0.0 — 2026-09-03 — The poster face. No radius, no --card fill, no bespoke chip: square mono
@@ -117,24 +118,16 @@
    lines fifty-two times, which is one fact typeset as a wall. It belongs to the STATE, so it sits
    on the group and the rows under it carry only what differs. */
 .flt-group {
+  --poster-section-size: 1.25rem;
   margin-bottom: 2rem;
 }
 
-/* The group head is a headline, so it is set in the headline face. The state word carries the
-   colour: a headline whose second half is coral when that half is the point. */
+/* The shared B1 heading holds the state, credential kind and count on a wrapping line. */
 .flt-group-head {
   display: flex;
   align-items: baseline;
   gap: 0.6rem;
   flex-wrap: wrap;
-  margin: 0 0 0.2rem;
-  font-family: var(--font-poster);
-  font-weight: var(--font-poster-weight);
-  font-size: 1.25rem;
-  line-height: var(--font-poster-leading);
-  letter-spacing: var(--font-poster-tracking);
-  text-transform: uppercase;
-  color: var(--text);
 }
 
 .flt-group-kind,
@@ -144,18 +137,10 @@
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--text-dim);
+  color: inherit;
 }
 
-/* The state is the thing the eye should land on. --text-dim is not used at heading size: measured
-   in a design review, it made "Never connected" the palest text on the page above six agents'
-   worth of rows, so the two states whose meaning colour IS the quiet grey read as ink instead. */
-.flt-group-state.flt-state--ok { color: var(--success-fg); }
-.flt-group-state.flt-state--expiring { color: var(--warn-fg); }
-.flt-group-state.flt-state--dead { color: var(--accent); }
-.flt-group-state.flt-state--unreadable { color: var(--accent); }
-.flt-group-state.flt-state--never { color: var(--text); }
-.flt-group-state.flt-state--unknown { color: var(--text); }
+/* The state words inherit the B1 slab's foreground in both themes. */
 
 .flt-group-note {
   margin: 0 0 0.8rem;
@@ -364,7 +349,7 @@
 }
 
 @media (max-width: 600px) {
-  .flt-group-head { font-size: 1.05rem; }
+  .flt-group { --poster-section-size: 1.05rem; }
   .flt { --poster-page-size: 2rem; }
   /* `margin-left: auto` on a row that has wrapped strands the control on a line of its own against
      a right edge that is not there. Same trap the state word already carries a rule for. */
