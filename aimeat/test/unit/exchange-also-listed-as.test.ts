@@ -3,7 +3,7 @@
  * @description An owner who flags an extension action for EXCHANGE AND flags an app-tool bound to that
  *   same action gets two listings for one call. The two coordinates never collide (`kaiku/search` and
  *   `apptool:seller/shop.html/find`), so the only duplicate guard, DUPLICATE_OF, never saw it, and
- *   nothing told the owner. Ruled 2026-09-13: both listings stay, and the reconcile report carries an
+ *   nothing told the owner. The 2026-09-13 default: both listings stay, and the reconcile report carries an
  *   ALSO_LISTED_AS row on each side naming the other. Whether they should list once is still open.
  * @usage cd aimeat && pnpm exec vitest run test/unit/exchange-also-listed-as.test.ts
  * @version-history

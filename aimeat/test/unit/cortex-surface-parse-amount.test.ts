@@ -7,7 +7,7 @@
  *
  *   WHY THIS FILE ALSO COMPARES TWO COPIES. A cortex pack is a hand-written browser IIFE and a served
  *   SDK lib is an esbuild bundle; neither can import the other, so the surface pack carries a copy of
- *   src/static/sdk-libs/commerce/amount.js. The ruling was ONE parser, so the copy is held to the
+ *   src/static/sdk-libs/commerce/amount.js. The fix keeps ONE parser, so the copy is held to the
  *   original here: every input in the table below and every short string over the characters that
  *   matter must get the same answer from both, or this fails and says which input drifted.
  * @version-history

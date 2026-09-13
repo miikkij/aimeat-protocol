@@ -560,8 +560,9 @@ function overrunMessage(doc: OdpsDocument, limit: OdpsTextLimit, path: string, l
 }
 
 /**
- * The fields of a generated ODPS document that are longer than the schema allows. A WARNING, by ruling
- * (2026-09-13): the authoring schemas accept more than ODPS does in these fields, and the node neither
+ * The fields of a generated ODPS document that are longer than the schema allows. A WARNING (the
+ * default chosen on 2026-09-13, open for the developer): the authoring schemas accept more than ODPS
+ * does in these fields, and the node neither
  * refuses the listing nor shortens the text, because a truncated legal restriction states something the
  * provider never wrote. What it owes the provider is being told, which is what this is for.
  */

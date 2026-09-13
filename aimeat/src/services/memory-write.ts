@@ -406,7 +406,7 @@ export async function writeMemoryRecord(
     // 8. A workspace record whose space the workspace manifest does not declare. Stored, answered as
     //    a success, and never listed, because the workspace read builds its spaces from the manifest.
     //    The MCP workspace door refuses that write; this door warns instead, because live apps may
-    //    keep keys there today (ruling 2026-09-13). Only `organism.*.w.*` record keys pay the read.
+    //    keep keys there today (the 2026-09-13 default; refusing is the developer's call). Only `organism.*.w.*` record keys pay the read.
     //    The warning lists the workspace's declared spaces, which is manifest content, and an
     //    ecosystem app may hold a write area without the read area the manifest needs, so it is not
     //    told (services/ecosystem-access.ts: a GEAI reads organism data only through a read area).
