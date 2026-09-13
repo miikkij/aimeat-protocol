@@ -12,6 +12,7 @@
  * @structure extRow · extOpen · cortexRow · cortexOpen
  * @usage import { extRow, cortexRow } from './rows.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose catalogue detail frames from poster.css.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { h } from 'preact';
@@ -66,8 +67,8 @@ function schemaWords(schema) {
 
 function extOpen(ctx, ext, own) {
   const d = ctx.details['ext:' + ext.name];
-  if (!d) return html`<div class="ex-open"><p class="ex-empty">${t('common.loading')}</p></div>`;
-  if (d.error) return html`<div class="ex-open"><p class="ex-empty">${d.error}</p></div>`;
+  if (!d) return html`<div class="ex-open poster-frame"><p class="ex-empty">${t('common.loading')}</p></div>`;
+  if (d.error) return html`<div class="ex-open poster-frame"><p class="ex-empty">${d.error}</p></div>`;
   const active = ext.status === 'active';
   const base = `${ctx.nodeUrl}/v1/ext/${encodeURIComponent(ext.name)}`;
   const firstAction = (d.actions || [])[0]?.id || 'action';
@@ -79,7 +80,7 @@ function extOpen(ctx, ext, own) {
   const test = ctx.test && ctx.test.ext === ext.name ? ctx.test : null;
   const used = ext.used_by || {};
   return html`
-    <div class="ex-open">
+    <div class="ex-open poster-frame">
       <p class="ex-lead">${ext.description || ''}</p>
       <span class="og-label">${x('actions')}</span>
       <div class="ex-act">
@@ -137,15 +138,15 @@ export function cortexRow(ctx, cx) {
 
 function cortexOpen(ctx, cx, own) {
   const d = ctx.details['cx:' + cx.name];
-  if (!d) return html`<div class="ex-open"><p class="ex-empty">${t('common.loading')}</p></div>`;
-  if (d.error) return html`<div class="ex-open"><p class="ex-empty">${d.error}</p></div>`;
+  if (!d) return html`<div class="ex-open poster-frame"><p class="ex-empty">${t('common.loading')}</p></div>`;
+  if (d.error) return html`<div class="ex-open poster-frame"><p class="ex-empty">${d.error}</p></div>`;
   const comps = d.components || [];
   const libs = comps.filter((c) => c.type === 'lib');
   const prompts = comps.filter((c) => c.type === 'prompt');
   const tag = (lib) => `<script src="${ctx.nodeUrl}/v1/cortex/${encodeURIComponent(cx.name)}@${cx.version}/libs/${encodeURIComponent(lib.filename)}"></script>`;
   const used = cx.used_by || {};
   return html`
-    <div class="ex-open">
+    <div class="ex-open poster-frame">
       <p class="ex-lead">${cx.description || ''}</p>
       <div class="ex-kv">
         ${libs.map((lib) => html`

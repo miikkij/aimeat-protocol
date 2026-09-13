@@ -10,6 +10,7 @@
  * @structure packRow · packOpen
  * @usage import { packRow } from './rows.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose catalogue detail frames from poster.css.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { h } from 'preact';
@@ -59,15 +60,15 @@ function modelExplained(p) {
 
 function packOpen(ctx, p) {
   const d = ctx.details[p.id];
-  if (!d) return html`<div class="lb-open"><p class="lb-empty">${t('common.loading')}</p></div>`;
-  if (d.error) return html`<div class="lb-open"><p class="lb-empty">${d.error}</p></div>`;
+  if (!d) return html`<div class="lb-open poster-frame"><p class="lb-empty">${t('common.loading')}</p></div>`;
+  if (d.error) return html`<div class="lb-open poster-frame"><p class="lb-empty">${d.error}</p></div>`;
   const include = Array.isArray(d.include) ? d.include : (p.include || []);
   const proofs = p.proofs || d.proofs || [];
   const used = p.used_by || {};
   const changelog = Array.isArray(d.changelog) ? d.changelog.slice().reverse() : [];
   const aiText = aiTextFor(p, d);
   return html`
-    <div class="lb-open">
+    <div class="lb-open poster-frame">
       <p class="lb-lead">${p.description || ''}</p>
       <div class="lb-kv">
         <div class="lb-k">${x('intoApp')}</div><div class="lb-v">${include.map((line) => html`<code key=${line}>${line}</code>`)}<small>${include.length > 1 ? x('intoAppOrder') : x('intoAppOne')} · <${CopyButton} text=${include.join('\n')} className="og-crumb-link" label=${x('copyLines')} copiedLabel=${x('copied')} /></small></div>
