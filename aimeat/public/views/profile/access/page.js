@@ -19,6 +19,7 @@
  *   secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-06 — Section 04, the secrets: the list with what names each one, the add form
  *     as a fold with a write-only value field, a replace on the row and a delete behind the
@@ -151,7 +152,7 @@ function secSignIn(ctx) {
   return html`
     <${Section} id="ac-signin" num="01" title=${x('secSignIn')} count=${sub} first=${true}>
       <p class="ac-para">${tf.enabled || s.passkeys.count ? x('signInIntroOn') : x('signInIntro')}</p>
-      ${s.managed_by ? html`<div class="ac-why"><b>${t('profile.security.managedTitle')}</b> ${t('profile.security.managedDesc').replace('{name}', s.managed_by.name)}</div>` : null}
+      ${s.managed_by ? html`<div class="ac-why poster-frame"><b>${t('profile.security.managedTitle')}</b> ${t('profile.security.managedDesc').replace('{name}', s.managed_by.name)}</div>` : null}
       <div class="ac-rows">
         ${row(x('row.password'), s.has_password ? x('row.passwordSet') : x('row.passwordNone'), html`<span class=${`og-chip ${s.has_password ? '' : 'og-chip--coral'}`}>${s.has_password ? x('inUse') : x('none')}</span>`)}
         ${!s.managed_by && s.passkeys.available ? html`
@@ -194,7 +195,7 @@ function secKeys(ctx) {
           ${list.length > shown.length ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => ctx.showMoreKeys()}>${x('moreKeys', { n: list.length - shown.length })}</button>` : null}
           ${unused ? html`<button type="button" class="og-door og-door--quiet og-door--danger" disabled=${ctx.busy === 'unused'} onClick=${() => ctx.revokeUnused()}>${x('revokeUnused', { n: unused, days: 30 })}</button>` : null}
         </div>` : null}
-        ${ctx.baseHolders ? html`<div class="ac-why"><b>${x('whyBaseTitle')}</b> ${x('whyBase', { n: ctx.baseHolders, total: ov.appGrants.total })} ${ov.base_package.map(scopeSentence).join('; ')}.</div>` : null}`
+        ${ctx.baseHolders ? html`<div class="ac-why poster-frame"><b>${x('whyBaseTitle')}</b> ${x('whyBase', { n: ctx.baseHolders, total: ov.appGrants.total })} ${ov.base_package.map(scopeSentence).join('; ')}.</div>` : null}`
       : html`<p class="ac-empty"><b>${x('keysEmptyTitle')}</b> ${x('keysEmptyBody')}</p>`}
       ${tokenFold(ctx)}
     <//>`;
@@ -211,10 +212,10 @@ function tokenFold(ctx) {
   const ready = !!f.label.trim() && (!scoped || chosen.length > 0);
   const created = ctx.created;
   return html`
-    <div style="margin-top: 1.2rem;">
+    <div class="ac-form-gap">
     <${Fold} id="ac-token" num="" title=${x('form.title')} sub=${created ? x('form.subCreated') : ''} open=${f.open} onToggle=${() => ctx.toggleForm()}>
       ${created ? html`
-        <div class="ac-open" style="margin: 0 0 1rem;">
+        <div class="ac-open ac-token-created">
           <span class="og-box-label">${x('created.title')}</span>
           <p class="ac-lead">${x('created.once')}</p>
           <div class="ac-token"><code>${created.token}</code><${CopyButton} className="og-door" text=${created.token} label=${x('copy')} onCopied=${() => ctx.showToast(x('created.copied'))} /></div>
@@ -278,7 +279,7 @@ function secSecrets(ctx) {
           ${list.map((s) => secretRow(ctx, s))}
         </div>`
       : (!ctx.secretsFailed ? html`<p class="ac-empty"><b>${x('secrets.emptyTitle')}</b> ${x('secrets.emptyBody')}</p>` : null)}
-      <div class="ac-why"><b>${x('secrets.whoTitle')}</b> ${x('secretsWho')}</div>
+      <div class="ac-why poster-frame"><b>${x('secrets.whoTitle')}</b> ${x('secretsWho')}</div>
       ${secretFold(ctx)}
     <//>`;
 }
@@ -288,7 +289,7 @@ function secretFold(ctx) {
   const f = ctx.secretForm;
   const ready = !!f.name.trim() && !!f.value;
   return html`
-    <div style="margin-top: 1.2rem;">
+    <div class="ac-form-gap">
     <${Fold} id="ac-secret-add" num="" title=${x('secrets.addTitle')} open=${f.open} onToggle=${() => ctx.toggleSecretForm()}>
       <div class="ac-form">
         <span class="og-label">${x('secrets.name')}</span>

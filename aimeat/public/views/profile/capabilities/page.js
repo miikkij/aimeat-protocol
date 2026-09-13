@@ -10,6 +10,7 @@
  * @structure renderPage · shelf · secOther · secAgent
  * @usage import { renderPage } from './capabilities/page.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
@@ -172,7 +173,7 @@ function secAgent(ctx, num, all, calls, vouches) {
   return html`
     <${Section} id="cp-ai" num=${num} title=${x('secAi')} count=${null}>
       <p class="cp-para">${x('aiIntro')}</p>
-      <div class="cp-rule">
+      <div class="cp-rule poster-frame">
         <span class="og-label">${x('ruleLabel')}</span>
         <p class="cp-para">${x('ruleBody', { base: ctx.nodeUrl })}</p>
         <div class="og-doors"><${CopyButton} text=${agentRule(ctx.nodeUrl)} className="og-door" label=${x('copyRule')} copiedLabel=${x('copied')} /></div>

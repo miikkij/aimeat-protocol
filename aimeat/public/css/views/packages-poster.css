@@ -10,6 +10,7 @@
  *   a new package, and the AI rule box.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
  *   v1.1.0 — 2026-09-05 — The compose form (a name, the owner's apps as a capped scrolling list with
  *     what each one loads beside it) and the block that says what a package deliberately did not
  *     carry. On a phone the app's name and its needs stack under the checkbox.
@@ -131,7 +132,7 @@
 .pk-expects .pk-para:last-child { margin-bottom: 0; }
 
 /* ── The rule an AI gets ───────────────────────────────────────────────────────────────────── */
-.pk-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; border: 3px solid var(--text); background: var(--card-bg); }
+.pk-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; }
 .pk-rule .og-label { display: block; margin-bottom: .3rem; }
 .pk-rule .pk-para { margin-bottom: .6rem; }
 

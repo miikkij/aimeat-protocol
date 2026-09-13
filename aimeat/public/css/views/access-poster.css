@@ -12,6 +12,7 @@
  *   quieted here. Every column is bounded so a long origin or label wraps inside its cell.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
  *   v1.1.0 — 2026-09-06 — Section 04, the secrets: a four-column list whose name column carries the
  *     {{secret:NAME}} spelling under the name, and the write-only field that replaces a value. It
  *     is the key list's grid with the middle column narrower, because "used by" is a short list of
@@ -32,8 +33,10 @@
 .ac-msg { display: block; margin: .4rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--success-fg); }
 .ac-msg.is-err { color: var(--accent); }
 .ac-slab-hint { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); max-width: 18rem; text-align: right; }
-.ac-why { margin-top: .9rem; padding: .8rem 1rem; border: 3px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; }
+.ac-why { margin-top: .9rem; padding: .8rem 1rem; font-size: .9rem; line-height: 1.55; }
 .ac-why b { font-weight: 800; }
+.ac-form-gap { margin-top: 1.2rem; }
+.ac-token-created { margin: 0 0 1rem; }
 .ac-label { display: block; margin: 1.1rem 0 .3rem; }
 
 /* ── 01: the sign-in rows ─────────────────────────────────────────────────────────────────── */
