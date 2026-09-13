@@ -36,6 +36,8 @@
  *   - Phase 8: aimeat_app_delete, both refusal arms and the real delete
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-extensions-apps
  * @version-history
+ *   v1.2.0 — 2026-09-13 — Test 23b: upload mode carries cortex_agents to the PUT and refuses a
+ *     malformed one before handing out a URL.
  *   v1.1.0 — 2026-09-08 — Test 21 asserts the tool's own ceiling now that /v1/mcp admits it.
  *   v1.0.0 — 2026-09-08 — Initial: the extension and app refusal arms, the two presigned roads, the
  *     draft workflow, and the app-size finding pinned on test 21.
@@ -594,6 +596,34 @@ await test('23. Omitting the content hands back a presigned road, and the PUT pu
     const versions = await json(`/v1/apps/${encodeURIComponent(author.owner)}/${PRESIGNED_APP}/versions`);
     assert(versions.status === 200, `the presigned app is not readable: ${versions.status}`);
     assert(versions.body.data.total === 1, `the presigned publish made ${versions.body.data.total} versions`);
+});
+
+await test('23b. Upload mode carries cortex_agents to the PUT, and a malformed one is refused before a URL', async () => {
+    // Upload mode accepted cortex_agents, minted a token without them and published an app with no
+    // agents: the pitfall "upload-mode-drops-cortex-agents" (2026-07-21) told builders to go inline.
+    const crew = {
+        agent_name: `upload-crew-${STAMP}`, readme_md: 'A crew that rides the upload road.', llm_profile: 'content',
+        agents: [{ role: 'Writer', goal: 'Write one line', backstory: 'Terse.', tools: ['memory'], allow_delegation: false }],
+        tasks: [{ id: 't1', description: 'Write about: {{ctx.prompt}}', expected_output: 'One line', agent: 'Writer' }],
+        process: 'sequential',
+    };
+    const file = `ea-upcrew-${STAMP}.html`;
+    const minted = await callTool(authorSession, 'aimeat_app_publish', {
+        filename: file, name: `Upload crew ${STAMP}`, category: 'tool', cortex_agents: [crew],
+        description: 'An app whose crew-def travels through the upload road.',
+        roadmap: 'A crew-def through the upload road.',
+    });
+    assert(!minted.isError && minted.data.mode === 'upload', `upload-mode mint: ${minted.text.slice(0, 300)}`);
+    const put = await fetch(minted.data.upload_url, { method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: `<!doctype html><title>crew ${STAMP}</title>` });
+    assert(put.status === 200, `PUT ${put.status}: ${(await put.text()).slice(0, 300)}`);
+    const probe = await json(`/v1/apps/${encodeURIComponent(author.owner)}/${file}/agents/${crew.agent_name}/instances`, { headers: authed(author.token) });
+    assert(probe.status === 200, `the crew-def did not survive upload mode: ${probe.status} ${JSON.stringify(probe.body?.error)}`);
+
+    const bad = await callTool(authorSession, 'aimeat_app_publish', {
+        filename: `ea-upbad-${STAMP}.html`, name: 'Bad crew', cortex_agents: [{ not_a_crew_def: true }],
+    });
+    assert(bad.isError && /Invalid cortex_agents/.test(bad.text), `malformed crew-def in upload mode: ${bad.text.slice(0, 300)}`);
+    assert(!bad.text.includes('upload_url'), 'the refusal handed back an upload URL');
 });
 
 console.log('\nPhase 7 — the draft workflow and the version list');
