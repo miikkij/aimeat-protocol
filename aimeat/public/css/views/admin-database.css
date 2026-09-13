@@ -8,6 +8,7 @@
  *   or by name. The sections, the strip, the doors and the slab come from admin.css and
  *   organism.css; only what this page adds lives here. Every value is a theme.css token.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Keep table-bar appearance in CSS while SVG attributes carry the ratios.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 
@@ -69,7 +70,7 @@
 /* Not `.adm-db-bar`: admin.css has owned that name since the old table, as the blue FILL inside
    a track, and redefining it here reached every page that still draws one. */
 .adm-db-share { height: 10px; background: var(--bg-surface); }
-.adm-db-share i { display: block; height: 100%; background: var(--text); }
+.adm-db-share svg { display: block; height: 100%; background: var(--text); }
 .adm-db-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 12px 2px 0; font-size: .78rem; color: var(--text-dim); }
 .adm-db-foot .adm-db-note { font-family: var(--font-mono); font-size: .72rem; }
 
