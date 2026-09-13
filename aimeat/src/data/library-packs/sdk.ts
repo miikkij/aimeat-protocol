@@ -10,6 +10,8 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.12.4 — 2026-09-13 — aimeat-auth's aiDoc tells a page to show itself from onSession, which runs for
+ *     a restore and a sign-in alike; onLogin stays sign-in only.
  *   v1.12.3 — 2026-09-13 — aimeat-auth's aiDoc names AIMEAT.auth.signIn(), the compact default and
  *     res.ok; aimeat-storage's names viewUrl() with a "<gaii>/<key>" reference and versioned_url.
  *   v1.12.2 — 2026-09-13 — Four appdev pitfalls answered in the libs, and said where a builder reads:
@@ -83,7 +85,7 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: [],
     license: 'MIT',
     apiSurface: 'AIMEAT.auth',
-    aiDoc: 'Login UI, Ed25519 auth, JWT lifecycle, session management. Handle BOTH login paths: mountLoginButton onLogin fires ONLY on a fresh sign-in (not on reload) — also call AIMEAT.auth.login() on load to restore an already-signed-in user. For a sign-in button of your own, call AIMEAT.auth.signIn() from its click handler: the consent popup on an app origin, the sign-in modal elsewhere; it resolves to the session or null. login() only restores and never opens anything. mountLoginButton is compact on phones by default; pass compact:false to keep the full row. session.fetch() returns already-parsed JSON: check res.ok before res.data, because a refusal resolves as a value.',
+    aiDoc: 'Login UI, Ed25519 auth, JWT lifecycle, session management. Show the app from mountLoginButton(sel, { onSession(session, { restored }) }): it runs once for every session that becomes available, the restore on page load (restored: true) and a sign-in (false), so it is the one handler a page needs. onLogin still fires ONLY on a fresh sign-in; never reload the page from either. For a sign-in button of your own, call AIMEAT.auth.signIn() from its click handler: the consent popup on an app origin, the sign-in modal elsewhere; it resolves to the session or null. login() only restores and never opens anything. mountLoginButton is compact on phones by default; pass compact:false to keep the full row. session.fetch() returns already-parsed JSON: check res.ok before res.data, because a refusal resolves as a value.',
     changelog: [],
     tierHint: 'T1',
     interviewTriggers: [],

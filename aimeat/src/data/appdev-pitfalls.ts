@@ -12,6 +12,8 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   v1.7.1 — 2026-09-13 — handle-both-auth-paths names onSession, the one handler for a restore and a
+ *     sign-in, and keeps the two-path wiring for a page that does not use it.
  *   v1.7.0 — 2026-09-13 — Every entry re-read against the code and stamped (verifiedAt,
  *     verifiedVersion). Fourteen corrected where the platform had moved under them, among them
  *     login-is-silent-only (AIMEAT.auth.signIn exists now), edit-published-app (the draft road,
@@ -270,9 +272,9 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'handle-both-auth-paths',
-    title: 'Handle BOTH onLogin (fresh) and login() restore',
+    title: 'Show the app from onSession: onLogin alone misses a returning user',
     symptom: 'The app works on first sign-in but shows logged-out UI after a reload: onLogin fires on a fresh interactive sign-in, not on a session restored in the background.',
-    fix: 'Wire both paths at startup into one "session ready" handler: `AIMEAT.auth.login().then(s => { if (s) ready(s); })` for the restore, and `mountLoginButton(sel, { onLogin: ready })` (or the auth `login` event) for a fresh sign-in. Make ready() safe to run twice. The pill renders signed-in only from a live session, so a stale stored one no longer shows "logged in" over an app that cannot call anything.',
+    fix: 'Pass your "session ready" handler as `mountLoginButton(sel, { onSession: ready })`: it runs once for a restore (`restored: true`) and for a sign-in (`restored: false`), so there is one path instead of two. Without onSession, wire both: `AIMEAT.auth.login().then(s => { if (s) ready(s); })` for the restore and `onLogin: ready` for a fresh sign-in, and make ready() safe to run twice. The pill renders signed-in only from a live session, so a stale stored one no longer shows "logged in" over an app that cannot call anything.',
     appliesTo: ['auth', 'app'],
     severity: 'warn',
     source: 'curated',

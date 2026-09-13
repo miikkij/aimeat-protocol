@@ -11,9 +11,13 @@
  *   module that imports isAppOrigin, apexLogout or requestConsentPopup from './session.js' is
  *   untouched.
  *
- * @structure isAppOrigin · appScopeDrift · silentAppToken · apexLogout · requestConsentPopup
+ * @structure isAppOrigin · appScopeDrift · silentAppToken · apexLogout · requestConsentPopup ·
+ *   reportUngrantableScopes
  * @usage import { isAppOrigin, silentAppToken } from './app-origin.js';
  * @version-history
+ *   v1.1.0 — 2026-09-13 — reportUngrantableScopes moved here from session.js, unchanged, when the
+ *     onLogin decision took that file past the 800-line ceiling. It reads the bridge's answer and
+ *     writes to the console, and nothing else, so it sits with the bridge it reports on.
  *   v1.0.0 — 2026-09-04 — Extracted verbatim from auth/session.js (lines 109-234).
  */
 import { APEX_URL, appDeclaredScopes } from './config.js';
@@ -65,6 +69,20 @@ export function silentAppToken() {
     (document.body || document.documentElement).appendChild(iframe);
     timer = setTimeout(function () { finish(null); }, 8000);
   });
+}
+
+/**
+ * Say, in the console, why nobody can sign in to this app. The bridge names the app and the words
+ * (routes/app-grants.ts); an older node sends neither, and then the sentence says less but still
+ * says what to check.
+ * @param {{ app?: string, unknown?: string }} r
+ */
+export function reportUngrantableScopes(r) {
+  try {
+    console.error('[aimeat-auth] Nobody can sign in to ' + (r.app || 'this app') + ': its <meta name="aimeat-scopes"> asks for '
+      + (r.unknown ? r.unknown : 'a word') + ', which this node cannot grant, and one such word refuses the whole sign-in. '
+      + 'Take the words from GET /v1/app-grants/scopes and publish the app again.');
+  } catch { /* no console */ }
 }
 
 // End the shared apex session from an APP ORIGIN (frames the same-site apex bridge in ?mode=logout).
