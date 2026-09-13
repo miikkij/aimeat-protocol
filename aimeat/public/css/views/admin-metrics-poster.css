@@ -9,6 +9,7 @@
  *   its own maximum in the header, so a bar is never a proportion of something a reader guesses.
  *   The sections, the strip and the doors come from admin.css and organism.css.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Keep share-bar appearance in CSS while SVG attributes carry the ratios.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 
@@ -56,10 +57,10 @@
 .adm-mx-name { font-family: var(--font-mono); font-size: .82rem; color: var(--text); overflow-wrap: anywhere; }
 .adm-mx-labels { font-family: var(--font-mono); font-size: .76rem; color: var(--text-dim); overflow-wrap: anywhere; }
 .adm-mx-bar { height: 12px; background: var(--bg-surface); }
-.adm-mx-bar i { display: block; height: 100%; background: var(--sun); }
+.adm-mx-bar svg { display: block; height: 100%; background: var(--sun); }
 /* The total is measured, not a part of the stack, so it is not the parts' colour. */
 .adm-mx-row--sum { border-bottom: 0; border-top: 2px solid var(--text); padding-top: 13px; }
-.adm-mx-row--sum .adm-mx-bar i { background: var(--text); }
+.adm-mx-row--sum .adm-mx-bar svg { background: var(--text); }
 .adm-mx-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 12px 2px 0; font-size: .78rem; color: var(--text-dim); }
 .adm-mx-foot .adm-mx-note { font-family: var(--font-mono); font-size: .72rem; }
 
