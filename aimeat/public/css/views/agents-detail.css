@@ -6,6 +6,7 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.28.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
  *   v1.27.0 -- 2026-09-09 -- .pf-agd-crew-llm: which model an agent thinks with, on the Crew tab.
@@ -2523,9 +2524,6 @@
   flex-wrap: wrap;
   gap: 0;
   row-gap: 2px;
-  /* Divider above the bar too, so the tabs read as their own block and don't
-     blend into the status row (Polling | Last seen | Today: N done) above. */
-  border-top: 1px solid var(--border, #E5E7EB);
   margin-top: 0.5rem;
   padding-top: 0.25rem;
   border-bottom: 1px solid var(--border, #E5E7EB);

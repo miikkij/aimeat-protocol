@@ -5,6 +5,7 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.26.0 -- 2026-09-06 -- The GAII stands on the row itself, closed and open, and copies itself
  *     when pressed (GaiiChip). It was the one thing about an agent that gets typed somewhere else,
@@ -321,7 +322,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
         ${renderZone2(state, agent, onboarding, setActiveTab, showToast)}
 
         <!-- Tab Bar -->
-        <div class="pf-agd-tabs">
+        <div class="pf-agd-tabs poster-row--thing">
           ${tabs.map(tab => {
             const label = t(tab.key);
             const changeKey = TAB_CHANGE_KEY[tab.id];

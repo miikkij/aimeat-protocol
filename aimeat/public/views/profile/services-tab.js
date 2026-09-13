@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab for publishing/managing services and browsing the catalogue.
  * @version-history
+ *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS classes; i18n for unit options and detail labels
@@ -258,7 +259,7 @@ export default function ServicesTab({ session, showToast, onStats }) {
   return html`
     <div class="poster-page-title">${t('profile.services.title')}</div>
     <div class="section-desc">${t('profile.services.desc')}</div>
-    <div class="sub-tabs">
+    <div class="sub-tabs poster-row--thing">
       <button class="sub-tab ${svcSubTab === 'mine' ? 'active' : ''}" onClick=${() => setSvcSubTab('mine')}>${t('profile.services.mine')}</button>
       <button class="sub-tab ${svcSubTab === 'catalogue' ? 'active' : ''}" onClick=${() => { setSvcSubTab('catalogue'); if (!catalogue) loadCatalogueData(catFilter); }}>${t('profile.services.catalogue')}</button>
     </div>
