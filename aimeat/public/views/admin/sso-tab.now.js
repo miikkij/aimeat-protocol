@@ -23,6 +23,7 @@
  *   - RightNow — the word, the five rows, the strip
  * @usage Imported by views/admin/sso-tab.js.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Organisation sign-in page in the poster face).
  */
 import { h } from 'preact';
@@ -59,7 +60,7 @@ export function Nothing({ node, onConnect }) {
   return html`
     <section class="og-sec og-sec--first" id="adm-sso-01">
       <div class="og-sec-h">
-        <h2>${S('now.title')}<small>01</small></h2>
+        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--danger" disabled=${node.locked} onClick=${onConnect}>
             ${S('now.connect')}
@@ -129,7 +130,7 @@ export function RightNow({ data, onConnect, toSection }) {
   return html`
     <section class="og-sec og-sec--first" id="adm-sso-01">
       <div class="og-sec-h">
-        <h2>${S('now.title')}<small>01</small></h2>
+        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" disabled=${node.locked} onClick=${onConnect}>
             ${S('now.connect')}
