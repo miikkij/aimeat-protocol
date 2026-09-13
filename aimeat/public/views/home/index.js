@@ -16,6 +16,7 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-09-14: The failure line is the site's shared toast (theme.css), held for its six seconds.
  *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v3.0.0 — 2026-08-26 — The finished home renders through the surface layout engine. The eleven
  *     fetches and the raw aimeat-live-update listener that re-ran all of them on any event of any
@@ -149,6 +150,6 @@ export default function HomeView({ navigate }) {
         locale=${getLocale()} />
       <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}
         session=${session} showToast=${showToast} />
-      ${toast && html`<div class="koti-toast" role="status">${toast}</div>`}
+      ${toast && html`<div class="toast toast-error toast-hold" role="status">${toast}</div>`}
     </div>`;
 }
