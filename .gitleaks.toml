@@ -1,0 +1,66 @@
+# gitleaks configuration for the full-history secret scan (security/semantic-audit/secrets-scan.mjs).
+#
+# WHY THIS FILE EXISTS. The scan ran with gitleaks' default rules and no configuration, so the only
+# way to forgive a false positive was to append it to gitleaks-baseline.json by hand. A baseline
+# entry pins one finding in one commit, and every new test file with a test account password is a
+# new finding — so the same class came back as "N new unacknowledged hits" every few weeks. The
+# baseline was last topped up on 2026-08-28 with ten of them, and by 2026-09-13 there were
+# twenty-nine more, every one a test fixture.
+#
+# WHAT IS ALLOWED HERE, AND WHAT IS NOT. Each allowlist below names a SHAPE and the place it may
+# appear, never a whole directory. `aimeat/test/**` is not exempt: a real AWS key, a real private
+# key or a real token pasted into a test file still fires, because none of them looks like these.
+# That matters more than the noise does, since a test file is exactly where a real credential gets
+# pasted by accident.
+#
+# HOW TO CHECK IT STILL WORKS. Put a realistic fake credential into a test file, run the scan, and
+# see it reported. That was done when this file was written: an AWS-shaped key in
+# aimeat/test/e2e-secrets.ts was found while all twenty-nine fixtures stayed quiet.
+#
+# The baseline file stays for the entries it already holds; this file stops the class from growing.
+
+[extend]
+useDefault = true
+
+# 1. Test account passwords. Every E2E suite registers a throwaway owner, and the password is a
+#    readable literal next to the name it belongs to: password: 'VaultTest12345'. Letters and
+#    digits only, which is what makes it recognisable and what a real credential almost never is.
+[[allowlists]]
+description = "E2E and unit test account passwords (letters and digits, next to their test owner)"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''aimeat/test/.*''']
+regexTarget = "match"
+regexes = ['''(?i)password\s*[:=]\s*['"][A-Za-z][A-Za-z0-9]{7,40}['"]''']
+
+# 2. The fixed test encryption key. One 64-character hex constant, the same in every suite that
+#    needs the node to boot with encryption on. It decrypts nothing outside a test database.
+[[allowlists]]
+description = "The shared 64-hex test encryption key in E2E suites"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''aimeat/test/.*''']
+regexTarget = "match"
+regexes = ['''AIMEAT_ENCRYPTION_KEY\s*[:=]\s*['"][0-9a-f]{64}['"]''']
+
+# 3. The built SDK bundle. aimeat-auth.js is generated from src/static/sdk-libs/src, and the hits
+#    are its own documentation strings describing a `password` parameter. A secret cannot enter a
+#    build without entering the source first, and the source is scanned.
+[[allowlists]]
+description = "Documentation strings in the generated SDK auth bundle"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''aimeat/src/static/sdk-libs/dist/aimeat-auth\.js''']
+regexTarget = "match"
+regexes = ['''password\.?"?\s*:''']
+
+# 4. Memory keys in the manuals. A curl example writing {"key":"csm.kirpputori.item-001", …} is an
+#    address in this product's own store, and the rule reads the word `key` as an API key.
+[[allowlists]]
+description = "Memory keys in documentation examples"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''docs/.*\.md''']
+regexTarget = "match"
+# The rule's match begins at the word, not at the quote before it, so the opening quote is optional.
+regexes = ['''"?key"?\s*:\s*"[a-z][a-z0-9]*(\.[a-z0-9-]+)+"''']
