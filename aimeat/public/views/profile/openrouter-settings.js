@@ -15,6 +15,7 @@
  *   openrouter/model-picker.js · openrouter/pricing.js · openrouter/budget-panel.js
  * @usage import { OpenRouterSettings } from './openrouter-settings.js';
  * @version-history
+ *   2026-09-13 -- V2v: compose section top rules from poster.css.
  *   v3.1.0 — 2026-08-17 — The why-lead (three sentences, shown until a key is saved): what an own
  *     key buys, what it costs (the one-time $10 that lifts OpenRouter's free tier to 1,000
  *     requests/day), and the first model worth picking. The panel asked for a key without ever
@@ -286,7 +287,7 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
   const pickerProps = { models, isOpenRouter, disabled: !keyed };
 
   return html`
-    <div class="pf-or-wrapper">
+    <div class="pf-or-wrapper poster-row--thing">
       <button class="pf-or-toggle" onClick=${() => setCollapsed(!collapsed)}>
         <span class="pf-or-toggle-icon">${collapsed ? '▶' : '▼'}</span>
         <span>${t('profile.openrouter.title')}</span>
@@ -302,14 +303,14 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
                arrives here from the chat's payer line without knowing what OpenRouter is; the
                three sentences answer why, what it costs, and what to pick first. -->
           ${!hasApiKey && html`
-            <section class="pf-or-section pf-or-why">
+            <section class="pf-or-section poster-row--thing pf-or-why">
               <p>${t('profile.openrouter.whyLead')}</p>
               <p>${t('profile.openrouter.whyCost')}</p>
               <p>${t('profile.openrouter.whyModel')}</p>
             </section>`}
 
           <!-- ── 1. Connection ───────────────────────────────── -->
-          <section class="pf-or-section">
+          <section class="pf-or-section poster-row--thing">
             <h4 class="pf-or-section-title">${t('profile.openrouter.section.connection')}</h4>
 
             <div class="pf-or-field">
@@ -364,7 +365,7 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
           </section>
 
           <!-- ── 2. Models ───────────────────────────────────── -->
-          <section class="pf-or-section">
+          <section class="pf-or-section poster-row--thing">
             <h4 class="pf-or-section-title">${t('profile.openrouter.section.models')}</h4>
             <div class="pf-or-models-head">
               <button type="button" class="btn-outline btn-sm" onClick=${loadModels}
@@ -451,7 +452,7 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
 
           <!-- ── 4. Budget ───────────────────────────────────── -->
           ${hasApiKey && html`
-            <section class="pf-or-section">
+            <section class="pf-or-section poster-row--thing">
               <h4 class="pf-or-section-title">${t('profile.openrouter.section.budget')}</h4>
               <${AiAppsBudgetPanel} />
             </section>`}
@@ -521,7 +522,7 @@ function ParamsSection({
   topP, setTopP, maxTokens, setMaxTokens, saving, onSave, message,
 }) {
   return html`
-    <section class="pf-or-section">
+    <section class="pf-or-section poster-row--thing">
       <details class="pf-or-params">
         <summary class="pf-or-section-title pf-or-params-summary">${t('profile.openrouter.section.params')}</summary>
 
