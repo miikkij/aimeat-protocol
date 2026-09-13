@@ -20,6 +20,7 @@
  *     discovery-tab.shared.js.
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-11 — The poster face: the status word, the metric rows, the strip, six numbered
  *     sections, and the tag check shared between 01 and 02. The five steps became one row per
  *     engine (discovery-tab.engines.js) and the instant updates a section of their own
@@ -84,7 +85,7 @@ function RightNow({ status, served, toSection, onToggle, busy }) {
   const openDoor = (href) => html`<a class="og-door og-door--quiet" href=${href} target="_blank" rel="noopener">${S('open')}</a>`;
   return html`
     <section class="og-sec og-sec--first" id="adm-disc-01">
-      <div class="og-sec-h"><h2>${S('now.title')}<small>01</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet ${off ? '' : 'og-door--danger'}" disabled=${busy} onClick=${onToggle}>
             ${off ? S('now.turnOn') : S('now.turnOff')}
@@ -142,7 +143,7 @@ function Checks({ status }) {
   const open = (href) => html`<a class="og-door og-door--quiet" href=${href} target="_blank" rel="noopener">${S('open')}</a>`;
   return html`
     <section class="og-sec" id="adm-disc-06">
-      <div class="og-sec-h"><h2>${S('checks.title')}<small>06</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('checks.title')}<small>06</small></h2>
         <div class="og-doors"><${CopyButton} text=${paste} label=${S('checks.copyAi')} className="og-door og-door--quiet" /></div></div>
       <div class="adm-disc-checks">
         <div>

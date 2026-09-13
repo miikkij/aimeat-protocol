@@ -16,6 +16,7 @@
  *   the plan dialog
  * @usage <${DiscoveryInstant} status=${status} onChanged=${load} />
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.1 — 2026-09-13 — The plan dialog is the large size and its actions sit in its footer.
  *   v1.0.0 — 2026-09-11 — Initial (the Discovery page in the poster face).
  */
@@ -120,7 +121,7 @@ export function DiscoveryInstant({ status, onChanged }) {
   return html`
     <section class="og-sec" id="adm-disc-03">
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <div class="og-sec-h"><h2>${S('instant.title')}<small>03</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('instant.title')}<small>03</small></h2>
         <div class="og-doors">
           ${can ? html`<button type="button" class="og-door og-door--quiet" disabled=${!!sending} onClick=${() => announce('pages')}>${S('instant.onlyPages', { n: status.sitemap.page_count })}</button>` : null}
         </div></div>
