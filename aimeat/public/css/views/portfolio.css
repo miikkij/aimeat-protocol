@@ -6,6 +6,7 @@
  *   column) and full-bleed public viewer (.portfolio-viewer-full).
  * @usage Loaded by spa.html; classes consumed by public/views/portfolio.js.
  * @version-history
+ *   v1.4.0 -- 2026-09-13 -- Let shared B1 section titles own the builder headings.
  *   v1.3.0 -- 2026-09-13 -- Compose poster rules and own the builder's inline presentation.
  *   v1.2.0 — 2026-08-29 — The two monospace rules read var(--font-mono) instead of naming a family.
  *   v1.1.0 — 2026-07-03 — Full-bleed public viewer: .portfolio-viewer-full column fills
@@ -32,12 +33,6 @@
   background: var(--card-bg, #FFFFFF);
   border-radius: 12px;
   padding: 1.5rem;
-}
-
-.portfolio-step h3 {
-  margin: 0 0 1rem;
-  font-size: 1.1rem;
-  color: var(--text, #1A1A2E);
 }
 
 .portfolio-step-number {
