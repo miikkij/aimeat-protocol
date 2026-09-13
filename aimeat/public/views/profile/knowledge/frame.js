@@ -10,6 +10,7 @@
  * @structure c · words · pkgId · statsOf · groupOf · packageRows · crumb · renderPage · entryText
  * @usage import { renderPage, packageRows, statsOf } from './frame.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
@@ -125,7 +126,7 @@ export function renderPage(ctx, { crumbs, title, chips = null, doors = null, str
       </div>
       ${strip}
       <div class="og-grid">
-        <div class="og-main">${children}</div>
+        <div class="og-main poster-row--thing">${children}</div>
         <nav class="og-rail" aria-label=${c('railTitle')}>
           <span class="og-rail-label">${t('knowledge.tabLabel')}</span>
           <button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'cover' })}><i>←</i>${c('backTo')}</button>

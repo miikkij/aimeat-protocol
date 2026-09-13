@@ -9,6 +9,7 @@
  * @structure c · kindName · kindSub · HUMAN_TYPES · desk · entryCells · entryRows · crumb · renderPage · openEntry
  * @usage import { renderPage, desk, entryRows, openEntry } from './frame.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 -- 2026-09-13 -- V2: use the shared ink rule on the search row.
  *   v1.0.0 — 2026-08-30 — Initial.
@@ -97,7 +98,7 @@ export function renderPage(ctx, { crumbs, title, chips = null, doors = null, rai
       </div>
       ${desk(ctx)}
       <div class="og-grid">
-        <div class="og-main">${children}</div>
+        <div class="og-main poster-row--thing">${children}</div>
         <nav class="og-rail" aria-label=${c('railTitle')}>
           <span class="og-rail-label">${t('discover.title')}</span>
           <button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'cover' })}><i>←</i>${c('backTo')}</button>
