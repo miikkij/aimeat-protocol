@@ -8,6 +8,8 @@ paths:
 
 ## Frontend
 
+A shape of the design language is a class in `poster.css`; a view sheet composes it and never writes the rule, the slab, the sun or the box itself.
+
 Full architecture, component library, cache-busting and SSE: `docs/frontend-development-guide.md`. Two mechanisms bite often:
 
 - **A new shared JS module** on an absolute path (`/js/services/foo.js`) needs an identity entry in the importmap in `public/spa.html`. `portal.ts` stamps `?v=BUILD_ID` automatically. Relative imports, bare specifiers and CSS need no entry.
