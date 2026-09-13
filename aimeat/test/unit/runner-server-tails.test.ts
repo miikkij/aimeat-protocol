@@ -11,10 +11,12 @@
  *   its suites and the issue that opened had nothing in it to act on.
  * @usage cd aimeat && pnpm test -- runner-server-tails
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Assert line retention independently of OS pipe chunk boundaries.
  *   v1.0.0 — 2026-09-13 — Initial, with the stdout half of the fix.
  */
 import { describe, it, expect } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { PassThrough } from 'node:stream';
 import { keepTails } from '../run-e2e-server.js';
 
 /** A child that runs one line of JavaScript, with both streams piped as the helper expects. */
@@ -31,6 +33,20 @@ async function tailOf(code: string): Promise<string> {
 }
 
 describe('keepTails', () => {
+    it.each(['', '\n'])('keeps the same last 20 lines across chunk boundaries (ending %j)', ending => {
+        const source = Array.from({ length: 30 }, (_, i) => `line ${i}`).join('\n') + ending;
+        const expected = '\n' + Array.from({ length: 20 }, (_, i) => `line ${i + 10}`).join('\n');
+        for (const chunks of [[source], [...source]]) {
+            const stdout = new PassThrough();
+            const stderr = new PassThrough();
+            const tail = keepTails({ stdout, stderr } as unknown as ChildProcess);
+            for (const chunk of chunks) stdout.write(chunk);
+            stdout.end();
+            stderr.end();
+            expect(tail()).toBe(expected);
+        }
+    });
+
     it('quotes what the node said on STDOUT, which is where Winston writes every level', async () => {
         const said = await tailOf(`console.log('{"level":"error","message":"Node key file is not valid JSON"}'); process.exit(1)`);
         expect(said).toContain('Node key file is not valid JSON');
