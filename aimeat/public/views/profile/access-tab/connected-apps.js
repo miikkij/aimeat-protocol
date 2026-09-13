@@ -9,6 +9,7 @@
  *   renders one card per app (scopes collapsed behind their count), single revoke
  *   + a bulk revoke of grants unused for STALE_DAYS.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-07-13 — Extracted from access-tab.js (max-file-lines)
  *   v1.2.0 — 2026-07-28 — A spending limit on the card of an app that asked to spend. The permission
  *     answers whether; an owner usually means an amount, and the question had nowhere to live until
@@ -202,7 +203,7 @@ export function ConnectedAppsSection({ showToast, initial }) {
       : sorted.length === 0
         ? html`<div class="access-empty-row"><span class="text-meta-sm">${t('profile.access.agEmpty') || 'No apps have access to your data.'}</span></div>`
         : sorted.map(g => html`
-            <div class="card" key=${g.grant_id}>
+            <div class="card poster-row--thing" key=${g.grant_id}>
               <div class="flex-between">
                 <div class="card-title">${escHtml(g.app_name || g.app)}</div>
                 <button

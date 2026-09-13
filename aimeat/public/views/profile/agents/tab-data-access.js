@@ -5,6 +5,7 @@
  * @description Data Access tab: shared tags, memory areas, knowledge packages,
  *   and effective scope summary.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.12.0 — 2026-08-25 — The shared data map was added here and removed again the same day: it
  *     describes an app, and this panel already has the control the owner needs.
  *   v1.11.0 -- 2026-08-24 -- Live update also follows 'agent-directives', which is where the memory
@@ -464,7 +465,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
   return html`
     <div class="pf-agd-card-grid">
       <!-- SHARED TAGS -->
-      <div class="pf-agd-data-section pf-agd-card">
+      <div class="pf-agd-data-section pf-agd-card poster-row--thing">
         <div class="pf-agd-section-header">
           <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.sharedTagsTitle')}</span>
           ${tags.length === 0 && !addingTag && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
@@ -498,7 +499,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
 
 
       <!-- MEMORY AREAS -->
-      <div class="pf-agd-data-section pf-agd-card">
+      <div class="pf-agd-data-section pf-agd-card poster-row--thing">
         <div class="pf-agd-section-header">
           <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.memoryAreasTitle')}</span>
           ${!hasAreas && !addingArea && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
@@ -549,7 +550,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
       </div>
 
       <!-- KNOWLEDGE PACKAGES -->
-      <div class="pf-agd-data-section pf-agd-card">
+      <div class="pf-agd-data-section pf-agd-card poster-row--thing">
         <div class="pf-agd-section-header">
           <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.knowledgeTitle')}</span>
           ${!hasResources && !addingPackage && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
@@ -575,7 +576,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
       </div>
 
       <!-- SKILLS (registry refs — distinct from knowledge packages) -->
-      <div class="pf-agd-data-section pf-agd-card">
+      <div class="pf-agd-data-section pf-agd-card poster-row--thing">
         <div class="pf-agd-section-header">
           <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.skillsTitle')}</span>
           ${skillLinks.length === 0 && !addingSkill && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
@@ -607,7 +608,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
       </div>
 
       <!-- STORED MEMORY KEYS -->
-      <div class="pf-agd-data-section pf-agd-card pf-agd-card--full">
+      <div class="pf-agd-data-section pf-agd-card pf-agd-card--full poster-row--thing">
           <div class="pf-agd-section-header">
             <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.storedKeysTitle')}</span>
             ${!hasKeys && !addingKey && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}

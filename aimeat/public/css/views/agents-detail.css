@@ -6,6 +6,7 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.28.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
  *   v1.27.0 -- 2026-09-09 -- .pf-agd-crew-llm: which model an agent thinks with, on the Crew tab.
  *   v1.26.0 -- 2026-09-08 -- The new-agent panel (.pf-agd-new*): a two-column form that folds to
@@ -2820,7 +2821,6 @@
    them in .pf-agd-card-grid (responsive two-column; --full spans both). This
    replaces the "one long ragged column with a dead right half" layout. */
 .pf .pf-agd-card {
-  border: 1px solid var(--border, #E5E7EB);
   border-radius: 10px;
   padding: 0.85rem 1rem;
   background: var(--card, #FFFFFF);

@@ -6,6 +6,7 @@
  *   View mode shows formatted text; edit mode uses a single textarea.
  *   Memory areas, knowledge packages, and config files live in their own tabs.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v2.2.0 -- 2026-07-17 -- Tab content wrapped in a single pf-agd-card.
  *   v2.0.0 -- 2026-05-24 -- C5: rewrite as full structured text editor; M6: no SSE listener (owner-initiated only)
  *   v2.1.0 -- 2026-05-31 -- Fix: behavioral directives were sent as `content` (a
@@ -117,7 +118,7 @@ export default function TabDirectives({ agentName, showToast }) {
   const hasContent = purpose || content;
 
   return html`
-    <div class="pf-agd-card">
+    <div class="pf-agd-card poster-row--thing">
       ${!editing ? html`
         <!-- View mode -->
         <div class="pf-agd-section-header">

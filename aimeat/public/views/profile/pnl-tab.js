@@ -9,6 +9,7 @@
  *   No forecasts: only the truth of the bookings. Live: re-fetches on the
  *   aimeat-live-update event when the finance domain ticks.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-08-07 — AccountantAccess: grant and revoke read access to your books.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 7: initial P&L tab.
@@ -44,7 +45,7 @@ function sourceLabel(source) {
 
 function LineTable({ titleKey, lines, totalMinor }) {
   return html`
-    <div class="card pf-pnl-block">
+    <div class="card pf-pnl-block poster-row--thing">
       <h3 class="poster-section-title">${t(titleKey)}</h3>
       ${lines.length === 0 && html`<p class="pf-pnl-empty">${t('profile.pnl.empty')}</p>`}
       ${lines.length > 0 && html`
@@ -116,7 +117,7 @@ function AccountantAccess({ showToast }) {
   if (!loaded) return null;
 
   return html`
-    <div class="card pf-pnl-block">
+    <div class="card pf-pnl-block poster-row--thing">
       <h3 class="poster-section-title">${t('profile.pnl.accountantTitle')}</h3>
       <p class="section-desc">${t('profile.pnl.accountantDesc')}</p>
 
@@ -206,13 +207,13 @@ export function PnlTab({ showToast }) {
           <${LineTable} titleKey="profile.pnl.expenses" lines=${report.expenses} totalMinor=${report.totalExpenseMinor} />
         </div>
 
-        <div class="card pf-pnl-result ${report.resultMinor >= 0 ? 'pos' : 'neg'}">
+        <div class="card pf-pnl-result ${report.resultMinor >= 0 ? 'pos' : 'neg'} poster-row--thing">
           <div class="pf-pnl-result-label">${t('profile.pnl.result')}</div>
           <div class="pf-pnl-result-value">${euros(report.resultMinor)}</div>
           <div class="pf-pnl-vat">${t('profile.pnl.vatPayable')}: ${euros(report.vatPayableMinor)}</div>
         </div>
 
-        <div class="card pf-pnl-block">
+        <div class="card pf-pnl-block poster-row--thing">
           <table class="pf-pnl-table">
             <tbody>
               ${report.transferCount > 0 && html`

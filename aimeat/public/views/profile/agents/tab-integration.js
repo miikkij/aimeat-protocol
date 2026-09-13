@@ -6,6 +6,7 @@
  *   during onboarding or production status (connection, platform, readiness,
  *   identity, delivery log) after completion.
  * @version-history
+ *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.10.0 -- 2026-08-27 -- The short way into an MCP connection, on both halves of this tab: above
  *     the onboarding checklist (none of which can be ticked before the agent reaches this node) and
  *     inside the production Connection card (the same agent on a second machine is the same
@@ -350,7 +351,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
   return html`
     <div class="pf-agd-card-grid">
       <!-- CONNECTION -->
-      <div class="pf-agd-section pf-agd-card">
+      <div class="pf-agd-section pf-agd-card poster-row--thing">
         <div class="pf-agd-section-label">${t('profile.agents.detail.connection')}</div>
         <div class="pf-agd-info-row">
           <span class="pf-agd-info-label">${t('profile.agents.detail.integration.deliveryMethod')}</span>
@@ -373,7 +374,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
             <span class="pf-agd-info-value">${webhook.lastSuccessAt ? timeAgo(webhook.lastSuccessAt) : '--'}</span>
           </div>
           ${editingWebhook ? html`
-            <div class="pf-agd-webhook-form">
+            <div class="pf-agd-webhook-form poster-row--thing">
               <input
                 type="url"
                 value=${webhookDraft}
@@ -405,7 +406,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
             <span class="pf-agd-info-value">${agent.pollingInterval || agent.polling_interval || '60s'}</span>
           </div>
           ${editingWebhook ? html`
-            <div class="pf-agd-webhook-form">
+            <div class="pf-agd-webhook-form poster-row--thing">
               <input
                 type="url"
                 value=${webhookDraft}
@@ -440,7 +441,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
       </div>
 
       <!-- PLATFORM & SKILL -->
-      <div class="pf-agd-section pf-agd-card">
+      <div class="pf-agd-section pf-agd-card poster-row--thing">
         <div class="pf-agd-section-label">${t('profile.agents.detail.platform')} & ${t('profile.agents.detail.skillBundle')}</div>
         <div class="pf-agd-info-row">
           <span class="pf-agd-info-label">${t('profile.agents.detail.platform')}</span>
@@ -474,7 +475,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
       </div>
 
       <!-- READINESS -->
-      <div class="pf-agd-section pf-agd-card pf-agd-card--full">
+      <div class="pf-agd-section pf-agd-card pf-agd-card--full poster-row--thing">
         <div class="pf-agd-section-label">${t('profile.agents.detail.readiness')}</div>
         <div class="pf-agd-step-pills">
           ${steps.map(s => html`
@@ -514,7 +515,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
 
       <!-- POST-ONBOARDING SETUP -->
       ${postChecklist && html`
-        <div class="pf-agd-section pf-agd-card">
+        <div class="pf-agd-section pf-agd-card poster-row--thing">
           <div class="pf-agd-section-label">${t('profile.agents.detail.integration.postOnboardingSetup')}</div>
           <div class="pf-agd-info-row">
             <span class="pf-agd-info-label">${t('profile.agents.detail.integration.commandsRegistered')}</span>
@@ -550,7 +551,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
       `}
 
       <!-- IDENTITY -->
-      <div class="pf-agd-section pf-agd-card">
+      <div class="pf-agd-section pf-agd-card poster-row--thing">
         <div class="pf-agd-section-label">${t('profile.agents.detail.identity')}</div>
         <div class="pf-agd-info-row">
           <span class="pf-agd-info-label">GAII</span>
@@ -577,7 +578,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
       </div>
 
       <!-- DELIVERY LOG -->
-      <div class="pf-agd-section pf-agd-card pf-agd-card--full">
+      <div class="pf-agd-section pf-agd-card pf-agd-card--full poster-row--thing">
         <div class="pf-agd-section-label">${t('profile.agents.detail.deliveryLog')}</div>
         ${displayDeliveries.length > 0 ? html`
           <table class="pf-agd-delivery-log">
