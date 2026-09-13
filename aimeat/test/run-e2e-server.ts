@@ -7,6 +7,7 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.5.0 -- 2026-09-13 -- Retain the last log lines independently of pipe chunk boundaries.
  *   v1.4.0 -- 2026-09-13 -- startServer keeps the tail of STDOUT as well as stderr, and names the
  *            port and backend. Winston writes every level to stdout, so the boot's own refusals
  *            went into the drain: the nightly sweep of 2026-09-12 reported a lane dead at 11888ms
@@ -641,17 +642,19 @@ const TAIL_LINES = 20;
  * same thing for the runner's own server, which is the one whose death takes a whole lane with it.
  */
 export function keepTails(child: ChildProcess): () => string {
-    const out: string[] = [];
-    const err: string[] = [];
-    const keep = (into: string[]) => (d: Buffer) => {
-        into.push(d.toString());
-        while (into.length > TAIL_LINES) into.shift();
+    const out = { text: '' };
+    const err = { text: '' };
+    const keep = (into: { text: string }) => (d: Buffer) => {
+        const lines = (into.text + d.toString()).split('\n');
+        // A trailing newline closes the last line; its empty split part is not another line.
+        const count = TAIL_LINES + (lines.at(-1) === '' ? 1 : 0);
+        into.text = lines.slice(-count).join('\n');
     };
     child.stdout?.on('data', keep(out));
     child.stderr?.on('data', keep(err));
     // stderr first: a crash lands there, and the log lines that led to it read as context under it.
     return () => {
-        const text = [err.join(''), out.join('')].map(s => s.trim()).filter(Boolean).join('\n---\n');
+        const text = [err.text, out.text].map(s => s.trim()).filter(Boolean).join('\n---\n');
         return text ? `\n${text}` : ' (the node printed nothing on either stream)';
     };
 }
