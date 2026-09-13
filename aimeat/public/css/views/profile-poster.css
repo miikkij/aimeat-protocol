@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   v1.14.0 -- 2026-09-13 -- Retire selectors whose profile views no longer render.
  *   v1.13.0 -- 2026-09-13 -- Compose portfolio page and B1 section headlines.
  *   v1.12.0 -- 2026-09-13 -- Compose portfolio section and flow rules from poster.css.
  *   v1.11.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
@@ -145,7 +146,6 @@
   border: 2px solid var(--text); border-radius: 0; padding: 10px 12px; background: var(--bg-dim);
 }
 .pf select.input-field, .pf-account-modal .pf-edit-select { background: var(--bg); padding: 8px 10px; }
-.pf .pf-select-inline { border: 2px solid var(--text); padding: 6px 10px; }
 .portfolio-paste-area, .portfolio-prompt-output { border-width: 3px; }
 .portfolio-prompt-output { color: var(--text); }
 
@@ -224,9 +224,7 @@
 .pf .mcpi--quick, .mcpi--tool { border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); }
 .mcpi-cmd-text { border: 2px solid var(--text); border-radius: 0; }
 
-/* ── Knowledge packages, and the raw fields the older tabs still use ────────────────────── */
-.kpkg-card { border-top-width: 2px; padding: 0.9rem 0; margin-bottom: 0; }
-.kpkg-card-expanded { border-top-color: var(--accent); }
+/* ── Raw fields the older tabs still use ───────────────────────────────────────────────── */
 .pf .btn-danger-solid { background: none; border: 0; border-bottom: 2px solid var(--accent); border-radius: 0; box-shadow: none; padding: 0 0 1px; color: var(--accent); font-weight: var(--font-poster-strong-weight); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .pf .btn-danger-solid:hover { color: var(--danger); border-color: var(--danger); background: none; }
 .pf input[type="text"], .pf input[type="search"], .pf input[type="url"], .pf input[type="email"], .pf input[type="number"], .pf input[type="password"],
@@ -257,14 +255,11 @@
 .pf .stat-card { padding: 0.9rem 0 1rem; margin-bottom: 0; }
 .pf .stat-grid { gap: 0 2rem; }
 
-/* ── Controls that keep a box: the segmented control and the collapsible ────────────────── */
+/* ── Controls that keep a box ──────────────────────────────────────────────────────────── */
 .pf .seg { border: 2px solid var(--text); border-radius: 0; background: none; }
 .pf .seg-btn { font-weight: var(--font-poster-strong-weight); padding: 0.35rem 0.9rem; color: var(--text); }
 .pf .seg-btn + .seg-btn { border-left: 2px solid var(--text); }
 .pf .seg-btn.active { background: var(--text); color: var(--bg); }
-.pf .collapsible { border: 0; border-top: 3px solid var(--text); border-radius: 0; }
-.pf .collapsible-header { border-radius: 0; font-weight: var(--font-poster-strong-weight); padding: 0.7rem 0; }
-.pf .collapsible-body { padding: 0 0 0.75rem; }
 .pf .alert { border-radius: 0; border-width: 2px; border-left-width: 6px; font-weight: 600; }
 .pf .pagination { font-family: var(--font-mono); }
 
@@ -373,8 +368,6 @@
 .pf .pf-agd-rule-source, .pf .agd-rule-source, .pf .cap-schema-pre, .pf .pf-agd-crew-try-output, .pf .pf-agd-config-preview, .pf .sch-card-dispatch {
   border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); box-shadow: none;
 }
-.pf .of-conseq--warn, .pf .of-prereq--warn { border-color: var(--warn); }
-.pf .of-prereq--blocked { border-color: var(--accent); }
 /* Chips: square, mono, the colour kept as the frame */
 .pf .sch-badge, .pf .sch-tag, .pf .sch-preset, .pf .of-badge, .pf .of-status, .pf .of-chip, .pf .of-group-count, .pf .wf-badge,
 .pf .pf-agd-status, .pf .agd-status, .pf .pf-agd-cap-badge, .pf .agd-cap-badge, .pf .pf-agd-cap-type, .pf .agd-cap-type, .pf .pf-agd-filter-pill,
@@ -388,10 +381,7 @@
 }
 .pf .pf-ureport-btn { color: var(--text); font-weight: var(--font-poster-text-weight); font-family: var(--font-showroom-body); font-size: 0.78rem; padding: 4px 10px; }
 .pf .pf-ureport-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
-/* The segmented control and the calendar */
-.pf .of-seg { border: 2px solid var(--text); border-radius: 0; background: none; padding: 0; }
-.pf .of-seg-btn { border-radius: 0; font-weight: var(--font-poster-strong-weight); color: var(--text); }
-.pf .of-seg-btn--on { background: var(--text); color: var(--bg); }
+/* The calendar */
 .pf .sch-cal-cell, .pf .sch-cal-weekcol { border-radius: 0; border: 2px solid var(--border); background: none; }
 .pf .sch-cal-cell--today, .pf .sch-cal-weekcol--today { border-color: var(--text); }
 .pf .sch-cal-weekcol-head, .pf .sch-cal-head { background: none; border-bottom: 2px solid var(--text); font-weight: var(--font-poster-strong-weight); }
@@ -435,16 +425,11 @@
 .pf .dsc-type-badge, .pf .cap-badge-callable, .pf .pf-eco-status-pending{ color: var(--accent); }
 .pf .pf-eco-status-active, .pf .pf-or-status--on { color: var(--success-fg); }
 .pf .pf-eco-status-revoked{ color: var(--danger); }
-.pf .dsc-facet-active, .pf .dsc-scope-active, .pf .lib-tier-btn.lib-tier-active { background: var(--sun); color: var(--on-sun); border-color: var(--text); }
-.pf .dsc-facet:hover, .pf .dsc-scope-btn:hover, .pf .lib-tier-btn:hover { background: none; border-color: var(--accent); color: var(--accent); }
-.pf .dsc-scope-btn, .pf .lib-tier-btn { font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); font-size: 0.8rem; padding: 4px 10px; }
 /* The quiet actions the older tabs draw as small framed buttons */
 .pf .ext-card-actions button, .pf .pf-eco-adv-actions button {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0 0 1px;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text);
 }
-.pf .ext-card-actions button:hover{ background: none; color: var(--accent); border-color: var(--accent); }
-.pf .ext-card-actions button.danger { color: var(--accent); border-color: var(--accent); }
 /* Search fields the older tabs draw as boxes */
 .pf .dsc-search, .pf .cap-search-input, .pf .lib-search, .pf .pf-or-msearch {
   background: transparent; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; padding: 8px 0;
