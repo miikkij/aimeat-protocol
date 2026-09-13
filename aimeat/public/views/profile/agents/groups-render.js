@@ -6,6 +6,9 @@
  *   grouped agent-card renderer (none / custom groups / mode / tag). Extracted from
  *   ../agents-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v2.0.0 -- 2026-09-14 -- The poster face (design canvas "Your Agents"): the search as an underlined
+ *     field, the filter line as chips and a select, the list as a table with a head row in the
+ *     plain view, group heads as a 3px rule with the count in mono.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.3.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
@@ -38,18 +41,26 @@ const AGENT_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 
 export function AgentSearch({ query, setQuery, shown, total }) {
   const active = query.trim() !== '';
   return html`
-    <div class="pf-agd-fleet-search">
-      <input class="input-field pf-agd-fleet-search-input" type="search"
+    <div class="agp-search">
+      <input class="og-input" type="search"
              value=${query}
              placeholder=${t('profile.agents.search.placeholder')}
              aria-label=${t('profile.agents.search.placeholder')}
              onInput=${(e) => setQuery(e.target.value)} />
       ${active && html`
-        <span class="pf-agd-fleet-search-count">${t('profile.agents.search.count', { shown, total })}</span>
-        <button class="pf-agd-filter-clear" onClick=${() => setQuery('')}>${t('profile.agents.filter.clear')}</button>
+        <span class="agp-search-count">${t('profile.agents.search.count', { shown, total })} · <button type="button" class="og-door og-door--quiet" onClick=${() => setQuery('')}>${t('profile.agents.filter.clear')}</button></span>
       `}
     </div>
   `;
+}
+
+/** The head of the agents table: the six columns every closed row (agent-card.js) fills. */
+function tableHead() {
+  const p = (k) => t('profile.agents.page.' + k);
+  return html`
+    <div class="agp-tbl" key="agp-head">
+      <div>${p('colAgent')}</div><div>${p('colRuns')}</div><div>${p('colAccess')}</div><div>${p('colSeen')}</div><div></div>
+    </div>`;
 }
 
 function collectTags(agents) {
@@ -71,27 +82,25 @@ export function renderFilterBar(agents, tagFilter, setTagFilter, groupBy, setGro
   }
 
   return html`
-    <div class="pf-agd-filter-bar">
+    <div class="agp-filters">
       ${tags.length > 0 && html`
-        <div class="pf-agd-filter-tags">
-          <span class="pf-agd-filter-label">${t('profile.agents.filter.byTag')}</span>
-          ${tags.map(tag => html`
-            <button key=${tag}
-                    class="pf-agd-tag-chip ${tagFilter.has(tag) ? 'pf-agd-tag-chip--active' : ''}"
-                    onClick=${() => toggleTag(tag)}>
-              ${tag}
-            </button>
-          `)}
-          ${tagFilter.size > 0 && html`
-            <button class="pf-agd-filter-clear" onClick=${() => setTagFilter(new Set())}>
-              ${t('profile.agents.filter.clear')}
-            </button>
-          `}
-        </div>
+        <span class="og-label">${t('profile.agents.filter.byTag')}</span>
+        ${tags.map(tag => html`
+          <button type="button" key=${tag}
+                  class=${`og-chip ${tagFilter.has(tag) ? 'og-chip--sun' : ''}`}
+                  onClick=${() => toggleTag(tag)}>
+            ${tag}
+          </button>
+        `)}
+        ${tagFilter.size > 0 && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setTagFilter(new Set())}>
+            ${t('profile.agents.filter.clear')}
+          </button>
+        `}
       `}
-      <div class="pf-agd-filter-groupby">
-        <span class="pf-agd-filter-label">${t('profile.agents.filter.groupBy')}</span>
-        <select class="pf-agd-filter-select" value=${groupBy} onChange=${(e) => setGroupBy(e.target.value)}>
+      <div class="agp-filters-groupby">
+        <span class="og-label">${t('profile.agents.filter.groupBy')}</span>
+        <select value=${groupBy} onChange=${(e) => setGroupBy(e.target.value)}>
           <option value="none">${t('profile.agents.filter.groupByNone')}</option>
           <option value="custom">${t('profile.agents.filter.groupByCustom')}</option>
           <option value="tag">${t('profile.agents.filter.groupByTag')}</option>
@@ -215,14 +224,15 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
     // The Chat Sessions tab casts a wider net (it also honours the legacy `session-` naming), and
     // that is deliberate: this grouping has to line up with the teal dot beside each card.
     const tools = ordered.filter(a => a.mode === 'workstation');
-    if (tools.length === 0) return ordered.map(row);
+    if (tools.length === 0) return [tableHead(), ...ordered.map(row)];
     const rest = ordered.filter(a => a.mode !== 'workstation');
     return [
+      tableHead(),
       ...rest.map(row),
       html`
-        <div class="pf-agd-group-header" key="ws-header">
-          <span class="pf-agd-badge pf-agd-badge--mode pf-agd-badge--mode-workstation">${t('profile.agents.startedByYou')}</span>
-          <span class="pf-agd-group-count">${tools.length}</span>
+        <div class="agp-group-head poster-row--thing" key="ws-header">
+          <span>${t('profile.agents.startedByYou')}</span>
+          <span class="agp-group-count">${tools.length}</span>
         </div>
       `,
       ...tools.map(row),
@@ -255,25 +265,23 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
       const collapsed = collapsedGroups?.has(g.id);
       return html`
         <div class="pf-agd-group" key=${'cg-' + g.id}>
-          <div class="pf-agd-group-header pf-agd-cgroup-header"
+          <div class="agp-group-head poster-row--thing"
                onDragOver=${groupDnd.onDragOver}
                onDrop=${(e) => { e.preventDefault(); groupDnd.onDropToGroup(g.id); }}>
-            <button class="pf-agd-cgroup-toggle" onClick=${() => toggleGroupCollapsed(g.id)} title=${t('profile.agents.groups.toggle')}>
-              <span class="pf-chevron ${collapsed ? '' : 'pf-chevron-open'}">▼</span>
-            </button>
+            <button type="button" class="og-door og-door--quiet" onClick=${() => toggleGroupCollapsed(g.id)} title=${t('profile.agents.groups.toggle')}>${collapsed ? '→' : '↓'}</button>
             ${editingGroup === g.id
-              ? html`<input class="input-field input-xs pf-agd-cgroup-name-input" autofocus
+              ? html`<input class="pf-agd-cgroup-name-input" autofocus
                        placeholder=${t('profile.agents.groups.namePlaceholder')}
                        value=${g.name}
                        onInput=${(e) => renameGroup(g.id, e.target.value)}
                        onBlur=${() => setEditingGroup(null)}
                        onKeyDown=${(e) => { if (e.key === 'Enter') setEditingGroup(null); }} />`
-              : html`<button class="pf-agd-cgroup-name" onClick=${() => setEditingGroup(g.id)} title=${t('profile.agents.groups.rename')}>${g.name || t('profile.agents.groups.unnamed')}</button>`}
-            <span class="pf-agd-group-count">${members.length}</span>
-            <button class="pj-icon-btn" title=${t('profile.agents.groups.remove')} onClick=${() => removeGroup(g.id)}>✕</button>
+              : html`<button type="button" class="og-door og-door--quiet" onClick=${() => setEditingGroup(g.id)} title=${t('profile.agents.groups.rename')}>${g.name || t('profile.agents.groups.unnamed')}</button>`}
+            <span class="agp-group-count">${members.length}</span>
+            <button type="button" class="og-door og-door--quiet" title=${t('profile.agents.groups.remove')} onClick=${() => removeGroup(g.id)}>✗</button>
           </div>
           ${!collapsed && (members.length === 0
-            ? html`<div class="pf-agd-cgroup-empty poster-row--thing">${t('profile.agents.groups.emptyDrop')}</div>`
+            ? html`<div class="agp-group-empty">${t('profile.agents.groups.emptyDrop')}</div>`
             : members.map(draggableCard))}
         </div>
       `;
@@ -286,20 +294,18 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
     const ungCollapsed = collapsedGroups?.has(UNGROUPED_ID);
 
     return html`
-      <div class="pf-agd-cgroup-bar">
-        <button class="btn-outline btn-sm" onClick=${addGroup}>+ ${t('profile.agents.groups.addGroup')}</button>
-        <span class="text-caption pf-agd-cgroup-hint">${t('profile.agents.groups.hint')}</span>
+      <div class="agp-group-bar">
+        <button type="button" class="og-door" onClick=${addGroup}>+ ${t('profile.agents.groups.addGroup')}</button>
+        <span class="agp-group-hint">${t('profile.agents.groups.hint')}</span>
       </div>
       ${groupSections}
       <div class="pf-agd-group" key="cg-ungrouped">
-        <div class="pf-agd-group-header pf-agd-cgroup-header"
+        <div class="agp-group-head poster-row--thing"
              onDragOver=${groupDnd.onDragOver}
              onDrop=${(e) => { e.preventDefault(); groupDnd.onDropToGroup(UNGROUPED_ID); }}>
-          <button class="pf-agd-cgroup-toggle" onClick=${() => toggleGroupCollapsed(UNGROUPED_ID)} title=${t('profile.agents.groups.toggle')}>
-            <span class="pf-chevron ${ungCollapsed ? '' : 'pf-chevron-open'}">▼</span>
-          </button>
-          <span class="pf-agd-cgroup-name pf-agd-group-untagged">${t('profile.agents.groups.ungrouped')}</span>
-          <span class="pf-agd-group-count">${ungrouped.length}</span>
+          <button type="button" class="og-door og-door--quiet" onClick=${() => toggleGroupCollapsed(UNGROUPED_ID)} title=${t('profile.agents.groups.toggle')}>${ungCollapsed ? '→' : '↓'}</button>
+          <span>${t('profile.agents.groups.ungrouped')}</span>
+          <span class="agp-group-count">${ungrouped.length}</span>
         </div>
         ${!ungCollapsed && ungrouped.map(draggableCard)}
       </div>
@@ -316,9 +322,9 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
     const order = AGENT_MODES.filter(m => byMode.has(m));
     return order.map(mode => html`
       <div class="pf-agd-group" key=${'mode-' + mode}>
-        <div class="pf-agd-group-header">
-          <span class="pf-agd-badge pf-agd-badge--mode pf-agd-badge--mode-${mode}">${t('profile.agents.mode.' + mode) || mode}</span>
-          <span class="pf-agd-group-count">${byMode.get(mode).length}</span>
+        <div class="agp-group-head poster-row--thing">
+          <span>${t('profile.agents.mode.' + mode) || mode}</span>
+          <span class="agp-group-count">${byMode.get(mode).length}</span>
         </div>
         ${byMode.get(mode).map(renderCard)}
       </div>
@@ -342,9 +348,9 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
   const sortedTags = [...byTag.keys()].sort();
   const sections = sortedTags.map(tag => html`
     <div class="pf-agd-group" key=${'tag-' + tag}>
-      <div class="pf-agd-group-header">
-        <span class="pf-agd-tag-chip">${tag}</span>
-        <span class="pf-agd-group-count">${byTag.get(tag).length}</span>
+      <div class="agp-group-head poster-row--thing">
+        <span class="og-chip">${tag}</span>
+        <span class="agp-group-count">${byTag.get(tag).length}</span>
       </div>
       ${byTag.get(tag).map(renderCard)}
     </div>
@@ -352,9 +358,9 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
   if (untagged.length > 0) {
     sections.push(html`
       <div class="pf-agd-group" key="tag-untagged">
-        <div class="pf-agd-group-header">
-          <span class="pf-agd-group-untagged">${t('profile.agents.filter.untagged')}</span>
-          <span class="pf-agd-group-count">${untagged.length}</span>
+        <div class="agp-group-head poster-row--thing">
+          <span>${t('profile.agents.filter.untagged')}</span>
+          <span class="agp-group-count">${untagged.length}</span>
         </div>
         ${untagged.map(renderCard)}
       </div>
