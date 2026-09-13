@@ -14,6 +14,15 @@
 # worse than the problem. Everything it prints, it measured.
 set -u
 
+# Claude Code hands the hook a JSON object on stdin, and its session_id is the one thing a session
+# cannot find out about itself any other way. Lifecycle Central 3.3.0 turns it into a link that
+# opens this conversation from the claim. Read only when stdin is not a terminal, so a person
+# running the script by hand is not left waiting on it.
+session_id=''
+if [ ! -t 0 ]; then
+  session_id=$(cat | tr -d '\r\n' | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([0-9a-fA-F-]\{36\}\)".*/\1/p')
+fi
+
 printf '=== AIMEAT session start ===\n\n'
 
 if [ -n "${AIMEAT_SESSION:-}" ]; then
@@ -21,6 +30,14 @@ if [ -n "${AIMEAT_SESSION:-}" ]; then
 else
   printf 'Session name: NOT SET. Export AIMEAT_SESSION=cc-<owner>-<tag> before your first commit,\n'
   printf '  or the commit carries no Session: trailer and the claims board cannot match it.\n'
+fi
+
+if [ -n "$session_id" ]; then
+  printf 'Claude Code session id: %s\n' "$session_id"
+  printf '  Give it to claim_open or claim_heartbeat as sessionId, and the claim in Lifecycle Central opens\n'
+  printf '  this conversation in VS Code on this machine. When Remote Control is on, give its\n'
+  printf '  https://claude.ai/code/... address as sessionUrl as well, and the claim opens the running session\n'
+  printf '  from any device. /clear starts a new id: heartbeat with the new one.\n'
 fi
 
 toplevel=$(git rev-parse --show-toplevel 2>/dev/null || echo '')
@@ -62,7 +79,8 @@ read it with aimeat_skill_get):
   2. Read the claims board — who holds which files and which E2E port.
        workspace ws-mtnphyhh8hc
   3. WRITE YOUR OWN CLAIM before editing: the area you will touch, the port you will run
-     E2E on (any free one from 40251 up that no active claim names), and your intent.
+     E2E on (any free one from 40251 up that no active claim names), your intent, and the
+     session id printed above.
      A claim written afterwards is a claim that protected nobody.
   4. Heartbeat it at least hourly, and whenever the area changes. Three hours old reads
      as stale to everyone else.
