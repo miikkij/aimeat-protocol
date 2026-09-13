@@ -27,6 +27,7 @@
  *   - SavedReports (default) — the rows
  * @usage imported by compliance-tab.js, rendered beside the paste
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-05 — The poster face: rows with a mono stamp and a chip, Open and Download as
  *     doors, the keep action lifted to the tab and offered in the section's header.
  *   v1.0.0 — 2026-08-23 — BR-02. The monthly job had no reader.
@@ -117,7 +118,7 @@ export default function SavedReports({ refresh, keeping, onKeep, onError }) {
 
   return html`
     <section class="og-sec adm-cmp-no-print" id="adm-cmp-06">
-      <div class="og-sec-h"><h2>${C('savedTitle')}<small>06</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('savedTitle')}<small>06</small></h2>
         <div class="og-doors"><button type="button" class="og-door og-door--quiet" disabled=${keeping} onClick=${onKeep}>${keeping ? C('savedSaving') : C('savedNow')}</button></div></div>
       <p class="adm-cmp-lead">${C('savedNote')}</p>
       ${reports === null ? html`<${Spinner} text=${C('loading')} />` : null}
