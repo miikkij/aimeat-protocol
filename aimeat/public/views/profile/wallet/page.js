@@ -13,6 +13,7 @@
  *   secRoads
  * @usage import { renderPage } from './wallet/page.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: select the shared ink frame for the pace explanation.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Lompakko-sivu", direction A).
  */
 import { h } from 'preact';
@@ -148,7 +149,7 @@ function secSources(ctx) {
         ${col(x('came'), l.earned, s.in, inRows, 'is-good')}
         ${col(x('went'), -l.spent, s.out, outRows, 'is-low')}
       </div>
-      <div class="wal-pace">
+      <div class="wal-pace poster-frame">
         <div><b>${x('paceTitle')}</b> ${x('paceBody', { pace, cap })} ${Number(w.balance) >= cap ? x('paceAtCap', { balance: w.balance, cap }) : x('paceBelowCap', { balance: w.balance, days: pace ? Math.ceil((cap - Number(w.balance)) / pace) : 0 })} ${l.total_rows ? (l.unrecorded > 0 ? x('paceRows', { sum: signed(l.ledger_sum), unrecorded: morsels(l.unrecorded) }) : l.unrecorded < 0 ? x('paceRowsOver', { sum: signed(l.ledger_sum), n: morsels(-l.unrecorded) }) : x('paceRowsExact', { sum: signed(l.ledger_sum) })) : ''}</div>
         <div class="wal-bar"><i style=${`width:${pct}%`}></i><span>${w.balance} / ${cap}</span></div>
       </div>

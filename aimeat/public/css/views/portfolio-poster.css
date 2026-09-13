@@ -9,6 +9,7 @@
  *   three roads to a changed page with the paste field, and the rule box an AI gets.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose the agent rule with the shared ink frame.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 
@@ -69,7 +70,7 @@
 .pf-paste-meta { display: block; margin-bottom: .3rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
 
 /* ── The rule an AI gets ───────────────────────────────────────────────────────────────────── */
-.pf-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; border: 3px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.6; }
+.pf-rule { margin: .6rem 0 .2rem; padding: .9rem 1.1rem; font-size: .9rem; line-height: 1.6; }
 .pf-rule .og-label { display: block; margin-bottom: .3rem; }
 .pf-rule .pf-para { margin-bottom: .5rem; }
 .pf-rule .og-doors { margin-top: .7rem; }

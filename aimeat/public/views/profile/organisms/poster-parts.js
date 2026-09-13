@@ -2,13 +2,14 @@
  * @file poster-parts.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The small parts the organism pages share in the poster face: a section under an ink
- *   rule with a numbered headline and doors on the right, a folded row that opens in place, the
+ * @description The small parts the organism pages share in the poster face: a section with a shared
+ *   B1 numbered headline and doors on the right, a folded row that opens in place, the
  *   translate-with-fallback helper and the in-page scroll. Lifted out of home.js so the workspace
  *   cover is built from the same pieces and the two pages cannot drift apart.
  * @structure tr(key, fallback) · scrollTo(id) · Section · Fold
  * @usage import { Section, Fold, tr, scrollTo } from '/views/profile/organisms/poster-parts.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Compose the section headline from the shared poster-section-title class.
  *   v1.1.0 — 2026-08-29 — scrollTo scrolls the content region itself instead of calling scrollIntoView,
  *     which also moved the window and hid the top bar on aimeat.io.
  *   v1.0.0 — 2026-08-29 — Extracted from home.js v3.0.0 for the workspace cover; no behaviour change.
@@ -37,12 +38,12 @@ export const scrollTo = (id) => {
   box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
 };
 
-/** A section under an ink rule: the numbered headline, the doors on the right, the body. */
+/** A B1 section: the numbered headline, the doors on the right, the body. */
 export function Section({ id, num, title, count, doors, first, children }) {
   return html`
     <section class=${`og-sec ${first ? 'og-sec--first' : ''}`} id=${id}>
       <div class="og-sec-h">
-        <h2>${title}${count !== null && count !== undefined ? html`<small>${count}</small>` : html`<small>${num}</small>`}</h2>
+        <h2 class="poster-section-title">${title}${count !== null && count !== undefined ? html`<small>${count}</small>` : html`<small>${num}</small>`}</h2>
         ${doors ? html`<div class="og-doors">${doors}</div>` : null}
       </div>
       ${children}
