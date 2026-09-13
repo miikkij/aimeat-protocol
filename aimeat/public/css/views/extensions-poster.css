@@ -9,6 +9,7 @@
  *   chips and the search line, and the install form.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose catalogue detail frames from poster.css.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 
@@ -51,7 +52,7 @@
 .ex-me small { display: block; color: var(--text-dim); }
 .ex-p > .ex-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
 .ex-go .og-door { font-size: .72rem; text-decoration: none; }
-.ex-p > .ex-open { grid-column: 1 / -1; display: block; margin: 0 0 .4rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
+.ex-p > .ex-open { grid-column: 1 / -1; display: block; margin: 0 0 .4rem; padding: 1rem 1.2rem 1.1rem; box-shadow: 8px 8px 0 var(--sun); font-size: .9rem; line-height: 1.55; color: var(--text); }
 .ex-lead { margin: 0 0 .6rem; font-size: .95rem; line-height: 1.55; }
 .ex-open .og-label { display: block; margin: .8rem 0 .2rem; }
 .ex-open code { font-family: var(--font-mono); font-size: .76rem; background: var(--bg-dim); padding: .05rem .3rem; overflow-wrap: anywhere; }
