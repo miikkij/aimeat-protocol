@@ -20,6 +20,7 @@
  *   - WorkTab({ data, switchPage }) — the three sections
  *   - dur / deadlineWords — the countdown a row prints instead of a timestamp
  * @version-history
+ *   v2.2.0 — 2026-09-13 — Compose shared poster headings in the populated view.
  *   v2.1.0 -- 2026-09-13 -- Compose the empty state's frame and B1 heading from poster.css.
  *   v2.0.0 — 2026-09-12 — The poster face, and the table drawing at all: the key it read has never
  *     existed on the shell's data. The cost object is read as an object (it was printed with a
@@ -117,7 +118,7 @@ export default function WorkTab({ data, switchPage }) {
 
       <section class="og-sec og-sec--first">
         <div class="og-sec-h">
-          <h2>${W('waitingQ')}<small>01</small></h2>
+          <h2 class="poster-section-title">${W('waitingQ')}<small>01</small></h2>
           <div class="og-doors">
             <button type="button" class="og-door og-door--quiet" onClick=${() => {
     document.querySelector('.adm-work-acts-sec')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -171,7 +172,7 @@ export default function WorkTab({ data, switchPage }) {
 
       <section class="og-sec">
         <div class="og-sec-h">
-          <h2>${W('every')}<small>02</small></h2>
+          <h2 class="poster-section-title">${W('every')}<small>02</small></h2>
           <div class="og-doors">
             <button type="button" class="og-door og-door--quiet" onClick=${() => setOldestFirst(v => !v)}>
               ${oldestFirst ? W('orderNewest') : W('orderOldest')}</button>
@@ -230,7 +231,7 @@ export default function WorkTab({ data, switchPage }) {
 
       <section class="og-sec adm-work-acts-sec">
         <div class="og-sec-h">
-          <h2>${W('actsTitle')}<small>03</small></h2>
+          <h2 class="poster-section-title">${W('actsTitle')}<small>03</small></h2>
           <div class="og-doors">
             <button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('actions')}>${t('dashboard.actions')}</button>
           </div>
