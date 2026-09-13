@@ -1,7 +1,9 @@
 /**
  * @file collaboration.js
  * @description Shared app discovery, roadmap editing and a publication change note.
- * @version-history v1.0.0 - 2026-09-08 - Make collaboration usable from the Apps page.
+ * @version-history
+ *   v1.0.1 — 2026-09-13 — The publish dialog's submit sits in the dialog's footer and names its form.
+ *   v1.0.0 - 2026-09-08 - Make collaboration usable from the Apps page.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -17,14 +19,15 @@ const pathOf = app => `/v1/apps/${encodeURIComponent(app.owner)}/${encodeURIComp
 
 export function PublishDialog({ app, busy, onPublish, onClose }) {
   const [line, setLine] = useState('');
-  return html`<${Modal} open=${true} title=${a('publishDraft')} onClose=${onClose} className="ap-publish-modal">
-    <form class="ap-form" onSubmit=${e => { e.preventDefault(); onPublish(app, line); }}>
+  // The submit sits in the footer, outside the form, and names the form it submits.
+  return html`<${Modal} open=${true} title=${a('publishDraft')} onClose=${onClose} className="ap-publish-modal"
+    footer=${html`<button type="submit" form="ap-publish-form" class="btn-primary" disabled=${busy || (!!line.trim() && line.trim().length < 3)}>${a('publishDraft')}</button>`}>
+    <form id="ap-publish-form" class="ap-form" onSubmit=${e => { e.preventDefault(); onPublish(app, line); }}>
       <p class="ap-hint">${a('publishConfirm', { name: nameOf(app) })}</p>
       <label class="ap-field ap-field--wide"><span class="og-label">${a('roadPublishLabel')}</span>
         <textarea class="og-input" rows="3" maxLength="600" value=${line} onInput=${e => setLine(e.target.value)} />
       </label>
       <p class="ap-hint">${a('roadPublishHint')}</p>
-      <button type="submit" class="btn-primary" disabled=${busy || (!!line.trim() && line.trim().length < 3)}>${a('publishDraft')}</button>
     </form>
   <//>`;
 }

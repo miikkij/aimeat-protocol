@@ -13,8 +13,10 @@
  *   back through render.js (which imports detail.js, which imports this module).
  * @version-history
  *   v1.0.0 — 2026-07-17 — Initial creation (Agent-Bundled Apps Slice 2: catalog surface)
+ *   v1.1.0 — 2026-09-13 — The modal opens through dialogs.js (the site's one dialog).
  */
 import { escapeHtml, jsArg } from './util.js';
+import { openDlg } from './dialogs.js';
 import { showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t } from './i18n.js';
@@ -128,7 +130,7 @@ export function showAppAgentsModal(owner, filename) {
       '</div>';
   }
   body.innerHTML = html;
-  document.getElementById('agents-overlay').hidden = false;
+  openDlg('agents-overlay');
 
   // Hosted instances per def (public endpoint — works signed out too).
   defs.forEach(function(def, i) {

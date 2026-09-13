@@ -121,6 +121,13 @@
     v2.16.0 — 2026-09-11 — Lengthen the page <title>. "My Apps — AIMEAT" is sixteen characters and
       says nothing about what the page does; Bing Webmaster Tools reported it among seven pages
       whose titles are too short to summarise themselves in a result list.
+    v2.17.0 — 2026-09-13 — The dialogs are the site's one dialog (public/css/dialog.css, built in
+      after the poster sheet). The overlay wrappers and their [hidden] rules leave (#modal-overlay,
+      #source-overlay, #settings-overlay, #aimeat-import-overlay, #prompt-builder-overlay and the
+      shared list of eleven), and so do the frames they held (.modal, .modal h2, .modal-actions,
+      .help-modal, .source-modal, .confirm-modal, .prompt-builder-modal, #backup-modal) and the
+      old section label (.settings-section, .settings-section-title), whose place the section slab
+      takes. A dialog opens in the browser's top layer, so none needs a z-index any more.
 -->
 <html lang="en">
 <head>
@@ -764,41 +771,8 @@
       opacity: .6;
     }
 
-    /* ── Modal Overlay ──────────────────────────────── */
-
-    #modal-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 500;
-      background: rgba(0, 0, 0, .3);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
-
-    #modal-overlay[hidden] {
-      display: none;
-    }
-
-    .modal {
-      background: var(--surface);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius);
-      padding: 32px;
-      max-width: 480px;
-      width: 100%;
-      box-shadow: 0 8px 40px rgba(0, 0, 0, .12);
-      animation: cardIn .4s cubic-bezier(.16, 1, .3, 1);
-    }
-
-    .modal h2 {
-      font-size: 1.15rem;
-      margin-bottom: 20px;
-      color: var(--text);
-    }
+    /* ── Dialogs: the frame, header, body and footer are public/css/dialog.css, built into this
+       page; what stays here is what sits inside a dialog's body. ── */
 
     /* ── Modal Form Elements ──────────────────────────── */
 
@@ -921,13 +895,6 @@
       flex-direction: column;
     }
 
-    .modal-actions {
-      display: flex;
-      gap: 10px;
-      justify-content: flex-end;
-    }
-
-    .help-modal { max-width: 640px; }
     .help-p { font-size: .85rem; color: var(--text-muted); line-height: 1.55; margin-top: 4px; }
 
     .modal-btn {
@@ -1366,26 +1333,6 @@
 
     /* ── Source Modal ──────────────────────────────── */
 
-    #source-overlay {
-      position: fixed;
-      inset: 0;
-      /* Above #detail-view (600): View/Edit Source is opened from inside the detail
-         view, whose opaque background would otherwise fully hide a 500-level overlay. */
-      z-index: 650;
-      background: rgba(0, 0, 0, .3);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
-
-    #source-overlay[hidden] {
-      display: none;
-    }
-
-    .source-modal { max-width: 800px; width: 95vw; }
     #source-code {
       width: 100%;
       min-height: 400px;
@@ -1403,38 +1350,6 @@
     }
 
     /* ── Settings Modal ──────────────────────────────── */
-
-    #settings-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 500;
-      background: rgba(0, 0, 0, .3);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
-
-    #settings-overlay[hidden] {
-      display: none;
-    }
-
-    .settings-section {
-      margin-bottom: 20px;
-    }
-
-    .settings-section-title {
-      font-size: .78rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: .04em;
-      margin-bottom: 12px;
-      padding-bottom: 6px;
-      border-bottom: 1px solid var(--border-subtle);
-    }
 
     .settings-row {
       display: flex;
@@ -1470,23 +1385,6 @@
     }
 
     /* ── AIMEAT Import Dialog ─────────────────────────── */
-
-    #aimeat-import-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 550;
-      background: rgba(0, 0, 0, .3);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
-
-    #aimeat-import-overlay[hidden] {
-      display: none;
-    }
 
     .aimeat-app-list {
       max-height: 300px;
@@ -1589,7 +1487,6 @@
 
     .backup-menu button:hover { background: var(--hover); }
 
-    #backup-modal { max-height: 84vh; display: flex; flex-direction: column; }
     #backup-import-body { overflow-y: auto; flex: 1; min-height: 0; }
 
     .backup-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
@@ -1631,49 +1528,8 @@
     .backup-result-list { font-size: .82rem; margin: 4px 0 10px; padding-left: 18px; }
     .backup-result-errors { color: #ef4444; }
 
-    #help-overlay,
-    #publish-overlay,
-    #versions-overlay,
-    #subdomain-overlay,
-    #backup-overlay,
-    #server-import-overlay,
-    #json-import-overlay,
-    #lineage-overlay,
-    #confirm-overlay,
-    #agents-overlay,
-    #protection-overlay {
-      position: fixed;
-      inset: 0;
-      /* Above #detail-view (z-index 600) so a modal opened FROM the detail view
-         (e.g. "Publish as v2") is not hidden behind that opaque overlay — same fix
-         as #source-overlay (v2.3.1). Stays below the context menu. */
-      z-index: 650;
-      background: rgba(0, 0, 0, .3);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
-
-    #help-overlay[hidden],
-    #publish-overlay[hidden],
-    #versions-overlay[hidden],
-    #subdomain-overlay[hidden],
-    #backup-overlay[hidden],
-    #server-import-overlay[hidden],
-    #json-import-overlay[hidden],
-    #lineage-overlay[hidden],
-    #confirm-overlay[hidden],
-    #agents-overlay[hidden],
-    #protection-overlay[hidden] {
-      display: none;
-    }
-
-    /* Confirm sits above any modal it may be triggered from (e.g. Remove-from-server in detail). */
-    #confirm-overlay { z-index: 900; }
-    .confirm-modal { max-width: 440px; }
+    /* The dialogs open in the browser's top layer, so none needs a z-index to clear the detail view,
+       and a confirm opened from inside another dialog lands on top of it. */
     .confirm-message { font-size: .95rem; line-height: 1.5; color: var(--text); margin: 0 0 20px; }
 
     /* Toast notices — replaces alert(). Top-right stack, above every modal. */
@@ -2110,19 +1966,6 @@
     .cortex-mini-meta{font-size:.7rem;color:var(--text-muted)}
 
     /* ── Prompt Builder Panel ──────────────────────── */
-    #prompt-builder-overlay {
-      position: fixed; inset: 0; z-index: 600;
-      background: rgba(0,0,0,.3); backdrop-filter: blur(6px);
-      display: none; align-items: center; justify-content: center; padding: 24px;
-    }
-    .prompt-builder-modal {
-      background: var(--surface);
-      border: 1px solid var(--border-subtle); border-radius: 16px;
-      padding: 28px; max-width: 720px; width: 96vw; max-height: 90vh;
-      display: flex; flex-direction: column; overflow-y: auto;
-      box-shadow: 0 8px 40px rgba(0,0,0,.12);
-    }
-    .prompt-builder-modal h2 { margin: 0 0 16px; font-size: 1.1rem; }
     .pb-mode-row { display: flex; gap: 12px; margin-bottom: 14px; }
     .pb-mode-radio { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: .88rem; }
     .pb-mode-radio input { accent-color: #E8564A; }

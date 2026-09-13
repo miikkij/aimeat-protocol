@@ -22,6 +22,7 @@
  * @structure CortexTab (default) · RightNow · WhatOffDoes · WhoCanRead
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.0.1 — 2026-09-13 — The turn-off, remove and remove-all dialogs' actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-12 — The poster face: five numbered sections, the dependant count the page had
  *     been discarding, the unused ones grouped, a confirmation that names what breaks, and removal
  *     behind the typed name. Values reach the template unescaped: htm escapes every interpolation
@@ -262,7 +263,13 @@ export default function CortexTab() {
         const apps = appsOf(e);
         const names = e?.used_by?.app_names ?? [];
         return html`
-      <${Modal} open=${!!e} onClose=${() => setTurningOff(null)} title=${e ? C('dialog.offTitle', { name: e.name }) : ''}>
+      <${Modal} open=${!!e} onClose=${() => setTurningOff(null)} title=${e ? C('dialog.offTitle', { name: e.name }) : ''}
+        footer=${e && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setTurningOff(null)}>${t('common.cancel')}</button>
+          <button type="button" class="adm-btn" disabled=${busy} onClick=${doTurnOff}>
+            ${apps === 0 ? C('dialog.offDo')
+              : apps === 1 ? C('dialog.offDoForOne')
+                : C('dialog.offDoFor', { n: num(apps) })}</button>`}>
         ${e && html`
           ${apps > 0
             ? html`
@@ -278,20 +285,17 @@ export default function CortexTab() {
           <div class="adm-mrow adm-mrow--two adm-mrow--last">
             <span><b>${C('dialog.stays')}</b><span class="adm-why">${C('dialog.staysWhy')}</span></span>
             <span class="adm-mval"></span>
-          </div>
-          <div class="adm-cx-dialog-acts">
-            <button type="button" class="adm-btn" disabled=${busy} onClick=${doTurnOff}>
-              ${apps === 0 ? C('dialog.offDo')
-                : apps === 1 ? C('dialog.offDoForOne')
-                  : C('dialog.offDoFor', { n: num(apps) })}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setTurningOff(null)}>${t('common.cancel')}</button>
           </div>`}
       <//>`;
     };
 
     const removeDialog = () => html`
       <${Modal} open=${!!removing} onClose=${() => setRemoving(null)}
-        title=${removing ? C('dialog.removeTitle', { name: removing.name }) : ''}>
+        title=${removing ? C('dialog.removeTitle', { name: removing.name }) : ''}
+        footer=${removing && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setRemoving(null)}>${t('common.cancel')}</button>
+          <button type="button" class="og-door og-door--quiet og-door--danger"
+            disabled=${busy || removing.typed !== removing.name} onClick=${doRemove}>${C('removeForGood')}</button>`}>
         ${removing && html`
           <div class="og-box">
             <span class="og-box-label">${C('dialog.removeWarnLabel')}</span>
@@ -301,12 +305,7 @@ export default function CortexTab() {
             <span>${C('dialog.removeTypeLabel', { name: removing.name })}</span>
             <input class="adm-input mono" type="text" value=${removing.typed} placeholder=${removing.name}
               onInput=${ev => setRemoving({ ...removing, typed: ev.target.value })} />
-          </label>
-          <div class="adm-cx-dialog-acts">
-            <button type="button" class="og-door og-door--quiet og-door--danger"
-              disabled=${busy || removing.typed !== removing.name} onClick=${doRemove}>${C('removeForGood')}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setRemoving(null)}>${t('common.cancel')}</button>
-          </div>`}
+          </label>`}
       <//>`;
 
     if (list === null) {
@@ -451,7 +450,12 @@ export default function CortexTab() {
       ${offDialog()}
       ${removeDialog()}
 
-      <${Modal} open=${!!removingBatch} onClose=${() => setRemovingBatch(null)} title=${C('dialog.batchTitle')}>
+      <${Modal} open=${!!removingBatch} onClose=${() => setRemovingBatch(null)} title=${C('dialog.batchTitle')}
+        footer=${removingBatch && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setRemovingBatch(null)}>${t('common.cancel')}</button>
+          <button type="button" class="og-door og-door--quiet og-door--danger"
+            disabled=${busy || removingBatch.typed !== C('dialog.removeWord')}
+            onClick=${doRemoveBatch}>${C('group.removeAll', { n: num(removingBatch.items.length) })}</button>`}>
         ${removingBatch && html`
           <p>${C('dialog.batchAsk', { n: num(removingBatch.items.length) })}</p>
           <p class="adm-cx-applist">${removingBatch.items.map((e, i) => html`${i > 0 ? ' · ' : ''}${e.name}`)}</p>
@@ -463,13 +467,7 @@ export default function CortexTab() {
             <span>${C('dialog.batchTypeLabel', { word: C('dialog.removeWord') })}</span>
             <input class="adm-input mono" type="text" value=${removingBatch.typed} placeholder=${C('dialog.removeWord')}
               onInput=${ev => setRemovingBatch({ ...removingBatch, typed: ev.target.value })} />
-          </label>
-          <div class="adm-cx-dialog-acts">
-            <button type="button" class="og-door og-door--quiet og-door--danger"
-              disabled=${busy || removingBatch.typed !== C('dialog.removeWord')}
-              onClick=${doRemoveBatch}>${C('group.removeAll', { n: num(removingBatch.items.length) })}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setRemovingBatch(null)}>${t('common.cancel')}</button>
-          </div>`}
+          </label>`}
       <//>
     </div>`;
 }

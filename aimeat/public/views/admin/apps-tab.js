@@ -19,6 +19,7 @@
  * @structure AppsAdminTab (default) · RightNow · FourStates · TakenDown
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.0.1 — 2026-09-13 — The take-down and delete dialogs' actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-12 — The poster face: five numbered sections, the facts the node already sent
  *     and the page ignored (forks, version, access code, search block, publish date, the address
  *     that opens the app), filters beside the search, the copy scan as a section with the suspected
@@ -347,7 +348,10 @@ export default function AppsAdminTab() {
       <${FourStates} facts=${facts} number=${n()} />
       <${TakenDown} apps=${apps} number=${n()} />
 
-      <${Modal} open=${!!hiding} onClose=${() => setHiding(null)} title=${A('hideTitle')}>
+      <${Modal} open=${!!hiding} onClose=${() => setHiding(null)} title=${A('hideTitle')}
+        footer=${hiding && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setHiding(null)}>${t('common.cancel')}</button>
+          <button type="button" class="adm-btn" disabled=${busy} onClick=${doHide}>${A('takeDown')}</button>`}>
         ${hiding && html`
           <p>${A('hideAsk', { name: escHtml(hiding.name), owner: escHtml(hiding.owner) })}</p>
           <p class="adm-ap-note">${A('hideExplain')}</p>
@@ -355,14 +359,14 @@ export default function AppsAdminTab() {
             <span>${A('reasonLabel')}</span>
             <input class="adm-input" type="text" value=${hiding.reason} placeholder=${A('reasonPh')}
               onInput=${e => setHiding({ ...hiding, reason: e.target.value })} />
-          </label>
-          <div class="adm-ap-dialog-acts">
-            <button type="button" class="adm-btn" disabled=${busy} onClick=${doHide}>${A('takeDown')}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setHiding(null)}>${t('common.cancel')}</button>
-          </div>`}
+          </label>`}
       <//>
 
-      <${Modal} open=${!!deleting} onClose=${() => setDeleting(null)} title=${A('deleteTitle')}>
+      <${Modal} open=${!!deleting} onClose=${() => setDeleting(null)} title=${A('deleteTitle')}
+        footer=${deleting && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setDeleting(null)}>${t('common.cancel')}</button>
+          <button type="button" class="og-door og-door--quiet og-door--danger"
+            disabled=${busy || deleting.typed !== deleting.filename} onClick=${doDelete}>${A('deleteForGood')}</button>`}>
         ${deleting && html`
           <p>${A('deleteAsk', { name: escHtml(deleting.name), owner: escHtml(deleting.owner) })}</p>
           <div class="og-box">
@@ -373,12 +377,7 @@ export default function AppsAdminTab() {
             <span>${A('deleteTypeLabel', { filename: deleting.filename })}</span>
             <input class="adm-input mono" type="text" value=${deleting.typed} placeholder=${deleting.filename}
               onInput=${e => setDeleting({ ...deleting, typed: e.target.value })} />
-          </label>
-          <div class="adm-ap-dialog-acts">
-            <button type="button" class="og-door og-door--quiet og-door--danger"
-              disabled=${busy || deleting.typed !== deleting.filename} onClick=${doDelete}>${A('deleteForGood')}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setDeleting(null)}>${t('common.cancel')}</button>
-          </div>`}
+          </label>`}
       <//>
     </div>`;
 }

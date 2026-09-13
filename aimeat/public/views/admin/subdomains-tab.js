@@ -15,6 +15,7 @@
  *   - Refusals: the four things the route answers no to, in its own words
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.0.1 — 2026-09-13 — The delete dialog's actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-12 — The poster face: the table becomes rows, search and filters arrive (a
  *     hundred and fifty mappings had neither), the Type and Created by columns go (one repeated
  *     the same word on every row, the other the same identity — it shows now only when it differs
@@ -302,7 +303,10 @@ export default function SubdomainsAdminTab() {
         </section>
       `}
 
-      <${Modal} open=${!!deleting} onClose=${() => setDeleting(null)} title=${S('deleteTitle')}>
+      <${Modal} open=${!!deleting} onClose=${() => setDeleting(null)} title=${S('deleteTitle')}
+        footer=${deleting && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setDeleting(null)}>${t('common.cancel')}</button>
+          <button class="adm-btn" disabled=${deleting.typed !== deleting.subdomain} onClick=${doDelete}>${S('delete')}</button>`}>
         ${deleting && html`
           <div class="adm-subs-ask">
             <p>${S('deleteLead')}</p>
@@ -316,10 +320,6 @@ export default function SubdomainsAdminTab() {
                 onInput=${e => setDeleting({ ...deleting, typed: e.target.value })} />
             </div>
             <p class="adm-subs-hint">${S('deleteHint')}</p>
-            <div class="adm-subs-act">
-              <button class="adm-btn" disabled=${deleting.typed !== deleting.subdomain} onClick=${doDelete}>${S('delete')}</button>
-              <button type="button" class="og-door og-door--quiet" onClick=${() => setDeleting(null)}>${t('common.cancel')}</button>
-            </div>
           </div>
         `}
       <//>

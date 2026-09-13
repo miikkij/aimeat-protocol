@@ -245,11 +245,30 @@ html`<${FormField} label="Name" hint="Your display name">
 
 ### Modal
 
+The site has one dialog. `Modal` renders a native `<dialog class="dlg">` opened with `showModal()`:
+a header with the title and the X, a body that is the only part to scroll, and a footer for the
+actions (quiet words first, the loud slab last). On a phone (560px and narrower) it is a sheet at
+the bottom edge. The look is `/css/dialog.css` and the closing rules are `/js/dialog.js`; the app
+catalog uses the same two files through `src/static/app-catalog/js/dialogs.js`. Escape and the page
+behind close only while nothing has been typed; the X always closes.
+
 ```javascript
-html`<${Modal} open=${showEdit} onClose=${() => setShowEdit(false)} title="Edit">
-  ...dialog content...
+html`<${Modal} open=${showEdit} onClose=${() => setShowEdit(false)} title=${t('x.editTitle')} size="md"
+  footer=${html`<button class="btn-ghost" onClick=${close}>${t('common.cancel')}</button>
+                <button class="btn-primary" onClick=${save}>${t('common.save')}</button>`}>
+  <section class="poster-section">
+    <h3 class="poster-section-title">${t('x.section')}</h3>
+    ...fields...
+  </section>
 </${Modal}>`
 ```
+
+Props: `size` (`sm` 440, `md` 560, `lg` 840, `xl` 1080), `footer`, `footerStart` (a side door at
+the footer's other end), `showClose` (default on), `guard` (default on; turn it off for a dialog with
+nothing to lose, such as a viewer). A section headline inside the body is `.poster-section-title`,
+drawn a step smaller than on the page. A toast raised while a dialog is open goes above it through
+`raiseAboveDialogs`. `pnpm check:dialogs` refuses a hand-rolled overlay, backdrop or
+`role="dialog"` box anywhere in the SPA or the catalog.
 
 ### Spinner
 

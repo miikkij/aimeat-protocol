@@ -164,39 +164,44 @@
   </div><!-- .cat-main -->
   </div><!-- .cat-body -->
 
-  <!-- Extension popup: what one active extension offers an app. The dialog frame and the title
-       slab every other dialog wears; cortex.js fills #cortex-popup-content. It sits out here with
-       the other dialogs: inside .cat-body (a stacking context) it opened under the site bar. -->
-  <div id="cortex-popup-overlay" class="cx-overlay" hidden>
-    <div class="modal cx-modal">
-      <div id="cortex-popup-content"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('cortex-popup-overlay').hidden = true" data-i18n="common.close">Close</button>
-      </div>
-    </div>
-  </div>
+  <!-- The dialogs. Every one is the site's one dialog (public/css/dialog.css, public/js/dialog.js,
+       both built into this page; js/dialogs.js opens and closes them): a header with the title and
+       the X, a body that is the only part to scroll, a footer with the actions, quiet words first
+       and the loud action last. On a phone each is a sheet at the bottom edge. A button marked
+       data-dlg-close closes its dialog the way the X does. -->
+
+  <!-- Extension popup: what one active extension offers an app; cortex.js fills the title, the
+       body and, for the extension's owner, the edit door at the footer's start. -->
+  <dialog id="cortex-popup-overlay" class="dlg modal dlg--md cx-modal">
+    <header class="dlg-head"><h2 class="dlg-title" id="cortex-popup-title"></h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body" id="cortex-popup-content"></div>
+    <footer class="dlg-foot">
+      <div class="dlg-foot-start" id="cortex-popup-owner"></div>
+      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+    </footer>
+  </dialog>
 
   <!-- Extension editor: the manifest and its library files, for the extension's owner. -->
-  <div id="cortex-editor-overlay" class="cx-overlay cx-overlay--editor" hidden>
-    <div class="modal cx-modal cx-modal--editor">
-      <h2 data-i18n="cortex.editorTitle">Extension Editor</h2>
+  <dialog id="cortex-editor-overlay" class="dlg modal dlg--lg cx-modal">
+    <header class="dlg-head"><h2 class="dlg-title" data-i18n="cortex.editorTitle">Extension Editor</h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body">
       <p id="cortex-editor-name" class="cx-sub"></p>
       <div id="cortex-editor-status" class="cx-status" role="status" aria-live="polite"></div>
       <label class="modal-label" for="cortex-editor-manifest" data-i18n="cortex.manifest">Manifest (YAML)</label>
       <textarea id="cortex-editor-manifest" class="cx-code cx-code--manifest" spellcheck="false"></textarea>
       <div id="cortex-editor-libs"></div>
       <button type="button" class="modal-btn secondary cx-add" onclick="window._launcher.cortexEditorAddLib()" data-i18n="cortex.addLib">+ Add Lib File</button>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="window._launcher.cortexEditorExport()" data-i18n="cortex.exportFiles">Export Files</button>
-        <button type="button" class="modal-btn primary" onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" data-i18n="cortex.saveReinstall">Save &amp; Re-install</button>
-        <button type="button" class="modal-btn secondary" onclick="window._launcher.closeCortexEditor()" data-i18n="common.cancel">Cancel</button>
-      </div>
     </div>
-  </div>
+    <footer class="dlg-foot">
+      <div class="dlg-foot-start"><button type="button" class="modal-btn secondary" onclick="window._launcher.cortexEditorExport()" data-i18n="cortex.exportFiles">Export Files</button></div>
+      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="modal-btn primary" onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" data-i18n="cortex.saveReinstall">Save &amp; Re-install</button>
+    </footer>
+  </dialog>
 
-  <div id="modal-overlay" hidden>
-    <div class="modal" id="add-app-modal">
-      <h2 id="modal-title" data-i18n="addModal.title">Add App</h2>
+  <dialog id="modal-overlay" class="dlg modal dlg--md">
+    <header class="dlg-head"><h2 class="dlg-title" id="modal-title" data-i18n="addModal.title">Add App</h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body" id="add-app-modal">
 
       <!-- Source tabs — server-only: paste HTML or upload an HTML/ZIP file; it publishes to your account. -->
       <div class="modal-tabs">
@@ -250,14 +255,12 @@
           <input type="text" id="app-tags" class="modal-input" placeholder="tools, productivity" data-i18n-ph="addModal.tagsPh" autocomplete="off"/>
         </div>
       </div>
-
-      <!-- Actions -->
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" id="modal-cancel-btn" data-i18n="common.cancel">Cancel</button>
-        <button type="button" class="modal-btn primary" id="modal-save-btn" data-i18n="common.save">Save</button>
-      </div>
     </div>
-  </div>
+    <footer class="dlg-foot">
+      <button type="button" class="modal-btn secondary" id="modal-cancel-btn" data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="modal-btn primary" id="modal-save-btn" data-i18n="common.save">Save</button>
+    </footer>
+  </dialog>
 
   <div id="iframe-view" hidden>
     <div class="iframe-toolbar">
@@ -292,57 +295,60 @@
     <button data-action="delete" class="danger" data-i18n="ctx.delete">&#x1F5D1;&#xFE0F; Delete</button>
   </div>
 
-  <!-- Settings Modal -->
-  <div id="help-overlay" hidden>
-    <div class="modal help-modal">
-      <h2 data-i18n="help.title">❓ How this catalog works</h2>
-      <div class="settings-section">
-        <div class="settings-section-title" data-i18n="help.modesTitle">Global vs Personal</div>
+  <!-- How the catalog works: five short sections, each under the section slab at the dialog's size. -->
+  <dialog id="help-overlay" class="dlg modal dlg--md" data-dlg-guard="off">
+    <header class="dlg-head"><h2 class="dlg-title" data-i18n="help.title">How this catalog works</h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body">
+      <section class="poster-section">
+        <h3 class="poster-section-title" data-i18n="help.modesTitle">Global vs Personal</h3>
         <p class="help-p" data-i18n="help.modes">Both are on THIS browser. Global apps are shared across every account signed in on this browser; Personal apps are private to your account. Personal needs you to be signed in.</p>
-      </div>
-      <div class="settings-section">
-        <div class="settings-section-title" data-i18n="help.whereTitle">Where your apps live</div>
+      </section>
+      <section class="poster-section">
+        <h3 class="poster-section-title" data-i18n="help.whereTitle">Where your apps live</h3>
         <p class="help-p" data-i18n="help.where">"Local Apps" live only in this browser (IndexedDB) — they don't follow you to another browser or device. Publish an app to put it on the server, and then you can manage it from anywhere. Keeping an app local-only is a valid choice; it just stays here.</p>
-      </div>
-      <div class="settings-section">
-        <div class="settings-section-title" data-i18n="help.sectionsTitle">The sections</div>
+      </section>
+      <section class="poster-section">
+        <h3 class="poster-section-title" data-i18n="help.sectionsTitle">The sections</h3>
         <p class="help-p" data-i18n="help.sections">Published = your apps on the server. Parked = your server apps hidden from the public catalogue but still usable by you. Community = other people's published apps. Local = apps only in this browser.</p>
-      </div>
-      <div class="settings-section">
-        <div class="settings-section-title" data-i18n="help.backupTitle">"Backup" means two different things</div>
+      </section>
+      <section class="poster-section">
+        <h3 class="poster-section-title" data-i18n="help.backupTitle">"Backup" means two different things</h3>
         <p class="help-p" data-i18n="help.backup">The 💾 menu (top bar) exports/imports your SERVER apps + extensions as a .zip. Settings → Export/Import JSON backs up this browser's LOCAL catalog. They are separate.</p>
-      </div>
-      <div class="settings-section">
-        <div class="settings-section-title" data-i18n="help.standaloneTitle">Run it against your own node</div>
+      </section>
+      <section class="poster-section">
+        <h3 class="poster-section-title" data-i18n="help.standaloneTitle">Run it against your own node</h3>
         <p class="help-p" data-i18n="help.standalone">Set Settings → Server URL to point the catalog at any AIMEAT node (e.g. your own localhost or a federated node). This page is meant to be usable standalone against the node you choose.</p>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn primary" onclick="window._launcher.closeHelp()" data-i18n="common.close">Close</button>
-      </div>
+      </section>
     </div>
-  </div>
+    <footer class="dlg-foot">
+      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+    </footer>
+  </dialog>
 
   <!-- Generic in-page confirm dialog — replaces native confirm() so every destructive action
-       uses a real modal (wired in bootstrap; showConfirm(message, onConfirm)). -->
-  <div id="confirm-overlay" hidden>
-    <div class="modal confirm-modal">
+       uses a real modal (wired in bootstrap; showConfirm(message, onConfirm)). A question with no
+       title: its X sits in the corner over the body. -->
+  <dialog id="confirm-overlay" class="dlg modal dlg--sm" data-dlg-guard="off">
+    <button type="button" class="dlg-close"></button>
+    <div class="dlg-body">
       <p id="confirm-message" class="confirm-message"></p>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" id="confirm-cancel-btn" data-i18n="common.cancel">Cancel</button>
-        <button type="button" class="modal-btn primary" id="confirm-ok-btn" data-i18n="common.confirm">OK</button>
-      </div>
     </div>
-  </div>
+    <footer class="dlg-foot">
+      <button type="button" class="modal-btn secondary" id="confirm-cancel-btn" data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="modal-btn primary" id="confirm-ok-btn" autofocus data-i18n="common.confirm">OK</button>
+    </footer>
+  </dialog>
 
-  <!-- Toast notices (replaces alert()). showNotice(message, type) appends here. -->
-  <div id="notice-stack" class="notice-stack" aria-live="polite"></div>
+  <!-- Toast notices (replaces alert()). showNotice(message, type) appends here; a manual popover,
+       so a notice raised while a dialog is open shows above it (raiseAboveDialogs). -->
+  <div id="notice-stack" class="notice-stack" popover="manual" aria-live="polite"></div>
 
-  <div id="settings-overlay" hidden>
-    <div class="modal" id="settings-modal">
-      <h2 data-i18n="settings.title">Settings</h2>
+  <dialog id="settings-overlay" class="dlg modal dlg--md">
+    <header class="dlg-head"><h2 class="dlg-title" data-i18n="settings.title">Settings</h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body" id="settings-modal">
 
-      <div class="settings-section">
-        <div class="settings-section-title" data-i18n="settings.appearance">Appearance</div>
+      <section class="poster-section">
+        <h3 class="poster-section-title" data-i18n="settings.appearance">Appearance</h3>
         <div class="settings-row">
           <label for="setting-theme" data-i18n="settings.theme">Theme</label>
           <select id="setting-theme" class="modal-input">
@@ -357,47 +363,48 @@
             <option value="fi">Suomi</option>
           </select>
         </div>
-      </div>
+      </section>
 
-      <div class="settings-section">
-        <div class="settings-section-title" data-i18n="settings.server">AIMEAT Server</div>
+      <section class="poster-section">
+        <h3 class="poster-section-title" data-i18n="settings.server">AIMEAT Server</h3>
         <div class="settings-row">
           <label for="setting-aimeat-url" data-i18n="settings.serverUrl">Server URL</label>
           <input type="url" id="setting-aimeat-url" class="modal-input" readonly autocomplete="off" data-i18n-title="settings.serverUrlHint" title="This catalog talks to the node that served it (same-origin)."/>
         </div>
-      </div>
-
-      <div class="modal-actions" style="margin-top:24px">
-        <button type="button" class="modal-btn secondary" id="settings-cancel-btn" data-i18n="common.cancel">Cancel</button>
-        <button type="button" class="modal-btn primary" id="settings-save-btn" data-i18n="common.save">Save</button>
-      </div>
+      </section>
     </div>
-  </div>
+    <footer class="dlg-foot">
+      <button type="button" class="modal-btn secondary" id="settings-cancel-btn" data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="modal-btn primary" id="settings-save-btn" data-i18n="common.save">Save</button>
+    </footer>
+  </dialog>
 
-  <!-- View Source Modal -->
-  <div id="source-overlay" hidden>
-    <div class="modal source-modal">
-      <h2 id="source-title">View Source</h2>
+  <!-- View Source Modal. Its closer asks before unsaved edits are lost, so it needs no guard. -->
+  <dialog id="source-overlay" class="dlg modal dlg--lg source-modal" data-dlg-guard="off">
+    <header class="dlg-head"><h2 class="dlg-title" id="source-title">View Source</h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body">
       <textarea id="source-code"></textarea>
       <div class="dtl-ai-status" id="source-draft-status"></div>
-      <div class="modal-actions">
-        <button class="modal-btn secondary" id="copy-source-btn" data-i18n="source.copy">Copy Source</button>
-        <button class="modal-btn primary" id="copy-prompt-btn" data-i18n="source.copyPrompt">Copy with AI Prompt</button>
-        <!-- The three canonical verbs, identical to the detail view's AI loop (TARGET-048):
-             save (private, checkpointed) → try (real origin, live untouched) → publish (public). -->
-        <button class="modal-btn primary" id="save-source-btn" disabled data-i18n="source.save">Save working copy</button>
-        <button class="modal-btn secondary" id="source-test-live-btn" hidden data-i18n="wc.try">Try it safely</button>
-        <button class="modal-btn success" id="source-publish-tested-btn" hidden data-i18n="wc.publishNew">Publish as a new version</button>
-        <button class="modal-btn secondary" id="close-source-btn" data-i18n="common.close">Close</button>
-      </div>
       <p class="wc-verbs-hint" data-i18n="wc.verbsHint">Save keeps it for you only. Try opens it on its real address without changing the live app. Publish is what other people see.</p>
     </div>
-  </div>
+    <footer class="dlg-foot">
+      <div class="dlg-foot-start">
+        <button type="button" class="modal-btn secondary" id="copy-source-btn" data-i18n="source.copy">Copy Source</button>
+        <button type="button" class="modal-btn secondary" id="copy-prompt-btn" data-i18n="source.copyPrompt">Copy with AI Prompt</button>
+      </div>
+      <button type="button" class="modal-btn secondary" id="close-source-btn" data-i18n="common.close">Close</button>
+      <!-- The three canonical verbs, identical to the detail view's AI loop (TARGET-048):
+           save (private, checkpointed) → try (real origin, live untouched) → publish (public). -->
+      <button type="button" class="modal-btn secondary" id="source-test-live-btn" hidden data-i18n="wc.try">Try it safely</button>
+      <button type="button" class="modal-btn primary" id="save-source-btn" disabled data-i18n="source.save">Save working copy</button>
+      <button type="button" class="modal-btn success" id="source-publish-tested-btn" hidden data-i18n="wc.publishNew">Publish as a new version</button>
+    </footer>
+  </dialog>
 
   <!-- Publish Modal -->
-  <div id="publish-overlay" hidden>
-    <div class="modal" id="publish-modal">
-      <h2 data-i18n="publish.title">&#x1F680; Publish App</h2>
+  <dialog id="publish-overlay" class="dlg modal dlg--md">
+    <header class="dlg-head"><h2 class="dlg-title" data-i18n="publish.title">Publish App</h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body" id="publish-modal">
       <div class="form-group">
         <label for="publish-filename" data-i18n="publish.filename">Filename</label>
         <input type="text" id="publish-filename" class="modal-input" placeholder="my-app.html" autocomplete="off"/>
@@ -414,30 +421,30 @@
         <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="publish.accessCodeHint">4-64 chars. If set, only people with the code can download.</div>
       </div>
       <div id="publish-status" style="margin-top:8px;font-size:.85rem"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('publish-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
-        <button type="button" class="modal-btn primary" id="publish-submit-btn" onclick="window._launcher.submitPublish()" data-i18n="publish.submit">Publish</button>
-      </div>
     </div>
-  </div>
+    <footer class="dlg-foot">
+      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="modal-btn primary" id="publish-submit-btn" onclick="window._launcher.submitPublish()" data-i18n="publish.submit">Publish</button>
+    </footer>
+  </dialog>
 
   <!-- Backup Import Modal -->
-  <div id="backup-overlay" hidden>
-    <div class="modal" id="backup-modal">
-      <h2 data-i18n="backup.title">&#x1F4E5; Import from backup</h2>
+  <dialog id="backup-overlay" class="dlg modal dlg--lg">
+    <header class="dlg-head"><h2 class="dlg-title" data-i18n="backup.title">Import from backup</h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body" id="backup-modal">
       <div id="backup-status" style="margin:4px 0;font-size:.85rem;min-height:1.1em"></div>
       <div id="backup-import-body"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('backup-overlay').hidden = true" data-i18n="common.close">Close</button>
-        <button type="button" class="modal-btn primary" id="backup-restore-btn" onclick="window._launcher.submitBackupRestore()" data-i18n="backup.restore" style="display:none">Restore selected</button>
-      </div>
     </div>
-  </div>
+    <footer class="dlg-foot">
+      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="modal-btn primary" id="backup-restore-btn" onclick="window._launcher.submitBackupRestore()" data-i18n="backup.restore" style="display:none">Restore selected</button>
+    </footer>
+  </dialog>
 
   <!-- Subdomain Assign Modal (operator only) -->
-  <div id="subdomain-overlay" hidden>
-    <div class="modal" id="subdomain-modal">
-      <h2 data-i18n="subModal.title">&#x1F310; Assign Subdomain</h2>
+  <dialog id="subdomain-overlay" class="dlg modal dlg--md">
+    <header class="dlg-head"><h2 class="dlg-title" data-i18n="subModal.title">Assign Subdomain</h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body" id="subdomain-modal">
       <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px" id="subdomain-app-label"></div>
       <div class="form-group">
         <label for="subdomain-input" data-i18n="subModal.label">Subdomain</label>
@@ -445,74 +452,74 @@
         <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="subModal.hint">Lowercase letters, numbers and hyphens (2-63 chars). The app is served at the subdomain root.</div>
       </div>
       <div id="subdomain-status" style="margin-top:8px;font-size:.85rem;min-height:1.1em"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('subdomain-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
-        <button type="button" class="modal-btn secondary" id="subdomain-unassign-btn" onclick="window._launcher.unassignSubdomain()" data-i18n="subModal.unassign">Unassign</button>
-        <button type="button" class="modal-btn primary" id="subdomain-save-btn" onclick="window._launcher.submitSubdomainAssign()" data-i18n="common.save">Save</button>
-      </div>
     </div>
-  </div>
+    <footer class="dlg-foot">
+      <div class="dlg-foot-start"><button type="button" class="modal-btn secondary" id="subdomain-unassign-btn" onclick="window._launcher.unassignSubdomain()" data-i18n="subModal.unassign">Unassign</button></div>
+      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="modal-btn primary" id="subdomain-save-btn" onclick="window._launcher.submitSubdomainAssign()" data-i18n="common.save">Save</button>
+    </footer>
+  </dialog>
 
-  <!-- Versions Modal -->
-  <div id="versions-overlay" hidden>
-    <div class="modal" id="versions-modal">
-      <h2><span id="versions-title">App Versions</span></h2>
+  <!-- Versions Modal: the title names the app the versions belong to. -->
+  <dialog id="versions-overlay" class="dlg modal dlg--lg" data-dlg-guard="off">
+    <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="versions.title">App Versions</span> <span id="versions-title" class="aga-app-ref"></span></h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body" id="versions-modal">
       <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px" data-i18n="versions.help">Every publish is kept. Restore re-publishes an older version as the new latest; Fork copies it into a new app. Older versions are never lost.</div>
       <div id="versions-status" style="margin:6px 0;font-size:.85rem;min-height:1.1em"></div>
-      <div id="versions-list" style="max-height:48vh;overflow-y:auto"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('versions-overlay').hidden = true" data-i18n="common.close">Close</button>
-      </div>
+      <div id="versions-list"></div>
     </div>
-  </div>
+    <footer class="dlg-foot">
+      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+    </footer>
+  </dialog>
 
   <!-- Fork lineage modal: cross-owner tree of forks (ancestry + descendants) with each node's live status -->
-  <div id="lineage-overlay" hidden>
-    <div class="modal" id="lineage-modal">
-      <h2><span id="lineage-title" data-i18n="lineage.title">Fork lineage</span></h2>
+  <dialog id="lineage-overlay" class="dlg modal dlg--lg" data-dlg-guard="off">
+    <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="lineage.title">Fork lineage</span> <span id="lineage-title" class="aga-app-ref"></span></h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body" id="lineage-modal">
       <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:6px" data-i18n="lineage.help">Every app that was forked from this one (and where this one came from), with each fork's current status. The chain survives a fork being parked or deleted.</div>
       <div id="lineage-summary" style="font-size:.82rem;color:var(--text-muted);margin-bottom:8px"></div>
       <div id="lineage-status" style="margin:6px 0;font-size:.85rem;min-height:1.1em"></div>
-      <div id="lineage-tree" style="max-height:52vh;overflow-y:auto;font-size:.85rem"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('lineage-overlay').hidden = true" data-i18n="common.close">Close</button>
-      </div>
+      <div id="lineage-tree" style="font-size:.85rem"></div>
     </div>
-  </div>
+    <footer class="dlg-foot">
+      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+    </footer>
+  </dialog>
 
   <!-- Bundled-agents modal (Agent-Bundled Apps): crew-def inspector + hosted instances with
        public offer prices + "deploy your own" (runner/organism pickers) onto the owner's fleet -->
-  <div id="agents-overlay" hidden>
-    <div class="modal" id="agents-modal">
-      <h2><span data-i18n="agents.title">Bundled agents</span> <span id="agents-modal-app" class="aga-app-ref"></span></h2>
+  <dialog id="agents-overlay" class="dlg modal dlg--lg" data-dlg-guard="off">
+    <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="agents.title">Bundled agents</span> <span id="agents-modal-app" class="aga-app-ref"></span></h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body" id="agents-modal">
       <div id="agents-modal-body" class="aga-body"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('agents-overlay').hidden = true" data-i18n="common.close">Close</button>
-      </div>
     </div>
-  </div>
+    <footer class="dlg-foot">
+      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+    </footer>
+  </dialog>
 
   <!-- Copy-protection modal: opt-in per-app flags applied to the runnable HTML at serve time -->
-  <div id="protection-overlay" hidden>
-    <div class="modal" id="protection-modal">
-      <h2><span id="protection-title" data-i18n="protect.title">Copy protection</span></h2>
+  <dialog id="protection-overlay" class="dlg modal dlg--md">
+    <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="protect.title">Copy protection</span> <span id="protection-title" class="aga-app-ref"></span></h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body" id="protection-modal">
       <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:10px" data-i18n="protect.help">Optional, per-app. These raise the cost of casual copying and make leaks traceable — they cannot stop someone who can view the app from copying its HTML. To truly protect logic or data, put it in a server-side extension.</div>
       <label class="protect-row"><input type="checkbox" id="protect-obfuscate"> <span><b data-i18n="protect.obfuscate">Obfuscate</b> — <span data-i18n="protect.obfuscateHint">mangle the app's inline scripts so the source is hard to read.</span></span></label>
       <label class="protect-row"><input type="checkbox" id="protect-domainLock"> <span><b data-i18n="protect.domainLock">Domain-lock</b> — <span data-i18n="protect.domainLockHint">only run on this node's app origin; a rehosted copy is sent home.</span></span></label>
       <label class="protect-row"><input type="checkbox" id="protect-watermark"> <span><b data-i18n="protect.watermark">Watermark</b> — <span data-i18n="protect.watermarkHint">embed an invisible fingerprint so a leaked copy traces back to who was served it.</span></span></label>
       <label class="protect-row"><input type="checkbox" id="protect-noRawDownload"> <span><b data-i18n="protect.noRawDownload">No raw download</b> — <span data-i18n="protect.noRawDownloadHint">block the raw source download; deliver the runnable app only.</span></span></label>
       <div id="protection-status" style="margin:8px 0 0;font-size:.85rem;min-height:1.1em"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn primary" onclick="window._launcher.saveProtection()" data-i18n="protect.save">Save</button>
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('protection-overlay').hidden = true" data-i18n="common.close">Close</button>
-      </div>
     </div>
-  </div>
+    <footer class="dlg-foot">
+      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="modal-btn primary" onclick="window._launcher.saveProtection()" data-i18n="protect.save">Save</button>
+    </footer>
+  </dialog>
 
   <!-- Generate App with AI — guided steps -->
-  <div id="prompt-builder-overlay">
-    <div class="prompt-builder-modal">
-      <h2 id="pb-title" data-i18n="pb.title">&#x2728; Generate App with AI</h2>
+  <dialog id="prompt-builder-overlay" class="dlg modal dlg--lg prompt-builder-modal">
+    <header class="dlg-head"><h2 class="dlg-title" id="pb-title" data-i18n="pb.title">Generate App with AI</h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body">
       <p class="pb-intro" data-i18n="pb.intro">No coding. Describe your idea, copy the prompt, and paste it into any AI chat (Claude, ChatGPT…). The AI asks a few questions, builds a ready-to-use app, and gives you one HTML file — then add it here to put it live.</p>
 
       <div class="pb-step">
@@ -562,12 +569,11 @@
         <p class="pb-step-hint" data-i18n="pb.step3hint">Got the HTML file from the AI? Add it here — it goes live on your node and you get a link to share.</p>
         <button class="modal-btn pb-step-btn" id="pb-add-btn" data-i18n="pb.addBtn">&#x2795; I have my app file — add it</button>
       </div>
-
-      <div class="modal-actions">
-        <button class="modal-btn secondary" id="pb-cancel-btn" data-i18n="common.close">Close</button>
-      </div>
     </div>
-  </div>
+    <footer class="dlg-foot">
+      <button type="button" class="modal-btn secondary" id="pb-cancel-btn" data-i18n="common.close">Close</button>
+    </footer>
+  </dialog>
 
   <!-- Published Apps Section (inserted before grid, toggled) -->
 

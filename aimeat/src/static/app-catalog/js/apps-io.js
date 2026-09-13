@@ -11,12 +11,14 @@
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 10).
  *   v2.0.0 — 2026-07-20 — Server-only cutover: drop the local writers (URL/file/paste/zip → IndexedDB);
  *     creation now builds a transient record and publishes it to the server as an unlisted app.
+ *   v2.1.0 — 2026-09-13 — The Add dialog opens and closes through dialogs.js (the site's one dialog).
  */
 import { saveApp } from './db.js';
 import { showNotice } from './ui.js';
 import { t } from './i18n.js';
 import { extractZip, bundleZip } from './zip.js';
 import { getCortexOwnerToken } from './cortex.js';   // sign-in gate in requireSignInThen (runtime-only call, no import cycle)
+import { openDlg, closeDlg } from './dialogs.js';
 
 // Injected once at bootstrap by main.js (main-local fns + the live working-set getter + the publish
 // modal opener from server-io, injected to avoid an apps-io ↔ server-io import cycle).
@@ -58,7 +60,7 @@ var selectedFile = null;
 var editingAppId = null;
 
 function showModal() {
-  document.getElementById('modal-overlay').hidden = false;
+  openDlg('modal-overlay');
   document.getElementById('modal-title').textContent = t('addModal.title');
   // Server-only: there is no URL-bookmark tab — default to pasting source.
   switchTab('paste');
@@ -150,7 +152,7 @@ function prefillFromHtml(html, fallbackName) {
 }
 
 function closeModal() {
-  document.getElementById('modal-overlay').hidden = true;
+  closeDlg('modal-overlay');
   // Reset form
   document.getElementById('app-name').value = '';
   document.getElementById('app-icon').value = '';
