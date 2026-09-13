@@ -31,10 +31,11 @@ case "$toplevel" in
   *)
     if [ "$common" = ".git" ] || [ "$common" = "$toplevel/.git" ]; then
       printf 'Worktree: THE SHARED CHECKOUT (%s).\n' "$toplevel"
-      printf '  That one is the developer'"'"'s. Before editing anything:\n'
-      printf '    git worktree add .worktrees/<session> origin/main\n'
-      printf '    cd .worktrees/<session>/aimeat && pnpm install && pnpm test:env:init\n'
-      printf '  (a root install does not populate aimeat/, and .env.test.* are never copied by hand).\n'
+      printf '  That one is the developer'"'"'s. Before editing anything, move into your own worktree:\n'
+      printf '    call the EnterWorktree tool with name cc-<owner>-<tag>\n'
+      printf '  (or start the next session with: claude --worktree cc-<owner>-<tag>). The WorktreeCreate hook\n'
+      printf '  makes .worktrees/<name> at origin/main with its own install and .env.test.*, and from then on\n'
+      printf '  Claude Code refuses edits to this checkout.\n'
     else
       printf 'Worktree: %s\n' "$toplevel"
     fi
