@@ -11,10 +11,17 @@
  *   Notifications page reads and writes it, the sweeps read it. Also the one place that says which
  *   SENDER a notification came from (`sourceOf`) and which group a type belongs to (`groupOfType`),
  *   including for records written before the source travelled with them.
- * @structure NOTIF_SETTINGS_KEY · types · defaultSettings · normalizeSettings · read/write ·
+ * @structure NOTIF_SETTINGS_KEY · types · defaultSettings · normalizeSettings ·
+ *   readNotificationSettingsStrict · readNotificationSettings · updateNotificationSettings ·
  *   groupOfType · senderKey · sourceOf · prefsFor · quietState · localMinutes
  * @usage const s = await readNotificationSettings(storage, ghii); const p = prefsFor(s, source, type);
+ *   await updateNotificationSettings(storage, ghii, cur => ({ ...cur, lastDigestAt }));
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Three ways a real record could be replaced with an older or a default one
+ *     (docs/pitfalls.md §84). readNotificationSettingsStrict throws on a failed read and is what the
+ *     settings and senders doors now read; updateNotificationSettings replaces
+ *     writeNotificationSettings and reads the record immediately before it writes, one write per
+ *     owner at a time. readNotificationSettings keeps its forgiving read for deciding delivery.
  *   v1.0.1 — 2026-09-13 — localMinutes says out loud when a timezone is unknown, the way validTz()
  *     twelve lines above it already did. Silently, an unknown zone put a person's quiet hours in
  *     UTC and woke them up. Found by no-silent-catch's fourth shape.
@@ -22,6 +29,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { serialByKey } from '../utils/serial-by-key.js';
 
 /** Under the reserved `notifications.` prefix (utils/reserved-keys.ts): a granted app cannot write it. */
 export const NOTIF_SETTINGS_KEY = 'notifications.settings';
@@ -128,26 +136,54 @@ function validTz(tz: string): boolean {
   catch (err) { logger.warn('notification-settings: unknown timezone, using UTC', { tz, error: String(err) }); return false; }
 }
 
+/**
+ * The record as it is, and a storage failure THROWN. For anything that shows the settings to someone
+ * who may then change them: defaults handed to an editor look exactly like a real record, and the page
+ * saves the whole record, so one toggle after a failed read erased every muted sender and the quiet
+ * hours.
+ */
+export async function readNotificationSettingsStrict(storage: Storage, ownerGhii: string): Promise<NotificationSettings> {
+  const rec = await storage.getMemory(ownerGhii, NOTIF_SETTINGS_KEY);
+  return rec ? normalizeSettings(rec.value) : defaultSettings();
+}
+
+/**
+ * For DECIDING what to do with a notification, never for writing back: a read failure must not
+ * swallow a notification, and the defaults deliver everything.
+ */
 export async function readNotificationSettings(storage: Storage, ownerGhii: string): Promise<NotificationSettings> {
   try {
-    const rec = await storage.getMemory(ownerGhii, NOTIF_SETTINGS_KEY);
-    return rec ? normalizeSettings(rec.value) : defaultSettings();
+    return await readNotificationSettingsStrict(storage, ownerGhii);
   } catch (err) {
-    // A read failure must not swallow a notification: the defaults deliver everything.
     logger.warn('notification-settings: reading failed, using defaults', { error: String(err) });
     return defaultSettings();
   }
 }
 
-export async function writeNotificationSettings(storage: Storage, ownerGhii: string, settings: NotificationSettings): Promise<NotificationSettings> {
-  const clean = normalizeSettings(settings);
-  const existing = await storage.getMemory(ownerGhii, NOTIF_SETTINGS_KEY);
-  const now = new Date().toISOString();
-  await storage.setMemory({
-    key: NOTIF_SETTINGS_KEY, ownerGaii: ownerGhii, value: clean, visibility: 'private', tags: ['settings'],
-    ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || now, updatedAt: now,
+/**
+ * The one way to write the record: read it, strictly, immediately before writing, and write what
+ * `change` makes of THAT. One owner's writes run one after another in this process.
+ *
+ * Both writers used to build on something older. The settings door kept the digest bookmark from a
+ * forgiving read, so a failed read saved it as null and the next digest re-sent what had gone out. The
+ * digest sweep wrote `{ ...snapshot, lastDigestAt }` with the snapshot it took before sending the
+ * email, so a save made while the email went out was overwritten with the settings from before it.
+ * A read that fails here throws, and nothing is written.
+ */
+export function updateNotificationSettings(
+  storage: Storage, ownerGhii: string, change: (current: NotificationSettings) => NotificationSettings,
+): Promise<NotificationSettings> {
+  return serialByKey(`notification-settings ${ownerGhii}`, async () => {
+    const existing = await storage.getMemory(ownerGhii, NOTIF_SETTINGS_KEY);
+    const current = existing ? normalizeSettings(existing.value) : defaultSettings();
+    const clean = normalizeSettings(change(current));
+    const now = new Date().toISOString();
+    await storage.setMemory({
+      key: NOTIF_SETTINGS_KEY, ownerGaii: ownerGhii, value: clean, visibility: 'private', tags: ['settings'],
+      ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || now, updatedAt: now,
+    });
+    return clean;
   });
-  return clean;
 }
 
 /** Which of the node's own groups a notification type belongs to. */
