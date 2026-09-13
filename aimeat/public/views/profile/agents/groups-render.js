@@ -6,6 +6,7 @@
  *   grouped agent-card renderer (none / custom groups / mode / tag). Extracted from
  *   ../agents-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v2.1.0 -- 2026-09-14 -- FilterBar is a component: the tags fold past twelve, and open on a door.
  *   v2.0.0 -- 2026-09-14 -- The poster face (design canvas "Your Agents"): the search as an underlined
  *     field, the filter line as chips and a select, the list as a table with a head row in the
  *     plain view, group heads as a 3px rule with the count in mono.
@@ -23,6 +24,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/agents-tab.js (max-file-lines)
  */
 import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -71,8 +73,18 @@ function collectTags(agents) {
   return [...set].sort();
 }
 
-export function renderFilterBar(agents, tagFilter, setTagFilter, groupBy, setGroupBy) {
+/** How many tags the filter line shows before it folds; the rest open on request. */
+const TAGS_SHOWN = 12;
+
+/**
+ * The filter line: the tags as chips (folded past TAGS_SHOWN, because 140 chips on one account
+ * hid the list under a wall), and the group-by select. A selected tag always shows, folded or not.
+ */
+export function FilterBar({ agents, tagFilter, setTagFilter, groupBy, setGroupBy }) {
+  const [tagsOpen, setTagsOpen] = useState(false);
   const tags = collectTags(agents);
+  const folded = !tagsOpen && tags.length > TAGS_SHOWN;
+  const shown = folded ? tags.filter((tag, i) => i < TAGS_SHOWN || tagFilter.has(tag)) : tags;
 
   function toggleTag(tag) {
     const next = new Set(tagFilter);
@@ -85,13 +97,18 @@ export function renderFilterBar(agents, tagFilter, setTagFilter, groupBy, setGro
     <div class="agp-filters">
       ${tags.length > 0 && html`
         <span class="og-label">${t('profile.agents.filter.byTag')}</span>
-        ${tags.map(tag => html`
+        ${shown.map(tag => html`
           <button type="button" key=${tag}
                   class=${`og-chip ${tagFilter.has(tag) ? 'og-chip--sun' : ''}`}
                   onClick=${() => toggleTag(tag)}>
             ${tag}
           </button>
         `)}
+        ${tags.length > TAGS_SHOWN && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setTagsOpen(v => !v)}>
+            ${folded ? t('profile.agents.page.allTags', { n: tags.length }) : t('profile.agents.page.fewerTags')}
+          </button>
+        `}
         ${tagFilter.size > 0 && html`
           <button type="button" class="og-door og-door--quiet" onClick=${() => setTagFilter(new Set())}>
             ${t('profile.agents.filter.clear')}

@@ -14227,6 +14227,8 @@
     },
     "agents": {
       "page": {
+        "allTags": "All {n} tags",
+        "fewerTags": "Fewer tags",
         "lede": "An agent is an AI that works in your name: it has its own identity, its own permissions and its own tasks and memory. Two are ready the moment you arrive; the rest you make here, or connect from the AI you already use.",
         "chipAgents": "{n} agents",
         "chipReady": "{n} ready",

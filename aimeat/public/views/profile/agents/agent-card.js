@@ -5,6 +5,8 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v2.1.0 -- 2026-09-14 -- The name is a full-width slab and the access sticker sits under it on the
+ *     right; the open card ends in a 2px ink rule so the next row starts on its own.
  *   v2.0.0 -- 2026-09-14 -- The poster face (design canvas "Your Agents", header B). Closed, the card
  *     is one row of the agents table. Open, the name is a headline, the chips sit under the GAII,
  *     the access level stands on the right as a sun sticker with "Manage access rights" on it (the
@@ -320,9 +322,11 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
 
   return html`
     <div class="agp-card poster-row--thing">
+      ${/* The name is the card's slab, the full width, the way a section starts; the facts and the
+            access sticker sit in the row under it, so nothing competes with the name for the line. */''}
+      <h2 class="agp-title poster-section-title" onClick=${handleCollapse}><span class="agp-caret">▼</span>${agent.display_name || agent.name}</h2>
       <div class="agp-mast" onClick=${handleCollapse}>
         <div class="agp-words">
-          <h2 class="agp-title poster-record-title poster-record-title--small"><span class="agp-caret">▼</span>${agent.display_name || agent.name}</h2>
           <div class="agp-id" onClick=${stop}><${GaiiChip} agent=${agent} /></div>
           <div class="agp-chips" onClick=${stop}>
             ${renderModeBadge(agent)}

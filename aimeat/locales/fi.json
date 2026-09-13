@@ -14214,6 +14214,8 @@
     },
     "agents": {
       "page": {
+        "allTags": "Kaikki {n} tagia",
+        "fewerTags": "Vähemmän tageja",
         "lede": "Agentti on tekoäly, joka toimii sinun nimissäsi: sillä on oma tunniste, omat oikeudet ja omat tehtävät ja muisti. Kaksi on valmiina heti; loput teet täällä tai liität tekoälystä, jota jo käytät.",
         "chipAgents": "{n} agenttia",
         "chipReady": "{n} valmiina",
