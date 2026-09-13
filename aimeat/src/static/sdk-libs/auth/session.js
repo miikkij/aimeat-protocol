@@ -12,6 +12,13 @@
  *   scheduleAutoRefresh/createSession · refreshOnFocus · the `auth` object.
  * @usage import { auth, api, isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
  * @version-history
+ *   v1.5.0 — 2026-09-13 — Every 'login' says which road produced the session, as `{ restored }` in the
+ *     listener's second argument: true for login()'s restore, the cookie, the unasked silent bridge
+ *     and a parent-handed session; false for a password, passkey, registration, a click's bridge or
+ *     popup, and a re-issued grant. signIn(opts) and showLoginModal(opts) call the caller's
+ *     onSession(session, { restored }) and, for a sign-in, onLogin(session), once each, through
+ *     on-login.js; the modal no longer calls onLogin itself, and on an app origin signIn() now does.
+ *     reportUngrantableScopes moved to app-origin.js unchanged (800-line ceiling).
  *   v1.4.0 — 2026-09-13 — Four appdev pitfalls. AIMEAT.auth.signIn(), the public interactive sign-in
  *     (consent popup on an app origin, the modal elsewhere), so no app has to click the pill's
  *     button by position. session.fetch merges headers by name (http.js sessionHeaders), so a
@@ -34,9 +41,10 @@ import { NODE_URL, NODE_ID, appDeclaredScopes } from './config.js';
 import { emit, on, off } from './events.js';
 import { mountPill } from './pill.js';
 import { showLoginModal } from './modal.js';
-import { isAppOrigin, appScopeDrift, silentAppToken, apexLogout, requestConsentPopup } from './app-origin.js';
+import { isAppOrigin, appScopeDrift, silentAppToken, apexLogout, requestConsentPopup, reportUngrantableScopes } from './app-origin.js';
 import { passkeySupported, passkeySignIn, passkeyAdd } from './passkey.js';
 import { api, authApi, sessionHeaders } from './http.js';
+import { onLoginWhileOpen } from './on-login.js';
 
 // The app-origin helpers moved to ./app-origin.js on 2026-09-04 (pure extraction, 800-line ceiling).
 // Re-exported from here because pill.js and the SDK's consumers import them from './session.js'.
@@ -101,15 +109,16 @@ export async function restoreSessionFromCookie() {
     persistSession(session);
     currentSession = session;
     scheduleAutoRefresh(session);
-    emit('login', session);
+    emit('login', session, { restored: true });
     return session;
   } catch {
     return null;
   }
 }
 
-// Build + install an app-origin session from a freshly issued grant access token.
-export function _buildAppSession(accessToken, appId, own, displayName) {
+// Build + install an app-origin session from a freshly issued grant access token. `restored` is the
+// road for the 'login' event (on-login.js): true when no click asked for this session.
+export function _buildAppSession(accessToken, appId, own, displayName, restored) {
   var payload = parseJwt(accessToken) || {};
   var ownerName = payload.owner || payload.sub;
   if (!ownerName) return null;
@@ -124,22 +133,8 @@ export function _buildAppSession(accessToken, appId, own, displayName) {
   persistSession(session);
   currentSession = session;
   scheduleAutoRefresh(session);
-  emit('login', session);
+  emit('login', session, { restored: !!restored });
   return session;
-}
-
-/**
- * Say, in the console, why nobody can sign in to this app. The bridge names the app and the words
- * (routes/app-grants.ts); an older node sends neither, and then the sentence says less but still
- * says what to check.
- * @param {{ app?: string, unknown?: string }} r
- */
-function reportUngrantableScopes(r) {
-  try {
-    console.error('[aimeat-auth] Nobody can sign in to ' + (r.app || 'this app') + ': its <meta name="aimeat-scopes"> asks for '
-      + (r.unknown ? r.unknown : 'a word') + ', which this node cannot grant, and one such word refuses the whole sign-in. '
-      + 'Take the words from GET /v1/app-grants/scopes and publish the app again.');
-  } catch { /* no console */ }
 }
 
 // Shared in-flight promise so concurrent callers reuse a single silent bridge instead of two iframes.
@@ -172,7 +167,8 @@ export function restoreSessionFromAppOrigin(interactive) {
       if (grant && grant.app) appId = grant.app;
     }
     if (!grant || !grant.access_token) return null;
-    return _buildAppSession(grant.access_token, appId, own, grant.display_name);
+    // A click asked for it (signIn) → a sign-in; nobody did (login() on boot, the pill) → a restore.
+    return _buildAppSession(grant.access_token, appId, own, grant.display_name, !interactive);
   })();
   _appOriginLoginInFlight.finally(function () { _appOriginLoginInFlight = null; });
   return _appOriginLoginInFlight;
@@ -403,7 +399,7 @@ async function sessionFromLogin(data) {
 
   currentSession = session;
   scheduleAutoRefresh(session);
-  emit('login', session);
+  emit('login', session, { restored: false });
   return session;
 }
 
@@ -444,7 +440,7 @@ async function restoreStoredSession(username) {
 
   currentSession = session;
   scheduleAutoRefresh(session);
-  emit('login', session);
+  emit('login', session, { restored: true });
   return session;
 }
 
@@ -521,7 +517,7 @@ export const auth = {
 
     currentSession = session;
     scheduleAutoRefresh(session);
-    emit('login', session);
+    emit('login', session, { restored: false });
     return session;
   },
 
@@ -555,20 +551,28 @@ export const auth = {
    * it opens the sign-in modal, with `opts` passed to it ({ tab: 'register', onLogin, i18n }).
    * Resolves to the session, or null when nobody signed in: the popup was closed or blocked, the
    * modal was dismissed, or the app asks for a scope this node cannot grant. An existing session is
-   * returned as it is.
+   * returned as it is, and reports nothing.
+   *
+   * `opts.onLogin(session)` and `opts.onSession(session, { restored })` are called once, on both
+   * roads, for the session this call produced (on-login.js). onLogin was the modal's to call until
+   * 2026-09-13, so on an app origin nobody called it.
    *
    * Added 2026-09-13. Before it the login pill's own button was the only interactive road, and
    * apps reached it by clicking `#login button`, which is the theme control that renders first.
-   * @param {object} [opts]
+   * @param {object & { onLogin?: Function }} [opts]
    * @returns {Promise<object|null>}
    */
   signIn(opts) {
+    var o = opts || {};
     if (currentSession) return Promise.resolve(currentSession);
-    if (isAppOrigin()) return restoreSessionFromAppOrigin(true);
+    var stop = onLoginWhileOpen({ onLogin: o.onLogin, onSession: o.onSession });
+    if (isAppOrigin()) {
+      return restoreSessionFromAppOrigin(true).finally(stop);
+    }
     return new Promise(function (resolve) {
       // The third argument hears the dialog leave the page, however it leaves; a finished sign-in
-      // has already set the session by then.
-      showLoginModal(opts || {}, function () {}, function () { resolve(currentSession); });
+      // has already set the session, and called onLogin, by then.
+      showLoginModal(o, function () {}, function () { stop(); resolve(currentSession); });
     });
   },
 
@@ -681,15 +685,19 @@ export const auth = {
     if (!s || !s._app) return null;
     const res = await requestConsentPopup(s._app, appDeclaredScopes(), true);
     if (res && res.revoked) { await auth.logout(); return { revoked: true }; }
-    if (res && res.access_token) return _buildAppSession(res.access_token, res.app || s._app, res.own != null ? !!res.own : s._own);
+    if (res && res.access_token) return _buildAppSession(res.access_token, res.app || s._app, res.own != null ? !!res.own : s._own, undefined, false);
     return null;
   },
 
   /** True when running inside a published app on its isolated origin (not the apex). */
   isAppOrigin() { return isAppOrigin(); },
 
-  /** Open the sign-in modal (password + Google if configured). */
-  showLoginModal(opts) { showLoginModal(opts || {}, function () {}); },
+  /** Open the sign-in modal (password + Google if configured). If a session arrives while it is open,
+   *  `opts.onLogin(session)` and `opts.onSession(session, { restored })` are called once (on-login.js). */
+  showLoginModal(opts) {
+    var o = opts || {};
+    showLoginModal(o, function () {}, onLoginWhileOpen({ onLogin: o.onLogin, onSession: o.onSession }));
+  },
 
   /** Check if there are stored credentials */
   get hasSession() { return !!load('session'); },
@@ -697,7 +705,7 @@ export const auth = {
   /** Get stored GHII without authenticating */
   get storedGhii() { const s = load('session'); return s?.ghii || null; },
 
-  /** Register an event listener */
+  /** Register an event listener. A 'login' listener gets (session, { restored }). */
   on(event, fn) { on(event, fn); },
 
   /** Remove an event listener */
@@ -762,7 +770,7 @@ export const auth = {
         }
 
         currentSession = session;
-        emit('login', session);
+        emit('login', session, { restored: true });   // handed over by the embedding page
         resolve(session);
       }
 
@@ -776,8 +784,11 @@ export const auth = {
 
   /**
    * Mount a login/register button that handles the full flow. Delegates the render to pill.js.
+   * onLogin(session, { restored }) runs once for each session that appears while it is mounted,
+   * the restore on page load included (on-login.js).
    * @param {string|Element|object} selector - CSS selector, DOM element, OR (options-first) the opts.
-   * @param {object} [opts] - { onLogin, onLogout, buttonText, compact }.
+   * @param {object} [opts] - { onLogin, onSession, onLogout, buttonText, compact }. onSession(session,
+   *   { restored }) runs for a restore and a sign-in alike; onLogin(session) for a sign-in only.
    */
   mountLoginButton(selector, opts = {}) {
     return mountPill(auth, selector, opts);

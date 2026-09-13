@@ -16,6 +16,10 @@
  *     stored blob and never restored it, so the page claimed a session no call had.
  * @usage cd aimeat && pnpm exec vitest run test/unit/sdk-auth-pill.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-13 — The developer's onLogin decision: a restore that lands calls onLogin once with
+ *     { restored: true }, a second login event about the same person does not call it again, and
+ *     Sign In hands signIn() the pill's options without onLogin. All three failed on the lib before
+ *     the change (onLogin was never called from the event; signIn got the options object whole).
  *   v1.0.0 — 2026-09-13 — Initial. Every case but the compact:false contract failed on the unchanged lib.
  */
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
@@ -108,6 +112,7 @@ function fakeAuth(over: Record<string, any> = {}): any {
     logout: vi.fn(),
     manageGrant: vi.fn(async () => null),
     on: events.on,
+    off: events.off,
     ...over,
   };
 }
@@ -155,14 +160,19 @@ describe('the compact pill is the default wherever the pill is mounted', () => {
 });
 
 describe('the pill\'s Sign In', () => {
-  it('goes through auth.signIn() with the pill\'s own options', async () => {
+  it('goes through auth.signIn() with the pill\'s own options, less its onLogin', async () => {
     const auth = fakeAuth();
-    const opts = { buttonText: 'Enter', onLogin: vi.fn() };
+    const opts = { buttonText: 'Enter', tab: 'register', onLogin: vi.fn() };
     const c = mount(auth, opts);
     try { c.byId('aimeat-login-btn').click(); } catch { /* the unchanged lib opened the real modal here */ }
     await settle();
     expect(auth.signIn).toHaveBeenCalledTimes(1);
-    expect(auth.signIn.mock.calls[0][0]).toBe(opts);
+    const passed = auth.signIn.mock.calls[0][0];
+    expect(passed).toMatchObject({ buttonText: 'Enter', tab: 'register' });
+    // The pill reports the sign-in itself, from the login event. signIn() calls the onLogin it is
+    // given, so handing it the pill's own would call the page's callback twice for one sign-in.
+    expect(passed).not.toHaveProperty('onLogin');
+    expect(opts.onLogin).not.toHaveBeenCalled();
     expect(modal.calls).toHaveLength(0);
   });
 });
@@ -181,19 +191,42 @@ describe('a stored session off an app origin', () => {
     expect(c.innerHTML).not.toContain('id="aimeat-logout-btn"');
   });
 
-  it('is re-rendered from the login event when the restore lands, and onLogin stays uncalled', async () => {
+  it('is re-rendered from the login event when the restore lands: onSession fires once with restored: true, onLogin not at all', async () => {
     store.set('aimeat_session', JSON.stringify(SESSION));
     let live: any = null;
     const auth = fakeAuth({
       getSession: () => live,
-      login: vi.fn(async () => { live = SESSION; events.emit('login', SESSION); return SESSION; }),
+      // What the real login() does: the restore emits 'login' with the road it came by.
+      login: vi.fn(async () => { live = SESSION; events.emit('login', SESSION, { restored: true }); return SESSION; }),
     });
     const onLogin = vi.fn();
-    const c = mount(auth, { onLogin });
+    const onSession = vi.fn();
+    const c = mount(auth, { onLogin, onSession });
     await settle();
     expect(auth.login).toHaveBeenCalledTimes(1);
     expect(c.innerHTML).toContain('id="aimeat-logout-btn"');
-    // Unchanged on purpose: whether onLogin should also fire on a restore is the developer's call.
+    // onSession covers a restore; onLogin keeps its contract, a sign-in only (2026-09-13).
+    expect(onSession).toHaveBeenCalledTimes(1);
+    expect(onSession).toHaveBeenCalledWith(SESSION, { restored: true });
+    expect(onLogin).not.toHaveBeenCalled();
+  });
+
+  it('does not fire onSession a second time for a second login event about the same person', async () => {
+    store.set('aimeat_session', JSON.stringify(SESSION));
+    let live: any = null;
+    const auth = fakeAuth({
+      getSession: () => live,
+      login: vi.fn(async () => { live = SESSION; events.emit('login', SESSION, { restored: true }); return SESSION; }),
+    });
+    const onLogin = vi.fn();
+    const onSession = vi.fn();
+    mount(auth, { onLogin, onSession });
+    await settle();
+    // A re-issued grant (the permissions gear) or a refreshed restore emits 'login' again for the
+    // person who is already signed in. Their session did not appear a second time.
+    live = { ...SESSION, jwt: 'x.y.z2' };
+    events.emit('login', live, { restored: false });
+    expect(onSession).toHaveBeenCalledTimes(1);
     expect(onLogin).not.toHaveBeenCalled();
   });
 

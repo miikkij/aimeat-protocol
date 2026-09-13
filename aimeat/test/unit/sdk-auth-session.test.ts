@@ -17,6 +17,11 @@
  *     too, so a page's own auth.login() and the pill's can overlap. They share one restore.
  * @usage cd aimeat && pnpm exec vitest run test/unit/sdk-auth-session.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-13 — The developer's onLogin decision: the login event carries { restored }, and
+ *     signIn({ onLogin }) calls it once, with that flag, for the session its dialog produced. Both
+ *     failed on the lib before the change. "Not called when the dialog closes without a sign-in, nor
+ *     by a later sign-in" passed there too, by construction: it guards the listener signIn() now
+ *     opens and must close.
  *   v1.0.0 — 2026-09-13 — Initial. Every case was run against the unchanged lib first and failed.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
@@ -112,7 +117,9 @@ beforeAll(async () => {
     await new Promise(r => setTimeout(r, 5));
     const body = String(url).endsWith('/v1/auth/refresh')
       ? { ok: true, data: { token: jwt(3600) } }
-      : { ok: true, data: {} };
+      : String(url).endsWith('/v1/ghii/login')
+        ? { ok: true, data: { token: jwt(3600), ghii: { ghii: 'alice@n1', display_name: 'Alice' }, owner: { name: 'alice' } } }
+        : { ok: true, data: {} };
     return { ok: true, status: 200, json: async () => body };
   };
   const session = await import('../../src/static/sdk-libs/auth/session.js');
@@ -219,17 +226,62 @@ describe('an aimeat-scopes word the node cannot grant', () => {
 describe('auth.login() restoring a stored session', () => {
   it('runs one restore for two overlapping calls: one refresh, one login event, one session', async () => {
     store.set('aimeat_session', JSON.stringify({ owner: 'alice', ghii: 'alice@n1', jwt: jwt(3600) }));
-    let logins = 0;
-    const count = () => { logins += 1; };
+    const heard: any[] = [];
+    const count = (_s: any, meta: any) => { heard.push(meta); };
     on('login', count);
     try {
       const [a, b] = await Promise.all([auth.login(), auth.login()]);
       expect(a).not.toBeNull();
       expect(b).toBe(a);
-      expect(logins).toBe(1);
+      expect(heard).toHaveLength(1);
+      // The event says which road the session came by: this one was restored, nobody signed in.
+      expect(heard[0]).toEqual({ restored: true });
       expect(calls.filter(c => c.url.endsWith('/v1/auth/refresh'))).toHaveLength(1);
     } finally {
       off('login', count);
+      await auth.logout();
+    }
+  });
+});
+
+describe('the onLogin a caller hands to AIMEAT.auth.signIn()', () => {
+  it('is called once when the dialog signs someone in, with onSession told restored: false; the dialog itself never calls it', async () => {
+    const onLogin = vi.fn();
+    const onSession = vi.fn();
+    const heard: any[] = [];
+    const listen = (_s: any, meta: any) => { heard.push(meta); };
+    on('login', listen);
+    try {
+      const pending = auth.signIn({ onLogin, onSession });
+      expect(modal.calls).toHaveLength(1);
+      // What the modal does on a finished sign-in: the password call, then it leaves the page.
+      const s = await auth.loginWithPassword('alice', 'correct horse battery');
+      modal.calls[0]?.onClosed();
+      await expect(pending).resolves.toBe(s);
+      expect(heard).toEqual([{ restored: false }]);
+      expect(onLogin).toHaveBeenCalledTimes(1);
+      expect(onLogin).toHaveBeenCalledWith(s);
+      expect(onSession).toHaveBeenCalledTimes(1);
+      expect(onSession).toHaveBeenCalledWith(s, { restored: false });
+      // Asking again while signed in hands back the session and reports nothing new.
+      await expect(auth.signIn({ onLogin })).resolves.toBe(s);
+      expect(onLogin).toHaveBeenCalledTimes(1);
+    } finally {
+      off('login', listen);
+      await auth.logout();
+    }
+  });
+
+  it('is not called when the dialog closes without a sign-in, nor by a sign-in that comes after it closed', async () => {
+    const onLogin = vi.fn();
+    const pending = auth.signIn({ onLogin });
+    modal.calls[0]?.onClosed();
+    await expect(pending).resolves.toBeNull();
+    try {
+      await auth.loginWithPassword('alice', 'correct horse battery');
+      expect(onLogin).not.toHaveBeenCalled();
+    } finally {
+      await auth.logout();
     }
   });
 });

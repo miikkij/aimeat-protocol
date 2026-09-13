@@ -193,8 +193,8 @@
 
   // src/static/sdk-libs/auth/events.js
   var listeners = {};
-  function emit(event, data) {
-    (listeners[event] || []).forEach((fn) => fn(data));
+  function emit(event, data, meta) {
+    (listeners[event] || []).forEach((fn) => fn(data, meta));
   }
   function on(event, fn) {
     if (!listeners[event]) listeners[event] = [];
@@ -766,6 +766,68 @@
     return d.innerHTML;
   }
 
+  // src/static/sdk-libs/auth/on-login.js
+  function sessionIdentity(session) {
+    if (!session) return null;
+    return String(session.ghii || session.owner || session.identity || session.gaii || "?");
+  }
+  function runCallback(name, fn, args) {
+    if (typeof fn !== "function") return;
+    var report = function(e) {
+      try {
+        console.error("[aimeat-auth] The page's " + name + " failed. The session is signed in; fix the callback:", e);
+      } catch {
+      }
+    };
+    try {
+      var result = fn.apply(null, args);
+      if (result && typeof result.then === "function") result.then(null, report);
+    } catch (e) {
+      report(e);
+    }
+  }
+  function reportSession(callbacks, session, restored) {
+    var cb = callbacks || {};
+    runCallback("onSession", cb.onSession, [session, { restored: !!restored }]);
+    if (!restored) runCallback("onLogin", cb.onLogin, [session]);
+  }
+  function loginWatcher(callbacks, liveSession) {
+    var reported = sessionIdentity(liveSession);
+    if (liveSession && callbacks && typeof callbacks.onSession === "function") {
+      setTimeout(function() {
+        if (sessionIdentity(liveSession) === reported) runCallback("onSession", callbacks.onSession, [liveSession, { restored: true }]);
+      }, 0);
+    }
+    return {
+      login: function(session, meta) {
+        var who = sessionIdentity(session);
+        if (!who || who === reported) return;
+        reported = who;
+        reportSession(callbacks, session, !!(meta && meta.restored));
+      },
+      logout: function() {
+        reported = null;
+      }
+    };
+  }
+  function onLoginWhileOpen(callbacks) {
+    var cb = callbacks || {};
+    if (typeof cb.onLogin !== "function" && typeof cb.onSession !== "function") return function() {
+    };
+    var done = false;
+    function hear(session, meta) {
+      if (done || !session) return;
+      done = true;
+      off("login", hear);
+      reportSession(cb, session, !!(meta && meta.restored));
+    }
+    on("login", hear);
+    return function stop() {
+      done = true;
+      off("login", hear);
+    };
+  }
+
   // src/static/sdk-libs/auth/pill.js
   var SETTINGS_ICON = '<svg class="cico" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/><path d="M5 2.5v3M11 6.5v3M7 10.5v3"/></svg>';
   function mountPill(auth2, selector, opts = {}) {
@@ -833,7 +895,9 @@
         var clusterHtml = '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + "</span>";
         container.innerHTML = '<span class="aimeat-auth-out">' + (useCompact ? '<span class="aimeat-auth-wrap"><button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" aria-label="' + escHtml(i.pageSettings || "Settings") + '" title="' + escHtml(i.pageSettings || "Settings") + '">' + SETTINGS_ICON + '<span class="ccar" aria-hidden="true">▾</span></button>' + clusterHtml + "</span>" : clusterHtml) + '<button id="aimeat-login-btn" class="aimeat-sign-btn">' + (opts.buttonText || i.signInBtn || "❤️ Sign In") + "</button></span>";
         document.getElementById("aimeat-login-btn").addEventListener("click", () => {
-          auth2.signIn(opts).then((s) => {
+          var signInOpts = {};
+          for (var k in opts) if (k !== "onLogin" && k !== "onSession") signInOpts[k] = opts[k];
+          auth2.signIn(signInOpts).then((s) => {
             if (s) render();
           }).catch(() => {
           });
@@ -844,6 +908,11 @@
       wireLangSwitch(container, i, locales);
       wirePaletteControl(container, clampPopover);
     }
+    const holder = (
+      /** @type {any} */
+      container
+    );
+    if (typeof holder.__aimeatPillUnmount === "function") holder.__aimeatPillUnmount();
     ensureClusterStyles();
     render();
     window.addEventListener("aimeat-lang-change", render);
@@ -883,12 +952,27 @@
         if (ev.key === "Escape") closeCompact();
       });
     }
-    auth2.on("login", render);
-    auth2.on("logout", () => {
+    const watcher = loginWatcher({ onLogin: opts.onLogin, onSession: opts.onSession }, auth2.getSession());
+    const onLoginEvent = (session, meta) => {
+      render();
+      watcher.login(session, meta);
+    };
+    const onLogoutEvent = () => {
+      watcher.logout();
       render();
       if (opts.onLogout) opts.onLogout();
-    });
+    };
+    auth2.on("login", onLoginEvent);
+    auth2.on("logout", onLogoutEvent);
     auth2.on("session-updated", render);
+    holder.__aimeatPillUnmount = () => {
+      if (typeof auth2.off === "function") {
+        auth2.off("login", onLoginEvent);
+        auth2.off("logout", onLogoutEvent);
+        auth2.off("session-updated", render);
+      }
+      window.removeEventListener("aimeat-lang-change", render);
+    };
     if (isAppOrigin() && !auth2.getSession()) {
       restoreSessionFromAppOrigin(false).then((s) => {
         if (!s && load("session")) {
@@ -1599,10 +1683,9 @@
         document.getElementById("aimeat-email-view").style.display = view === "email" ? "" : "none";
         document.getElementById("aimeat-totp-view").style.display = view === "totp" ? "" : "none";
       }
-      function finishLogin(session) {
+      function finishLogin() {
         modal.remove();
         renderBtn();
-        if (opts.onLogin) opts.onLogin(session);
       }
       wirePasskeyButton({
         i,
@@ -1756,11 +1839,9 @@
           });
           msgEl.textContent = i.emailVerifiedSigningIn || "Verified! Signing you in...";
           msgEl.style.display = "block";
-          var session = await auth.loginWithPassword(pendingEmailLogin.username, pendingEmailLogin.password);
+          await auth.loginWithPassword(pendingEmailLogin.username, pendingEmailLogin.password);
           pendingEmailLogin = null;
-          modal.remove();
-          renderBtn();
-          if (opts.onLogin) opts.onLogin(session);
+          finishLogin();
         } catch (e) {
           errEl.textContent = e.message;
           errEl.style.display = "block";
@@ -1914,8 +1995,8 @@
         btn.textContent = isFederated ? i.connectingHome || "Connecting to home node..." : i.working || "Working...";
         btn.disabled = true;
         try {
-          const session = await auth.loginWithPassword(isEmail || isFederated ? raw : localName, password);
-          finishLogin(session);
+          await auth.loginWithPassword(isEmail || isFederated ? raw : localName, password);
+          finishLogin();
         } catch (e) {
           if (e.code === "EMAIL_NOT_VERIFIED" && !isFederated) {
             releaseBtn("aimeat-go-btn", signInLabel);
@@ -1991,10 +2072,8 @@
           return;
         }
         try {
-          const session = await auth.register(username, displayName, { password, locale: currentModalLang() });
-          modal.remove();
-          renderBtn();
-          if (opts.onLogin) opts.onLogin(session);
+          await auth.register(username, displayName, { password, locale: currentModalLang() });
+          finishLogin();
         } catch (e) {
           if (e.code === "EMAIL_REQUIRED") {
             releaseBtn("aimeat-reg-btn", createLabel);
@@ -2077,6 +2156,12 @@
         finish(null);
       }, 8e3);
     });
+  }
+  function reportUngrantableScopes(r) {
+    try {
+      console.error("[aimeat-auth] Nobody can sign in to " + (r.app || "this app") + ': its <meta name="aimeat-scopes"> asks for ' + (r.unknown ? r.unknown : "a word") + ", which this node cannot grant, and one such word refuses the whole sign-in. Take the words from GET /v1/app-grants/scopes and publish the app again.");
+    } catch {
+    }
   }
   function apexLogout() {
     return new Promise(function(resolve) {
@@ -2226,13 +2311,13 @@
       persistSession(session);
       currentSession = session;
       scheduleAutoRefresh(session);
-      emit("login", session);
+      emit("login", session, { restored: true });
       return session;
     } catch {
       return null;
     }
   }
-  function _buildAppSession(accessToken, appId, own, displayName) {
+  function _buildAppSession(accessToken, appId, own, displayName, restored) {
     var payload = parseJwt(accessToken) || {};
     var ownerName = payload.owner || payload.sub;
     if (!ownerName) return null;
@@ -2250,14 +2335,8 @@
     persistSession(session);
     currentSession = session;
     scheduleAutoRefresh(session);
-    emit("login", session);
+    emit("login", session, { restored: !!restored });
     return session;
-  }
-  function reportUngrantableScopes(r) {
-    try {
-      console.error("[aimeat-auth] Nobody can sign in to " + (r.app || "this app") + ': its <meta name="aimeat-scopes"> asks for ' + (r.unknown ? r.unknown : "a word") + ", which this node cannot grant, and one such word refuses the whole sign-in. Take the words from GET /v1/app-grants/scopes and publish the app again.");
-    } catch {
-    }
   }
   function restoreSessionFromAppOrigin(interactive) {
     if (currentSession) return Promise.resolve(currentSession);
@@ -2278,7 +2357,7 @@
         if (grant && grant.app) appId = grant.app;
       }
       if (!grant || !grant.access_token) return null;
-      return _buildAppSession(grant.access_token, appId, own, grant.display_name);
+      return _buildAppSession(grant.access_token, appId, own, grant.display_name, !interactive);
     })();
     _appOriginLoginInFlight.finally(function() {
       _appOriginLoginInFlight = null;
@@ -2481,7 +2560,7 @@
     persistSession(session);
     currentSession = session;
     scheduleAutoRefresh(session);
-    emit("login", session);
+    emit("login", session, { restored: false });
     return session;
   }
   async function restoreStoredSession(username) {
@@ -2506,7 +2585,7 @@
     }
     currentSession = session;
     scheduleAutoRefresh(session);
-    emit("login", session);
+    emit("login", session, { restored: true });
     return session;
   }
   var auth = {
@@ -2572,7 +2651,7 @@
       });
       currentSession = session;
       scheduleAutoRefresh(session);
-      emit("login", session);
+      emit("login", session, { restored: false });
       return session;
     },
     /**
@@ -2601,19 +2680,28 @@
      * it opens the sign-in modal, with `opts` passed to it ({ tab: 'register', onLogin, i18n }).
      * Resolves to the session, or null when nobody signed in: the popup was closed or blocked, the
      * modal was dismissed, or the app asks for a scope this node cannot grant. An existing session is
-     * returned as it is.
+     * returned as it is, and reports nothing.
+     *
+     * `opts.onLogin(session)` and `opts.onSession(session, { restored })` are called once, on both
+     * roads, for the session this call produced (on-login.js). onLogin was the modal's to call until
+     * 2026-09-13, so on an app origin nobody called it.
      *
      * Added 2026-09-13. Before it the login pill's own button was the only interactive road, and
      * apps reached it by clicking `#login button`, which is the theme control that renders first.
-     * @param {object} [opts]
+     * @param {object & { onLogin?: Function }} [opts]
      * @returns {Promise<object|null>}
      */
     signIn(opts) {
+      var o = opts || {};
       if (currentSession) return Promise.resolve(currentSession);
-      if (isAppOrigin()) return restoreSessionFromAppOrigin(true);
+      var stop = onLoginWhileOpen({ onLogin: o.onLogin, onSession: o.onSession });
+      if (isAppOrigin()) {
+        return restoreSessionFromAppOrigin(true).finally(stop);
+      }
       return new Promise(function(resolve) {
-        showLoginModal(opts || {}, function() {
+        showLoginModal(o, function() {
         }, function() {
+          stop();
           resolve(currentSession);
         });
       });
@@ -2725,17 +2813,19 @@
         await auth.logout();
         return { revoked: true };
       }
-      if (res && res.access_token) return _buildAppSession(res.access_token, res.app || s._app, res.own != null ? !!res.own : s._own);
+      if (res && res.access_token) return _buildAppSession(res.access_token, res.app || s._app, res.own != null ? !!res.own : s._own, void 0, false);
       return null;
     },
     /** True when running inside a published app on its isolated origin (not the apex). */
     isAppOrigin() {
       return isAppOrigin();
     },
-    /** Open the sign-in modal (password + Google if configured). */
+    /** Open the sign-in modal (password + Google if configured). If a session arrives while it is open,
+     *  `opts.onLogin(session)` and `opts.onSession(session, { restored })` are called once (on-login.js). */
     showLoginModal(opts) {
-      showLoginModal(opts || {}, function() {
-      });
+      var o = opts || {};
+      showLoginModal(o, function() {
+      }, onLoginWhileOpen({ onLogin: o.onLogin, onSession: o.onSession }));
     },
     /** Check if there are stored credentials */
     get hasSession() {
@@ -2746,7 +2836,7 @@
       const s = load("session");
       return s?.ghii || null;
     },
-    /** Register an event listener */
+    /** Register an event listener. A 'login' listener gets (session, { restored }). */
     on(event, fn) {
       on(event, fn);
     },
@@ -2826,7 +2916,7 @@
             session.identity = session.gaii || session.ghii || null;
           }
           currentSession = session;
-          emit("login", session);
+          emit("login", session, { restored: true });
           resolve(session);
         }
         window.addEventListener("message", handler);
@@ -2837,8 +2927,11 @@
     compactPill: true,
     /**
      * Mount a login/register button that handles the full flow. Delegates the render to pill.js.
+     * onLogin(session, { restored }) runs once for each session that appears while it is mounted,
+     * the restore on page load included (on-login.js).
      * @param {string|Element|object} selector - CSS selector, DOM element, OR (options-first) the opts.
-     * @param {object} [opts] - { onLogin, onLogout, buttonText, compact }.
+     * @param {object} [opts] - { onLogin, onSession, onLogout, buttonText, compact }. onSession(session,
+     *   { restored }) runs for a restore and a sign-in alike; onLogin(session) for a sign-in only.
      */
     mountLoginButton(selector, opts = {}) {
       return mountPill(auth, selector, opts);

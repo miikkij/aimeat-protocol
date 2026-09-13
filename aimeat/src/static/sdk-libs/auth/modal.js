@@ -13,6 +13,11 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.10.0 — 2026-09-13 — The modal stops calling opts.onLogin. The developer decided that onLogin runs
+ *     for every session that becomes available, restores included, with { restored }; it is called
+ *     from the 'login' event through on-login.js, by whoever opened the modal (the pill,
+ *     AIMEAT.auth.signIn, AIMEAT.auth.showLoginModal). A modal that also called it would have made
+ *     one interactive sign-in call it twice.
  *   v1.9.0 — 2026-09-13 — An optional third argument, called when the dialog leaves the page by any
  *     road, so AIMEAT.auth.signIn() can settle with the session or with null when it is dismissed.
  *   v1.8.0 — 2026-09-04 — The passkey button, first in the sign-in tab (modal-passkey.js). Pressed
@@ -398,11 +403,11 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       document.getElementById('aimeat-totp-view').style.display = view === 'totp' ? '' : 'none';
     }
 
-    /** A finished sign-in, whichever step produced it. */
-    function finishLogin(session) {
+    /** A finished sign-in, whichever step produced it. The caller's onLogin is not called here: the
+     *  session core's 'login' event reaches it through on-login.js, once, with the road it came by. */
+    function finishLogin() {
       modal.remove();
       renderBtn();
-      if (opts.onLogin) opts.onLogin(session);
     }
 
     // The passkey button. Its whole ceremony lives in the auth lib; the modal only says where the
@@ -545,11 +550,9 @@ export function showLoginModal(opts, renderBtn, onClosed) {
         });
         msgEl.textContent = i.emailVerifiedSigningIn || 'Verified! Signing you in...';
         msgEl.style.display = 'block';
-        var session = await auth.loginWithPassword(pendingEmailLogin.username, pendingEmailLogin.password);
+        await auth.loginWithPassword(pendingEmailLogin.username, pendingEmailLogin.password);
         pendingEmailLogin = null;
-        modal.remove();
-        renderBtn();
-        if (opts.onLogin) opts.onLogin(session);
+        finishLogin();
       } catch (e) {
         errEl.textContent = e.message;
         errEl.style.display = 'block';
@@ -675,8 +678,8 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       btn.disabled = true;
       try {
         // Email and federated GHII go over as typed; a local GHII goes as the bare name.
-        const session = await auth.loginWithPassword(isEmail || isFederated ? raw : localName, password);
-        finishLogin(session);
+        await auth.loginWithPassword(isEmail || isFederated ? raw : localName, password);
+        finishLogin();
       } catch (e) {
         // Password correct but the account still needs a verified email — finish that here.
         if (e.code === 'EMAIL_NOT_VERIFIED' && !isFederated) {
@@ -756,10 +759,8 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       }
 
       try {
-        const session = await auth.register(username, displayName, { password, locale: currentModalLang() });
-        modal.remove();
-        renderBtn();
-        if (opts.onLogin) opts.onLogin(session);
+        await auth.register(username, displayName, { password, locale: currentModalLang() });
+        finishLogin();
       } catch (e) {
         // A node that turned its gate on after this page loaded still lands here — same step.
         if (e.code === 'EMAIL_REQUIRED') {

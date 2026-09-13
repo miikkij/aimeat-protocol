@@ -9,6 +9,9 @@
  * @structure buildPromptSessionSections(nodeUrl) → the markdown for both sections
  * @usage body += buildPromptSessionSections(nodeUrl);
  * @version-history
+ *   v1.1.0 — 2026-09-13 — The auth pattern uses onSession(session, { restored }), which runs for a restore
+ *     and a sign-in alike, instead of three paths (onLogin, login().then, the login event) that a
+ *     builder had to wire together and usually wired two of. onLogin is unchanged in the library.
  *   v1.0.2 — 2026-09-13 — ADDITIVE, one sentence in "read `ok` before `data`": what `UNDECLARED_SPACE`
  *     means (a space the workspace manifest does not declare, refused and not stored, the developer's
  *     decision) and that it goes to someone who can declare the space rather than into a retry.
@@ -27,7 +30,7 @@ export function buildPromptSessionSections(nodeUrl: string): string {
 
   // Auth pattern
   body += '### Auth Pattern\n';
-  body += 'Handle BOTH login paths: a fresh sign-in click (the onLogin callback) AND a page that loads already signed in (restore the session yourself). `onLogin` fires ONLY on a fresh sign-in — it does NOT fire on reload when a session already exists, so a page that relies on onLogin alone shows nothing to an already-logged-in returning user.\n';
+  body += 'A person arrives in one of two ways: they sign in, or the page loads already signed in. `onSession(session, { restored })` on the login button covers both: it runs once for every session that becomes available, a restore on page load (`restored: true`) and a sign-in (`restored: false`). Show the app from onSession and nowhere else. `onLogin` still fires ONLY on a fresh sign-in, so a page that relies on onLogin alone shows nothing to a returning user; never reload the page from either callback.\n';
   body += '`AIMEAT.auth.login()` is the restore and never opens anything: it returns the stored session or null. A sign-in button of your own calls `AIMEAT.auth.signIn()` from its click handler (on an app origin that click is the user gesture the consent popup needs; elsewhere it opens the sign-in modal); it resolves to the session or null. Never click the login bar\'s buttons by position: the first control in it is the language or light/dark switch.\n';
   body += '```html\n';
   body += '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"></' + 'script>\n';
@@ -35,21 +38,12 @@ export function buildPromptSessionSections(nodeUrl: string): string {
   body += 'function showApp(session) { /* session.owner, session.jwt, session.fetch() */ }\n';
   body += 'function hideApp() { /* hide content, show a "Sign in" message */ }\n';
   body += '\n';
-  body += '// Path 1 — fresh sign-in / sign-out via the login button:\n';
+  body += '// One handler for every way a session arrives: the restore on page load, a sign-in\n';
+  body += '// through the button, the silent sign-in on an app subdomain, a consent-popup return.\n';
   body += 'AIMEAT.auth.mountLoginButton("#login", {\n';
-  body += '  onLogin: showApp,   // fires ONLY on a fresh sign-in click, NOT on reload\n';
+  body += '  onSession: function (session, how) { showApp(session); },  // how.restored: true on reload\n';
   body += '  onLogout: hideApp\n';
   body += '});\n';
-  body += '\n';
-  body += '// Path 2 — already signed in when the page loads. Restore the stored session\n';
-  body += '// explicitly; login() returns the session (or null if not signed in).\n';
-  body += 'AIMEAT.auth.login().then(function (session) { if (session) showApp(session); });\n';
-  body += '\n';
-  body += '// Path 3 — ASYNC logins (app-subdomain silent SSO, consent-popup return): these\n';
-  body += '// fire neither onLogin nor the login() promise above. The login EVENT covers every\n';
-  body += "// path — always add it, or a published app stays hidden after the user grants access.\n";
-  body += "AIMEAT.auth.on('login', showApp);\n";
-  body += "AIMEAT.auth.on('logout', hideApp);\n";
   body += '</' + 'script>\n';
   body += '```\n\n';
 

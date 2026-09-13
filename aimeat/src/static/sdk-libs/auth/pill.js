@@ -5,12 +5,24 @@
  *   grants, and the compact button + popover that is the mobile-safe default everywhere)
  *   into a container, wires logout / manage-grant / theme / compact-popover, and re-renders on the
  *   'login'/'logout'/'session-updated' events. With a stored session and no live one it confirms it
- *   itself: the silent SSO bridge on an app origin, auth.login() elsewhere. Extracted from
+ *   itself: the silent SSO bridge on an app origin, auth.login() elsewhere. The page's callbacks run
+ *   from the 'login' event (on-login.js): opts.onSession once per session appearance, restores
+ *   included, and opts.onLogin for a sign-in only. Extracted from
  *   mountLoginButton in auth-lib-part2.ts; receives `auth` so it never touches module state
  *   directly (reads via auth.getSession()).
- * @structure mountPill(auth, selector, opts) → render() + event wiring.
+ * @structure mountPill(auth, selector, opts) → render() + event wiring; a second mount into the same
+ *   container replaces the first.
  * @usage import { mountPill } from './pill.js';  (auth.mountLoginButton delegates here)
  * @version-history
+ *   v1.6.0 — 2026-09-13 — onSession(session, { restored }), the developer's decision: called whenever a
+ *     session appears while the pill is mounted, the restore on page load (restored: true) and a
+ *     sign-in through its button or any other road (false), and for a session already live at mount
+ *     (true). onLogin keeps its contract, a sign-in only, now also on an app origin where it never
+ *     ran: firing it on a restore would loop three live apps that reload from it. Once per
+ *     appearance, again after a sign-out. Sign In hands signIn() the pill's options without either
+ *     callback, because signIn() calls the ones it is given. A second mount into the same container
+ *     (the portal mounts again on every language change) takes the first one's event listeners
+ *     down, so one sign-in cannot reach two copies of the callback.
  *   v1.5.0 — 2026-09-13 — Four appdev pitfalls. Compact is the default wherever the pill is mounted,
  *     not only on an app origin (`compact: false` keeps the full row). A signed-out pill gets a
  *     compact form too: its controls fold behind a settings button and Sign In stays in the row.
@@ -43,6 +55,7 @@ import { paletteControlHtml, wirePaletteControl } from './palette.js';
 import { ensureClusterStyles, clampPopover } from './cluster.js';
 import { load, remove } from './crypto.js';
 import { emit } from './events.js';
+import { loginWatcher } from './on-login.js';
 
 // The signed-out compact trigger: three sliders, the usual mark for "adjust how this looks". Inline
 // SVG in currentColor, so it follows the pill's ink in every theme and palette.
@@ -163,8 +176,12 @@ export function mountPill(auth, selector, opts = {}) {
       document.getElementById('aimeat-login-btn').addEventListener('click', () => {
         // The one public interactive sign-in (session.js auth.signIn), so the pill and an app's own
         // button take the same road: on an app origin this click is the user gesture that opens the
-        // consent popup; elsewhere it opens the sign-in modal with the pill's options.
-        auth.signIn(opts).then((s) => { if (s) render(); }).catch(() => {});
+        // consent popup; elsewhere it opens the sign-in modal with the pill's options. Without
+        // onLogin and onSession: signIn() calls the callbacks it is given, and the pill already
+        // reports this sign-in from the 'login' event below, so passing them on would call twice.
+        var signInOpts = {};
+        for (var k in opts) if (k !== 'onLogin' && k !== 'onSession') signInOpts[k] = opts[k];
+        auth.signIn(signInOpts).then((s) => { if (s) render(); }).catch(() => {});
       });
       wireCompactTrigger();
     }
@@ -172,6 +189,12 @@ export function mountPill(auth, selector, opts = {}) {
     wireLangSwitch(container, i, locales);
     wirePaletteControl(container, clampPopover);
   }
+  // A second mount into the same container replaces the first. The portal mounts again on every
+  // language change; with the earlier mount still listening, one sign-in would reach the page's
+  // onLogin once per mount.
+  const holder = /** @type {any} */ (container);
+  if (typeof holder.__aimeatPillUnmount === 'function') holder.__aimeatPillUnmount();
+
   ensureClusterStyles();
   render();
   // The pill's own switch fires this, and so does an app that sets the language itself. Re-render so
@@ -210,18 +233,32 @@ export function mountPill(auth, selector, opts = {}) {
     });
     document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeCompact(); });
   }
-  // Re-render when the session changes out-of-band (e.g. the H-2 silent SSO logs in async). Only
-  // re-render (do NOT call opts.onLogin — the interactive modal path already does).
-  auth.on('login', render);
+  // The 'login' event is where the pill hears a session arrive by any road: its own restore below,
+  // a sign-in through its button, an app's own signIn(), the silent SSO bridge. It re-renders, and
+  // it is where the page's callbacks run (on-login.js): opts.onSession(session, { restored }) once for
+  // every session that becomes available, a restore on page load included, and opts.onLogin(session)
+  // only for a sign-in, as it always was. Not twice for the same person, again after a sign-out.
+  const watcher = loginWatcher({ onLogin: opts.onLogin, onSession: opts.onSession }, auth.getSession());
+  const onLoginEvent = (session, meta) => { render(); watcher.login(session, meta); };
   // Logout is the ONE place that also notifies the host: the event fires after the session is
   // already cleared, so every subscriber that then reads getSession()/hasSession sees the truth.
   // Calling opts.onLogout from the button handler instead raced the async logout() and left hosts
   // (the SPA header's bell + "Me" menu) rendering a signed-in state next to a "Sign In" button.
   // Routing it through the event also covers the paths the button never touches: a grant revoke
   // via manageGrant(), and the stale-cache drop below.
-  auth.on('logout', () => { render(); if (opts.onLogout) opts.onLogout(); });
+  const onLogoutEvent = () => { watcher.logout(); render(); if (opts.onLogout) opts.onLogout(); };
+  auth.on('login', onLoginEvent);
+  auth.on('logout', onLogoutEvent);
   auth.on('session-updated', render); // live display-name (etc.) edits
-  // Seamless SSO: on an app origin with no session yet, attempt the silent bridge ourselves. Always
+  holder.__aimeatPillUnmount = () => {
+    if (typeof auth.off === 'function') {
+      auth.off('login', onLoginEvent);
+      auth.off('logout', onLogoutEvent);
+      auth.off('session-updated', render);
+    }
+    window.removeEventListener('aimeat-lang-change', render);
+  };
+  // Silent SSO: on an app origin with no session yet, attempt the silent bridge ourselves. Always
   // re-confirm via the bridge on load (the cached session is only a UI cache); drop a stale cache.
   if (isAppOrigin() && !auth.getSession()) {
     restoreSessionFromAppOrigin(false).then((s) => {
@@ -232,9 +269,8 @@ export function mountPill(auth, selector, opts = {}) {
     // looked at: it drew "logged in" while getSession() stayed null and every call in the app had no
     // session (appdev pitfall pill-alone-does-not-sign-the-app-in). Confirm it the way the app-origin
     // branch does. auth.login() shares one restore with a page that calls it too; a restore that
-    // lands re-renders through the 'login' event, and one that finds nothing draws the truth. onLogin
-    // is still not called on a restore, and that is deliberate here: whether it should be is an open
-    // question for the developer (docs/pitfalls.md §6), not something this branch decides.
+    // lands comes back through the 'login' event above, which re-renders and calls onLogin with
+    // restored: true, and one that finds nothing draws the truth.
     auth.login().catch(() => null).then((s) => {
       if (s) return;
       if (load('session')) { remove('session'); emit('logout'); }
