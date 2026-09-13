@@ -12435,6 +12435,8 @@
     },
     "agents": {
       "page": {
+        "allTags": "Las {n} etiquetas",
+        "fewerTags": "Menos etiquetas",
         "lede": "Un agente es una IA que trabaja en tu nombre: tiene su propia identidad, sus propios permisos y sus propias tareas y memoria. Dos están listos desde el primer momento; el resto los creas aquí o los conectas desde la IA que ya usas.",
         "chipAgents": "{n} agentes",
         "chipReady": "{n} listos",

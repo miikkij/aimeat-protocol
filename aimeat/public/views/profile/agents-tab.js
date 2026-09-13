@@ -7,6 +7,7 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.0.1 -- 2026-09-14 -- The tag filter folds (FilterBar).
  *   v4.0.0 -- 2026-09-14 -- The poster face (design canvas "Your Agents"): crumb, masthead, chips, a
  *     strip of figures, slab-headed sections that fold and stay folded per browser, the agents as a
  *     table (the tile board is gone: it counted what the table already lists), the ink rail. The
@@ -105,7 +106,7 @@ import { McpSetupGuide } from './ai-setup-guide.js';
 import { Section, Fold, scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { buildAgentPrompt, buildTaskRunnerPrompt, buildMcpOnboardingPrompt, PLATFORMS, PLATFORM_KEYS, PLATFORM_LABELS } from './agents/connect-prompts.js';
 import { loadAgentOrder, saveAgentOrder, UNGROUPED_ID, loadCollapsedGroups, saveCollapsedGroups, loadSeen, saveSeen, markTabSeen, effectiveOrderedNames, matchesAgentQuery, popOutAgent, loadFold, saveFold } from './agents/tab-helpers.js';
-import { AgentSearch, renderFilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
+import { AgentSearch, FilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
 import { agentState } from './agents/state-detector.js';
 import ScopesModal from './agents/scopes-modal.js';
 import BasicAgentsPanel from './agents/basic-agents-panel.js';
@@ -679,7 +680,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
                   shown=${agents.filter(a => matchesAgentQuery(a, query)).length}
                   total=${agents.length}
                 />
-                ${renderFilterBar(agents, tagFilter, setTagFilter, groupBy, pickGroupBy)}
+                <${FilterBar} agents=${agents} tagFilter=${tagFilter} setTagFilter=${setTagFilter} groupBy=${groupBy} setGroupBy=${pickGroupBy} />
                 ${running > 0 ? html`<${ActiveTasksPanel}
                   activeTasksMap=${activeTasksMap}
                   agents=${agents}
