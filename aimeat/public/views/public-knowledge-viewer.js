@@ -10,6 +10,7 @@
  *   origin in the rail. Reads the public endpoints; the Art. 50(4) label stays under the headline.
  * @structure PublicKnowledgeViewer · BrowseView · DetailView · entryToMarkdown · buildFullMarkdown
  * @version-history
+ *   v2.2.0 -- 2026-09-13 -- V2: compose public reader section headlines with poster-section-title.
  *   v2.1.0 -- 2026-09-13 -- V2: use the shared ink rule on the public search row.
  *   v2.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Tietopankin sivu", direction A):
  *     the card grid becomes a list with a sentence per package, the centred card becomes a reading
@@ -320,15 +321,15 @@ function DetailView({ packageId, onBack }) {
           const erefs = entry.references || [];
           const rels = entry.related_entries || [];
           return html`<section class=${`og-sec kp-entry-sec ${i === 0 && !manifest.synthesis?.description ? 'og-sec--first' : ''}`} id=${'kp-pe-' + i} key=${entry.key}>
-            <div class="og-sec-h"><h2><span class="kp-num">${String(i + 1).padStart(2, '0')}</span> ${entry.title || entryName}</h2><div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => toggle(entry.key)}>${isClosed ? c('open') : c('close')}</button></div></div>
+            <div class="og-sec-h"><h2 class="poster-section-title"><span class="kp-num">${String(i + 1).padStart(2, '0')}</span> ${entry.title || entryName}</h2><div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => toggle(entry.key)}>${isClosed ? c('open') : c('close')}</button></div></div>
             ${isClosed ? null : html`
               ${content ? html`<p>${entryToText(content)}</p>` : html`<p class="og-empty">${t('pkv.entryUnavailable')}</p>`}
               ${erefs.length ? html`<div class="kp-refs">${erefs.map((r, j) => html`<div class="kp-ref" key=${j}><i class=${r.verified ? '' : 'kp-ref--no'}>${r.verified ? c('verified') : c('unverified')}</i>${r.url ? html`<a href=${r.url} target="_blank" rel="noopener">${r.title || r.url} ↗</a>` : html`<span>${r.title || c('untitled')}</span>`}</div>`)}</div>` : null}
               ${rels.length ? html`<div class="kp-rels">${rels.map((r, j) => { const tg = target(r.key); return html`<span class="kp-rel" key=${j}><b>${relWord(r.relation)}</b>${tg ? (tg.title || r.key) : r.key}</span>`; })}</div>` : null}`}
           </section>`;
         })}
-        ${manifest.references?.length ? html`<section class="og-sec"><div class="og-sec-h"><h2>${t('pkv.references')}</h2></div><div class="kp-refs">${manifest.references.map((r, j) => html`<div class="kp-ref" key=${j}><i class=${r.verified ? '' : 'kp-ref--no'}>${r.verified ? c('verified') : c('unverified')}</i>${r.url ? html`<a href=${r.url} target="_blank" rel="noopener">${r.title || r.url} ↗</a>` : html`<span>${r.title}</span>`}</div>`)}</div></section>` : null}
-        ${links.length ? html`<section class="og-sec"><div class="og-sec-h"><h2>${c('pubRelated')}</h2></div><div class="kp-rels">${links.map((l, j) => html`<span class="kp-rel" key=${j}><b>${relWord(l.relation)}</b>${l.target_name || l.target}</span>`)}</div></section>` : null}
+        ${manifest.references?.length ? html`<section class="og-sec"><div class="og-sec-h"><h2 class="poster-section-title">${t('pkv.references')}</h2></div><div class="kp-refs">${manifest.references.map((r, j) => html`<div class="kp-ref" key=${j}><i class=${r.verified ? '' : 'kp-ref--no'}>${r.verified ? c('verified') : c('unverified')}</i>${r.url ? html`<a href=${r.url} target="_blank" rel="noopener">${r.title || r.url} ↗</a>` : html`<span>${r.title}</span>`}</div>`)}</div></section>` : null}
+        ${links.length ? html`<section class="og-sec"><div class="og-sec-h"><h2 class="poster-section-title">${c('pubRelated')}</h2></div><div class="kp-rels">${links.map((l, j) => html`<span class="kp-rel" key=${j}><b>${relWord(l.relation)}</b>${l.target_name || l.target}</span>`)}</div></section>` : null}
       </div>
       <nav class="og-rail">
         <span class="og-rail-label">${t('pkv.title')}</span>
