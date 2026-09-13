@@ -45,6 +45,9 @@
  *   const out = await createBoard({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- A board reaction counts once per person: a mark the owner or any of their
+ *     agents already gave is the caller's mark (react answers ok without a second entry, un-react takes
+ *     it back). It counted per identity, so an owner and their agent were two votes.
  *   v1.2.0 -- 2026-09-06 -- Review item 3.3: the public-board ceiling is publicBoardCeiling(),
  *     exported, because a limit enforced only where a board is BORN is not a limit -- the
  *     visibility flip and cortex activation both got past it.
@@ -57,7 +60,7 @@
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardRecord, BoardRules, BoardSubscriptionRecord } from '../storage/interface.js';
-import { isSameOwner } from '../utils/gaii.js';
+import { isSameOwner, ownerGhiiOf } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
 
 /** The bounds BoardRulesSchema applies on the HTTP door. */
@@ -345,6 +348,18 @@ export async function reactToBoardPost(
         return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Post not found' };
     }
 
+    // One vote per PERSON (decided 2026-09-13). A person's agents act in their name, so a mark already
+    // given by the owner or by any of their agents is this caller's mark too: answered ok, not stored
+    // twice. Compared on the owner GHII, node included, so a namesake on another node is someone else.
+    const post = await storage.getPost(input.boardId, input.postId);
+    if (!post) {
+        return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Post not found' };
+    }
+    const person = ownerGhiiOf(caller.gaii);
+    if ((post.reactions?.[reaction] ?? []).some(g => ownerGhiiOf(g) === person)) {
+        return { ok: true };
+    }
+
     const stored = await storage.addReaction(input.boardId, input.postId, reaction, caller.gaii);
     if (!stored) {
         return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Post not found' };
@@ -381,7 +396,13 @@ export async function unreactToBoardPost(
         return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Post not found' };
     }
 
-    const removed = await storage.removeReaction(input.boardId, input.postId, reaction, caller.gaii);
+    // The person's mark, whichever of their identities gave it (the owner may take back the heart
+    // their agent gave, and the other way round). Their own identity's mark first.
+    const post = await storage.getPost(input.boardId, input.postId);
+    const holders = post?.reactions?.[reaction] ?? [];
+    const person = ownerGhiiOf(caller.gaii);
+    const mark = holders.find(g => g === caller.gaii) ?? holders.find(g => ownerGhiiOf(g) === person) ?? caller.gaii;
+    const removed = await storage.removeReaction(input.boardId, input.postId, reaction, mark);
     if (!removed) {
         return { ok: false, status: 404, code: 'NOT_FOUND', message: 'No such reaction from you on that post' };
     }
