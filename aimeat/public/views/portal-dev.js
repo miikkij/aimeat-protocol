@@ -6,6 +6,7 @@
  *   platform → variant → connection type → share app). Composes the panels and
  *   upload sub-modules (extracted to satisfy max-file-lines).
  * @version-history
+ *   v2.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.1.0 — 2026-06-02 — Component unification (#11): node-badge dot uses
  *     canonical <StatusDot status="online" /> instead of bespoke .dv-dot
@@ -226,7 +227,7 @@ export default function PortalDevView({ locale }) {
       </section>
 
       <!-- Steps 2 to 4, folded until the step before them is answered -->
-      <section class="dv-folds">
+      <section class="dv-folds poster-row--thing">
         <${Fold} num="2" label=${dt('step2.label', locale)} open=${manyVariants}
           done=${selectedPlatform && !manyVariants && selectedVariant ? selectedVariant.name : ''}>
           ${manyVariants && html`
