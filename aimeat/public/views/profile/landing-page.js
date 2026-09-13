@@ -17,6 +17,8 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   2026-09-13 — Fix: a ?tab= in the address beats the tab remembered in sessionStorage, so the home
+ *     settings' link to access opens access even after Scheduler was open earlier in the same tab.
  *   2026-09-13 — Compose overview B1 headings and row rules from shared poster classes.
  *   v3.17.0 -- 2026-09-13 -- V2: select the shared poster crumb in the tab header.
  *   v3.16.0 — 2026-09-03 — The AI page's route id is 'ai'; 'generator' (its old name, which an
@@ -171,16 +173,23 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
   // sessionStorage, NOT localStorage, so the remembered position is per browser
   // TAB: with several profile tabs open, refreshing one restores ITS own view
   // instead of whichever tab last wrote a shared localStorage value.
+  // A ?tab= in the address wins over the remembered view: a link that names a tab (the home
+  // settings' "Sign-in security and access") arrives through the SPA router, where spa.html's
+  // cold-open primer does not run, and the tab visited earlier in this browser tab used to open
+  // instead. F5 is unaffected, because an open view keeps its ?tab= in the URL.
   const [openView, setOpenView] = useState(() => {
     try {
+      const asked = canonicalTab(new URLSearchParams(window.location.search).get('tab'));
+      if (asked) {
+        const v = { tabId: asked, slot: 'main' };
+        try { sessionStorage.setItem('aimeat-profile-tab', JSON.stringify(v)); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
+        return v;
+      }
       const saved = sessionStorage.getItem('aimeat-profile-tab');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.tabId && parsed.slot) return { ...parsed, tabId: canonicalTab(parsed.tabId) };
       }
-      // Fall back to a ?tab= deep link (also how Back/Forward restores a tab).
-      const tabId = canonicalTab(new URLSearchParams(window.location.search).get('tab'));
-      if (tabId) return { tabId, slot: 'main' };
     // eslint-disable-next-line aimeat/no-silent-catch -- ignore
     } catch { /* ignore */ }
     return null;
