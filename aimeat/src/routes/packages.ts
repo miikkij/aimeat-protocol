@@ -241,7 +241,10 @@ export function packagesRouter(
       author: req.query.author as string | undefined,
       category: req.query.category as string | undefined,
       status: req.query.status as string | undefined,
-      visibility: req.query.visibility as string | undefined,
+      // No `visibility` from the query. It used to be forwarded and used as the filter, which on an
+      // unauthenticated door meant `?visibility=private` listed every author's private packages with
+      // their components. Dropped from the parameter list rather than ignored, here and in
+      // openapi.yaml, because a parameter that silently does nothing is the next person's bug.
       search: req.query.search as string | undefined,
       limit: parseInt(req.query.limit as string ?? '50', 10),
       offset: parseInt(req.query.offset as string ?? '0', 10),

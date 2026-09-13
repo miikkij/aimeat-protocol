@@ -261,6 +261,41 @@ await test('Create package defaults: published and private', async () => {
   assert(body.data?.visibility === 'private', `Expected visibility=private, got ${body.data?.visibility}`);
 });
 
+// The list door has no authentication on it, and it used to pass `?visibility=` straight into a
+// storage filter that means `where visibility = ?`. So a stranger — or nobody at all — asking for
+// `private` was handed every author's private packages, `components` and all, which is their
+// CONTENT. Reproduced on aimeat.io on 2026-09-13 before the fix: one real package came back.
+await test('A private package is invisible to a stranger, whatever visibility they ask for', async () => {
+  const secret = `${pkgName}-secret`;
+  const made = await json('/v1/packages', {
+    method: 'POST',
+    headers: authed(ownerToken),
+    body: JSON.stringify({
+      name: secret,
+      visibility: 'private',
+      components: [{ id: 'csm-main', type: 'csm', label: 'Main CSM', content: '{"fields":["NOBODY ELSE SEES THIS"]}' }],
+    }),
+  });
+  assert(made.status === 201, `setup: expected 201, got ${made.status}: ${JSON.stringify(made.body)}`);
+  assert(made.body.data?.visibility === 'private', `setup: expected private, got ${made.body.data?.visibility}`);
+
+  const names = (b: any) => (b.data?.packages ?? []).map((p: any) => p.name);
+  for (const [label, path] of [
+    ['the plain list', '/v1/packages'],
+    ['asking for private', '/v1/packages?visibility=private'],
+    ["asking for private by the author's name", `/v1/packages?visibility=private&author=${encodeURIComponent(ownerName)}`],
+  ] as const) {
+    const { status, body } = await json(path);
+    assert(status === 200, `${label}: expected 200, got ${status}`);
+    assert(!names(body).includes(secret), `${label} handed a stranger the private package: ${JSON.stringify(names(body))}`);
+    assert(!JSON.stringify(body).includes('NOBODY ELSE SEES THIS'), `${label} leaked the private package's contents`);
+  }
+
+  // And the author still sees their own, or their list would lie to them.
+  const own = await json(`/v1/packages?author=${encodeURIComponent(ownerName)}`, { headers: authed(ownerToken) });
+  assert(names(own.body).includes(secret), `the author's own list lost their private package: ${JSON.stringify(names(own.body))}`);
+});
+
 await test('Create package rejects an invalid visibility', async () => {
   const { status } = await json('/v1/packages', {
     method: 'POST',
