@@ -9,6 +9,7 @@
  *   badges come from admin.css and organism.css; only what this page adds lives here. Every value
  *   is a theme.css token, so the page flips with the theme.
  * @version-history
+ *   v1.2.0 — 2026-09-13 — Own existing note spacing formerly declared in markup.
  *   v1.1.1 — 2026-09-13 — .adm-ap-dialog-acts leaves: the dialogs' actions are in the dialog's footer.
  *   v1.1.0 — 2026-09-12 — The table stacks at 1100px rather than 768: the content column is about
  *     290px narrower than the window, so between those two widths the table scrolled sideways
@@ -20,6 +21,8 @@
 .adm-ap-intro { margin: 0 0 .9rem; font-size: .88rem; line-height: 1.55; color: var(--text-dim); max-width: 76ch; }
 .adm-ap-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
 .adm-ap-note { margin: 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-ap-note--spaced { margin-top: 12px; }
+.adm-ap-danger-note { margin-top: 16px; }
 .adm-ap .adm-mrow--last { border-bottom: 0; }
 .adm-ap .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
 .adm-ap .og-strip b.adm-ap-coral { color: var(--accent); }

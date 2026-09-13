@@ -19,6 +19,7 @@
  * @structure AppsAdminTab (default) · RightNow · FourStates · TakenDown
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose shared poster headings and external spacing.
  *   v2.0.1 — 2026-09-13 — The take-down and delete dialogs' actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-12 — The poster face: five numbered sections, the facts the node already sent
  *     and the page ignored (forks, version, access code, search block, publish date, the address
@@ -68,7 +69,7 @@ function RightNow({ facts, number, onFilter }) {
     </div>`;
   return html`
     <section class="og-sec og-sec--first" id="adm-ap-now">
-      <div class="og-sec-h"><h2>${A('now.title')}<small>${number}</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${A('now.title')}<small>${number}</small></h2>
         <div class="og-doors">
           <a class="og-door og-door--quiet" href="/v1/app-store" target="_blank" rel="noopener">${A('now.openWall')}</a>
         </div></div>
@@ -117,13 +118,13 @@ function FourStates({ facts, number }) {
     </div>`;
   return html`
     <section class="og-sec" id="adm-ap-states">
-      <div class="og-sec-h"><h2>${A('states.title')}<small>${number}</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${A('states.title')}<small>${number}</small></h2></div>
       <p class="adm-ap-lead">${A('states.lead')}</p>
       ${step(1, 'down', A('states.count', { n: num(facts.down) }))}
       ${step(2, 'parked', A('states.count', { n: num(facts.parked) }))}
       ${step(3, 'code', A('states.count', { n: num(facts.coded) }))}
       ${step(4, 'seo', A('states.count', { n: num(facts.notIndexed) }), true)}
-      <div class="og-box" style="margin-top: 16px">
+      <div class="og-box adm-ap-danger-note">
         <span class="og-box-label">${A('states.dangerLabel')}</span>
         ${A('states.danger')}
       </div>
@@ -135,7 +136,7 @@ function TakenDown({ apps, number }) {
   const down = apps.filter(a => a.operator_hidden);
   return html`
     <section class="og-sec" id="adm-ap-log">
-      <div class="og-sec-h"><h2>${A('log.title')}<small>${number}</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${A('log.title')}<small>${number}</small></h2></div>
       ${down.length === 0
         ? html`<p class="adm-ap-note">${A('log.none')}</p>`
         : down.map((a, i) => html`
@@ -304,7 +305,7 @@ export default function AppsAdminTab() {
       <${RightNow} facts=${facts} number=${n()} onFilter=${(key) => { setFilter(key); setQuery(''); }} />
 
       <section class="og-sec" id="adm-ap-find">
-        <div class="og-sec-h"><h2>${A('find.title')}<small>${n()}</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${A('find.title')}<small>${n()}</small></h2>
           <div class="og-doors"><span class="adm-ap-note">${A('find.count', { n: num(shown.length), total: num(facts.all) })}</span></div></div>
 
         <div class="adm-ap-tools">
@@ -341,7 +342,7 @@ export default function AppsAdminTab() {
             </tbody>
           </table>
         </div>
-        ${shown.length === 0 && html`<p class="adm-ap-note" style="margin-top: 12px">${A('noMatch')}</p>`}
+        ${shown.length === 0 && html`<p class="adm-ap-note adm-ap-note--spaced">${A('noMatch')}</p>`}
       </section>
 
       <${CopyScan} result=${scanResult} apps=${apps} scanning=${scanning} onScan=${runCopyScan} number=${n()} />
