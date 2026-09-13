@@ -6,6 +6,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   2026-09-13 — Compose overview B1 headings and row rules from shared poster classes.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2v: compose section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
@@ -1771,12 +1772,8 @@
 
 /* --- Suggested next steps (home dashboard): a numbered index under a headline --- */
 .pf .pf-next { background: none; padding: 2.5rem 0 0; }
-.pf .pf-next-title {
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 2.1rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
-  color: var(--text); margin-bottom: 1.2rem;
-}
-.pf .pf-next-grid { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 0; border-top: 3px solid var(--text); counter-reset: pf-next; }
+.pf-overview { --poster-section-size: 2.1rem; }
+.pf .pf-next-grid { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 0; counter-reset: pf-next; }
 .pf .pf-next-card {
   display: flex; align-items: baseline; gap: 20px; width: 100%; text-align: left;
   padding: 14px 0; border-radius: 0; cursor: pointer; font: inherit;
@@ -2182,7 +2179,7 @@
 }
 /* The index: a table of contents rather than a menu. One rule on top, group words in coral,
    every item a hairline row, the open one on the sun. */
-.pf-side-home { border-top: 3px solid var(--text); padding-top: 0.9rem; font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent); }
+.pf-side-home { padding-top: 0.9rem; font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent); }
 
 .pf-side-group { margin-top: 1.1rem; }
 .pf-side-group-title { font-size: 0.66rem; font-weight: var(--font-poster-strong-weight); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); padding: 0 0 0.35rem; border-bottom: 2px solid var(--text); }
@@ -2944,16 +2941,14 @@
    home dashboard — wider than a narrow phone, overflowing the right edge. */
 .pf-home-card { background: none; padding: 0; min-width: 0; }
 .pf-home-card-title {
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 2.1rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
-  color: var(--text); margin-bottom: 1rem; background: none; border: none; padding: 0; text-align: left;
-  display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap;
+  display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; text-align: left;
+  border-top: 0; border-right: 0; border-left: 0;
 }
 .pf-home-card-link { cursor: pointer; }
 .pf-home-card-link:hover { color: var(--accent); }
 .pf-home-card-note { font-family: var(--font-mono); font-weight: 400; font-size: 0.8rem; text-transform: none; letter-spacing: 0; color: var(--text-dim); }
-.pf-home-card > .pf-home-row:first-of-type { border-top: 3px solid var(--text); }
-.pf-home-row { display: flex; align-items: center; gap: 0.7rem; width: 100%; background: none; border: none; border-bottom: 1px solid var(--border); padding: 0.55rem 0; border-radius: 0; cursor: pointer; font-size: 0.98rem; font-weight: 700; color: var(--text); text-align: left; font-family: inherit; }
+.pf-home-row { display: flex; align-items: center; gap: 0.7rem; width: 100%; background: none; border-right: 0; border-left: 0; border-bottom: 1px solid var(--border); padding: 0.55rem 0; border-radius: 0; cursor: pointer; font-size: 0.98rem; font-weight: 700; color: var(--text); text-align: left; font-family: inherit; }
+.pf-home-row:not(.poster-row--thing) { border-top: 0; }
 .pf-home-row:hover { color: var(--accent); }
 .pf-home-row-static { cursor: default; }
 .pf-home-row-static:hover { color: var(--text); }
@@ -2964,7 +2959,6 @@
 .pf-lp-stat-link { background: none; border: none; padding: 0; border-radius: 0; cursor: pointer; font: inherit; color: inherit; }
 /* Home "Usage & quotas" card — thick quota bars + the counts as a row of numerals */
 .pf-usage-card { grid-column: 1 / -1; }
-.pf-usage-card > .pf-usage-row:first-of-type { border-top: 3px solid var(--text); }
 .pf-usage-row { padding: 0.9rem 0; border-bottom: 1px solid var(--border); margin: 0; }
 .pf-usage-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.5rem; }
 .pf-usage-label { font-size: 1rem; font-weight: 800; color: var(--text); }
@@ -2986,7 +2980,7 @@
 .pf-ai-win-cost { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 3rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); color: var(--text); font-variant-numeric: tabular-nums; }
 .pf-ai-windows .pf-ai-win:first-child .pf-ai-win-cost { color: var(--accent); }
 .pf-ai-win-sub { order: 3; font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
-.pf-ai-chart { margin: 0.2rem 0 1rem; border-top: 3px solid var(--text); padding-top: 0.6rem; }
+.pf-ai-chart { margin: 0.2rem 0 1rem; padding-top: 0.6rem; }
 .pf-ai-apps-head { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.3rem; padding-bottom: 0.4rem; border-bottom: 3px solid var(--text); }
 .pf-ai-app-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); font-size: 0.95rem; font-weight: 700; }
 .pf-ai-app-dot { width: 14px; height: 14px; border-radius: 0; flex: none; }
@@ -3439,7 +3433,6 @@
    preference rather than another card in the grid. */
 .pf .pf-start-page {
   margin: 4rem 0 1rem; padding-top: 1.2rem;
-  border-top: 3px solid var(--text);
   flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
 }
 .pf .pf-start-page .start-page-title { font-weight: 800; font-size: 1rem; }

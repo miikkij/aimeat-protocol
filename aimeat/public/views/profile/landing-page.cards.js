@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-13 — Compose overview B1 headings and row rules from shared poster classes.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.3.0 -- 2026-09-13 -- V2: compose the avatar with the shared poster frame.
  *   2026-09-03 — The AI page's menu item is route id 'ai' (was 'generator'), and the usage card's
@@ -108,9 +109,9 @@ export function ContinueCard() {
   };
   return html`
     <div class="pf-home-card">
-      <div class="pf-home-card-title">${t('profile.landing.continueTitle') || 'Continue'}</div>
-      ${items.map(it => html`
-        <button class="pf-home-row" key=${it.type + it.id} onClick=${() => openItem(it)}>
+      <div class="poster-section-title pf-home-card-title">${t('profile.landing.continueTitle') || 'Continue'}</div>
+      ${items.map((it, index) => html`
+        <button class=${`pf-home-row ${index === 0 ? 'poster-row--thing' : ''}`} key=${it.type + it.id} onClick=${() => openItem(it)}>
           <span class="pf-home-row-ico">${RECENT_ICONS[it.type] || '•'}</span>
           <span class="pf-home-row-label">${escHtml(it.label)}</span>
           <span class="pf-home-row-meta">${relTime(it.at)}</span>
@@ -160,7 +161,7 @@ export function AgentsCard({ owner, initialAgents }) {
   const activeToday = agents.filter(a => isToday(a.last_seen)).length;
   return html`
     <div class="pf-home-card">
-      <button class="pf-home-card-title pf-home-card-link" onClick=${() => openProfileTab('agents')}>
+      <button class="poster-section-title pf-home-card-title pf-home-card-link" onClick=${() => openProfileTab('agents')}>
         ${t('profile.landing.agentsTitle') || 'Agents'}
         ${activeToday > 0 ? html`<span class="pf-home-card-note"> · ${(t('profile.landing.activeTodayCount') || '{n} active today').replace('{n}', String(activeToday))}</span>` : null}
       </button>
@@ -275,7 +276,7 @@ export function UsageCard({ switchTab, initialUsage }) {
   const c = u.counts;
   return html`
     <div class="pf-home-card pf-usage-card poster-row--thing">
-      <div class="pf-home-card-title">${t('profile.landing.usageTitle') || 'Usage & quotas'}</div>
+      <div class="poster-section-title pf-home-card-title">${t('profile.landing.usageTitle') || 'Usage & quotas'}</div>
       ${bar(t('profile.landing.usageMemory') || 'Memory', u.memory,
         `${u.memory.used_keys}/${u.memory.max_keys} ${t('profile.memory.keysWord') || 'keys'} · ${fmtBytes(u.memory.used_bytes)} / ${fmtBytes(u.memory.max_bytes)}`)}
       ${bar(t('profile.landing.usageStorage') || 'Files', u.storage,
@@ -348,7 +349,7 @@ export function CommerceCard() {
     .join(' · ') || `0 ${morsels}`;
   return html`
     <div class="pf-home-card pf-commerce-card">
-      <div class="pf-home-card-title">${t('profile.landing.commerceTitle') || 'Commerce'}</div>
+      <div class="poster-section-title pf-home-card-title">${t('profile.landing.commerceTitle') || 'Commerce'}</div>
       <div class="pf-ai-windows">
         ${chip(t('profile.landing.commerceBought') || 'Purchases', String(stats.bought), fmtTotals(stats.spentBy))}
         ${chip(t('profile.landing.commerceSold') || 'Sales', String(stats.sold), fmtTotals(stats.earnedBy))}
@@ -391,14 +392,14 @@ export function AiSpendCard() {
 
   return html`
     <div class="pf-home-card pf-ai-card">
-      <div class="pf-home-card-title">${t('profile.landing.aiSpendTitle') || 'AI apps spend'}</div>
+      <div class="poster-section-title pf-home-card-title">${t('profile.landing.aiSpendTitle') || 'AI apps spend'}</div>
       <div class="pf-ai-windows">
         ${win(t('profile.landing.aiWin24h') || 'Today', windows && windows.d1)}
         ${win(t('profile.landing.aiWin7d') || '7 days', windows && windows.d7)}
         ${win(t('profile.landing.aiWin30d') || '30 days', windows && windows.d30)}
       </div>
       ${datasets.length > 0 && html`
-        <div class="pf-ai-chart">
+        <div class="pf-ai-chart poster-row--thing">
           <${UsageChart} stacked labels=${labels} datasets=${datasets} height=${180}
             legend=${false} yFormat=${fmtUsd} />
         </div>`}
@@ -446,7 +447,7 @@ export function AgentLedgerCard() {
 
   return html`
     <div class="pf-home-card pf-ai-card">
-      <div class="pf-home-card-title">${t('profile.landing.agentLedgerTitle') || 'Agent LLM usage'}</div>
+      <div class="poster-section-title pf-home-card-title">${t('profile.landing.agentLedgerTitle') || 'Agent LLM usage'}</div>
       <div class="pf-ai-windows">
         ${tile(t('profile.landing.agentLedgerCost') || 'Cost', fmtUsd(totals.cost_usd))}
         ${tile(t('profile.landing.agentLedgerTokens') || 'Tokens', fmtCompact(totals.total_tokens))}
@@ -599,8 +600,8 @@ export function NextSteps({ switchTab, hasApps }) {
 
   return html`
     <div class="pf-next">
-      <div class="pf-next-title">${t('profile.landing.nextTitle')}</div>
-      <div class="pf-next-grid">
+      <div class="poster-section-title pf-next-title">${t('profile.landing.nextTitle')}</div>
+      <div class="pf-next-grid poster-row--thing">
         ${steps.map((s, i) => html`
           <button class=${'pf-next-card' + (i === 0 ? ' pf-next-card--primary' : '')} key=${s.key}
             onClick=${s.go}>
