@@ -23,6 +23,7 @@ export const FAST_CHECKS = [
     { script: 'check:mcp-schemas', label: 'MCP tool input-schema parity' },
     { script: 'check:plain-language', label: 'Plain language for the messages a person hears' },
     { script: 'check:poster-shapes', label: 'Design-language shapes live in poster.css, not in view sheets' },
+    { script: 'check:dialogs', label: 'One dialog for the site: no hand-rolled overlay, backdrop or role="dialog" box' },
     { script: 'check:viewport', label: 'Cortex pack integrity: embed + VERSION constants' },
     { script: 'check:ai-disclosure', label: 'AI disclosure gates: one LLM path, one publish path, labels intact' },
     { script: 'check:locales', label: 'Language files agree with en.json' },
