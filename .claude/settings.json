@@ -6,8 +6,47 @@
     "stale, both times found by the developer rather than by the session. A rule nothing enforces",
     "is a rule that holds only while somebody remembers it, and eight sessions share this repo.",
     "SessionStart prints the ritual and the live board into the session's own context before its",
-    "first tool call, so the claim is written from what the session already knows."
+    "first tool call, so the claim is written from what the session already knows.",
+    "",
+    "claudeMdExcludes (2026-09-13): a session starts in the main checkout and reads files in",
+    ".worktrees/<session>/, and every such read loaded that worktree's whole CLAUDE.md a second",
+    "time (load_reason nested_traversal, 19 times in 10 of 115 retained transcripts, measured again",
+    "on a live run). The patterns match only the top of a worktree, so one copy stays: the main",
+    "checkout's for a session started there, the ancestor's for a session started inside one.",
+    "",
+    "permissions.deny (2026-09-13): Read refused on files nobody edits by hand and nobody needs",
+    "whole, so a Grep or a Read cannot pour megabytes into context: minified third-party libs,",
+    "generated bundles and notices, lockfiles, tool-written baselines. The .env names are what",
+    ".claudeignore listed as 'may contain secrets'; Claude Code never read that file (the 2.1.226",
+    "binary has no occurrence of the word), so this is the first time the list is enforced.",
+    "Kept readable on purpose: openapi.yaml, locales/*.json, db-types.ts, aimeat/security/*.json."
   ],
+  "claudeMdExcludes": [
+    "**/.worktrees/*/CLAUDE.md",
+    "**/.worktrees/*/.claude/rules/**",
+    "**/.claude/worktrees/**"
+  ],
+  "permissions": {
+    "deny": [
+      "Read(./**/aimeat/public/lib/**/*.min.*)",
+      "Read(./**/aimeat/public/lib/duckdb-wasm@*/**/*)",
+      "Read(./**/aimeat/public/lib/daisyui@*.css)",
+      "Read(./**/aimeat/public/lib/tailwindcss@*.js)",
+      "Read(./**/src/static/sdk-libs/dist/**/*)",
+      "Read(./**/src/static/app-catalog.html)",
+      "Read(./**/THIRD-PARTY-NOTICES.md)",
+      "Read(./**/pnpm-lock.yaml)",
+      "Read(./**/uv.lock)",
+      "Read(./**/Cargo.lock)",
+      "Read(./**/.dependency-cruiser-known-violations.json)",
+      "Read(./**/security/semantic-audit/gitleaks-baseline.json)",
+      "Read(./**/.env)",
+      "Read(./**/.env.local)",
+      "Read(./**/.env.production)",
+      "Read(./**/.env.development)",
+      "Read(./**/.env.developer.override)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
