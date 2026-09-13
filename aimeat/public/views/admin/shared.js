@@ -8,6 +8,7 @@
  *   self-contained design system (adm-* scoped); these are intentionally separate
  *   from the main /components primitives.
  * @version-history
+ *   v1.5.0 -- 2026-09-13 -- Stable toast callbacks keep consumer read effects from restarting.
  *   v1.4.0 — 2026-09-12 — Row and when(): the metric row and the machine-readable stamp every
  *     operator page in the poster face uses, moved here from the Discovery page's own file when the
  *     Hooks page needed the same two.
@@ -22,7 +23,7 @@
  *     t('common.error')) — were hardcoded English (Rule 4/7.8).
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { escHtml } from '/js/utils.js';
@@ -191,9 +192,10 @@ export function DataTable({ headers, rows, scroll }) {
  */
 export function useToast() {
   const [msg, setMsg] = useState(null);
-  const showError   = (text) => setMsg({ type: 'error',   text });
-  const showSuccess = (text) => setMsg({ type: 'success', text });
-  const clear       = ()     => setMsg(null);
+  // Consumers include these callbacks in read-effect dependencies (for example CORS).
+  const showError   = useCallback((text) => setMsg({ type: 'error',   text }), []);
+  const showSuccess = useCallback((text) => setMsg({ type: 'success', text }), []);
+  const clear       = useCallback(() => setMsg(null), []);
   return [msg, showError, showSuccess, clear];
 }
 
