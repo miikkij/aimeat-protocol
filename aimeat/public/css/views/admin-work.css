@@ -10,6 +10,7 @@
  *   what this page adds lives here. Every value is a theme.css token, so the page flips with the
  *   theme.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose the empty state's frame and B1 heading from poster.css.
  *   v1.0.0 — 2026-09-12 — Initial (the Work page in the poster face).
  */
 
@@ -94,12 +95,7 @@
 .adm-work-flow s { text-decoration: none; color: var(--text-dim); }
 
 /* ── The empty state, which used to contradict the count beside its own name ──────────────── */
-.adm-work-empty { border: 3px solid var(--text); background: var(--card-bg); padding: 18px 22px; max-width: 640px; margin-top: 8px; }
-.adm-work-empty h3 {
-  margin: 0 0 5px; font-family: var(--font-poster); font-weight: var(--font-poster-weight, 400);
-  font-size: 1.2rem; line-height: var(--font-poster-leading, 1); letter-spacing: var(--font-poster-tracking, .01em);
-  text-transform: uppercase; color: var(--text);
-}
+.adm-work-empty { --poster-section-size: 1.2rem; padding: 18px 22px; max-width: 640px; margin-top: 8px; }
 .adm-work-empty p { margin: 0; font-size: .9rem; line-height: 1.55; color: var(--text-dim); }
 
 @media (max-width: 1100px) {
