@@ -10,6 +10,7 @@
  * @structure renderDocSpace
  * @usage import { renderDocSpace } from '/views/profile/organisms/workspace/doc-space.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- Compose the document index top rule with poster-row--thing.
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
  */
 import { h } from 'preact';
@@ -108,7 +109,7 @@ export function renderDocSpace(ctx, ot) {
       </div>
       ${spaceDesc(ot) ? html`<div class="section-desc">${spaceDesc(ot)}</div>` : null}
       <div class="pj-docspace">
-        <div class="pj-doc-index">
+        <div class="pj-doc-index poster-row--thing">
           ${childrenOf(null).map(renderSection)}
           ${unsorted.length > 0 ? html`
             <div class="pj-sec" onDragOver=${allowDrop} onDrop=${dropOn(null)}><div class="pj-sec-head"><span class="pj-sec-name pj-muted">${t('organisms.unsorted') || 'Unsorted'}</span></div>${renderDocList(unsorted)}</div>` : null}
