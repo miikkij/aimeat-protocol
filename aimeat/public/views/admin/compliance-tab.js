@@ -31,6 +31,7 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-05 — The poster face: the gaps grouped by kind with a door each, the limits in
  *     the dashed box before the numbers, the register as a table with a who-answered column and a
  *     framed sheet for an opened entry, the three ways to start in the register's empty state
@@ -137,7 +138,7 @@ function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, 
   const toApps = () => switchPage('apps');
   return html`
     <section class="og-sec og-sec--first" id="adm-cmp-01">
-      <div class="og-sec-h"><h2>${C('gapsTitle')}<small>01</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('gapsTitle')}<small>01</small></h2>
         <div class="og-doors">${door(C('toApps'), toApps)}</div></div>
       <div class="adm-ov-grid">
         <div>
@@ -193,7 +194,7 @@ function Limits({ items }) {
   const list = items || [];
   return html`
     <section class="og-sec" id="adm-cmp-02">
-      <div class="og-sec-h"><h2>${C('limitsTitle')}<small>02</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('limitsTitle')}<small>02</small></h2></div>
       <div class="og-box">
         <span class="og-box-label">${C('limitsLabel')}</span>
         <p class="adm-cmp-box-p">${C('limitsNote')}</p>
@@ -223,7 +224,7 @@ function Happened({ derived, switchPage }) {
     </div>`;
   return html`
     <section class="og-sec" id="adm-cmp-03">
-      <div class="og-sec-h"><h2>${C('derivedTitle')}<small>03</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('derivedTitle')}<small>03</small></h2>
         <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('usage')}>${C('toUsage')}</button></div></div>
       <p class="adm-cmp-lead">${C('derivedNote')}</p>
       <div class="adm-two">
