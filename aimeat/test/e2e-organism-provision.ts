@@ -9,6 +9,10 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=organism-provision
  * @version-history
+ *   v1.1.0 — 2026-09-13 — UNDECLARED_SPACE: a memory write (owner and app-grant roads), a single
+ *     publish and a batch publish into a space the manifest does not declare are stored and warned,
+ *     the workspace read does not list them, and the add_object_types repair the warning names makes
+ *     them list and stops the warning.
  *   v1.0.0 — 2026-07-14 — Initial: organism:write scope + POST /v1/organisms/:id/workspaces + role-or-scope gate.
  */
 import * as ed from '@noble/ed25519';
@@ -118,6 +122,74 @@ async function main() {
         const key = `organism.${orgId}.w.${ws}.crm.contacts.c1.latest`;
         const r = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key, value: { id: 'c1', etunimi: 'Aino', omistaja: `${owner}@${NODE_ID}`, tila: 'uusi' }, visibility: 'owner' }) });
         assert(r.status === 200 || r.status === 201, `valid write: ${r.status} ${JSON.stringify(r.body.error)}`);
+        // Positive control for the UNDECLARED_SPACE cases below: a declared space carries no warning.
+        assert(r.body.data?.warnings === undefined, `a declared space must not warn, got ${JSON.stringify(r.body.data?.warnings)}`);
+    });
+
+    // ── UNDECLARED_SPACE: a space the workspace's manifest does not declare ──────────────────────
+    //
+    // A workspace keeps the manifest it was created with, so an app that later adds a space writes
+    // into a namespace an older workspace does not declare. Every door stored the record and answered
+    // success, and the workspace read, which lists declared spaces only, never showed it. The MCP
+    // write door refuses; these doors warn (ruling 2026-09-13: live apps may keep keys there today).
+    // Appdev pitfalls group-apps/new-space-needs-a-heal-step and data/heal-step-catch-hides-a-
+    // workspace-a-version-behind.
+    type Warn = { code?: string; namespace?: string; declared_spaces?: Array<{ namespace: string }>; how_to_fix?: string };
+    const undeclared = (data: Record<string, unknown> | undefined): Warn | undefined =>
+        ((data?.warnings as Warn[] | undefined) ?? []).find(w => w.code === 'UNDECLARED_SPACE');
+
+    await test('POST /v1/memory into an undeclared space → stored, 201, and warns UNDECLARED_SPACE', async () => {
+        const key = `organism.${orgId}.w.${ws}.crm.campaigns.k1.draft`;
+        const r = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ key, value: { id: 'k1', title: 'Spring' }, visibility: 'owner' }) });
+        assert(r.status === 201, `expected 201 (warned, not refused), got ${r.status} ${JSON.stringify(r.body.error)}`);
+        const w = undeclared(r.body.data);
+        assert(!!w, `expected an UNDECLARED_SPACE warning, got ${JSON.stringify(r.body.data)}`);
+        assert(w!.namespace === 'crm.campaigns', `names the namespace, got ${w!.namespace}`);
+        assert((w!.declared_spaces ?? []).some(d => d.namespace === 'crm.contacts'), `lists the declared spaces, got ${JSON.stringify(w!.declared_spaces)}`);
+        assert(String(w!.how_to_fix).includes('add_object_types'), `names the repair, got ${w!.how_to_fix}`);
+    });
+
+    await test('the same write through an app grant (the SDK writeDraft road) warns too', async () => {
+        const key = `organism.${orgId}.w.${ws}.crm.campaigns.k1b.draft`;
+        const r = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${appWrite}` }, body: JSON.stringify({ key, value: { id: 'k1b' }, visibility: 'private' }) });
+        assert(r.status === 201, `app write: ${r.status} ${JSON.stringify(r.body.error)}`);
+        assert(!!undeclared(r.body.data), `expected UNDECLARED_SPACE on the app road, got ${JSON.stringify(r.body.data)}`);
+    });
+
+    await test('POST /v1/organisms/:id/publish of that draft → published, and warns UNDECLARED_SPACE', async () => {
+        const r = await json(`/v1/organisms/${orgId}/publish`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ ws, namespace: 'crm.campaigns', id: 'k1' }) });
+        assert(r.status === 200 && r.body.data?.published === true, `publish: ${r.status} ${JSON.stringify(r.body.error)}`);
+        assert(!!undeclared(r.body.data), `expected UNDECLARED_SPACE on the single publish, got ${JSON.stringify(r.body.data)}`);
+    });
+
+    await test('batch records publish into the undeclared space → published, and warns UNDECLARED_SPACE once', async () => {
+        const r = await json(`/v1/organisms/${orgId}/workspace/records/publish`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ ws, namespace: 'crm.campaigns', records: [{ id: 'k2', value: { id: 'k2' } }, { id: 'k3', value: { id: 'k3' } }] }) });
+        assert(r.status === 200 && r.body.data?.published === 2, `batch: ${r.status} ${JSON.stringify(r.body.data ?? r.body.error)}`);
+        const warnings = (r.body.data?.warnings as Warn[] | undefined) ?? [];
+        assert(warnings.length === 1 && warnings[0].code === 'UNDECLARED_SPACE', `one warning for the batch, got ${JSON.stringify(warnings)}`);
+    });
+
+    await test('the workspace read does not list the undeclared space (why the warning exists)', async () => {
+        const r = await json(`/v1/organisms/${orgId}/workspace?ws=${ws}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(r.status === 200, `read: ${r.status}`);
+        const objects = (r.body.data?.objects ?? {}) as Record<string, unknown[]>;
+        assert(!('campaign' in objects), `no campaign space before the repair, got ${Object.keys(objects).join(',')}`);
+    });
+
+    await test('the repair the warning names: add_object_types, then the space lists and publishing stops warning', async () => {
+        const put = await json(`/v1/organisms/${orgId}/workspace?ws=${ws}`, { method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ add_object_types: [{ name: 'campaign', namespace: 'crm.campaigns', mode: 'records' }] }) });
+        assert(put.status === 200, `heal: ${put.status} ${JSON.stringify(put.body.error)}`);
+        const r = await json(`/v1/organisms/${orgId}/workspace/records/publish`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ ws, namespace: 'crm.campaigns', records: [{ id: 'k4', value: { id: 'k4' } }] }) });
+        assert(r.status === 200 && r.body.data?.published === 1, `publish after heal: ${r.status}`);
+        assert(r.body.data?.warnings === undefined, `a declared space must not warn, got ${JSON.stringify(r.body.data?.warnings)}`);
+        const read = await json(`/v1/organisms/${orgId}/workspace?ws=${ws}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        const listed = ((read.body.data?.objects ?? {}) as Record<string, Array<{ id?: string }>>).campaign ?? [];
+        assert(['k1', 'k2', 'k3', 'k4'].every(id => listed.some(o => o.id === id)), `the records stored before the repair now list too, got ${JSON.stringify(listed.map(o => o.id))}`);
+    });
+
+    await test('a non-member publishing into the undeclared space is refused, not warned → 403', async () => {
+        const r = await json(`/v1/organisms/${orgId}/workspace/records/publish`, { method: 'POST', headers: { Authorization: `Bearer ${owner2Token}` }, body: JSON.stringify({ ws, namespace: 'crm.other', records: [{ id: 'x1', value: { id: 'x1' } }] }) });
+        assert(r.status === 403, `expected 403, got ${r.status}`);
     });
 
     await test('schema lock enforced: an INVALID contact (bad enum + extra field) → 422', async () => {

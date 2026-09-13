@@ -22,6 +22,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-13 — aimeat_board_rules_set on the service surface, beside the other board tools.
  *   2026-09-13 — aimeat_dm_archive_as_owner and aimeat_dm_organize_as_owner on the agent surface.
  *   2026-09-12 — aimeat_dm_inbox_as_owner and aimeat_dm_thread_as_owner on the agent surface.
  *   2026-09-08 — aimeat_admin_cors_overview and aimeat_admin_cors_set on the operator surface,
@@ -246,7 +247,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',
         'aimeat_skill_publish', 'aimeat_skill_list', 'aimeat_skill_get', 'aimeat_skill_link', 'aimeat_skill_unlink', 'aimeat_skill_update',
         'aimeat_board_list', 'aimeat_board_read', 'aimeat_board_create', 'aimeat_board_post', 'aimeat_board_reply',
-        'aimeat_board_react', 'aimeat_board_subscribe', 'aimeat_board_members', 'aimeat_board_delete',
+        'aimeat_board_react', 'aimeat_board_subscribe', 'aimeat_board_members', 'aimeat_board_rules_set', 'aimeat_board_delete',
         'aimeat_work_inbox', 'aimeat_work_accept', 'aimeat_work_deliver',
         'aimeat_action_execute',
         'aimeat_wallet_balance', 'aimeat_wallet_transactions',

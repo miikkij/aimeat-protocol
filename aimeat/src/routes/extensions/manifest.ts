@@ -5,6 +5,10 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-09-13 — A manifest that does not parse answers with the parser's line and column
+ *                         (yamlErrorText, also used by the package ZIP door), and a `type: secret`
+ *                         config field with no `default` is no longer stored as its own descriptor,
+ *                         which the sandbox read as a truthy ctx.config value.
  *   v1.6.0 — 2026-09-05 — A manifest may declare `workspace: { read: bool, write: bool }`, which is
  *                         what makes `ctx.workspace` exist in the sandbox. Validated here and stored
  *                         as `config.__workspace`, a key the manifest's own `config:` cannot set.
@@ -84,6 +88,20 @@ export function scanSandboxCapabilityWarnings(scripts: Record<string, string>): 
     if (hits.length) out.push(`${hits.join(', ')}: ${message}`);
   }
   return out;
+}
+
+/**
+ * A YAML parse error as one line an author can act on: the parser's first message line, which names
+ * the line and column, plus a hint when the cause is the usual one. The `yaml` library follows its
+ * message with a code excerpt spread over further lines; that excerpt is dropped so the answer stays
+ * one readable sentence in an error envelope.
+ */
+export function yamlErrorText(err: unknown): string {
+  const first = (err instanceof Error ? err.message : String(err)).split('\n')[0].trim().replace(/[:.]\s*$/, '');
+  const hint = /nested mappings|compact mapping|implicit keys/i.test(first)
+    ? ' This is usually a plain value containing ": ", such as a description: quote it, or write it as a folded block (>-).'
+    : '';
+  return `${first}.${hint}`;
 }
 
 const isNonNegInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && Number.isFinite(v);
@@ -318,8 +336,13 @@ export function buildExtensionRecordFromManifest(
   let manifest: Record<string, unknown>;
   try {
     manifest = parseYaml(manifestYaml) as Record<string, unknown>;
-  } catch {
-    return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'Failed to parse manifest YAML' };
+  } catch (err) {
+    // The parser's own message carries the line and column ("Nested mappings are not allowed in
+    // compact mappings at line 4, column 16"), and that position is the whole fix for the common
+    // case: an unquoted `: ` inside a description. Returning a bare "Failed to parse" sent authors
+    // to parse the file locally just to find out where.
+    return { ok: false, status: 400, code: 'INVALID_MANIFEST',
+      message: `Failed to parse manifest YAML: ${yamlErrorText(err)}` };
   }
 
   const metadata = manifest.metadata as Record<string, unknown> | undefined;
@@ -424,6 +447,7 @@ export function buildExtensionRecordFromManifest(
           + `is being installed by "${installer}". An extension can only gate its own installer's app.` };
     }
   }
+  const manifestSecretKeys = computeManifestSecretKeys(manifestConfig);
   const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
   const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
   const manifestSchedules = manifest.schedules as Array<Record<string, unknown>> | undefined;
@@ -484,12 +508,19 @@ export function buildExtensionRecordFromManifest(
     config: {
       ...(manifestConfig
         ? Object.fromEntries(
-            Object.entries(manifestConfig).map(([k, v]) => {
-              if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
-                return [k, (v as Record<string, unknown>).default];
-              }
-              return [k, v];
-            }),
+            Object.entries(manifestConfig)
+              // A `type: secret` field declared WITHOUT a default has no value, and storing its
+              // descriptor in its place made `ctx.config.apiKey` the object
+              // `{ type: 'secret', description }`: truthy, so `if (ctx.config.apiKey)` passed and the
+              // extension sent "Bearer [object Object]" upstream. Leave it out; the field stays listed
+              // in __secretKeys below, and a re-install without a value keeps the stored secret.
+              .filter(([k, v]) => !(manifestSecretKeys.includes(k) && !('default' in (v as Record<string, unknown>))))
+              .map(([k, v]) => {
+                if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
+                  return [k, (v as Record<string, unknown>).default];
+                }
+                return [k, v];
+              }),
           )
         : {}),
       ...(manifestSchedules ? { __schedules: manifestSchedules } : {}),
@@ -497,10 +528,7 @@ export function buildExtensionRecordFromManifest(
       // Record which config fields are `type: 'secret'` so the route can encrypt their values
       // at rest and the runtime can decrypt before the VM (the descriptor type is otherwise
       // lost by the flatten above). See services/extension-secrets.ts.
-      ...((): Record<string, unknown> => {
-        const secretKeys = computeManifestSecretKeys(manifestConfig);
-        return secretKeys.length ? { [SECRET_KEYS_FIELD]: secretKeys } : {};
-      })(),
+      ...(manifestSecretKeys.length ? { [SECRET_KEYS_FIELD]: manifestSecretKeys } : {}),
     },
     limits: {
       memoryMb: Math.min((manifestLimits?.memory_mb as number) ?? config.extensionMaxMemoryMb, config.extensionMaxMemoryMb),

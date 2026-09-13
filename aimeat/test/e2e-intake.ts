@@ -9,6 +9,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=intake
  * @version-history
+ *   v1.1.0 — 2026-09-13 — A form whose destination's strict schema lacks "id", an allowed field or a
+ *     default is refused at definition (422 INTAKE_SCHEMA_MISMATCH naming each), and re-locking the
+ *     schema in place fixes it without recreating the workspace.
  *   v1.0.0 — 2026-07-16 — Initial: forms CRUD + anon submit (allow-list, honeypot, schema-lock, isolation).
  */
 import * as ed from '@noble/ed25519';
@@ -216,6 +219,73 @@ async function main() {
         const id = (r.body.data as { id?: string }).id;
         assert(!!id, 'the record is still written');
     });
+    // ── A form whose destination schema cannot hold its records is refused when it is DEFINED ──
+    //
+    // The submit path adds `id` to every record and writes the form's allowed fields and defaults
+    // into it, then validates against the space's locked schema, which a workspace always locks
+    // strict. A schema without one of those names used to accept the form definition and then refuse
+    // every anonymous submission with 422 additionalProperty, which only the anonymous submitter saw
+    // (appdev pitfall data/intake-schema-must-allow-injected-id).
+    let noIdWs = '';
+    await test('setup: a second workspace whose strict schema has no "id" property', async () => {
+        const w = await json(`/v1/organisms/${orgId}/workspaces`, {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({
+                name: 'NoId Leads', manifest: LEADS_MANIFEST,
+                schemas: { 'crm.leads': { type: 'object', additionalProperties: false, required: ['nimi'], properties: { nimi: { type: 'string' }, omistaja: { type: 'string' } } } },
+            }),
+        });
+        assert(w.status === 201, `create ws: ${w.status} ${JSON.stringify(w.body.error)}`);
+        noIdWs = (w.body.data as { ws: string }).ws;
+    });
+
+    await test('a form into a strict schema with no "id" is refused at definition → 422 naming id', async () => {
+        const r = await json('/v1/intake/forms', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ organism_id: orgId, ws: noIdWs, namespace: 'crm.leads', form_id: 'no-id', allowed_fields: ['nimi'], defaults: { omistaja: ownerGhii } }),
+        });
+        assert(r.status === 422, `expected 422, got ${r.status} ${JSON.stringify(r.body)}`);
+        assert(r.body.error?.code === 'INTAKE_SCHEMA_MISMATCH', `code: ${r.body.error?.code}`);
+        const missing = ((r.body.error as { details?: { missing_properties?: string[] } })?.details?.missing_properties) ?? [];
+        assert(missing.includes('id'), `missing_properties must name id, got ${JSON.stringify(missing)}`);
+        const stored = await json(`/v1/intake/${orgId}/${noIdWs}/no-id`);
+        assert(stored.status === 404, `a refused definition must not be stored, got ${stored.status}`);
+    });
+
+    await test('an allowed field or a default the strict schema lacks is named too → 422', async () => {
+        const r = await json('/v1/intake/forms', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ organism_id: orgId, ws, namespace: 'crm.leads', form_id: 'extra-fields', allowed_fields: ['nimi', 'puhelin'], defaults: { omistaja: ownerGhii, luotu: '{{now}}', kampanja: 'kevat' } }),
+        });
+        assert(r.status === 422, `expected 422, got ${r.status}`);
+        const missing = ((r.body.error as { details?: { missing_properties?: string[] } })?.details?.missing_properties) ?? [];
+        assert(missing.includes('puhelin') && missing.includes('kampanja'), `names both, got ${JSON.stringify(missing)}`);
+        assert(!missing.includes('id') && !missing.includes('nimi'), `names only what is missing, got ${JSON.stringify(missing)}`);
+    });
+
+    await test('fixed in place: re-lock the schema with "id", and the same form defines and takes a submission', async () => {
+        const put = await json(`/v1/organisms/${orgId}/workspace?ws=${noIdWs}`, {
+            method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ schemas: { 'crm.leads': { type: 'object', additionalProperties: false, required: ['nimi'], properties: { id: { type: 'string' }, nimi: { type: 'string' }, omistaja: { type: 'string' } } } } }),
+        });
+        assert(put.status === 200, `re-lock: ${put.status} ${JSON.stringify(put.body.error)}`);
+        const def = await json('/v1/intake/forms', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ organism_id: orgId, ws: noIdWs, namespace: 'crm.leads', form_id: 'no-id', allowed_fields: ['nimi'], defaults: { omistaja: ownerGhii } }),
+        });
+        assert(def.status === 200, `define after re-lock: ${def.status} ${JSON.stringify(def.body.error)}`);
+        const sub = await json(`/v1/intake/${orgId}/${noIdWs}/no-id`, { method: 'POST', body: JSON.stringify({ nimi: 'Fixed In Place' }) });
+        assert(sub.status === 200 && sub.body.ok === true, `submit: ${sub.status} ${JSON.stringify(sub.body.error)}`);
+    });
+
+    await test('a namespace with no schema lock takes any form (positive control)', async () => {
+        const r = await json('/v1/intake/forms', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ organism_id: orgId, ws, namespace: 'crm.unlocked', form_id: 'unlocked', allowed_fields: ['anything'], defaults: { whatever: 1 } }),
+        });
+        assert(r.status === 200, `expected 200, got ${r.status} ${JSON.stringify(r.body.error)}`);
+    });
+
     await test('delete a form → its public link stops working (404)', async () => {
         const del = await json(`/v1/intake/forms?organism_id=${orgId}&ws=${ws}&form_id=${disabledForm}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
         assert(del.status === 200 && (del.body.data as { deleted: boolean }).deleted === true, `delete: ${del.status}`);

@@ -8,6 +8,10 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.8.0 — 2026-09-13 — publishDraft and publishDraftsBatch return `warning` (UNDECLARED_SPACE) when
+ *     the workspace manifest declares no space for the namespace: the record is stored and no
+ *     workspace read lists it. Not refused, since live apps may publish there today. The batch
+ *     publish's schema violations carry path, rule and params, so they name the refused property.
  *   v1.7.0 — 2026-08-23 — Publishing consumes EVERY copy of the draft, not only the freshest one.
  *     A draft is stored under whoever wrote it, so a record an agent proposed and its owner then
  *     approved had two: the agent's under its GAII and the owner's under the GHII. Publishing
@@ -48,6 +52,7 @@ import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../../service
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from '../../services/workspace-roles.js';
 import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from '../../services/workspace-versions.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
+import { readPublishSpace, type UndeclaredSpaceWarning } from '../../services/workspace-write-items.js';
 import { logger } from '../../utils/logger.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
@@ -177,7 +182,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   const publishDraft = async (
     organismId: string, ws: string | undefined, namespace: string, instance: string, publisher: string,
     expectedVersion?: number | null,
-  ): Promise<{ ok: true; version: number; skipped?: boolean } | { ok: false; code: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> => {
+  ): Promise<{ ok: true; version: number; skipped?: boolean; warning?: UndeclaredSpaceWarning } | { ok: false; code: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> => {
     const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
     const base = `${wsRoot}.${namespace}.${instance}`;
     const ownerGhii = ownerGhiiOf(publisher);
@@ -200,19 +205,19 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const vis = draft.visibility;
     const tags = draft.tags ?? [];
     const existingLatest = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
+    // Read before the change-guard, so a no-op re-publish into an undeclared space still says so.
+    const { ot: pubOt, warning } = await readPublishSpace(storage, organismId, ws, namespace);
+    const warned = warning ? { warning } : {};
 
     // Change-guard: an unchanged re-publish (contract agents re-publish the same draft on every poll
     // cycle) must NOT append a byte-identical .version.N. Consume the draft and return without touching
     // .latest or firing the Tracked-Response side effect.
     if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draftValue)) {
       for (const d of draftCopies(items, base)) await storage.deleteMemory(d.ownerGaii, `${base}.draft`);
-      return { ok: true, version: maxN, skipped: true };
+      return { ok: true, version: maxN, skipped: true, ...warned };
     }
     // Honour the manifest's `versioned` flag (default true): a `versioned:false` space (e.g. a request
     // queue) keeps only .latest — no immutable per-publish history.
-    const mkey = `${wsRoot}.meta.manifest`;
-    const manRec = (await storage.listAllMemory({ prefix: mkey, limit: 10 })).items.find(r => r.key === mkey);
-    const pubOt = ((manRec?.value as { objectTypes?: Array<{ namespace?: string; versioned?: boolean; create_only?: boolean; maxVersions?: number }> } | undefined)?.objectTypes ?? []).find(o => o.namespace === namespace);
     const versioned = pubOt?.versioned !== false;
     const n = maxN + 1;
 
@@ -259,7 +264,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // .latest. Re-editing the published instance starts a fresh draft. (Without this the workspace
     // shows a stale draft alongside the identical published copy.) EVERY copy: see draftCopies.
     for (const d of draftCopies(items, base)) await storage.deleteMemory(d.ownerGaii, `${base}.draft`);
-    return { ok: true, version: n };
+    return { ok: true, version: n, ...warned };
   };
 
   // BATCH publish (data-access redesign, Phase 2): publish MANY drafts in ONE workspace+namespace as one
@@ -278,18 +283,16 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // consume). An import has the final values, so this collapses N draft-writes + N publishes into ONE
     // request. Interactive edits still use the draft flow (no directValues).
     directValues?: Record<string, { value: unknown; visibility?: MemoryRecord['visibility'] }>,
-  ): Promise<{ results: Array<{ instance: string; ok: boolean; version?: number; skipped?: boolean; code?: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> }> => {
+  ): Promise<{ results: Array<{ instance: string; ok: boolean; version?: number; skipped?: boolean; code?: 'NO_DRAFT' | 'INVALID'; violations?: unknown }>; warning?: UndeclaredSpaceWarning }> => {
     const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
     const ownerGhii = ownerGhiiOf(publisher);
     const nsPrefix = `${wsRoot}.${namespace}.`;
-    // ONE scan of the whole namespace + ONE manifest read (the `versioned` flag) for the entire batch.
+    // ONE scan of the whole namespace + ONE manifest read (`versioned`, UNDECLARED_SPACE) for the entire batch.
     // excludeVersionRows: the batch needs each record's .draft/.latest VALUES but only the version
     // NUMBERS — those come from ONE value-free key scan (versionRefsByBase below).
     const { items: allRows } = await storage.listAllMemory({ prefix: nsPrefix, limit: 100000, excludeVersionRows: true });
     const versionsByBase = await versionRefsByBase(storage, nsPrefix);
-    const mkey = `${wsRoot}.meta.manifest`;
-    const manRec = (await storage.listAllMemory({ prefix: mkey, limit: 10 })).items.find(r => r.key === mkey);
-    const pubOt = ((manRec?.value as { objectTypes?: Array<{ namespace?: string; versioned?: boolean; create_only?: boolean; requires_expected_version?: boolean; maxVersions?: number }> } | undefined)?.objectTypes ?? []).find(o => o.namespace === namespace);
+    const { ot: pubOt, warning } = await readPublishSpace(storage, organismId, ws, namespace);
     const versioned = pubOt?.versioned !== false;
     // Retention window for this namespace (0 = keep all; append-only spaces resolve to 0).
     const pruneWindow = effectiveMaxVersions(config, pubOt);
@@ -359,7 +362,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       // Schema (in-memory, from the ONCE-compiled schema) — no per-record findApplicableSchema round-trip.
       if (schemaToValidate) {
         const sv = validateValueAgainstSchema(draftValue, schemaToValidate);
-        if (!sv.ok) { results.push({ instance, ok: false, code: 'INVALID', violations: (sv.errors ?? []).map(m => ({ message: m })) }); continue; }
+        if (!sv.ok) { results.push({ instance, ok: false, code: 'INVALID', violations: sv.violations ?? (sv.errors ?? []).map(m => ({ message: m })) }); continue; }
       }
       const n = maxN + 1;
       if (versioned) {
@@ -395,7 +398,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     }
     // Fire Tracked-Response evaluation for each published record (gated O(1) in the subscriber).
     for (const e of toEmit) emitMemoryWritten(e.owner, e.key);
-    return { results };
+    return { results, ...(warning ? { warning } : {}) };
   };
 
   // Reopen a published record for editing: copy organism.{id}.{ns}.{instance}.latest → .draft so the

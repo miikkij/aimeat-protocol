@@ -9,6 +9,9 @@
  * @structure buildPromptSessionSections(nodeUrl) → the markdown for both sections
  * @usage body += buildPromptSessionSections(nodeUrl);
  * @version-history
+ *   v1.0.1 — 2026-09-13 — The auth sentence names AIMEAT.auth.signIn(), which now exists, instead of
+ *     telling a custom button to click the login bar's own button (whose first control is the
+ *     language or mode switch).
  *   v1.0.0 — 2026-09-13 — Extracted verbatim from build-app-prompt.ts (max-file-lines).
  */
 
@@ -22,7 +25,7 @@ export function buildPromptSessionSections(nodeUrl: string): string {
   // Auth pattern
   body += '### Auth Pattern\n';
   body += 'Handle BOTH login paths: a fresh sign-in click (the onLogin callback) AND a page that loads already signed in (restore the session yourself). `onLogin` fires ONLY on a fresh sign-in — it does NOT fire on reload when a session already exists, so a page that relies on onLogin alone shows nothing to an already-logged-in returning user.\n';
-  body += 'The login bar is the ONLY interactive sign-in path: on an app origin `AIMEAT.auth.login()` is silent-only (it restores an existing session and returns null otherwise). Never hand-roll a sign-in button that calls login() — mount the login bar; a custom button must delegate its click to the login bar\'s own button.\n';
+  body += '`AIMEAT.auth.login()` is the restore and never opens anything: it returns the stored session or null. A sign-in button of your own calls `AIMEAT.auth.signIn()` from its click handler (on an app origin that click is the user gesture the consent popup needs; elsewhere it opens the sign-in modal); it resolves to the session or null. Never click the login bar\'s buttons by position: the first control in it is the language or light/dark switch.\n';
   body += '```html\n';
   body += '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"></' + 'script>\n';
   body += '<script>\n';

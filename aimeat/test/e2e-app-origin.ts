@@ -10,6 +10,9 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   v1.6.0 — 2026-09-13 — The tagless case no longer asserts the author's bytes START the served
+ *     document: the app-ref block now leads a document with no head, so the app's first script can
+ *     read it. The discovery case also parses that block as served and finds it in the head.
  *   v1.5.0 — 2026-08-15 — Phase 7 gains the way BACK to the code field: a browser meeting the
  *     code-gated app on its own origin with no usable grant is bounced to the apex unlock page and
  *     the round trip completes, while ?unlock=1 without a grant, and any non-browser Accept, keep
@@ -213,6 +216,11 @@ async function main() {
             assert(body.includes(`owner:  ${owner}`), 'the owner is stated');
             assert(body.includes('/webmcp'), 'it points at the callable-tool listing');
             assert(body.includes('rel="mcp-server"'), 'and links the MCP server card for a raw-HTML reader');
+            // The identity block parses as served (JSON escapes, not HTML entities) and sits in the head,
+            // so AIMEAT.atelier.appRef() works from the app's first line.
+            const refBlock = /<script type="application\/json" id="aimeat-app-ref">([^<]*)<\/script>/.exec(body);
+            assert(refBlock !== null && JSON.parse(refBlock[1]).app_id === filename, 'the app-ref block parses as served and names the app');
+            assert(body.indexOf('id="aimeat-app-ref"') < body.indexOf('</head>'), 'the app-ref block is in the head');
         });
 
         // An app is under no obligation to close a tag, and three published on aimeat.io do not:
@@ -240,7 +248,13 @@ async function main() {
             assert(res.body.includes('<noscript id="aimeat-agent-discovery">'), 'no discovery block');
             assert(res.body.includes(`app_id: ${taglessFile}`), 'the discovery block does not name the app');
             assert(res.body.includes('aimeat-app-badge'), 'no attribution badge');
-            assert(res.body.startsWith(taglessHtml), 'the author\'s own bytes were altered rather than appended to');
+            // The app's identity block now leads a document with no head, because the front is the one
+            // place guaranteed to be ahead of the app's first script (appref-block-is-injected-after-your-
+            // script, 2026-09-13). The author's bytes are still intact; they no longer start the file.
+            assert(res.body.includes(taglessHtml), 'the author\'s own bytes were altered');
+            const refAt = res.body.indexOf('<script type="application/json" id="aimeat-app-ref">');
+            assert(refAt >= 0 && refAt < res.body.indexOf('<script>document.getElementById'),
+                `the app-ref block must come before the app's own script, found at ${refAt}`);
         });
 
         await test('llms.txt on an app origin is THAT app, not the node builder guide', async () => {

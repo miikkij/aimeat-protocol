@@ -458,8 +458,10 @@ The simplest pattern: write a plain IIFE that uses `AIMEAT.data` and
 ### 5.3 Install + activate
 
 Via MCP: `aimeat_cortex_install` (inline `manifest` + `libs` map, or upload-mode ZIP
-with `manifest.yaml` at root + `libs/`), then `aimeat_cortex_activate`. Note
-`aimeat_cortex_install` is CREATE-only — updates go through `PUT /v1/cortex/{name}`.
+with `manifest.yaml` at root + `libs/`), then `aimeat_cortex_activate`. To ship new
+code for a cortex you already installed, call `aimeat_cortex_install` again with
+`update: true` (inline manifest), which goes through `PUT /v1/cortex/{name}`; the answer's
+`lib_urls` names each lib's served address.
 
 Via REST the body is **JSON** — `{manifest, libs}` where `libs` maps filename → source
 (the `libs` DICT format, not a `lib` object — see Common Mistakes §3):

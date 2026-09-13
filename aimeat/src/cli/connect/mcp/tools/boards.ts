@@ -5,6 +5,9 @@
  * @description MCP tool registrations for board management -- creating, listing,
  *   subscribing, reacting, replying, member updates, and deletion.
  * @version-history
+ *   v1.4.0 -- 2026-09-13 -- aimeat_board_create sends `rules`, and aimeat_board_rules_set reaches
+ *     PATCH /v1/boards/:id/rules. A board created through the connector ran on the node defaults,
+ *     and its posts expired after seven days with no tool able to change that.
  *   v1.3.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_board_reply carries `ai_provenance` /
  *     `ai_provenance_id` and echoes what was recorded. The catalog promised the parameter; this
  *     shape stripped it as an unknown key.
@@ -23,6 +26,18 @@ import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
 import { envelopeResult } from './_registry.js';
 
+/**
+ * The rule set a board takes, the same shape the node's own tool declares (mcp/boards.ts). Strict,
+ * so a misspelled rule is refused here instead of stripped on the way out. The bounds are the node's
+ * to check: services/board-write.ts refuses an out-of-range value with the message that names it.
+ */
+const boardRulesInput = z.strictObject({
+  posting: z.enum(['owner', 'members', 'anyone']).optional(),
+  categories: z.array(z.string()).optional(),
+  default_ttl_hours: z.number().optional(),
+  post_cost: z.number().optional(),
+}).describe('The board\'s own rules: posting, categories, default_ttl_hours, post_cost');
+
 export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
 
@@ -36,12 +51,23 @@ export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): vo
     description: z.string().optional().describe('Board description'),
     visibility: z.string().optional().describe('Board visibility level'),
     allowed_gaiis: z.array(z.string()).optional().describe('GAIIs allowed to access a shared/private board'),
-  }, annotationsFor('aimeat_board_create'), async ({ name, description, visibility, allowed_gaiis }) => {
+    rules: boardRulesInput.optional(),
+  }, annotationsFor('aimeat_board_create'), async ({ name, description, visibility, allowed_gaiis, rules }) => {
     const body: Record<string, unknown> = { name };
     if (description) body.description = description;
     if (visibility) body.visibility = visibility;
     if (allowed_gaiis) body.allowed_gaiis = allowed_gaiis;
+    // POST /v1/boards has read `rules` since 2026-08-30; this door never sent it.
+    if (rules) body.rules = rules;
     const resp = await client.post('/v1/boards', body);
+    return envelopeResult(resp);
+  });
+
+  mcp.tool('aimeat_board_rules_set', descriptionFor('aimeat_board_rules_set'), {
+    board_id: z.string().describe('Board identifier'),
+    rules: boardRulesInput,
+  }, annotationsFor('aimeat_board_rules_set'), async ({ board_id, rules }) => {
+    const resp = await client.patch(`/v1/boards/${encodeURIComponent(board_id)}/rules`, { rules });
     return envelopeResult(resp);
   });
 

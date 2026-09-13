@@ -32,8 +32,10 @@
  *     code that claims the request was honoured, is the same class of defect this file exists to
  *     remove. No stored-file client on this node sends one.
  * @structure parseRangeHeader() — the verdict · sendPartialContent() / setAcceptRanges() /
- *   rangeNotSatisfiable() — the three response shapes a door needs · serveStoredFile() — all three,
- *   plus the read, in the one order that does not load a file to send part of it
+ *   rangeNotSatisfiable() — the three response shapes a door needs · storedFileVersion() /
+ *   storedFileEtag() / versionedAddress() — the per-write token behind the ETag and an upload
+ *   answer's `?v=` · serveStoredFile() — all of it,
+ *   plus the read, in the one order that does not load a file to send part of it or to answer 304
  * @usage
  *   const file = await storage.getStorageFileMeta(gaii, key);      // no bytes yet
  *   if (!file) { …404… }
@@ -41,9 +43,14 @@
  *   const served = await serveStoredFile(res, file, req.headers.range, {
  *       range: (start, length) => storage.readStorageFileRange(gaii, key, start, length),
  *       all: () => storage.getStorageFile(gaii, key).then(f => f?.data ?? null),
- *   });
+ *   }, { headOnly: req.method === 'HEAD', conditionals: req.headers });
  *   if (!served) { …404… }                                         // it vanished mid-request
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Revalidation. Every stored-file response carries a strong ETag built from
+ *     the write time and size (storedFileVersion), If-None-Match and If-Modified-Since are answered
+ *     304 before anything is read, and If-Range that no longer names the file sends the whole file.
+ *     A re-upload to the same key was served stale for up to five minutes with nothing to revalidate
+ *     against (appdev pitfall pub-file-cache-stale-assets).
  *   v1.1.0 -- 2026-08-15 -- TARGET-063: serveStoredFile(), so a range is read as a range. The four
  *     doors each carried the same three-line dance and each began by loading the whole file.
  *   v1.0.0 -- 2026-08-15 -- TARGET-063 A1: extracted from the three copies in routes/storage-files.ts,
@@ -171,6 +178,85 @@ export function needsBytesForType(file: { mimeType: string; utf8Verified?: boole
     return file.utf8Verified === undefined && needsUtf8Verdict(file.mimeType);
 }
 
+/**
+ * The version of one stored write, as a short URL-safe token: the write time in milliseconds and the
+ * size, both in base 36. Null when the record carries no write time.
+ *
+ * Every write stamps a new `createdAt` (services/storage-file-write.ts, and both providers overwrite
+ * it on conflict), so the token changes each time a key is written again, and it is read from
+ * metadata alone. Two uses: the strong ETag below, and the `?v=` an upload answer puts on the file's
+ * address so a re-upload is a different URL to every cache (GET /v1/pub ignores the query).
+ */
+export function storedFileVersion(file: { size: number; createdAt?: string }): string | null {
+    if (!file.createdAt) return null;
+    const at = Date.parse(file.createdAt);
+    if (Number.isNaN(at)) return null;
+    return `${at.toString(36)}-${file.size.toString(36)}`;
+}
+
+/** The strong ETag of one stored write, quoted, or null when the record carries no write time. */
+export function storedFileEtag(file: { size: number; createdAt?: string }): string | null {
+    const version = storedFileVersion(file);
+    return version ? `"${version}"` : null;
+}
+
+/**
+ * A file's address with `v=<storedFileVersion>` added to its query, for an upload answer to hand
+ * out. The address stays the one the file is served at: GET /v1/pub reads the path and ignores the
+ * query. What changes is the cache key, so a page that switches to the new address after a
+ * re-upload gets the new bytes at once rather than when the old copy's max-age runs out.
+ */
+export function versionedAddress(url: string, file: { size: number; createdAt?: string }): string {
+    const version = storedFileVersion(file);
+    return version ? `${url}${url.includes('?') ? '&' : '?'}v=${version}` : url;
+}
+
+/** The request headers a conditional answer reads. `req.headers` fits as it is. */
+export interface ConditionalHeaders {
+    'if-none-match'?: string;
+    'if-modified-since'?: string;
+    'if-range'?: string;
+}
+
+/** The entity tags in an If-None-Match or If-Range value, each without its `W/` prefix. */
+function entityTags(value: string): string[] {
+    return [...value.matchAll(/(?:W\/)?("[^"]*")/g)].map(m => m[1]);
+}
+
+/**
+ * RFC 9110 §13.2.2 steps 3 and 4 for a GET or HEAD: may this request be answered 304?
+ *
+ * If-None-Match is decided first and, when present, If-Modified-Since is not consulted at all. The
+ * comparison is WEAK, so a `W/` form of our tag matches: a proxy that compresses the response weakens
+ * the tag it forwards, and the browser sends that form back. If-Modified-Since compares at whole
+ * seconds, which is the resolution of an HTTP-date, and an unparseable date is ignored.
+ */
+function notModified(headers: ConditionalHeaders, etag: string | null, modifiedMs: number | null): boolean {
+    const inm = headers['if-none-match'];
+    if (typeof inm === 'string' && inm.trim()) {
+        if (inm.trim() === '*') return true;
+        return etag !== null && entityTags(inm).includes(etag);
+    }
+    const ims = headers['if-modified-since'];
+    if (typeof ims === 'string' && ims.trim() && modifiedMs !== null) {
+        const since = Date.parse(ims);
+        if (Number.isNaN(since)) return false;
+        return Math.floor(modifiedMs / 1000) * 1000 <= since;
+    }
+    return false;
+}
+
+/**
+ * RFC 9110 §13.1.5: does an If-Range still name this representation? An entity tag must match
+ * STRONGLY, and a date must equal Last-Modified exactly. Anything else means the file changed since
+ * the client's earlier ranges, and the answer is the whole new file, never a slice of it.
+ */
+function ifRangeHolds(value: string, etag: string | null, lastModified: string | null): boolean {
+    const v = value.trim();
+    if (v.startsWith('"') || v.startsWith('W/')) return etag !== null && v === etag;
+    return lastModified !== null && Date.parse(v) === Date.parse(lastModified);
+}
+
 /** How a door gets at the bytes it is about to serve. Both halves come from the storage layer, and
  *  a range read never touches the rest of the file. */
 export interface StoredFileReader {
@@ -198,14 +284,37 @@ export async function serveStoredFile(
     file: { key: string; mimeType: string; size: number; utf8Verified?: boolean; createdAt?: string; downloadName?: string },
     rangeHeader: string | undefined,
     read: StoredFileReader,
-    opts: { headOnly?: boolean } = {},
+    opts: { headOnly?: boolean; conditionals?: ConditionalHeaders } = {},
 ): Promise<boolean> {
-    // A validator, on every representation of the file. A ranged reader keeps one of these between
+    // Validators, on every representation of the file. A ranged reader keeps one of these between
     // requests to know the bytes did not move under it, and DuckDB reads Last-Modified straight off
-    // the probe. It costs nothing: the write time is already in the metadata.
+    // the probe. They cost nothing: the write time and the size are already in the metadata.
+    let lastModified: string | null = null;
+    let modifiedMs: number | null = null;
     if (file.createdAt) {
         const at = new Date(file.createdAt);
-        if (!Number.isNaN(at.getTime())) res.setHeader('Last-Modified', at.toUTCString());
+        if (!Number.isNaN(at.getTime())) {
+            lastModified = at.toUTCString();
+            modifiedMs = at.getTime();
+            res.setHeader('Last-Modified', lastModified);
+        }
+    }
+    // THE ETAG IS WHAT MAKES A SHORT max-age SAFE. A re-upload replaces the row under the same key,
+    // and GET /v1/pub answers with five minutes of freshness: with only Last-Modified, a browser
+    // holding the old response had no cheap way to learn the bytes changed, and an app iterating on
+    // an asset looked at the old picture and concluded its fix had failed (appdev pitfall
+    // pub-file-cache-stale-assets). Strong, because a new write is a new createdAt.
+    const etag = storedFileEtag(file);
+    if (etag) res.setHeader('ETag', etag);
+
+    // A conditional request that still holds is answered before anything is read, the legacy
+    // charset read included, and before Range: RFC 9110 §13.2.2 evaluates the preconditions first,
+    // and a 304 ignores the range. The caller's own headers (Cache-Control, CORS) are already set.
+    const conditionals = opts.conditionals ?? {};
+    if (notModified(conditionals, etag, modifiedMs)) {
+        res.status(304);
+        res.end();
+        return true;
     }
     // ONE decision, made before anything is sent: can this file's content type be named without its
     // bytes? With a stored verdict, yes, and nothing outside the requested range is ever read. For a
@@ -222,7 +331,11 @@ export async function serveStoredFile(
     if (needsBytesForType(file) && !whole) return false;
     const described = whole ? { ...file, data: whole } : file;
 
-    const verdict = parseRangeHeader(rangeHeader, file.size);
+    // If-Range that no longer names this file turns the range request into a plain GET.
+    const ifRange = conditionals['if-range'];
+    const rangeStillApplies = !(typeof ifRange === 'string' && ifRange.trim())
+        || ifRangeHolds(ifRange, etag, lastModified);
+    const verdict = parseRangeHeader(rangeStillApplies ? rangeHeader : undefined, file.size);
 
     // A HEAD answers out of the metadata and reads nothing more. Express auto-handles HEAD through
     // the GET handler, so /v1/pub was loading the entire file and discarding the body: 114 ms

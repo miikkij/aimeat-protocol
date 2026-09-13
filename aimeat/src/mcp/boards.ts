@@ -2,8 +2,8 @@
  * @file boards.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description MCP board tools and resource registrations. Provides 7 tools for board
- *   management (list, create, subscribe, react, reply, manage members, delete) and 1
+ * @description MCP board tools and resource registrations. Provides 8 tools for board
+ *   management (list, create, set rules, subscribe, react, reply, manage members, delete) and 1
  *   resource template for reading board posts via the MCP resource protocol.
  * @structure
  *   - registerBoardsTools() — registers all board tools and resources on an McpServer instance
@@ -24,6 +24,11 @@
  *     to build its own record and emit its own event here, and the copies had drifted: no bound on a
  *     board name or a reaction, the operator rule named public but not system, federate never set,
  *     and a roster call with neither add nor remove reported success while changing nothing.
+ *   v1.6.0 -- 2026-09-13 -- A board's rules over MCP. aimeat_board_create takes `rules` and answers
+ *     with the rules that apply, defaults included, and a sentence naming the post lifetime;
+ *     aimeat_board_rules_set changes them under the keeper rule PATCH /v1/boards/:id/rules applies.
+ *     Rules existed only over HTTP, so a board built by an agent ran on the node defaults and a
+ *     catalogue board emptied itself seven days after launch with nothing at creation saying so.
  *   v1.5.0 -- 2026-08-30 -- The board-posts resource leaves out a post flags have hidden
  *     (services/board-moderation.ts), as the HTTP listing and aimeat_board_read do.
  */
@@ -35,14 +40,63 @@ import type { Storage, BoardRecord } from '../storage/interface.js';
 import { parseGAII, parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { createBoardReply } from '../services/board-post.js';
+import { createBoardReply, boardPostPrice } from '../services/board-post.js';
 import { withoutHiddenPosts } from '../services/board-moderation.js';
 import {
-    boardVisibleTo, createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, deleteBoardById,
-    type BoardWriteCaller,
+    boardVisibleTo, createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules,
+    deleteBoardById, boardRulesBlock, type BoardWriteCaller,
 } from '../services/board-write.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
+
+/**
+ * How long a post lives when neither the post nor the board names a lifetime.
+ *
+ * A COPY of DEFAULT_TTL_HOURS in services/board-post.ts, which that file does not export. It is
+ * here so the create answer can say the number out loud: a board used as a catalogue emptied itself
+ * a week after launch, and nothing an agent read at creation mentioned the week. Replace this with
+ * the import once board-post.ts exports its constant.
+ */
+const DEFAULT_POST_TTL_HOURS = 168;
+
+/**
+ * The rules a board actually runs on, defaults filled in: what an author meets when posting.
+ *
+ * `rules` on a board is what its keeper SET, and it is absent when they set nothing, which is the
+ * case that bit. The price is boardPostPrice's own answer for an empty post, so the board's price
+ * and the node's base price are read from one place.
+ */
+function effectiveBoardRules(board: BoardRecord, config: AimeatConfig): Record<string, unknown> {
+    const r = board.rules ?? {};
+    const defaultPosting = board.visibility === 'public' ? 'anyone'
+        : board.visibility === 'shared' ? 'members'
+        : board.visibility === 'system' ? 'operators' : 'owner';
+    const basePrice = boardPostPrice(board, config, 0);
+    return {
+        posting: r.posting ?? defaultPosting,
+        // Empty means any category, or none, is accepted.
+        categories: r.categories ?? [],
+        default_ttl_hours: r.defaultTtlHours ?? DEFAULT_POST_TTL_HOURS,
+        post_cost: basePrice,
+        post_cost_per_kb: basePrice > 0 ? config.boardPostCostPerKb : 0,
+    };
+}
+
+/** One sentence an agent reads at creation, so the lifetime is never a discovery. */
+function lifetimeNote(effective: Record<string, unknown>): string {
+    const hours = effective.default_ttl_hours as number;
+    const span = hours % 24 === 0 ? `${hours / 24} day${hours === 24 ? '' : 's'}` : `${hours} hours`;
+    return `A post on this board is removed ${span} after it is written unless the post names its own lifetime. `
+        + 'Change it with aimeat_board_rules_set.';
+}
+
+/** The rule set an agent may send. Strict, so a misspelled rule is refused instead of dropped. */
+const boardRulesInput = z.strictObject({
+    posting: z.enum(['owner', 'members', 'anyone']).optional(),
+    categories: z.array(z.string()).optional(),
+    default_ttl_hours: z.number().optional(),
+    post_cost: z.number().optional(),
+});
 
 export function registerBoardsTools(
     mcp: McpServer,
@@ -155,20 +209,24 @@ export function registerBoardsTools(
             visibility: z.enum(['private', 'shared', 'public']),
             description: z.string().optional(),
             allowed_gaiis: z.array(z.string()).optional(),
+            rules: boardRulesInput.optional(),
         },
         annotationsFor('aimeat_board_create'),
-        async ({ name, visibility, description, allowed_gaiis }) => {
+        async ({ name, visibility, description, allowed_gaiis, rules }) => {
             // services/board-write.ts — the same create POST /v1/boards performs. The operator rule
             // lived here as "public requires operator" while the route reserves system boards too,
             // the name and description had no bound at all, and federate was never set.
+            // `rules` goes to the same normalizer the HTTP body does. This tool did not take it, so a
+            // board built over MCP ran on the defaults and its posts were gone after seven days.
             const out = await createBoard({ storage, config }, await boardCaller(), {
-                name, visibility, description, allowedGaiis: allowed_gaiis,
+                name, visibility, description, allowedGaiis: allowed_gaiis, rules,
             });
             if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
             const board = out.board;
 
             emitResourceListChanged(agentGaii);
 
+            const effective = effectiveBoardRules(board, config);
             return {
                 content: [{
                     type: 'text' as const,
@@ -176,7 +234,51 @@ export function registerBoardsTools(
                         id: board.id,
                         name: board.name,
                         visibility: board.visibility,
+                        rules: boardRulesBlock(board) ?? null,
+                        effective_rules: effective,
+                        note: lifetimeNote(effective),
                         created_at: board.createdAt,
+                    }, null, 2),
+                }],
+            };
+        },
+    );
+
+    // ── Tool: aimeat_board_rules_set ──
+    mcp.tool(
+        'aimeat_board_rules_set',
+        descriptionFor('aimeat_board_rules_set'),
+        {
+            board_id: z.string(),
+            rules: boardRulesInput,
+        },
+        annotationsFor('aimeat_board_rules_set'),
+        async ({ board_id, rules }) => {
+            const board = await storage.getBoard(board_id);
+            if (!board) return { content: [{ type: 'text' as const, text: `NOT_FOUND: Board not found: ${board_id}` }], isError: true };
+
+            // The keeper rule PATCH /v1/boards/:id/rules applies, word for word: the exact identity
+            // that created the board, or an operator. Another agent of the same owner is refused on
+            // both doors. Whether a same-owner principal should pass is open; until it is decided the
+            // two doors give the same answer.
+            const caller = await boardCaller();
+            if (board.ownerGaii !== caller.gaii && !caller.roles.includes('operator')) {
+                return { content: [{ type: 'text' as const, text: 'ACCESS_DENIED: Only the keeper of this board sets its rules. Ask them, or open a board of your own.' }], isError: true };
+            }
+
+            // The shape check, the write and the change event are services/board-write.ts.
+            const out = await setBoardRules({ storage, config }, board, rules);
+            if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
+
+            const effective = effectiveBoardRules(out.board, config);
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        id: out.board.id,
+                        rules: boardRulesBlock(out.board) ?? null,
+                        effective_rules: effective,
+                        note: lifetimeNote(effective),
                     }, null, 2),
                 }],
             };

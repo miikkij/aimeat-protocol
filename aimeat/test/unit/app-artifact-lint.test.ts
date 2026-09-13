@@ -19,6 +19,12 @@
  *   is about a destination and nothing short of a listening socket proves it.
  * @usage cd aimeat && pnpm test -- app-artifact-lint
  * @version-history
+ *   v1.5.0 — 2026-09-13 — Five cases from appdev pitfall triage, each seen failing first: an
+ *     aimeat-scopes word the node cannot grant is named (and a grantable list, spaced or
+ *     comma-separated, stays quiet); an empty aimeat-scopes counts as none; a served copy made by
+ *     the real applyServeMarks is told it is one, while an app that only names a mark from script is
+ *     not; a skipped type="module" block says it was not parsed; the cdn-libs-blocked sentence no
+ *     longer claims the app CSP allows this node only.
  *   v1.4.0 — 2026-09-06 — The probe's destination, asserted against a real listening server: an
  *     asset path of `/\host/x` reached `http://host/x` through `new URL(path, base)`, so an app's
  *     own bytes could aim the node's publish-time probe at a stranger (CodeQL alert 1612).
@@ -40,6 +46,8 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { AimeatConfig } from '../../src/config.js';
 import { lintAppArtifact } from '../../src/services/app-artifact-lint.js';
+import { applyServeMarks } from '../../src/services/app-serve-marks.js';
+import { moduleGoalAvailable } from '../../src/utils/inline-script-parse.js';
 
 /** Only the fields the check reads. Cast rather than built: the rest of the config is irrelevant. */
 const config = {
@@ -112,8 +120,10 @@ describe('lintAppArtifact — inline JavaScript that does not parse', () => {
 describe('lintAppArtifact — asset URLs', () => {
   it('warns about an external host, and never fetches it', async () => {
     const html = CLEAN.replace('</head>', '<script src="https://cdn.jsdelivr.net/npm/x@1"></script></head>');
-    const { ids } = await findings(html);
+    const { ids, messages } = await findings(html);
     expect(ids).toContain('cdn-libs-blocked');
+    // app-csp.ts allows https: scripts today; the finding used to claim the opposite (2026-09-13).
+    expect(messages.join(' ')).not.toContain('allows this node only');
   });
 
   it('warns about a relative path — a published app has no siblings', async () => {
@@ -181,6 +191,86 @@ describe('lintAppArtifact — the head declarations', () => {
     expect(meta[0]?.message).toContain('aimeat-app');
     expect(meta[0]?.message).toContain('aimeat-locales');
     expect(meta[0]?.message).not.toContain('aimeat-scopes');
+  });
+
+  // 2026-09-13, appdev pitfall declare-aimeat-scopes-or-get-the-silent-four. One word outside the
+  // grantable vocabulary makes the silent bridge answer invalid_scope and the visible authorize
+  // answer 400 for the WHOLE list, so nobody signs in, and the publish said nothing about it.
+  it('names every aimeat-scopes word this node cannot grant, and no word it can', async () => {
+    const html = CLEAN.replace('content="memory:read memory:write"', 'content="memory:read storage:delete organism:admin"');
+    const { warnings } = await lintAppArtifact(html, config);
+    const scopes = warnings.filter(f => f.pitfall === 'app-meta-declarations' && f.message.includes('cannot grant'));
+    expect(scopes).toHaveLength(1);
+    expect(scopes[0]?.severity).toBe('warn');
+    expect(scopes[0]?.message).toContain('storage:delete');
+    expect(scopes[0]?.message).toContain('organism:admin');
+    expect(scopes[0]?.message).not.toContain('memory:read');
+    expect(scopes[0]?.message).toContain('/v1/app-grants/scopes');
+  });
+
+  it('stays quiet about words the node can grant, whitespace- or comma-separated', async () => {
+    for (const content of ['memory:read memory:write ai:use', 'memory:read,memory:write']) {
+      const html = CLEAN.replace('content="memory:read memory:write"', `content="${content}"`);
+      const { warnings } = await lintAppArtifact(html, config);
+      expect(warnings, content).toEqual([]);
+    }
+  });
+
+  it('reads an empty aimeat-scopes as declaring nothing, because the SDK does', async () => {
+    const html = CLEAN.replace('content="memory:read memory:write"', 'content=" "');
+    const { warnings } = await lintAppArtifact(html, config);
+    const meta = warnings.filter(f => f.pitfall === 'app-meta-declarations');
+    expect(meta).toHaveLength(1);
+    expect(meta[0]?.message).toContain('aimeat-scopes');
+  });
+});
+
+describe('lintAppArtifact — a served copy published as source', () => {
+  // 2026-09-13, appdev pitfall served-app-html-contains-injected-badge. The node adds its marks on
+  // the way OUT and skips any mark already present, so a republished served copy keeps a badge the
+  // owner may have switched off and an AI-disclosure block for a version that no longer exists.
+  it('warns when the upload carries the marks the node adds at serve time, and names the raw download', async () => {
+    const served = applyServeMarks(CLEAN, { badge: true }).toString('utf-8');
+    const { blocking, warnings } = await lintAppArtifact(served, config);
+    expect(blocking).toEqual([]);
+    const copy = warnings.filter(f => f.pitfall === 'edit-published-app');
+    expect(copy).toHaveLength(1);
+    expect(copy[0]?.severity).toBe('warn');
+    expect(copy[0]?.message).toContain('aimeat-app-badge');
+    expect(copy[0]?.message).toContain('download_url');
+  });
+
+  it('knows the reviewer tag the node writes into the head', async () => {
+    const served = applyServeMarks(CLEAN, { reviewedBy: 'Jane Reviewer' }).toString('utf-8');
+    const { ids } = await findings(served);
+    expect(ids).toContain('edit-published-app');
+  });
+
+  it('stays quiet when the app only names a mark from its own script', async () => {
+    const html = CLEAN.replace('async function start()',
+      'var b = document.getElementById("aimeat-app-badge"); var r = document.querySelector(\'meta[name="aimeat-reviewed-by"]\'); async function start()');
+    const { warnings } = await lintAppArtifact(html, config);
+    expect(warnings).toEqual([]);
+  });
+});
+
+describe('lintAppArtifact — module scripts the parser cannot read', () => {
+  // 2026-09-13, curated pitfall inline-js-does-not-parse. No production start path passes
+  // --experimental-vm-modules, so a `type="module"` block was skipped with no finding and a broken
+  // one published as clean.
+  it('says so when a module block is not parsed, and refuses a broken one when it can parse modules', async () => {
+    const html = CLEAN.replace('</body>', '<script type="module">const = ;</script></body>');
+    const { blocking, warnings } = await lintAppArtifact(html, config);
+    if (moduleGoalAvailable()) {
+      expect(blocking.map(f => f.pitfall)).toContain('inline-js-does-not-parse');
+    } else {
+      expect(blocking).toEqual([]);
+      const skipped = warnings.filter(f => f.pitfall === 'inline-js-does-not-parse');
+      expect(skipped).toHaveLength(1);
+      expect(skipped[0]?.severity).toBe('warn');
+      expect(skipped[0]?.message).toMatch(/<script> #\d/);
+      expect(skipped[0]?.message).toContain('not parsed');
+    }
   });
 });
 

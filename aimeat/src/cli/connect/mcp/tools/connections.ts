@@ -7,11 +7,15 @@
  *   seven tools locally. Thin proxies over the shared REST routes, so both surfaces behave
  *   identically and neither can drift into being the permissive one.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- aimeat_mail_send returns an error result when the node says the send did
+ *     not go out, through refuseUnsentSend() from the CLI dispatch. The 200 envelope used to pass
+ *     through as a success.
  *   v1.0.0 -- 2026-08-26 -- Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
+import { refuseUnsentSend } from '../../tool-call-defs-connections.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
@@ -88,8 +92,10 @@ export function registerConnectionTools(mcp: McpServer, registry: AgentRegistry)
     ai_disclosure: z.enum(['none', 'ai-assisted', 'ai-generated', 'autonomous']).optional()
       .describe('Say in a header that a machine wrote this. Declare it if you wrote the body.'),
   }, annotationsFor('aimeat_mail_send'), async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure, theme }) => out(
-    // The outbound door, not around it: every gate lives behind this one route.
-    await client.post('/v1/outbound/send', {
+    // The outbound door, not around it: every gate lives behind this one route. The route answers
+    // 200 for a send that did not go out; refuseUnsentSend turns that into an error result, the same
+    // one the CLI dispatch returns.
+    refuseUnsentSend(await client.post('/v1/outbound/send', {
       contact_id, subject, body,
       kind: kind ?? 'transactional',
       ...(connection_id ? { connection_id } : {}),
@@ -97,6 +103,6 @@ export function registerConnectionTools(mcp: McpServer, registry: AgentRegistry)
       ...(reply_to ? { reply_to } : {}),
       ...(ai_disclosure ? { ai_disclosure } : {}),
       ...(theme ? { theme } : {}),
-    }),
+    })),
   ));
 }

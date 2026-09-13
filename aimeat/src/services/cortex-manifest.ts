@@ -8,6 +8,9 @@
  * @structure parseCortexManifest() entry point; validate*Component() per type; validateNamespaceOwnership().
  * @usage import { parseCortexManifest, validateNamespaceOwnership } from '../services/cortex-manifest.js';
  * @version-history
+ *   v1.2.0 — 2026-09-13 — A lib component's `api_surface` that is not a string, and `exports` that is
+ *     not a list of strings, are validation errors naming the field. A list-shaped api_surface threw
+ *     "apiSurface.trim is not a function" and the install failed as a processing error.
  *   v1.1.0 — 2026-07-13 — lib components without exports / api_surface now produce discovery warnings
  *     (the capability aggregator publishes exactly those fields; empty ones make the cortex
  *     undiscoverable via GET /v1/capabilities).
@@ -440,8 +443,24 @@ function validateLibComponent(
     }
   }
 
+  // The two discovery fields are refused BY NAME when they have the wrong shape. `api_surface`
+  // written as a YAML list of {name, signature} objects used to reach `apiSurface.trim()` below and
+  // throw a TypeError, so the install failed as a processing error that named no field; a
+  // non-list `exports` was silently read as "no exports". Absent stays a warning, as before.
+  if (raw.exports !== undefined && raw.exports !== null
+    && (!Array.isArray(raw.exports) || raw.exports.some(e => typeof e !== 'string'))) {
+    errors.push(`components[${index}]: exports must be a list of strings (the public function or member names), `
+      + `got ${Array.isArray(raw.exports) ? 'a list with a non-string entry' : typeof raw.exports}`);
+    return;
+  }
+  if (raw.api_surface !== undefined && raw.api_surface !== null && typeof raw.api_surface !== 'string') {
+    errors.push(`components[${index}]: api_surface must be a string (write it as a YAML block scalar, \`api_surface: |\`), `
+      + `got ${Array.isArray(raw.api_surface) ? 'a list' : typeof raw.api_surface}`);
+    return;
+  }
+
   const exportNames = Array.isArray(raw.exports) ? raw.exports as string[] : [];
-  const apiSurface = (raw.api_surface as string) ?? '';
+  const apiSurface = typeof raw.api_surface === 'string' ? raw.api_surface : '';
 
   // Discovery contract: the capability aggregator publishes exactly these two fields as the
   // cortex's callable surface (GET /v1/capabilities). Empty ones make the lib undiscoverable

@@ -17,6 +17,8 @@
  *   import { storageChunkedUploadRouter } from './storage-files-chunked.js';
  *   router.use(storageChunkedUploadRouter(config, storage));   // before the wildcard routes
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- The complete answer carries owner_gaii and versioned_url, like every
+ *     other storage upload answer (AIMEAT.storage.uploadChunked had neither).
  *   v1.0.0 -- 2026-09-08 -- Extracted from routes/storage-files.ts, unchanged.
  */
 import { Router } from 'express';
@@ -30,6 +32,8 @@ import { checkStorageQuota, chargeOverage } from '../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
 import { randomBytes } from 'node:crypto';
+import { versionedAddress } from '../utils/http-range.js';
+import { pubEmbedUrl } from '../services/doc-images.js';
 
 /** Anonymous agents (shared#anonymous@...) may only use keys prefixed with "anonymous/" */
 function isAnonymousGaii(gaii: string): boolean {
@@ -223,11 +227,15 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
 
         res.status(201).json(success(config.nodeId, {
             key: file.key,
+            owner_gaii: file.ownerGaii,
             size: file.size,
             mime_type: file.mimeType,
             visibility: file.visibility,
             chunks_assembled: sortedIndices.length,
             created_at: file.createdAt,
+            // The /v1/pub address plus ?v=<this write>, as every other storage upload answers: a
+            // re-upload to the same key is otherwise served from browsers' five-minute copies.
+            versioned_url: versionedAddress(pubEmbedUrl(file.ownerGaii, file.key), file),
         }, [
             { description: 'Download this file', method: 'GET', url: `/v1/storage/${encodeURIComponent(file.key)}` },
         ]));

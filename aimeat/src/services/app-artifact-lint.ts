@@ -34,13 +34,20 @@
  * @structure
  *   - AppArtifactFinding / AppArtifactLintResult — the shapes a publish response carries
  *   - lintAppArtifact(html, config) — the whole check: blocking[] + warnings[]
- *   - checkInlineScripts / collectAssetRefs / probeNodeAssets / checkRegister / checkTheme /
- *     checkMetas / checkAgentDataReads — one concern each
+ *   - checkInlineScripts / checkUnparsedModules / collectAssetRefs / probeNodeAssets / checkRegister /
+ *     checkTheme / checkMetas / checkAgentDataReads / checkServedCopy — one concern each
  * @usage
  *   import { lintAppArtifact } from './app-artifact-lint.js';
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   v1.4.0 — 2026-09-13 — Four warnings the publish response owed its builders, all from appdev
+ *     pitfall triage. An aimeat-scopes word the node cannot grant is named (one such word refuses
+ *     the whole sign-in, so nobody could sign in and the publish said nothing), and an empty
+ *     aimeat-scopes counts as declaring nothing. An upload carrying the node's own serve marks is
+ *     told it is a served copy and where the raw download is (checkServedCopy). A type="module"
+ *     block the parser skipped now says it was not parsed instead of passing in silence. And the
+ *     cdn-libs-blocked sentence stops claiming the app CSP allows this node only, which it does not.
  *   v1.3.1 — 2026-09-06 — Three CodeQL findings on this file, one of them a hole. The asset probe
  *     no longer resolves the uploaded path against a base URL: `new URL('/\\host/x', base)` moves
  *     the request to `host`, because a backslash is a slash in a special scheme, so an app could
@@ -72,6 +79,12 @@
 import type { AimeatConfig } from '../config.js';
 import { extractInlineScripts, moduleGoalAvailable, parseSource, selfTest } from '../utils/inline-script-parse.js';
 import { logger } from '../utils/logger.js';
+import { APP_GRANTABLE_SCOPES } from '../routes/app-grant-vocabulary.js';
+import { BADGE_MARK } from '../utils/app-badge.js';
+import { RESERVE_MARK } from '../utils/app-chrome-reserve.js';
+import { DISCOVERY_MARK } from '../utils/app-agent-discovery.js';
+import { PROVENANCE_HTML_MARK } from './ai-provenance-marks.js';
+import { REVIEWED_MARK } from './app-serve-marks.js';
 
 /**
  * One finding, shaped so an agent can act on it without prose parsing: a curated pitfall id, the
@@ -120,11 +133,13 @@ export async function lintAppArtifact(html: string, config: AimeatConfig): Promi
   blocking.push(...await probeNodeAssets(refs.nodePaths, config));
   blocking.push(...checkRegister(html));
 
+  warnings.push(...checkUnparsedModules(html));
   warnings.push(...checkTheme(html));
   warnings.push(...checkMetas(html));
   warnings.push(...checkAgentDataReads(html));
   warnings.push(...checkDeclaredButUnused(html));
   warnings.push(...checkTrackMixing(html));
+  warnings.push(...checkServedCopy(html));
 
   return { blocking, warnings };
 }
@@ -354,6 +369,26 @@ function checkInlineScripts(html: string): AppArtifactFinding[] {
   return out;
 }
 
+/**
+ * The module blocks checkInlineScripts had to skip, said out loud.
+ *
+ * A skipped block used to leave no trace, so a module script with a syntax error published with a
+ * clean response. No production start path passes --experimental-vm-modules, which makes this the
+ * common case rather than the exception. A warning, not a block: nothing here proves the module is
+ * broken, only that this node did not look.
+ */
+function checkUnparsedModules(html: string): AppArtifactFinding[] {
+  if (moduleGoalAvailable()) return [];
+  const skipped = extractInlineScripts(html).filter(b => b.goal === 'module').map(b => `<script> #${b.index}`);
+  if (skipped.length === 0) return [];
+  const one = skipped.length === 1;
+  return [finding('inline-js-does-not-parse', 'warn',
+    `${skipped.join(', ')} ${one ? 'is a type="module" block and was' : 'are type="module" blocks and were'} `
+    + 'not parsed: this node runs without --experimental-vm-modules, so it cannot read module syntax, '
+    + 'and a syntax error in there would stop the module in the browser with nothing said here. Parse '
+    + 'it before publishing: `pnpm check:js-syntax --html your-app.html` reads module blocks too.')];
+}
+
 // ── Blocking check 2: do the app's asset URLs exist on this node? ───────────────────────────────
 
 interface AssetRefs {
@@ -410,10 +445,12 @@ function collectAssetRefs(html: string, config: AimeatConfig): AssetRefs {
       }
       if (!seenExternal.has(host)) {
         seenExternal.add(host);
+        // The app CSP allows https: scripts and styles today (utils/app-csp.ts). The sentence said
+        // "this node only" until 2026-09-13, which was false and made a working app look broken.
         warnings.push(finding('cdn-libs-blocked', 'warn',
-          `This app loads assets from ${host}. The app CSP allows this node only, so on a hardened node `
-          + 'the page goes blank. Use the node-vendored equivalent under /lib/ or /v1/libs/ — the build '
-          + 'spec lists what exists.'));
+          `This app loads assets from ${host}. The app CSP on this node still allows https hosts, so it `
+          + 'works today, and on a node that tightens its CSP to its own origin the page goes blank. Use '
+          + 'the node-vendored equivalent under /lib/ or /v1/libs/; the build spec lists what exists.'));
       }
       continue;
     }
@@ -574,15 +611,108 @@ function checkTheme(html: string): AppArtifactFinding[] {
 function checkMetas(html: string): AppArtifactFinding[] {
   const head = html.slice(0, SCAN_BYTES);
   const has = (name: string) => new RegExp(`<meta\\b[^>]*name\\s*=\\s*["']${name}["']`, 'i').test(head);
+  const out: AppArtifactFinding[] = [];
   const missing: string[] = [];
+  // The words, read the way the SDK reads them (auth/config.js appDeclaredScopes: the first tag,
+  // trimmed, an empty one meaning "nothing declared") and split the way the node splits them.
+  const scopeWords = declaredScopeWords(head);
   if (!has('aimeat-app')) missing.push('`aimeat-app` (your published filename — on an app subdomain the page cannot work it out, and AIMEATAgentFace.publish needs it)');
   if (!has('aimeat-scopes')) missing.push('`aimeat-scopes` (what sign-in asks the user to approve; without it the app gets the default grant only, so ai:use and memory:delete are unavailable)');
+  else if (scopeWords.length === 0) missing.push('`aimeat-scopes` (the tag is there with no words in it, which the sign-in reads as declaring nothing, so the app gets the default grant only)');
   if (!has('aimeat-locales')) missing.push('`aimeat-locales` (the languages you have — this is what draws the language switch in the login pill; declare one language and nothing renders)');
-  if (missing.length === 0) return [];
+  if (missing.length) {
+    out.push(finding('app-meta-declarations', 'warn',
+      `The head declares none of: ${missing.join('; ')}. They are one line each and the build spec shows `
+      + 'the exact form.'));
+  }
 
-  return [finding('app-meta-declarations', 'warn',
-    `The head declares none of: ${missing.join('; ')}. They are one line each and the build spec shows `
-    + 'the exact form.')];
+  // A word outside the vocabulary refuses the WHOLE list: the silent bridge answers invalid_scope
+  // and GET /v1/app-grants/authorize answers 400 INVALID_SCOPE, so nobody signs in to the app, its
+  // owner included. A warning rather than a block, as the file header explains: a publish that
+  // fails is a publish that gets worked around, and the sentence below tells the builder exactly
+  // which word to change.
+  const unknown = [...new Set(scopeWords.filter(w => !Object.prototype.hasOwnProperty.call(APP_GRANTABLE_SCOPES, w)))];
+  if (unknown.length) {
+    out.push(finding('app-meta-declarations', 'warn',
+      `\`<meta name="aimeat-scopes">\` asks for ${unknown.map(w => `\`${w}\``).join(', ')}, which this node `
+      + 'cannot grant. One word outside the vocabulary refuses the whole sign-in, so nobody can sign in '
+      + 'to this app, the owner included. Take the words from GET /v1/app-grants/scopes (file deletion '
+      + 'is storage:write; there is no storage:delete).'));
+  }
+  return out;
+}
+
+/** The words of the first `<meta name="aimeat-scopes">`, or none when it is absent or empty. */
+function declaredScopeWords(head: string): string[] {
+  // Walked with indexOf, each tag ending at its own `>` and the next search starting after it, so
+  // the cost stays linear in the head a stranger uploaded (a `<meta\b[^>]*>` scan restarts its run
+  // at every `<meta`).
+  const lower = head.toLowerCase();
+  for (let at = lower.indexOf('<meta'); at !== -1;) {
+    const end = lower.indexOf('>', at);
+    if (end === -1) break;
+    const tag = head.slice(at, end + 1);
+    if (/^<meta[\s/]/i.test(tag) && /\bname\s*=\s*["']aimeat-scopes["']/i.test(tag)) {
+      const content = /\bcontent\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1] ?? '';
+      return content.split(/[\s,]+/).map(w => w.trim()).filter(Boolean);
+    }
+    at = lower.indexOf('<meta', end + 1);
+  }
+  return [];
+}
+
+// ── Warning: a served copy uploaded as source ───────────────────────────────────────────────────
+
+/**
+ * The marks the node adds to an app on its way OUT (services/app-serve-marks.ts), each with the tag
+ * it has to sit in. Matched in tag context so an app that merely names one from its own script
+ * (`getElementById('aimeat-app-badge')`) is not told it published a served copy.
+ */
+const SERVE_MARKS: ReadonlyArray<{ mark: string; tag: RegExp }> = [
+  { mark: BADGE_MARK, tag: /^[a-z]/i },
+  { mark: RESERVE_MARK, tag: /^[a-z]/i },
+  { mark: PROVENANCE_HTML_MARK, tag: /^[a-z]/i },
+  { mark: DISCOVERY_MARK, tag: /^[a-z]/i },
+  { mark: REVIEWED_MARK, tag: /^meta\b/i },
+];
+
+/** How far back from a mark its opening `<` may sit. The node's own tags carry a few attributes. */
+const MARK_TAG_LOOKBACK = 400;
+
+/**
+ * Does this upload carry the node's own serve marks?
+ *
+ * The node skips a mark that is already in the document, which is what makes a re-serve idempotent,
+ * and it is also why publishing a served copy goes wrong quietly: a baked-in badge ignores the owner
+ * switching it off, and a baked-in AI-disclosure block suppresses the one for the version actually
+ * published. Nothing is stripped and nothing is refused (the owner's ruling, 2026-09-13); the builder
+ * is told where the source is.
+ *
+ * Read backwards from each occurrence rather than with one `<tag[^>]*mark` pattern, for the reason
+ * hasColorSchemeMediaQuery gives: an unbounded run that restarts at every `<` is quadratic on bytes a
+ * stranger uploaded.
+ */
+function checkServedCopy(html: string): AppArtifactFinding[] {
+  const found: string[] = [];
+  for (const { mark, tag } of SERVE_MARKS) {
+    for (let at = html.indexOf(mark); at !== -1; at = html.indexOf(mark, at + 1)) {
+      const before = html.slice(Math.max(0, at - MARK_TAG_LOOKBACK), at);
+      const open = before.lastIndexOf('<');
+      if (open === -1 || before.indexOf('>', open) !== -1) continue;
+      if (!tag.test(before.slice(open + 1))) continue;
+      found.push(mark);
+      break;
+    }
+  }
+  if (found.length === 0) return [];
+
+  return [finding('edit-published-app', 'warn',
+    `This document carries marks the node adds when it serves an app (${found.map(m => `\`${m}\``).join(', ')}), `
+    + 'so it is a served copy rather than the source. The node skips a mark that is already present, so '
+    + 'a copy published with them keeps an attribution badge the owner may have switched off and an '
+    + 'AI-disclosure block that describes an older version. Take the source from the `download_url` '
+    + 'aimeat_app_get returns (GET /v1/apps/<owner>/<filename> without mode=inline answers the stored '
+    + 'bytes as uploaded), edit that, and publish it.')];
 }
 
 /**

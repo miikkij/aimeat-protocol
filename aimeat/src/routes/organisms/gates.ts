@@ -6,6 +6,9 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — The three publish answers (single, batch, an approved publish gate) carry
+ *     `warnings: [UNDECLARED_SPACE]` when the workspace manifest declares no space for the namespace.
+ *     Those records were stored and answered as published, and the workspace read never listed them.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  */
 import type { Router } from 'express';
@@ -172,17 +175,20 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       }
       return;
     }
+    // UNDECLARED_SPACE: published, and no workspace read will list it, because the manifest declares no
+    // such space. Said on the answer rather than refused: live apps may publish there today.
+    const warned = result.warning ? { warnings: [result.warning] } : {};
     if (result.skipped) {
       // No-op re-publish (draft identical to the live .latest) — no new version, no decision-log or
       // structure-snapshot churn. The stale draft was still consumed.
-      res.json(success(config.nodeId, { published: true, namespace, id: instance, version: result.version, skipped: true }, [
+      res.json(success(config.nodeId, { published: true, namespace, id: instance, version: result.version, skipped: true, ...warned }, [
         { description: 'View the workspace', method: 'GET', url: `/v1/organisms/${id}/workspace` },
       ]));
       emitChange('organisms');
       return;
     }
     await writeDecision(id, publisher, `published ${namespace}.${instance} v${result.version}`, [`${namespace}.${instance}`]);
-    res.json(success(config.nodeId, { published: true, namespace, id: instance, version: result.version }, [
+    res.json(success(config.nodeId, { published: true, namespace, id: instance, version: result.version, ...warned }, [
       { description: 'View the workspace', method: 'GET', url: `/v1/organisms/${id}/workspace` },
       { description: 'List version history', method: 'GET', url: `/v1/memory?prefix=${encodeURIComponent(`organism.${id}.${namespace}.${instance}.version.`)}` },
     ]));
@@ -261,7 +267,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     } else {
       ids = (instances as unknown[]).filter((x): x is string => typeof x === 'string' && !!x);
     }
-    const { results } = await publishDraftsBatch(id, wsId, namespace, ids, publisher, expMap, directValues);
+    const { results, warning } = await publishDraftsBatch(id, wsId, namespace, ids, publisher, expMap, directValues);
 
     const published = results.filter(r => r.ok && !r.skipped);
     if (published.length > 0) {
@@ -274,6 +280,8 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       skipped: results.filter(r => r.ok && r.skipped).length,
       failed: results.filter(r => !r.ok).length,
       results,
+      // The whole batch went into one namespace, so one warning covers it (see the single publish).
+      ...(warning ? { warnings: [warning] } : {}),
     }));
   });
 
@@ -367,6 +375,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
 
     // A publish gate executes the publish on approve/edit BEFORE the decision is recorded, so a
     // failed publish (no draft / invalid) leaves the approval pending rather than falsely approved.
+    let publishWarning: unknown;
     if (approval.action === 'publish' && d !== 'reject') {
       const pargs = approval.arguments as Record<string, unknown> | undefined;
       const ns = typeof pargs?.namespace === 'string' ? pargs.namespace : undefined;
@@ -383,6 +392,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
           }
           return;
         }
+        publishWarning = pub.warning;
       }
     }
 
@@ -395,7 +405,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     const verb = d === 'approve' ? 'approved' : d === 'reject' ? 'rejected' : 'edited & approved';
     await writeDecision(id, decider, `${verb} gate: ${approval.action}`, [aid]);
 
-    res.json(success(config.nodeId, { approval: updated, decision: d }, [
+    res.json(success(config.nodeId, { approval: updated, decision: d, ...(publishWarning ? { warnings: [publishWarning] } : {}) }, [
       { description: 'View the decision log', method: 'GET', url: `/v1/organisms/${id}/workspace` },
     ]));
     emitChange('organisms');

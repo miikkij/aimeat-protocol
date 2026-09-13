@@ -14,6 +14,8 @@
  *     refresh_token never expands scopes on its own; the visible authorize flow rejects a
  *     redirect_uri on ANOTHER app's subdomain, exposes app_owner/origin_bound on the pending
  *     request, and the code exchange reports own=true only for the app's own origin-bound owner.
+ *   v1.3.0 — 2026-09-13 — invalid_scope names the app and the ungrantable words, is answered before
+ *     the session is read, and a plain-object property name (`constructor`) is not a scope word.
  *   v1.2.0 — 2026-08-11 — The subdomain-serve check addresses a real Host in the app family
  *     (helpers/host-request.ts). `x-app-origin` on its own stopped being an app origin when
  *     subdomain.ts v1.5.0 began requiring the Host to belong to the family it claims.
@@ -313,6 +315,28 @@ async function main() {
         await test('ungrantable scope → invalid_scope', async () => {
             const r = await silent(ORIGIN_A, 'operator:all', A.rt);
             assert(r.ok === false && r.error === 'invalid_scope', `expected invalid_scope, got ${JSON.stringify(r)}`);
+        });
+        // 2026-09-13, appdev pitfall declare-aimeat-scopes-or-get-the-silent-four. The bare
+        // invalid_scope left the SDK nothing to say, so Sign In did nothing and said nothing.
+        await test('invalid_scope names the app and ONLY the words the node cannot grant', async () => {
+            const r = await silent(ORIGIN_A, 'memory:read bogus:word storage:delete', A.rt) as any;
+            assert(r.ok === false && r.error === 'invalid_scope', `expected invalid_scope, got ${JSON.stringify(r)}`);
+            assert(r.app === `${a}/app-a.html`, `the reply must name the app, got ${JSON.stringify(r.app)}`);
+            assert(typeof r.app_name === 'string' && r.app_name.length > 0, `app_name, got ${JSON.stringify(r.app_name)}`);
+            const words = String(r.unknown ?? '').split(' ');
+            assert(words.includes('bogus:word') && words.includes('storage:delete'), `unknown words, got ${JSON.stringify(r.unknown)}`);
+            assert(!words.includes('memory:read'), `a grantable word must not be named, got ${JSON.stringify(r.unknown)}`);
+            assert(!r.access_token, 'no token may come with an invalid_scope answer');
+        });
+        await test('an ungrantable word is answered before the session: no cookie → invalid_scope, not login_required', async () => {
+            const r = await silent(ORIGIN_A, 'memory:read bogus:word', null) as any;
+            assert(r.ok === false && r.error === 'invalid_scope', `expected invalid_scope, got ${JSON.stringify(r)}`);
+            assert(r.app === `${a}/app-a.html` && r.unknown === 'bogus:word', `app and word named, got ${JSON.stringify(r)}`);
+        });
+        await test('a property name of a plain object is not a scope word → invalid_scope, no token', async () => {
+            const r = await silent(ORIGIN_A, 'memory:read constructor', A.rt) as any;
+            assert(r.ok === false && r.error === 'invalid_scope' && r.unknown === 'constructor', `expected invalid_scope naming constructor, got ${JSON.stringify(r)}`);
+            assert(!r.access_token, 'no token may carry a scope outside the vocabulary');
         });
         await test('unknown subdomain → unknown_app', async () => {
             const r = await silent(`https://nope.${APP_HOST}`, 'memory:read', A.rt);

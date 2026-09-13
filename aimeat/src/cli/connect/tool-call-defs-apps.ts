@@ -8,6 +8,11 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.8.0 -- 2026-09-13 -- aimeat_extension_install and aimeat_cortex_install take the YAML manifest
+ *     the catalog publishes (they declared an object and JSON-parsed the YAML, so neither could
+ *     install anything), and `update` reaches the redeploy route; activate follows the extension
+ *     install; aimeat_extension_get forwards include_source. The HTTP steps are shared with the
+ *     connector's MCP door (mcp/tools/extensions.ts).
  *   v1.7.1 -- 2026-09-13 -- aimeat_appdev_overview's model parameter is described as ordering, not
  *     filtering. aimeat_app_publish declares cortex_agents and sends them as cortex.agents.
  *   v1.7.0 -- 2026-09-06 -- Review item 6.3: aimeat_extension_invoke puts the instance in the PATH.
@@ -33,13 +38,14 @@
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, optionalNumber, optionalBoolean, requiredArray, optionalArray, requiredRecord, optionalRecord, PAGING_INPUT, paging } from './tool-call-helpers.js';
+import { query, requiredString, optionalString, optionalNumber, optionalBoolean, requiredArray, optionalArray, optionalRecord, PAGING_INPUT, paging } from './tool-call-helpers.js';
 import type { AimeatClient, ApiResponse } from './api-client.js';
 import { defineAppIam } from '../../services/iam/define-app-iam.js';
 import type { LevelDef } from '../../services/iam/model.js';
 import type { CommandDef } from '../../services/iam/app-commands.js';
 import type { ContributionProof } from '../../models/contribution-proof.js';
 import { appSettingsTools } from './tool-call-defs-apps-settings.js';
+import { installExtensionOverHttp, installCortexOverHttp, extensionDetailPath } from './mcp/tools/extensions.js';
 
 /** What a caller states about one run, in the connector's own wire vocabulary. */
 export interface ProofAttachInput {
@@ -364,23 +370,18 @@ export const appTools: ConnectCliToolDefinition[] = [
         },
     },
     {
+        // The catalog's input is the contract (manifest YAML, scripts, update, activate). This entry
+        // declared its own `name` and an OBJECT manifest, and JSON-parsed the YAML a caller sends, so
+        // no real manifest ever left the process; and it posted update/activate to POST
+        // /v1/extensions, which reads neither. The logic is installExtensionOverHttp(), shared with the
+        // connector's MCP door.
         name: 'aimeat_extension_install',
-        description: 'Install an extension from a manifest.',
-        input: {
-            name: { type: 'string', required: true, description: 'Extension name.' },
-            manifest: { type: 'object', required: true, description: 'Extension manifest object.' },
-            scripts: { type: 'object', description: 'The extension SOURCE, as { path: contents }. POST /v1/extensions reads it; without it the install has a manifest and no code.' },
-            update: { type: 'boolean', description: 'Update an extension that already exists instead of refusing.' },
-            activate: { type: 'boolean', description: 'Activate it once installed.' },
-        },
-        handler: ({ client }, input) => {
-            const body: JsonObject = { name: requiredString(input, 'name'), manifest: requiredRecord(input, 'manifest') };
-            const scripts = optionalRecord(input, 'scripts');
-            if (scripts) body.scripts = scripts;
-            if (optionalBoolean(input, 'update')) body.update = true;
-            if (optionalBoolean(input, 'activate')) body.activate = true;
-            return client.post('/v1/extensions', body);
-        },
+        handler: ({ client }, input) => installExtensionOverHttp(client, {
+            manifest: optionalString(input, 'manifest'),
+            scripts: optionalRecord(input, 'scripts'),
+            update: optionalBoolean(input, 'update'),
+            activate: optionalBoolean(input, 'activate'),
+        }),
     },
     {
         name: 'aimeat_extension_activate',
@@ -401,10 +402,10 @@ export const appTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.delete(`/v1/extensions/${encodeURIComponent(requiredString(input, 'name'))}`),
     },
     {
+        // include_source reads ?full=true, which the route answers with the scripts only to the
+        // installer's own sessions holding ext:write, and refuses to anyone else.
         name: 'aimeat_extension_get',
-        description: 'Get extension details.',
-        input: { name: { type: 'string', required: true, description: 'Extension name.' } },
-        handler: ({ client }, input) => client.get(`/v1/extensions/${encodeURIComponent(requiredString(input, 'name'))}`),
+        handler: ({ client }, input) => client.get(extensionDetailPath(requiredString(input, 'name'), optionalBoolean(input, 'include_source'))),
     },
     {
         name: 'aimeat_cortex_list',
@@ -413,19 +414,19 @@ export const appTools: ConnectCliToolDefinition[] = [
         handler: ({ client }) => client.get('/v1/cortex'),
     },
     {
+        // Same repair as the extension install above: the catalog's YAML manifest, no invented
+        // `name`, and `update` sent to PUT /v1/cortex/:name, the redeploy route. POST /v1/cortex reads
+        // `manifest` as a YAML string and never replaces an installed cortex. This door has no upload
+        // mode, so a manifest is required here.
         name: 'aimeat_cortex_install',
-        description: 'Install a cortex model from a manifest.',
         input: {
-            name: { type: 'string', required: true, description: 'Cortex name.' },
-            manifest: { type: 'object', required: true, description: 'Cortex manifest object.' },
-            libs: { type: 'object', description: 'The cortex library sources, as { path: contents }. POST /v1/cortex reads it; without it the pack installs with no code in it.' },
+            manifest: { type: 'string', required: true, description: 'Cortex manifest in YAML format. Use @file:path to load it from disk.' },
         },
-        handler: ({ client }, input) => {
-            const body: JsonObject = { name: requiredString(input, 'name'), manifest: requiredRecord(input, 'manifest') };
-            const libs = optionalRecord(input, 'libs');
-            if (libs) body.libs = libs;
-            return client.post('/v1/cortex', body);
-        },
+        handler: ({ client }, input) => installCortexOverHttp(client, {
+            manifest: requiredString(input, 'manifest'),
+            libs: optionalRecord(input, 'libs'),
+            update: optionalBoolean(input, 'update'),
+        }),
     },
     {
         name: 'aimeat_cortex_activate',

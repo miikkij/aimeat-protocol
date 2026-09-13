@@ -11,6 +11,9 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.25.0 — 2026-09-13 — aimeat_memory_write answers `warnings` from the shared write, and its
+ *     SHADOWED_BY_OWNER_COPY fields take their words from there. The shadowing check ran only on the
+ *     agent's first write of a key, so the warning went quiet once the owner had saved the same key.
  *   v1.24.0 — 2026-09-12 — registerAdminFederationTools: where this node stands with its peers and
  *     what is waiting on a person. The federation surface had doors for peers, settlements and
  *     genesis peering, and nothing at all for the operator's own view of it.
@@ -118,7 +121,7 @@ import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema, struc
 import { buildDiscoveryRegistry, runDiscovery, computeFacets, type DiscoveryType } from '../services/discovery/index.js';
 import { getAgentSkillLinks } from '../services/skills.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
-import { notInYourNamespace, shadowedByOwnerCopy, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
+import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from './catalog/output-schemas.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenance } from './ai-provenance-result.js';
@@ -522,8 +525,12 @@ export function registerCoreTools(
                     isError: true,
                 };
             }
-            const { record, shadowedBy } = written;
+            const { record, warnings } = written;
             const aiProvenanceId = record.aiProvenanceId;
+            // The flat `warning` / `warning_detail` / `shadowed_by` fields are this tool's published
+            // shape for the shadowing case and stay; their words now come from the shared write, which
+            // also fills `warnings` with the same text for every door (UNDECLARED_SPACE included).
+            const shadow = warnings.find(w => w.code === 'SHADOWED_BY_OWNER_COPY');
             return {
                 content: [{
                     type: 'text' as const,
@@ -538,7 +545,8 @@ export function registerCoreTools(
                         // What the node recorded about how this was made — returned so the agent can
                         // see the stamp it got by saying nothing, rather than discovering it later.
                         ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
-                        ...(shadowedBy ? shadowedByOwnerCopy(key, agentGaii, shadowedBy) : {}),
+                        ...(shadow ? { warning: shadow.code, warning_detail: shadow.message, shadowed_by: shadow.shadowed_by } : {}),
+                        ...(warnings.length ? { warnings } : {}),
                     }, null, 2),
                 }],
             };

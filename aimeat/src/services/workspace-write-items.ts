@@ -14,17 +14,27 @@
  *   auto-generated id when the caller gives none, so a half-written batch that the caller retries
  *   would otherwise duplicate the documents that already landed.
  * @structure MAX_BATCH_ITEMS · genDocId() · normalizeWriteItems() · resolveSpace() · resolveWriteItem()
+ *   · undeclaredSpaceWarning() · readPublishSpace() · undeclaredSpaceForKey()
  * @usage const norm = normalizeWriteItems({ space, value, id, section, items });
  *   if ('error' in norm) return fail(norm.error);
  *   const resolved = norm.items.map(it => resolveWriteItem(it, objectTypes));
  * @version-history
+ *   v1.2.0 — 2026-09-13 — UNDECLARED_SPACE: the warning a memory write or a publish carries when the
+ *     workspace manifest declares no space for its namespace. The MCP write door refused that write
+ *     here, while POST /v1/memory, the SDK's writeDraft and both publish doors stored the record and
+ *     answered success, and the workspace read, which lists declared spaces only, never showed it.
+ *     A production CRM ran a month and forty-four releases with four such spaces. Warned rather than
+ *     refused on those doors, because live apps may keep keys there today (ruling 2026-09-13; whether
+ *     to refuse later is open). readPublishSpace() is the manifest read both publish paths made inline.
  *   v1.1.0 — 2026-09-02 — resolveSpace() split out of resolveWriteItem(), which now calls it. The
  *     in-place document edits need the same manifest lookup and the same two refusals, and a second
  *     copy of "No space named X" is a second sentence to keep true.
  *   v1.0.0 — 2026-07-31 — Initial: batch normalisation shared by the three workspace_write surfaces.
  */
 
+import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { isMemoryBackedSpace } from './workspace-meta.js';
+import { parseWorkspaceRecordKey } from './write-guards.js';
 
 /** One tool call may carry this many items. Past this the caller should split the migration. */
 export const MAX_BATCH_ITEMS = 50;
@@ -165,6 +175,84 @@ export function resolveSpace(
         // Old manifests declared documents as kind:'document' without a mode — honour the intent.
         isDoc: ot.mode === 'document' || (!ot.mode && ot.kind === 'document'),
     };
+}
+
+/** A space's manifest entry as a publish reads it: the retention and write-guard flags beside the name. */
+export interface PublishObjectType extends WriteObjectType {
+    versioned?: boolean;
+    create_only?: boolean;
+    requires_expected_version?: boolean;
+    maxVersions?: number;
+}
+
+/**
+ * What a write or a publish answers, beside its success, when the workspace manifest declares no
+ * memory-backed space for the record's namespace. The record IS stored; no workspace read lists it,
+ * because the read builds its spaces from the manifest. The usual cause is a workspace created from
+ * an older version of an app's manifest, which keeps the spaces it was made with.
+ */
+export interface UndeclaredSpaceWarning {
+    code: 'UNDECLARED_SPACE';
+    message: string;
+    namespace: string;
+    declared_spaces: Array<{ name: string; namespace: string }>;
+    how_to_fix: string;
+}
+
+/**
+ * The warning for `namespace` against a workspace's objectTypes, or null when a memory-backed space
+ * declares it. A `meta.*` namespace is the workspace's own configuration and is never a space.
+ */
+export function undeclaredSpaceWarning(
+    namespace: string, objectTypes: WriteObjectType[], organismId: string, ws: string,
+): UndeclaredSpaceWarning | null {
+    if (namespace === 'meta' || namespace.startsWith('meta.')) return null;
+    const types = objectTypes.filter((o): o is WriteObjectType => !!o && typeof o === 'object');
+    if (types.some(o => o.namespace === namespace && isMemoryBackedSpace(o))) return null;
+    const declared = types
+        .filter(o => typeof o.namespace === 'string' && isMemoryBackedSpace(o))
+        .map(o => ({ name: o.name || (o.namespace as string), namespace: o.namespace as string }));
+    const list = declared.map(d => `${d.name} (${d.namespace})`).join(', ') || '(none)';
+    const otherBacking = types.find(o => o.namespace === namespace);
+    return {
+        code: 'UNDECLARED_SPACE',
+        message: otherBacking
+            ? `Stored, but no workspace read will list it: the space "${namespace}" has backing '${otherBacking.backing}', so its data does not live in workspace records. Spaces that do: ${list}.`
+            : `Stored, but no workspace read will list it: this workspace's manifest declares no space "${namespace}". A workspace keeps the spaces it was created with, so one made from an older version of an app's manifest lacks the newer ones. Declared: ${list}.`,
+        namespace,
+        declared_spaces: declared,
+        how_to_fix: `Add the space to this workspace: PUT /v1/organisms/${organismId}/workspace?ws=${ws} with { add_object_types: [{ name, namespace: "${namespace}", mode }], schemas }, or aimeat_workspace_update { organism_id, ws, add_spaces, schemas }. Only the workspace creator or an organism admin may: a plain member is answered 403 NOT_CREATOR, and any other answer is a failure to show someone who can act. Then read the manifest back and compare its objectTypes with the ones the app ships.`,
+    };
+}
+
+/**
+ * Read the manifest entry a publish into `namespace` needs, and the UNDECLARED_SPACE warning.
+ *
+ * `ot` comes from the first copy of the manifest the scan returns, which is what both publish paths
+ * read inline before this existed. The warning reads EVERY copy: a key is unique per owner, so a
+ * workspace can hold more than one manifest, and a space any of them declares is not undeclared.
+ * The organism root (no `ws`) has no workspace manifest to compare with and never warns.
+ */
+export async function readPublishSpace(
+    storage: Storage, organismId: string, ws: string | undefined, namespace: string,
+): Promise<{ ot: PublishObjectType | undefined; warning: UndeclaredSpaceWarning | null }> {
+    const mkey = `${ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`}.meta.manifest`;
+    const copies = (await storage.listAllMemory({ prefix: mkey, limit: 10 })).items.filter(r => r.key === mkey);
+    const typesOf = (r: MemoryRecord | undefined): PublishObjectType[] =>
+        (r?.value as { objectTypes?: PublishObjectType[] } | undefined)?.objectTypes ?? [];
+    const ot = typesOf(copies[0]).find(o => o?.namespace === namespace);
+    const warning = ws && copies.length ? undeclaredSpaceWarning(namespace, copies.flatMap(typesOf), organismId, ws) : null;
+    return { ot, warning };
+}
+
+/**
+ * The UNDECLARED_SPACE warning for a memory key, when it is a workspace record
+ * (`organism.{org}.w.{ws}.{namespace}.{id}.draft|latest|version.N`); null for every other key.
+ */
+export async function undeclaredSpaceForKey(storage: Storage, key: string): Promise<UndeclaredSpaceWarning | null> {
+    const parts = parseWorkspaceRecordKey(key);
+    if (!parts) return null;
+    return (await readPublishSpace(storage, parts.organismId, parts.ws, parts.namespace)).warning;
 }
 
 /**

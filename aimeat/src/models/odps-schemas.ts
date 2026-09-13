@@ -17,6 +17,10 @@
  *   const parsed = OdpsExtrasSchema.safeParse(req.body.odps);
  *   if (!parsed.success) return res.status(400).json(error(nodeId, 'INVALID_ODPS', parsed.error.message));
  * @version-history
+ *   Comment only — 2026-09-13 — Correction to the entry below: valueProposition (512), licence
+ *     restrictions (255), the other licence texts and dataHolder description (512), and dataHolder
+ *     legalName and slogan (256) ARE capped by ODPS. The authoring limits stay raised; a generated
+ *     document past an ODPS cap is published with a warning (exchange-odps.ts odpsLengthOverruns).
  *   Text limits raised 10x (shortText 4 000, longText 40 000, valueProposition 4 000) — 2026-07-30 —
  *     none of them came from ODPS; they were ours, and they truncated real descriptors.
  *   v1.1.0 — 2026-07-25 — Pinned to ODPS v4.1 (the version the addendum's Q2 named): `language` (v4.1
@@ -166,7 +170,10 @@ export const OdpsExtrasSchema = z.object({
   governanceProfile: z.enum(ODPS_GOVERNANCE_PROFILES).optional(),
   /** v4.1: importance of this product in the provider's portfolio. */
   portfolioPriority: z.enum(ODPS_PORTFOLIO_PRIORITIES).optional(),
-  /** ODPS caps the value proposition at 512 characters. */
+  /**
+   * ODPS caps the value proposition at 512 characters. This accepts more, and a longer one is published
+   * as written with an ODPS_FIELD_TOO_LONG warning (services/exchange-odps.ts odpsLengthOverruns).
+   */
   valueProposition: z.string().trim().min(1).max(4_000).optional(),
   productSeries: shortText.optional(),
   categories: shortList.optional(),

@@ -22,6 +22,8 @@
  *   Runs against a live server (E2E_BASE, default http://localhost:40251). No AI provenance
  *   record is minted here, so the visible-label half is proven in test/unit/app-marks.test.ts.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — The tagless case asserts the author's bytes are intact and the app-ref block
+ *     comes before the app's own script, instead of the bytes starting the document.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -319,7 +321,10 @@ await test('It is served with the marks anyway', async () => {
     const res = await fetch(`${BASE}/v1/apps/${ownerAName}/${TAGLESS}?mode=inline`);
     assert(res.status === 200, `inline serve status ${res.status}`);
     const html = await res.text();
-    assert(html.startsWith(TAGLESS_HTML), 'the author\'s own bytes were altered rather than appended to');
+    // The identity block leads a document with no head since 2026-09-13, so the app's first script can
+    // read it; the author's bytes are intact but no longer start the file.
+    assert(html.includes(TAGLESS_HTML), 'the author\'s own bytes were altered');
+    assert(html.indexOf('id="aimeat-app-ref"') < html.indexOf('<script>document.getElementById'), 'the app-ref block arrives after the app\'s own script');
     assert(html.includes('aimeat-app-badge'), 'no attribution badge');
     assert(html.includes('aimeat-app-ref'), 'no agent-discovery block');
     assert(html.length > TAGLESS_HTML.length + 500, `only ${html.length - TAGLESS_HTML.length} bytes added`);

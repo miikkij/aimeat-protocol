@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-13 — aimeat_board_rules_set (idempotent, nothing destroyed).
  *   2026-09-13 — aimeat_dm_archive_as_owner (idempotent, nothing destroyed) and aimeat_dm_organize_as_owner.
  *   2026-09-12 — aimeat_dm_inbox_as_owner and aimeat_dm_thread_as_owner (both read-only).
  *   2026-09-08 — aimeat_admin_cors_overview (read-only) and aimeat_admin_cors_set.
@@ -132,6 +133,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_board_react: { title: 'React to Board Post', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_board_subscribe: { title: 'Subscribe to Board', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_board_delete: { title: 'Delete Board', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    // Replaces the rule set, and the same set sent twice leaves the same board. Nothing is removed:
+    // posts already on the board keep the lifetime they were given.
+    aimeat_board_rules_set: { title: 'Set Board Rules', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Sharing groups ──
     aimeat_group_list: { title: 'List Sharing Groups', readOnlyHint: true },

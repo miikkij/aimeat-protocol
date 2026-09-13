@@ -12,6 +12,14 @@
  * @structure one `it` per fixture case, plus the idempotency and never-on-the-way-in guarantees.
  * @usage pnpm exec vitest run test/unit/app-serve-marks.test.ts
  * @version-history
+ *   v1.5.0 — 2026-09-13 — Goldens re-captured for the fifth intentional output change: the
+ *     `#aimeat-app-ref` block moves from the end of the body to the start of the head, and its JSON
+ *     is escaped for a script element instead of for HTML (app-serve-marks v1.4.0). 9 of 19 cases
+ *     moved, exactly the nine documents that carry a discovery block, and each differs from its old
+ *     golden only by that block: with it cut out of both, the bytes are identical. The third of
+ *     the three cases: the assertion was right and the behaviour changed under it. New section
+ *     for the block itself (appdev pitfall appref-block-is-injected-after-your-script); its five
+ *     placement and parsing cases failed on the old pass before the change.
  *   v1.4.0 — 2026-09-05 — Goldens re-captured for the fourth intentional output change: the
  *     attribution badge draws its bolt as an inline SVG instead of typing a ⚡, and its panel is
  *     opaque so the words' contrast no longer depends on what the app painted behind them
@@ -144,5 +152,80 @@ describe('applyServeMarks: the caller may declare the payload a document', () =>
     const sniffed = applyServeMarks(closed, { badge: true }).toString('utf-8');
     const declared = applyServeMarks(closed, { badge: true, isDocument: true }).toString('utf-8');
     expect(declared).toBe(sniffed);
+  });
+});
+
+/**
+ * The app's own identity block (v1.4.0 of the pass).
+ *
+ * THE HOLE THIS SECTION IS THE MEMORY OF. `#aimeat-app-ref` rode at the end of the body with the
+ * rest of the discovery block, so an app's inline script ran before it existed: appRef() read at
+ * parse time answered null, the owner was shown the visitor view of their own app and a public
+ * gallery read from an empty identity, with a clean console (appdev pitfall
+ * appref-block-is-injected-after-your-script, 2026-08-28). The mosaic itself read it that way. And
+ * the JSON was HTML-escaped, which a script element's raw text never decodes, so JSON.parse of
+ * the block as served threw on the first `&quot;`.
+ */
+describe('applyServeMarks: the app-ref block is readable from the app\'s first script', () => {
+  const discovery = {
+    owner: 'alice', filename: 'demo.html', appName: 'Demo', description: 'A demo app',
+    baseUrl: 'https://aimeat.io', toolNames: ['search'], webmcp: true,
+  };
+  const REF = 'id="aimeat-app-ref"';
+  /** The text inside the served ref block, exactly as a script would read it. */
+  function refText(out: string): string {
+    const m = /<script type="application\/json" id="aimeat-app-ref">([\s\S]*?)<\/script>/.exec(out);
+    expect(m, 'no ref block in the output').toBeTruthy();
+    return m![1];
+  }
+
+  it('lands in the head, ahead of every script the app wrote', () => {
+    const doc = '<!DOCTYPE html><html lang="fi"><head><meta charset="utf-8"><script>var early = 1;</script>'
+      + '<title>t</title></head><body><script>var ref = document.getElementById("aimeat-app-ref");</script></body></html>';
+    const out = applyServeMarks(doc, { discovery }).toString('utf-8');
+    const at = out.indexOf(REF);
+    expect(at).toBeGreaterThan(out.indexOf('<head>'));
+    expect(at).toBeLessThan(out.indexOf('<script>var early'));
+    expect(at).toBeLessThan(out.indexOf('</head>'));
+    // The script-free half stays where a text extractor reads it: after the app, in the body.
+    expect(out.indexOf('<noscript id="aimeat-agent-discovery">')).toBeGreaterThan(out.indexOf('var ref ='));
+    expect(out.split(REF).length).toBe(2);
+  });
+
+  it('parses as JSON exactly as served, even when a value carries markup characters', () => {
+    const out = applyServeMarks('<html><head></head><body></body></html>',
+      { discovery: { ...discovery, filename: 'a&b"<c></script>.html' } }).toString('utf-8');
+    const text = refText(out);
+    expect(text).not.toContain('<');
+    const ref = JSON.parse(text);
+    expect(ref.owner).toBe('alice');
+    expect(ref.app_id).toBe('a&b"<c></script>.html');
+  });
+
+  it('in a document with no head element, sits after the doctype and before the first script', () => {
+    const doc = '<!DOCTYPE html><meta charset="utf-8"><script>go()</script><body><div id="app"></div></body>';
+    const out = applyServeMarks(doc, { discovery }).toString('utf-8');
+    expect(out.startsWith('<!DOCTYPE html>')).toBe(true);
+    expect(out.indexOf(REF)).toBeLessThan(out.indexOf('<script>go()'));
+  });
+
+  it('in a tagless document, comes first, before anything the app wrote', () => {
+    const doc = '<meta charset="utf-8"><title>NOSTE</title><script>go()</script><div id="app"></div>';
+    const out = applyServeMarks(doc, { discovery, isDocument: true }).toString('utf-8');
+    expect(out.indexOf(REF)).toBeLessThan(out.indexOf('<meta charset'));
+  });
+
+  it('never lands inside a <head> the app wrote into its own JavaScript', () => {
+    const doc = '<html><body><script>var tpl = "<head></head>";</script></body></html>';
+    const out = applyServeMarks(doc, { discovery }).toString('utf-8');
+    expect(out).toContain('<script>var tpl = "<head></head>";</script>');
+    expect(out.indexOf(REF)).toBeLessThan(out.indexOf('<body>'));
+  });
+
+  it('is added once when an already-served document is served again', () => {
+    const doc = '<!DOCTYPE html><html><head><title>t</title></head><body><p>x</p></body></html>';
+    const once = applyServeMarks(doc, { discovery }).toString('utf-8');
+    const twice = applyServeMarks(once, { discovery }).toString('utf-8');
+    expect(twice).toBe(once);
   });
 });
