@@ -19,6 +19,7 @@
  *   secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-13 -- Compose the recovery frame from poster.css.
  *   v1.3.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-06 — Section 04, the secrets: the list with what names each one, the add form
@@ -166,7 +167,7 @@ function secSignIn(ctx) {
         ${row(x('row.federation'), ctx.fed.all ? x('row.federationAll') : ctx.fed.nodes.length ? x('row.federationList', { n: ctx.fed.nodes.length }) : x('row.federationNone'), html`<span class="og-chip">${ctx.fed.all ? x('fed.allChip') : x('fed.listChip', { n: ctx.fed.nodes.length })}</span><button type="button" class="og-door" disabled=${ctx.busy === 'fed'} onClick=${() => ctx.toggleFedAll()}>${ctx.fed.all ? x('fed.restrict') : x('fed.allowAll')}</button>`, 'is-last')}
         ${federationBlock(ctx)}
         ${row(x('row.recovery'), ctx.ownerKey ? x('row.recoveryHere') : x('row.recoveryNotHere'), ctx.ownerKey ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => ctx.setKeyShown(!ctx.keyShown)}>${ctx.keyShown ? x('hide') : x('show')}</button><${CopyButton} className="og-door" text=${ctx.ownerKey} label=${x('copy')} onCopied=${() => ctx.showToast(x('keyCopied'))} />` : html`<span class="og-chip og-chip--dim">${x('notHere')}</span>`, ctx.ownerKey ? 'is-last' : '')}
-        ${ctx.ownerKey ? html`<div class="ac-keybox"><div><b>${x('recovery.title')}</b> ${x('recovery.body')}<br /><code class=${ctx.keyShown ? 'is-shown' : ''}>${ctx.ownerKey}</code></div></div>` : null}
+        ${ctx.ownerKey ? html`<div class="ac-keybox poster-frame"><div><b>${x('recovery.title')}</b> ${x('recovery.body')}<br /><code class=${ctx.keyShown ? 'is-shown' : ''}>${ctx.ownerKey}</code></div></div>` : null}
       </div>
     <//>`;
 }
