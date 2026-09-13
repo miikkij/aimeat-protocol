@@ -23,6 +23,7 @@
  * @structure PromptsTab (default) · RightNow · TakingCurrent · WhatChanged
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose shared poster headings and external reset-note spacing.
  *   v2.0.0 — 2026-09-12 — The poster face: four numbered sections, search over eighty-eight
  *     prompts, the list beside the editor, the three kinds on screen, the languages this site
  *     serves instead of Finnish alone, and the group reset kept one press away.
@@ -62,7 +63,7 @@ function RightNow({ facts, number, onShowChanged }) {
     </div>`;
   return html`
     <section class="og-sec og-sec--first" id="adm-pr-now">
-      <div class="og-sec-h"><h2>${P('now.title')}<small>${number}</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${P('now.title')}<small>${number}</small></h2>
         <div class="og-doors">
           <button type="button" class="og-door og-door--quiet" onClick=${onShowChanged}>${P('now.showChanged')}</button>
         </div></div>
@@ -114,16 +115,16 @@ function TakingCurrent({ facts, number, onResetAll }) {
     </div>`;
   return html`
     <section class="og-sec" id="adm-pr-taking">
-      <div class="og-sec-h"><h2>${P('taking.title')}<small>${number}</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${P('taking.title')}<small>${number}</small></h2></div>
       <p class="adm-pr-lead">${P('taking.lead')}</p>
       ${step(1, 'writes', P('taking.keepsHistory'))}
       ${step(2, 'languages', P('taking.worthAWarning'))}
       ${step(3, 'group', P('taking.wholeGroup'))}
       ${step(4, 'orphan', P('taking.orphanValue', { n: num(facts.orphan) }), true)}
-      <div class="og-box" style="margin-top: 16px">
+      <div class="og-box adm-pr-reset-note">
         <span class="og-box-label">${P('taking.dangerLabel')}</span>
         ${P('taking.danger')}
-        <div class="og-doors" style="margin-top: 10px">
+        <div class="og-doors adm-pr-reset-doors">
           <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${onResetAll}>${P('taking.takeAll')}</button>
         </div>
       </div>
@@ -138,7 +139,7 @@ function WhatChanged({ prompts, number, onOpen }) {
     .slice(0, 8);
   return html`
     <section class="og-sec" id="adm-pr-log">
-      <div class="og-sec-h"><h2>${P('log.title')}<small>${number}</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${P('log.title')}<small>${number}</small></h2></div>
       ${recent.length === 0
         ? html`<p class="adm-pr-note">${P('log.none')}</p>`
         : recent.map((p, i) => html`
@@ -337,7 +338,7 @@ export default function PromptsTab({ data }) {
       <${RightNow} facts=${facts} number=${n()} onShowChanged=${() => { setFilter('changed'); setQuery(''); }} />
 
       <section class="og-sec" id="adm-pr-find">
-        <div class="og-sec-h"><h2>${P('find.title')}<small>${n()}</small></h2>
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('find.title')}<small>${n()}</small></h2>
           <div class="og-doors"><span class="adm-pr-note">${P('find.count', { n: num(shown.length), total: num(facts.all) })}</span></div></div>
         <div class="adm-pr-bench">
           <${PromptList} prompts=${shown} counts=${{ all: facts.all, changed: facts.changed, off: facts.off, orphan: facts.orphan }}
