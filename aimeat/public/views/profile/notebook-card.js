@@ -14,6 +14,7 @@
  * @usage html`<${NoteCard} note=${note} showToast=${showToast} orgNames=${orgNames} settings=${settings}
  *                autoEnrich=${auto} onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />`
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.1.1 — 2026-06-23 — Fix: Skip on an enrichment step was disabled whenever ANY step was running
  *     (so during an auto-run batch every Skip was dead). Skip is now only disabled for the step actually
  *     running; a live skip-ref lets an in-flight batch honor a mid-run skip.
@@ -316,7 +317,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
     const anyDone = enrichments.length > 0;
     const preview = composeEnrichedMarkdown(baseText(), enrichments);
     return html`
-      <div class="pf-nb-enrich">
+      <div class="pf-nb-enrich poster-row--thing">
         <div class="text-meta-sm pf-nb-enrich-summary">${plan?.summary || ''}${conf !== null ? ` · ${conf}%` : ''}</div>
         ${steps.length === 0
           ? html`<div class="empty">${t('profile.notebook.planNoSteps')}</div>`
@@ -327,7 +328,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
                 const skipped = skippedStepIds.includes(step.id);
                 const running = runningStepId === step.id;
                 return html`
-                  <li key=${step.id} class="pf-nb-plan-step ${done ? 'done' : skipped ? 'skipped' : ''}">
+                  <li key=${step.id} class="pf-nb-plan-step ${done ? 'done' : skipped ? 'skipped' : ''} poster-row--thing">
                     <div class="pf-nb-plan-step-head">
                       <span class="badge ${step.kind === 'librarian_assess' ? 'badge-info' : step.kind === 'delegate' ? 'badge-success' : ''}">${t('profile.notebook.kind_' + step.kind)}</span>
                       <span class="pf-nb-plan-step-title">${step.title}</span>
@@ -369,11 +370,11 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
     const { chunks, busy, filedCount } = distrib;
     const selectedCount = chunks.filter(c => c.include).length;
     return html`
-      <div class="pf-nb-enrich">
+      <div class="pf-nb-enrich poster-row--thing">
         <div class="text-meta-sm pf-nb-enrich-summary">${(t('profile.notebook.distributeIntro') || '{n} pieces').replace('{n}', String(chunks.length))}</div>
         <ol class="pf-nb-plan-steps">
           ${chunks.map((c, i) => html`
-            <li key=${i} class="pf-nb-plan-step ${c.include ? '' : 'skipped'}">
+            <li key=${i} class="pf-nb-plan-step ${c.include ? '' : 'skipped'} poster-row--thing">
               <div class="pf-nb-plan-step-head">
                 <label class="pf-nb-chunk-pick">
                   <input type="checkbox" checked=${c.include} disabled=${busy} onChange=${() => toggleChunk(i)} />
@@ -403,7 +404,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
     const docSpaces = ws?.documentSpaces || [];
     const conf = result.suggestion ? Math.round((result.suggestion.confidence || 0) * 100) : null;
     return html`
-      <div class="pf-nb-suggest">
+      <div class="pf-nb-suggest poster-row--thing">
         ${result.suggestion?.reason && html`<div class="text-meta-sm pf-nb-suggest-reason">${escHtml(result.suggestion.reason)}${conf !== null ? ` · ${conf}%` : ''}</div>`}
         <label class="pf-nb-suggest-label">${t('profile.notebook.fieldOrganism')}</label>
         <select class="input-field" value=${edit.organismId} onChange=${e => onOrganismChange(e.target.value)}>
@@ -482,7 +483,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
       </div>
 
       ${sorting && html`
-        <div class="pf-nb-suggest pf-nb-progress">
+        <div class="pf-nb-suggest pf-nb-progress poster-row--thing">
           <${Spinner} text=${t(NB_STEPS[sortStep])} />
           <ol class="pf-nb-steps">
             ${NB_STEPS.map((s, i) => html`
@@ -492,7 +493,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
           </ol>
         </div>`}
       ${sortError && html`
-        <div class="pf-nb-suggest pf-nb-progress">
+        <div class="pf-nb-suggest pf-nb-progress poster-row--thing">
           <div class="alert alert-warning"><span class="alert-msg">${t('profile.notebook.sortErrorTitle')}: ${escHtml(sortError.message)}</span></div>
           ${sortError.code === 'NO_OPENROUTER_KEY' && html`
             <div class="text-meta-sm">${t('profile.notebook.needKey')}</div>
@@ -504,9 +505,9 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
         </div>`}
       ${suggest && renderSuggestPanel()}
 
-      ${planning && html`<div class="pf-nb-suggest pf-nb-progress"><${Spinner} text=${t('profile.notebook.planning')} /></div>`}
+      ${planning && html`<div class="pf-nb-suggest pf-nb-progress poster-row--thing"><${Spinner} text=${t('profile.notebook.planning')} /></div>`}
       ${enrichError && html`
-        <div class="pf-nb-suggest pf-nb-progress">
+        <div class="pf-nb-suggest pf-nb-progress poster-row--thing">
           <div class="alert alert-warning"><span class="alert-msg">${t('profile.notebook.planErrorTitle')}: ${escHtml(enrichError.message)}</span></div>
           ${enrichError.code === 'NO_OPENROUTER_KEY' && html`
             <div class="text-meta-sm">${t('profile.notebook.needKey')}</div>
@@ -518,7 +519,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
         </div>`}
       ${enrich && !distrib && renderEnrichPanel()}
 
-      ${distributing && html`<div class="pf-nb-suggest pf-nb-progress"><${Spinner} text=${t('profile.notebook.splitting')} /></div>`}
+      ${distributing && html`<div class="pf-nb-suggest pf-nb-progress poster-row--thing"><${Spinner} text=${t('profile.notebook.splitting')} /></div>`}
       ${distrib && renderDistributePanel()}
 
       ${trackOpen && trackMsg && html`<${TrackResponseModal} open=${true} msg=${trackMsg}

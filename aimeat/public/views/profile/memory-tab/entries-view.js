@@ -7,6 +7,7 @@
  *   of memory rows with per-row visibility/rules/cart/federation controls. Extracted verbatim from
  *   memory-tab.js as a ctx-consuming plain render function (all state/handlers passed in via ctx).
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.1.0 — 2026-08-11 — Sharing left the visibility menu. A row shows a "shared · N" badge when a
  *     key-space share covers its key (with the group names in the title), and the expanded row can
@@ -141,7 +142,7 @@ export function renderEntries(ctx) {
         </div>
       `}
       ${expandedMem === m.key && html`
-        <div class="mem-detail">
+        <div class="mem-detail poster-row--thing">
           <div class="mem-detail-key" title=${m.key}>${escHtml(m.key)}</div>
           ${(!fullLoaded && valueOf(m) === undefined)
             // Always "loading", never a bare ellipsis: the open row fetches its own value (see the
@@ -284,7 +285,7 @@ export function renderEntries(ctx) {
         <div class="pf-mem-quota-bar"><div class="pf-mem-quota-fill ${quotaPct >= 90 ? 'pf-mem-quota-fill--danger' : ''}" style=${`width:${quotaPct}%`}></div></div>
       </div>
     `}
-    <div class="mem-tools-section">
+    <div class="mem-tools-section poster-row--thing">
       <span class="mem-tools-label">${t('profile.memory.toolsLabel') || 'Tools'}</span>
       <div class="mem-tools-actions">
         ${!fullLoaded && html`<button class="btn-outline btn-sm" onClick=${loadFullContents}>${t('profile.memory.loadContents') || 'Load all contents'}</button>`}
@@ -333,7 +334,7 @@ export function renderEntries(ctx) {
     <${TagCloud} tags=${tagsByFreq} selected=${memTagFilter} onToggle=${toggleMemTag} onClear=${() => setMemTagFilter(new Set())} limit=${10} />
     ${showMemForm && html`<${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} />`}
     ${selectedKeys.size > 0 && html`
-      <div class="mem-bulkbar">
+      <div class="mem-bulkbar poster-row--thing">
         <span class="mem-bulkbar-count">${(t('profile.memory.bulkSelected') || '{n} selected').replace('{n}', String(selectedKeys.size))}</span>
         ${/* Sharing is not a visibility any more, so the bulk bar changes visibility only. Sharing
               many keys at once is one share over a pattern that covers them, which is the Access

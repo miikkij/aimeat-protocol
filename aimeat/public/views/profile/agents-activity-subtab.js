@@ -13,6 +13,7 @@
  *   - ScheduledJobs -- cron job list with source badges
  *   - EventLog -- scrollable recent event entries
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 2
  */
 import { h } from 'preact';
@@ -42,7 +43,7 @@ function StatsCards({ stats }) {
   return html`
     <div class="stat-grid">
       ${cards.map(c => html`
-        <div class="stat-card" key=${c.key}>
+        <div class="stat-card poster-row--thing" key=${c.key}>
           <div class="stat-card-value">${c.value}</div>
           <div class="stat-card-label">${t(`profile.agents.activity.${c.key}`)}</div>
         </div>

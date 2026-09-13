@@ -11,6 +11,7 @@
  *   TabUsage({ agentName }) -- fetch (by-model + runs) -> stat cards + two lists.
  * @usage rendered by agent-card.js renderTabContent for activeTab === 'usage'.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 -- 2026-07-11 -- Initial: first consumer of the ledger, closes the "recorded
  *     but nowhere to see it" gap for agent LLM usage.
  *   v1.1.0 -- 2026-07-16 -- Mount folds the two ledger reads into GET /v1/ledger/usage/overview
@@ -100,15 +101,15 @@ export default function TabUsage({ agent, agentName }) {
   return html`
     <div>
       <div class="stat-grid">
-        <div class="stat-card">
+        <div class="stat-card poster-row--thing">
           <div class="stat-card-value">${fmtUsd(totals?.cost_usd)}</div>
           <div class="stat-card-label">${t('profile.agents.detail.usage.cost')}</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card poster-row--thing">
           <div class="stat-card-value">${fmtNum(totals?.total_tokens)}</div>
           <div class="stat-card-label">${t('profile.agents.detail.usage.tokens')}</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card poster-row--thing">
           <div class="stat-card-value">${fmtNum(totals?.calls)}</div>
           <div class="stat-card-label">${t('profile.agents.detail.usage.calls')}</div>
         </div>

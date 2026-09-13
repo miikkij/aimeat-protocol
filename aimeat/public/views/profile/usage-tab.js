@@ -26,6 +26,7 @@
  *   - UsageTab (default) — fetch + render
  * @usage Registered in views/profile.js as the `usage` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-08-15 — House styles: .stat-grid/.stat-card and .seg/.seg-btn instead of a local
  *     clone; own classes renamed off the colliding pf-usage-* prefix.
@@ -189,7 +190,7 @@ export default function UsageTab() {
       ${data ? html`
         <div class="stat-grid">
           ${statCards.map(c => html`
-            <div class="stat-card">
+            <div class="stat-card poster-row--thing">
               <div class="stat-card-value">${c.value}</div>
               <div class="stat-card-label">${c.label}</div>
             </div>`)}

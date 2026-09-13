@@ -12,6 +12,7 @@
  *   - TaskItem + its helpers (status labels, JSON tree, memory entry, RequestChangesModal,
  *     blur preference) now live in ./agents/task-item.js (extracted for max-file-lines)
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v4.13.0 -- 2026-07-13 -- Split (max-file-lines): moved TaskItem and its helper renderers
  *     (statusLabel/todoStatusIcon/formatScopeEntry/todoProgress, parseMemoryValue/JsonNode/
  *     TaskMemoryEntry, RequestChangesModal, blur-preference helpers) into ./agents/task-item.js.
@@ -149,7 +150,7 @@ function TaskCreateForm({ agentName, showToast, onCreated, onCancel }) {
   }
 
   return html`
-    <div class="pf-agd-create-form">
+    <div class="pf-agd-create-form poster-row--thing">
       <div class="pf-agd-form-field">
         <label>${t('profile.agents.tasks.descLabel')}</label>
         <textarea

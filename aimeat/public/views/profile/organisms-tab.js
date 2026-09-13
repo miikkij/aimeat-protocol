@@ -19,6 +19,7 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v2.8.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v2.7.0 — 2026-09-06 — The counts and the date always render, empty cell and all, because the
@@ -533,7 +534,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     <!-- Create form (opened from the topbar button) -->
     <div class="mb-1">
       ${!showCreate ? null : html`
-        <div class="create-form">
+        <div class="create-form poster-row--thing">
           <h4 class="card-h3 mb-half">${t('organisms.createTitle') || 'Create New Organism'}</h4>
           <div class="flex-col">
             <input type="text" placeholder=${t('organisms.namePlaceholder') || 'Name'} value=${formName} onInput=${(e) => setFormName(e.target.value)}

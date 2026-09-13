@@ -6,6 +6,7 @@
  *   template editor (slot rows), the deploy panel, and the deployed-instance viewer. Dark-theme only —
  *   all colors/spacing via theme.css variables. Reuses several pf-nb-* helpers from notebook.css.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 — 2026-06-21 — Phase 0: template management + deploy + instance viewer.
  *   v1.1.0 — 2026-06-21 — Phase 1: AI-author panel + charter Readable/YAML views.
  *   v1.2.0 — 2026-06-21 — Phase 2: pulse status + change ledger.
@@ -29,7 +30,7 @@
 .pf-ld-chart {
   display: block;
   background: var(--bg-dim, var(--card));
-  border: 1px solid var(--border);
+
   border-radius: var(--radius, 8px);
 }
 .pf-ld-chart rect { fill: var(--accent, var(--text)); }
@@ -42,7 +43,7 @@
 }
 .pf-ld-num { max-width: 5rem; display: inline-block; margin-left: 0.3rem; }
 .pf-ld-pending {
-  border: 1px solid var(--accent, var(--border));
+
   border-radius: var(--radius, 8px);
   padding: var(--space-sm, 0.75rem);
   margin-top: var(--space-xs, 0.4rem);
@@ -98,7 +99,7 @@
 .pf-ld-cv-active { color: var(--text); font-weight: 600; }
 .pf-ld-charter-box {
   background: var(--bg-dim, var(--card));
-  border: 1px solid var(--border);
+
   border-radius: var(--radius, 8px);
   padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
   margin-top: var(--space-xs, 0.4rem);
@@ -142,7 +143,7 @@
   margin-top: var(--space-sm, 0.75rem);
   padding: var(--space-md, 1rem);
   background: var(--surface, var(--card));
-  border: 1px solid var(--border);
+
   border-radius: var(--radius, 8px);
   display: flex;
   flex-direction: column;
