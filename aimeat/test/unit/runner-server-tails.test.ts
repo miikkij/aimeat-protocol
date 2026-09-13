@@ -11,6 +11,7 @@
  *   its suites and the issue that opened had nothing in it to act on.
  * @usage cd aimeat && pnpm test -- runner-server-tails
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- Let output-producing children drain their pipes before exit.
  *   v1.1.0 -- 2026-09-13 -- Assert line retention independently of OS pipe chunk boundaries.
  *   v1.0.0 — 2026-09-13 — Initial, with the stdout half of the fix.
  */
@@ -48,12 +49,12 @@ describe('keepTails', () => {
     });
 
     it('quotes what the node said on STDOUT, which is where Winston writes every level', async () => {
-        const said = await tailOf(`console.log('{"level":"error","message":"Node key file is not valid JSON"}'); process.exit(1)`);
+        const said = await tailOf(`console.log('{"level":"error","message":"Node key file is not valid JSON"}'); process.exitCode = 1`);
         expect(said).toContain('Node key file is not valid JSON');
     });
 
     it('quotes stderr too, and puts it first', async () => {
-        const said = await tailOf(`console.log('a log line'); console.error('the crash'); process.exit(1)`);
+        const said = await tailOf(`console.log('a log line'); console.error('the crash'); process.exitCode = 1`);
         expect(said.indexOf('the crash')).toBeLessThan(said.indexOf('a log line'));
     });
 
@@ -62,7 +63,8 @@ describe('keepTails', () => {
     });
 
     it('keeps the END of a long stream, which is where the reason is', async () => {
-        const said = await tailOf(`for (let i = 0; i < 200; i++) console.log('line ' + i); process.exit(1)`);
+        // process.exit() can discard pending pipe writes before keepTails ever receives them.
+        const said = await tailOf(`for (let i = 0; i < 200; i++) console.log('line ' + i); process.exitCode = 1`);
         expect(said).toContain('line 199');
         expect(said).not.toContain('line 0\n');
     });
