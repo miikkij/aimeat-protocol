@@ -22,6 +22,7 @@
  *   - Organisations — section 02 with connections, and the create form
  * @usage Imported by views/admin/sso-tab.js.
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Organisation sign-in page in the poster face).
  */
 import { h } from 'preact';
@@ -47,7 +48,7 @@ export function BeforeYouStart({ node, onCreate, busy }) {
   return html`
     <section class="og-sec" id="adm-sso-02">
       <div class="og-sec-h">
-        <h2>${S('before.title')}<small>02</small></h2>
+        <h2 class="poster-section-title">${S('before.title')}<small>02</small></h2>
         <div class="og-doors">
           ${!creating ? html`
             <button type="button" class="og-door og-door--danger" disabled=${node.locked}
@@ -174,7 +175,7 @@ export function Organisations({ data, onOpen, onCreate, busy }) {
   return html`
     <section class="og-sec" id="adm-sso-02">
       <div class="og-sec-h">
-        <h2>${S('orgs.title')}<small>02</small></h2>
+        <h2 class="poster-section-title">${S('orgs.title')}<small>02</small></h2>
         <div class="og-doors">
           ${!creating ? html`
             <button type="button" class="og-door og-door--quiet" disabled=${node.locked}

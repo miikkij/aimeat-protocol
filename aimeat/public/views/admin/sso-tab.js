@@ -24,6 +24,7 @@
  *   - SsoTab (default) — the read, the empty/connected branch, and the per-company detail
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face. One read that says whether anybody can sign in, an
  *     empty state that leads with what the operator gets rather than with SAML and SCIM, a row per
  *     company saying what it can do right now, and the sixth step the playbook never had.
@@ -61,7 +62,7 @@ function AskAi({ node, count }) {
   return html`
     <section class="og-sec" id="adm-sso-03">
       <div class="og-sec-h">
-        <h2>${S('ai.title')}<small>03</small></h2>
+        <h2 class="poster-section-title">${S('ai.title')}<small>03</small></h2>
         <div class="og-doors">
           <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
         </div>
