@@ -15,6 +15,7 @@
  *   - subscribe / test / unsubscribe / saveTemplate / resetTemplates: call admin service
  *
  * @version-history
+ *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-12 — The poster face: three cards and an accordion become five numbered
  *     sections. The page says whether the VAPID keys are set instead of a sentence saying they are
  *     required, shows the trigger types that are actually in AIMEAT_PUSH_NOTIFY_TYPES rather than
@@ -234,7 +235,7 @@ export default function PushTab({ data, reload, switchPage }) {
 
       <section class="og-sec og-sec--first">
         <div class="og-sec-h">
-          <h2>${P('now')}<small>${no.now}</small></h2>
+          <h2 class="poster-section-title">${P('now')}<small>${no.now}</small></h2>
           <div class="og-doors">
             <button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('email')}>${P('toEmail')}</button>
           </div>
@@ -272,7 +273,7 @@ export default function PushTab({ data, reload, switchPage }) {
 
       ${showSetup && html`
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${P('setup')}<small>${no.setup}</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('setup')}<small>${no.setup}</small></h2></div>
         <p class="adm-pu-lead">${P('setupLead')}</p>
         <div class="adm-pu-steps">
           <div class="adm-pu-step">
@@ -298,7 +299,7 @@ export default function PushTab({ data, reload, switchPage }) {
       </section>`}
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${P('browser')}<small>${no.browser}</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('browser')}<small>${no.browser}</small></h2></div>
         <p class="adm-pu-lead">${P('browserLead')}</p>
         <div class="adm-pu-acts">
           ${thisBrowser
@@ -315,7 +316,7 @@ export default function PushTab({ data, reload, switchPage }) {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${P('triggers')}<small>${no.triggers}</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('triggers')}<small>${no.triggers}</small></h2></div>
         <p class="adm-pu-lead">${P('triggersLead')}</p>
         ${TRIGGERS.map((type, i) => {
     const live = liveTypes.includes(type);
@@ -331,7 +332,7 @@ export default function PushTab({ data, reload, switchPage }) {
 
       <section class="og-sec">
         <div class="og-sec-h">
-          <h2>${P('messages')}<small>${no.messages}</small></h2>
+          <h2 class="poster-section-title">${P('messages')}<small>${no.messages}</small></h2>
           <div class="og-doors">
             <span class="adm-pu-chips">
               ${locales.map((l) => html`<button type="button" class="adm-pu-chip ${tplLocale === l ? 'on' : ''}"
@@ -382,7 +383,7 @@ export default function PushTab({ data, reload, switchPage }) {
       </section>
 
       <section class="og-sec">
-        <div class="og-sec-h"><h2>${P('subs')}<small>${no.subs}</small></h2></div>
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('subs')}<small>${no.subs}</small></h2></div>
         ${!subs.length
     ? html`<div class="adm-pu-empty">${t('dashboard.noSubscriptions')}</div>`
     : html`
