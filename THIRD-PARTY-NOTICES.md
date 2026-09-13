@@ -390,7 +390,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [negotiator](https://github.com/jshttp/negotiator#readme) | 0.6.4 | MIT |
 | [negotiator](https://github.com/jshttp/negotiator#readme) | 1.1.0 | MIT |
 | [node-abi](https://github.com/electron/node-abi#readme) | 3.96.0 | MIT |
-| [nodemailer](https://nodemailer.com/) | 9.1.1 | MIT-0 |
+| [nodemailer](https://nodemailer.com/) | 10.0.9 | MIT-0 |
 | [normalize-path](https://github.com/jonschlinkert/normalize-path) | 3.0.0 | MIT |
 | [npm-run-path](https://github.com/sindresorhus/npm-run-path#readme) | 4.0.1 | MIT |
 | [oauth4webapi](https://github.com/panva/oauth4webapi) | 3.8.7 | MIT |
@@ -8156,7 +8156,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### nodemailer 9.1.1
+### nodemailer 10.0.9
 
 ```text
 Copyright (c) 2011-2023 Andris Reinman
