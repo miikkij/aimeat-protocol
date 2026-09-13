@@ -17,6 +17,7 @@
  *   square mono chip, 2px framed, selected on the sun; and the ink slab, which comes from
  *   .btn-primary rather than from here.
  * @version-history
+ *   v2.2.0 -- 2026-09-13 -- Compose the standalone page title from poster.css.
  *   v2.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   v2.0.0 — 2026-09-03 — The poster face. No radius, no --card fill, no bespoke chip: square mono
  *     chips, groups under an ink rule, headline face on the group heads, the migration alarm as
@@ -45,14 +46,7 @@
 }
 
 .flt-title {
-  font-family: var(--font-poster);
-  font-weight: var(--font-poster-weight);
-  font-size: 2.8rem;
-  line-height: var(--font-poster-leading);
-  letter-spacing: var(--font-poster-tracking);
-  text-transform: uppercase;
   margin: 0 0 0.4rem;
-  color: var(--text);
 }
 
 .flt-desc {
@@ -371,7 +365,7 @@
 
 @media (max-width: 600px) {
   .flt-group-head { font-size: 1.05rem; }
-  .flt-title { font-size: 2rem; }
+  .flt { --poster-page-size: 2rem; }
   /* `margin-left: auto` on a row that has wrapped strands the control on a line of its own against
      a right edge that is not there. Same trap the state word already carries a rule for. */
   .flt-row-move { margin-left: 0; }
