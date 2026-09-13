@@ -8,6 +8,7 @@
  *   selected item, group labels wear the sun, the node id sits on top in mono. Content surfaces
  *   map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   v2.8.0 -- 2026-09-13 -- Compose the admin page title from poster.css.
  *   v2.7.0 -- 2026-09-13 -- Compose configuration section headings from poster.css.
  *   v2.6.0 — 2026-09-12 — A numeral strip whose cells are filters wraps on a narrow screen like one
  *     whose cells are not. organism.css halves `.og-strip > div` under 1100px and a button is not a
@@ -160,7 +161,7 @@
 /* Main area. NO overflow of its own: .page-content above is the one scroll region, and an
    overflow:auto here — even one that never actually scrolls — becomes the nearest scrollport
    and quietly breaks every position:sticky inside (the left index, the pinned rows below). */
-.adm-main { flex: 1; padding: 0 32px 24px; background: var(--bg-deep); min-width: 0; }
+.adm-main { --poster-page-size: 2.1rem; flex: 1; padding: 0 32px 24px; background: var(--bg-deep); min-width: 0; }
 /* The page title and its refresh stay in sight wherever you are on a long page. */
 .adm-topbar {
   position: sticky;
@@ -177,14 +178,7 @@
 }
 .adm-topbar-right { display: flex; align-items: center; gap: 14px; }
 .adm-page-title {
-  font-size: 2.1rem;
-  /* The one headline face of the site; it ships one cut, so a literal 800 would be a synthesised bold. */
-  font-family: var(--font-headline);
-  font-weight: var(--font-poster-weight, 800);
-  letter-spacing: var(--font-poster-tracking, .01em);
-  line-height: var(--font-poster-leading, 1);
-  text-transform: uppercase;
-  color: var(--text);
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 10px;
