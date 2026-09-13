@@ -152,6 +152,7 @@ The rules that apply only to certain code live in `.claude/rules/`, and each loa
 | Licensing | `licensing.md` | `aimeat/public/lib/`, `package.json`, the licence and notices scripts |
 | Locales | `locales.md` | `aimeat/locales/`, `aimeat/src/i18n.ts` |
 | File headers; the 800-line limit | `code-files.md` | any `.ts`, `.js`, `.mjs` or `.css` under `aimeat/` |
+| Changing a skill: measure it with its eval suite (`pnpm eval:skill`) | `skills.md` | `.claude/skills/`, `.claude/evals/` |
 
 A new rule goes into this file only when it holds in every session, whatever the session touches. Everything else goes into the rule file for its paths. `pnpm check:instructions` refuses a `paths` pattern that matches no tracked file, and a root file grown past its ceiling.
 
