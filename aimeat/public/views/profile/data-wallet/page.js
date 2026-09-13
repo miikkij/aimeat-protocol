@@ -14,6 +14,7 @@
  *   secRoads
  * @usage import { renderPage } from './data-wallet/page.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: select shared ink frames for explanations and the export row.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Tietolompakko-sivu", direction A).
  */
 import { h } from 'preact';
@@ -146,7 +147,7 @@ function secTargets(ctx) {
           <div class="dw-row dw-row--head"><div>${x('col.target')}</div><div>${x('col.whoWhat')}</div><div>${x('col.since')}</div><div></div></div>
           ${list.map((r) => targetRow(ctx, r))}
         </div>` : html`<p class="dw-empty"><b>${x('noGrantsTitle')}</b> ${x('noGrantsBody')}</p>`}`}
-      <div class="dw-why"><b>${x('howTitle')}</b> ${x('howBody')}</div>
+      <div class="dw-why poster-frame"><b>${x('howTitle')}</b> ${x('howBody')}</div>
     <//>`;
 }
 
@@ -170,7 +171,7 @@ function secTrail(ctx) {
         </div>
         ${items.length > shown.length ? html`<div class="dw-more"><button type="button" class="og-door og-door--quiet" onClick=${() => ctx.showMoreTrail()}>${x('moreRows', { n: items.length - shown.length })}</button></div>` : null}`
       : html`<p class="dw-empty"><b>${x('trailEmptyTitle')}</b> ${x('trailEmptyBody')}</p>`}
-      ${ctx.manifestShare >= 0.5 && ctx.deniedCount >= 20 ? html`<div class="dw-why"><b>${x('meaningTitle')}</b> ${x('meaningManifest', { n: n(ctx.manifestDenied), total: n(ctx.deniedCount) })}</div>` : null}
+      ${ctx.manifestShare >= 0.5 && ctx.deniedCount >= 20 ? html`<div class="dw-why poster-frame"><b>${x('meaningTitle')}</b> ${x('meaningManifest', { n: n(ctx.manifestDenied), total: n(ctx.deniedCount) })}</div>` : null}
     <//>`;
 }
 
@@ -258,7 +259,7 @@ function secExport(ctx) {
     <${Section} id="dw-export" num="04" title=${x('secExport')} count=${x('secExportSub', { keys: n(ps.total_memory_keys), files: n(ps.total_storage_files) })}>
       <p class="dw-para">${x('exportIntro', { mb })}</p>
       <div class="dw-contents">${items.map(([k, sub]) => html`<div key=${k}><b>${x('export.' + k)}</b><small>${sub}</small></div>`)}</div>
-      <div class="dw-export">
+      <div class="dw-export poster-frame">
         <button type="button" class="og-slab" disabled=${ctx.exporting} onClick=${() => ctx.exportAll()}>${ctx.exporting ? x('exporting') : x('exportDoor')}</button>
         <div>${x('exportBody', { file: ctx.exportName })} ${msg(ctx.exportMsg)}</div>
       </div>

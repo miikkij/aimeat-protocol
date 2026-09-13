@@ -10,6 +10,7 @@
  *   two roads. Every column is bounded so a long key or name wraps inside its cell. NOTE: this file
  *   must be linked in spa.html.
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose explanations and the export row with the shared ink frame.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 
@@ -28,7 +29,7 @@
 .dw-slab-hint { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); max-width: 18rem; text-align: right; }
 .dw-label { display: block; margin: 1rem 0 .4rem; }
 .dw-box { margin-top: 1.4rem; }
-.dw-why { margin-top: .9rem; padding: .8rem 1rem; border: 3px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; }
+.dw-why { margin-top: .9rem; padding: .8rem 1rem; font-size: .9rem; line-height: 1.55; }
 .dw-why b { font-weight: 800; }
 
 /* ── Filters and rows ─────────────────────────────────────────────────────────────────────── */
@@ -91,7 +92,7 @@
 .dw-contents > div { padding: .4rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
 .dw-contents b { display: block; font-weight: 800; color: var(--text); }
 .dw-contents small { display: block; margin-top: .1rem; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); overflow-wrap: anywhere; }
-.dw-export { display: flex; align-items: center; gap: 1.4rem; margin-top: .9rem; padding: .9rem 1.1rem; border: 3px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; }
+.dw-export { display: flex; align-items: center; gap: 1.4rem; margin-top: .9rem; padding: .9rem 1.1rem; font-size: .9rem; line-height: 1.55; }
 .dw-export .og-slab { flex: none; }
 
 /* ── 05: the two roads ─────────────────────────────────────────────────────────────────────── */

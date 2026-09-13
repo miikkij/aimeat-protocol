@@ -13,6 +13,7 @@
  *   secFirst · secAgent
  * @usage import { renderPage } from './portfolio/page.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: select the shared ink frame for the agent rule.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { h } from 'preact';
@@ -276,7 +277,7 @@ function secAgent(ctx, state) {
   return html`
     <${Section} id="pf-ai" num="05" title=${x('secAi')} count=${null}>
       <p class="pf-para">${x('aiIntro')}</p>
-      <div class="pf-rule">
+      <div class="pf-rule poster-frame">
         <span class="og-label">${x('ruleLabel')}</span>
         <p class="pf-para">${x('ruleBody')}</p>
         <code>GET ${apexUrl(ctx.ownerName)}</code> → <code>aimeat_portfolio_publish { html }</code> · ${x('ruleNoMcp')} <code>PUT /v1/portfolio/upload { html }</code>
