@@ -12,6 +12,7 @@
  * @structure HookRuns({ data }) — the filter, the table, the empty state
  * @usage <${HookRuns} data=${data} />
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose the shared poster section heading.
  *   v1.0.0 — 2026-09-12 — Initial (the Hooks page in the poster face).
  */
 import { h } from 'preact';
@@ -40,7 +41,7 @@ export function HookRuns({ data }) {
 
   return html`
     <section class="og-sec" id="adm-hook-04">
-      <div class="og-sec-h"><h2>${S('runs.title')}<small>04</small></h2>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('runs.title')}<small>04</small></h2>
         <div class="adm-hook-filters">
           <button type="button" class=${'adm-hook-fchip' + (refusedOnly ? '' : ' on')} onClick=${() => { setRefusedOnly(false); setAll(false); }}>${S('runs.filterAll')}</button>
           <button type="button" class=${'adm-hook-fchip' + (refusedOnly ? ' on' : '')} onClick=${() => { setRefusedOnly(true); setAll(false); }}>${S('runs.filterRefused')}</button>

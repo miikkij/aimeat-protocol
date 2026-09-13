@@ -17,6 +17,7 @@
  * @structure HookBind({ data, onBind, busy }) — the moment, the picker, the order, the contract
  * @usage <${HookBind} data=${data} onBind=${bind} busy=${busy} />
  * @version-history
+ *   v1.1.0 — 2026-09-13 — Compose the shared heading and externalize spacing.
  *   v1.0.0 — 2026-09-12 — Initial (the Hooks page in the poster face).
  */
 import { h } from 'preact';
@@ -56,7 +57,7 @@ export function HookBind({ data, onBind, busy }) {
 
   return html`
     <section class="og-sec" id="adm-hook-03">
-      <div class="og-sec-h"><h2>${S('bind.title')}<small>03</small></h2></div>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('bind.title')}<small>03</small></h2></div>
       <p class="adm-hook-lead">${S('bind.lead')}</p>
 
       <div class="adm-hook-two">
@@ -87,7 +88,7 @@ export function HookBind({ data, onBind, busy }) {
               : available.length === 0
                 ? html`<p class="adm-hook-note">${S('bind.allPicked')}</p>`
                 : html`
-                  <div class="adm-hook-fld" style=${refs.length > 0 ? 'margin-top:10px' : ''}>
+                  <div class="adm-hook-fld">
                     <select value="" onChange=${e => { if (e.target.value) add(e.target.value); }}>
                       <option value="">${S('bind.pickAction')}</option>
                       ${available.map(a => html`
@@ -101,7 +102,7 @@ export function HookBind({ data, onBind, busy }) {
 
           <div>
             <div class="adm-hook-lbl">${S('bind.order')}</div>
-            <p class="adm-hook-note" style="margin-top:0">
+            <p class="adm-hook-note adm-hook-note--flush">
               ${refs.length === 0 ? S('bind.orderNone') : gate ? S('bind.orderGate') : S('bind.orderNotify')}
             </p>
           </div>
@@ -116,14 +117,14 @@ export function HookBind({ data, onBind, busy }) {
 
         <div>
           <div class="adm-hook-lbl">${S('bind.whatIsSent')}</div>
-          <div class="adm-hook-frame" style="margin-bottom:16px">
+          <div class="adm-hook-frame adm-hook-frame--request">
             <pre class="adm-hook-pre">${sentExample(hook, data.node_id ?? '')}</pre>
           </div>
           <div class="adm-hook-lbl">${S('bind.whatItAnswers')}</div>
           <div class="adm-hook-frame">
             <pre class="adm-hook-pre">${S('bind.contract', { s: seconds })}</pre>
           </div>
-          <div class="og-box" style="margin-top:16px">
+          <div class="og-box adm-hook-contract-warning">
             <span class="og-box-label">${S('bind.warnLabel')}</span>
             <div class="adm-hook-box-body">${S('bind.warnBody', { s: seconds })}</div>
           </div>
