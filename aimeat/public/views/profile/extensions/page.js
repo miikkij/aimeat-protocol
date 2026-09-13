@@ -10,6 +10,7 @@
  * @structure renderPage · secExtensions · secCortexes · secNew
  * @usage import { renderPage } from './extensions/page.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { h } from 'preact';
@@ -55,7 +56,7 @@ export function renderPage(ctx) {
       ${crumb()}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('profile.tabs.extensions')}<small>${x('titleSub')}</small></h1>
+          <h1 class="og-title poster-page-title">${t('profile.tabs.extensions')}<small>${x('titleSub')}</small></h1>
           <div class="og-chips">
             ${none ? chip(x('chipNone'), 'og-chip--coral') : exts ? chip(x('chipExt', { n: mine.length })) : null}
             ${!none && cxs ? chip(x('chipCortex', { n: myCx.length })) : null}

@@ -11,6 +11,7 @@
  * @structure renderOffersView · renderCover · secBack · secAuto · secAsk · catalogue · aiResults · sellPage
  * @usage import { renderOffersView } from './offers/cover.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-06 — The map moves to map-page.js, where it gains three flat views and a search field.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces the segment tabs, the facet panel and the wall of cards.
  */
@@ -58,7 +59,7 @@ function renderCover(ctx) {
       ${crumb(ctx, [])}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('profile.tabs.offers')}</h1>
+          <h1 class="og-title poster-page-title">${t('profile.tabs.offers')}</h1>
           <div class="og-chips">
             ${chip(m.items.length, 'chipOffers')}${chip(m.agents, 'chipAgents')}${chip(m.onlineAgents, 'chipOnline')}${chip(m.autoN, 'chipAuto')}${chip(m.stepsN, 'chipSteps')}
             ${chip(m.selling.length, 'chipSelling', m.selling.length ? '' : 'og-chip--dim')}${chip(m.latest.length, 'chipDeliveries', 'og-chip--coral')}
@@ -222,4 +223,3 @@ function sellPage(ctx) {
       </div>`,
   });
 }
-

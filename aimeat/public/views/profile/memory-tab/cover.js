@@ -15,6 +15,7 @@
  *   renderRecord · renderPage
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-06 — The public/members chips in a table of spaces move into their own mark
  *     group, pushed to the far end of the name cell so they line up down the table.
  *   v1.0.0 — 2026-08-29 — Initial. Replaces the two tab rows, the tools box, the two search fields
@@ -101,7 +102,7 @@ function renderPage(ctx, { id, crumbs, title, sub = null, doors = null, rail = n
     <div class="og og-mp og-page">
       ${crumb(ctx, crumbs)}
       <div class="og-mast og-mast--page">
-        <div class="og-mast-words"><h1 class=${`og-title ${id === 'record' ? 'mp-title--key' : ''}`}>${title}${sub ? html`<small>${sub}</small>` : null}</h1></div>
+        <div class="og-mast-words"><h1 class=${`og-title poster-page-title ${id === 'record' ? 'mp-title--key' : ''}`}>${title}${sub ? html`<small>${sub}</small>` : null}</h1></div>
         ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
       </div>
       <div class="og-grid">
@@ -153,7 +154,7 @@ function fileRows(ctx, files) {
     return html`
       <div class="og-fold" key=${key}>
         <span class="mp-file-kind">${isImage ? html`<${AuthImage} src=${fileBytesUrl(f, NODE_URL)} alt=${key} />` : String(cat || 'file').slice(0, 4)}</span>
-        <span class="og-fold-name">${key}<small class="og-fold-r" style=${undefined}></small></span>
+        <span class="og-fold-name">${key}<small class="og-fold-r"></small></span>
         <span class="og-fold-r">${f.size ? formatBytes(f.size) : ''} · ${t('knowledge.visibility.' + (f.visibility || 'private')) || f.visibility}</span>
         <button type="button" class="og-door og-door--quiet og-fold-door" onClick=${() => setPreviewFile(f)}>${t('profile.files.preview') || 'Preview'}</button>
         <${CopyButton} text=${url} label=${t('common.copyUrl') || 'Copy URL'} className="og-door og-door--quiet og-fold-door" onCopied=${() => showToast(t('profile.files.urlCopied') || 'URL copied')} />
@@ -224,7 +225,7 @@ function renderCover(ctx) {
       ${crumb(ctx, [])}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('profile.memory.title') || 'Memory'}</h1>
+          <h1 class="og-title poster-page-title">${t('profile.memory.title') || 'Memory'}</h1>
           <div class="og-chips">
             <span class="og-chip">${num(all.length)} ${c('figKeys', 'keys')}</span>
             <span class="og-chip">${formatBytes(bytes)}</span>
@@ -291,12 +292,12 @@ function renderCover(ctx) {
           <//>
 
           <${Section} id="mp-stale" num=${nStale} title=${c('stale', 'Stale')} count=${stale.length}>
-            <p class="og-hint" style=${undefined}>${c('staleHint', 'Keys nobody has changed in 90 days. Open one to decide; delete what no longer matters.')}</p>
+            <p class="og-hint">${c('staleHint', 'Keys nobody has changed in 90 days. Open one to decide; delete what no longer matters.')}</p>
             ${stale.length ? html`<div class="og-folds">${(staleAll ? stale : stale.slice(0, 8)).map(m => html`
               <div class="og-fold" key=${m.key}><span class="og-fold-name mp-key">${m.key}<small class="og-fold-r"> ${formatBytes(m.bytes)} · ${formatRelativeTime(m.updated_at || m.created_at)}</small></span>
                 <button type="button" class="og-door og-door--quiet og-fold-door" onClick=${() => pickView({ kind: 'record', key: m.key })}>${c('open', 'Open')}</button>
                 <button type="button" class="og-door og-door--quiet og-door--danger og-fold-door" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn') || 'Delete'}</button></div>`)}</div>
-              ${stale.length > 8 && !staleAll ? html`<button type="button" class="og-door og-door--quiet" style=${undefined} onClick=${() => setStaleAll(true)}>${c('showAll', 'show all {n}').replace('{n}', String(stale.length))}</button>` : null}` : html`<p class="og-hint">${c('noStale', 'Nothing has gone stale.')}</p>`}
+              ${stale.length > 8 && !staleAll ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => setStaleAll(true)}>${c('showAll', 'show all {n}').replace('{n}', String(stale.length))}</button>` : null}` : html`<p class="og-hint">${c('noStale', 'Nothing has gone stale.')}</p>`}
           <//>
 
           <${Section} id="mp-seen" num=${nSeen} title=${c('seen', 'Who else sees')} count=${seenRows.length}
@@ -397,7 +398,7 @@ function renderRecord(ctx, key) {
     <div class="og-field"><span class="og-label">${c('tags', 'Tags')}</span>
       ${editingMemTags === key ? html`<${TagEditor} tags=${m.tags || []} onSave=${(tags) => { handleUpdateMemoryTags(key, tags, m.version); setEditingMemTags(null); }} />`
         : html`<div class="mp-tags">${(m.tags || []).map(tag => html`<span class="og-chip og-chip--dim" key=${tag}>${tag}</span>`)}<button type="button" class="og-door og-door--quiet" onClick=${() => setEditingMemTags(key)}>${t('tags.editTags') || 'Edit tags'}</button></div>`}</div>
-    ${covering.length ? html`<div class="og-field"><span class="og-label">${c('share', 'key-space share')}</span>${covering.map(sh => html`<div class="og-fold" key=${sh.id} style=${undefined}><span class="og-fold-name mp-key">${sh.key_pattern}<small class="og-fold-r"> → ${sh.group?.name || sh.group_id}</small></span><button type="button" class="og-door og-door--quiet og-fold-door" onClick=${() => revokeCoveringShare(sh)}>${t('profile.memory.shRevoke') || 'Stop sharing'}</button></div>`)}</div>` : null}
+    ${covering.length ? html`<div class="og-field"><span class="og-label">${c('share', 'key-space share')}</span>${covering.map(sh => html`<div class="og-fold" key=${sh.id}><span class="og-fold-name mp-key">${sh.key_pattern}<small class="og-fold-r"> → ${sh.group?.name || sh.group_id}</small></span><button type="button" class="og-door og-door--quiet og-fold-door" onClick=${() => revokeCoveringShare(sh)}>${t('profile.memory.shRevoke') || 'Stop sharing'}</button></div>`)}</div>` : null}
     <nav class="og-rail">
       <span class="og-rail-label">${c('thisRecord', 'This record')}</span>
       <button type="button" class="og-rail-link" onClick=${() => pickView({ kind: 'space', id: g.id })}><i>←</i>${space ? space.label : g.id}</button>
@@ -421,7 +422,7 @@ function renderRecord(ctx, key) {
     </div>
     <div class="mp-value">
       ${renderValue(ctx, m, showRaw)}
-      ${v !== undefined ? html`<div class="og-actions" style=${undefined}><button type="button" class="og-door og-door--quiet" onClick=${() => setShowRaw(r => !r)}>${showRaw ? c('showPretty', 'Show readable') : c('showRaw', 'Show raw')}</button></div>` : null}
+      ${v !== undefined ? html`<div class="og-actions"><button type="button" class="og-door og-door--quiet" onClick=${() => setShowRaw(r => !r)}>${showRaw ? c('showPretty', 'Show readable') : c('showRaw', 'Show raw')}</button></div>` : null}
     </div>` });
 }
 
@@ -443,12 +444,12 @@ function renderOther(ctx, id) {
   } else if (id === 'tools') {
     body = html`
       <div class="og-fields">
-        <div class="og-box og-box--solid"><span class="og-box-label">${t('profile.memory.exportBtn') || 'Export'}</span><p class="og-hint" style=${undefined}>${c('exportHint', 'A JSON backup of every key in this memory (the selected agent’s, if one is chosen). A key space can be exported alone from its own page.')}</p><div class="og-actions"><button type="button" class="og-slab" onClick=${() => handleExport()}>${t('profile.memory.exportBtn') || 'Export'}</button></div></div>
-        <div class="og-box og-box--solid"><span class="og-box-label">${t('profile.memory.importBtn') || 'Import'}</span><p class="og-hint" style=${undefined}>${c('importHint', 'A JSON backup made here or by an agent. Choose first what happens when a key already exists.')}</p>
+        <div class="og-box og-box--solid"><span class="og-box-label">${t('profile.memory.exportBtn') || 'Export'}</span><p class="og-hint">${c('exportHint', 'A JSON backup of every key in this memory (the selected agent’s, if one is chosen). A key space can be exported alone from its own page.')}</p><div class="og-actions"><button type="button" class="og-slab" onClick=${() => handleExport()}>${t('profile.memory.exportBtn') || 'Export'}</button></div></div>
+        <div class="og-box og-box--solid"><span class="og-box-label">${t('profile.memory.importBtn') || 'Import'}</span><p class="og-hint">${c('importHint', 'A JSON backup made here or by an agent. Choose first what happens when a key already exists.')}</p>
           <div class="og-actions"><div class="og-choice">${['skip', 'overwrite', 'rename'].map(mode => html`<button type="button" key=${mode} class=${`og-choice-btn ${importMode === mode ? 'on' : ''}`} onClick=${() => setImportMode(mode)}>${t('profile.memory.importMode.' + mode) || mode}</button>`)}</div>
           <button type="button" class="og-slab" disabled=${importing} onClick=${triggerImport}>${importing ? '…' : (t('profile.memory.importBtn') || 'Import')}</button></div>
           <input type="file" accept="application/json,.json" ref=${importFileRef} class="pf-hidden" onChange=${handleImportFile} /></div>
-        ${!fullLoaded ? html`<div class="og-box"><span class="og-box-label">${t('profile.memory.loadContents') || 'Load all contents'}</span><p class="og-hint" style=${undefined}>${c('loadAllHint', 'The list carries keys and sizes only; loading every value lets the filter on the All-as-keys page search inside them. Costs one large read.')}</p><div class="og-actions"><button type="button" class="og-door" onClick=${loadFullContents}>${t('profile.memory.loadContents') || 'Load all contents'}</button></div></div>` : null}
+        ${!fullLoaded ? html`<div class="og-box"><span class="og-box-label">${t('profile.memory.loadContents') || 'Load all contents'}</span><p class="og-hint">${c('loadAllHint', 'The list carries keys and sizes only; loading every value lets the filter on the All-as-keys page search inside them. Costs one large read.')}</p><div class="og-actions"><button type="button" class="og-door" onClick=${loadFullContents}>${t('profile.memory.loadContents') || 'Load all contents'}</button></div></div>` : null}
       </div>`;
   }
   return renderPage(ctx, { id, crumbs: [{ label: title }], title, doors, children: body });

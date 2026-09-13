@@ -13,6 +13,7 @@
  *   secFirst · secAgent
  * @usage import { renderPage } from './portfolio/page.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 -- 2026-09-13 -- V2: select the shared ink frame for the agent rule.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
@@ -82,7 +83,7 @@ function mast(ctx, state) {
   return html`
     <div class="og-mast">
       <div class="og-mast-words">
-        <h1 class="og-title">${t('portfolio.tabLabel')}<small>${x('titleSub')}</small></h1>
+        <h1 class="og-title poster-page-title">${t('portfolio.tabLabel')}<small>${x('titleSub')}</small></h1>
         <div class="og-chips">${chips}</div>
         <p class="og-desc">${desc}</p>
       </div>

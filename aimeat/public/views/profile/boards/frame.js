@@ -9,6 +9,7 @@
  * @structure c · words · who · leftWords · standingWords · followedOf · boardRows · noticeRow · crumb · renderPage
  * @usage import { renderPage, boardRows, noticeRow } from './frame.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Taulujen sivu", direction A).
  */
 import { h } from 'preact';
@@ -138,7 +139,7 @@ export function renderPage(ctx, { crumbs, label = null, title, chips = null, doo
       <div class="og-mast og-mast--page">
         <div class="og-mast-words">
           ${label ? html`<div class="og-label">${label}</div>` : null}
-          <h1 class="og-title bp-title--page">${title}</h1>
+          <h1 class="og-title poster-page-title bp-title--page">${title}</h1>
           ${chips ? html`<div class="og-chips">${chips}</div>` : null}
         </div>
         ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}

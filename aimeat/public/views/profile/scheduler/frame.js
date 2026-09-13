@@ -8,6 +8,7 @@
  * @structure c · hhmm · whoRuns · resultWord · lastRun · crumb · pageLinks · renderPage
  * @usage import { renderPage, whoRuns, c, hhmm } from './frame.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-12 — `loc()` is gone: it derived the date FORMAT from the page LANGUAGE, which
  *     is a separate setting, and /js/format.js reads the reader's own. `hhmm` reads their clock too
  *     rather than the browser's, which matters most here, where the clock IS the content.
@@ -77,7 +78,7 @@ export function renderPage(ctx, { id, crumbs, title, chips = null, doors = null,
       ${crumb(ctx, crumbs)}
       <div class="og-mast og-mast--page">
         <div class="og-mast-words">
-          <h1 class="og-title sc-title--page">${title}</h1>
+          <h1 class="og-title poster-page-title sc-title--page">${title}</h1>
           ${chips ? html`<div class="og-chips">${chips}</div>` : null}
         </div>
         ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}

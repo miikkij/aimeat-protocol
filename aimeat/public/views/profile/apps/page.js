@@ -12,6 +12,7 @@
  * @structure renderPage · secWaiting · secKunto · secNewest · secFirst
  * @usage import { renderPage } from './apps/page.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-02 — Initial.
  *   v1.2.0 — 2026-09-08 — The builders section: who else may build these apps.
  *   v1.1.0 — 2026-09-03 — A newest row says what the app needs (requiresLine): the cortexes it loads and the extensions it calls, with a pinned version after the at sign.
@@ -64,7 +65,7 @@ export function renderPage(ctx) {
       ${crumb()}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('profile.tabs.apps')}<small>${a('titleSub')}</small></h1>
+          <h1 class="og-title poster-page-title">${t('profile.tabs.apps')}<small>${a('titleSub')}</small></h1>
           <div class="og-chips">
             ${none ? chip(a('chipNone'), 'og-chip--coral') : chip(a('chipCount', { n: apps.length }))}
             ${none ? chip(a('chipFirst'), 'og-chip--dim') : drafts.length ? chip(a('chipDrafts', { n: drafts.length }), 'og-chip--coral') : null}

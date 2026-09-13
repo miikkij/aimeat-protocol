@@ -11,6 +11,7 @@
  * @structure renderBoardsView · renderCover · secFollowed · secRecent · secPublic · ownBoardForm · secApp
  * @usage import { renderBoardsView } from './boards/cover.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces the subscriptions list, the "browse all" list and the
  *     create form that opened on top of an empty page.
  */
@@ -69,7 +70,7 @@ function renderCover(ctx) {
       ${crumb(ctx, [])}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${t('profile.tabs.boards')}</h1>
+          <h1 class="og-title poster-page-title">${t('profile.tabs.boards')}</h1>
           <div class="og-chips">
             ${chip(ctx.followed.length, 'chipFollowed')}${fresh ? chip(fresh, 'chipNew', 'og-chip--coral') : null}${chip(ctx.others.length, 'chipPublic')}${ownBoards ? chip(ownBoards, 'chipOwn') : null}
           </div>

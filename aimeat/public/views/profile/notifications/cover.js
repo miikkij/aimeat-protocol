@@ -11,6 +11,7 @@
  * @structure renderCover · secInbox · secSenders · secDevices · quietFold · howFold
  * @usage import { renderCover } from './notifications/cover.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces a page that showed no notification and three email
  *     choices nothing read.
  */
@@ -45,7 +46,7 @@ export function renderCover(ctx) {
       ${crumb()}
       <div class="og-mast">
         <div class="og-mast-words">
-          <h1 class="og-title">${c('title')}</h1>
+          <h1 class="og-title poster-page-title">${c('title')}</h1>
           <div class="og-chips">
             ${unread ? chip(unread, 'chipUnread', 'og-chip--coral') : null}${chip(recent.length, 'chipRecent')}${appSenders ? chip(appSenders, 'chipApps') : null}${devices ? chip(devices, 'chipDevices') : null}
           </div>
