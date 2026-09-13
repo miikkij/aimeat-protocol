@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Choose useful work, connect an AI, copy the task and see the saved note at home.
  * @version-history
+ *   2026-09-13: Compose the existing home shapes with shared poster classes.
  *   v1.1.0 — 2026-09-12 — The lines the chosen task governs (hint, connection, prompt, links, result)
  *     sit in one .koti-journey-panel; the optional webpage stays outside it.
  *   v1.0.1 — 2026-09-09 — Reuse the home's fold choices and underlined actions.
@@ -59,7 +60,7 @@ export function HomeJourney() {
       <h2 id="home-journey-title" class="koti-band-title">${t('homeJourney.title')}</h2>
       <p>${t(connected ? 'homeJourney.returning' : 'homeJourney.welcome')}</p>
       <div class="koti-journey-choices" role="group" aria-label=${t('homeJourney.title')}>
-        ${actions.map(id => html`<button type="button" key=${id} class=${'koti-link' + (action === id ? ' koti-fold--on' : '')}
+        ${actions.map(id => html`<button type="button" key=${id} class=${'poster-action koti-link' + (action === id ? ' koti-fold--on' : '')}
           aria-pressed=${action === id} onClick=${() => {
             setAction(id); setCopied(false);
             try { sessionStorage.setItem(choiceKey, id); }
@@ -70,9 +71,9 @@ export function HomeJourney() {
       </div>
       <div class="koti-journey-panel">
       <p class="koti-hint">${t('homeJourney.' + action + 'Hint')}</p>
-      <div class="koti-journey-status" role="status">
+      <div class="koti-journey-status poster-row" role="status">
         <span>${t(connected ? 'homeJourney.connected' : 'homeJourney.notConnected')}</span>
-        <button type="button" class="koti-link"
+        <button type="button" class="poster-action koti-link"
           aria-expanded=${connecting} onClick=${() => setConnecting(v => !v)}>
           ${t(connecting ? 'homeJourney.hideConnection' : connected ? 'homeJourney.anotherAi' : 'homeJourney.connect')}
         </button>
@@ -82,9 +83,9 @@ export function HomeJourney() {
         <${McpSetupGuide} />
         <h3>${t('homeJourney.prove')}</h3>
         <p>${t('homeJourney.proveHint')}</p>
-        <${PromptCard} label=${t('homeJourney.prove')} prompt=${proof?.prompt || ''} className="koti-link"
+        <${PromptCard} label=${t('homeJourney.prove')} prompt=${proof?.prompt || ''} className="poster-action koti-link"
           copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')} />
-        <button type="button" class="koti-link" onClick=${refresh}>${t('homeJourney.check')}</button>
+        <button type="button" class="poster-action koti-link" onClick=${refresh}>${t('homeJourney.check')}</button>
         <details class="koti-journey-details"><summary>${t('homeJourney.deviceFlow')}</summary>
           <${StepAgent} onChanged=${refresh} showToast=${setMessage} />
         </details>
@@ -92,16 +93,16 @@ export function HomeJourney() {
       <div class="koti-journey-task">
         <p>${t('homeJourney.copyHint')}</p>
         <${PromptCard} key=${action} label=${t('homeJourney.' + action)} prompt=${prompt}
-          className="koti-link"
+          className="poster-action koti-link"
           copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')}
           onCopied=${() => setCopied(true)} />
         ${copied && html`<p role="status">${t('homeJourney.copied')}</p>`}
         <div class="koti-journey-links">
-          <button type="button" class="koti-link" onClick=${refresh}>${t('homeJourney.checkResult')}</button>
-          <a class="koti-link" href=${'/v1/profile?tab=' + targets[action]}>${t('homeJourney.open' + action)} →</a>
-          ${chat?.enabled && html`<a class="koti-link" href="/v1/chat">${t('homeJourney.localChat')} →</a>`}
+          <button type="button" class="poster-action koti-link" onClick=${refresh}>${t('homeJourney.checkResult')}</button>
+          <a class="poster-action koti-link" href=${'/v1/profile?tab=' + targets[action]}>${t('homeJourney.open' + action)} →</a>
+          ${chat?.enabled && html`<a class="poster-action koti-link" href="/v1/chat">${t('homeJourney.localChat')} →</a>`}
         </div>
-        ${ready && saved && html`<div class="koti-journey-result" role="status">
+        ${ready && saved && html`<div class="koti-journey-result poster-box" role="status">
           <h3>${t('homeJourney.saved')}</h3>
           ${typeof note.title === 'string' && html`<strong>${note.title}</strong>`}
           <p>${note.text}</p>
@@ -113,7 +114,7 @@ export function HomeJourney() {
       <details class="koti-journey-details"><summary>${t('homeJourney.optionalPage')}</summary>
         <p>${t('homeJourney.optionalPageHint')}</p>
         ${state.mat.done
-          ? html`<a class="koti-link" href=${state.mat.standaloneUrl || state.mat.url}>${t('home.mat.view')} →</a>`
+          ? html`<a class="poster-action koti-link" href=${state.mat.standaloneUrl || state.mat.url}>${t('home.mat.view')} →</a>`
           : html`<${StepMat} onDone=${refresh} />`}
       </details>
       ${message && html`<p role="alert">${message}</p>`}
