@@ -14,6 +14,7 @@
  *     bundle, and its verbs behind a "pick verbs" toggle
  *   - IdentitySection · CrewSection · RunSection · ContractSection
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.1.0 -- 2026-08-28 -- A list field never flattens what it cannot show. capabilities.technical is
  *     a list of {name, type} objects; the comma input rendered them as "[object Object]" and a blur
  *     wrote that string back, which would have emptied the agent's searchable capabilities without
@@ -165,11 +166,11 @@ export function ToolMenu({ selected, onChange, idPrefix, runtimeTools }) {
   `;
   return html`
     <div class="pf-agd-crew-tools">
-      <div class="pf-agd-crew-tools-group">
+      <div class="pf-agd-crew-tools-group poster-row--thing">
         <div class="pf-agd-crew-tools-title">${t(`${K}.tools.core`)}</div>
         ${core.map(row)}
       </div>
-      <div class="pf-agd-crew-tools-group">
+      <div class="pf-agd-crew-tools-group poster-row--thing">
         <div class="pf-agd-crew-tools-title">${t(`${K}.tools.exchange`)}</div>
         ${row(EXCHANGE_BUNDLE)}
         <button type="button" class="btn-ghost btn-sm pf-agd-crew-tools-refine" onClick=${() => setRefine(r => !r)}>

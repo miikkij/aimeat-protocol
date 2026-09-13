@@ -5,6 +5,7 @@
  * @description Profile tab showing real-time node statistics including uptime,
  *   request counts, tunnel metrics, mailbox stats, and security counters.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-03-16 — Initial node stats tab
@@ -36,7 +37,7 @@ function fmtBytes(b) {
 // tone ∈ accent | success | danger | warn | purple | blue (canonical
 // .stat-card-value modifiers) — no inline colour, so it flips in dark mode.
 function StatCard({ label, value, tone }) {
-  return html`<div class="stat-card">
+  return html`<div class="stat-card poster-row--thing">
     <div class="stat-card-value ${tone || ''}">${value}</div>
     <div class="stat-card-label">${label}</div>
   </div>`;

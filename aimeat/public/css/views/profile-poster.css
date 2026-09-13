@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2v: compose section top rules from poster.css.
  *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
@@ -343,14 +344,15 @@
    square mono chip) so the whole machine room changes in one file. Selectors keep the .pf
    prefix the view sheets use, so the cascade order decides. */
 /* Sections: a rule on top, no frame */
-.pf .sch-form, .pf .sch-cal-freq, .pf .of-mapwrap, .pf .of-empty-need, .pf .pf-nb-suggest, .pf .pf-nb-enrich, .pf .pf-nb-plan-step,
-.pf .wf-form-section, .pf .cap-info-section, .pf .pf-ld-pending, .pf .pf-ld-charter-box, .pf .pf-ld-editor, .pf .pf-ld-chart,
-.pf .pf-agd-crew-live, .pf .pf-agd-crew-problems, .pf .pf-agd-crew-tools-group, .pf .mbr-yours,
-.pf .mem-tools-section, .pf .mem-detail, .pf .mem-browse-panel, .pf .mem-bulkbar, .pf .pn-card, .pf .pn-setup, .pf .agent-cta, .pf .create-form,
-.pf .ext-detail-section, .pf .platform-content, .pf .pf-agd-governance-section, .pf .agd-governance-section, .pf .pf-agd-services-info, .pf .agd-services-info,
-.pf .pf-agd-create-form, .pf .agd-create-form, .pf .pf-agd-builder, .pf .agd-builder, .pf .pf-agd-cgroup-empty, .pf .pf-agd-msg-proposed-task, .pf .agd-msg-proposed-task,
-.pf .pf-agd-directives-content, .pf .stat-card, .pf .pf-usage-card {
-  background: none; border: 0; border-top: 3px solid var(--text); border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem;
+.pf .sch-form, .pf .sch-cal-freq, .pf .pf-nb-suggest, .pf .pf-nb-enrich,
+.pf .pf-nb-plan-step, .pf .pf-ld-pending, .pf .pf-ld-charter-box, .pf .pf-ld-editor,
+.pf .pf-ld-chart, .pf .pf-agd-crew-live, .pf .pf-agd-crew-problems, .pf .pf-agd-crew-tools-group,
+.pf .mem-tools-section, .pf .mem-detail, .pf .mem-browse-panel, .pf .mem-bulkbar,
+.pf .pn-card, .pf .pn-setup, .pf .agent-cta, .pf .create-form,
+.pf .platform-content, .pf .pf-agd-governance-section, .pf .agd-services-info, .pf .pf-agd-create-form,
+.pf .pf-agd-cgroup-empty, .pf .agd-msg-proposed-task, .pf .pf-agd-directives-content, .pf .stat-card,
+.pf .pf-usage-card {
+  background: none; border-right: 0; border-bottom: 0; border-left: 0; border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem;
 }
 .pf .stat-card { padding: 0.9rem 0 1rem; }
 /* Rows: one rule under each, the row's own words in bold */

@@ -5,6 +5,7 @@
  * @description Agent Defaults section — owner-level default rules and token
  *   budget for agents. Mounted at the foot of the Your agents page.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.1.0 — 2026-09-05 — Moved from access-tab/agent-defaults.js to the agents' own folder and
  *     mounted on the Your agents page: the rules are about the agents, not about who holds a key.
@@ -128,7 +129,7 @@ export function AgentDefaultsSection({ showToast, initial }) {
         </div>
       </div>
     ` : html`
-      <div class="create-form">
+      <div class="create-form poster-row--thing">
         <h4 class="card-h3 mb-half">${t('profile.access.adEditTitle') || 'Edit Agent Defaults'}</h4>
         <div class="flex-col">
           <div class="form-row">

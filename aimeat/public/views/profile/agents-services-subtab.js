@@ -9,6 +9,7 @@
  *   - AgentServicesSubtab (default export) -- main component
  *   - ServiceCard -- individual service display card
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.1.0 -- 2026-05-24 -- Fix locale keys; add status dots and active/inactive labels
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
  */
@@ -107,7 +108,7 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
 
   return html`
     <div>
-      <div class="agd-services-info">
+      <div class="agd-services-info poster-row--thing">
         ${t('profile.agents.detail.services.info')}
       </div>
 

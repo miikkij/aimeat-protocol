@@ -6,6 +6,7 @@
  *   and the agent Schedules sub-tab (agents/tab-schedules.js). Prefix: sch-.
  *   Theme-token driven (no hardcoded colors) so it flips with dark/light mode.
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 -- 2026-06-03 -- Initial scheduler styles
  *   v1.1.0 -- 2026-07-03 -- Add the day/week/month calendar (.sch-cal-*) + .sch-flash highlight used
  *     when a calendar event scrolls to its schedule card/row. Kind colour via a --k custom property.
@@ -70,7 +71,7 @@
 
 /* ── Create form ── */
 .sch-form {
-  background: var(--card); border: 1px solid var(--border);
+  background: var(--card);
   border-radius: var(--radius); padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.75rem;
 }
 .sch-form-row { display: flex; flex-direction: column; gap: 0.3rem; }
@@ -190,7 +191,7 @@
 
 /* ── "Continuously running" strip — high-frequency schedules kept out of the grid ── */
 .sch-cal-freq {
-  border: 1px solid var(--border); border-radius: 8px;
+border-radius: 8px;
   background: var(--bg-dim); padding: 0.5rem 0.65rem;
   display: flex; flex-direction: column; gap: 0.45rem;
 }
@@ -246,4 +247,3 @@
   font-size: var(--text-sm);
   color: var(--text-dim);
 }
-

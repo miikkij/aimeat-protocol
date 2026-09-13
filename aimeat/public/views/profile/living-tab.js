@@ -11,6 +11,7 @@
  * @structure LivingTab (default export) — templates list/editor + deploy + instances list/viewer
  * @usage html`<${LivingTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-07-16 — Mount folds templates + instances + organisms into GET /v1/living-docs
  *     (getLivingOverview); individual reads (two full memory scans) kept as fallback.
@@ -260,7 +261,7 @@ export default function LivingTab({ session, showToast }) {
     const W = 280, Hh = 56, n = series.length;
     const max = Math.max(...series.map(d => d.value), 1), min = Math.min(...series.map(d => d.value), 0);
     const range = (max - min) || 1, bw = W / n;
-    return html`<svg class="pf-ld-chart" viewBox="0 0 ${W} ${Hh}" width="100%" height=${Hh} preserveAspectRatio="none">
+    return html`<svg class="pf-ld-chart poster-row--thing" viewBox="0 0 ${W} ${Hh}" width="100%" height=${Hh} preserveAspectRatio="none">
       ${series.map((d, i) => { const h = ((d.value - min) / range) * (Hh - 8) + 4; return html`<rect key=${i} x=${i * bw + 1} y=${Hh - h} width=${Math.max(1, bw - 2)} height=${h}><title>${escHtml(d.label)}: ${d.value}</title></rect>`; })}
     </svg>`;
   };
@@ -270,7 +271,7 @@ export default function LivingTab({ session, showToast }) {
   // ── Render: template editor ──
 
   const renderEditor = () => html`
-    <div class="pf-ld-editor">
+    <div class="pf-ld-editor poster-row--thing">
       <div class="poster-section-title pf-nb-section">${editing.id && templates?.some(x => x.id === editing.id) ? t('profile.living.editTemplate') : t('profile.living.newTemplate')}</div>
       <label class="pf-nb-suggest-label">${t('profile.living.fieldTitle')}</label>
       <input class="input-field" value=${editing.title} onInput=${e => patchEditing({ title: e.target.value })} />
@@ -285,8 +286,8 @@ export default function LivingTab({ session, showToast }) {
         <button class="btn-ghost btn-sm ${charterView === 'readable' ? 'pf-ld-cv-active' : ''}" onClick=${() => setCharterView(v => v === 'readable' ? null : 'readable')}>${t('profile.living.charterReadable')}</button>
         <button class="btn-ghost btn-sm ${charterView === 'yaml' ? 'pf-ld-cv-active' : ''}" onClick=${() => setCharterView(v => v === 'yaml' ? null : 'yaml')}>${t('profile.living.charterYaml')}</button>
       </div>
-      ${charterView === 'readable' && html`<div class="pf-ld-charter-box"><${Markdown} text=${editing.charterReadable || editing.charter?.scope || t('profile.living.charterEmpty')} /></div>`}
-      ${charterView === 'yaml' && html`<pre class="pf-ld-charter-box pf-ld-yaml">${escHtml(living.charterToYaml(editing.charter || {}))}</pre>`}
+      ${charterView === 'readable' && html`<div class="pf-ld-charter-box poster-row--thing"><${Markdown} text=${editing.charterReadable || editing.charter?.scope || t('profile.living.charterEmpty')} /></div>`}
+      ${charterView === 'yaml' && html`<pre class="pf-ld-charter-box pf-ld-yaml poster-row--thing">${escHtml(living.charterToYaml(editing.charter || {}))}</pre>`}
 
       <div class="pf-nb-suggest-label">${t('profile.living.automation')}</div>
       <div class="pf-ld-automation">
@@ -322,7 +323,7 @@ export default function LivingTab({ session, showToast }) {
   // ── Render: deploy panel ──
 
   const renderDeploy = () => html`
-    <div class="pf-ld-editor">
+    <div class="pf-ld-editor poster-row--thing">
       <div class="poster-section-title pf-nb-section">${t('profile.living.deployTitle').replace('{title}', deploying.template.title)}</div>
       ${orgs.length === 0
         ? html`<div class="empty">${t('profile.living.noOrgs')}</div>`
@@ -350,7 +351,7 @@ export default function LivingTab({ session, showToast }) {
     const st = opened.config.status || {};
     const lastPulse = st.last_pulse ? fmtDateTime(st.last_pulse) : t('profile.living.never');
     return html`
-      <div class="pf-ld-editor">
+      <div class="pf-ld-editor poster-row--thing">
         <div class="pf-ld-opened-head">
           <div class="poster-section-title">${escHtml(opened.config.title)}</div>
           <div class="pf-ld-card-btns">
@@ -400,7 +401,7 @@ export default function LivingTab({ session, showToast }) {
                     ${versions.map((v, i) => html`<option key=${i} value=${i}>${fmtDateTime(v.producedAt)} · ${escHtml(v.producedBy || '')}</option>`)}
                   </select>
                 </div>
-                ${pickedVer && html`<div class="pf-ld-charter-box"><${Markdown} text=${pickedVer.markdown} /></div>`}`}
+                ${pickedVer && html`<div class="pf-ld-charter-box poster-row--thing"><${Markdown} text=${pickedVer.markdown} /></div>`}`}
               ${sec.kind === 'aggregate' && html`
                 <div class="pf-ld-aggregate">
                   ${series.length ? renderChart(series) : html`<span class="text-meta-sm">${t('profile.living.noData')}</span>`}
@@ -414,7 +415,7 @@ export default function LivingTab({ session, showToast }) {
               <textarea class="input-field" rows="3" placeholder=${t('profile.living.sectionContentPh')}
                 value=${der?.markdown || ''} onChange=${e => saveSlot(sec.slot, e.target.value)}></textarea>
               ${opened.pending?.[sec.slot] && html`
-                <div class="pf-ld-pending">
+                <div class="pf-ld-pending poster-row--thing">
                   <div class="text-meta-sm">⏳ ${t('profile.living.pendingTitle')}</div>
                   <div class="pf-nb-enrich-preview-body pf-ld-pending-body"><${Markdown} text=${opened.pending[sec.slot].markdown} /></div>
                   <div class="pf-ld-card-btns">

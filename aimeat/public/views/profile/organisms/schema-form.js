@@ -8,6 +8,7 @@
  * @structure SchemaForm
  * @usage import { SchemaForm } from '/views/profile/organisms/schema-form.js';
  * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  */
 import { h } from 'preact';
@@ -112,7 +113,7 @@ export function SchemaForm({ schema, busy, onSave, onCancel, initial, idPrefix, 
   };
 
   return html`
-    <div class="create-form pj-draft-form">
+    <div class="create-form pj-draft-form poster-row--thing">
       <div class="flex-col">
         ${fieldNames.length === 0
           ? html`<div class="pj-empty">${t('organisms.loading') || 'Loading...'}</div>`
