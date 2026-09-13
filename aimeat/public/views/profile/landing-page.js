@@ -17,6 +17,7 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   2026-09-13 — Compose overview B1 headings and row rules from shared poster classes.
  *   v3.17.0 -- 2026-09-13 -- V2: select the shared poster crumb in the tab header.
  *   v3.16.0 — 2026-09-03 — The AI page's route id is 'ai'; 'generator' (its old name, which an
  *     app or a bookmark may still carry) resolves to it from the URL, from a remembered session,
@@ -447,7 +448,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
         })()}
       </aside>
 
-      <main class="pf-content">
+      <main class=${`pf-content ${openView ? '' : 'pf-overview'}`}>
         ${openView ? html`
           <div class="pf-content-head">
             <span class="poster-crumb">${getTabLabel(openView.tabId)}</span>
@@ -477,7 +478,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
           ${/* Where a sign-in lands. The same control the home mounts in its own settings, at the
                 foot of this overview as a footer preference. The way to the home itself is the
                 header and the top of the sidebar; this only decides the start page. */''}
-          <${StartPageSetting} className="pf-start-page" />
+          <${StartPageSetting} className="pf-start-page poster-row--thing" />
         `}
       </main>
     </div>
