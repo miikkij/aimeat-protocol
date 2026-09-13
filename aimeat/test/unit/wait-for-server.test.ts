@@ -10,13 +10,14 @@
  *   are about the message and about how long the failure takes to arrive.
  * @usage cd aimeat && pnpm test -- wait-for-server
  * @version-history
+ *   v1.1.0 — 2026-09-13 — The thread reading: the wording everywhere, the real /proc walk on Linux.
  *   v1.0.0 — 2026-09-09 — Initial, with the helper.
  */
 import { describe, it, expect } from 'vitest';
 import { spawn } from 'node:child_process';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { waitForServer } from '../helpers/wait-for-server.js';
+import { waitForServer, describeThreadStates } from '../helpers/wait-for-server.js';
 
 /** A child that runs one line of JavaScript, with both streams piped as the helper expects. */
 const child = (code: string) =>
@@ -65,6 +66,24 @@ describe('waitForServer', () => {
         try {
             await expect(waitForServer(c, 'http://127.0.0.1:1', { budgetMs: 1_000 }))
                 .rejects.toThrow(/refuses connections, so nothing ever bound it.*printed NOTHING/s);
+        } finally { c.kill('SIGKILL'); }
+    });
+
+    it('spells out what each thread is doing, and says when the main one is parked', () => {
+        expect(describeThreadStates(['S', 'S', 'D'], 'io_schedule'))
+            .toBe(' Its 3 thread(s): 2×S (sleeping, woken by a signal or an event), '
+                + '1×D (in uninterruptible sleep, which is the disk), and the main thread is parked in io_schedule.');
+        // No wchan on this kernel, and a state letter nobody documented: say the rest anyway.
+        expect(describeThreadStates(['R', 'X'], '')).toBe(' Its 2 thread(s): 1×R (running), 1×X (unknown state).');
+        // Nothing readable under /proc is not a claim about the process.
+        expect(describeThreadStates([], 'futex_wait')).toBe('');
+    });
+
+    it.skipIf(process.platform !== 'linux')('names the threads of a node that never answers', async () => {
+        const c = child('setTimeout(() => {}, 30_000)');
+        try {
+            await expect(waitForServer(c, 'http://127.0.0.1:1', { budgetMs: 1_000 }))
+                .rejects.toThrow(/thread\(s\):/);
         } finally { c.kill('SIGKILL'); }
     });
 

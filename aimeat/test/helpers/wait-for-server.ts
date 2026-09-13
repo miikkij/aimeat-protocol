@@ -31,6 +31,11 @@
  *   const child = spawn('node', [...], { stdio: ['ignore', 'pipe', 'pipe'] });
  *   return waitForServer(child, BASE);
  * @version-history
+ *   v1.2.0 — 2026-09-13 — And WHERE it is: the state letter of every thread, and the kernel
+ *     function the main one is parked in. The share of a core narrowed the question and left it
+ *     open — a node that sat out 420 seconds at 2% of a core beside siblings that booted in 7,
+ *     while having burned a whole boot's worth of CPU, is not simply losing a fair fight for the
+ *     processor, and nothing in the message could say what it was doing instead.
  *   v1.1.0 — 2026-09-12 — The CPU reading gives the SHARE OF ONE CORE instead of a verdict. The
  *     verdict was wrong in the case that happens: a spawned node burned 7.8s of CPU in 180s on the
  *     Postgres guard tier and was called "WAITING on something, not computing", when 7.8s is about
@@ -43,7 +48,7 @@
  */
 import type { ChildProcess } from 'node:child_process';
 import { connect } from 'node:net';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { URL } from 'node:url';
 
 /** How long a spawned node may take to answer. Generous on purpose: see the file header. */
@@ -115,6 +120,7 @@ export async function waitForServer(
     // process is killed, because after that the port tells you nothing.
     const listening = await portAnswers(base);
     const cpu = cpuSecondsOf(child.pid);
+    const threads = threadStatesOf(child.pid);
     const said = bytes === 0
         ? 'the node printed NOTHING, so it never reached its first log line'
         : `the node printed ${bytes} bytes, first at ${firstOutputAt - began}ms`;
@@ -136,7 +142,7 @@ export async function waitForServer(
     throw new Error(
         `${label} did not answer ${base}${path} within ${budgetMs}ms. `
         + `The port ${listening ? 'IS accepting connections, so something is there and not answering HTTP' : 'refuses connections, so nothing ever bound it'}; `
-        + `${said}.${burned} `
+        + `${said}.${burned}${threads} `
         + `Raise AIMEAT_E2E_BOOT_MS if the machine is slow rather than broken.${tail()}`);
 }
 
@@ -160,6 +166,63 @@ function cpuSecondsOf(pid: number | undefined): number | null {
     } catch {
         return null;
     }
+}
+
+/** What the kernel says each of a state letter's threads is doing, for the message. */
+const THREAD_STATES: Record<string, string> = {
+    R: 'running',
+    S: 'sleeping, woken by a signal or an event',
+    D: 'in uninterruptible sleep, which is the disk',
+    T: 'stopped',
+    Z: 'a zombie',
+};
+
+/**
+ * WHERE the process is, thread by thread, on Linux, where CI runs.
+ *
+ * The share of a core narrowed the question and did not close it. On 2026-09-13 a spawned node sat
+ * out a 420-second budget at 2% of a core, having burned a whole boot's worth of CPU, while four
+ * of its siblings booted in 7 to 11 seconds on the same lane of the same run — so "starved by the
+ * other lanes" stopped fitting, and nothing in the message could say what it was doing instead.
+ * These two files answer that: the state letter separates a thread the scheduler is passing over
+ * (R) from one asleep on an event (S) from one the kernel will not even interrupt because it is
+ * waiting on the disk (D), and `wchan` names the kernel function the main thread is parked in
+ * (`do_epoll_wait`, `futex_wait`, `io_schedule` mean three different bugs).
+ *
+ * Read before the SIGKILL, because nothing under /proc survives it. Returns '' anywhere else,
+ * which costs the message one clause and nothing else.
+ */
+function threadStatesOf(pid: number | undefined): string {
+    if (process.platform !== 'linux' || !pid) return '';
+    try {
+        const states: string[] = [];
+        for (const tid of readdirSync(`/proc/${pid}/task`)) {
+            try {
+                const stat = readFileSync(`/proc/${pid}/task/${tid}/stat`, 'utf-8');
+                states.push(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[0]);
+            } catch { /* a thread that ended between the listing and the read */ }
+        }
+        let wchan = '';
+        try {
+            const w = readFileSync(`/proc/${pid}/wchan`, 'utf-8').trim();
+            if (w && w !== '0') wchan = w;
+        } catch { /* wchan is not readable on every kernel */ }
+        return describeThreadStates(states, wchan);
+    } catch {
+        return '';
+    }
+}
+
+/** The sentence the reading becomes. Separate from the reading so it can be asserted anywhere. */
+export function describeThreadStates(states: string[], wchan: string): string {
+    if (states.length === 0) return '';
+    const counts = new Map<string, number>();
+    for (const s of states) counts.set(s, (counts.get(s) ?? 0) + 1);
+    const spelled = [...counts.entries()]
+        .map(([s, n]) => `${n}×${s} (${THREAD_STATES[s] ?? 'unknown state'})`)
+        .join(', ');
+    const parked = wchan ? `, and the main thread is parked in ${wchan}` : '';
+    return ` Its ${states.length} thread(s): ${spelled}${parked}.`;
 }
 
 /** Does anything accept a TCP connection at that address? Half a second, then no. */
