@@ -1,13 +1,13 @@
 ---
 name: aimeat-frontend-verify
-description: AIMEAT frontend rules: the styling conventions to write to, and how a finished change is verified by driving a real browser through the Playwright MCP server (three viewports, repaint count, idle network log). Use before writing or editing anything under public/views, public/components, public/js, public/css, public/locales or an HTML page, and again when that change is done or an AIMEAT app has been published.
+description: AIMEAT frontend rules: the styling conventions to write to, and how a finished change is verified by driving a real browser through the Playwright MCP server (three viewports, repaint count, idle network log). Use before writing or editing anything under public/views, public/components, public/js, public/css, locales or an HTML page, and again when that change is done or an AIMEAT app has been published.
 ---
 
 # Verifying a finished frontend change
 
 **Do not write or run the `.spec.ts` Playwright suite** (`pnpm test:playwright:*`). It is unreliable. Drive a real browser through the **Playwright MCP server** (`.mcp.json`) instead.
 
-**Trigger:** a completed change to `public/views/`, `public/components/`, `public/js/`, `public/css/`, `public/locales/`, or a `*.html` page, or a published single-file AIMEAT app (`aimeat_app_publish`). Mid-development is not the trigger; done is.
+**Trigger:** a completed change to `public/views/`, `public/components/`, `public/js/`, `public/css/`, `locales/`, or a `*.html` page, or a published single-file AIMEAT app (`aimeat_app_publish`). Mid-development is not the trigger; done is.
 
 Against the running dev server (`pnpm dev`, port 40050): navigate to the page, reach the authenticated state, perform the real interactions, and confirm the expected result actually happens. Elements appear, data persists, edits and deletes take effect.
 
