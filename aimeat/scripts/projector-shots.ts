@@ -24,11 +24,15 @@
  *   Book takes twenty seconds to draw its first screen and a calculator takes two; the projector
  *   reads the same file, so the pictures and the words cannot drift apart.
  * @usage
- *   AIMEAT_SHOT_BASE=https://aimeat.io AIMEAT_SHOT_USER=<owner> AIMEAT_SHOT_PASSWORD=<password> \
- *     pnpm projector:shots [--only settings|admin|apps|settings:scheduler,apps:design-book] \
+ *   AIMEAT_SHOT_BASE=https://aimeat.io pnpm projector:shots \
+ *     [--only settings|admin|apps|settings:scheduler,apps:design-book] \
  *     [--width 1600] [--height 1000] [--settle 1800] [--show <path to a show.json>]
- * @structure SETTINGS · ADMIN · SLOW_MS · arg · launchBrowser · readShow · main
+ *   The sign-in comes from scripts/.env (AIMEAT_APP_LOGIN_USER / _PASSWORD) unless AIMEAT_SHOT_USER
+ *   and AIMEAT_SHOT_PASSWORD are set; AIMEAT_SHOT_ENV names another env file.
+ * @structure SETTINGS · ADMIN · SLOW_MS · arg · launchBrowser · readShow · loginFromEnvFile · main
  * @version-history
+ *   v1.3.0 — 2026-09-15 — The sign-in falls back to scripts/.env, the file the repo's other
+ *     scripts already read, so the command needs no password on the line.
  *   v1.2.0 — 2026-09-14 — The apps in the show, from show.json: their own settle, a page other than
  *     the app itself (the catalogue), and the catalogue's details view opened before the shutter.
  *     Nine more slow menu pages, measured on aimeat.io.
@@ -112,12 +116,33 @@ function readShow(path: string): ShowEntry[] {
   }
 }
 
+/**
+ * The sign-in the repo's own scripts already keep: scripts/.env at the repo root carries
+ * AIMEAT_APP_LOGIN_USER and AIMEAT_APP_LOGIN_PASSWORD (gitignored; scripts/.env.example names
+ * them). Read when AIMEAT_SHOT_USER / AIMEAT_SHOT_PASSWORD are not set; AIMEAT_SHOT_ENV points at
+ * another file. A missing file is simply no fallback.
+ */
+function loginFromEnvFile(): { username: string; password: string } {
+  const path = process.env.AIMEAT_SHOT_ENV || resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', '.env');
+  try {
+    const vars: Record<string, string> = {};
+    for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+      if (m) vars[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+    }
+    return { username: vars.AIMEAT_APP_LOGIN_USER || '', password: vars.AIMEAT_APP_LOGIN_PASSWORD || '' };
+  } catch {
+    return { username: '', password: '' };
+  }
+}
+
 async function main(): Promise<void> {
   const base = (process.env.AIMEAT_SHOT_BASE || 'http://localhost:40600').replace(/\/$/, '');
-  const username = process.env.AIMEAT_SHOT_USER || '';
-  const password = process.env.AIMEAT_SHOT_PASSWORD || '';
+  const fromFile = loginFromEnvFile();
+  const username = process.env.AIMEAT_SHOT_USER || fromFile.username;
+  const password = process.env.AIMEAT_SHOT_PASSWORD || fromFile.password;
   if (!username || !password) {
-    console.error('AIMEAT_SHOT_USER and AIMEAT_SHOT_PASSWORD (an owner with the operator role) are required.');
+    console.error('A sign-in is required: AIMEAT_SHOT_USER and AIMEAT_SHOT_PASSWORD, or AIMEAT_APP_LOGIN_USER and AIMEAT_APP_LOGIN_PASSWORD in scripts/.env (an owner with the operator role).');
     process.exit(2);
   }
   const only = arg('only');
