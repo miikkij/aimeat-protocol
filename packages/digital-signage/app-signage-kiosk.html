@@ -1,6 +1,6 @@
 <!-- AIMEAT App Manifest
 name: Signage Kiosk
-version: 2.0.0
+version: 2.0.1
 description: Full-screen digital signage display — reads one public screen document, no login
 entry: index.html
 -->
@@ -19,6 +19,8 @@ entry: index.html
   @version-history
     v2.0.0 — 2026-07-11 — Rewritten for the workspace-document model (was memory-key kiosk). Public
       document read, client-side rotation, per-view active window + weight, emergency override.
+    v2.0.1 — 2026-09-14 — The poll re-renders only when the screen changed. Every poll used to
+      restart the rotation at the first view, so a 30 s poll showed only the first 30 / interval views.
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -168,12 +170,28 @@ entry: index.html
       tick(); clockTimer = setInterval(tick, 15000);
     }
 
+    // What the stage shows: the payload plus which views are inside their active window right now.
+    // A poll that returns the same signature leaves the stage and the rotation alone; re-rendering
+    // restarts the rotation at the first view, so a 30 s poll would show only 30 / interval views.
+    function signature(payload) {
+      const now = Date.now();
+      const active = payload.views.map((v) => (!v.activeFrom || Date.parse(v.activeFrom) <= now)
+        && (!v.activeUntil || Date.parse(v.activeUntil) >= now));
+      return JSON.stringify(payload) + '|' + active.join(',');
+    }
+
     // ── boot + poll ───────────────────────────────────────────────────────
+    let shown = null;  // signature of what the stage shows; null after an error or before the first load
+
     async function load() {
       try {
         const payload = await fetchScreen();
+        const sig = signature(payload);
+        if (sig === shown) return;
         render(payload);
+        shown = sig;
       } catch (e) {
+        shown = null;
         const msg = e && e.message;
         if (msg === 'not-public') showStatus('This screen is not published publicly yet. In the Signage admin, mark it public.');
         else showStatus('Could not load the screen (' + (msg || 'error') + '). Check org / ws / screen.');
