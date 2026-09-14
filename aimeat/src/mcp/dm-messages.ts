@@ -64,7 +64,7 @@ import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.
 import { deleteOwnerMessage } from '../services/direct-message-delete.js';
 import { delegateReaderFor, readOwnerOverview, readOwnerThread } from '../services/owner-mailbox-reads.js';
 import { sendGroupMessage } from '../services/conversation-group.js';
-import { broadcastFromPrincipal } from '../services/message-broadcast.js';
+import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message-broadcast.js';
 import type { DeliveryCtx } from '../services/message-delivery.js';
 import { MessageAttachmentInputSchema, InteractiveQuestionSchema } from '../models/message-schemas.js';
 import { annotationsFor } from './annotations.js';
@@ -300,19 +300,13 @@ export function registerDmMessageTools(
                 mode: mode ?? 'broadcast', body: body ?? '', subject, attachments: mapped, interactive,
                 // A FUNCTION, so the service stamps it after its own refusals: stamping writes a
                 // row, and this tool was writing it before the service could refuse the audience.
-                stampProvenance: () => provenanceForWrite(storage, {
+                stampProvenance: broadcastProvenanceStamp({ storage, config }, {
                     principal: senderGhii,
-                    // The questions are content a person reads, exactly as in aimeat_dm_ask, so they
-                    // are hashed with the body rather than left out of the record.
-                    content: [body ?? '', ...(interactive?.questions ?? []).map(q => `${q.header ?? ''} ${q.prompt ?? ''}`)].join('\n'),
+                    body,
+                    questions: interactive?.questions,
                     declaredId: ai_provenance_id,
                     declared: toDeclaredProvenance(ai_provenance),
                     pipeline: 'mcp.dm_broadcast',
-                    surface: { visibility: 'private', humanAudience: true },
-                    labelPolicy: config.aiLabelPublic,
-                    nodeId: config.nodeId,
-                    baseUrl: config.baseUrl,
-                    enabled: config.aiProvenance,
                 }),
             });
             if (!result.ok) {

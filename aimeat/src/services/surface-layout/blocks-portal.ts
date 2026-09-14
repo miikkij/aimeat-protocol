@@ -24,6 +24,8 @@
  *   and falls back to this one. A new block, or a rewritten sentence, moves both: the locale key is
  *   what a Finnish operator actually reads.
  * @version-history
+ *   v1.3.0 — 2026-09-14 — Seven portal.frame-* blocks: the front page as the message frame says it
+ *     (TARGET-075). The showroom blocks are untouched.
  *   v1.2.0 — 2026-09-12 — The summaries an operator reads say what the part is, in plain words.
  *     Eleven of them described the part the way the front page pitches itself ("Loved the demo?
  *     Take one home", "Safe is a list, not a word"), which reads as a slogan rather than as an
@@ -315,5 +317,85 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         props: {},
         maxPerSurface: 1,
         summary: 'The closing words: this is free to try, with the way back up to the wish box and, when there is one, the shop.',
+    },
+
+    // 5. The front page as the message frame says it (2026-09-14, TARGET-075): say what you want,
+    //    then make sure it happens. Seven blocks; the counters, the store and the safety list are
+    //    the showroom's own blocks reused. Components in views/landing-v2*.js.
+    {
+        id: 'portal.frame-hero',
+        surfaces: ['portal'],
+        presence: { kind: 'always' },
+        localeStem: 'landing2.hero',
+        liveDomains: [],
+        props: {
+            picture: {
+                type: 'boolean',
+                default: true,
+                description: 'Whether the full-width showroom picture renders under the headline. Off gives a text-only hero.',
+            },
+        },
+        maxPerSurface: 1,
+        summary: 'The claim at the top: say what you want, then make sure it happens. The box a visitor types a wish into, "plug in the AI you already use" as the first door and "get your own" as the second, and the showroom picture.',
+    },
+    {
+        id: 'portal.frame-ten',
+        surfaces: ['portal'],
+        presence: { kind: 'always' },
+        localeStem: 'landing2.ten',
+        liveDomains: [],
+        props: {},
+        maxPerSurface: 1,
+        summary: 'Ten seconds under the hood: six outcomes one after another, the question why a visitor should care, and the answer: their AI gets these powers and they get them through it.',
+    },
+    {
+        id: 'portal.frame-projector',
+        surfaces: ['portal'],
+        presence: { kind: 'always' },
+        localeStem: 'landing2.proj',
+        liveDomains: ['apps'],
+        props: {},
+        maxPerSurface: 1,
+        summary: 'The slide projector: one big button, one slide per page of Settings & Controls and Admin and per app in the show, the menus around it as a word cloud with the current word lit. Optional for the visitor.',
+    },
+    {
+        id: 'portal.frame-cards',
+        surfaces: ['portal'],
+        presence: { kind: 'always' },
+        localeStem: 'landing2.cards',
+        liveDomains: [],
+        props: {},
+        maxPerSurface: 1,
+        summary: 'Prompts and what they made: four cards, each with the prompt to copy, what it produced, how long it took and with which model.',
+    },
+    {
+        id: 'portal.frame-wall',
+        surfaces: ['portal'],
+        presence: { kind: 'always' },
+        localeStem: 'landing2.wall',
+        liveDomains: ['apps'],
+        props: {},
+        maxPerSurface: 1,
+        summary: 'The apps published here, the ones other people built first and this site\'s own after them.',
+    },
+    {
+        id: 'portal.frame-linux',
+        surfaces: ['portal'],
+        presence: { kind: 'always' },
+        localeStem: 'landing2.linux',
+        liveDomains: [],
+        props: {},
+        maxPerSurface: 1,
+        summary: 'One line above the safety list: AIMEAT is the Linux of AI, open code, your server, your rules, so the list can be checked rather than believed.',
+    },
+    {
+        id: 'portal.frame-close',
+        surfaces: ['portal'],
+        presence: { kind: 'always' },
+        localeStem: 'landing2.close',
+        liveDomains: [],
+        props: {},
+        maxPerSurface: 1,
+        summary: 'The closing line, AI & me at work, at the shop, at 7 am, at the start, and the two buttons back to the demo and to the shop.',
     },
 ];

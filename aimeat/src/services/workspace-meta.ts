@@ -42,6 +42,11 @@
  *     way to READ them: the tool's own advice was to fetch GET /v1/memory/{key}/schema first, which
  *     an MCP-only client cannot do, so the safe round-trip was impossible and an update dropped
  *     whatever the previous schema said. Both read surfaces now return them.
+ *   v1.9.0 — 2026-09-14 — The additive path fills the defaults of the backing it is adding. They
+ *     were the memory ones for every space, so `add_spaces` with `backing:'rows'` failed on the
+ *     `versioned: true` it had just stamped itself, and a row space that got through carried
+ *     `mode: 'records'` — a memory space's storage mode, on a space that stores neither records nor
+ *     documents. Reported 2026-09-14 from a node building an eCOA diary on row spaces.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -329,10 +334,19 @@ export async function updateWorkspaceMeta(
     for (const raw of addObjectTypes) {
       if (!raw || typeof raw !== 'object' || !raw.name || !raw.namespace) throw new WorkspaceMetaError('INVALID_MANIFEST', 'Each add_spaces entry needs a name and a namespace.');
       if (haveName.has(raw.name) || haveNs.has(raw.namespace)) { skipped.push(String(raw.name)); continue; }
+      // The defaults belong to the KIND of space being added, and they were the memory ones for
+      // everybody until 2026-09-14. A row space arrived carrying `versioned: true`, which its own
+      // rule refuses, so add_spaces rejected every row space whose caller had not thought to pass
+      // `versioned: false` — a refusal naming a field the caller never set. And `mode` is how a
+      // MEMORY space stores what it holds (a schema-locked record or a markdown page); a row space
+      // has neither, so stamping `mode: 'records'` on it tells every reader whose test is the mode
+      // that this is a records space.
+      const isRows = (raw.backing ?? 'memory') === 'rows';
+      const defaults: Record<string, unknown> = isRows
+        ? { backing: 'rows', writeRole: 'member', cardinality: 'many', versioned: false }
+        : { mode: raw.kind === 'document' ? 'document' : 'records', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true };
       const ot: Record<string, unknown> = normalizeObjectTypes([{
-        mode: raw.mode || (raw.kind === 'document' ? 'document' : 'records'), backing: raw.backing || 'memory', writeRole: raw.writeRole || 'member',
-        cardinality: raw.cardinality || 'many', versioned: raw.versioned !== undefined ? raw.versioned : true,
-        ...raw, schemaRef: raw.schemaRef || `schema:${String(raw.name)}@1`,
+        ...defaults, ...raw, schemaRef: raw.schemaRef || `schema:${String(raw.name)}@1`,
       }])[0];
       existing.push(ot); haveName.add(raw.name); haveNs.add(raw.namespace); added.push(String(raw.name));
     }

@@ -10,6 +10,10 @@
  *   kpiMeets, firstLine, shortActor, cap, isMobileView, renderSpaceNotice
  * @usage import { PRIMARY_FIELD, groupDocs } from '/views/profile/organisms/workspace/helpers.js';
  * @version-history
+ *   2026-09-14 -- A row space reads as a row space: its own notice. It fell into the "backing not
+ *     supported" branch, which told the owner to switch it to memory — the one change row spaces
+ *     exist to prevent. The repeated name-and-badge head went with it: organism.css hides it inside
+ *     an og-page, which is the only place this renders, so it was markup nobody could see.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
  */
@@ -98,13 +102,17 @@ export const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 export const isMobileView = () => window.matchMedia('(max-width: 640px)').matches;
 
 // A declared space whose backing isn't memory — never silently hidden, its tab shows a notice.
+// Two of those backings are supported and keep their content somewhere else on purpose (tasks in
+// the task system, rows in the row store), so each says where to look. Only a backing this build
+// does not implement is told to switch to memory: saying that to a row space would undo the very
+// thing row spaces are for. The space's own name and kind are the page headline and subtitle above
+// this (cover.js), and the section head this used to repeat them in is `display: none` inside an
+// og-page (css/views/organism.css), so it is the notice alone.
 export const renderSpaceNotice = (ot) => html`
   <div class="pj-section poster-row--thing" key=${ot.name}>
-    <div class="pj-section-head">
-      <span class="pj-section-title">${(ot.name)}</span>
-      <span class="badge badge-warn">${(String(ot.backing))}</span>
-    </div>
     <div class="pj-space-notice">${ot.backing === 'tasks'
       ? (t('organisms.spaceTasksBacked') || 'This space points at the task system — its items are tasks, not workspace records. Manage them in the Tasks views.')
-      : (t('organisms.spaceBackingUnsupported') || 'This space’s backing is not supported, so its content is not shown here. Edit the workspace (manifest) and set this space’s backing to "memory" to restore it — files and knowledge packages attach via Sources or document images instead.')}</div>
+      : ot.backing === 'rows'
+        ? (t('organisms.spaceRowsBacked') || 'This space holds rows the group accumulates. They are appended and never edited, and this page does not list them — they are read with the row tools, which filter and page through them.')
+        : (t('organisms.spaceBackingUnsupported') || 'This space’s backing is not supported, so its content is not shown here. Edit the workspace (manifest) and set this space’s backing to "memory" to restore it — files and knowledge packages attach via Sources or document images instead.')}</div>
   </div>`;

@@ -11,6 +11,9 @@
  *   - flagsRouter(config, storage): POST /v1/flags plus flag listing/review routes
  *
  * @version-history
+ *   v1.2.0 — 2026-09-14 — The organism-admin path asks which PRINCIPAL is calling, not whose name
+ *     the call carries: it read the admin's GHII from `req.auth.owner`, so the admin's own agent
+ *     moderated in their name and so did a same-named visitor from another node. Invariant 11.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-11 — The flag write moves to services/moderation-flags.ts, which the MCP tool
  *     now calls too (August 2026 audit step 8). The valid target types and reasons, the organism
@@ -19,7 +22,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope, isOwnerPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { FlagCreateSchema, validateBody } from '../models/schemas.js';
@@ -128,9 +131,16 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
         }
 
         // Phase 2.4 — Allow organism admins to moderate flags within their organism
+        //
+        // THE ADMIN PATH ASKS WHO IS CALLING, not whose name the call carries. It read the GHII from
+        // `req.auth.owner`, which every principal acting for that person carries — so the admin's
+        // own agent, holding no scope for this and never granted it, moderated in their name, and a
+        // visitor signed in from another node under the same name did too, on a door whose only
+        // gate is requireAuth(). The owner name is not a principal (invariant 11). Found by the AI
+        // triage of 2026-09-13.
         const isOperator = req.auth!.roles.includes('operator');
         let isOrganismAdmin = false;
-        if (!isOperator) {
+        if (!isOperator && isOwnerPrincipal(req.auth) && !req.auth!.federated) {
             const organism = await resolveOrganismForFlag(storage, existing.targetType, existing.targetId);
             if (organism) {
                 const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner);

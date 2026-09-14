@@ -1,10 +1,12 @@
 /**
  * @file landing.js
- * @description Logged-out front page, the showroom (2026-08-28): the hero with the wish box as the
- *   one action → live counters as its evidence → the wall of published apps with its introduction
- *   → the store (when this node has one) → the safety list → the two rooms → what shipped lately →
- *   the last word. A signed-in visitor arriving at the site's ROOT is forwarded to their start
- *   page; /v1/portal is the front page itself and never forwards anyone. No protocol terms
+ * @description Logged-out front page as the message frame says it (2026-09-14, TARGET-075): the
+ *   hero (say what you want, then make sure it happens; the wish box; plug in the AI you already
+ *   use) → live counters as its evidence → ten seconds under the hood and the answer that is the
+ *   hinge → the slide projector → prompts and what they made → the wall, the community first →
+ *   the store (when this node has one) → why the safety list is checkable → the safety list → the
+ *   last word. A signed-in visitor arriving at the site's ROOT is forwarded to their start page;
+ *   /v1/portal is the front page itself and never forwards anyone. No protocol terms
  *   (GHII/GAII/CSM/federation) above the fold; a working result does the selling.
  *
  *   THE ORDER IS THE OPERATOR'S NOW. The page is a layout rendered by views/surface/renderer.js
@@ -13,14 +15,17 @@
  *   is the door an anonymous visitor arrives at and a blank front page is the worst thing that can
  *   happen on the node.
  *
- *   Each section lives in its own sibling: landing-showroom.js (hero, wall introduction, last
- *   word), landing-showroom-rooms.js (store, safety list, rooms), landing-wall.js (the wall),
- *   landing-node-totals.js, landing-changelog.js. The blocks the showroom order no longer lists
- *   (landing-doors.js, landing-builder.js, landing-prompts.js, home/welcome-door.js) are still in
- *   the block catalogue for an operator to put back.
+ *   Each section lives in its own sibling: landing-v2.js (hero, ten seconds, the Linux line, the
+ *   last word), landing-v2-projector.js, landing-v2-cards.js (the prompt cards and the wall),
+ *   landing-showroom-rooms.js (store, safety list), landing-node-totals.js. The blocks the frame's
+ *   order no longer lists (the showroom's hero, wall introduction, gallery, rooms, change log and
+ *   close; landing-doors.js, landing-builder.js, landing-prompts.js, home/welcome-door.js) are
+ *   still in the block catalogue for an operator to put back.
  * @structure default export Landing({ navigate })
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
+ *   v7.0.0 — 2026-09-14 — The message frame's page (TARGET-075): the fallback tree mirrors the
+ *     new DEFAULT_LAYOUTS.portal, built from landing-v2*.js. The arrival logic is untouched.
  *   v6.1.0 — 2026-08-28 — The page renders nothing until the layout answer arrives (or fails):
  *     the fallback tree used to mount every block once before the layout mounted them again,
  *     so the counters, the wall and the log each fetched twice on every arrival.
@@ -109,11 +114,11 @@ import { getLocale } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
 import { SurfaceRenderer, useSurfaceLayout } from '/views/surface/renderer.js';
 import NodeTotals from './landing-node-totals.js';
-import NodeChangeLog from './landing-changelog.js';
-import { Gallery } from './landing-wall.js';
 import { storeWish, hasStoredWish } from './landing-doors.js';
-import { ShowroomHero, WallIntro, ShowroomClose } from './landing-showroom.js';
-import { StoreSection, TrustList, Rooms } from './landing-showroom-rooms.js';
+import { StoreSection, TrustList } from './landing-showroom-rooms.js';
+import { Hero2, TenSeconds, LinuxLine, Close2 } from './landing-v2.js';
+import { Projector } from './landing-v2-projector.js';
+import { PromptCards, Wall2 } from './landing-v2-cards.js';
 import { storeHref } from '/js/site.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -199,38 +204,40 @@ export default function Landing({ navigate }) {
   // milliseconds; a blank page for that long is invisible, a doubled page load is not.
   if (!surface.failed && !surface.ready) return html`<div class="ld"></div>`;
 
-  // The showroom order, the same one DEFAULT_LAYOUTS.portal declares on the server: the store
+  // The message frame's order, the same one DEFAULT_LAYOUTS.portal declares on the server: the store
   // section is the one part that depends on configuration (a node without a store has no prices to
   // show), and the fallback reads the same site link the block registry gates on.
   return html`
     <div class="ld">
-      <!-- 0. The hero: the claim, the wish box as the one action, three quieter doors, the
-              showroom picture. -->
-      <${ShowroomHero} navigate=${navigate} />
+      <!-- 0. The hero: the claim, the wish box, the two doors, the showroom picture. -->
+      <${Hero2} navigate=${navigate} />
 
       <!-- 1. Live counters, directly under the claim, as its first evidence. -->
       <${NodeTotals} />
 
-      <!-- 2. What the wall is, then the wall itself: the best thing on this page for showing the
-              place is alive. -->
-      <${WallIntro} />
-      <${Gallery} />
+      <!-- 2. Ten seconds under the hood, and the hinge: your AI gets these powers, you get them
+              through it. -->
+      <${TenSeconds} navigate=${navigate} />
 
-      <!-- 3. Loved the demo? Take one home. Only when this node has a store to send people to. -->
+      <!-- 3. The slide projector: optional, for whoever wants to see everything. -->
+      <${Projector} />
+
+      <!-- 4. Prompts and what they produced. -->
+      <${PromptCards} />
+
+      <!-- 5. Built by people and their AI: the community first, then the house. -->
+      <${Wall2} />
+
+      <!-- 6. Liked the demo? Get your own. Only when this node has a store to send people to. -->
       ${storeHref() ? html`<${StoreSection} fromPrice="19 €/mo"
         tiers="Solo: 19 · Team: 59 · Office: 99 · Own machine: 179 · Compliance: 369 · Managed: from 2 000" />` : ''}
 
-      <!-- 4. Safe is a list, not a word; it ends with how this node marks AI content. -->
+      <!-- 7. Safe? See for yourself. The Linux line is the reason the list can be checked. -->
+      <${LinuxLine} />
       <${TrustList} navigate=${navigate} />
 
-      <!-- 5. The two rooms: the incubator and the clubhouse. -->
-      <${Rooms} />
-
-      <!-- 6. Built with itself, every day, and the log that proves it. -->
-      <${NodeChangeLog} />
-
-      <!-- 7. The last word, and the way back up to the wish box. -->
-      <${ShowroomClose} />
+      <!-- 8. The last word, and the way back up to the wish box. -->
+      <${Close2} />
 
       ${/* The footer this page used to carry (Docs, Run your own node, GitHub, For developers,
             AI transparency) is the shell's SiteFooter now — spa.html renders it under every
