@@ -82,3 +82,23 @@ export async function collapseKeyTo(storage: Storage, key: string, keepOwner: st
     .filter(r => r.key === key && r.ownerGaii !== keepOwner)
     .map(r => storage.deleteMemory(r.ownerGaii, r.key).catch(err => { logger.warn('collapseKeyTo: best-effort collapse', { error: String(err) }); })));
 }
+
+/**
+ * The organism's runtime config record (organism.{id}.meta.config), which is where the gates live —
+ * the publish gate among them. Absent means defaults.
+ *
+ * It is read across EVERY owner, not from the caller's own namespace, and that is the whole point:
+ * the config normally belongs to the organism's creator, so a per-owner read returns nothing for
+ * any other member. The MCP publish tool did a per-owner read, so for every member but the creator
+ * the gate registered as absent and the publish went straight through — the human review step
+ * bypassed by the door that needed it most.
+ *
+ * Moved here from ./shared.ts on 2026-09-14 (max-file-lines), unchanged.
+ */
+export async function readOrganismConfig(
+    storage: Storage, organismId: string,
+): Promise<Record<string, unknown> | null> {
+    const key = `organism.${organismId}.meta.config`;
+    const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
+    return (items.find(r => r.key === key)?.value as Record<string, unknown> | undefined) ?? null;
+}

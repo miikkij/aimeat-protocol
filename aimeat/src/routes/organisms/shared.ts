@@ -46,7 +46,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { verifyShareToken } from '../../services/share-token.js';
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
-import { normalizeDocValueImages } from '../../services/doc-images.js';
+import { normalizeDocValueImages, scopeDocImagesToWorkspace } from '../../services/doc-images.js';
 import { resolveIdentity, isSameOwner, isGEAI } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { ecoMayReadKey } from '../../services/ecosystem-access.js';
@@ -58,29 +58,11 @@ import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { readPublishSpace, type UndeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
 import { logger } from '../../utils/logger.js';
 
-/** Whether a membership role satisfies an approval's required approverRole. */
-/**
- * The organism's runtime config record (organism.{id}.meta.config), which is where the gates live —
- * the publish gate among them. Absent means defaults.
- *
- * It is read across EVERY owner, not from the caller's own namespace, and that is the whole point:
- * the config normally belongs to the organism's creator, so a per-owner read returns nothing for
- * any other member. The MCP publish tool did a per-owner read, so for every member but the creator
- * the gate registered as absent and the publish went straight through — the human review step
- * bypassed by the door that needed it most.
- */
-export async function readOrganismConfig(
-    storage: Storage, organismId: string,
-): Promise<Record<string, unknown> | null> {
-    const key = `organism.${organismId}.meta.config`;
-    const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
-    return (items.find(r => r.key === key)?.value as Record<string, unknown> | undefined) ?? null;
-}
-
-// Moved to ./record-helpers.ts on 2026-08-11 (max-file-lines). Re-exported so every existing
-// import of these from ./shared.js keeps resolving, including src/mcp/workspaces.ts.
-export { canWriteNamespaceRule, roleSatisfies, fresherRec, ownerGhiiOf, collapseKeyTo } from './record-helpers.js';
-import { fresherRec, ownerGhiiOf, collapseKeyTo, canWriteNamespaceRule, revertRecordToDraft } from './record-helpers.js';
+// Moved to ./record-helpers.ts on 2026-08-11 (max-file-lines), and readOrganismConfig on 2026-09-14
+// for the same reason. Re-exported so every existing import of these from ./shared.js keeps
+// resolving, including src/mcp/workspaces.ts and services/workspace-tool-ops.ts.
+export { canWriteNamespaceRule, roleSatisfies, fresherRec, ownerGhiiOf, collapseKeyTo, readOrganismConfig } from './record-helpers.js';
+import { fresherRec, ownerGhiiOf, collapseKeyTo, canWriteNamespaceRule, revertRecordToDraft, readOrganismConfig } from './record-helpers.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
 
 export type ShareAccess = 'open' | 'password' | 'account';
@@ -201,10 +183,18 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
 
     // Scope embedded document images to this workspace (members-only) + rewrite to /v1/pub before the
     // draft becomes the published copy — so a shared doc's images load for members without going public.
-    const draftValue = await normalizeDocValueImages(storage, config, draft.value, ownerGhii.split('@')[0], ws ? `${organismId}/${ws}` : undefined);
+    // The URLs are rewritten with NO workspaceRef, so nothing is opened yet: passing it makes every
+    // embedded file readable by the workspace's members as a side effect, and the line below can
+    // still refuse the publish. Same ordering defect as the draft door, same fix (doc-images.ts
+    // scopeDocImagesToWorkspace). The rewritten URL is identical either way.
+    const draftValue = await normalizeDocValueImages(storage, config, draft.value, ownerGhii.split('@')[0]);
 
     const validation = await validateMemoryWrite(`${base}.latest`, draftValue, storage, { viaPublish: true, expectedVersion });
     if (!validation.valid) return { ok: false, code: 'INVALID', violations: validation.errors };
+
+    // Past the refusal: the document is being published, so its images may be scoped to the members
+    // who are about to be able to read it.
+    if (ws) await scopeDocImagesToWorkspace(storage, config, draftValue, ownerGhii.split('@')[0], `${organismId}/${ws}`);
 
     const versionRefs = await listVersionRefs(storage, base);
     const maxN = maxVersionOf(versionRefs);

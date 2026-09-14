@@ -154,3 +154,41 @@ export async function normalizeDocValueImages(
   const normalized = await normalizeDocImageUrls(storage, config, md, ownerName, workspaceRef);
   return normalized === md ? value : { ...(value as Record<string, unknown>), markdown: normalized };
 }
+
+/**
+ * The VISIBILITY half on its own, for a caller that has to rewrite the URLs before it knows whether
+ * the write will happen at all.
+ *
+ * REFUSE BEFORE YOU WRITE. Opening a file to a workspace's members is a write, and passing
+ * `workspaceRef` to the functions above performs it as a side effect of rewriting a URL. The
+ * workspace draft door did that inside its planning loop, so a batch whose second item failed the
+ * schema — or the whole write failing the archived check or the size limit — had already made the
+ * FIRST item's embedded files readable by every member, and then wrote nothing. Found by the AI
+ * triage of 2026-09-13.
+ *
+ * So the two halves separate: normalise with no `workspaceRef` while planning (the rewritten URL is
+ * identical either way — resolveEmbedUrl returns the same `/v1/pub` form), and call this once every
+ * refusal has passed. Best-effort and total, like its neighbours: a file that cannot be scoped
+ * leaves the document rendering for its writer and not for members, which is the old behaviour of a
+ * failed update and not a new one.
+ */
+export async function scopeDocImagesToWorkspace(
+  storage: Storage, config: AimeatConfig, value: unknown, ownerName: string, workspaceRef: string,
+): Promise<void> {
+  if (!workspaceRef || !value || typeof value !== 'object' || Array.isArray(value)) return;
+  const md = (value as Record<string, unknown>).markdown;
+  if (typeof md !== 'string' || !md.includes('/v1/')) return;
+  DOC_IMG_RE.lastIndex = 0;
+  const urls = [...new Set([...md.matchAll(DOC_IMG_RE)].map(m => m[2]))];
+  if (!urls.length) return;
+
+  const ownerGhii = `${ownerName}@${config.nodeId}`;
+  const agents = await storage.getAgentsByOwner(ownerName).catch(err => { logger.warn('scopeDocImagesToWorkspace: continuing after a suppressed failure', { error: String(err) }); return []; });
+  const candidates = [ownerGhii, ...agents.map(a => a.gaii)];
+  for (const url of urls) {
+    // The URL it returns is discarded: the caller already holds the normalised markdown, and this
+    // pass exists for the updateFileVisibility inside.
+    await resolveEmbedUrl(storage, url, ownerName, candidates, workspaceRef)
+      .catch(err => { logger.warn('scopeDocImagesToWorkspace: best-effort', { url, error: String(err) }); return url; });
+  }
+}

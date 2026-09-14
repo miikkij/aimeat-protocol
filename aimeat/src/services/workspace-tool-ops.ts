@@ -56,7 +56,7 @@ import { entryTitle } from './structure-overview.js';
 import { isMemoryBackedSpace, readWorkspaceSchemas } from './workspace-meta.js';
 import { emitChange } from './event-bus.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
-import { normalizeDocValueImages } from './doc-images.js';
+import { normalizeDocValueImages, scopeDocImagesToWorkspace } from './doc-images.js';
 import { normalizeWriteItems, resolveWriteItem, type ResolvedWriteItem } from './workspace-write-items.js';
 import { findWorkspaceRecord, writeWorkspaceRecord } from './workspace-write.js';
 import { writeProvenanceEcho, readProvenanceMany } from '../mcp/ai-provenance-result.js';
@@ -316,7 +316,11 @@ export async function writeWorkspaceDraftsOp(
     for (const [i, item] of resolved.entries()) {
         const key = `${root}.${item.namespace}.${item.instanceId}.draft`;
         let v = coerceValue(item.value, item.instanceId);
-        if (item.isDoc) v = await normalizeDocValueImages(storage, config, v, caller.ownerName, `${organismId}/${ws}`);
+        // NO `workspaceRef` HERE, AND THAT IS THE POINT. Passing it opens every embedded file to
+        // the workspace's members as a side effect of rewriting the URL — a write, inside the loop
+        // that decides whether to write at all. The rewritten URL is identical either way; the
+        // visibility is applied below, once nothing can still refuse.
+        if (item.isDoc) v = await normalizeDocValueImages(storage, config, v, caller.ownerName);
         const valid = await validateMemoryWrite(key, v, storage);
         if (!valid.valid) return refuse(422, 'SCHEMA_VALIDATION_FAILED', `${batch ? `items[${i}]: ` : ''}Draft rejected by schema: ` + JSON.stringify(valid.errors), { violations: valid.errors });
         planned.push({ key, v, item });
@@ -329,6 +333,13 @@ export async function writeWorkspaceDraftsOp(
     }
     const overLimit = await checkWorkspaceWriteLimits(storage, config, caller.ownerGhii, planned, i => (batch ? `items[${i}]: ` : ''));
     if (overLimit) return refuse(413, 'LIMIT_EXCEEDED', overLimit);
+
+    // Past every refusal, so now the embedded files may be opened to the workspace's members. Above
+    // this line a batch's second item could still send the whole call back 422, 409 or 413 with the
+    // first item's images already readable and nothing written.
+    for (const { v, item } of planned) {
+        if (item.isDoc) await scopeDocImagesToWorkspace(storage, config, v, caller.ownerName, `${organismId}/${ws}`);
+    }
 
     const written: Record<string, unknown>[] = [];
     let lastProvenanceId: string | undefined;
