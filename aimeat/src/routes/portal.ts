@@ -534,6 +534,8 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     // The connect story (2026-08-29): the road from "connect the AI you already use" to the
     // guided path, told before the account exists.
     '/v1/connect-your-ai',
+    // The front page's design round (2026-09-14, TARGET-075), on its own address next to /v1/portal.
+    '/v1/portal-v2',
     '/v1/glossary',
     '/v1/business',
     // The human sibling of the machine-readable statement at /v1/ai-transparency. A different
