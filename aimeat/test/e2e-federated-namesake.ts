@@ -18,6 +18,9 @@
  *   attestation. The runner pins AIMEAT_FEDERATION_AUTH_POLICY=all_peers and private egress.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-namesake
  * @version-history
+ *   v1.3.0 — 2026-09-14 — The doors that hand over the ACCOUNT, not just a read of it: the session
+ *     refresh, the GDPR export and delete, the connectivity-key mint, and the file listing. Each
+ *     one failed on the source with the harm in the message.
  *   v1.2.0 — 2026-09-13 — GET /v1/owners/:name: the visitor gets the namesake's public card, never
  *     its roles or its agent roster (the door compared the owner name).
  *   v1.1.0 — 2026-09-13 — The identity itself, which is the root: the visitor's session resolves to
@@ -435,6 +438,71 @@ spec:
         const after = await json('/v1/cortex', as(alice.token));
         assert((after.body.data.extensions as any[]).some(e => e.name === cortexName),
             "the visitor's DELETE removed the namesake's cortex");
+    });
+
+    // THE ACCOUNT ITSELF. Everything above is about what a visitor may READ of the namesake's; these
+    // are the doors that hand over the account. A federated login mints roles ['owner'], so
+    // requireRole('owner') and even requireOwnerPrincipal() admit the visitor, and each door's own
+    // check is a NAME comparison that then matches the local account. Found by the AI triage of
+    // 2026-09-13, nine doors of one shape.
+    await test('The visitor cannot renew their session into a LOCAL owner token', async () => {
+        // The worst of them: the legacy refresh read the local account of the same name for its
+        // roles and minted a token with them, carrying no `federated` marker and no federation
+        // scopes. One call and the visitor WAS the local account — operator too, where it is one.
+        const r = await json('/v1/auth/refresh', as(fedToken, { method: 'POST' }));
+        assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`);
+    });
+
+    await test('The visitor cannot erase or export the local namesake', async () => {
+        const exported = await json(`/v1/owners/${encodeURIComponent(namesake)}/export`, as(fedToken));
+        assert(exported.status === 403, `export: expected 403, got ${exported.status}`);
+
+        const erased = await json(`/v1/owners/${encodeURIComponent(namesake)}`, as(fedToken, { method: 'DELETE' }));
+        assert(erased.status === 403, `delete: expected 403, got ${erased.status}`);
+
+        // And the account is still there, which is the assertion that matters.
+        const still = await json('/v1/messages/overview', as(alice.token));
+        assert(still.status === 200, `the namesake's account did not survive: ${still.status}`);
+    });
+
+    await test('The visitor cannot mint a key that creates an agent under the local account', async () => {
+        // The key records `params.owner` from the caller's name, and the unauthenticated
+        // /v1/agents/connect door then builds an agent under whatever account that names.
+        const r = await json('/v1/auth/connectivity-key', as(fedToken, {
+            method: 'POST', body: JSON.stringify({ agent_name: `fedns-intruder-${stamp}` }),
+        }));
+        assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`);
+    });
+
+    await test("The visitor's file list is their own, never the local namesake's", async () => {
+        // The namesake stores one first, so an empty answer below is a fence and not an empty node.
+        const stored = await json('/v1/memory/files', as(alice.token, {
+            method: 'POST',
+            body: JSON.stringify({
+                key: `fedns-private-file-${stamp}`,
+                content: Buffer.from('the local alice wrote this').toString('base64'),
+                mime_type: 'text/plain', visibility: 'private',
+            }),
+        }));
+        assert(stored.status === 200 || stored.status === 201, `storing the namesake's file: ${stored.status} ${JSON.stringify(stored.body?.error)}`);
+        const hers = await json('/v1/memory/files?count=true', as(alice.token));
+        assert(hers.body.data.count >= 1, `the namesake cannot see her own file: ${JSON.stringify(hers.body?.data)}`);
+
+        const scoped = await json(`/v1/federation/peers/${homeNodeId}`, as(operator.token, {
+            method: 'PUT', body: JSON.stringify({ federation_auth_scopes: ['memory:read', 'catalogue:read', 'storage:read'] }),
+        }));
+        assert(scoped.status === 200, `granting the peer storage:read: ${scoped.status}`);
+        const relogin = await json('/v1/ghii/login', {
+            method: 'POST', body: JSON.stringify({ username: `${namesake}@${homeNodeId}`, password: 'the-home-node-decides' }),
+        });
+        assert(relogin.status === 200, `federated re-login: ${relogin.status}`);
+
+        const r = await json('/v1/memory/files?count=true', as(relogin.body.data.token as string));
+        // Either refused outright or answered with the visitor's own (empty) list — never the
+        // namesake's. What must not happen is the owner branch running for a visitor.
+        if (r.status === 200) {
+            assert(r.body.data.count === 0, `the visitor was handed ${r.body.data.count} of the namesake's files`);
+        }
     });
 }
 

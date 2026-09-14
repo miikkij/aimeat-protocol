@@ -6,6 +6,9 @@
  *   check-update diff, instance details, and instance removal (optional component cleanup).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-14 — requireLocalSession on every door. Each one compares `instance.owner`
+ *     against `req.auth.owner`, and a federated login mints that as the local part of the visitor's
+ *     HOME name — so a visitor read, updated and removed the instances of whoever here shares it.
  *   v1.1.1 — 2026-09-12 — The three resolveGhii calls take the node instead of `req.auth!.sub`, so
  *     the coordinate an instance is compared against can no longer be the bare account name.
  *     wish-identity-gate-sees-resolveghii.
@@ -17,7 +20,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireScope } from '../../auth/middleware.js';
+import { requireAuth, requireScope, requireLocalSession } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseNotYours } from '../../middleware/refusals.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -38,7 +41,7 @@ export function registerManageRoutes(
   storage: Storage,
 ): void {
   // GET /v1/instances — List my instances
-  router.get('/v1/instances', requireAuth(), async (req, res) => {
+  router.get('/v1/instances', requireAuth(), requireLocalSession(), async (req, res) => {
     const owner = req.auth!.owner;
     const status = req.query.status as string | undefined;
     const packageGroupId = req.query.packageGroupId as string | undefined;
@@ -58,7 +61,7 @@ export function registerManageRoutes(
 
   // GET /v1/instances/:id/status — Component status with live hash comparison
   // (Must be before the generic GET /v1/instances/:id)
-  router.get('/v1/instances/:id/status', requireAuth(), async (req, res) => {
+  router.get('/v1/instances/:id/status', requireAuth(), requireLocalSession(), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
 
@@ -125,7 +128,7 @@ export function registerManageRoutes(
 
   // GET /v1/instances/:id/check-update — Check for available updates
   // (Must be before the generic GET /v1/instances/:id)
-  router.get('/v1/instances/:id/check-update', requireAuth(), async (req, res) => {
+  router.get('/v1/instances/:id/check-update', requireAuth(), requireLocalSession(), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
 
@@ -140,7 +143,7 @@ export function registerManageRoutes(
   });
 
   // GET /v1/instances/:id — Get instance details
-  router.get('/v1/instances/:id', requireAuth(), async (req, res) => {
+  router.get('/v1/instances/:id', requireAuth(), requireLocalSession(), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
     const roles = req.auth!.roles;
@@ -164,7 +167,7 @@ export function registerManageRoutes(
   });
 
   // DELETE /v1/instances/:id — Remove instance
-  router.delete('/v1/instances/:id', requireAuth(), requireScope('packages:write'), async (req, res) => {
+  router.delete('/v1/instances/:id', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
     const ownerGaii = await resolveGhii(storage, owner, config);
