@@ -376,6 +376,66 @@ async function run() {
             assert(!JSON.stringify(r.body.data).includes(tc), `${path} handed the visitor the namesake's work`);
         }
     });
+
+    // CORTEX WAS THE SAME NAME COMPARISON, ON THE WRITE SIDE TOO. Every ownership question in
+    // services/cortex-lifecycle.ts is `ext.installedBy === caller.ownerName`, and callerOf() handed
+    // it the bare owner name of a federated session — so the visitor did not merely READ the local
+    // namesake's private cortexes, they owned them: update, deactivate, delete, and the namespace.
+    await test("The local namesake's private cortex is not the visitor's to read or to delete", async () => {
+        const cortexName = `fedns-private-${stamp}`;
+        const manifest = `apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: ${cortexName}
+  namespace: ${namesake}
+  description: A private cortex of the LOCAL account
+spec:
+  version: "1.0.0"
+  components:
+    - type: lib
+      name: greeter
+      filename: greeter.js
+      exports: [hello]
+      api_surface: hello()
+`;
+        const install = await json('/v1/cortex', as(alice.token, {
+            method: 'POST',
+            body: JSON.stringify({ manifest, libs: { 'greeter.js': 'window.hello = () => "local alice only";' } }),
+        }));
+        assert(install.status === 201, `install: ${install.status} ${JSON.stringify(install.body?.error)}`);
+
+        // The namesake sees it, so an empty answer below is a fence and not a missing record.
+        const mine = await json('/v1/cortex', as(alice.token));
+        assert((mine.body.data.extensions as any[]).some(e => e.name === cortexName),
+            `the namesake lost their own cortex: ${JSON.stringify((mine.body.data.extensions as any[]).map(e => e.name))}`);
+
+        // The same point as the work door above: what a visitor may reach is this node's decision,
+        // so grant the peer the words the cortex doors ask for and put the handlers in front of it.
+        const scoped = await json(`/v1/federation/peers/${homeNodeId}`, as(operator.token, {
+            method: 'PUT', body: JSON.stringify({ federation_auth_scopes: ['memory:read', 'catalogue:read', 'cortex:write'] }),
+        }));
+        assert(scoped.status === 200, `granting the peer cortex:write: ${scoped.status} ${JSON.stringify(scoped.body?.error)}`);
+        const relogin = await json('/v1/ghii/login', {
+            method: 'POST', body: JSON.stringify({ username: `${namesake}@${homeNodeId}`, password: 'the-home-node-decides' }),
+        });
+        assert(relogin.status === 200, `federated re-login: ${relogin.status}`);
+        const cortexToken = relogin.body.data.token as string;
+
+        const enc = encodeURIComponent(cortexName);
+        const listed = await json('/v1/cortex', as(cortexToken));
+        assert(listed.status === 200, `the visitor's list: ${listed.status}`);
+        assert(!(listed.body.data.extensions as any[]).some(e => e.name === cortexName),
+            "the visitor was shown the local namesake's private cortex");
+
+        const detail = await json(`/v1/cortex/${enc}`, as(cortexToken));
+        assert(detail.status !== 200, `the visitor opened it: ${detail.status} ${JSON.stringify(detail.body?.data ?? null).slice(0, 200)}`);
+
+        const gone = await json(`/v1/cortex/${enc}`, as(cortexToken, { method: 'DELETE' }));
+        assert(gone.status !== 200 && gone.status !== 204, `the visitor deleted it: ${gone.status}`);
+        const after = await json('/v1/cortex', as(alice.token));
+        assert((after.body.data.extensions as any[]).some(e => e.name === cortexName),
+            "the visitor's DELETE removed the namesake's cortex");
+    });
 }
 
 try {
