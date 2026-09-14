@@ -30,6 +30,8 @@
  * @structure MIN_LINES · normalise() · main()
  * @usage pnpm check:copied-logic  ·  --strict fails the build  ·  --list prints every pair
  * @version-history
+ *   v1.1.0 — 2026-09-14 — Seed 5 → 3: the provenance stamp and the welcome bonus are each one
+ *     function instead of two and three copies.
  *   v1.0.0 — 2026-08-11 — Initial. Written after the audit's own diff was found to have repaired
  *     four differences by copying the rule into the second door.
  */
@@ -48,9 +50,9 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MIN_LINES = 6;
 
 /**
- * The seed: file pairs on 2026-08-11, after every MCP↔REST pair was collapsed. What is left is five
- * pairs between a ROUTE and a SERVICE — the same disease, but the agent surface is not in it, and
- * each predates this work.
+ * The seed: file pairs on 2026-08-11, after every MCP↔REST pair was collapsed. What was left then
+ * was five pairs between a ROUTE and a SERVICE — the same disease, but the agent surface was not in
+ * it, and each predated that work.
  *
  * The original list, for what it is worth: the audit's own four copies
  * (services/install-quotas.ts, services/agent-task-rules.ts, services/memory-ceilings.ts and the
@@ -58,8 +60,14 @@ const MIN_LINES = 6;
  *
  * Lower it as pairs are cleared. Never raise it: a new pair means somebody repaired a difference by
  * copying the rule, which is the failure this whole exercise exists to prevent.
+ *
+ * 2026-09-14: 5 → 3, in two steps on the same day. The broadcast's AI-provenance stamp was written
+ * once (ce0a967a5). Then the welcome bonus, which was written out at all three doors that create an
+ * account (services/owner-provisioning.ts, routes/ghii/register-login.ts, routes/ghii/web-verify.ts)
+ * so its amount, its condition and the transaction's shape lived in three places, became
+ * creditWelcomeBonus() in owner-provisioning.ts, called from all three. Three pairs gone.
  */
-const SEED = 5;
+const SEED = 3;
 
 const SIDES = [
     { name: 'mcp', dir: 'src/mcp' },

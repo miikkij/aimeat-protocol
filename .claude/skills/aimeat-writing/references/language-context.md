@@ -69,6 +69,7 @@ everywhere at once, and say so in the Changes section.
 | sandboxed outside-calling code | holds no key of theirs | extension | laajennus | extensión |
 | a shared group | people and AIs sharing work | organism | organismi | organismo |
 | a shared container | documents and records inside an organism | workspace | työtila | espacio de trabajo |
+| a space for what a group piles up | a workspace space for rows that keep arriving (messages, events, readings): appended, never edited, read with their own tools | row space | rivitila | espacio de filas |
 | an operating guide | instructions for one named capability | skill | taito | habilidad |
 | the write pacer | not money, not credit, never buys anything | morsel | murunen | morsel |
 | granted model spend | real money the house fronts, and it runs out | AI allowance | tekoälysaldo | saldo de IA |
@@ -192,6 +193,10 @@ service, the directory, the token, the identifier and the username: the test nam
 
 ## Changes
 
+- **2026-09-14** — row space added, with the workspace notice that first needed it in all three
+  languages. *Rivitila* is the word the developer and the reporting session were already using in
+  Finnish before anything was written down, so the row records it rather than proposing it; *fila*
+  is the ordinary Spanish word for a row of a table and needs no compound.
 - **2026-09-12** — written, after a pass over the Memory and Access screens in which cold readers
   in Finnish and Spanish, working separately, rejected the same two words on evidence. The table's
   decided column records what those screens already shipped rather than proposing anything new.

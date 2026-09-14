@@ -6,6 +6,9 @@
  *   itself (dry_run validation, component registration, @activate-cron firing, rollback on failure)
  *   lives in the service, so this door and the MCP tool run the same code.
  * @version-history
+ *   v1.5.0 — 2026-09-14 — requireLocalSession, as on every other instance door: the install files
+ *     the instance under `req.auth.owner`, which a federated session carries as the local part of
+ *     the visitor's HOME name.
  *   v1.4.1 — 2026-09-12 — resolveGhii takes the node rather than a fallback identity from here, so
  *     an owner session can no longer file the install under the bare account name. The `sub` still
  *     handed to installPackage is a different thing: the principal recorded on the schedules the
@@ -26,7 +29,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireScope } from '../../auth/middleware.js';
+import { requireAuth, requireScope, requireLocalSession } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { installPackage } from '../../services/package-install.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
@@ -47,7 +50,7 @@ export function registerInstallRoutes(
   // owner happened to approve. Owner sessions are waved through by requireScope, so the Packages tab
   // and the gallery installs are untouched; the word is in GRANDFATHERED_SCOPES, so every agent and
   // every live app grant already carries it and nothing in flight breaks.
-  router.post('/v1/packages/:groupId/install', requireAuth(), requireScope('packages:write'), async (req, res) => {
+  router.post('/v1/packages/:groupId/install', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const owner = req.auth!.owner;
     const ownerGhii = await resolveGhii(storage, owner, config);

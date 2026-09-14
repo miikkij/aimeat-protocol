@@ -43,6 +43,217 @@ const EXT_BRAIN = `{"manifest":"# The brain's only clock, and it costs nothing t
 
 const CORTEX_BRAIN = `{"manifest":"metadata:\\n  name: company-brain\\n  namespace: companybrain\\n  description: The company brain's browser surface. Reaches the caretaker extension for the source register and the weekly report; the knowledge itself lives in the owner's own workspace and the app reads it directly.\\n  author: operator\\n  tags: [company, knowledge, provenance, company-brain]\\ncomponents:\\n  - type: lib\\n    name: company-brain\\n    filename: company-brain.js\\n    exports:\\n      - state\\n      - configure\\n      - putSource\\n      - removeSource\\n      - touchSource\\n      - sweep\\n      - staleness\\n    api_surface: |\\n      Every call here needs a signed-in session. Unlike a shop, a company brain has no public half:\\n      what a company knows, and what it does not, is not a document for passers-by.\\n\\n      AIMEAT.brain.state(session)\\n        -> { brain: { company, org, ws } | null, sources: [...], report: {...} | null }\\n        One read for the whole page. Three calls would be three chances to render half of it.\\n\\n      AIMEAT.brain.configure(session, { company, org, ws })\\n      AIMEAT.brain.putSource(session, source)     add or replace one feed, by its id\\n      AIMEAT.brain.removeSource(session, id)\\n      AIMEAT.brain.touchSource(session, id, error?)  delivered now, or failed with a reason\\n      AIMEAT.brain.sweep(session)                 run the weekly check by hand\\n\\n      AIMEAT.brain.staleness(fact, today?) -> 'anchored' | 'fresh' | 'due' | 'unknown'\\n        A PURE FUNCTION, no network. Ageing is decided when the page renders, never swept: an\\n        anchored fact points at a document the owner holds and never falls due, an observed one\\n        carries review_after and is compared with today. Costs nothing and cannot drift.\\n\\n      Requires: /v1/libs/aimeat-auth.js. The knowledge records are read with\\n      /v1/libs/aimeat-organism.js straight from the owner's workspace, not through here.\\n","libs":{"company-brain.js":"/**\\n * @file company-brain.js\\n * @author Jouni Miikki\\n * SPDX-License-Identifier: MIT\\n * @description The company brain's browser surface: \`AIMEAT.brain.*\`. The app in this package talks\\n *   to the caretaker extension through here and never to \`/v1/ext/\` itself.\\n *\\n *   WHY THIS LAYER EXISTS AT ALL, rather than the app calling the extension directly: an app may\\n *   only ask for the scopes in the node's app-grant vocabulary, and there is no \`ext:\` word in it.\\n *   Reaching an extension is cortex's job — the app trusts cortex, cortex trusts the extension, and\\n *   no layer skips the one below.\\n *\\n *   EVERY CALL NEEDS A SESSION. A shop has a public half and a private one; a company brain has\\n *   only the private one. What a company knows, and more to the point what it does not, is not a\\n *   document for passers-by, so there is no getPublic path in this file at all.\\n *\\n *   THE KNOWLEDGE DOES NOT COME THROUGH HERE. Facts, entities, gaps and findings live in the\\n *   owner's own workspace and the app reads them with aimeat-organism, so they can be exported,\\n *   shared and taken elsewhere without this extension existing. What this file reaches is the\\n *   machinery: which feeds run, when each last delivered, and what the caretaker said last week.\\n *\\n *   The short name \`company-brain\` below is rewritten to the per-instance registered name when the\\n *   package is installed, in this file as in the app. Leave it exactly as it is.\\n * @structure AIMEAT.brain: state · configure · putSource · removeSource · touchSource · sweep · staleness\\n * @version-history\\n *   v1.0.0 — 2026-08-23 — Initial (TARGET-071).\\n */\\n(function (AIMEAT) {\\n  'use strict';\\n\\n  var ACTION = '/v1/ext/company-brain/';\\n\\n  /** POST one extension action with the caller's session. */\\n  function call(session, action, body) {\\n    if (!session || typeof session.fetch !== 'function') {\\n      return Promise.reject(new Error('sign in first'));\\n    }\\n    // session.fetch RESOLVES TO THE PARSED ENVELOPE, not to a Response. Calling .json() on it is the\\n    // mistake that looks right: it throws \\"res.json is not a function\\" from inside a lib, one frame\\n    // away from the button the person pressed.\\n    return session.fetch(ACTION + action, {\\n      method: 'POST',\\n      headers: { 'Content-Type': 'application/json' },\\n      body: JSON.stringify(body || {}),\\n    }).then(function (envelope) {\\n      // The action's own answer is inside the node's envelope. A refusal from the brain (not yours,\\n      // no such source) arrives as ok:false in there rather than as an HTTP error, so it is handed\\n      // back as it is: \\"no such source\\" is an answer the caller renders, not an exception.\\n      var out = (envelope && envelope.data) ? envelope.data : envelope;\\n      if (out && typeof out === 'object' && 'result' in out) return out.result;\\n      return out;\\n    });\\n  }\\n\\n  /** Which company this brain is for, what feeds it, and what the caretaker last said. One read. */\\n  function state(session) { return call(session, 'admin', { op: 'state' }); }\\n\\n  /** Name the company and the workspace this brain writes its knowledge into. */\\n  function configure(session, opts) {\\n    var o = opts || {};\\n    return call(session, 'admin', { op: 'configure', company: o.company, org: o.org, ws: o.ws });\\n  }\\n\\n  /**\\n   * Add or replace one feed, by its id.\\n   *\\n   * \`coverage_note\` is the field worth filling in even when it feels obvious. A source whose limits\\n   * are unwritten is the one that quietly becomes \\"everything we know\\", and the caretaker names any\\n   * source that has none rather than counting them.\\n   */\\n  function putSource(session, source) { return call(session, 'admin', { op: 'put_source', source: source }); }\\n\\n  function removeSource(session, id) { return call(session, 'admin', { op: 'remove_source', id: id }); }\\n\\n  /** This feed delivered just now, or failed with a reason. A reason marks it broken. */\\n  function touchSource(session, id, error) {\\n    return call(session, 'admin', { op: 'touch_source', id: id, error: error || undefined });\\n  }\\n\\n  /** Run the weekly check by hand. Same code the schedule runs, and it costs the same: nothing. */\\n  function sweep(session) { return call(session, 'admin', { op: 'sweep' }); }\\n\\n  /**\\n   * How a fact stands right now. A PURE FUNCTION: no network, no schedule, no stored verdict.\\n   *\\n   *   anchored — points at a document the owner holds. Never falls due, however old it is.\\n   *   fresh    — observed, and its review_after has not arrived.\\n   *   due      — observed, and the day it was to be checked again has passed.\\n   *   unknown  — observed with no review_after, which is a fact nobody set a life span for.\\n   *\\n   * Ageing is decided here, when the page renders, rather than by anything that sweeps. It costs\\n   * nothing, it cannot drift out of step with the data, and there is no job to notice it broke.\\n   */\\n  function staleness(fact, today) {\\n    if (!fact) return 'unknown';\\n    if (fact.kind === 'anchored') return 'anchored';\\n    if (!fact.review_after) return 'unknown';\\n    var when = String(today || new Date().toISOString().slice(0, 10));\\n    // Both are ISO dates, and ISO dates compare correctly as strings.\\n    return String(fact.review_after).slice(0, 10) < when ? 'due' : 'fresh';\\n  }\\n\\n  var exports = {\\n    state: state,\\n    configure: configure,\\n    putSource: putSource,\\n    removeSource: removeSource,\\n    touchSource: touchSource,\\n    sweep: sweep,\\n    staleness: staleness,\\n  };\\n\\n  if (AIMEAT.register) AIMEAT.register('company-brain', exports);\\n  if (!AIMEAT.brain) AIMEAT.brain = exports;\\n\\n})(window.AIMEAT || (window.AIMEAT = {}));\\n"}}`;
 
+/**
+ * What this app does with a company's data, in the author's own words. It travels with the bytes so
+ * an installed copy can answer the question without anyone opening the source, and the installer
+ * writes it beside the app under the name this node gave it.
+ */
+const DATAMAP_BRAIN = {
+  "spec": "aimeat.datamap/2",
+  "what": "A company brain. One page that answers what this company knows, where each piece of it came from, what is waiting for someone to look at it, and which feeds keep it current. It hangs off one company record and finds it from its own address, so an owner installs it once per company with nothing to configure.",
+  "usedFor": "Keeping a company's knowledge in one place that says out loud where it is thin. The registered details become its first anchored facts, each pointing back at the entry the owner wrote themselves; everything added afterwards carries the same provenance. A weekly check that spends nothing names the feeds that have gone quiet, and interrupts only when one is actually broken.",
+  "form": "organism-workspace",
+  "arrangement": "The knowledge lives in the owner's OWN organism, as records in a workspace the app finds by the contract its manifest declares rather than by a stored id, so it can be exported, shared and taken elsewhere without this app or its extension existing. The machinery lives apart from it, in the caretaker extension's private namespace: which feeds run, when each last delivered, and what last week's check said. The split is not tidiness. A sandboxed extension can read an owner's memory only where it is public, so a register kept in the workspace would be invisible to the one job whose whole purpose is to check it, and a company's list of what it does not know is not a public document.",
+  "machinery": [
+    "extensions",
+    "cortex",
+    "scheduling"
+  ],
+  "leaves": [
+    {
+      "what": "A notification to the owner when a feed has broken",
+      "to": "The owner's own notification channels on this node",
+      "recallable": false
+    }
+  ],
+  "held": [
+    {
+      "what": "brain.fact.*",
+      "holds": "what this company knows, one claim at a time",
+      "kind": "user-written",
+      "usedFor": "user-returns-to-read",
+      "where": "organism-workspace",
+      "whereExactly": "the owner's own organism, in the workspace whose manifest declares contract: brain",
+      "owner": "organism",
+      "readers": "organism-members",
+      "writers": [
+        "person-in-the-ui",
+        "an-agent",
+        "install-seed"
+      ],
+      "shape": "one-per-thing",
+      "keptFor": "until-deleted",
+      "lossRisk": "only-copy",
+      "personalData": "yes",
+      "why": "It is the company's knowledge rather than this app's, so it sits where it can be exported, shared with the people who need it and read by any AI, with or without this app installed. A fact carries whether it is anchored to something the owner holds or observed and due for review, which is what stops the store becoming a pile of assertions with no age.",
+      "isA": "schema:Claim"
+    },
+    {
+      "what": "brain.entity.*",
+      "holds": "the people, customers and partners the facts are about",
+      "kind": "register",
+      "usedFor": "search-and-filter",
+      "where": "organism-workspace",
+      "whereExactly": "the same workspace as the facts",
+      "owner": "organism",
+      "readers": "organism-members",
+      "writers": [
+        "person-in-the-ui",
+        "an-agent"
+      ],
+      "shape": "one-per-thing",
+      "keptFor": "until-deleted",
+      "lossRisk": "only-copy",
+      "personalData": "yes",
+      "why": "A fact about a person is worth little without the person, and the two belong in one space so a reader can follow either direction. Named people are in here, which is why the workspace is private and the organism the owner's own.",
+      "isA": "schema:Person"
+    },
+    {
+      "what": "brain.gap.*",
+      "holds": "what this company does NOT know, and since when",
+      "kind": "user-written",
+      "usedFor": "user-returns-to-read",
+      "where": "organism-workspace",
+      "whereExactly": "the same workspace as the facts",
+      "owner": "organism",
+      "readers": "organism-members",
+      "writers": [
+        "person-in-the-ui",
+        "an-agent"
+      ],
+      "shape": "one-per-thing",
+      "keptFor": "until-deleted",
+      "lossRisk": "only-copy",
+      "personalData": "no",
+      "why": "Beside the facts rather than in a list of its own, because a gap is only meaningful next to what is already known. A store with no way to say what is missing reads as complete, which is the failure this app exists to prevent."
+    },
+    {
+      "what": "brain.commitment.*",
+      "holds": "what somebody said they would do, and by when",
+      "kind": "user-written",
+      "usedFor": "user-returns-to-read",
+      "where": "organism-workspace",
+      "whereExactly": "the same workspace as the facts",
+      "owner": "organism",
+      "readers": "organism-members",
+      "writers": [
+        "person-in-the-ui",
+        "an-agent"
+      ],
+      "shape": "one-per-thing",
+      "keptFor": "until-deleted",
+      "lossRisk": "only-copy",
+      "personalData": "yes",
+      "why": "A promise is a fact with a due date and a name on it, and separating the two would mean a reader has to open two places to see what the company is carrying."
+    },
+    {
+      "what": "brain.finding.*",
+      "holds": "what a review turned up and what it was about",
+      "kind": "ai-generated",
+      "usedFor": "evidence-of-what-happened",
+      "where": "organism-workspace",
+      "whereExactly": "the same workspace as the facts",
+      "owner": "organism",
+      "readers": "organism-members",
+      "writers": [
+        "an-agent",
+        "person-in-the-ui"
+      ],
+      "shape": "one-per-thing",
+      "keptFor": "until-deleted",
+      "lossRisk": "user-can-rewrite",
+      "personalData": "unstated",
+      "why": "A finding points at the facts it came from, so it belongs in the same space as them. It is kept rather than applied silently, because a review that leaves no trace cannot be argued with later."
+    },
+    {
+      "what": "brain.brief.*",
+      "holds": "a written summary of some part of what the company knows",
+      "kind": "ai-generated",
+      "usedFor": "user-returns-to-read",
+      "where": "organism-workspace",
+      "whereExactly": "the same workspace as the facts",
+      "owner": "organism",
+      "readers": "organism-members",
+      "writers": [
+        "an-agent",
+        "person-in-the-ui"
+      ],
+      "shape": "one-per-thing",
+      "keptFor": "until-deleted",
+      "lossRisk": "recomputable",
+      "personalData": "unstated",
+      "why": "A brief is written from the facts and can be written again from them, so losing one costs a rerun rather than knowledge. It is stored because a person wants to re-read the one they shared, not re-generate a different one."
+    },
+    {
+      "what": "brain",
+      "holds": "which company this brain is for, and which organism and workspace it writes into",
+      "kind": "settings",
+      "usedFor": "app-cannot-run-without",
+      "where": "extension-namespace",
+      "whereExactly": "the caretaker extension's own namespace, private",
+      "owner": "extension",
+      "readers": "the-app-itself",
+      "writers": [
+        "person-in-the-ui"
+      ],
+      "shape": "one-record",
+      "keptFor": "until-deleted",
+      "lossRisk": "user-can-rewrite",
+      "personalData": "no",
+      "why": "The caretaker runs server-side on a schedule with nobody signed in, so the pointer to the workspace has to be somewhere it can read without a session. Private, because an ext: namespace is world-readable by default and which organism a company keeps its knowledge in is not a public fact."
+    },
+    {
+      "what": "sources",
+      "holds": "the register of what feeds this company's knowledge: each feed, what it does not cover, how often it should deliver and when it last did",
+      "kind": "register",
+      "usedFor": "evidence-of-what-happened",
+      "where": "extension-namespace",
+      "whereExactly": "the caretaker extension's own namespace, private",
+      "owner": "extension",
+      "readers": "the-app-itself",
+      "writers": [
+        "person-in-the-ui",
+        "a-schedule-unattended"
+      ],
+      "shape": "collection-under-one-key",
+      "keptFor": "until-deleted",
+      "lossRisk": "user-can-rewrite",
+      "personalData": "no",
+      "why": "Here and not in the workspace because the weekly check has to READ what it maintains, and a sandboxed extension sees an owner's memory only where it is public. It also belongs here on its own merits: which feed runs and when it last succeeded is machinery, while what those feeds produced is the company's knowledge.",
+      "isA": "aimeat:SourceRegister"
+    },
+    {
+      "what": "report",
+      "holds": "what the last weekly check said: how many feeds were checked, which are quiet, which are broken, and which have no coverage note",
+      "kind": "snapshot",
+      "usedFor": "user-returns-to-read",
+      "where": "extension-namespace",
+      "whereExactly": "the caretaker extension's own namespace, private",
+      "owner": "extension",
+      "readers": "the-app-itself",
+      "writers": [
+        "a-schedule-unattended"
+      ],
+      "shape": "one-record",
+      "keptFor": "until-deleted",
+      "lossRisk": "recomputable",
+      "personalData": "no",
+      "why": "One record replaced each week rather than a history, because the question it answers is what the state is now. Losing it costs one run of a check that spends nothing."
+    }
+  ],
+  "elsewhere": [
+    {
+      "what": "The company's registered details: business ID, VAT ID, address, bank and e-invoicing",
+      "status": "copy-of-anothers-record",
+      "where": "The company record on this node, which the owner maintains themselves",
+      "controlledBy": "The owner, through their company settings",
+      "deletion": "Deleting the anchored facts here removes the brain's copies. The company record is untouched, and re-running the first setup writes them again from it."
+    }
+  ],
+  "source": "declared",
+  "at": "2026-09-14T00:00:00.000Z"
+} as const;
+
 export function companyBrainPackage(): ExamplePackageDef {
   return {
     name: 'company-brain',
@@ -60,7 +271,11 @@ export function companyBrainPackage(): ExamplePackageDef {
       // only when the filename ends in .html (routes/subdomains.ts). An extensionless component id
       // therefore produces an app that can never be opened on its own origin — the only place the
       // SSO bridge works — and never gets a subdomain minted for it.
-      { id: 'app-brain.html', type: 'app', label: 'Company brain', content: APP_BRAIN, dependencies: ['ext-brain', 'cortex-brain'] },
+      {
+        id: 'app-brain.html', type: 'app', label: 'Company brain', content: APP_BRAIN,
+        dependencies: ['ext-brain', 'cortex-brain'],
+        meta: { app: { datamap: DATAMAP_BRAIN } },
+      },
     ],
     templateListing: {
       title: 'Company brain',

@@ -15,6 +15,9 @@
  *   import { statsRouter } from '../routes/stats.js';
  *   app.use(statsRouter(config, storage, stats, metricsRegistry));
  * @version-history
+ *   v1.3.0 -- 2026-09-14 -- `authenticated` means a signed-in caller on both doors, not merely a
+ *     `req.auth`: in anonymous mode this node hands every passer-by one, so the setting showed the
+ *     figures to anybody who asked. isSignedInCaller(), auth/account-security.ts.
  *   v1.2.0 -- 2026-09-12 -- The payload moves to services/stats-page.ts, unchanged, so the MCP
  *     tool can make the same read. Pure extraction.
  *   v1.1.1 -- 2026-05-21 -- Fix range response to return same flat shape as full snapshot
@@ -28,6 +31,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { StatsCollector } from '../services/stats.js';
 import { success, error } from '../middleware/envelope.js';
+import { isSignedInCaller } from '../auth/middleware.js';
 import { buildStatsSnapshot } from '../services/stats-page.js';
 
 export function statsRouter(
@@ -51,7 +55,11 @@ export function statsRouter(
         return;
       }
     } else if (config.statsAccess === 'authenticated') {
-      if (!req.auth) {
+      // `anonymous` as well as absent. In anonymous mode this node hands every caller with no
+      // credential a shared anonymous one, so `!req.auth` never matched and `authenticated` showed
+      // the figures to anybody who asked — the setting said signed-in callers only, and meant it.
+      // The question has a name in auth/account-security.ts. Found by the AI triage of 2026-09-13.
+      if (!isSignedInCaller(req.auth)) {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required'));
         return;
       }
@@ -80,7 +88,8 @@ export function statsRouter(
         return;
       }
     } else if (config.metricsAccess === 'authenticated') {
-      if (!req.auth) {
+      // The shared anonymous credential is not a signed-in caller — see the note on /v1/stats.
+      if (!isSignedInCaller(req.auth)) {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required'));
         return;
       }

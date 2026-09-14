@@ -1,0 +1,171 @@
+/**
+ * @file landing-v2.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The front page's design round (ld-v2- prefix, TARGET-075): the blocks in
+ *   views/landing-v2.js, landing-v2-projector.js and landing-v2-cards.js that the showroom does not
+ *   already dress. Same language as landing-showroom.css: the showroom faces, 3px ink borders, hard
+ *   offset shadows in ink, sun and coral, and every colour a theme token so the dark theme inverts.
+ *   Mobile first: the base rules are the phone, and the wider screens add columns.
+ * @version-history
+ *   v0.2.0 — 2026-09-14 — The cloud's words are buttons, and the apps in the show are a third group.
+ *   v0.1.0 — 2026-09-14 — Design round.
+ */
+
+/* ── Shared ────────────────────────────────────────────────────────────────────────────────── */
+.ld-v2-h2-row { flex-direction: row; flex-wrap: wrap; gap: .3em; }
+.ld-v2-title { font-size: clamp(2.1rem, 5.4vw, 4.8rem); }
+.ld-v2-doors { display: flex; flex-direction: column; gap: 1rem; align-items: flex-start; }
+.ld-v2-doors .ld-sh-btn { font-size: 1rem; }
+@media (min-width: 601px) { .ld-v2-doors { flex-direction: row; align-items: center; gap: 1.75rem; } }
+
+/* ── Ten seconds under the hood ─────────────────────────────────────────────────────────────── */
+.ld-v2-ten { display: flex; flex-direction: column; gap: 1.2rem; padding: 3rem 0 1.5rem; }
+.ld-v2-stage {
+  display: flex; align-items: center; justify-content: center; min-height: 12rem; padding: 2rem 1.25rem;
+  border: 4px solid var(--text); box-shadow: 10px 10px 0 var(--text); cursor: pointer; text-align: center;
+  font-family: var(--font-showroom); text-transform: uppercase; font-size: clamp(1.6rem, 4.6vw, 3.4rem); line-height: 1.05;
+  transition: background 200ms ease, color 200ms ease;
+}
+.ld-v2-stage:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+/* The sun frames (every third, and the answer) compose showroom-slab--sun in the markup. */
+.ld-v2-frame--1 { background: var(--card-bg); color: var(--text); }
+.ld-v2-frame--2 { background: var(--accent); color: #FFFFFF; }
+.ld-v2-stage--more, .ld-v2-frame--more { background: var(--text); color: var(--bg); box-shadow: 10px 10px 0 var(--accent); }
+.ld-v2-stage--answer, .ld-v2-frame--answer { box-shadow: 10px 10px 0 var(--accent); }
+.ld-v2-stage--answer .ld-v2-stage-text { font-size: clamp(1.5rem, 4vw, 3rem); }
+@keyframes ld-v2-pop { from { opacity: 0; transform: translateY(.3em) scale(.98); } to { opacity: 1; transform: none; } }
+.ld-v2-stage-text { display: block; max-width: 22ch; animation: ld-v2-pop 260ms ease-out; }
+.ld-v2-ten-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.ld-v2-dots { display: flex; gap: .45rem; align-items: center; }
+.ld-v2-dot { width: 10px; height: 10px; color: var(--text); border: 2px solid currentColor; background: transparent; }
+.ld-v2-dot--end { border-radius: 999px; }
+.ld-v2-dot.is-on { background: var(--accent); border-color: var(--accent); }
+.ld-v2-replay { font-family: var(--font-showroom-body); font-weight: 800; }
+.ld-v2-ten-all { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+.ld-v2-frame {
+  padding: 1.25rem 1rem; box-shadow: 6px 6px 0 var(--text);
+  font-family: var(--font-showroom); text-transform: uppercase; font-size: 1.3rem; line-height: 1.1; text-align: center;
+}
+.ld-v2-frame--more, .ld-v2-frame--answer { grid-column: 1 / -1; }
+.ld-v2-ten-after { margin: .5rem 0 0; font-family: var(--font-showroom-body); font-size: 1.15rem; font-weight: 600; line-height: 1.5; color: var(--text); }
+.ld-v2-ten-after a { color: var(--accent); font-weight: 800; text-decoration: none; }
+.ld-v2-ten-after a:hover { text-decoration: underline; }
+@media (min-width: 700px) { .ld-v2-ten-all { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* ── The slide projector ────────────────────────────────────────────────────────────────────── */
+.ld-v2-proj { display: flex; flex-direction: column; gap: 1.5rem; padding: 3rem 0 2rem; }
+.ld-v2-proj-head { display: flex; flex-direction: column; gap: .8rem; }
+.ld-v2-proj-sub { max-width: 60ch; }
+.ld-v2-proj-grid { display: grid; grid-template-columns: 1fr; gap: 1.75rem; align-items: start; }
+/* On a phone the projector comes first and the two menus follow it; on a wide screen the menus
+   flank it, Settings & Controls on the left and Admin on the right. */
+.ld-v2-projector { display: flex; flex-direction: column; gap: 1rem; align-items: center; order: 1; }
+.ld-v2-cloud--settings { order: 2; }
+.ld-v2-cloud--admin { order: 3; }
+.ld-v2-slide { width: 100%; display: flex; flex-direction: column; gap: .8rem; touch-action: pan-y; }
+/* The slide in its carrier: an ink frame, a card-coloured slide, and the hard shadow that says
+   the whole thing is a machine on a table. */
+.ld-v2-slide-frame {
+  position: relative; aspect-ratio: 16 / 10; width: 100%; box-sizing: border-box; padding: 12px; background: var(--text);
+  border: 4px solid var(--text); box-shadow: 12px 12px 0 var(--accent); overflow: hidden;
+  animation: ld-v2-seat 220ms ease-out;
+}
+@keyframes ld-v2-seat { from { transform: translateX(-6px); filter: brightness(.6); } 60% { transform: translateX(2px); } to { transform: none; filter: none; } }
+.ld-v2-slide-img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; background: var(--card-bg); }
+.ld-v2-slide-placeholder {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6rem; height: 100%;
+  background: repeating-linear-gradient(135deg, var(--card-bg) 0 18px, var(--bg-surface) 18px 36px);
+  border: 3px dashed var(--text-dim); text-align: center; padding: 1rem;
+}
+.ld-v2-slide-page { font-family: var(--font-showroom); text-transform: uppercase; font-size: clamp(1.4rem, 4vw, 2.4rem); color: var(--text); }
+.ld-v2-slide-note { font-family: var(--font-showroom-body); font-size: .85rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
+.ld-v2-slide-caption { margin: 0; display: flex; flex-direction: column; gap: .25rem; font-family: var(--font-showroom-body); }
+.ld-v2-slide-where { font-family: var(--font-showroom); text-transform: uppercase; font-size: .8rem; letter-spacing: .04em; color: var(--accent); }
+.ld-v2-slide-text { font-size: 1.15rem; font-weight: 800; line-height: 1.4; color: var(--text); }
+.ld-v2-controls { display: flex; align-items: center; justify-content: center; gap: 1.25rem; padding: .5rem 0 0; }
+/* The big button: the one control on an old projector, a sun disc on an ink base with a coral
+   shadow, and it sinks when pressed. */
+.ld-v2-bigbutton {
+  width: 6.5rem; height: 6.5rem; border-radius: 999px; border: 4px solid var(--text);
+  box-shadow: 0 8px 0 var(--text), 0 8px 0 6px var(--accent);
+  font-family: var(--font-showroom); font-size: 1.15rem; letter-spacing: .06em; text-transform: uppercase;
+  cursor: pointer; transition: transform 80ms ease, box-shadow 80ms ease;
+}
+.ld-v2-bigbutton:hover { background: color-mix(in srgb, var(--sun) 85%, #FFFFFF); }
+.ld-v2-bigbutton:active { transform: translateY(6px); box-shadow: 0 2px 0 var(--text), 0 2px 0 6px var(--accent); }
+.ld-v2-bigbutton:focus-visible { outline: 3px solid var(--accent); outline-offset: 6px; }
+.ld-v2-arrow {
+  width: 3rem; height: 3rem; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text); box-shadow: 4px 4px 0 var(--text); cursor: pointer;
+  transition: transform 80ms ease, box-shadow 80ms ease;
+}
+.ld-v2-arrow:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--text); }
+.ld-v2-proj-bar { display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap; }
+.ld-v2-counter { font-family: var(--font-showroom); text-transform: uppercase; font-size: .85rem; letter-spacing: .04em; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.ld-v2-autobtn { font-family: var(--font-showroom-body); font-weight: 800; min-width: 6rem; }
+.ld-v2-autobtn.is-on { background: var(--text); color: var(--bg); border-color: var(--text); }
+/* The word cloud: the two menus as they are, and one word lit. */
+.ld-v2-cloud { display: flex; flex-direction: column; gap: .6rem; }
+/* The menu's name is a poster section title at menu size. */
+.ld-v2-cloud-title { --poster-section-size: .95rem; margin: 0 0 .3rem; }
+.ld-v2-cloud-group { display: flex; flex-direction: column; gap: .3rem; }
+.ld-v2-cloud-groupname { font-family: var(--font-showroom); text-transform: uppercase; font-size: .72rem; letter-spacing: .06em; color: var(--text-dim); }
+.ld-v2-cloud-words { display: flex; flex-wrap: wrap; gap: .35rem .45rem; }
+/* Every word is a button: press it and the projector jumps to that slide. */
+.ld-v2-word {
+  appearance: none; cursor: pointer; border-radius: 0;
+  font-family: var(--font-showroom-body); font-size: .82rem; font-weight: 700; line-height: 1.2; padding: .2rem .45rem;
+  border: 2px solid var(--border);
+  transition: background 200ms ease, color 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+}
+.ld-v2-word:hover { border-color: var(--text); color: var(--text); }
+.ld-v2-word:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.ld-v2-cloud--apps { order: 4; }
+/* Zero specificity on purpose, so the lit word's composed sun class wins over the resting colours. */
+:where(.ld-v2-word) { color: var(--text-dim); background: transparent; }
+.ld-v2-word.is-lit { border-color: var(--text); box-shadow: 3px 3px 0 var(--text); transform: scale(1.06); }
+@media (min-width: 1000px) {
+  .ld-v2-proj-grid { grid-template-columns: minmax(0, 3fr) minmax(0, 6fr) minmax(0, 3fr); gap: 2rem; }
+  .ld-v2-cloud--settings { order: 1; }
+  .ld-v2-projector { order: 2; }
+  .ld-v2-cloud--admin { order: 3; }
+  .ld-v2-cloud--apps { order: 4; grid-column: 1 / -1; }
+}
+
+/* ── Prompts and what they made ─────────────────────────────────────────────────────────────── */
+.ld-v2-cards { display: flex; flex-direction: column; gap: 1.2rem; padding: 3rem 0 1.5rem; }
+.ld-v2-cards-sub { max-width: 64ch; }
+.ld-v2-cardgrid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; padding: 6px; }
+.ld-v2-card { display: flex; flex-direction: column; box-shadow: 8px 8px 0 var(--text); }
+.ld-v2-card:nth-child(2n) { box-shadow: 8px 8px 0 var(--accent); }
+.ld-v2-card-shot { aspect-ratio: 16 / 9; background: var(--bg-surface); cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.ld-v2-card-shot img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.ld-v2-card-shot-ph { font-family: var(--font-showroom); text-transform: uppercase; font-size: 1.6rem; color: var(--text-dim); padding: 1rem; text-align: center; }
+.ld-v2-card-body { display: flex; flex-direction: column; gap: .8rem; padding: 1.1rem 1.2rem 1.3rem; }
+.ld-v2-card-result { margin: 0; font-family: var(--font-showroom-body); font-size: 1rem; font-weight: 600; line-height: 1.5; color: var(--text); }
+/* The prompt: a dashed frame says "this is the placeholder", and the real prompt takes the same box. */
+.ld-v2-card-prompt {
+  margin: 0; padding: .8rem .9rem; white-space: pre-wrap; overflow-wrap: anywhere;
+  font-family: var(--font-mono); font-size: .85rem; line-height: 1.5; color: var(--text);
+  background: var(--bg-surface); border: 2px dashed var(--accent);
+}
+.ld-v2-card-facts { margin: 0; display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.ld-v2-card-facts div { display: flex; flex-direction: column; gap: .1rem; }
+.ld-v2-card-facts dt { font-family: var(--font-showroom); text-transform: uppercase; font-size: .72rem; letter-spacing: .04em; color: var(--text-dim); }
+.ld-v2-card-facts dd { margin: 0; font-family: var(--font-showroom-body); font-weight: 800; font-size: .95rem; color: var(--accent); }
+.ld-v2-card-actions { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
+.ld-v2-card-copy { font-family: var(--font-showroom-body); font-weight: 800; }
+@media (min-width: 760px) { .ld-v2-cardgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ── The wall in two groups ─────────────────────────────────────────────────────────────────── */
+.ld-v2-wall { display: flex; flex-direction: column; gap: 1rem; padding: 2rem 0 2rem; }
+.ld-v2-wall .ld-h2 { margin: 0; }
+.ld-v2-wall-lead { max-width: 64ch; }
+.ld-v2-wall-own { margin-top: 1.5rem; color: var(--accent); }
+
+/* ── The Linux line and the last word ───────────────────────────────────────────────────────── */
+.ld-v2-linux { margin: 3rem 0 1.25rem; }
+.ld-v2-close-line { margin: 0; display: flex; flex-direction: column; gap: .2rem; font-family: var(--font-showroom); text-transform: uppercase; font-size: clamp(1.1rem, 2.6vw, 1.7rem); line-height: 1.2; }
+.ld-v2-close-line span:last-child { color: var(--sun); }
+@media (min-width: 900px) { .ld-v2-close-line { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: .3rem 1.2rem; } }

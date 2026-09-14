@@ -12,11 +12,14 @@
  *
  *   WHAT THIS CHANGES IS WHEN THINGS ARE READ. The old home ran eleven requests through one loader
  *   and re-ran all eleven on any SSE event whatsoever. Here a mailbox arriving re-reads the mailbox.
- * @structure NameplateBlock · McpConnectBlock · MatBlock · MailboxBlock · ChatDoorBlock · FleetBlock ·
+ * @structure NameplateBlock · McpConnectBlock · MatBlock · MailboxBlock · YourTurnBlock · ChatDoorBlock · FleetBlock ·
  *   ThingsBlock · PlaybooksBlock · AchievementsBlock · FeedBlock · OpenItemsBlock · InstallCtaBlock ·
  *   TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-09-14: YourTurnBlock, which lists the threads whose last word was somebody else's. The
+ *     mailbox row had the unread count and nothing said WHICH conversations were waiting; the
+ *     conversations list already carries who spoke last, so this needed no new door.
  *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v1.1.0 — 2026-08-27 — McpConnectBlock, and the mcp- platform-name shaping it shares with
  *     ChatDoorBlock lifted into one function: useShared caches by key and shapes at read time, so
@@ -32,7 +35,7 @@ import { useShared } from '/views/surface/shared-read.js';
 import { useHomeState } from '/views/surface/home-state.js';
 import { useHomePrefs } from '/views/surface/home-prefs.js';
 import {
-  MailboxRow, FleetLine, Things, FavoriteApps, Playbooks, TrustLine, Achievements,
+  MailboxRow, YourTurn, FleetLine, Things, FavoriteApps, Playbooks, TrustLine, Achievements,
 } from '/views/home/status-parts.js';
 import { HomeHeader } from '/views/home/header.js';
 import { HomeJourney } from '../home/journey.js';
@@ -79,6 +82,37 @@ export function MailboxBlock() {
     (d) => ({ unread: d?.unread ?? 0 }));
   if (!data) return null;
   return html`<${MailboxRow} mail=${data} />`;
+}
+
+/**
+ * The handle inside any principal id: 'alice@node' → 'alice', 'bot#alice@node' → 'bot'. A home row
+ * needs a word a person recognises, and the conversations list carries the id rather than a name.
+ */
+function handleOf(id) {
+  const beforeAt = String(id ?? '').split('@')[0];
+  return beforeAt.includes('#') ? beforeAt.split('#').pop() : beforeAt;
+}
+
+/**
+ * The threads still waiting on this person, newest first.
+ *
+ * WHICH THREADS. The conversations list says who spoke last in each (`lastDirection`), so "their
+ * turn ended, mine began" is already in the data and no new door was needed for this block.
+ * `viaAgent` rows are an agent's own correspondence read from outside, and they are left out: the
+ * owner is not the one being waited on there.
+ */
+export function YourTurnBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { props = {} }) {
+  const max = Number.isFinite(props.max) ? props.max : 5;
+  const { data } = useShared('turn', '/v1/messages/conversations', ['messages'],
+    (d) => (d?.conversations ?? [])
+      .filter((c) => c.lastDirection === 'inbound' && !c.viaAgent)
+      .map((c) => ({
+        id: c.conversationId,
+        who: c.groupAlias || handleOf(c.peerGhii),
+        said: String(c.lastMessage ?? '').trim(),
+      })));
+  if (!data) return null;
+  return html`<${YourTurn} threads=${data} max=${max} />`;
 }
 
 export function FleetBlock() {

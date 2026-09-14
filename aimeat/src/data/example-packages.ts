@@ -45,7 +45,11 @@ export interface ExamplePackageDef {
   category: string;
   tags: string[];
   visibility: 'public' | 'private';
-  components: { id: string; type: string; label: string; content: string; dependencies: string[] }[];
+  components: {
+    id: string; type: string; label: string; content: string; dependencies: string[];
+    /** Per-component metadata that travels with the bytes; `meta.app` is a PackageAppMeta. */
+    meta?: Record<string, unknown>;
+  }[];
   templateListing: {
     title: string;
     description: string;
@@ -96,6 +100,9 @@ export function buildRecords(def: ExamplePackageDef, author: string, authorGhii:
     content: c.content,
     contentHash: hashContent(c.content),
     dependencies: c.dependencies,
+    // Only when there is something to say, so a definition without metadata produces the same
+    // component it always did.
+    ...(c.meta && Object.keys(c.meta).length > 0 ? { meta: c.meta } : {}),
   }));
 
   const pkg: PackageRecord = {

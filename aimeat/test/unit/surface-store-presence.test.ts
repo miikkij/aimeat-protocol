@@ -42,17 +42,20 @@ describe('the store block on the front page', () => {
         expect(ids).toContain('portal.store');
     });
 
+    // The built-in front page is the message frame's order since 2026-09-14 (TARGET-075): the hero
+    // leads, the counters sit directly under it, and the closing line is last.
     it('sits in the built-in front page, so a node with a store shows it without arranging anything', () => {
         const ids = defaultLayout('portal', configWith(true)).blocks.map(b => b.id);
         expect(ids).toContain('portal.store');
-        expect(ids[0]).toBe('portal.showroom-hero');
-        expect(ids[ids.length - 1]).toBe('portal.close');
+        expect(ids[0]).toBe('portal.frame-hero');
+        expect(ids[ids.length - 1]).toBe('portal.frame-close');
     });
 
     it('drops out of the built-in front page on a node with no store, and the rest of the order holds', () => {
         const ids = defaultLayout('portal', configWith(false)).blocks.map(b => b.id);
         expect(ids).not.toContain('portal.store');
-        expect(ids.indexOf('portal.gallery')).toBe(ids.indexOf('portal.wall-intro') + 1);
-        expect(ids[ids.length - 1]).toBe('portal.close');
+        expect(ids.indexOf('portal.totals')).toBe(ids.indexOf('portal.frame-hero') + 1);
+        expect(ids.indexOf('portal.frame-linux')).toBe(ids.indexOf('portal.trust') - 1);
+        expect(ids[ids.length - 1]).toBe('portal.frame-close');
     });
 });

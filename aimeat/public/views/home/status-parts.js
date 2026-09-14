@@ -12,9 +12,12 @@
  *   spills: the person stars what matters, the rest folds away, and the fold says how much it
  *   holds. The first version showed every chip it had, which on the developer's own account was
  *   the wall of noise this file exists to prevent.
- * @structure MailboxRow · FleetLine · ChatDoor · NamedRow · Things · FavoriteApps · Playbooks · TrustLine · Achievements
+ * @structure MailboxRow · YourTurn · FleetLine · ChatDoor · NamedRow · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   2026-09-14: YourTurn — the threads whose last word was somebody else's. The mailbox row gives
+ *     the unread count and that is a different question: unread is "you have not looked", this is
+ *     "you looked and they are still waiting".
  *   2026-09-13: Compose the existing home shapes with shared poster classes.
  *   v1.5.0 — 2026-08-28 — The poster home: the mailbox and fleet lines carry their number as a
  *     big numeral (bigNumber() splits the translated sentence at its placeholder, so every
@@ -83,6 +86,42 @@ export function MailboxRow({ mail }) {
           : tr('home.mail.empty', 'Mailbox: nothing new')}
       </span>
     </a>`;
+}
+
+/**
+ * The threads where the ball is in this person's court: the last word in each was somebody else's.
+ *
+ * WHY THIS IS NOT THE UNREAD COUNT, which the row above already gives. Unread says "you have not
+ * looked"; this says "you looked and they are still waiting". They come apart the moment somebody
+ * opens a message meaning to answer later, which is most of them. Asked for by a person whose home
+ * page answers one question every morning — what do I have to decide today — and who had the count
+ * and not the list.
+ *
+ * An agent's own threads are not here. They are the agent's correspondence, surfaced to the owner
+ * read-only elsewhere; putting them in a list titled "waiting for your answer" would be asking a
+ * person to answer mail that is not addressed to them.
+ */
+export function YourTurn({ threads, max }) {
+  const rows = (threads ?? []).slice(0, max ?? 5);
+  if (!rows.length) return null;
+  const hidden = (threads ?? []).length - rows.length;
+  return html`
+    <section class="koti-band koti-turn">
+      <h2 class="koti-band-title">${tr('home.turn.title', 'Waiting for your answer')}</h2>
+      <ul class="koti-turn-list">
+        ${rows.map((r) => html`
+          <li class="koti-turn-row" key=${r.id}>
+            <a class="koti-turn-link" href="/v1/profile?tab=messages">
+              <span class="koti-turn-who">${r.who}</span>
+              <span class="koti-turn-said">${r.said}</span>
+            </a>
+          </li>`)}
+      </ul>
+      ${hidden > 0 && html`
+        <p class="koti-turn-more">
+          ${bigNumber(tr('home.turn.more', '{n} more are waiting'), '{n}', hidden)}
+        </p>`}
+    </section>`;
 }
 
 /**
