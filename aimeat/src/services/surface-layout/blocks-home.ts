@@ -85,6 +85,24 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
         summary: 'Whether anything unread is waiting, and how much.',
     },
     {
+        id: 'home.your-turn',
+        surfaces: ['home'],
+        presence: { kind: 'always' },
+        localeStem: 'home.turn',
+        liveDomains: ['messages'],
+        props: {
+            max: {
+                type: 'number',
+                default: 5,
+                min: 1,
+                max: 20,
+                description: 'How many waiting threads to name before the rest are counted.',
+            },
+        },
+        maxPerSurface: 1,
+        summary: 'Which conversations are waiting on an answer from them.',
+    },
+    {
         id: 'home.chat-door',
         // On the onboarding home too: a new account used to be sent straight into the chat because
         // it is the one place a person with nothing connected can act. The steps and the chat door
