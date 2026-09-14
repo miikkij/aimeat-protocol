@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Takes the slide projector's pictures (front page, views/landing-v2-projector.js):
  *   one screenshot of every page of Settings & Controls and of Admin, signed in as the operator,
- *   into public/img/frontdemo/projector/<where>-<id>.png. The projector shows a placeholder for a
- *   page whose file is missing, so this script is the only way a real picture gets there.
+ *   and one of every app in the show (public/img/frontdemo/projector/show.json), into
+ *   public/img/frontdemo/projector/<where>-<id>.png. The projector shows a placeholder for a page
+ *   whose file is missing, so this script is the only way a real picture gets there.
  *
  *   THE PICTURES GO ON A PUBLIC PAGE. They are taken in the operator's session and show whatever
  *   the pages show that operator, so look at every file before committing it: an admin page can
@@ -18,18 +19,25 @@
  *   session without one is thrown away (sdk-libs/auth/session.js, restoreStoredSession).
  *   Playwright drives the machine's own Edge or Chrome first and a Playwright-installed Chromium
  *   after that, like the screenshot worker.
+ *
+ *   THE SHOW IS DATA. show.json lists the apps in order with their own settle, because a Design
+ *   Book takes twenty seconds to draw its first screen and a calculator takes two; the projector
+ *   reads the same file, so the pictures and the words cannot drift apart.
  * @usage
  *   AIMEAT_SHOT_BASE=https://aimeat.io AIMEAT_SHOT_USER=<owner> AIMEAT_SHOT_PASSWORD=<password> \
- *     pnpm projector:shots [--only settings|admin|settings:scheduler,admin:config] [--width 1600] \
- *     [--height 1000] [--settle 1800]
- * @structure SETTINGS · ADMIN · SLOW_MS · arg · launchBrowser · main
+ *     pnpm projector:shots [--only settings|admin|apps|settings:scheduler,apps:design-book] \
+ *     [--width 1600] [--height 1000] [--settle 1800] [--show <path to a show.json>]
+ * @structure SETTINGS · ADMIN · SLOW_MS · arg · launchBrowser · readShow · main
  * @version-history
+ *   v1.2.0 — 2026-09-14 — The apps in the show, from show.json: their own settle, a page other than
+ *     the app itself (the catalogue), and the catalogue's details view opened before the shutter.
+ *     Nine more slow menu pages, measured on aimeat.io.
  *   v1.1.0 — 2026-09-14 — A settle per slow page (scheduler 16 s, messages 11 s, measured on
  *     aimeat.io) and --only takes a list of pages, so one page can be retaken alone.
  *   v1.0.0 — 2026-09-14 — Initial, with the front page as the message frame says it (TARGET-075).
  */
 import { chromium, type Browser } from 'playwright-core';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -56,12 +64,23 @@ const ADMIN = [
 /**
  * Pages that take longer than the rest to fill: the settle before the shutter, in milliseconds,
  * where the default (--settle) is not enough. Measured on aimeat.io on 2026-09-14: the scheduler
- * needs about 15 s and the messages page about 10 s before they show their content.
+ * needs about 15 s, the messages page about 10 s, and the rest of this list around 10 s.
  */
 const SLOW_MS: Record<string, number> = {
   'settings:scheduler': 16_000,
-  'settings:messages': 11_000,
+  'settings:messages': 12_000,
+  'settings:skills': 12_000,
+  'settings:living': 12_000,
+  'settings:nodes': 12_000,
+  'admin:compliance': 12_000,
+  'admin:memory-admin': 12_000,
+  'admin:subdomains': 12_000,
+  'admin:skills': 12_000,
 };
+
+type Name = string | Record<string, string>;
+interface ShowEntry { id: string; name: Name; app?: string; url?: string; settle?: number; detailOf?: string; line?: Name }
+interface Target { where: 'settings' | 'admin' | 'apps'; id: string; url: string; settle: number; detailOf?: string }
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -82,6 +101,17 @@ async function launchBrowser(): Promise<Browser> {
   throw new Error(`No browser to drive (${last}). Install one with: npx playwright install chromium`);
 }
 
+/** The apps in the show, from show.json (or --show <path>); an unreadable file is an empty show. */
+function readShow(path: string): ShowEntry[] {
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8'));
+    return Array.isArray(parsed?.apps) ? parsed.apps.filter((e: ShowEntry) => e && typeof e.id === 'string' && (e.app || e.url)) : [];
+  } catch (e) {
+    console.warn(`show.json not read (${(e as Error).message.split('\n')[0]}); no app slides.`);
+    return [];
+  }
+}
+
 async function main(): Promise<void> {
   const base = (process.env.AIMEAT_SHOT_BASE || 'http://localhost:40600').replace(/\/$/, '');
   const username = process.env.AIMEAT_SHOT_USER || '';
@@ -96,18 +126,31 @@ async function main(): Promise<void> {
   const settle = Number(arg('settle') || 1800);
   const outDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'img', 'frontdemo', 'projector');
   mkdirSync(outDir, { recursive: true });
+  const show = readShow(arg('show') || resolve(outDir, 'show.json'));
 
-  // --only takes a side (settings | admin) or a comma-separated list of pages (settings:scheduler,
-  // admin:config, or a bare id that matches on either side), so one slow page can be retaken alone.
+  // --only takes a side (settings | admin | apps) or a comma-separated list of pages
+  // (settings:scheduler, apps:design-book, or a bare id that matches on any side), so one slow
+  // page can be retaken alone.
   const wanted = (only || '').split(',').map((s) => s.trim()).filter(Boolean);
-  const keep = (where: 'settings' | 'admin', id: string) =>
-    wanted.length === 0 || wanted.some((w) => w === where || w === id || w === `${where}:${id}`);
-  const targets: Array<{ where: 'settings' | 'admin'; id: string; url: string }> = [
-    ...SETTINGS.filter((id) => keep('settings', id)).map((id) => ({ where: 'settings' as const, id, url: `${base}/v1/profile?tab=${encodeURIComponent(id)}` })),
-    ...ADMIN.filter((id) => keep('admin', id)).map((id) => ({ where: 'admin' as const, id, url: `${base}/v1/admin?tab=${encodeURIComponent(id)}` })),
+  const SIDES = ['settings', 'admin', 'apps'];
+  // A side name selects the whole side and nothing else: "apps" is the show, not the Apps tab.
+  const keep = (where: Target['where'], id: string) =>
+    wanted.length === 0 || wanted.some((w) => w === where || w === `${where}:${id}` || (!SIDES.includes(w) && w === id));
+  const appUrl = (app: string) => {
+    const slash = app.indexOf('/');
+    return `${base}/v1/apps/${encodeURIComponent(app.slice(0, slash))}/${encodeURIComponent(app.slice(slash + 1))}?mode=inline`;
+  };
+  const targets: Target[] = [
+    ...SETTINGS.filter((id) => keep('settings', id)).map((id) => ({ where: 'settings' as const, id, url: `${base}/v1/profile?tab=${encodeURIComponent(id)}`, settle: Math.max(settle, SLOW_MS[`settings:${id}`] ?? 0) })),
+    ...ADMIN.filter((id) => keep('admin', id)).map((id) => ({ where: 'admin' as const, id, url: `${base}/v1/admin?tab=${encodeURIComponent(id)}`, settle: Math.max(settle, SLOW_MS[`admin:${id}`] ?? 0) })),
+    ...show.filter((e) => keep('apps', e.id)).map((e) => ({
+      where: 'apps' as const, id: e.id,
+      url: e.url ? (e.url.startsWith('http') ? e.url : `${base}${e.url}`) : appUrl(e.app as string),
+      settle: Math.max(settle, Number(e.settle) || 0), detailOf: e.detailOf,
+    })),
   ];
   if (targets.length === 0) {
-    console.error(`--only ${only} matches no page. Use settings, admin, or pages like settings:scheduler,admin:config.`);
+    console.error(`--only ${only} matches no page. Use settings, admin, apps, or pages like settings:scheduler,apps:design-book.`);
     process.exit(2);
   }
 
@@ -136,8 +179,18 @@ async function main(): Promise<void> {
     const page = await ctx.newPage();
     for (const tgt of targets) {
       try {
-        await page.goto(tgt.url, { waitUntil: 'load', timeout: 30_000 });
-        await page.waitForTimeout(Math.max(settle, SLOW_MS[`${tgt.where}:${tgt.id}`] ?? 0));
+        await page.goto(tgt.url, { waitUntil: 'load', timeout: 60_000 });
+        await page.waitForTimeout(tgt.settle);
+        if (tgt.detailOf) {
+          // The catalogue's details view has no address of its own; open it the way a row's ⋯ does.
+          const slash = tgt.detailOf.indexOf('/');
+          // Runs in the page; `globalThis` there is the window, and this file has no DOM types.
+          await page.evaluate(([owner, filename]) => {
+            const launcher = (globalThis as unknown as { _launcher?: { openPublishedDetail?: (o: string, f: string, l: string, v: number) => void } })._launcher;
+            launcher?.openPublishedDetail?.(owner, filename, '', 0);
+          }, [tgt.detailOf.slice(0, slash), tgt.detailOf.slice(slash + 1)]);
+          await page.waitForTimeout(Math.max(4_000, Math.floor(tgt.settle / 2)));
+        }
         const png = await page.screenshot({ type: 'png' });
         const file = resolve(outDir, `${tgt.where}-${tgt.id}.png`);
         writeFileSync(file, png);
