@@ -289,7 +289,21 @@ export interface UpstreamCheckAnswer {
     havePublishedAt: string;
     upstreamVersion: string;
     upstreamPublishedAt: string;
-    /** False when the source signed with a key other than the one this copy was pulled under. */
+    /**
+     * Was a signature checked at all? False for a copy brought in as a ZIP by hand: upstreamFromZip
+     * pins no key (it has none to pin) and takes the address from the archive's own `source_url`,
+     * so there is nothing to check the answer against and nobody vouching for where it came from.
+     */
+    signerChecked: boolean;
+    /**
+     * True only when a PINNED key verified this answer. False means one of two things, and
+     * `signerChecked` says which: no key was pinned, so nothing was verified — or a key was pinned
+     * and did not verify, which never reaches here because that is a 409 KEY_CHANGED.
+     *
+     * It was hardcoded `true` until 2026-09-14, so an unpinned upstream — a ZIP somebody dropped in,
+     * answering at an address the ZIP itself named — was told its signer was unchanged, with no
+     * signature read. The field's own line above it promised the opposite.
+     */
     signerUnchanged: boolean;
 }
 
@@ -300,9 +314,14 @@ export type UpstreamCheckResult =
 /**
  * Ask the source node what it has now, without downloading anything.
  *
- * Reads the signed statement and nothing else, so this costs one small JSON read. It still VERIFIES
- * that statement: an unsigned or wrongly signed answer is not an update notice, it is a reason to
- * stop. Writes nothing either way.
+ * Reads the signed statement and nothing else, so this costs one small JSON read. Where a key was
+ * pinned it still VERIFIES that statement: a wrongly signed answer is not an update notice, it is a
+ * 409 and a reason to stop. Writes nothing either way.
+ *
+ * WHERE NO KEY WAS PINNED it verifies nothing, because there is nothing to verify against — and it
+ * says so, in `signerChecked`. This sentence used to read "it still VERIFIES that statement" flat,
+ * while the return hardcoded `signerUnchanged: true`, so the one case with no signature at all was
+ * the case that claimed the strongest answer.
  */
 export async function checkUpstream(
     deps: PackagePullDeps, pkg: PackageRecord,
@@ -334,8 +353,9 @@ export async function checkUpstream(
     }
 
     // The pinned key, not whatever the answer would like to be checked against.
-    const signerUnchanged = up.publicKey.length > 0 && await verifyAttestation(up.publicKey, doc);
-    if (up.publicKey.length > 0 && !signerUnchanged) {
+    const signerChecked = up.publicKey.length > 0;
+    const signerUnchanged = signerChecked && await verifyAttestation(up.publicKey, doc);
+    if (signerChecked && !signerUnchanged) {
         return {
             ok: false, status: 409, code: 'KEY_CHANGED',
             message: `${up.node} is answering with a signature that does not check out against the key your copy was pulled under.`,
@@ -356,7 +376,8 @@ export async function checkUpstream(
             havePublishedAt: up.publishedAt,
             upstreamVersion: doc.descriptor.version,
             upstreamPublishedAt: doc.descriptor.published_at,
-            signerUnchanged: true,
+            signerChecked,
+            signerUnchanged,
         },
     };
 }
