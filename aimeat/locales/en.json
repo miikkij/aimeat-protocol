@@ -12691,6 +12691,8 @@
     "projCounter": "Slide {n} of {total}",
     "projStop": "Stop",
     "projAuto": "Run it",
+    "projSoundOn": "Sound on",
+    "projSoundOff": "Sound off",
     "cloudApps": "Apps in the show",
     "slideGeneric": "[What this page did for someone: the sentence comes later.]",
     "slideApps": "Installed on your phone and your desktop. No app store in between.",

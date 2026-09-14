@@ -105,6 +105,8 @@
 .ld-v2-counter { font-family: var(--font-showroom); text-transform: uppercase; font-size: .85rem; letter-spacing: .04em; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .ld-v2-autobtn { font-family: var(--font-showroom-body); font-weight: 800; min-width: 6rem; }
 .ld-v2-autobtn.is-on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.ld-v2-mutebtn { display: inline-flex; align-items: center; gap: .4rem; font-family: var(--font-showroom-body); font-weight: 800; }
+.ld-v2-mutebtn.is-off { color: var(--text-dim); }
 /* The word cloud: the two menus as they are, and one word lit. */
 .ld-v2-cloud { display: flex; flex-direction: column; gap: .6rem; }
 /* The menu's name is a poster section title at menu size. */
