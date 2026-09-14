@@ -87,6 +87,7 @@
   <!-- hrefs are stamped with ?v=BUILD_ID at serve time by portal.ts serveSpa() -->
   <link rel="stylesheet" href="/css/views/landing.css">
   <link rel="stylesheet" href="/css/views/landing-showroom.css">
+  <link rel="stylesheet" href="/css/views/landing-v2.css">
   <link rel="stylesheet" href="/css/views/changelog.css">
   <link rel="stylesheet" href="/css/views/build-story.css">
   <link rel="stylesheet" href="/css/views/portal-classic.css">
@@ -211,6 +212,9 @@
       "/views/landing-doors.js": "/views/landing-doors.js",
       "/views/landing-showroom.js": "/views/landing-showroom.js",
       "/views/landing-showroom-rooms.js": "/views/landing-showroom-rooms.js",
+      "/views/landing-v2.js": "/views/landing-v2.js",
+      "/views/landing-v2-projector.js": "/views/landing-v2-projector.js",
+      "/views/landing-v2-cards.js": "/views/landing-v2-cards.js",
       "/views/landing-node-totals.js": "/views/landing-node-totals.js",
       "/views/landing-prompts.js": "/views/landing-prompts.js",
       "/views/landing-wall.js": "/views/landing-wall.js",
@@ -531,6 +535,9 @@
       // logged-in visitors are forwarded to /v1/profile by the view itself. The old
       // portal view stays reachable at /v1/classic (prompt boxes / "Build").
       '/v1/portal':      () => import('/views/landing.js' + B),
+      // The front page's design round (2026-09-14, TARGET-075): the message-frame version, on its
+      // own address so the two can be compared. A spaRoute in routes/portal.ts too, or F5 is a 404.
+      '/v1/portal-v2':   () => import('/views/landing-v2.js' + B),
       // /v1/pricing is gone (2026-08-28): the store is its own AIMEAT instance and the only place
       // a price exists. The server redirects the old address there, or to the front page.
       '/v1/start':       () => import('/views/start.js' + B),
