@@ -49,6 +49,10 @@
  *   doorReach(fields, facts, declared)
  * @usage const m = doorReach(recordFields(files), loadFacts({ build: true }).facts, declaredInputs);
  * @version-history
+ *   v2.1.0 — 2026-09-14 — A service lookup (`require*`, `get*`, `resolve*` …) no longer pairs a route
+ *     with a tool: requireOwnCompany had made aimeat_company_update the "twin" of the invoice routes,
+ *     so its new organism_id parameter silently cleared two invoice findings. The callee id carries
+ *     the function's name for this.
  *   v2.0.0 — 2026-09-14 — Mentions replaced by doors: what a route reads (CodeQL) against what its
  *     twin tools declare. The name-level join tried the same day is gone with them.
  *   v1.1.0 — 2026-09-14 — The vocabulary is every *Record type in src/ outside src/cli/, not only
@@ -69,12 +73,16 @@ export const GENERIC_CALLERS = 12;
 
 /**
  * A call that says nothing about which job a unit does, however few tools make it: a lookup
- * (`storage.getAgent` linked 21 doors to 10 unrelated tools on 2026-09-14), or a utility, middleware
- * or auth helper (`utils/gaii.ts` linked 10). A shared job is a shared service or a shared write.
+ * (`storage.getAgent` linked 21 doors to 10 unrelated tools on 2026-09-14; the service lookup
+ * `requireOwnCompany` made aimeat_company_update a twin of the invoice routes), or a utility,
+ * middleware or auth helper (`utils/gaii.ts` linked 10). A shared job is a shared service or a
+ * shared write. A function callee reads `file#line#name`.
  */
+const LOOKUP = '(get|list|has|count|find|search|read|resolve|require|is|load|fetch)(?![a-z])';
 export function isPlumbing(callee: string): boolean {
     return /^src\/(utils|middleware|auth)\//.test(callee)
-        || /^storage\.(get|list|has|count|find|search|read|resolve|is)[A-Z]?/.test(callee);
+        || new RegExp(`^storage\\.${LOOKUP}`).test(callee)
+        || new RegExp(`#${LOOKUP}[A-Za-z0-9_]*$`).test(callee);
 }
 
 /**

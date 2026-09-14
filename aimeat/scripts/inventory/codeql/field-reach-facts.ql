@@ -454,7 +454,24 @@ predicate carriesRequestData(Expr arg) {
 }
 
 /**
- * The name a unit's call is paired by: a function in another file, or `storage.<method>`.
+ * A function's own name, or the name of the constant it is assigned to, or nothing. It goes into the
+ * callee id so the join can tell a lookup (`requireOwnCompany`) from a job (`updateCompany`): on
+ * 2026-09-14 the lookup made aimeat_company_update a "twin" of the invoice routes, which have no tool.
+ */
+string functionName(DataFlow::FunctionNode f) {
+  result = f.getFunction().getName()
+  or
+  not exists(f.getFunction().getName()) and
+  exists(VariableDeclarator d | d.getInit() = f.getFunction() | result = d.getBindingPattern().(VarDecl).getName())
+  or
+  not exists(f.getFunction().getName()) and
+  not exists(VariableDeclarator d | d.getInit() = f.getFunction()) and
+  result = ""
+}
+
+/**
+ * The name a unit's call is paired by: a function in another file (`file#line#name`), or
+ * `storage.<method>`.
  *
  * Bound to the unit's own calls first. Written without that on 2026-09-14, the file inequality was
  * the only thing relating the unit to the call, and the evaluator built every function against every
@@ -464,7 +481,7 @@ string crossFileCallee(DataFlow::FunctionNode u, DataFlow::InvokeNode call) {
   callIn(call, localReach(u)) and
   (
     exists(DataFlow::FunctionNode f | f = calleeOf(call) and f.getFile() != u.getFile() |
-      result = f.getFile().getRelativePath() + "#" + f.getStartLine()
+      result = f.getFile().getRelativePath() + "#" + f.getStartLine() + "#" + functionName(f)
     )
     or
     not exists(calleeOf(call)) and
