@@ -29,6 +29,7 @@
  * @structure SETTINGS_TABS · ADMIN_GROUPS · LINES · inLocale · pickApps · clickZig · Projector
  * @usage import { Projector } from './landing-v2-projector.js';
  * @version-history
+ *   v0.5.0 — 2026-09-14 — A sound-off button beside the big one; the choice holds for the browser.
  *   v0.4.0 — 2026-09-14 — A sentence for every page of both menus, and the big button jumps to
  *     any other slide while the arrows walk the queue. Jouni, on the second look.
  *   v0.3.0 — 2026-09-14 — The apps in the show come from show.json, the file the shots script
@@ -285,6 +286,11 @@ function clickZig(ref) {
 }
 
 const Chevron = (dir) => html`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d=${dir < 0 ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'}></path></svg>`;
+/** A speaker, drawn: with two waves when the sound is on, crossed out when it is off. */
+const Speaker = (on) => html`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M11 5L6 9H2v6h4l5 4V5z"></path>
+  ${on ? html`<path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path>` : html`<path d="M22 9l-6 6"></path><path d="M16 9l6 6"></path>`}
+</svg>`;
 
 export function Projector() {
   const [idx, setIdx] = useState(0);
@@ -292,7 +298,21 @@ export function Projector() {
   const [started, setStarted] = useState(false);
   const [missing, setMissing] = useState({});
   const [appSlides, setAppSlides] = useState([]);
+  // Sound off is a choice that should hold for this browser: the button says so, and the click
+  // is skipped rather than played silently. Storage can be blocked; then the choice lasts a visit.
+  const [muted, setMuted] = useState(() => {
+    try { return localStorage.getItem('aimeat.projector.muted') === '1'; }
+    catch (err) { swallowed('landing-v2: projector mute read', err); return false; }
+  });
+  const toggleMute = () => {
+    setMuted((m) => {
+      try { localStorage.setItem('aimeat.projector.muted', m ? '0' : '1'); }
+      catch (err) { swallowed('landing-v2: projector mute write', err); }
+      return !m;
+    });
+  };
   const audio = useRef(null);
+  const play = () => { if (!muted) clickZig(audio); };
   const ref = useRef(null);
   const touchX = useRef(null);
 
@@ -347,19 +367,19 @@ export function Projector() {
 
   const press = (dir = 1) => {
     setAuto(false);
-    clickZig(audio);
+    play();
     setIdx((i) => (i + dir + total) % total);
   };
   // The big button is the carousel's lucky dip: any other slide, never the same one twice. The
   // arrows keep their places in the queue.
   const shuffle = () => {
     setAuto(false);
-    clickZig(audio);
+    play();
     setIdx((i) => (total < 2 ? i : (i + 1 + Math.floor(Math.random() * (total - 1))) % total));
   };
   const jump = (i) => {
     setAuto(false);
-    clickZig(audio);
+    play();
     setIdx(i);
   };
   const onKey = (e) => {
@@ -434,6 +454,11 @@ export function Projector() {
             <span class="ld-v2-counter">${tr('landing2.projCounter', 'Slide {n} of {total}').replace('{n}', String(idx + 1)).replace('{total}', String(total))}</span>
             <button type="button" class=${`btn-outline ld-v2-autobtn ${auto ? 'is-on' : ''}`} aria-pressed=${auto} onClick=${() => setAuto((a) => !a)}>
               ${auto ? tr('landing2.projStop', 'Stop') : tr('landing2.projAuto', 'Run it')}
+            </button>
+            <button type="button" class=${`btn-outline ld-v2-mutebtn ${muted ? 'is-off' : ''}`} aria-pressed=${muted}
+              title=${muted ? tr('landing2.projSoundOff', 'Sound off') : tr('landing2.projSoundOn', 'Sound on')} onClick=${toggleMute}>
+              ${Speaker(!muted)}
+              <span>${muted ? tr('landing2.projSoundOff', 'Sound off') : tr('landing2.projSoundOn', 'Sound on')}</span>
             </button>
           </div>
         </div>

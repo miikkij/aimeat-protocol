@@ -10905,6 +10905,8 @@
     "projCounter": "Diapositiva {n} de {total}",
     "projStop": "Detener",
     "projAuto": "Ponlo a andar",
+    "projSoundOn": "Sonido activado",
+    "projSoundOff": "Sonido apagado",
     "cloudApps": "Aplicaciones de la muestra",
     "slideGeneric": "[Lo que esta página hizo por alguien: la frase llega después.]",
     "slideApps": "Instalada en tu celular y en tu computadora. Sin tienda de aplicaciones en medio.",

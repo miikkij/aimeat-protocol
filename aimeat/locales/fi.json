@@ -12678,6 +12678,8 @@
     "projCounter": "Dia {n} / {total}",
     "projStop": "Pysäytä",
     "projAuto": "Pyöritä",
+    "projSoundOn": "Äänet päällä",
+    "projSoundOff": "Äänet pois",
     "cloudApps": "Esityksen apit",
     "slideGeneric": "[Mitä tämä sivu teki jollekulle: lause tulee myöhemmin.]",
     "slideApps": "Asennettu puhelimeen ja työpöydälle. Ei sovelluskauppaa välissä.",
