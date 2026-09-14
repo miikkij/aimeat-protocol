@@ -73,6 +73,39 @@ describe('gate-policy.shouldGate', () => {
     expect(shouldGate({ action: 'deliverable:accept', risk: 'high', policy: { autonomy: 'L5' } }).gate).toBe(false);
   });
 
+  // THE SAME SHAPE AS `rule`, ONE FIELD OVER, and the second half of the 2026-09-07 ruling. `rule`
+  // stopped deciding anything because it arrives on req.body and belongs to the caller; `risk`
+  // arrives on the same body, from the same caller, and still decided everything.
+  it("an agent's own word about its own risk cannot lower the gate below the default", () => {
+    // L2 reads `gate ≥ medium`. An agent calling its own action low was auto-approved and the
+    // record said decidedBy:'system'.
+    expect(shouldGate({ action: 'flow:advance', risk: 'low', policy: { autonomy: 'L2' }, selfDeclaredRisk: true }))
+      .toEqual({ gate: true, reason: 'autonomy_L2_risk_medium_self_declared_floored' });
+    // Saying nothing has always meant medium, so a caller that declares nothing is unchanged.
+    expect(shouldGate({ action: 'flow:advance', policy: { autonomy: 'L2' }, selfDeclaredRisk: true }))
+      .toEqual({ gate: true, reason: 'autonomy_L2_risk_medium' });
+    // RAISING is still the caller's to do: more caution than the policy asks for is never refused.
+    expect(shouldGate({ action: 'flow:advance', risk: 'high', policy: { autonomy: 'L3' }, selfDeclaredRisk: true }))
+      .toEqual({ gate: true, reason: 'autonomy_L3_risk_high' });
+  });
+
+  it("a HUMAN member's word is untouched, or L2 would collapse into L1", () => {
+    // The person is the party the policy protects, not the party it constrains. Flooring everyone
+    // would make `low` decoration and the L2 row a lie.
+    expect(shouldGate({ action: 'flow:advance', risk: 'low', policy: { autonomy: 'L2' } }).gate).toBe(false);
+    expect(shouldGate({ action: 'flow:advance', risk: 'low', policy: { autonomy: 'L2' }, selfDeclaredRisk: false }).gate).toBe(false);
+  });
+
+  it('the floor still outranks a self-declared risk in both directions', () => {
+    // A floor action gates whatever the agent claims, and reports the floor as the reason.
+    expect(shouldGate({ action: 'spend', risk: 'low', policy: { autonomy: 'L5' }, selfDeclaredRisk: true }))
+      .toEqual({ gate: true, reason: 'always_gate' });
+    // And L4/L5 still auto-run every non-floor action: the floor raises the risk word, it does not
+    // override the owner's level.
+    expect(shouldGate({ action: 'flow:advance', risk: 'low', policy: { autonomy: 'L5' }, selfDeclaredRisk: true }).gate)
+      .toBe(false);
+  });
+
   it('a manifest can empty alwaysGate to opt a class out of the floor', () => {
     expect(shouldGate({ action: 'spend', risk: 'low', policy: { autonomy: 'L5', alwaysGate: [] } }).gate).toBe(false);
   });

@@ -59,6 +59,13 @@ function riskRank(r: Risk): number {
   return r === 'low' ? 1 : r === 'medium' ? 2 : 3;
 }
 
+/**
+ * The lowest risk a caller may claim ABOUT ITS OWN ACTION. It is the value an absent `risk` has
+ * always carried, so a caller that says nothing and a caller that says `low` are now treated alike,
+ * and neither is treated worse than the old default.
+ */
+const SELF_DECLARED_FLOOR: Risk = 'medium';
+
 export interface GatePolicy {
   autonomy?: Autonomy;     // manifest.policy.agentAutonomy
   alwaysGate?: string[];   // manifest.policy.alwaysGate (replaces the default floor when present)
@@ -107,8 +114,29 @@ export function shouldGate(input: {
   risk?: Risk;
   rule?: 'approve' | 'auto';
   policy?: GatePolicy;
+  /**
+   * True when `risk` is the CALLER's own word about its OWN action — an agent, an app grant, an
+   * ecosystem token. A human member describing what they are about to do is not this: they are the
+   * party the policy protects, not the party it constrains.
+   */
+  selfDeclaredRisk?: boolean;
 }): { gate: boolean; reason: string } {
-  const risk = input.risk ?? 'medium';
+  const declared = input.risk ?? 'medium';
+  // THE SAME SHAPE AS `rule`, ONE FIELD OVER. `rule: 'auto'` stopped deciding anything on
+  // 2026-09-07 because it arrives on req.body and belongs to the caller; `risk` arrives on the same
+  // body, from the same caller, and still decided everything. So an agent on an L2 organism — whose
+  // table row reads `gate ≥ medium` — sent `risk: 'low'` about its own action and was auto-approved,
+  // recorded as `decidedBy: 'system'`. Found by the AI triage of 2026-09-13.
+  //
+  // A self-declared risk may RAISE the caution and never lower it below the value an absent one
+  // already carries. A HUMAN member's word is untouched, which is why this takes a flag rather than
+  // a flat floor: flooring everyone would collapse L2 into L1 and make the word `low` decoration.
+  //
+  // WHAT IT DOES NOT CLOSE, said out loud: `action` comes off the same body. An agent that names a
+  // destructive act something else escapes the eight-name floor whatever this does with the risk
+  // word. Closing that needs the node to know what an action IS, which it does not.
+  const floored = input.selfDeclaredRisk === true && riskRank(declared) < riskRank(SELF_DECLARED_FLOOR);
+  const risk: Risk = floored ? SELF_DECLARED_FLOOR : declared;
   const alwaysGate = input.policy?.alwaysGate ?? DEFAULT_ALWAYS_GATE;
 
   if (alwaysGate.includes(input.action)) return { gate: true, reason: 'always_gate' };
@@ -120,7 +148,9 @@ export function shouldGate(input: {
   const autonomy = input.policy?.autonomy ?? 'L3';
   const threshold = GATE_AT_OR_ABOVE[autonomy];
   if (threshold !== null && riskRank(risk) >= riskRank(threshold)) {
-    return { gate: true, reason: `autonomy_${autonomy}_risk_${risk}` };
+    // The suffix is for whoever reads the audit: the caller said something lower, and this is the
+    // value that decided. Without it the record would show a risk nobody typed.
+    return { gate: true, reason: `autonomy_${autonomy}_risk_${risk}${floored ? '_self_declared_floored' : ''}` };
   }
   // Past the owner's threshold. The caller's pass-through is honoured here and only here, so the
   // reason still says which of the two let it through.

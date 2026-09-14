@@ -62,7 +62,12 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     const approverRoleVal = ['owner', 'admin', 'member'].includes(approverRole) ? approverRole : 'owner';
 
     const policy = gatePolicyFromManifest(await readManifest(id));
-    const decision = shouldGate({ action, risk: riskVal, rule, policy });
+    // Whose word `risk` is. A human member describing what they are about to do is the party the
+    // policy protects; an agent, an app grant or an ecosystem token describing its OWN action is the
+    // party it constrains, and its word cannot lower the gate below the default. Same test the rest
+    // of this codebase uses for "a person in person": the owner role without the agent one.
+    const selfDeclaredRisk = !(req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent'));
+    const decision = shouldGate({ action, risk: riskVal, rule, policy, selfDeclaredRisk });
 
     const actor = resolveIdentity(req.auth!, config.nodeId);
     const now = new Date().toISOString();
