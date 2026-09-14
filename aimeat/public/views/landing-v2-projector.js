@@ -26,9 +26,12 @@
  *   run is silent until then.
  *
  *   The section is optional and its title says so: this is for whoever wants to see everything.
- * @structure SETTINGS_TABS · ADMIN_GROUPS · LINES · pickApps · clickZig · Projector
+ * @structure SETTINGS_TABS · ADMIN_GROUPS · LINES · inLocale · pickApps · clickZig · Projector
  * @usage import { Projector } from './landing-v2-projector.js';
  * @version-history
+ *   v0.3.0 — 2026-09-14 — The apps in the show come from show.json, the file the shots script
+ *     photographs, with a picture of their own and a sentence in three languages; the catalogue's
+ *     screenshot is the fallback.
  *   v0.2.0 — 2026-09-14 — Every menu page is a slide and every word is a button that jumps to it;
  *     the apps chosen for the show are the third group of the cloud, with the catalogue's own
  *     screenshots. Jouni, on seeing the first round.
@@ -38,7 +41,7 @@ import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { swallowed } from '/js/swallowed.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
@@ -134,12 +137,37 @@ const AUTO_MS = 1600;
 const SWIPE_PX = 40;
 const APPS_IN_SHOW = 12;
 
+/** A show.json text: one string, or one per language with English as the fallback. */
+const inLocale = (v) => {
+  if (!v) return '';
+  if (typeof v === 'string') return v;
+  return v[getLocale()] || v.en || Object.values(v)[0] || '';
+};
+
 /**
- * The apps in the show: the ones tagged `reference` in their manifest, which is how the catalogue
- * curates (the frame's own rule), or the most opened when nobody has tagged one yet.
- * @param {any[]} apps
+ * The apps in the show. show.json (public/img/frontdemo/projector/show.json, the same file
+ * scripts/projector-shots.ts photographs) names them in order, with a picture taken by that
+ * script and a sentence of its own or the catalogue's description. Without the file, the show is
+ * the apps tagged `reference` in their manifest, which is how the catalogue curates, or the most
+ * opened when nobody has tagged one yet, with the catalogue's own screenshot.
+ * @param {any[]} entries  show.json's `apps`, or [] when there is no file
+ * @param {any[]} apps     the catalogue's listing, for descriptions and screenshots
  */
-function pickApps(apps) {
+function pickApps(entries, apps) {
+  const byPath = new Map(apps.map((a) => [`${a.owner}/${a.filename}`, a]));
+  if (entries.length > 0) {
+    return entries.map((e) => {
+      const a = e.app ? byPath.get(e.app) : null;
+      return {
+        where: 'apps',
+        id: String(e.id),
+        name: inLocale(e.name) || a?.manifest?.name || String(e.id),
+        shot: `/img/frontdemo/projector/apps-${encodeURIComponent(String(e.id))}.png`,
+        fallbackShot: a?.has_screenshot && a.screenshot_url ? a.screenshot_url : null,
+        line: inLocale(e.line) || (a?.manifest?.description || '').slice(0, 160),
+      };
+    });
+  }
   const tagged = apps.filter((a) => (a.manifest?.tags || []).some((x) => String(x).toLowerCase() === 'reference'));
   const chosen = tagged.length > 0 ? tagged : [...apps].sort((a, b) => (b.downloads || 0) - (a.downloads || 0)).slice(0, APPS_IN_SHOW);
   return chosen.map((a) => ({
@@ -147,6 +175,7 @@ function pickApps(apps) {
     id: `${a.owner}/${a.filename}`,
     name: a.manifest?.name || a.filename,
     shot: a.has_screenshot && a.screenshot_url ? a.screenshot_url : null,
+    fallbackShot: null,
     line: (a.manifest?.description || '').slice(0, 160),
   }));
 }
@@ -208,9 +237,17 @@ export function Projector() {
 
   useEffect(() => {
     let alive = true;
-    fetch('/v1/apps?sort=popular&limit=200').then(r => r.json())
-      .then(j => { if (alive) setAppSlides(pickApps(j?.data?.apps || [])); })
-      .catch(err => { swallowed('landing-v2: projector apps', err); });
+    // The show file and the catalogue, together: the file says which apps and in what order, the
+    // catalogue supplies a description and a picture where the file gives none. A missing file is
+    // an empty show, and then the catalogue picks.
+    const showReq = fetch('/img/frontdemo/projector/show.json')
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => (Array.isArray(j?.apps) ? j.apps.filter((e) => e && e.id) : []))
+      .catch(err => { swallowed('landing-v2: projector show', err); return []; });
+    const appsReq = fetch('/v1/apps?sort=popular&limit=200').then(r => r.json())
+      .then(j => j?.data?.apps || [])
+      .catch(err => { swallowed('landing-v2: projector apps', err); return []; });
+    Promise.all([showReq, appsReq]).then(([entries, apps]) => { if (alive) setAppSlides(pickApps(entries, apps)); });
     return () => { alive = false; };
   }, []);
 
@@ -257,7 +294,10 @@ export function Projector() {
     if (Math.abs(dx) >= SWIPE_PX) press(dx < 0 ? 1 : -1);
   };
 
-  const src = slide.where === 'apps' ? slide.shot : `/img/frontdemo/projector/${slide.where}-${slide.id}.png`;
+  // An app slide tries the show's own picture first and the catalogue's screenshot when that file
+  // is missing; a menu slide has only the one place to look.
+  const own = slide.where === 'apps' ? slide.shot : `/img/frontdemo/projector/${slide.where}-${slide.id}.png`;
+  const src = (own && !missing[own]) ? own : (slide.where === 'apps' ? slide.fallbackShot : own);
   const pageName = slide.where === 'apps' ? slide.name : tr(slide.page, slide.id);
   const whereName = slide.where === 'admin' ? tr('nav.admin', 'Admin')
     : slide.where === 'apps' ? tr('landing2.cloudApps', 'Apps in the show')
