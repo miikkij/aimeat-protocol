@@ -12,6 +12,8 @@
  * @structure renderRunModeBadge(agent) · RunModeSwitch({ agent, showToast })
  * @usage import { RunModeSwitch, renderRunModeBadge } from './agent-card-run-mode.js';
  * @version-history
+ *   v1.1.0 — 2026-09-14 — The three buttons are the shared choice group (og-choice), the pressed one on
+ *     the sun, so the switch looks like the same control everywhere on the poster face.
  *   v1.0.0 — 2026-09-01 — Extracted with the switch (Agent v2, post-audit item 5).
  */
 import { h } from 'preact';
@@ -83,10 +85,10 @@ export function RunModeSwitch({ agent, showToast }) {
             leave it — a mistaken `spawn` put an agent on the roster for good, and the only way back
             was an API call nobody would find. crewaimeat-dev hit exactly that on 2026-09-03 and
             could not undo a test agent. `null` on the wire; the button is the third choice here. */''}
-      <div class="pf-agd-runmode-choice" role="group" aria-label=${t('profile.agents.runMode.label')}>
+      <div class="pf-agd-runmode-choice og-choice" role="group" aria-label=${t('profile.agents.runMode.label')}>
         ${[['spawn', 'spawn'], ['resident', 'resident'], [null, 'unset']].map(([value, key]) => html`
-          <button
-            class="btn-outline btn-sm ${runMode === value ? 'is-on' : ''}"
+          <button type="button"
+            class="og-choice-btn ${runMode === value ? 'on' : ''}"
             aria-pressed=${runMode === value ? 'true' : 'false'}
             disabled=${saving}
             onClick=${() => choose(value)}>

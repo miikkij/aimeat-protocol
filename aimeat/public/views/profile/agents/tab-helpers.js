@@ -6,10 +6,14 @@
  *   custom-group collapse state, per-tab "last seen" change tracking, effective ordering,
  *   and pop-out. Extracted from ../agents-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-14 — loadFold()/saveFold(): which of the page's sections the person left open,
+ *     remembered on this browser.
  *   v1.1.0 — 2026-09-06 — agentGaii() and matchesAgentQuery(): the one reading of an agent's
  *     identifier, and the needle test the fleet search runs over the board and the list together.
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/agents-tab.js (max-file-lines)
  */
+
+import { swallowed } from '/js/swallowed.js';
 
 // ── Finding one agent among many ──
 
@@ -66,6 +70,26 @@ export function loadCollapsedGroups(owner) {
 export function saveCollapsedGroups(owner, set) {
   if (!owner) return;
   try { localStorage.setItem(COLLAPSE_KEY_PREFIX + owner, JSON.stringify([...set])); }
+  // eslint-disable-next-line aimeat/no-silent-catch -- ignore quota/availability errors
+  catch { /* ignore quota/availability errors */ }
+}
+
+// ── Per-browser fold state of the page's sections (localStorage) ──
+// Whether "Start with two agents" and "Connect the AI you already use" stand open or closed is a
+// choice the person made on this browser, and a section that springs back open on every visit is
+// a section they close every visit. Keyed by owner like the rest; `fallback` is the answer when
+// nobody has chosen yet (open while there is something to do, closed once there is not).
+const FOLD_KEY_PREFIX = 'aimeat-agent-fold:';
+export function loadFold(owner, id, fallback) {
+  if (!owner) return fallback;
+  try {
+    const v = localStorage.getItem(`${FOLD_KEY_PREFIX}${owner}:${id}`);
+    return v === null ? fallback : v === '1';
+  } catch (err) { swallowed('tab-helpers: fold', err); return fallback; }
+}
+export function saveFold(owner, id, open) {
+  if (!owner) return;
+  try { localStorage.setItem(`${FOLD_KEY_PREFIX}${owner}:${id}`, open ? '1' : '0'); }
   // eslint-disable-next-line aimeat/no-silent-catch -- ignore quota/availability errors
   catch { /* ignore quota/availability errors */ }
 }

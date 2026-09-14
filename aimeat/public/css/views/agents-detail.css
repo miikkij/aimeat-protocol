@@ -6,6 +6,7 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   2026-09-14 -- The rules for the agents page's and the card masthead's old markup leave; the poster sheets carry the new ones.
  *   2026-09-14 -- .pf-agd-solo-toast leaves; the pop-out window uses the shared .toast in theme.css.
  *   2026-09-13 -- V2y: shared B1 class owns the agent setup panel headline.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
@@ -118,16 +119,6 @@
  *   v2.29.0 -- 2026-08-08 -- .pf-agd-idcard-copy deleted — the GAII copy button is btn-ghost btn-sm btn-copy-inline.
  */
 
-/* Header row: title left, connect button right. The bottom margin keeps the
-   connect button from sitting flush against the description text below. */
-.pf-agd-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.65rem;
-}
-
 /* Stat cards inside agent detail tabs (Activity, Quality): size each card to its
    content so long uppercase labels ("Onnistumisprosentti") fit, and center the
    group instead of left-stacking it. */
@@ -173,13 +164,6 @@
   font-weight: 600;
 }
 
-/* Sub-tab content area */
-.pf .agd-subtab-content ,
-.pf .pf-agd-subtab-content  {
-  padding: 1rem 0 0.5rem;
-  min-height: 120px;
-}
-
 /* Section headers inside sub-tabs */
 .pf .agd-section-header ,
 .pf .pf-agd-section-header  {
@@ -203,79 +187,6 @@
   margin: 0.25rem 0 0.5rem;
 }
 
-/* Task list items */
-.pf .agd-task-item ,
-.pf .pf-agd-task-item  {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: var(--radius-xs, 6px);
-  margin-bottom: 0.35rem;
-  background: var(--card-bg, #FFFFFF);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.pf .agd-task-item:hover ,
-.pf .pf-agd-task-item:hover  { background: var(--card-bg-alt, #F3F4F6); }
-.pf .agd-task-title ,
-.pf .pf-agd-task-title  { font-weight: 500; flex: 1; font-size: 0.85rem; }
-.pf .agd-task-meta ,
-.pf .pf-agd-task-meta  { display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; }
-.pf .agd-task-time ,
-.pf .pf-agd-task-time  { font-size: 0.75rem; color: var(--text-dim, #6B7280); }
-
-/* Status badges */
-.pf .agd-status ,
-.pf .pf-agd-status  {
-  font-size: 0.7rem;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.pf .agd-status-draft ,
-.pf .pf-agd-status-draft  { background: var(--card-bg-alt, #F3F4F6); color: var(--text-dim, #6B7280); }
-.pf .agd-status-queued ,
-.pf .pf-agd-status-queued  { background: rgba(217, 119, 6, 0.1); color: var(--warn, #F59E0B); }
-.pf .agd-status-active ,
-.pf .pf-agd-status-active  { background: rgba(37, 99, 235, 0.1); color: var(--blue, #3B82F6); }
-.pf .agd-status-done ,
-.pf .pf-agd-status-done  { background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981); }
-.pf .agd-status-failed ,
-.pf .pf-agd-status-failed  { background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444); }
-.pf .agd-status-stalled ,
-.pf .pf-agd-status-stalled  { background: rgba(239, 68, 68, 0.1); color: var(--warn, #F59E0B); }
-.pf .pf-agd-status-revision_requested { background: rgba(217, 119, 6, 0.18); color: var(--warn, #F59E0B); }
-
-/* Task revision flow (since 1.14.5): outdated todos shown collapsed beneath
-   the active proposal so the owner can see what was replaced after a
-   /request-changes round-trip. */
-.pf .pf-agd-todo-history {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--border, #E5E7EB);
-}
-.pf .pf-agd-todo-history-toggle {
-  background: none;
-  border: none;
-  color: var(--text-dim, #6B7280);
-  font-size: 0.85rem;
-  cursor: pointer;
-  padding: 0.25rem 0;
-  text-align: left;
-}
-.pf .pf-agd-todo-history-toggle:hover { color: var(--text); }
-.pf .pf-agd-todo-list-outdated {
-  opacity: 0.6;
-  margin-top: 0.25rem;
-}
-.pf .pf-agd-todo-outdated .pf-agd-todo-title {
-  text-decoration: line-through;
-  color: var(--text-dim, #6B7280);
-}
-
 /* Request-changes modal contents */
 .pf .pf-agd-modal-help {
   color: var(--text-dim, #6B7280);
@@ -297,14 +208,6 @@
 }
 
 /* Task creation form */
-.pf .agd-create-form ,
-.pf .pf-agd-create-form  {
-  padding: 0.75rem;
-
-  border-radius: var(--radius-xs, 6px);
-  margin-top: 0.5rem;
-  background: var(--card-bg, #FFFFFF);
-}
 .pf .agd-form-field ,
 .pf .pf-agd-form-field  { margin-bottom: 0.65rem; }
 .pf .agd-form-field label ,
@@ -345,58 +248,6 @@
 .pf .agd-form-actions ,
 .pf .pf-agd-form-actions  { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
 
-/* Task expanded detail / event log */
-.pf .agd-task-expanded ,
-.pf .pf-agd-task-expanded  {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border, #E5E7EB);
-  border-top: none;
-  border-radius: 0 0 var(--radius-xs, 6px) var(--radius-xs, 6px);
-  margin-top: -0.35rem;
-  margin-bottom: 0.35rem;
-  background: var(--card-bg-alt, #F3F4F6);
-  font-size: 0.85rem;
-}
-.pf .agd-task-desc ,
-.pf .pf-agd-task-desc  { color: var(--text-dim, #6B7280); margin-bottom: 0.5rem; line-height: 1.4; }
-.pf .agd-task-timestamps ,
-.pf .pf-agd-task-timestamps  {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  font-size: 0.7rem;
-  color: var(--text-muted, #9CA3AF);
-  margin-bottom: 0.5rem;
-  padding-bottom: 0.4rem;
-  border-bottom: 1px solid var(--border, #E5E7EB);
-}
-.pf .agd-todo-completed-at ,
-.pf .pf-agd-todo-completed-at  {
-  font-size: 0.7rem;
-  color: var(--text-muted, #9CA3AF);
-  margin-top: 0.15rem;
-}
-.pf .agd-task-actions ,
-.pf .pf-agd-task-actions  { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
-
-.pf .agd-event-log ,
-.pf .pf-agd-event-log  { max-height: 200px; overflow-y: auto; margin-top: 0.5rem; }
-.pf .agd-event-item ,
-.pf .pf-agd-event-item  {
-  padding: 0.25rem 0;
-  border-bottom: 1px solid var(--border, #E5E7EB);
-  font-size: 0.8rem;
-  display: flex;
-  gap: 0.5rem;
-  align-items: baseline;
-}
-.pf .agd-event-item:last-child ,
-.pf .pf-agd-event-item:last-child  { border-bottom: none; }
-.pf .agd-event-time ,
-.pf .pf-agd-event-time  { color: var(--text-dim, #6B7280); font-size: 0.7rem; flex-shrink: 0; }
-.pf .agd-event-type ,
-.pf .pf-agd-event-type  { font-weight: 500; flex-shrink: 0; }
-
 /* Empty state */
 .pf .agd-empty ,
 .pf .pf-agd-empty  {
@@ -405,12 +256,6 @@
   color: var(--text-dim, #6B7280);
   font-size: 0.85rem;
 }
-.pf .pf-agd-empty-hint {
-  color: var(--text-dim);
-  font-size: 0.8rem;
-  margin-top: 0.25rem;
-}
-
 /* Directives display */
 .pf .agd-directive-section ,
 .pf .pf-agd-directive-section  { margin-bottom: 1rem; }
@@ -1138,173 +983,6 @@
 .pf .agd-version-badge ,
 .pf .pf-agd-version-badge  { font-size: 0.7rem; color: var(--text-muted, #9CA3AF); }
 
-/* ── Task TODO list ── */
-
-/* Progress badge shown next to task title */
-.pf .agd-todo-progress ,
-.pf .pf-agd-todo-progress  {
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 1px 7px;
-  border-radius: 10px;
-  background: rgba(37, 99, 235, 0.1);
-  color: var(--blue, #3B82F6);
-  white-space: nowrap;
-}
-
-/* TODO section wrapper inside expanded task */
-.pf .agd-todo-section ,
-.pf .pf-agd-todo-section  {
-  margin: 0.5rem 0;
-}
-.pf .agd-todo-header ,
-.pf .pf-agd-todo-header  {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.35rem;
-  font-size: 0.8rem;
-}
-.pf .agd-todo-summary ,
-.pf .pf-agd-todo-summary  {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.pf .agd-todo-time ,
-.pf .pf-agd-todo-time  {
-  font-size: 0.7rem;
-  color: var(--text-muted, #9CA3AF);
-}
-
-/* Environment badges (AIMEAT / Agent) */
-.pf .agd-env-badge ,
-.pf .pf-agd-env-badge  {
-  font-size: 0.6rem;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  white-space: nowrap;
-}
-.pf .agd-env-aimeat ,
-.pf .pf-agd-env-aimeat  {
-  background: rgba(16, 185, 129, 0.12);
-  color: var(--success, #10b981);
-}
-.pf .agd-env-agent ,
-.pf .pf-agd-env-agent  {
-  background: rgba(217, 119, 6, 0.12);
-  color: var(--warn, #F59E0B);
-}
-
-/* TODO item list */
-.pf .agd-todo-list ,
-.pf .pf-agd-todo-list  {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-.pf .agd-todo-item ,
-.pf .pf-agd-todo-item  {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  padding: 0.4rem 0.5rem;
-  border-radius: var(--radius-xs, 6px);
-  background: var(--card-bg, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
-  font-size: 0.8rem;
-  transition: border-color 0.15s;
-}
-.pf .agd-todo-active ,
-.pf .pf-agd-todo-active  {
-  border-color: var(--blue, #3B82F6);
-  background: rgba(37, 99, 235, 0.04);
-}
-.pf .agd-todo-done ,
-.pf .pf-agd-todo-done  {
-  opacity: 0.7;
-}
-.pf .agd-todo-failed ,
-.pf .pf-agd-todo-failed  {
-  border-color: var(--danger, #ef4444);
-  background: rgba(239, 68, 68, 0.04);
-}
-.pf .agd-todo-skipped ,
-.pf .pf-agd-todo-skipped  {
-  opacity: 0.5;
-}
-
-/* Status icon column */
-.pf .agd-todo-icon ,
-.pf .pf-agd-todo-icon  {
-  flex-shrink: 0;
-  font-size: 0.85rem;
-  line-height: 1.4;
-  width: 1.2rem;
-  text-align: center;
-}
-
-/* Content column */
-.pf .agd-todo-content ,
-.pf .pf-agd-todo-content  {
-  flex: 1;
-  min-width: 0;
-}
-.pf .agd-todo-title ,
-.pf .pf-agd-todo-title  {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  font-weight: 500;
-  line-height: 1.4;
-}
-.pf .agd-todo-est ,
-.pf .pf-agd-todo-est  {
-  font-size: 0.65rem;
-  color: var(--text-muted, #9CA3AF);
-  white-space: nowrap;
-}
-.pf .agd-todo-desc ,
-.pf .pf-agd-todo-desc  {
-  font-size: 0.75rem;
-  color: var(--text-dim, #6B7280);
-  line-height: 1.4;
-  margin-top: 0.15rem;
-}
-.pf .agd-todo-reason ,
-.pf .pf-agd-todo-reason  {
-  font-size: 0.7rem;
-  color: var(--text-muted, #9CA3AF);
-  font-style: italic;
-  margin-top: 0.1rem;
-}
-.pf .agd-todo-verify ,
-.pf .pf-agd-todo-verify  {
-  font-size: 0.7rem;
-  color: var(--text-muted, #9CA3AF);
-  margin-top: 0.1rem;
-  padding-left: 0.5rem;
-  border-left: 2px solid var(--border, #E5E7EB);
-}
-
-/* Waiting state (no todos yet) */
-.pf .agd-todo-waiting ,
-.pf .pf-agd-todo-waiting  {
-  text-align: center;
-  padding: 1rem;
-  color: var(--text-muted, #9CA3AF);
-  font-size: 0.8rem;
-  font-style: italic;
-  background: var(--card-bg, #FFFFFF);
-  border: 1px dashed var(--border, #E5E7EB);
-  border-radius: var(--radius-xs, 6px);
-  margin: 0.5rem 0;
-}
-
 /* ══════════════════════════════════════════════════════════════
    Agent Detail Tab-View (Plan 4)
    All new classes use pf-agd- prefix (profile agent detail)
@@ -1639,55 +1317,10 @@
 .pf .pf-agd-card {
   margin-bottom: 0.5rem;
 }
-.pf .pf-agd-collapsed {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
-  padding: 0.625rem 0.875rem;
-  background: var(--card-bg, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: var(--radius-xs, 6px);
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-.pf .pf-agd-collapsed:hover {
-  background: var(--card-bg-alt, #F3F4F6);
-}
-.pf .pf-agd-collapsed--problem {
-  border-color: var(--danger, #ef4444);
-}
-/* Top row: expand arrow + icon + name + badges + pop-out */
-.pf .pf-agd-collapsed-main {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-/* Second row: delivery + status + last seen, smaller, faint divider above */
-.pf .pf-agd-collapsed-meta {
-  margin-top: 0.4rem;
-  padding-top: 0.35rem;
-  border-top: 1px solid var(--border-subtle, #F3F4F6);
-  font-size: 0.7rem;
-  color: var(--text-muted, #9CA3AF);
-  line-height: 1.4;
-}
 .pf .pf-agd-expand-icon {
   font-size: 0.7rem;
   color: var(--text-dim, #6B7280);
   transition: transform 0.15s;
-  flex-shrink: 0;
-}
-.pf .pf-agd-expand-icon--open {
-  transform: none;
-}
-.pf .pf-agd-collapsed-icon {
-  font-size: 0.9rem;
-  flex-shrink: 0;
-}
-.pf .pf-agd-collapsed-name {
-  font-weight: 600;
-  font-size: 0.9rem;
   flex-shrink: 0;
 }
 .pf .pf-agd-delivery-indicator {
@@ -1695,38 +1328,6 @@
   color: var(--text-muted, #9CA3AF);
   margin-right: 0.5rem;
 }
-.pf .pf-agd-collapsed-badges {
-  display: flex;
-  gap: 0.35rem;
-  flex-shrink: 0;
-}
-.pf .pf-agd-collapsed-stats {
-  margin-left: auto;
-  font-size: 0.75rem;
-  color: var(--text-dim, #6B7280);
-  white-space: nowrap;
-  text-align: right;
-}
-
-/* Pop-out button (open agent in its own window) */
-.pf .pf-agd-popout-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-dim, #6B7280);
-  font-family: inherit;
-  font-size: 0.95rem;
-  line-height: 1;
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-.pf .pf-agd-collapsed-main .pf-agd-popout-btn { margin-left: auto; }
-.pf .pf-agd-popout-btn:hover {
-  color: var(--accent, #E8564A);
-  background: var(--bg-dim, #F9FAFB);
-}
-
 /* ── The GAII, on the row and copied on press ──
    Sized to sit inside the collapsed card's meta line without taking a second line: the value is
    one unbreakable token, so it ellipsizes when the card is narrow and the whole string still goes
@@ -1771,34 +1372,6 @@
   opacity: 0.55;
 }
 .pf .pf-agd-gaii:hover .pf-agd-gaii-mark { opacity: 1; }
-/* Separator between the GAII and the rest of the meta line, matching the middle dots the
-   delivery/status pieces bring with them. */
-.pf .pf-agd-meta-sep {
-  margin: 0 0.4rem 0 0.15rem;
-  color: var(--border, #E5E7EB);
-}
-
-/* ── The fleet search, above the board ──
-   One row: the field takes the width, the count and the clear only appear once something is
-   typed, so an empty search is a field and nothing else. */
-.pf .pf-agd-fleet-search {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.75rem;
-}
-.pf .pf-agd-fleet-search-input {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.pf .pf-agd-fleet-search-count {
-  flex: none;
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: var(--text-muted, #9CA3AF);
-  white-space: nowrap;
-}
-
 /* ── Drag-to-reorder rows (ungrouped, unfiltered agent list) ── */
 /* The row's box (= the drop target) is extended LEFT to cover the grip handle
    via padding-left, while a matching negative margin-left pulls the box back so
@@ -1910,112 +1483,6 @@
   color: var(--accent);
 }
 
-/* ── The basic-agents panel: one press, three agents ── */
-.pf .pf-agd-basic {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--card);
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-.pf .pf-agd-basic-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-.pf .pf-agd-basic-desc {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin-top: 0.15rem;
-  /* A flex item's automatic min-width is its content, which holds the whole page open on a phone.
-     docs/pitfalls.md §30. */
-  min-width: 0;
-}
-.pf .pf-agd-basic-state {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.pf .pf-agd-basic-status {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.75rem;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-.pf .pf-agd-basic-status.is-connected {
-  color: var(--success, #10b981);
-}
-.pf .pf-agd-basic-icon {
-  flex: 0 0 auto;
-}
-.pf .pf-agd-basic-hint {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  margin-top: 0.25rem;
-}
-.pf .pf-agd-basic-list {
-  list-style: none;
-  margin: 0.5rem 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-.pf .pf-agd-basic-item-head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-.pf .pf-agd-basic-name {
-  font-weight: 600;
-  font-size: 0.85rem;
-}
-.pf .pf-agd-basic-have {
-  font-size: 0.75rem;
-  color: var(--success, #10b981);
-}
-.pf .pf-agd-basic-item-desc {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  margin-top: 0.15rem;
-}
-
-/* What the agent reaches, and whether it starts work on its own: the two things the person is
-   actually agreeing to when they press the button. */
-.pf .pf-agd-basic-item-gets {
-  display: flex;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-top: 0.25rem;
-}
-.pf .pf-agd-basic-gets-label {
-  color: var(--text-dim, var(--text-muted));
-  font-weight: 500;
-}
-.pf .pf-agd-basic-alone {
-  font-size: 0.7rem;
-  padding: 0.05rem 0.4rem;
-  border-radius: 999px;
-  border: 1px solid var(--warning, #f59e0b);
-  color: var(--warning, #f59e0b);
-  white-space: nowrap;
-}
-.pf .pf-agd-basic-notice {
-  margin-top: 0.5rem;
-  padding: 0.5rem 0.6rem;
-  border-left: 2px solid var(--warning, #f59e0b);
-  background: var(--bg-dim);
-  font-size: 0.78rem;
-  color: var(--text-muted);
-}
-
 /* ── Which model an agent thinks with ── */
 .pf .pf-agd-crew-llm {
   border: 1px solid var(--border);
@@ -2049,100 +1516,6 @@
 }
 .pf .pf-agd-crew-llm-current {
   font-size: 0.85rem;
-}
-
-/* ── The new-agent panel: a name, a shape, and what the owner's agents have proposed ── */
-.pf .pf-agd-new {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--card);
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-.pf .pf-agd-new-form {
-  display: grid;
-  /* Two columns where there is room, one on a phone. `minmax(0, …)` rather than a bare fraction:
-     a grid item's automatic minimum is its content, and a long placeholder would otherwise hold
-     the page open. docs/pitfalls.md §30. */
-  /* TWO COLUMNS AT MOST. `auto-fit` alone gave four tracks of 256 px on a 1440 px screen, which
-     turns six short fields into a wall and puts the textarea's own row a long way from its label.
-     The clamp keeps the fold at one column on a phone and stops there. */
-  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
-  max-width: 46rem;
-  gap: 0.75rem;
-  margin-top: 0.9rem;
-}
-.pf .pf-agd-new-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  min-width: 0;
-}
-.pf .pf-agd-new-field--wide {
-  grid-column: 1 / -1;
-}
-.pf .pf-agd-new-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-.pf .pf-agd-new-hint {
-  font-size: 0.75rem;
-  /* --text-dim, not --text-muted: measured 2.54:1 against the light theme's white at 12 px,
-     where the panel beside it reads 4.83:1 on the darker token. A hint nobody can read is a
-     hint that is not there. */
-  color: var(--text-dim);
-}
-.pf .pf-agd-new-actions {
-  grid-column: 1 / -1;
-  display: flex;
-  justify-content: flex-end;
-}
-.pf .pf-agd-new-attach {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin-top: 0.75rem;
-  padding: 0.5rem 0.6rem;
-  border-left: 2px solid var(--warning, #f59e0b);
-  background: var(--bg-dim);
-  font-size: 0.8rem;
-  /* --text, not a muted token: this strip sits on --bg-dim rather than on the card, and the
-     dim grey measured 4.39:1 against it — 0.11 short, which is the kind of miss a token that
-     was chosen against white always makes on a tinted ground. It is also the one line here
-     that asks the person to do something. */
-  color: var(--text);
-}
-.pf .pf-agd-new-waiting {
-  margin-top: 1rem;
-  border-top: 1px solid var(--border);
-  padding-top: 0.75rem;
-}
-.pf .pf-agd-new-waiting-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-.pf .pf-agd-new-waiting-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--border);
-}
-.pf .pf-agd-new-waiting-row:first-of-type {
-  border-top: none;
-}
-.pf .pf-agd-new-waiting-row > div:first-child {
-  min-width: 0;
-}
-.pf .pf-agd-new-waiting-actions {
-  display: flex;
-  gap: 0.4rem;
-  flex: 0 0 auto;
 }
 
 /* Tag chip strip on expanded card */
@@ -2218,181 +1591,14 @@
   margin-bottom: 0.5rem;
   border-bottom: 1px solid var(--border, #E5E7EB);
 }
-.pf .pf-agd-filter-tags,
-.pf .pf-agd-filter-groupby {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-.pf .pf-agd-filter-label {
-  font-size: 0.8rem;
-  color: var(--text-muted, #6B7280);
-  font-weight: 500;
-}
-.pf .pf-agd-filter-select {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.85rem;
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 4px;
-  background: var(--card-bg, #FFFFFF);
-  color: var(--text, #111827);
-}
-.pf .pf-agd-filter-clear {
-  background: none;
-  border: none;
-  color: var(--blue, #3B82F6);
-  font-size: 0.8rem;
-  cursor: pointer;
-  padding: 0.15rem 0.3rem;
-}
-.pf .pf-agd-filter-clear:hover { text-decoration: underline; }
 
 .pf .pf-agd-group { margin-bottom: 1.25rem; }
-.pf .pf-agd-group-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0;
-  margin-bottom: 0.5rem;
-  border-bottom: 1px dashed var(--border, #E5E7EB);
-}
-.pf .pf-agd-group-count {
-  font-size: 0.8rem;
-  color: var(--text-muted, #6B7280);
-}
-.pf .pf-agd-group-untagged {
-  font-size: 0.85rem;
-  font-style: italic;
-  color: var(--text-muted, #6B7280);
-}
 
 /* ── Custom groups (user-defined sections, drag-to-assign) ── */
-.pf .pf-agd-cgroup-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.75rem;
-}
-.pf .pf-agd-cgroup-hint {
-  color: var(--text-muted, #6B7280);
-  font-size: 0.78rem;
-}
-/* The header doubles as the drop target for filing agents into the group. */
-.pf .pf-agd-cgroup-header {
-  cursor: default;
-}
-.pf .pf-agd-cgroup-toggle {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-muted, #9CA3AF);
-  font-size: 0.7rem;
-  padding: 0 0.1rem;
-  line-height: 1;
-}
-.pf .pf-agd-cgroup-toggle:hover { color: var(--accent, #E8564A); }
-.pf .pf-agd-cgroup-name {
-  flex: 1;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: text;
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--text, #1A1A2E);
-  padding: 0.1rem 0.2rem;
-  border-radius: 4px;
-}
-.pf .pf-agd-cgroup-name:hover { background: var(--bg-surface, #F3F4F6); }
 .pf .pf-agd-cgroup-name-input {
   flex: 1;
   font-weight: 600;
   font-size: 0.9rem;
-}
-.pf .pf-agd-cgroup-empty {
-  font-size: 0.82rem;
-  color: var(--text-muted, #9CA3AF);
-  font-style: italic;
-  padding: 0.5rem 0.25rem;
-
-  border-radius: 8px;
-  margin-bottom: 0.5rem;
-}
-
-/* ── Expanded Card ── */
-
-.pf .pf-agd-expanded {
-  background: var(--card-bg, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: var(--radius, 8px);
-  overflow: hidden;
-}
-
-/* Zone 1: Identity */
-.pf .pf-agd-zone1 {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  cursor: pointer;
-}
-.pf .pf-agd-zone1-identity {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  flex-shrink: 0;
-}
-.pf .pf-agd-zone1-name {
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-/* The GAII line under the header, on the card's own content inset. Its own row because the header
-   is already full: at 390px the badges and the last-seen leave the identity column 41px, which is
-   two characters of an identifier whose point is that it is complete. */
-.pf .pf-agd-gaii-row {
-  padding: 0 1rem 0.25rem;
-}
-.pf .pf-agd-zone1-badges {
-  display: flex;
-  gap: 0.35rem;
-  flex-shrink: 0;
-}
-.pf .pf-agd-zone1-right {
-  margin-left: auto;
-  font-size: 0.75rem;
-  color: var(--text-dim, #6B7280);
-}
-
-/* Capabilities summary (collapsed one-liner "N tools · N skills · N langs").
-   The wrapper carries the card's content inset (1rem) so the summary doesn't sit
-   flush against the card edge, plus a little top gap to separate it from the
-   tag/badge strip above. */
-.pf .pf-agd-capwrap {
-  padding: 0.4rem 1rem 0.1rem;
-}
-
-/* Capabilities badges */
-.pf .pf-agd-capabilities {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  padding: 0.25rem 0.75rem 0.5rem;
-}
-.pf .pf-agd-cap-badge {
-  font-size: 0.675rem;
-  padding: 0.125rem 0.5rem;
-  border-radius: 999px;
-  font-weight: 500;
-}
-.pf .pf-agd-cap-badge--tech {
-  background: var(--success-bg, #ECFDF5);
-  color: var(--success, #10B981);
-}
-.pf .pf-agd-cap-badge--domain {
-  background: var(--info-bg, #EFF6FF);
-  color: var(--info, #3B82F6);
 }
 
 /* Zone 2: Status (state-dependent) */
@@ -2495,37 +1701,6 @@
 
 /* ── Tab Bar ── */
 
-.pf .pf-agd-tabs {
-  display: flex;
-  /* Wrap to a second row instead of scrolling horizontally: with 10 tabs the
-     bar no longer fits one line on the card width. TABS (agent-card.js) is
-     ordered by owner usage frequency so the most-used tabs land on the top row
-     and the rarely-touched setup tabs fall to the second. */
-  flex-wrap: wrap;
-  gap: 0;
-  row-gap: 2px;
-  margin-top: 0.5rem;
-  padding-top: 0.25rem;
-  border-bottom: 1px solid var(--border, #E5E7EB);
-}
-.pf .pf-agd-tab {
-  padding: 0.5rem 0.875rem;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-dim, #6B7280);
-  cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 500;
-  white-space: nowrap;
-  transition: color 0.15s, border-color 0.15s;
-}
-.pf .pf-agd-tab:hover { color: var(--text, #1A1A2E); }
-.pf .pf-agd-tab--active {
-  color: var(--accent, #E8564A);
-  border-bottom-color: var(--accent, #E8564A);
-  font-weight: 600;
-}
 .pf .pf-agd-tab-content {
   padding: 1rem;
   min-height: 150px;
@@ -2556,12 +1731,6 @@
   background: var(--danger-bg, #FEE2E2);
   color: var(--danger-fg, #DC2626);
   border-color: var(--danger-border, #FECACA);
-}
-.pf .pf-agd-tab {
-  /* allow the inline count badge to sit beside the label */
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
 }
 .pf .pf-agd-tab-badge {
   display: inline-flex;
@@ -2600,8 +1769,6 @@
 .pf .pf-agd-legend-pill--active { border-color: var(--accent); color: var(--text); }
 .pf .pf-agd-legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .pf .pf-agd-legend-count { color: var(--muted); }
-.pf .pf-agd-cap-summary { background: none; border: none; padding: 0.15rem 0; font-size: 0.78rem; color: var(--text-dim); cursor: pointer; }
-.pf .pf-agd-cap-summary:hover { color: var(--text); }
 .pf .pf-agd-none-inline { font-size: 0.78rem; color: var(--muted); margin: 0 auto 0 0.5rem; }
 .pf .pf-agd-inline-stars { display: inline-flex; gap: 1px; }
 .pf .pf-agd-inline-star { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--border); padding: 0 1px; line-height: 1; }
@@ -2745,54 +1912,7 @@
 }
 .pf .pf-agd-msg-bubble .md-body th { background: var(--card-bg-alt, #F3F4F6); }
 
-/* ── Integration tab: Onboarding checklist ── */
-
-.pf .pf-agd-checklist {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-bottom: 1rem;
-}
-.pf .pf-agd-step {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.5rem;
-  border-radius: var(--radius-xs, 6px);
-  font-size: 0.82rem;
-  border: 1px solid var(--border, #E5E7EB);
-  background: var(--card-bg, #FFFFFF);
-}
-.pf .pf-agd-step--passed {
-  border-color: rgba(16, 185, 129, 0.3);
-}
-.pf .pf-agd-step--pending {
-  opacity: 0.7;
-}
-.pf .pf-agd-step--failed {
-  border-color: rgba(239, 68, 68, 0.3);
-}
-.pf .pf-agd-step-icon {
-  font-size: 0.9rem;
-  flex-shrink: 0;
-  width: 1.2rem;
-  text-align: center;
-}
-.pf .pf-agd-step-name {
-  font-weight: 500;
-  flex: 1;
-}
-.pf .pf-agd-step-detail {
-  font-size: 0.7rem;
-  color: var(--text-muted, #9CA3AF);
-  margin-left: auto;
-}
-
 /* ── Integration tab: Production sections ── */
-
-.pf .pf-agd-section {
-  margin-bottom: 1.25rem;
-}
 
 /* Card scheme shared by every agent-detail tab: content groups become bordered
    cards (.pf-agd-card) and a tab that pairs short groups side by side wraps
@@ -2848,31 +1968,6 @@
   overflow-wrap: anywhere;
   min-width: 0;
 }
-
-/* ── Delivery log table ── */
-
-.pf .pf-agd-delivery-log {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.78rem;
-}
-.pf .pf-agd-delivery-log th {
-  text-align: left;
-  padding: 0.35rem 0.5rem;
-  font-weight: 600;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  color: var(--text-dim, #6B7280);
-  border-bottom: 1px solid var(--border, #E5E7EB);
-}
-.pf .pf-agd-delivery-log td {
-  padding: 0.3rem 0.5rem;
-  border-bottom: 1px solid var(--border-subtle, #F3F4F6);
-  color: var(--text, #1A1A2E);
-}
-.pf .pf-agd-delivery-log tr:last-child td { border-bottom: none; }
-.pf .pf-agd-delivery-toggle { margin-top: 0.375rem; }
 
 /* ── Messages tab: Command palette ── */
 
@@ -3102,34 +2197,6 @@
   margin-top: 0.4rem;
 }
 
-/* Completed-task deliverable link (task → agent-memory key) */
-.pf .pf-agd-deliverable {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin: 0.4rem 0;
-}
-.pf .pf-agd-deliverable-label {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-dim, #6B7280);
-}
-.pf .pf-agd-deliverable-key {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  background: var(--code-bg, #F3F4F6);
-  padding: 1px 6px;
-  border-radius: 3px;
-  word-break: break-all;
-}
-.pf .pf-agd-deliverable-gone {
-  font-size: 0.78rem;
-  color: var(--warn, #F59E0B);
-  font-style: italic;
-  margin: 0.25rem 0 0.5rem;
-}
-
 /* Danger-tinted ghost button used for in-row delete actions */
 .pf .pf-agd-action-danger {
   color: var(--danger, #EF4444);
@@ -3314,7 +2381,6 @@
 }
 .pf .pf-agd-status-dot--active { background: var(--success, #10b981); }
 .pf .pf-agd-status-dot--inactive { background: var(--text-dim, #6B7280); }
-.pf .pf-agd-status-dot--error { background: var(--danger, #ef4444); }
 
 /* Active/Inactive badges */
 .pf .pf-agd-badge--active { background: var(--success, #10b981); color: var(--bg, #fff); }
@@ -3376,16 +2442,6 @@
   padding-top: 0.5rem;
   border-top: 1px solid var(--border, #E5E7EB);
   line-height: 1.4;
-}
-
-/* Delivery method status indicator */
-.pf .pf-agd-delivery-status {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-  font-size: 0.82rem;
-  font-weight: 500;
 }
 
 /* Data access: area form */
@@ -3504,29 +2560,6 @@
 .pf .pf-agd-service-status--active { background: var(--success, #10b981); }
 .pf .pf-agd-service-status--inactive { background: var(--text-muted, #9CA3AF); }
 
-/* ── Scope management (card footer) ── */
-
-.pf .pf-agd-card-footer {
-  padding: 0.5rem 1rem;
-  border-top: 1px solid var(--border, #E5E7EB);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.pf .pf-agd-card-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-/* The link through to the agent's host carries a hostname, which can be long and is one
-   unbreakable token. Left to wrap it doubled the footer row on a phone (31px → 54px measured at
-   390px), so it stays on one line and truncates; the full address is in the title. */
-.pf .pf-agd-card-actions a {
-  max-width: 14rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* ── Input wrapper for autocomplete ── */
 .pf .pf-agd-input-wrap {
   position: relative;
@@ -3540,49 +2573,6 @@
 }
 .pf .pf-agd-progress-header {
   margin-top: 0.25rem;
-}
-.pf .agd-task-title-row ,
-.pf .pf-agd-task-title-row  {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-/* Per-task "hide title" toggle (eye icon) -- used to blur sensitive titles for
-   screen recordings. Preference is browser-only (localStorage). */
-.pf .pf-agd-blur-toggle  {
-  flex-shrink: 0;
-  background: transparent;
-  border: none;
-  padding: 0;
-  margin: 0;
-  font-size: 0.95rem;
-  line-height: 1;
-  cursor: pointer;
-  /* Hidden by default to keep the task list uncluttered; revealed when the row
-     is hovered or the button is focused. opacity (not display) so the title
-     never shifts when the eye appears. A row whose title is currently hidden
-     keeps its eye visible (see --on) so the hidden state stays discoverable. */
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-.pf .pf-agd-task-item:hover .pf-agd-blur-toggle  { opacity: 0.55; }
-.pf .pf-agd-blur-toggle:hover  { opacity: 0.9; }
-.pf .pf-agd-blur-toggle:focus-visible  { opacity: 0.9; }
-/* A blurred (hidden-title) row shows its 🙈 at all times, hover or not. */
-.pf .pf-agd-blur-toggle--on  { opacity: 0.85; }
-.pf .pf-agd-task-item:hover .pf-agd-blur-toggle--on  { opacity: 0.95; }
-
-.pf .pf-agd-task-title--blurred  {
-  filter: blur(5px);
-  user-select: none;
-  cursor: pointer;
-}
-.pf .agd-task-group-title ,
-.pf .pf-agd-task-group-title  {
-  margin-top: 0.5rem;
-  margin-bottom: 0.25rem;
 }
 
 /* ── Governance section (Activity tab) ── */
@@ -3634,62 +2624,6 @@
   padding-top: 6px;
   border-top: 1px solid var(--border);
   margin-top: 4px;
-}
-
-/* ── Integration tab: Webhook edit form ── */
-
-.pf .pf-agd-webhook-form {
-  display: flex;
-  gap: 0.35rem;
-  align-items: center;
-  margin-top: 0.5rem;
-}
-.pf .pf-agd-webhook-form input {
-  flex: 1;
-  padding: 0.35rem 0.5rem;
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 4px;
-  font-size: 0.82rem;
-  background: var(--card-bg, #FFFFFF);
-  color: var(--text, #1A1A2E);
-  font-family: inherit;
-}
-.pf .pf-agd-webhook-form input:focus {
-  outline: none;
-  border-color: var(--accent, #E8564A);
-}
-
-/* ── Integration tab: Roles badge ── */
-
-.pf .pf-agd-role-badge {
-  display: inline-block;
-  font-size: 0.7rem;
-  padding: 1px 8px;
-  border-radius: 10px;
-  font-weight: 500;
-  background: var(--accent-subtle, rgba(59, 130, 246, 0.1));
-  color: var(--blue, #3B82F6);
-}
-
-/* ── Integration tab: Strengths / Gaps text ── */
-
-.pf .pf-agd-strengths-gaps {
-  font-size: 0.8rem;
-  margin-top: 0.5rem;
-  line-height: 1.5;
-}
-.pf .pf-agd-strengths-gaps-label {
-  font-weight: 600;
-  color: var(--text-dim, #6B7280);
-}
-.pf .pf-agd-strengths-gaps-value {
-  color: var(--text, #1A1A2E);
-}
-
-/* ── Compact Connect Agent content ── */
-
-.pf .pf-agd-connect-content {
-  margin-top: 0.75rem;
 }
 
 /* ── Message command-reply pairing ── */
@@ -3824,34 +2758,6 @@
 
 /* ── Deliverable rating (Tasks tab) ── */
 
-/* Current rating + rate/re-rate button row under a done task's deliverable */
-.pf .pf-agd-rate-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0.5rem 0;
-}
-.pf .pf-agd-rate-current {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-}
-.pf .pf-agd-rate-current-stars {
-  color: var(--accent, #E8564A);
-  letter-spacing: 1px;
-}
-.pf .pf-agd-rate-current-ctx {
-  color: var(--text-dim, #6B7280);
-  font-weight: 600;
-}
-.pf .pf-agd-rate-current-comment {
-  color: var(--text-muted, #9CA3AF);
-  font-style: italic;
-}
-
 /* Star picker inside the rate modal */
 .pf .pf-agd-rate-stars {
   display: flex;
@@ -3936,84 +2842,6 @@
   white-space: nowrap;
 }
 
-/* Tasks tab — max concurrent tasks runner config */
-.pf .pf-agd-concurrency {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0.25rem 0 0.75rem;
-  font-size: 0.85rem;
-}
-.pf .pf-agd-concurrency-label {
-  color: var(--text-dim, #6B7280);
-  font-weight: 600;
-}
-.pf .pf-agd-concurrency-input {
-  width: 4rem;
-  padding: 0.25rem 0.4rem;
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 6px;
-  background: var(--card-bg, #FFFFFF);
-  color: var(--text, #1A1A2E);
-  font-size: 0.85rem;
-}
-.pf .pf-agd-concurrency-hint {
-  color: var(--text-muted, #9CA3AF);
-  font-size: 0.75rem;
-}
-
-/* ── Tasks-tab triage: bucket segments + search + time chips ── */
-.pf .pf-agd-bucket-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  border-bottom: 1px solid var(--border, #E5E7EB);
-  margin: 0.25rem 0 0.75rem;
-}
-.pf .pf-agd-bucket {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.85rem;
-  color: var(--text-dim, #6B7280);
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-.pf .pf-agd-bucket:hover { color: var(--text, #1A1A2E); }
-.pf .pf-agd-bucket--active {
-  color: var(--accent, #E8564A);
-  border-bottom-color: var(--accent, #E8564A);
-  font-weight: 600;
-}
-.pf .pf-agd-bucket-count {
-  display: inline-block;
-  min-width: 1.1rem;
-  font-size: 0.7rem;
-  color: var(--text-muted, #9CA3AF);
-}
-.pf .pf-agd-bucket--active .pf-agd-bucket-count { color: var(--accent, #E8564A); }
-.pf .pf-agd-bucket-spacer { flex: 1; }
-.pf .pf-agd-search-toggle {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 0.95rem;
-  padding: 0.25rem 0.4rem;
-  opacity: 0.6;
-  border-radius: 6px;
-}
-.pf .pf-agd-search-toggle:hover { opacity: 1; }
-.pf .pf-agd-search-toggle--on { opacity: 1; background: var(--bg-dim, #F3F4F6); }
-
-.pf .pf-agd-search-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
 .pf .pf-agd-search-input {
   flex: 1;
   min-width: 12rem;
@@ -4024,25 +2852,6 @@
   color: var(--text);
   font-size: 0.85rem;
 }
-.pf .pf-agd-time-chips { display: flex; gap: 0.25rem; }
-.pf .pf-agd-time-chip {
-  background: var(--bg-dim, #F3F4F6);
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 999px;
-  padding: 0.15rem 0.6rem;
-  font-size: 0.75rem;
-  color: var(--text-dim, #6B7280);
-  cursor: pointer;
-}
-.pf .pf-agd-time-chip--on {
-  background: var(--accent, #E8564A);
-  border-color: var(--accent, #E8564A);
-  color: #fff;
-}
-
-/* Triage buttons pushed to the right of the task action row */
-.pf .pf-agd-task-actions-spacer { flex: 1; }
-
 /* Per-task memory entries (expanded task) -- collapsible per entry */
 .pf .pf-agd-task-memory { margin: 0.5rem 0; }
 .pf .pf-agd-task-memory-list {
@@ -4104,14 +2913,6 @@
   max-height: 340px;
   overflow: auto;
 }
-/* Raw (non-JSON) memory value: keep formatting, wrap long lines. */
-.pf .pf-agd-task-memory-raw {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: var(--font-mono, monospace);
-}
-
 /* Markdown-rendered non-JSON memory values (e.g. an agent's latest_output).
    Compact, mirroring the message-bubble .md-body variant. The memory body
    background is grey (--bg-dim), so code chips get a border + light fill for
@@ -4178,76 +2979,6 @@
   text-align: left;
 }
 .pf .pf-agd-task-memory-md .md-body th { background: var(--card-bg, #FFFFFF); }
-
-/* Markdown-rendered task descriptions (agent-authored prompts are often long and
-   structured). Compact, mirroring the task-memory variant. The expanded card
-   background is grey (--card-bg-alt), so code chips get a white fill + border for
-   contrast. Paragraphs keep the dim base colour; headings use the normal text
-   colour to stand out. */
-.pf .pf-agd-task-desc .md-body > :first-child { margin-top: 0; }
-.pf .pf-agd-task-desc .md-body > :last-child { margin-bottom: 0; }
-.pf .pf-agd-task-desc .md-body p { margin: 0.3rem 0; }
-.pf .pf-agd-task-desc .md-body h1,
-.pf .pf-agd-task-desc .md-body h2,
-.pf .pf-agd-task-desc .md-body h3,
-.pf .pf-agd-task-desc .md-body h4 {
-  margin: 0.5rem 0 0.2rem;
-  line-height: 1.3;
-  font-size: 0.85rem;
-  color: var(--text, #1A1A2E);
-}
-.pf .pf-agd-task-desc .md-body h1 { font-size: 0.95rem; }
-.pf .pf-agd-task-desc .md-body h2 { font-size: 0.9rem; }
-.pf .pf-agd-task-desc .md-body ul,
-.pf .pf-agd-task-desc .md-body ol { margin: 0.3rem 0; padding-left: 1.3rem; }
-.pf .pf-agd-task-desc .md-body li { margin: 0.12rem 0; }
-.pf .pf-agd-task-desc .md-body a { color: var(--accent, #E8564A); }
-.pf .pf-agd-task-desc .md-body strong { color: var(--text, #1A1A2E); }
-.pf .pf-agd-task-desc .md-body blockquote {
-  margin: 0.35rem 0;
-  padding: 0.15rem 0.55rem;
-  border-left: 3px solid var(--border, #E5E7EB);
-  color: var(--text-dim, #6B7280);
-}
-.pf .pf-agd-task-desc .md-body .md-code {
-  font-family: var(--font-mono, ui-monospace, Menlo, Consolas, monospace);
-  font-size: 0.72rem;
-  background: var(--card-bg, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
-  padding: 0.02rem 0.3rem;
-  border-radius: 4px;
-}
-.pf .pf-agd-task-desc .md-body .md-pre {
-  margin: 0.4rem 0;
-  padding: 0.55rem;
-  background: var(--card-bg, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 6px;
-  overflow-x: auto;
-}
-.pf .pf-agd-task-desc .md-body .md-pre .md-code {
-  display: block;
-  white-space: pre;
-  background: none;
-  border: none;
-  padding: 0;
-  tab-size: 4;
-  font-size: 0.72rem;
-  line-height: 1.35;
-  color: var(--text, #1A1A2E);
-}
-.pf .pf-agd-task-desc .md-body table {
-  border-collapse: collapse;
-  margin: 0.35rem 0;
-  font-size: 0.72rem;
-}
-.pf .pf-agd-task-desc .md-body th,
-.pf .pf-agd-task-desc .md-body td {
-  border: 1px solid var(--border, #E5E7EB);
-  padding: 0.2rem 0.45rem;
-  text-align: left;
-}
-.pf .pf-agd-task-desc .md-body th { background: var(--card-bg, #FFFFFF); }
 
 /* Structured JSON view: key/value rows, nested blocks indented with a guide line. */
 .pf .pf-agd-json-block { display: flex; flex-direction: column; gap: 0.05rem; }

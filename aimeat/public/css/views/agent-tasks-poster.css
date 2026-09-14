@@ -1,0 +1,140 @@
+/**
+ * @file agent-tasks-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The agent card's Tasks tab in the poster face (agt- prefix; design canvas
+ *   "Tasks.dc.html"). The shared shapes come from poster.css (.poster-record, .poster-record-title)
+ *   and organism.css (.og-label, .og-door, .og-slab, .og-chip, .og-field); this file carries what
+ *   the task queue adds: the runs-at-a-time sentence, the bucket bar and its search, the four-column
+ *   task row, the opened task's record with its parts (to do, what happened, details, memory,
+ *   rating) and the actions row. NOTE: this file must be linked in spa.html AFTER organism.css
+ *   and profile-poster.css (useViewCSS is a no-op, and the underline inputs tie on specificity
+ *   with the raw .pf field rules).
+ * @version-history
+ *   v1.0.0 -- 2026-09-14 -- Initial: the Tasks tab wears the poster face.
+ */
+
+.agt-tab { font-family: var(--font-showroom-body); color: var(--text); }
+
+/* ── The top line: what this is, and the one loud action ────────────────────────────────────── */
+.agt-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+
+/* ── Runs [ n ] task at a time. The underline comes from .og-input; only the box is ours. ───── */
+.agt-runs { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; margin: 1rem 0 1.2rem; font-size: .95rem; font-weight: 600; }
+.agt-tab input.agt-runs-n {
+  width: 2.4rem; padding: 0 0 .1rem; text-align: center;
+  font-family: var(--font-mono); font-size: .95rem; font-weight: 500; appearance: textfield;
+}
+.agt-tab input.agt-runs-n::-webkit-outer-spin-button,
+.agt-tab input.agt-runs-n::-webkit-inner-spin-button { appearance: none; margin: 0; }
+.agt-tab input.agt-runs-n:focus { border-bottom-color: var(--accent); }
+.agt-tab input.agt-runs-n:disabled { opacity: .5; }
+.agt-hint { font-size: .85rem; line-height: 1.5; font-weight: 500; color: var(--text-dim); }
+
+/* ── The buckets, and the search that opens under them ──────────────────────────────────────── */
+.agt-filters { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; margin: 1.2rem 0 .2rem; }
+.agt-tab .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
+.agt-tab .og-door:disabled { opacity: .5; cursor: default; }
+.agt-tab .og-door:disabled:hover { color: var(--text); border-bottom-color: var(--text); }
+.agt-tab .og-door em { font-family: var(--font-mono); font-style: normal; font-weight: 500; font-size: .72rem; color: var(--text-dim); margin-left: .4rem; }
+.agt-tab .agt-find { margin-left: auto; color: var(--text-dim); border-bottom-color: var(--border); }
+.agt-tab .agt-find:hover, .agt-tab .agt-find.on { color: var(--accent); border-bottom-color: var(--accent); }
+
+.agt-search { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; margin: .9rem 0 .2rem; }
+.agt-tab input.agt-search-input { flex: 1 1 16rem; min-width: 0; padding: .4rem 0; font-size: .95rem; }
+.agt-chips { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+/* The picked chip keeps .og-chip--sun untouched; the rest lose the button's own ground. */
+.agt-tab .agt-chips .og-chip { cursor: pointer; }
+.agt-tab .agt-chips .og-chip:not(.og-chip--sun) { background: none; border-color: var(--border); color: var(--text-dim); }
+.agt-tab .agt-chips .og-chip:not(.og-chip--sun):hover { border-color: var(--text); color: var(--text); }
+
+/* ── One task, closed: name, progress, when, status ─────────────────────────────────────────── */
+.agt-row { display: grid; grid-template-columns: minmax(0, 1fr) 4rem minmax(0, 9rem) 5rem; gap: 0 1rem; align-items: center; cursor: pointer; }
+.agt-row > div { padding: .65rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.agt-nm { display: flex; align-items: center; gap: .55rem; min-width: 0; }
+.agt-nm-t { font-weight: 800; font-size: .95rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agt-nm-t.is-open { color: var(--accent); }
+.agt-nm-t.is-hidden { filter: blur(6px); user-select: none; }
+.agt-tab .agt-eye { flex: none; display: inline-flex; align-items: center; background: none; border: 0; border-radius: 0; padding: 0; cursor: pointer; color: var(--text-dim); }
+.agt-tab .agt-eye:hover, .agt-tab .agt-eye[aria-pressed="true"] { color: var(--accent); }
+.agt-eye svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
+.agt-m { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
+
+.agt-tab .agt-status { display: inline-block; white-space: nowrap; }
+.agt-tab .agt-status--done { border-color: var(--success-fg, #047857); color: var(--success-fg, #047857); }
+.agt-tab .agt-status--failed { border-color: var(--accent); color: var(--accent); }
+/* A running task wears .og-chip--sun; the sun ground is the shared shape, not a local one. */
+
+/* ── One task, open: the record and its parts ───────────────────────────────────────────────── */
+.agt-record { margin: 1.4rem 0 .4rem; }
+.agt-record-h { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.agt-tab .agt-record-title { font-size: 1.6rem; line-height: 1.05; }
+.agt-desc { margin: .6rem 0 0; max-width: 760px; font-size: .95rem; line-height: 1.55; }
+.agt-desc > :first-child { margin-top: 0; }
+.agt-desc > :last-child { margin-bottom: 0; }
+.agt-stamps { display: block; margin-top: .5rem; }
+
+/* The 3px top rule is .poster-row--thing, carried in the markup beside this class. */
+.agt-part { margin-top: 1.4rem; padding-top: .7rem; }
+.agt-part-h { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: .4rem; }
+
+/* ── To do ──────────────────────────────────────────────────────────────────────────────────── */
+.agt-todo { display: flex; align-items: flex-start; gap: .8rem; padding: .6rem 0; border-bottom: 1px solid var(--border); }
+.agt-tick { flex: none; box-sizing: border-box; width: 18px; height: 18px; border: 2px solid var(--border); color: var(--text-dim); font-size: .75rem; line-height: 14px; text-align: center; font-weight: 800; }
+.agt-tick--done { border-color: var(--success-fg, #047857); color: var(--success-fg, #047857); }
+.agt-tick--failed { border-color: var(--accent); color: var(--accent); }
+.agt-tick--pending { border-color: var(--text); }
+.agt-tick--active { border-color: var(--text); color: var(--accent); }
+.agt-todo-b { min-width: 0; }
+.agt-todo-b b { font-weight: 800; font-size: .95rem; }
+.agt-tab .agt-todo-b .og-chip { margin-left: .4rem; }
+.agt-sub { margin-top: .15rem; font-size: .85rem; line-height: 1.45; color: var(--text-dim); }
+.agt-todo-r { margin-left: auto; display: flex; align-items: baseline; gap: .8rem; white-space: nowrap; }
+.agt-todo--old { opacity: .6; }
+.agt-history { margin-top: .8rem; }
+
+/* ── What happened ──────────────────────────────────────────────────────────────────────────── */
+.agt-log { display: grid; grid-template-columns: 7rem 7rem minmax(0, 1fr); gap: 0 1rem; align-items: baseline; }
+.agt-log > div { padding: .5rem 0; border-bottom: 1px solid var(--border); min-width: 0; font-size: .9rem; }
+.agt-w { font-weight: 700; }
+.agt-msg { overflow-wrap: anywhere; }
+
+/* ── Details, memory, rating ────────────────────────────────────────────────────────────────── */
+.agt-kv { display: grid; grid-template-columns: minmax(0, 9rem) minmax(0, 1fr); gap: .3rem 1rem; align-items: baseline; padding: .5rem 0; border-bottom: 1px solid var(--border); }
+.agt-k { font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); }
+.agt-v { min-width: 0; font-size: .9rem; line-height: 1.5; overflow-wrap: anywhere; }
+.agt-v > .og-door { margin-left: .6rem; }
+.agt-tab code.agt-key { font-family: var(--font-mono); font-size: .78rem; color: var(--text); }
+.agt-preview { margin-top: .8rem; }
+.agt-preview img { max-width: 100%; height: auto; }
+.agt-rating { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; font-size: .9rem; }
+.agt-stars { font-size: 1rem; letter-spacing: .08em; color: var(--text); }
+.agt-stars-off { color: var(--border); }
+.agt-rating-note { color: var(--text-dim); }
+
+/* ── The actions, with what cannot be undone pushed to the far right ────────────────────────── */
+.agt-actions { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; margin-top: 1.2rem; }
+.agt-actions .og-door--danger { margin-left: auto; }
+.agt-actions .og-door--danger ~ .og-door--danger { margin-left: 0; }
+
+/* ── Nothing here yet ───────────────────────────────────────────────────────────────────────── */
+.agt-empty { margin: .8rem 0; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+
+/* ── The create form. The top rule is .poster-row--thing, the ink frame .poster-box, the
+      underline field .og-input; this sheet holds the sizes only. ─────────────────────────────── */
+.agt-form { display: flex; flex-direction: column; gap: 1.1rem; margin: 1.2rem 0 1.4rem; padding-top: 1.1rem; }
+.agt-tab textarea.agt-ta {
+  width: 100%; box-sizing: border-box; border-radius: 0; padding: .6rem .7rem; margin: 0;
+  font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.5; font-weight: 400;
+  color: var(--text); resize: vertical; outline: none;
+}
+.agt-tab textarea.agt-ta:focus { border-color: var(--accent); }
+.agt-count { margin-top: .3rem; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); text-align: right; }
+.agt-count.is-max { color: var(--accent); }
+.agt-form-actions { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }
+
+@media (max-width: 700px) {
+  .agt-row { grid-template-columns: minmax(0, 1fr) 3rem minmax(0, 6rem) 4.5rem; gap: 0 .6rem; }
+  .agt-log { grid-template-columns: 6rem minmax(0, 1fr); }
+  .agt-log > div:nth-child(3n + 3) { grid-column: 1 / -1; padding-top: 0; }
+}

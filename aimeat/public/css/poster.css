@@ -3,6 +3,7 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.4.0 -- 2026-09-14 -- The choice tile (.poster-choice) and the sun sticker (.poster-sticker).
  *   v1.3.0 -- 2026-09-13 -- Share numeral cuts, record titles and the quota meter role.
  *   v1.2.0 -- 2026-09-13 -- Share recurring initials boxes and the compact, large and irreversible asides.
  *   v1.1.0 -- 2026-09-13 -- V2: source band phone padding and the named coral section shadow cut.
@@ -80,6 +81,19 @@
 .poster-frame { border: 3px solid var(--text); background: var(--card); }
 .poster-dialog { border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); font-family: var(--font-showroom-body); }
 .poster-record { padding: 1.2rem 1.4rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card); }
+/* A choice tile: one of a few boxed answers, the chosen one on the sun with an ink shadow
+   (scheduler-poster.css .sc-choice is the source cut). A sticker: a small sun-ground box with a
+   short headline and one door, for the one fact about a thing that must be seen before its name
+   is read (the agent's access level, design canvas "Your Agents" header B). */
+.poster-choice { padding: .7rem .8rem; border: 2px solid var(--text); border-radius: 0; background: var(--card-bg); cursor: pointer; text-align: left; font-family: var(--font-showroom-body); font-size: .8rem; line-height: 1.45; color: var(--text-dim); }
+.poster-choice b { display: block; font-weight: 800; font-size: .88rem; color: var(--text); margin-bottom: .2rem; }
+.poster-choice:hover { border-color: var(--accent); }
+.poster-choice.on { background: var(--sun); color: var(--on-sun); box-shadow: 4px 4px 0 var(--text); }
+.poster-choice.on b { color: var(--on-sun); }
+.poster-sticker { display: flex; flex-direction: column; align-items: flex-end; gap: .35rem; background: var(--sun); color: var(--on-sun); border: 2px solid var(--text); border-radius: 0; padding: .6rem .9rem; box-shadow: 4px 4px 0 var(--text); }
+.poster-sticker .poster-stat-number { color: var(--on-sun); margin: 0; white-space: nowrap; }
+.poster-sticker .poster-action, .poster-sticker .og-door { color: var(--on-sun); border-bottom-color: var(--on-sun); font-size: .74rem; }
+.poster-sticker .poster-action:hover, .poster-sticker .og-door:hover { color: var(--text); }
 /* profile-poster.css has no coral aside. The existing .ld-sh-box supplies this shape. */
 .poster-aside {
   padding: 1rem 1.25rem; border: 3px dashed var(--accent); border-radius: 0; background: var(--card-bg);

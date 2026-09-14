@@ -2,16 +2,22 @@
  * @file agents-tasks-subtab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Task queue sub-tab for agent detail view.
- *   Shows queued, active, and completed tasks with todo plans,
- *   "Start this task" approval button, and progress tracking.
- *   Filter pills allow switching between all/active/queued/completed/failed views.
+ * @description Task queue sub-tab for agent detail view, in the poster face.
+ *   The header names the queue and carries the one loud action; under it the runs-at-a-time
+ *   setting, the Recent/Keep/Archive doors with their counts, the search that opens on demand
+ *   with its time chips, the task rows themselves, and the create form.
+ *   Styled by css/views/agent-tasks-poster.css (agt- prefix).
  * @structure
  *   - AgentTasksSubtab (default export) -- main component with filter pills + create form
  *   - TaskCreateForm -- plain create form (description + optional title)
  *   - TaskItem + its helpers (status labels, JSON tree, memory entry, RequestChangesModal,
  *     blur preference) now live in ./agents/task-item.js (extracted for max-file-lines)
  * @version-history
+ *   v5.0.0 -- 2026-09-14 -- The Tasks tab wears the poster face: agt- markup against
+ *     css/views/agent-tasks-poster.css. The header is a coral label plus one slab, the
+ *     concurrency setting reads as one sentence with the number inline, the buckets and the
+ *     search toggle are underlined doors, the time filters are square chips, and the create
+ *     form uses the shared field shapes. No behaviour change.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v4.13.0 -- 2026-07-13 -- Split (max-file-lines): moved TaskItem and its helper renderers
  *     (statusLabel/todoStatusIcon/formatScopeEntry/todoProgress, parseMemoryValue/JsonNode/
@@ -88,7 +94,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { listTasks, createTask } from '/js/services/agent-tasks.js';
 import { setMaxConcurrentTasks } from '/js/services/agents.js';
 import { TaskItem } from './agents/task-item.js';
@@ -150,23 +156,25 @@ function TaskCreateForm({ agentName, showToast, onCreated, onCancel }) {
   }
 
   return html`
-    <div class="pf-agd-create-form poster-row--thing">
-      <div class="pf-agd-form-field">
-        <label>${t('profile.agents.tasks.descLabel')}</label>
+    <div class="agt-form poster-row--thing">
+      <div class="og-field">
+        <span class="og-label">${t('profile.agents.tasks.descLabel')}</span>
         <textarea
+          class="poster-box agt-ta"
           placeholder=${t('profile.agents.tasks.builder.placeholder')}
           value=${description}
           maxlength=${DESC_MAX}
           onInput=${e => setDescription(e.target.value)}
           rows="6"
         ></textarea>
-        <div class=${`agd-chat-charcount ${description.length >= DESC_MAX ? 'agd-chat-charcount-max' : ''}`}>
+        <div class=${`agt-count ${description.length >= DESC_MAX ? 'is-max' : ''}`}>
           ${description.length} / ${DESC_MAX}
         </div>
       </div>
-      <div class="pf-agd-form-field">
-        <label>${t('profile.agents.tasks.titleLabel')}</label>
+      <div class="og-field">
+        <span class="og-label">${t('profile.agents.tasks.titleLabel')}</span>
         <input
+          class="og-input"
           type="text"
           maxlength=${TITLE_MAX}
           placeholder=${t('profile.agents.tasks.titlePlaceholder')}
@@ -174,11 +182,11 @@ function TaskCreateForm({ agentName, showToast, onCreated, onCancel }) {
           onInput=${e => setTitle(e.target.value)}
         />
       </div>
-      <div class="pf-agd-form-actions">
-        <button class="btn-primary btn-sm" onClick=${handleCreate} disabled=${creating || !description.trim()}>
+      <div class="agt-form-actions">
+        <button type="button" class="og-slab" onClick=${handleCreate} disabled=${creating || !description.trim()}>
           ${creating ? t('profile.agents.tasks.starting') : t('profile.agents.tasks.createTask')}
         </button>
-        <button class="btn-outline btn-sm" onClick=${onCancel} disabled=${creating}>
+        <button type="button" class="og-door og-door--quiet" onClick=${onCancel} disabled=${creating}>
           ${t('profile.agents.tasks.cancel')}
         </button>
       </div>
@@ -262,69 +270,69 @@ export default function AgentTasksSubtab({ agent, agentName, showToast, openTask
   }
 
   if (tasks === null) {
-    return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
+    return html`<div class="agt-tab"><div class="agt-empty">${t('profile.loading')}</div></div>`;
   }
 
   const totalTasks = counts.recent + counts.keep + counts.archive;
 
   return html`
-    <div>
-      <div class="pf-agd-section-header">
-        <span class="pf-agd-section-title">
-          ${t('profile.agents.tasks.title')}${totalTasks > 0 ? ` (${totalTasks})` : ''}
+    <div class="agt-tab">
+      <div class="agt-head">
+        <span class="og-label">
+          ${t('profile.agents.tasks.title')}${totalTasks > 0 ? ` · ${totalTasks}` : ''}
         </span>
-        <button class="btn-outline btn-sm" onClick=${() => setShowCreate(!showCreate)}>
-          ${showCreate ? '-' : '+'} ${t('profile.agents.tasks.newTask')}
+        <button type="button" class="og-slab" onClick=${() => setShowCreate(!showCreate)} aria-expanded=${showCreate}>
+          ${t('profile.agents.tasks.newTask')}
         </button>
       </div>
 
-      <div class="pf-agd-concurrency">
-        <label class="pf-agd-concurrency-label" for="pf-agd-mct-${agentName}">
-          ${t('profile.agents.tasks.concurrency.label')}
-        </label>
+      <div class="agt-runs">
+        <span>${tOr('profile.agents.tasks.concurrency.runsBefore', 'Runs')}</span>
         <input
-          id="pf-agd-mct-${agentName}"
-          class="pf-agd-concurrency-input"
+          class="og-input agt-runs-n"
           type="number"
           min="1"
           max="20"
           value=${maxConcurrent}
           disabled=${savingConcurrency}
+          aria-label=${t('profile.agents.tasks.concurrency.label')}
           onChange=${e => handleSaveConcurrency(e.target.value)}
         />
-        <span class="pf-agd-concurrency-hint">${t('profile.agents.tasks.concurrency.hint')}</span>
+        <span>${tOr('profile.agents.tasks.concurrency.runsAfter', 'task at a time.')}</span>
+        <span class="agt-hint">${t('profile.agents.tasks.concurrency.hint')}</span>
       </div>
 
       ${showCreate && html`
         <${TaskCreateForm} agentName=${agentName} showToast=${showToast} onCreated=${handleCreated} onCancel=${() => setShowCreate(false)} />
       `}
 
-      ${error && html`<div class="pf-agd-empty">${error}</div>`}
+      ${error && html`<div class="agt-empty">${error}</div>`}
 
-      <div class="pf-agd-bucket-bar">
+      <div class="agt-filters">
         ${BUCKETS.map(b => html`
-          <button key=${b}
-                  class="pf-agd-bucket ${bucket === b ? 'pf-agd-bucket--active' : ''}"
+          <button type="button" key=${b}
+                  class=${`og-door ${bucket === b ? 'on' : ''}`}
                   onClick=${() => setBucket(b)}>
-            ${t(`profile.agents.tasks.bucket.${b}`)} <span class="pf-agd-bucket-count">${counts[b] ?? 0}</span>
+            ${t(`profile.agents.tasks.bucket.${b}`)}<em>${counts[b] ?? 0}</em>
           </button>
         `)}
-        <span class="pf-agd-bucket-spacer"></span>
-        <button class="pf-agd-search-toggle ${searchOpen ? 'pf-agd-search-toggle--on' : ''}"
+        <button type="button"
+                class=${`og-door og-door--quiet agt-find ${searchOpen ? 'on' : ''}`}
                 onClick=${() => setSearchOpen(o => !o)}
-                title=${t('profile.agents.tasks.search.toggle')}
-                aria-pressed=${searchOpen}>🔍</button>
+                aria-pressed=${searchOpen}>
+          ${tOr('profile.agents.tasks.search.toggle', 'Find a task by its name or id')}
+        </button>
       </div>
 
       ${searchOpen && html`
-        <div class="pf-agd-search-bar">
-          <input class="pf-agd-search-input" type="search"
+        <div class="agt-search">
+          <input class="og-input agt-search-input" type="search"
                  placeholder=${t('profile.agents.tasks.search.placeholder')}
                  value=${q} onInput=${e => setQ(e.target.value)} />
-          <div class="pf-agd-time-chips">
+          <div class="agt-chips">
             ${TIME_CHIPS.map(c => html`
-              <button key=${c}
-                      class="pf-agd-time-chip ${timeChip === c ? 'pf-agd-time-chip--on' : ''}"
+              <button type="button" key=${c}
+                      class=${`og-chip ${timeChip === c ? 'og-chip--sun' : ''}`}
                       onClick=${() => setTimeChip(c)}>
                 ${t(`profile.agents.tasks.search.time.${c}`)}
               </button>
@@ -337,7 +345,7 @@ export default function AgentTasksSubtab({ agent, agentName, showToast, openTask
         <${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks}
           autoOpen=${task.id === openTaskId ? openTaskNonce : 0} />
       `) : html`
-        <div class="pf-agd-empty">${q ? t('profile.agents.tasks.search.noResults') : t(`profile.agents.tasks.bucket.empty.${bucket}`)}</div>
+        <div class="agt-empty">${q ? t('profile.agents.tasks.search.noResults') : t(`profile.agents.tasks.bucket.empty.${bucket}`)}</div>
       `}
     </div>
   `;
