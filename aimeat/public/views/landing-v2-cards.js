@@ -2,21 +2,26 @@
  * @file landing-v2-cards.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Two proof sections of the front page's design round (TARGET-075). The prompt
- *   cards: one card per prompt, the prompt to copy, what it produced, how long it took and with
- *   which model, for four apps that really run on this server. And the wall: the same list of
- *   published apps the showroom shows, split in two, the community's apps first because "built by
- *   people and their AI" is a claim and they are its proof, then the house's own.
+ * @description Two proof sections of the front page (TARGET-075). The prompt cards: four prompts,
+ *   four very different things (a game, a tool for a business, a room for a team, a committee of
+ *   agents), each the whole product experience in one frame: you get a place, you plug in your AI,
+ *   you paste the prompt, the thing exists. And the wall: the same list of published apps the
+ *   showroom shows, split in two, the community's apps first because "built by people and their
+ *   AI" is a claim and they are its proof, then the house's own.
  *
- *   THE PROMPT TEXTS, TIMES AND MODELS ARE PLACEHOLDERS the developer fills in; the cards say so
- *   on their face. The apps, their names and what they do are real.
+ *   THE PROMPTS ARE THE PRODUCT, AND THEY ARE ENGLISH. A prompt is what a person pastes into their
+ *   AI, so it stays in the language the models work best in; the card's title and sentence are in
+ *   the visitor's language. The time and the model are filled in once each prompt has been run
+ *   (CARDS[].took / model), and until an app exists the card says so instead of linking nowhere.
  *
  *   WHO IS "THE HOUSE" is not in the public app list. The wall reads window.__SITE.operatorOwner
  *   when the server provides it and otherwise treats the owner with the most apps as the house,
  *   which is true on aimeat.io (131 of 156) and is the open question TARGET-075 carries.
- * @structure CARDS · PromptCards · AppCard · Wall2
+ * @structure PROMPTS · CARDS · PromptCards · AppCard · Wall2
  * @usage import { PromptCards, Wall2 } from './landing-v2-cards.js';
  * @version-history
+ *   v0.2.0 — 2026-09-14 — Four new prompts, written to be run: a co-op lighthouse game, receipts
+ *     into the ledger, a live decision room, a committee of agents. The apps they make come after.
  *   v0.1.0 — 2026-09-14 — Design round, TARGET-075.
  */
 import { h } from 'preact';
@@ -32,60 +37,113 @@ import { date as fmtDate } from '/js/format.js';
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-/** The four apps, as they are on aimeat.io on 2026-09-14. Names are product names and stay. */
+/** What every prompt opens with: read first, then build, then finish properly. */
+const PREAMBLE = `You are connected to aimeat.io over MCP as my AI. Build and publish the app below on my account.
+
+Before writing a line: call aimeat_appdev_overview, read the Atelier build spec (GET /v1/prompts/build-app-atelier) and the skill node:aimeat-app-builder-atelier with aimeat_skill_get, read aimeat_appdev_pitfall_list, and search the Design Book with aimeat_designbook_search for the parts you will use. Reuse what exists: the served libraries under /v1/libs and the library packs, never a CDN. Pick one look for the whole app in light and dark. The app must work on a phone first.
+
+When it is built: publish it with aimeat_app_publish, run aimeat_app_audit and fix everything it names, take the screenshot, set the legal pages with aimeat_app_legal_set, switch search on with aimeat_app_seo_set, and hand me the address. Then tell me, in two lines, how long the whole thing took from this message to the address, and which model you are.`;
+
+/** The four prompts. English on purpose: this is what gets pasted into an AI. */
+const PROMPTS = {
+  lighthouse: `${PREAMBLE}
+
+THE APP: "NIGHT WATCH", a two-player co-op game about keeping one lighthouse lit through one night.
+
+The lighthouse is the same for everyone, and it persists: every night anyone plays is one entry in the keeper's log, kept server-side in a cortex extension, so the log grows for as long as the app exists. One night is four minutes of real time.
+
+Two keepers in two browsers share a realtime room (the realtime library, WebRTC with a WebSocket fallback). The keeper on the stairs carries oil up a spiral of eleven floors while the storm knocks out lamps floor by floor; the keeper in the lamp room turns the lens by hand to track ships that only she can see on her radar, and calls out bearings that appear as text on the stairs keeper's screen. A ship that passes an unlit sector is lost, and the night's score is ships saved minus ships lost. Solo play is allowed and the second role is then an AI keeper who calls bearings through the owner's model, slightly late, as a real colleague would.
+
+Build it on Phaser 4 through the aimeat-phaser base: keyboard, gamepad and touch as one control, the levels as text maps with the level editor open to players, generated music that rises with the storm, a trophy for the first night with zero ships lost. A guest's progress follows them into an account when they sign in. The crew leaderboard is per night and all time.
+
+At dawn the app writes the keeper's log entry with the owner's model from what actually happened (bearings called, lamps lost, ships saved), stores it with an AI provenance record, and posts it to the Showcase board. Pick a look that reads as a lighthouse at night: one dark ground, one warm light, no other colours, every text in the game bilingual EN/FI.`,
+
+  tosite: `${PREAMBLE}
+
+THE APP: "TOSITE", receipts into the accounting ledger with no typing.
+
+Installable on a phone. One button: photograph a receipt. The owner's model reads the photo (POST /v1/ai/complete with the image, under the app's quota) and answers with a voucher proposal: date, counterparty, total, VAT rate and amount, the VAT code from the Finnish set, an account suggestion, and its confidence. I see the photo and the proposal side by side, correct a field if I must, and press "book it". That press writes an append-only voucher through /v1/finance/vouchers, files the photo in storage as its evidence, and shows the voucher number. A photo that is not a receipt is refused with the reason, and a duplicate (same counterparty, total and date within three days) is caught before it is booked.
+
+The second screen is the month: every voucher, the VAT report the ledger already computes, and two exports, CSV and Finvoice, made for the accountant. The third screen is a share: one press opens the month's evidence to a sharing group named "accountant", and revokes it when the month closes.
+
+Companies: the app reads my companies from /v1/companies and books under the one I pick, with separate books per company. Every receipt the model read carries an AI provenance record that says the model proposed and a person confirmed. Look: an official document, black on white, one accent, monospace numbers, nothing decorative. EN/FI, Finnish first.`,
+
+  signalroom: `${PREAMBLE}
+
+THE APP: "SIGNAL ROOM", a live decision room for five people who have to decide something in ten minutes.
+
+One person opens a room inside an organism and types the question. The others join from the link and see each other live (Yjs through the realtime library, presence cursors, names from their accounts). Round one is silent: each person turns a dial from "no" to "yes" and writes one sentence; nobody sees the others' dials until the ninety-second clock runs out, and then all five appear at once. Round two: the owner's model reads the five sentences and names the dissent in two lines, without taking a side. Round three is the same dial again, and the room shows how far each person moved.
+
+The ruling is written by the person who opened the room, in one sentence, and then the app writes a decision record into the organism's workspace (a records space named decisions, schema-locked) with the question, both rounds' dials, the five sentences, the model's two lines with their provenance record, and the ruling. Every participant signs the record with an identity attestation, and the record shows who has signed. Anyone who refuses to sign is recorded as refusing, which is a valid outcome.
+
+A room that reaches no ruling in twenty minutes closes and writes that too. Look: a control room at night, one dial per person drawn in SVG, large type, nothing that needs a mouse. EN/FI/ES.`,
+
+  committee: `${PREAMBLE}
+
+THE APP: "THE COMMITTEE", where my own agents deliberate a question and I get the minutes.
+
+I type a question and pick up to four of my agents from /v1/agents (the app names which are reachable right now). It composes a workflow with aimeat_workflow_save: one step per agent, each told to take a position in under 200 words and to name the strongest argument against itself; then a step where every agent reads the others and may change its position once; then a pause that waits for my answer; then a closing step in which one agent, chosen by lot, writes the minutes. Every message an agent writes is a direct message in one thread that carries the agent's name and the model it used, so the deliberation is readable as it happens on the Messages page and in the app.
+
+When the pause comes, the app shows me the four positions side by side with what each one changed, and I answer with a ruling or a further question; a further question starts another round. The minutes go into a living document in my organism's workspace, the thread stays as the record, and the app sends me a direct message with the ruling and a link. If I have fewer than four agents, it runs with the ones I have and says so; with none, it tells me how to connect one and stops.
+
+A schedule can reconvene the committee weekly on the same question, and the app shows how the positions drifted over the weeks. Look: a chamber, four seats drawn as four columns, minutes typeset like a public record, the EU AI label on everything a model wrote. EN/FI.`,
+};
+
+/**
+ * The four cards. `app` is owner/filename once the prompt has been run and the thing exists;
+ * `took` and `model` are filled in from that run. Until then the card says "not built yet".
+ */
 const CARDS = [
-  { owner: 'happydude500001', file: 'tinki.html', name: 'TINKI', key: 'landing2.cardTinki',
-    en: 'An auction house where agents bid for you, sealed, every bid covered by a payment hold.' },
-  { owner: 'happydude500001', file: 'parvi.html', name: 'PARVI', key: 'landing2.cardParvi',
-    en: 'An agent that reads the emissions off Porkkala and disagrees with three ships about where they are.' },
-  { owner: 'happydude500001', file: 'palkkalaskuri-2026.html', name: 'Suomen palkkalaskuri 2026', key: 'landing2.cardPalkka',
-    en: 'A Finnish salary calculator for 2026 with the tax rules built in, and your history kept when you sign in.' },
-  { owner: 'happydude500001', file: 'ai-music-charts.html', name: 'AI Music Charts', key: 'landing2.cardMusic',
-    en: 'The weekly chart of AI-made music, and every entry says who, which model and how much human work.' },
+  { id: 'lighthouse', name: 'NIGHT WATCH', key: 'landing2.cardLighthouse', en: 'Two keepers in two browsers keep one lighthouse lit through a four-minute night, and the keeper\'s log grows for as long as the app exists.', prompt: PROMPTS.lighthouse, app: null, took: '', model: '' },
+  { id: 'tosite', name: 'TOSITE', key: 'landing2.cardTosite', en: 'Photograph a receipt and it is a voucher in the ledger with its VAT code, the photo filed as evidence, and the month ready for the accountant.', prompt: PROMPTS.tosite, app: null, took: '', model: '' },
+  { id: 'signalroom', name: 'SIGNAL ROOM', key: 'landing2.cardSignalRoom', en: 'Five people, one question, two silent rounds of dials, and a ruling every one of them signed.', prompt: PROMPTS.signalroom, app: null, took: '', model: '' },
+  { id: 'committee', name: 'THE COMMITTEE', key: 'landing2.cardCommittee', en: 'Your own agents deliberate a question, change their minds once, wait for your ruling, and hand you the minutes.', prompt: PROMPTS.committee, app: null, took: '', model: '' },
 ];
 
 const EyeMark = html`<svg class="ld-eye" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
 
 /**
- * Prompts and what they produced. The card is the whole product experience in one frame: you
- * get a place, you plug in your AI, you paste the prompt, the thing exists.
+ * Prompts and what they made. The card is the whole product experience in one frame: you get a
+ * place, you plug in your AI, you paste the prompt, the thing exists.
  */
 export function PromptCards() {
   const [missing, setMissing] = useState({});
-  const promptPh = tr('landing2.cardPromptPh', '[PROMPT: the exact words this was asked with. Jouni fills this in.]');
   return html`
     <section class="ld-v2-cards">
       <h2 class="ld-sh-h2 ld-v2-h2-row">
         <span>${tr('landing2.cardsTitle1', 'What to do on day one:')}</span>
         <span class="ld-sh-accent">${tr('landing2.cardsTitle2', 'a prompt, and what it made')}</span>
       </h2>
-      <p class="ld-sh-text ld-v2-cards-sub">${tr('landing2.cardsSub', 'Four things that exist because somebody pasted a prompt here. Copy one, paste it into your own AI, and yours exists too. The time and the model are on each card so you know what to expect.')}</p>
+      <p class="ld-sh-text ld-v2-cards-sub">${tr('landing2.cardsSub', 'Four prompts, four very different things. Copy one, paste it into your own AI, and see what comes back. The time it took and the model go on the card once each one has been run.')}</p>
       <div class="ld-v2-cardgrid">
         ${CARDS.map((c) => {
-          const href = `/v1/apps/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.file)}?mode=inline`;
-          const shot = `/v1/apps/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.file)}/screenshot`;
-          const open = (e) => { e.preventDefault(); openAppSandboxed(href, c.name); };
+          const built = !!c.app;
+          const href = built ? `/v1/apps/${c.app.split('/').map(encodeURIComponent).join('/')}?mode=inline` : '';
+          const shot = built ? `/v1/apps/${c.app.split('/').map(encodeURIComponent).join('/')}/screenshot` : '';
+          const open = (e) => { e.preventDefault(); if (built) openAppSandboxed(href, c.name); };
           return html`
-            <article class="ld-v2-card poster-frame" key=${c.file}>
-              <div class="ld-v2-card-shot" role="button" tabindex="0" onClick=${open}
-                onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') open(e); }}>
-                ${missing[shot]
+            <article class="ld-v2-card poster-frame" key=${c.id}>
+              <div class="ld-v2-card-shot" role=${built ? 'button' : undefined} tabindex=${built ? 0 : undefined} onClick=${open}
+                onKeyDown=${(e) => { if (built && (e.key === 'Enter' || e.key === ' ')) open(e); }}>
+                ${!built || missing[shot]
                   ? html`<span class="ld-v2-card-shot-ph">${c.name}</span>`
                   : html`<img src=${shot} alt=${c.name} onError=${() => setMissing((m) => ({ ...m, [shot]: true }))} />`}
               </div>
               <div class="ld-v2-card-body">
                 <h3 class="ld-sh-h3">${c.name}</h3>
                 <p class="ld-v2-card-result">${tr(c.key, c.en)}</p>
-                <pre class="ld-v2-card-prompt">${promptPh}</pre>
+                <pre class="ld-v2-card-prompt" tabindex="0">${c.prompt}</pre>
                 <dl class="ld-v2-card-facts">
-                  <div><dt>${tr('landing2.cardTook', 'Took')}</dt><dd>${tr('landing2.cardTookPh', '[time]')}</dd></div>
-                  <div><dt>${tr('landing2.cardModel', 'Model')}</dt><dd>${tr('landing2.cardModelPh', '[model]')}</dd></div>
+                  <div><dt>${tr('landing2.cardTook', 'Took')}</dt><dd>${c.took || tr('landing2.cardTookPh', '[time]')}</dd></div>
+                  <div><dt>${tr('landing2.cardModel', 'Model')}</dt><dd>${c.model || tr('landing2.cardModelPh', '[model]')}</dd></div>
                 </dl>
                 <div class="ld-v2-card-actions">
-                  <${CopyButton} text=${promptPh} className="btn-primary ld-v2-card-copy"
+                  <${CopyButton} text=${c.prompt} className="btn-primary ld-v2-card-copy"
                     label=${tr('landing2.cardCopy', 'Copy the prompt')}
                     copiedLabel=${tr('landing2.cardCopied', 'Copied. Paste it into your AI')} />
-                  <a class="ld-sh-door showroom-door" href=${href} onClick=${open}>${tr('landing2.cardOpen', 'Open what it made →')}</a>
+                  ${built
+                    ? html`<a class="ld-sh-door showroom-door" href=${href} onClick=${open}>${tr('landing2.cardOpen', 'Open what it made →')}</a>`
+                    : html`<span class="ld-v2-card-notyet">${tr('landing2.cardNotYet', 'Not built yet. Be the first: run it.')}</span>`}
                 </div>
               </div>
             </article>`;
@@ -161,7 +219,7 @@ export function Wall2() {
     <section class="ld-v2-wall">
       <h2 class="ld-h2">${tr('landing2.wallTitle', 'Built by people and their AI.')}</h2>
       ${community.length > 0 ? html`
-        <p class="ld-sh-text ld-v2-wall-lead">${tr('landing2.wallCommunity', 'These were built by people who came here with their own AI. Every one of them is a stranger\'s proof.').replace('{n}', String(community.length))}</p>
+        <p class="ld-sh-text ld-v2-wall-lead">${tr('landing2.wallCommunity', 'These were built by people who came here with their own AI. Every one of them is proof from somebody we have never met.').replace('{n}', String(community.length))}</p>
         <div class="ld-gallery">${community.map((a) => html`<${AppCard} a=${a} key=${a.owner + '/' + a.filename} />`)}</div>` : ''}
       ${own.length > 0 ? html`
         <h3 class="ld-sh-h3 ld-v2-wall-own">${tr('landing2.wallOwn', 'And by us, here, every day.')}</h3>
