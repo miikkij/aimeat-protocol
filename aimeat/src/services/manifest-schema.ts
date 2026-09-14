@@ -52,6 +52,13 @@
  *     without them a row space would be unqueryable, which is v1.2.0's lesson one enum over) and
  *     `retention` (maxRows and maxDays, where age counts from when the row LANDED). Seed version
  *     bumped 4→5 so the stored system schema upgrades in place.
+ *   v1.8.0 -- 2026-09-14 -- The upgrade adopts a record written under ANY `system@` identity, not
+ *     only the node's current name. A node id may legitimately change (innokas.aimeat.io was first
+ *     booted on the default `aimeat-local-001-dev` and renamed on 2026-08-24), and `lockedBy` keeps
+ *     the name it was seeded with, so the equality check read the node's own earlier self as a
+ *     stranger and skipped the upgrade at every boot afterwards. That node sat at seed v4 for three
+ *     weeks and refused every `backing: 'rows'` manifest while running code that supports rows. The
+ *     record is re-stamped with the current identity as it is upgraded.
  */
 import type { Storage } from '../storage/interface.js';
 
@@ -205,11 +212,25 @@ export function seededVersionOf(schemaJson: Record<string, unknown> | undefined 
 }
 
 /**
+ * Was this record written by a node's own boot seeder, whatever that node was CALLED at the time?
+ *
+ * The distinction matters because `lockedBy` answers two different questions and only one of them
+ * is stable. `PUT /v1/memory/:key/schema` stamps the caller's GHII (`alice@node-id`), and nothing
+ * but a seeder writes a `system@` lock — so the prefix, not the whole string, is what separates
+ * "the node seeded this" from "a person customized this". A node id is allowed to change, and when
+ * it does the old name stays in every record the node wrote under it.
+ */
+export function isSystemSeeded(lockedBy: string | undefined | null): boolean {
+  return typeof lockedBy === 'string' && lockedBy.startsWith('system@');
+}
+
+/**
  * Register the manifest-format schema at startup — and UPGRADE it in place when this build ships
  * a newer seed version (so e.g. the backing-enum narrowing reaches existing nodes' DBs without a
- * manual migration). An operator-customized record (lockedBy ≠ the system identity this is called
- * with) is left alone, the same guarantee the create-only seed gave. Mirrors `seedProfileSchemas`
- * (a global `*`-wildcard prefix schema resolved by `findApplicableSchema`'s wildcard pass).
+ * manual migration). An operator-customized record (a GHII lock) is left alone, the same guarantee
+ * the create-only seed gave; a record this node seeded under an OLDER node id is its own and is
+ * upgraded, then re-stamped with the current identity. Mirrors `seedProfileSchemas` (a global
+ * `*`-wildcard prefix schema resolved by `findApplicableSchema`'s wildcard pass).
  *
  * @returns the number of records written (newly seeded + upgraded).
  */
@@ -219,9 +240,9 @@ export async function seedManifestSchema(storage: Storage, lockedBy: string): Pr
   for (const keyPattern of [MANIFEST_SCHEMA_KEY, MANIFEST_WS_SCHEMA_KEY]) {
     const existing = await storage.getSchema(keyPattern, 'prefix');
     if (existing) {
-      if (existing.lockedBy !== lockedBy) continue;                             // operator-customized — hands off
+      if (!isSystemSeeded(existing.lockedBy)) continue;                         // operator-customized — hands off
       if (seededVersionOf(existing.schemaJson) >= MANIFEST_SEED_VERSION) continue;  // already current
-      await storage.setSchema({ ...existing, schemaJson: MANIFEST_FORMAT_SCHEMA, schemaMode: 'open', updatedAt: now });
+      await storage.setSchema({ ...existing, schemaJson: MANIFEST_FORMAT_SCHEMA, schemaMode: 'open', lockedBy, updatedAt: now });
       seeded++;
       continue;
     }
