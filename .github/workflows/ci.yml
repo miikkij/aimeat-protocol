@@ -70,9 +70,29 @@ jobs:
       # language, cortex packs, AI disclosure, locales, licences and notices, protocol versions, and
       # the August 2026 audit ratchets (route scopes, denial coverage, outbound fetch, trusted keys,
       # storage parity, sandbox entry points, shared implementation, surface focus, dependency
-      # cruiser, SSE parity, copied logic, doc counts, scope parity, the liaison surface). Each is a
+      # cruiser, SSE parity, copied logic, doc counts, scope parity, field reach, the liaison surface). Each is a
       # ratchet seeded with its day's count, so it fails only on a NEW offender. `pnpm check:fast
       # --list` prints the set; a red one prints its own output whole.
+      # check:field-reach (in check:fast below) reads what CodeQL says each REST handler takes and
+      # which agent tools stand beside it. The inventory query runs here with the CLI, in its own
+      # step, and never on the Security tab: codeql.yml's own comment says what low-precision
+      # queries did there, and this one is an inventory, not a vulnerability. The hosted runner
+      # carries the CodeQL bundle in its tool cache; the pinned bundle is the fallback. The answer
+      # lands in node_modules/.cache/field-reach/, where the gate finds it for this tree.
+      - name: Field reach facts, measured with the CodeQL CLI (field-reach:measure)
+        working-directory: aimeat
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! ls "$RUNNER_TOOL_CACHE"/CodeQL/*/x64/codeql/codeql >/dev/null 2>&1; then
+            gh release download codeql-bundle-v2.27.0 --repo github/codeql-action \
+              --pattern codeql-bundle-linux64.tar.zst --dir "$RUNNER_TEMP"
+            tar --zstd -xf "$RUNNER_TEMP/codeql-bundle-linux64.tar.zst" -C "$RUNNER_TEMP"
+            export CODEQL_CLI="$RUNNER_TEMP/codeql/codeql"
+            echo "CODEQL_CLI=$CODEQL_CLI" >> "$GITHUB_ENV"
+          fi
+          pnpm field-reach:measure
+
       - name: The read-only gates, four at a time (check:fast)
         working-directory: aimeat
         run: pnpm check:fast

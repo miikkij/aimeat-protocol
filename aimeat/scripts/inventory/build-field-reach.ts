@@ -2,84 +2,78 @@
  * @file scripts/inventory/build-field-reach.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Question C of wish-invarianttiauditointi, as a report. Analysis only.
- * @structure main() — record fields, which surfaces name them, and the ones only REST does
+ * @description Question C of wish-invarianttiauditointi, as a report. Analysis only; the gate over the
+ *   same measurement is check:field-reach.
+ * @structure main() — REST doors, their agent twins, and the fields a door takes that no twin does
  * @usage cd aimeat && pnpm exec tsx scripts/inventory/build-field-reach.ts
  * @version-history
+ *   v2.0.0 — 2026-09-14 — Reports the door-by-door measurement (field-reach.ts v2) instead of mentions,
+ *     and needs the CodeQL CLI for it.
  *   v1.0.0 — 2026-09-03 — Initial (wish-invarianttiauditointi, phase 1, question C).
  */
-import ts from 'typescript';
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { recordFields, fieldReach } from './field-reach.js';
-import { srcProgram } from './program.js';
+import { join, resolve } from 'node:path';
+import { recordFields, doorReach, GENERIC_CALLERS, type AgentSurface } from './field-reach.js';
+import { loadFacts } from './field-reach-facts.js';
+import { captureServer, captureConnector, captureCliDispatch, type CapturedTool } from './mcp-capture.js';
+import { srcProgram, AIMEAT } from './program.js';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const AIMEAT = resolve(HERE, '..', '..');
 const OUT_DIR = join(resolve(AIMEAT, '..'), 'secaudit');
 
 function main(): void {
-    const files = srcProgram().files;
-    const fields = recordFields(files);
-    const reach = fieldReach(files, fields);
+    const got = loadFacts({ build: true });
+    if (got.facts === null) {
+        console.error(`✖ field reach needs the CodeQL CLI: ${got.reason}`);
+        process.exit(1);
+    }
+    const keys = (m: Map<string, CapturedTool>): Map<string, string[]> => new Map([...m].map(([k, v]) => [k, v.inputKeys]));
+    const declared: Record<AgentSurface, Map<string, string[]>> = {
+        'mcp.node': keys(captureServer()), 'mcp.connector': keys(captureConnector()), 'cli.dispatch': keys(captureCliDispatch()),
+    };
+    const m = doorReach(recordFields(srcProgram().files), got.facts, declared);
+    const restOnly = m.findings.filter(f => f.kind === 'rest-only');
+    const noTwin = m.findings.filter(f => f.kind === 'no-twin');
 
     const lines: string[] = [];
     const say = (s = ''): void => { lines.push(s); };
 
-    say('# Kenttien tavoitettavuus pinnoittain');
+    say('# Kenttien tavoitettavuus ovittain');
     say();
-    say('Wishin kohta C, siinä muodossa joka löydöllä oikeasti oli. `run_mode` sai oven HTTP:hen');
-    say('eikä yhtään jonka agentti tavoittaa, ja `mode` sen vieressä samalla tietueella oli');
-    say('kolmella pinnalla. Kumpikaan ovi ei ollut väärin — väärin oli se, että kenttä sai yhden');
-    say('eikä muita, eikä mikään mittari kysynyt.');
+    say('REST-ovi ja sen agenttikaksoset: työkalut, jotka tekevät saman työn. Ovi lukee kentän');
+    say('pyynnöstä (CodeQL seuraa arvon), kaksonen julistaa kentän syötteekseen (MCP-kirjasto riisuu');
+    say('julistamattoman avaimen). Kenttä, jonka ovi ottaa ja jota yksikään kaksonen ei ota, on');
+    say('`organism_id`-löydön muoto. Menetelmä ja rajat: scripts/inventory/field-reach.ts.');
     say();
-    say('MAININTOJA, EI KIRJOITUKSIA. Sen todistaminen että pinta KIRJOITTAA kentän vaatii');
-    say('kutsugraafin, jota tämä vaihe ei vielä rakenna. Maininnat yliraportoivat — vastauksessa');
-    say('nimetty kenttä lasketaan kuin pyynnössä nimetty — ja se on tässä turvallinen suunta.');
+    say(`- Ovia, jotka lukevat tietuekenttiä: **${m.doors.length}**, joista kaksonen on ${m.doors.filter(d => d.twins.length).length}`);
+    say(`- Kenttiä, jotka ovi ottaa eikä kaksonen: **${restOnly.length}**`);
+    say(`- Ovia ilman kaksosta: **${noTwin.length}**`);
+    say(`- Lukuja, joiden avainta CodeQL ei nimennyt: ${[...m.blind.unnamed.values()].flat().length}`);
+    say(`- Lukuja, joiden reittiä ei tunneta: ${[...m.blind.unrouted.values()].flat().length}`);
     say();
-    say(`Tietuekenttiä tarkasteltu: **${fields.size}**`);
+    say(`## Kenttä ovessa, ei kaksosessa — ${restOnly.length}`);
     say();
-
-    const bySurfaceCount = new Map<number, number>();
-    for (const r of reach) bySurfaceCount.set(r.surfaces.length, (bySurfaceCount.get(r.surfaces.length) ?? 0) + 1);
-    say('| pintoja jotka mainitsevat | kenttiä |');
-    say('|---|---|');
-    for (const n of [...bySurfaceCount.keys()].sort()) say(`| ${n} | ${bySurfaceCount.get(n)} |`);
+    for (const f of restOnly) say(`- \`${f.field}\` — ${f.route} — ${f.at} — kaksoset: ${f.twins!.join(', ')}`);
     say();
-
-    const restOnly = reach.filter(r => r.surfaces.length === 1 && r.surfaces[0] === 'rest');
-    say(`## Vain REST mainitsee — ${restOnly.length}`);
+    say(`## Ovi ilman agenttikaksosta — ${noTwin.length}`);
     say();
-    say('Nämä voi asettaa selaimella ja ei millään joka toimii ihmisen puolesta. Se on');
-    say('`run_mode`-löydön muoto. Jokainen on kandidaatti: osa on aidosti vain ihmisen');
-    say('asetettavia, ja sen ratkaisee kentän merkitys eikä tämä taulukko.');
+    for (const f of noTwin) say(`- ${f.route} — ${f.fields!.join(', ')}`);
     say();
-    for (const r of restOnly.sort((a, b) => a.field.localeCompare(b.field))) {
-        say(`- \`${r.field}\` — ${r.records.join(', ')} — ${r.examples.rest}`);
-    }
+    say(`## Syrjään jätetyt yleisfunktiot (yli ${GENERIC_CALLERS} node-työkalua kutsuu)`);
     say();
-
-    const nowhere = reach.filter(r => r.surfaces.length === 0);
-    say(`## Ei yhdelläkään pinnalla — ${nowhere.length}`);
-    say();
-    say('Tietue kantaa kentän, eikä yksikään ovi mainitse sitä. Joko solmun sisäinen, tai');
-    say('jäänne. Sama kysymys kuin scope-sanalla jolla on nolla ovea.');
-    say();
-    for (const r of nowhere.sort((a, b) => a.field.localeCompare(b.field)).slice(0, 30)) {
-        say(`- \`${r.field}\` — ${r.records.join(', ')}`);
-    }
-    if (nowhere.length > 30) say(`- … ja ${nowhere.length - 30} muuta, kaikki JSONissa`);
+    for (const [callee, n] of m.generic) say(`- ${callee} — ${n}`);
     say();
 
     mkdirSync(OUT_DIR, { recursive: true });
     writeFileSync(join(OUT_DIR, 'field-reach.json'), JSON.stringify({
         generatedAt: new Date().toISOString(),
-        note: 'Phase 1 question C. Mentions, not writes. Candidates, not verdicts.',
-        reach,
+        note: 'Door by door: what a REST route reads (CodeQL) against what its agent twins declare.',
+        doors: m.doors.map(d => ({ ...d, reads: Object.fromEntries(d.reads) })),
+        findings: m.findings,
+        blind: { unnamed: Object.fromEntries(m.blind.unnamed), unrouted: Object.fromEntries(m.blind.unrouted) },
+        generic: m.generic,
     }, null, 2) + '\n', 'utf-8');
     writeFileSync(join(OUT_DIR, 'field-reach.md'), lines.join('\n') + '\n', 'utf-8');
-    console.error(`✓ ${fields.size} kenttää, ${restOnly.length} vain RESTissä, ${nowhere.length} ei missään → secaudit/field-reach.*`);
+    console.error(`✓ ${m.doors.length} ovea, ${restOnly.length} kenttää vain ovessa, ${noTwin.length} ovea ilman kaksosta → secaudit/field-reach.*`);
 }
 
 main();
