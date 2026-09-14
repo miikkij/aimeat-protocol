@@ -5,6 +5,13 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v2.1.0 -- 2026-09-14 -- The name is a full-width slab and the access sticker sits under it on the
+ *     right; the open card ends in a 2px ink rule so the next row starts on its own.
+ *   v2.0.0 -- 2026-09-14 -- The poster face (design canvas "Your Agents", header B). Closed, the card
+ *     is one row of the agents table. Open, the name is a headline, the chips sit under the GAII,
+ *     the access level stands on the right as a sun sticker with "Manage access rights" on it (the
+ *     old MANAGE at the foot of the card went unfound), how it runs is one sentence with the switch
+ *     behind a door, and the tabs stand in three groups: Work, Knowledge, Set-up. No footer.
  *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.26.0 -- 2026-09-06 -- The GAII stands on the row itself, closed and open, and copies itself
@@ -96,8 +103,11 @@ import { apiGet, apiPatch } from '/js/api.js';
 import { timeAgo } from '/js/utils.js';
 import { agentState, getDefaultTab } from './state-detector.js';
 import { GaiiChip } from './gaii-chip.js';
-import { deliveryLabel, renderDeliveryIndicator, renderPlatformBadge, renderModelBadge, renderReadinessBadge } from './agent-card-badges.js';
-import { RunModeSwitch, renderRunModeBadge } from './agent-card-run-mode.js';
+import { deliveryLabel, renderPlatformBadge, renderModelBadge, renderReadinessBadge } from './agent-card-badges.js';
+import { RunModeSwitch } from './agent-card-run-mode.js';
+import { templateLabel } from './scope-config.js';
+import { detectTemplate } from './scope-model.js';
+import { agentGaii } from './tab-helpers.js';
 import { testWebhook, updateWebhook } from '/js/services/agent-integration.js';
 import TabReadme from './tab-readme.js';
 import TabIntegration from './tab-integration.js';
@@ -121,12 +131,8 @@ const html = htm.bind(h);
 // README is opt-in and prepended only when the agent has published one, so it
 // is NOT in this base list. See readmeTab below.
 //
-// Explicit owner-requested order (not auto-grouping). The tab bar wraps to a
-// second row (flex-wrap, see .pf-agd-tabs CSS) instead of scrolling, so the
-// first-listed tabs naturally land on the top row. README is prepended
-// separately when present, so the effective order is:
-//   README · Integration · Tasks · Messages · Data Access · Quality · Activity
-//   · Directives · Agent Config · Services
+// The registry of tabs: id and label. The order on screen comes from TAB_GROUPS below, which sorts
+// them into Work, Knowledge and Set-up; README is prepended separately when present.
 const TABS = [
   { id: 'integration', key: 'profile.agents.detail.tabs.integration' },
   { id: 'tasks', key: 'profile.agents.detail.tabs.tasks' },
@@ -144,6 +150,14 @@ const TABS = [
 ];
 
 const readmeTab = { id: 'readme', key: 'profile.agents.detail.tabs.readme' };
+
+// The three groups the tabs are sorted into on the open card: what the agent does, what it knows
+// and has done, and how it is set up. Order inside a group is the order on screen.
+const TAB_GROUPS = [
+  { id: 'work', key: 'profile.agents.page.tabGroups.work', tabs: ['tasks', 'messages', 'schedules', 'directives'] },
+  { id: 'knowledge', key: 'profile.agents.page.tabGroups.knowledge', tabs: ['readme', 'data-access', 'quality', 'usage', 'activity'] },
+  { id: 'setup', key: 'profile.agents.page.tabGroups.setup', tabs: ['integration', 'crew', 'agent-config', 'services', 'contracts'] },
+];
 
 // Read the agent's owner-namespaced README markdown (agents.<name>.readme).
 // Uses the owner-session list endpoint (?agent=<gaii>) — the same path
@@ -177,6 +191,8 @@ function totalChanges(changes) {
 export default function AgentCard({ agent, onboarding, expanded, onToggle, session, showToast, allAgents, changes, onTabSeen, onScopesClick, onDeleteClick, onFederateToggle, onPopOut, soloMode = false, preSelectedTab = null, openTaskId = null, openTaskNonce = 0 }) {
   const state = agentState(agent);
   const [activeTab, setActiveTab] = useState(null);
+  // The run-mode switch stands behind the sentence that says the current state; open on request.
+  const [runsOpen, setRunsOpen] = useState(false);
   // README markdown: undefined = not loaded, '' = none published, string = show tab.
   const [readme, setReadme] = useState(undefined);
   // True once the user clicks a tab, so the async README default never yanks
@@ -248,130 +264,126 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
     if (expanded) { setActiveTab(null); userPickedTab.current = false; }
   }, [expanded, agent.name, onToggle, soloMode]);
 
+  // What the agent may reach, as the word the scope dialog uses for the same set. The list
+  // projection carries default_scopes; a missing list is the legacy everything (detectTemplate).
+  const accessLabel = templateLabel(detectTemplate(agent.default_scopes ?? ['*']));
+  const platform = onboarding?.platformName || onboarding?.detectedPlatform || null;
+  const runsWord = agent.run_mode ? t(`profile.agents.runMode.${agent.run_mode}`) : t('profile.agents.runMode.unset');
+
   if (!expanded) {
+    // ONE ROW OF THE TABLE. The columns are the same six the head names (groups-render.js) and the
+    // GAII rides under the name, because it is what a person carries away from this row: the name
+    // is for the eye, the GAII is what a chat, a config file or another agent is given.
     return html`
-      <div class="pf-agd-card poster-row--thing">
-        <div class="pf-agd-collapsed ${state === 'problem' ? 'pf-agd-collapsed--problem' : ''}"
-             onClick=${() => onToggle(agent.name)}>
-          <div class="pf-agd-collapsed-main">
-            <span class="pf-agd-expand-icon">▶</span>
-            <span class="pf-agd-collapsed-icon">🤖</span>
-            <span class="pf-agd-collapsed-name">${agent.display_name || agent.name}</span>
-            ${renderChangeBadge(changes)}
-            <!-- Mode/platform/readiness badges live in the expanded detail only — repeated
-                 identically on every row they were noise, not information. -->
-            <div class="pf-agd-collapsed-badges">
-              ${agent.federate && html`<span class="pf-agd-badge pf-agd-badge--federation">${t('profile.federated')}</span>`}
-            </div>
-            ${renderPopOut(onPopOut, agent)}
-          </div>
-          <!-- Second line: faint-divider-separated meta (GAII + delivery + status + last seen)
-               so the long status text gets its own row instead of overflowing. The GAII leads it
-               because it is what a person carries away from this row: the name is for the eye,
-               the GAII is what a chat, a config file or another agent is given. -->
-          <div class="pf-agd-collapsed-meta">
-            <${GaiiChip} agent=${agent} /><span class="pf-agd-meta-sep">·</span>
-            ${renderDeliveryIndicator(agent)}
-            ${renderCollapsedStats(state, agent, onboarding)}
-          </div>
+      <div class=${`agp-row ${state === 'problem' ? 'agp-row--problem' : ''}`} onClick=${() => onToggle(agent.name)}>
+        <div class="agp-nm">
+          <span class="agp-nm-text">${agent.display_name || agent.name}</span>
+          ${renderChangeBadge(changes)}
+          ${agent.mode && agent.mode !== 'interactive' ? html`<span class="og-chip og-chip--dim">${t(`profile.agents.mode.${agent.mode}`) || agent.mode}</span>` : null}
+          ${platform ? html`<span class="og-chip og-chip--dim">${platform}</span>` : null}
+          ${agent.federate && html`<span class="og-chip og-chip--dim">${t('profile.federated')}</span>`}
+          <small>${agentGaii(agent)}</small>
         </div>
+        <div class="agp-w">${runsWord}</div>
+        <div class="agp-w">${accessLabel}</div>
+        <div class="agp-m">${agent.last_seen ? timeAgo(agent.last_seen) : t('profile.agents.page.neverSeen')}</div>
+        <div class="agp-go"><button type="button" class="og-door">${t('profile.agents.page.openRow')}</button></div>
       </div>
     `;
   }
 
+  // The tabs in three groups (design canvas "Your Agents", header B): a person looks in one group
+  // of five instead of scanning fourteen. README joins Knowledge only when the agent has one.
+  const tabIds = new Set(tabs.map(x => x.id));
+  const tabButton = (tab) => {
+    const label = t(tab.key);
+    const changeKey = TAB_CHANGE_KEY[tab.id];
+    // The tab you're currently viewing never shows a badge — you're
+    // looking at it (and the effect above keeps it marked-seen).
+    const count = (changeKey && activeTab !== tab.id) ? (changes?.[changeKey] || 0) : 0;
+    // Neutral dot; coral ONLY when there are unseen FAILED tasks.
+    const failed = tab.id === 'tasks' && (changes?.tasksFailed || 0) > 0;
+    return html`
+      <button type="button" key=${tab.id}
+              class=${`poster-tab ${activeTab === tab.id ? 'is-on' : ''}`}
+              onClick=${(e) => {
+                e.stopPropagation();
+                userPickedTab.current = true;
+                setActiveTab(tab.id);
+                // Opening a tracked tab clears its unseen badge.
+                if (changeKey && onTabSeen) onTabSeen(agent.name, changeKey);
+              }}>
+        ${label !== tab.key ? label : tab.id.charAt(0).toUpperCase() + tab.id.slice(1)}
+        ${count > 0 ? html`<span class="pf-agd-tab-badge pf-agd-tab-badge--dot ${failed ? 'pf-agd-tab-badge--failed' : ''}"></span>` : ''}
+      </button>
+    `;
+  };
+  const stop = (e) => e.stopPropagation();
+
   return html`
-    <div class="pf-agd-card poster-row--thing">
-      <div class="pf-agd-expanded">
-        <!-- Zone 1: Identity -->
-        <div class="pf-agd-zone1" onClick=${handleCollapse}>
-          <span class="pf-agd-expand-icon pf-agd-expand-icon--open">▼</span>
-          <div class="pf-agd-zone1-identity">
-            <span class="pf-agd-zone1-name">${agent.display_name || agent.name}</span>
-          </div>
-          <div class="pf-agd-zone1-badges">
+    <div class="agp-card poster-row--thing">
+      ${/* The name is the card's slab, the full width, the way a section starts; the facts and the
+            access sticker sit in the row under it, so nothing competes with the name for the line. */''}
+      <h2 class="agp-title poster-section-title" onClick=${handleCollapse}><span class="agp-caret">▼</span>${agent.display_name || agent.name}</h2>
+      <div class="agp-mast" onClick=${handleCollapse}>
+        <div class="agp-words">
+          <div class="agp-id" onClick=${stop}><${GaiiChip} agent=${agent} /></div>
+          <div class="agp-chips" onClick=${stop}>
             ${renderModeBadge(agent)}
-            ${renderRunModeBadge(agent)}
             ${renderPlatformBadge(onboarding)}
             ${renderModelBadge(agent)}
             ${renderReadinessBadge(state, onboarding)}
-            ${agent.federate && html`<span class="pf-agd-badge pf-agd-badge--federation">${t('profile.federated')}</span>`}
+            ${agent.last_seen ? html`<span class=${`og-chip ${state === 'problem' ? 'agp-chip--warn' : (state === 'production' || state === 'idle') ? 'agp-chip--ok' : 'og-chip--dim'}`}>${agent?.health?.delivery ? deliveryLabel(agent.health.delivery) : t('profile.agents.detail.lastSeen')} · ${timeAgo(agent.last_seen)}</span>` : null}
+            <${CapabilitiesSummary} agent=${agent} />
+            ${onFederateToggle
+              ? html`<button type="button" class="og-chip og-chip--dim"
+                  title=${agent.federate ? (t('profile.agents.detail.federationOnHint') || 'Click to make local only') : (t('profile.agents.detail.federationOffHint') || 'Click to share via federation')}
+                  onClick=${() => onFederateToggle(agent)}>
+                  ${t('profile.agents.detail.federationLabel')} ${agent.federate ? t('profile.agents.detail.federationOn') : t('profile.agents.detail.federationOff')}
+                </button>`
+              : agent.federate ? html`<span class="og-chip og-chip--dim">${t('profile.federated')}</span>` : null}
+            <${TagStrip} agent=${agent} showToast=${showToast} />
           </div>
-          <span class="pf-agd-zone1-right">
-            ${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''}
-          </span>
         </div>
-
-        <!-- The GAII on its own line rather than inside the header: it is far wider than the name,
-             and sharing the header row with the badges would leave it a few characters at a phone
-             width. Directly under the name, because that is the same thing said twice: once for
-             the eye, once for whatever this gets pasted into. -->
-        <div class="pf-agd-gaii-row"><${GaiiChip} agent=${agent} /></div>
-
-        <!-- Tags (editable) -->
-        <${TagStrip} agent=${agent} showToast=${showToast} />
-
-        <!-- How this agent is meant to be RUN. The badge in the header says what it is; this is
-             where it is changed, beside the other things about this one agent a person edits. -->
-        <${RunModeSwitch} agent=${agent} showToast=${showToast} />
-
-        <!-- Capabilities — collapsed to a one-line summary ("14 tools · 5 skills"); the full
-             pill wall took a third of the screen before the tabs. Click to expand. -->
-        <${CapabilitiesSummary} agent=${agent} />
-
-        <!-- Zone 2: Status -->
-        ${renderZone2(state, agent, onboarding, setActiveTab, showToast)}
-
-        <!-- Tab Bar -->
-        <div class="pf-agd-tabs poster-row--thing">
-          ${tabs.map(tab => {
-            const label = t(tab.key);
-            const changeKey = TAB_CHANGE_KEY[tab.id];
-            // The tab you're currently viewing never shows a badge — you're
-            // looking at it (and the effect above keeps it marked-seen).
-            const count = (changeKey && activeTab !== tab.id) ? (changes?.[changeKey] || 0) : 0;
-            // Neutral gray badge; red ONLY when there are unseen FAILED tasks.
-            const failed = tab.id === 'tasks' && (changes?.tasksFailed || 0) > 0;
-            return html`
-              <button key=${tab.id}
-                      class="pf-agd-tab ${activeTab === tab.id ? 'pf-agd-tab--active' : ''}"
-                      onClick=${(e) => {
-                        e.stopPropagation();
-                        userPickedTab.current = true;
-                        setActiveTab(tab.id);
-                        // Opening a tracked tab clears its unseen badge.
-                        if (changeKey && onTabSeen) onTabSeen(agent.name, changeKey);
-                      }}>
-                ${label !== tab.key ? label : tab.id.charAt(0).toUpperCase() + tab.id.slice(1)}
-                ${count > 0 ? html`<span class="pf-agd-tab-badge pf-agd-tab-badge--dot ${failed ? 'pf-agd-tab-badge--failed' : ''}"></span>` : ''}
-              </button>
-            `;
-          })}
+        <div class="agp-side" onClick=${stop}>
+          <div class="poster-sticker">
+            <b class="poster-stat-number poster-stat-number--small">${accessLabel}</b>
+            ${onScopesClick && html`<button type="button" class="og-door" onClick=${() => onScopesClick(agent)}>${t('profile.agents.page.manageAccess')} →</button>`}
+          </div>
+          ${renderPopOut(onPopOut, agent)}
+          ${renderHostConsole(agent)}
         </div>
+      </div>
 
-        <!-- Tab Content -->
-        <div class="pf-agd-tab-content" onClick=${(e) => e.stopPropagation()}>
+      ${/* How this agent is meant to be RUN: one sentence, and the switch behind one door. The
+            node stores and shows this and never enforces it; the sentence says what is true. */''}
+      <div class="agp-runs" onClick=${stop}>
+        <span class="og-label">${t('profile.agents.runMode.label')}</span>
+        <span>${t(`profile.agents.page.runs.${agent.run_mode || 'unset'}`)}</span>
+        <button type="button" class="og-door og-door--quiet" onClick=${() => setRunsOpen(v => !v)}>
+          ${runsOpen ? t('profile.agents.page.close') : (agent.run_mode ? t('profile.agents.page.runsChange') : t('profile.agents.page.runsDecide'))} →
+        </button>
+        ${runsOpen && html`<${RunModeSwitch} agent=${agent} showToast=${showToast} />`}
+      </div>
+
+      ${/* The status banner while the agent is new, onboarding or in trouble. */''}
+      <div onClick=${stop}>${renderZone2(state, agent, onboarding, setActiveTab, showToast)}</div>
+
+      <div class="agp-nav" onClick=${stop}>
+        ${TAB_GROUPS.map(g => {
+          const members = g.tabs.filter(id => tabIds.has(id)).map(id => tabs.find(x => x.id === id));
+          if (members.length === 0) return null;
+          return html`
+            <div class="agp-nav-group" key=${g.id}>
+              <span class="og-label">${t(g.key)}</span>
+              <div class="agp-tabs">${members.map(tabButton)}</div>
+            </div>`;
+        })}
+      </div>
+
+      <div class="agp-panel poster-panel" onClick=${stop}>
+        <div class="pf-agd-tab-content">
           ${renderTabContent(activeTab, agent, onboarding, session, showToast, allAgents, readme, openTaskId, openTaskNonce, onDeleteClick)}
-        </div>
-
-        <!-- Card Footer: Scopes + federation toggle. Delete lives in the Agent Config tab's
-             danger zone (typed-name confirm) — not on every tab's footer. -->
-        <div class="pf-agd-card-footer">
-          <div class="pf-agd-card-actions">
-            ${renderPopOut(onPopOut, agent)}
-            ${renderHostConsole(agent)}
-            ${onScopesClick && html`
-              <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); onScopesClick(agent); }}>
-                ${t('profile.agents.scopeUi.manage')}
-              </button>
-            `}
-            ${onFederateToggle && html`
-              <button class="btn-ghost btn-sm"
-                title=${agent.federate ? (t('profile.agents.detail.federationOnHint') || 'Click to make local only') : (t('profile.agents.detail.federationOffHint') || 'Click to share via federation')}
-                onClick=${(e) => { e.stopPropagation(); onFederateToggle(agent); }}>
-                ${(t('profile.agents.detail.federationLabel') || 'Federation')}: ${agent.federate ? (t('profile.agents.detail.federationOn') || 'on') : (t('profile.agents.detail.federationOff') || 'off')}
-              </button>
-            `}
-          </div>
         </div>
       </div>
     </div>
@@ -390,35 +402,29 @@ function CapabilitiesSummary({ agent }) {
   if (tools.length) parts.push(`${tools.length} ${t('profile.agents.detail.capTools') || 'tools'}`);
   if (skills.length) parts.push(`${skills.length} ${t('profile.agents.detail.capSkills') || 'skills'}`);
   if (langs.length) parts.push(`${langs.length} ${t('profile.agents.detail.capLangs') || 'languages'}`);
+  // A chip in the masthead's row; the full list opens under the row (agp-caps takes the row's
+  // whole width) so a wall of pills never sits between the name and the tabs uninvited.
   return html`
-    <div class="pf-agd-capwrap">
-      <button class="pf-agd-cap-summary" onClick=${(e) => { e.stopPropagation(); setOpen(o => !o); }}>
-        ${parts.join(' · ')} <span class="pf-chevron ${open ? 'pf-chevron-open' : ''}">▼</span>
-      </button>
-      ${open && html`
-        <div class="pf-agd-capabilities">
-          ${tools.map(c => html`
-            <span key=${c.name || c} class="pf-agd-cap-badge pf-agd-cap-badge--tech">${c.name || c}</span>
-          `)}
-          ${skills.map(c => html`
-            <span key=${c} class="pf-agd-cap-badge pf-agd-cap-badge--domain">${c}</span>
-          `)}
-          ${langs.map(l => html`
-            <span key=${'lang-' + l} class="pf-agd-cap-badge pf-agd-cap-badge--domain">${'Language: ' + l}</span>
-          `)}
-        </div>
-      `}
-    </div>
+    <button type="button" class="og-chip og-chip--dim" aria-expanded=${open ? 'true' : 'false'}
+      onClick=${(e) => { e.stopPropagation(); setOpen(o => !o); }}>
+      ${parts.join(' · ')} ${open ? '↑' : '↓'}
+    </button>
+    ${open && html`
+      <div class="agp-caps">
+        ${tools.map(c => html`<span key=${c.name || c} class="og-chip">${c.name || c}</span>`)}
+        ${skills.map(c => html`<span key=${c} class="og-chip og-chip--dim">${c}</span>`)}
+        ${langs.map(l => html`<span key=${'lang-' + l} class="og-chip og-chip--dim">${'Language: ' + l}</span>`)}
+      </div>
+    `}
   `;
 }
 
-// Pop-out button: opens this agent in its own window (one window per agent,
-// so re-clicking focuses the existing one). Only rendered when the parent
-// supplies onPopOut — the standalone solo view omits it.
+// The way to this agent's own window (one window per agent, so re-clicking focuses the existing
+// one). Only rendered when the parent supplies onPopOut — the standalone solo view omits it.
 function renderPopOut(onPopOut, agent) {
   if (!onPopOut) return null;
-  return html`<button class="pf-agd-popout-btn" title=${t('profile.agents.detail.popOut')}
-    onClick=${(e) => { e.stopPropagation(); onPopOut(agent); }}>⤢</button>`;
+  return html`<button type="button" class="og-door og-door--quiet" title=${t('profile.agents.detail.popOut')}
+    onClick=${(e) => { e.stopPropagation(); onPopOut(agent); }}>${t('profile.agents.detail.popOut')} ↗</button>`;
 }
 
 // The way through to wherever this agent actually runs, when its host has said where that is
@@ -437,8 +443,8 @@ function renderHostConsole(agent) {
     // eslint-disable-next-line aimeat/no-silent-catch -- an unparseable address is simply not offered
     return null;
   }
-  return html`<a class="btn-outline btn-sm" href=${url} target="_blank" rel="noopener noreferrer"
-    title=${url} onClick=${(e) => e.stopPropagation()}>${t('profile.agents.detail.openInHost', { host })}</a>`;
+  return html`<a class="og-door og-door--quiet agp-host" href=${url} target="_blank" rel="noopener noreferrer"
+    title=${url} onClick=${(e) => e.stopPropagation()}>${t('profile.agents.detail.openInHost', { host })} ↗</a>`;
 }
 
 // Collapsed-card mini-badge: total unseen changes across Tasks/Messages/Memory,
@@ -457,31 +463,6 @@ function renderChangeBadge(changes) {
   return html`<span class="pf-agd-change-badge pf-agd-change-badge--dot ${failed ? 'pf-agd-change-badge--failed' : ''}" title=${title}></span>`;
 }
 
-function renderCollapsedStats(state, agent, onboarding) {
-  switch (state) {
-    case 'new':
-      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)} · ` : ''}${t('profile.agents.detail.state.newSummary')}`;
-    case 'onboarding': {
-      const nextStep = onboarding?.steps?.find(s => s.status === 'pending');
-      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''}${nextStep ? ` · ${t('profile.agents.detail.state.next')}: ${tOr('agentOnboarding.steps.' + nextStep.id, nextStep.title || nextStep.id)}` : ''}`;
-    }
-    case 'problem':
-      return html`${t('profile.agents.detail.state.problemSummary')}${agent.last_seen ? ` · ${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''}`;
-    case 'idle':
-    case 'production':
-    default: {
-      const parts = [];
-      if (agent.last_seen) parts.push(`${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}`);
-      if (agent.taskStats) {
-        const { done, active: act } = agent.taskStats;
-        if (done || act) parts.push(`${t('profile.agents.detail.today')}: ${done || 0} ${t('profile.agents.detail.done')}${act ? `, ${act} ${t('profile.agents.detail.active')}` : ''}`);
-      }
-      if (agent.tokensUsedToday != null) parts.push(`${t('profile.agents.detail.tokensToday')}: ${num(agent.tokensUsedToday)}`);
-      return html`${parts.join(' · ')}`;
-    }
-  }
-}
-
 function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
   switch (state) {
     case 'system':
@@ -489,7 +470,7 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
       return null;
     case 'new':
       return html`
-        <div class="pf-agd-zone2 pf-agd-zone2--new">
+        <div class="pf-agd-zone2 pf-agd-zone2--new poster-aside poster-aside--small">
           <div class="pf-agd-zone2-title">${t('profile.agents.detail.zone2.newTitle')}</div>
           <div class="pf-agd-zone2-desc">${t('profile.agents.detail.zone2.newDesc')}</div>
           <div class="pf-agd-zone2-actions">
@@ -506,7 +487,7 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
       const pct = Math.round((passed / total) * 100);
       const nextStep = steps.find(s => s.status === 'pending');
       return html`
-        <div class="pf-agd-zone2 pf-agd-zone2--onboarding">
+        <div class="pf-agd-zone2 pf-agd-zone2--onboarding poster-aside poster-aside--small">
           <div class="pf-agd-zone2-title">
             ${t('profile.agents.detail.zone2.onboardingTitle')}: ${passed} / ${total}
             ${nextStep ? html`<span class="pf-agd-zone2-desc"> ${t('profile.agents.detail.state.next')}: ${tOr('agentOnboarding.steps.' + nextStep.id, nextStep.title || nextStep.id)}</span>` : ''}
@@ -553,7 +534,7 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
 function renderModeBadge(agent) {
   const mode = agent.mode || 'interactive';
   const label = t(`profile.agents.mode.${mode}`) || mode;
-  return html`<span class="pf-agd-badge pf-agd-badge--mode pf-agd-badge--mode-${mode}" title=${t('profile.agents.mode.tooltip') || ''}>${label}</span>`;
+  return html`<span class="og-chip og-chip--dim" title=${t('profile.agents.mode.tooltip') || ''}>${label}</span>`;
 }
 
 // Editable tag strip shown in the expanded card header. The same owner-managed
@@ -599,10 +580,10 @@ function TagStrip({ agent, showToast }) {
   return html`
     <div class="pf-agd-tag-strip pf-agd-tag-strip--editable">
       ${tags.map(tag => html`
-        <span key=${tag} class="pf-agd-tag-chip pf-agd-tag-chip--editable">
+        <span key=${tag} class="og-chip">
           ${tag}
-          <button class="pf-agd-tag-chip-remove" title=${t('profile.agents.detail.data_access.tagRemoved')}
-                  onClick=${(e) => { e.stopPropagation(); removeTag(tag); }}>×</button>
+          <button type="button" class="pf-agd-tag-chip-remove" title=${t('profile.agents.detail.data_access.tagRemoved')}
+                  onClick=${(e) => { e.stopPropagation(); removeTag(tag); }}>✗</button>
         </span>
       `)}
       ${adding
@@ -614,7 +595,7 @@ function TagStrip({ agent, showToast }) {
                    else if (e.key === 'Escape') { setAdding(false); setNewTag(''); }
                  }}
                  onBlur=${() => { if (newTag.trim()) addTag(); else setAdding(false); }} />`
-        : html`<button class="pf-agd-tag-add-btn" onClick=${() => setAdding(true)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>`}
+        : html`<button type="button" class="og-chip og-chip--dim" onClick=${() => setAdding(true)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>`}
     </div>
   `;
 }
@@ -675,7 +656,7 @@ function ProblemZone2({ agent, setActiveTab, showToast }) {
   };
 
   return html`
-    <div class="pf-agd-zone2 pf-agd-zone2--problem">
+    <div class="pf-agd-zone2 pf-agd-zone2--problem poster-aside poster-aside--small">
       <div class="pf-agd-zone2-title">${t('profile.agents.detail.zone2.problemTitle')}</div>
       <div class="pf-agd-zone2-desc">
         ${reasons.map(r => html`<div>${(reasonText[r] ?? (() => r))()}</div>`)}

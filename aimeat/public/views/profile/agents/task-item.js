@@ -2,11 +2,15 @@
  * @file public/views/profile/agents/task-item.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Single task row for the agent Tasks sub-tab: expand/collapse, todo plan,
- *   deliverable + per-task memory preview, start/cancel/delete/rate/triage actions, plus its
- *   helper renderers (status labels, JSON tree, memory entry, request-changes modal, blur
- *   preference). Extracted from ../agents-tasks-subtab.js to satisfy max-file-lines.
+ * @description Single task row for the agent Tasks sub-tab: the closed four-column row (name,
+ *   to-do progress, when, status chip) and the opened record with its parts -- to do, what
+ *   happened, details, memory entries, rating -- plus the actions row (start, request changes,
+ *   triage, cancel, delete). The helpers it is built from live in ./task-item-parts.js.
  * @version-history
+ *   v2.0.0 — 2026-09-14 — The Tasks tab wears the poster face: agt- markup against
+ *     css/views/agent-tasks-poster.css, the record box for an open task, the eye icon in place of
+ *     the two emoji, doors and a slab in place of the old button classes. No behaviour change. The
+ *     helpers, the request-changes modal and the memory viewer moved to ./task-item-parts.js.
  *   v1.0.1 — 2026-09-13 — The request-changes dialog's actions sit in its footer.
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/agents-tasks-subtab.js (max-file-lines)
  */
@@ -15,183 +19,28 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { deleteTask, startTask, listEvents, requestChanges, rateTask, setTaskTriage } from '/js/services/agent-tasks.js';
-import { useConfirm, Modal } from '/components/Modal.js';
+import { useConfirm } from '/components/Modal.js';
 import { Markdown } from '/components/Markdown.js';
-import { detectImage, ImageView, DeliverableBody } from '/components/ImageDeliverable.js';
+import { DeliverableBody } from '/components/ImageDeliverable.js';
 import RateModal from './rate-modal.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate, time as fmtTime } from '/js/format.js';
-
-// Per-browser "blur the title" preference. Used when screen-recording the tab
-// so sensitive task titles can be hidden without affecting other viewers or
-// the server. Stored as an array of task IDs in localStorage; survives reloads
-// but never leaves this browser.
-const BLUR_STORAGE_KEY = 'aimeat.blurredTaskTitles';
-
-function readBlurredSet() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(BLUR_STORAGE_KEY));
-    return new Set(Array.isArray(parsed) ? parsed : []);
-  } catch { return new Set(); }
-}
-
-function isTaskBlurred(taskId) {
-  return readBlurredSet().has(taskId);
-}
-
-function setTaskBlurred(taskId, blurred) {
-  const set = readBlurredSet();
-  if (blurred) set.add(taskId); else set.delete(taskId);
-  // eslint-disable-next-line aimeat/no-silent-catch -- storage full/blocked -- preference just won't persist
-  try { localStorage.setItem(BLUR_STORAGE_KEY, JSON.stringify([...set])); } catch { /* storage full/blocked -- preference just won't persist */ }
-}
-
-function statusLabel(status) {
-  const key = `profile.agents.tasks.${status}`;
-  const val = t(key);
-  return val !== key ? val : status.charAt(0).toUpperCase() + status.slice(1);
-}
-
-function todoStatusIcon(status) {
-  if (status === 'done') return '✅';
-  if (status === 'failed') return '❌';
-  if (status === 'skipped') return '⏭';
-  if (status === 'active') return '▶';
-  if (status === 'outdated') return '·';
-  return '⬜';
-}
-
-// Render one task scope entry as readable text. Scope is an array whose entries
-// may be plain strings (legacy free-text scopes) or structured provenance objects
-// stamped by the scheduler, e.g.
-//   { name:'schedule', value:'0 9 * * *', type:'cron', description:'Uutisputki – aamukirjoitus' }
-// A naive join()/String() prints "[object Object]" for the structured form, so
-// format the parts we know into e.g. "schedule: 0 9 * * * — Uutisputki – aamukirjoitus".
-function formatScopeEntry(s) {
-  if (s == null) return '';
-  if (typeof s !== 'object') return String(s);
-  const head = s.name || s.type || '';
-  const val = s.value != null && s.value !== '' ? String(s.value) : '';
-  const lead = [head, val].filter(Boolean).join(': ');
-  const desc = s.description ? ` — ${s.description}` : '';
-  const out = `${lead}${desc}`.trim();
-  return out || JSON.stringify(s);
-}
-
-function todoProgress(todos) {
-  if (!todos || todos.length === 0) return null;
-  const active = todos.filter(td => td.status !== 'outdated');
-  if (active.length === 0) return null;
-  const done = active.filter(td => td.status === 'done').length;
-  return `${done}/${active.length}`;
-}
-
-// Modal where the owner types the change request shown to the agent. Kept
-// inline here (rather than in /components) because the textarea-with-send
-// pattern is specific to this view; if a second caller needs it later, lift
-// it into a shared component.
-function RequestChangesModal({ open, onClose, onSubmit, submitting }) {
-  const [message, setMessage] = useState('');
-  useEffect(() => { if (open) setMessage(''); }, [open]);
-  function handleSend() {
-    const trimmed = message.trim();
-    if (!trimmed) return;
-    onSubmit(trimmed);
-  }
-  return html`<${Modal} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.requestChangesTitle')}
-    footer=${html`
-      <button class="btn-ghost" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
-      <button class="btn-primary" onClick=${handleSend} disabled=${submitting || !message.trim()}>
-        ${submitting ? t('profile.agents.tasks.requestChangesSending') : t('profile.agents.tasks.requestChangesSend')}
-      </button>`}>
-    <p class="pf-agd-modal-help">${t('profile.agents.tasks.requestChangesHelp')}</p>
-    <textarea
-      class="pf-agd-revision-textarea"
-      placeholder=${t('profile.agents.tasks.requestChangesPlaceholder')}
-      value=${message}
-      onInput=${e => setMessage(e.target.value)}
-      rows=${6}
-    ></textarea>
-  <//>`;
-}
-
-// Parse a memory value into structured JSON when possible. Returns { json } for
-// objects (or strings that parse as JSON), or { raw } for plain text/markdown.
-function parseMemoryValue(value) {
-  if (value === null || value === undefined) return { raw: '' };
-  if (typeof value === 'object') return { json: value };
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (trimmed && (trimmed[0] === '{' || trimmed[0] === '[')) {
-      try { return { json: JSON.parse(trimmed) }; }
-      // eslint-disable-next-line aimeat/no-silent-catch -- not JSON after all -- show raw
-      catch { /* not JSON after all -- show raw */ }
-    }
-    return { raw: value };
-  }
-  return { raw: String(value) };
-}
-
-// Recursive structured JSON renderer: objects/arrays become indented key/value
-// rows, primitives get type-coloured values. Far easier to scan than raw JSON.
-function JsonNode({ value }) {
-  if (value === null) return html`<span class="pf-agd-json-null">null</span>`;
-  const t = typeof value;
-  if (t === 'string') return html`<span class="pf-agd-json-str">${value}</span>`;
-  if (t === 'number') return html`<span class="pf-agd-json-num">${value}</span>`;
-  if (t === 'boolean') return html`<span class="pf-agd-json-bool">${value ? 'true' : 'false'}</span>`;
-  const entries = Array.isArray(value) ? value.map((v, i) => [String(i), v]) : Object.entries(value || {});
-  if (entries.length === 0) return html`<span class="pf-agd-json-empty">${Array.isArray(value) ? '[ ]' : '{ }'}</span>`;
-  return html`
-    <div class="pf-agd-json-block">
-      ${entries.map(([k, v]) => {
-        const nested = v !== null && typeof v === 'object';
-        return html`
-          <div class=${`pf-agd-json-row ${nested ? 'pf-agd-json-row--nested' : ''}`} key=${k}>
-            <span class="pf-agd-json-key">${k}</span>
-            <${JsonNode} value=${v} />
-          </div>
-        `;
-      })}
-    </div>
-  `;
-}
-
-// One collapsible memory entry. Header (key + JSON badge) toggles the body, which
-// renders a structured JSON view when the value is JSON, raw text otherwise.
-function TaskMemoryEntry({ entry }) {
-  const [open, setOpen] = useState(false);
-  const { json, raw } = parseMemoryValue(entry.value);
-  const isJson = json !== undefined;
-  // A memory value that IS an image (a /v1/pub URL string, or a { url, mime:image/* } object such as
-  // crews.image-maker.images.<id>) renders as a thumbnail instead of a JSON/text blob.
-  const image = detectImage(isJson ? json : raw, entry.key);
-  return html`
-    <div class="pf-agd-task-memory-entry">
-      <button class="pf-agd-task-memory-head" onClick=${(e) => { e.stopPropagation(); setOpen(o => !o); }} aria-expanded=${open}>
-        <span class="pf-agd-task-memory-caret">${open ? '▼' : '▶'}</span>
-        <code class="pf-agd-task-memory-key">${entry.key}</code>
-        ${image ? html`<span class="pf-agd-task-memory-badge">IMG</span>` : isJson && html`<span class="pf-agd-task-memory-badge">JSON</span>`}
-      </button>
-      ${open && html`
-        <div class="pf-agd-task-memory-body">
-          ${image
-            ? html`<${ImageView} desc=${image} />`
-            : isJson
-              ? html`<${JsonNode} value=${json} />`
-              // Non-JSON values (e.g. an agent's latest_output) are usually
-              // markdown — render them formatted via the shared safe Markdown
-              // component instead of raw text.
-              : html`<div class="pf-agd-task-memory-md"><${Markdown} text=${raw} /></div>`}
-        </div>
-      `}
-    </div>
-  `;
-}
+import {
+  isTaskBlurred,
+  setTaskBlurred,
+  statusLabel,
+  statusChipClass,
+  todoTick,
+  formatScopeEntry,
+  todoProgress,
+  EyeIcon,
+  RequestChangesModal,
+  TaskMemoryEntry,
+} from './task-item-parts.js';
 
 export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }) {
   const [expanded, setExpanded] = useState(false);
@@ -212,7 +61,7 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
   // This task's memory entries: null = not requested, {loading}|{items}.
   const [taskMemory, setTaskMemory] = useState(null);
   // Local-only "hide the title" toggle (for screen recordings). Persisted per
-  // task ID in localStorage; see helpers at top of file.
+  // task ID in localStorage; see the helpers in ./task-item-parts.js.
   const [blurred, setBlurred] = useState(() => isTaskBlurred(task.id));
   const { confirm, ConfirmUI } = useConfirm();
 
@@ -452,6 +301,11 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
   const totalMinutes = todos.reduce((sum, td) => sum + (td.estimateMinutes || 0), 0);
   const aimeatSteps = todos.filter(td => td.environment === 'aimeat').length;
   const agentSteps = todos.filter(td => td.environment === 'agent').length;
+  const doneTodos = todos.filter(td => td.status === 'done').length;
+  const status = task.status || 'draft';
+  const hasScope = task.scope && (!Array.isArray(task.scope) || task.scope.length > 0);
+  const hasRules = task.rules && task.rules.length > 0;
+  const hasDetails = Boolean(task.deliverableKey) || hasScope || hasRules;
 
   function formatDateTime(iso) {
     if (!iso) return '';
@@ -459,160 +313,91 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
       + fmtTime(iso, { hour: '2-digit', minute: '2-digit' });
   }
 
+  // One mono line: created … · updated … · completed …
+  const stamps = [
+    task.createdAt && `${t('profile.agents.tasks.created')} ${formatDateTime(task.createdAt)}`,
+    task.updatedAt && task.updatedAt !== task.createdAt && `${t('profile.agents.tasks.updated')} ${formatDateTime(task.updatedAt)}`,
+    task.completedAt && `${t('profile.agents.tasks.completed')} ${formatDateTime(task.completedAt)}`,
+  ].filter(Boolean).join(' · ');
+
+  // The env badges of the old face, as the plan's one mono line: agent 2 · about 5 min
+  const planLine = [
+    aimeatSteps > 0 && `${t('profile.agents.tasks.envAimeat')} ${aimeatSteps}`,
+    agentSteps > 0 && `${t('profile.agents.tasks.envAgent')} ${agentSteps}`,
+    totalMinutes > 0 && tOr('profile.agents.tasks.aboutMinutes', 'about {n} min', { n: totalMinutes }),
+  ].filter(Boolean).join(' · ');
+
+  // A fresh vnode per call: the closed row and the open record both show the chip at once.
+  const statusChip = () => html`<span class=${`og-chip agt-status ${statusChipClass(status)}`}>${statusLabel(status)}</span>`;
+  const stars = Math.max(0, Math.min(5, Math.round(rating?.stars || 0)));
+  // The log part only appears once there is a log, a fetch in flight, or a recorded emptiness.
+  const showLog = loadingEvents || (events && (events.length > 0 || !isQueued));
+
   return html`
     <div ref=${taskRef}>
-      <div class="pf-agd-task-item" onClick=${handleExpand}>
-        <div class="pf-agd-task-title-row">
+      <div class="agt-row" onClick=${handleExpand}>
+        <div class="agt-nm">
           <button
-            class=${`pf-agd-blur-toggle ${blurred ? 'pf-agd-blur-toggle--on' : ''}`}
+            type="button"
+            class="agt-eye"
             onClick=${handleToggleBlur}
             title=${blurred ? t('profile.agents.tasks.unblurTitle') : t('profile.agents.tasks.blurTitle')}
             aria-pressed=${blurred}
-          >${blurred ? '🙈' : '👁'}</button>
-          <span class=${`pf-agd-task-title ${blurred ? 'pf-agd-task-title--blurred' : ''}`}>${task.title || task.id}</span>
-          ${progress && html`<span class="pf-agd-todo-progress">${progress}</span>`}
+          ><${EyeIcon} hidden=${blurred} /></button>
+          <span class=${`agt-nm-t ${blurred ? 'is-hidden' : ''} ${expanded ? 'is-open' : ''}`}>${task.title || task.id}</span>
         </div>
-        <div class="pf-agd-task-meta">
-          ${task.createdAt && html`<span class="pf-agd-task-time">${timeAgo(task.createdAt)}</span>`}
-          <span class="pf-agd-status pf-agd-status-${task.status || 'draft'}">${statusLabel(task.status || 'draft')}</span>
-        </div>
+        <div class="agt-m">${progress || ''}</div>
+        <div class="agt-m">${task.createdAt ? timeAgo(task.createdAt) : ''}</div>
+        <div>${statusChip()}</div>
       </div>
+
       ${expanded && html`
-        <div class="pf-agd-task-expanded">
-          ${task.description && html`<div class="pf-agd-task-desc"><${Markdown} text=${task.description} /></div>`}
-
-          ${task.deliverableKey && html`
-            <div class="pf-agd-deliverable">
-              <span class="pf-agd-deliverable-label">${t('profile.agents.tasks.deliverable')}:</span>
-              <code class="pf-agd-deliverable-key">${task.deliverableKey}</code>
-              <button class="btn-ghost btn-sm" onClick=${(e) => { e.stopPropagation(); fetchDeliverable(); }}>
-                ${t('profile.agents.tasks.viewDeliverable')}
-              </button>
-            </div>
-            ${deliverable && html`
-              ${deliverable.loading
-                ? html`<div class="pf-agd-empty">${t('profile.loading')}</div>`
-                : deliverable.notFound
-                  ? html`<div class="pf-agd-deliverable-gone">${t('profile.agents.tasks.deliverableGone')}</div>`
-                  : html`<div class="pf-agd-memory-preview"><${DeliverableBody} value=${deliverable.value} alt=${task.title || task.description} /></div>`}
-            `}
-          `}
-
-          <div class="pf-agd-task-memory">
-            <button class="btn-ghost btn-sm" onClick=${(e) => { e.stopPropagation(); fetchTaskMemory(); }}>
-              ${t('profile.agents.tasks.memory.show')}
-            </button>
-            ${taskMemory && (taskMemory.loading
-              ? html`<div class="pf-agd-empty">${t('profile.loading')}</div>`
-              : taskMemory.items.length === 0
-                ? html`<div class="pf-agd-empty">${t('profile.agents.tasks.memory.none')}</div>`
-                : html`
-                  <div class="pf-agd-task-memory-list">
-                    ${taskMemory.items.map(it => html`<${TaskMemoryEntry} key=${it.key} entry=${it} />`)}
-                  </div>
-                `)}
+        <div class="poster-record agt-record">
+          <div class="agt-record-h">
+            <h3 class="poster-record-title agt-record-title">${task.title || task.id}</h3>
+            ${statusChip()}
           </div>
-
-          ${isDone && html`
-            <div class="pf-agd-rate-row">
-              ${rating
-                ? html`
-                  <span class="pf-agd-rate-current">
-                    <span class="pf-agd-rate-current-stars">${'★★★★★'.slice(0, rating.stars)}${'☆☆☆☆☆'.slice(0, 5 - rating.stars)}</span>
-                    <span class="pf-agd-rate-current-ctx">${t(`profile.agents.detail.quality.contexts.${rating.context}`)}</span>
-                    ${rating.comment && html`<span class="pf-agd-rate-current-comment">${rating.comment}</span>`}
-                  </span>
-                  <button class="btn-ghost btn-sm" onClick=${handleOpenRate}>${t('profile.agents.tasks.rate.rerate')}</button>
-                `
-                : html`<button class="btn-outline btn-sm" onClick=${handleOpenRate}>${t('profile.agents.tasks.rate.button')}</button>`}
-            </div>
-          `}
-
-          ${task.scope && (!Array.isArray(task.scope) || task.scope.length > 0) && html`
-            <div class="pf-agd-info-row">
-              <span class="pf-agd-info-label">${t('profile.agents.detail.tasks.scope')}</span>
-              <span class="pf-agd-info-value">
-                ${Array.isArray(task.scope)
-                  ? task.scope.map((s, i) => html`<div key=${i}>${formatScopeEntry(s)}</div>`)
-                  : formatScopeEntry(task.scope)}
-              </span>
-            </div>
-          `}
-          ${task.rules && task.rules.length > 0 && html`
-            <div class="pf-agd-info-row">
-              <span class="pf-agd-info-label">${t('profile.agents.detail.tasks.rules')}</span>
-              <span class="pf-agd-info-value">
-                ${Array.isArray(task.rules) ? task.rules.map(r => html`<div key=${r}>${r}</div>`) : task.rules}
-              </span>
-            </div>
-          `}
-
-          <div class="pf-agd-task-timestamps">
-            ${task.createdAt && html`<span>${t('profile.agents.tasks.created')}: ${formatDateTime(task.createdAt)}</span>`}
-            ${task.updatedAt && task.updatedAt !== task.createdAt && html`<span>${t('profile.agents.tasks.updated')}: ${formatDateTime(task.updatedAt)}</span>`}
-            ${task.completedAt && html`<span>${t('profile.agents.tasks.completed')}: ${formatDateTime(task.completedAt)}</span>`}
-          </div>
+          ${task.description && html`<div class="agt-desc"><${Markdown} text=${task.description} /></div>`}
+          ${stamps && html`<span class="agt-m agt-stamps">${stamps}</span>`}
 
           ${hasTodos && html`
-            <div class="pf-agd-todo-section">
-              <div class="pf-agd-todo-header">
-                <strong>${t('profile.agents.tasks.todoLabel')}</strong>
-                <span class="pf-agd-todo-summary">
-                  ${aimeatSteps > 0 && html`<span class="pf-agd-env-badge pf-agd-env-aimeat">${t('profile.agents.tasks.envAimeat')}: ${aimeatSteps}</span>`}
-                  ${agentSteps > 0 && html`<span class="pf-agd-env-badge pf-agd-env-agent">${t('profile.agents.tasks.envAgent')}: ${agentSteps}</span>`}
-                  ${totalMinutes > 0 && html`<span class="pf-agd-todo-time">~${totalMinutes} ${t('profile.agents.tasks.minuteShort')}</span>`}
+            <div class="agt-part poster-row--thing">
+              <div class="agt-part-h">
+                <span class="og-label">
+                  ${t('profile.agents.tasks.todoLabel')} · ${tOr('profile.agents.tasks.todoCount', '{done} of {total}', { done: doneTodos, total: todos.length })}
                 </span>
+                ${planLine && html`<span class="agt-m">${planLine}</span>`}
               </div>
-              <div class="pf-agd-todo-list">
-                ${todos.map((td, i) => html`
-                  <div class="pf-agd-todo-item pf-agd-todo-${td.status || 'pending'}" key=${td.id || i}>
-                    <span class="pf-agd-todo-icon">${todoStatusIcon(td.status || 'pending')}</span>
-                    <div class="pf-agd-todo-content">
-                      <div class="pf-agd-todo-title">
-                        ${td.title}
-                        <span class="pf-agd-env-badge pf-agd-env-${td.environment || 'agent'}">${td.environment === 'aimeat' ? t('profile.agents.tasks.envAimeat') : t('profile.agents.tasks.envAgent')}</span>
-                        ${td.estimateMinutes && html`
-                          <span class="pf-agd-todo-est">${td.estimateMinutes} ${t('profile.agents.tasks.minuteShort')}</span>
-                        `}
-                      </div>
-                      ${td.description && html`<div class="pf-agd-todo-desc">${td.description}</div>`}
-                      ${td.environmentReason && html`
-                        <div class="pf-agd-todo-reason">${td.environmentReason}</div>
-                      `}
-                      ${td.verification && html`<div class="pf-agd-todo-verify">${td.verification}</div>`}
-                      ${td.completedAt && html`<div class="pf-agd-todo-completed-at">${formatDateTime(td.completedAt)}</div>`}
+              ${todos.map((td, i) => {
+                const tick = todoTick(td.status || 'pending');
+                return html`
+                  <div class="agt-todo" key=${td.id || i}>
+                    <span class=${`agt-tick ${tick.cls}`}>${tick.glyph}</span>
+                    <div class="agt-todo-b">
+                      <b>${td.title}</b>
+                      <span class="og-chip og-chip--dim">${td.environment === 'aimeat' ? t('profile.agents.tasks.envAimeat') : t('profile.agents.tasks.envAgent')}</span>
+                      ${td.description && html`<div class="agt-sub">${td.description}</div>`}
+                      ${td.environmentReason && html`<div class="agt-sub">${td.environmentReason}</div>`}
+                      ${td.verification && html`<div class="agt-sub">${td.verification}</div>`}
+                    </div>
+                    <div class="agt-todo-r">
+                      ${td.estimateMinutes && html`<span class="agt-m">${td.estimateMinutes} ${t('profile.agents.tasks.minuteShort')}</span>`}
+                      ${td.completedAt && html`<span class="agt-m">${formatDateTime(td.completedAt)}</span>`}
                     </div>
                   </div>
-                `)}
-              </div>
-            </div>
-          `}
-
-          ${!hasTodos && isQueued && html`
-            <div class="pf-agd-todo-waiting">
-              ${t('profile.agents.tasks.builder.waitingTodos')}
-            </div>
-          `}
-
-          ${isRevisionRequested && html`
-            <div class="pf-agd-todo-waiting">
-              ${t('profile.agents.tasks.revisionWaiting')}
-            </div>
-          `}
-
-          ${outdatedTodos.length > 0 && html`
-            <div class="pf-agd-todo-history">
-              <button class="pf-agd-todo-history-toggle" onClick=${(e) => { e.stopPropagation(); setShowOutdated(v => !v); }}>
-                ${showOutdated ? '▼' : '▶'} ${t('profile.agents.tasks.outdatedTodos')} (${outdatedTodos.length})
-              </button>
-              ${showOutdated && html`
-                <div class="pf-agd-todo-list pf-agd-todo-list-outdated">
-                  ${outdatedTodos.map((td, i) => html`
-                    <div class="pf-agd-todo-item pf-agd-todo-outdated" key=${td.id || 'old-' + i}>
-                      <span class="pf-agd-todo-icon">${todoStatusIcon('outdated')}</span>
-                      <div class="pf-agd-todo-content">
-                        <div class="pf-agd-todo-title">${td.title}</div>
-                        ${td.description && html`<div class="pf-agd-todo-desc">${td.description}</div>`}
+                `;
+              })}
+              ${outdatedTodos.length > 0 && html`
+                <div class="agt-history">
+                  <button type="button" class="og-door og-door--quiet" onClick=${(e) => { e.stopPropagation(); setShowOutdated(v => !v); }} aria-expanded=${showOutdated}>
+                    ${t('profile.agents.tasks.outdatedTodos')}<em>${outdatedTodos.length}</em>
+                  </button>
+                  ${showOutdated && outdatedTodos.map((td, i) => html`
+                    <div class="agt-todo agt-todo--old" key=${td.id || 'old-' + i}>
+                      <span class="agt-tick"></span>
+                      <div class="agt-todo-b">
+                        <b>${td.title}</b>
+                        ${td.description && html`<div class="agt-sub">${td.description}</div>`}
                       </div>
                     </div>
                   `)}
@@ -621,48 +406,133 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
             </div>
           `}
 
-          ${loadingEvents && html`<div class="pf-agd-empty">${t('profile.loading')}</div>`}
-          ${events && events.length > 0 && html`
-            <div class="pf-agd-event-log">
-              ${events.map(ev => html`
-                <div class="pf-agd-event-item" key=${ev.id || ev.timestamp}>
-                  <span class="pf-agd-event-time">${ev.timestamp ? timeAgo(ev.timestamp) : ''}</span>
-                  <span class="pf-agd-event-type">${ev.type || ''}</span>
-                  <span>${ev.message || ''}</span>
+          ${!hasTodos && isQueued && html`<div class="agt-empty">${t('profile.agents.tasks.builder.waitingTodos')}</div>`}
+          ${isRevisionRequested && html`<div class="agt-empty">${t('profile.agents.tasks.revisionWaiting')}</div>`}
+
+          ${showLog && html`
+            <div class="agt-part poster-row--thing">
+              <div class="agt-part-h">
+                <span class="og-label">${tOr('profile.agents.tasks.whatHappened', 'What happened')}</span>
+              </div>
+              ${loadingEvents && html`<div class="agt-empty">${t('profile.loading')}</div>`}
+              ${events && events.length > 0 && html`
+                <div class="agt-log">
+                  ${events.map(ev => html`
+                    <div class="agt-m" key=${(ev.id || ev.timestamp) + '-when'}>${ev.timestamp ? timeAgo(ev.timestamp) : ''}</div>
+                    <div class="agt-w" key=${(ev.id || ev.timestamp) + '-what'}>${ev.type || ''}</div>
+                    <div class="agt-msg" key=${(ev.id || ev.timestamp) + '-said'}>${ev.message || ''}</div>
+                  `)}
                 </div>
-              `)}
+              `}
+              ${events && events.length === 0 && !isQueued && html`<div class="agt-empty">${t('profile.agents.tasks.noEventsRecorded')}</div>`}
             </div>
           `}
-          ${events && events.length === 0 && !isQueued && html`
-            <div class="pf-agd-empty">${t('profile.agents.tasks.noEventsRecorded')}</div>
+
+          ${hasDetails && html`
+            <div class="agt-part poster-row--thing">
+              <div class="agt-part-h">
+                <span class="og-label">${tOr('profile.agents.tasks.detailsLabel', 'Details')}</span>
+              </div>
+              ${task.deliverableKey && html`
+                <div class="agt-kv">
+                  <span class="agt-k">${t('profile.agents.tasks.deliverable')}</span>
+                  <span class="agt-v">
+                    <code class="agt-key">${task.deliverableKey}</code>
+                    <button type="button" class="og-door og-door--quiet" onClick=${(e) => { e.stopPropagation(); fetchDeliverable(); }}>
+                      ${t('profile.agents.tasks.viewDeliverable')}
+                    </button>
+                  </span>
+                </div>
+              `}
+              ${hasScope && html`
+                <div class="agt-kv">
+                  <span class="agt-k">${t('profile.agents.detail.tasks.scope')}</span>
+                  <span class="agt-v">
+                    ${Array.isArray(task.scope)
+                      ? task.scope.map((s, i) => html`<div key=${i}>${formatScopeEntry(s)}</div>`)
+                      : formatScopeEntry(task.scope)}
+                  </span>
+                </div>
+              `}
+              ${hasRules && html`
+                <div class="agt-kv">
+                  <span class="agt-k">${t('profile.agents.detail.tasks.rules')}</span>
+                  <span class="agt-v">
+                    ${Array.isArray(task.rules) ? task.rules.map(r => html`<div key=${r}>${r}</div>`) : task.rules}
+                  </span>
+                </div>
+              `}
+              ${deliverable && html`
+                ${deliverable.loading
+                  ? html`<div class="agt-empty">${t('profile.loading')}</div>`
+                  : deliverable.notFound
+                    ? html`<div class="agt-empty">${t('profile.agents.tasks.deliverableGone')}</div>`
+                    : html`<div class="agt-preview"><${DeliverableBody} value=${deliverable.value} alt=${task.title || task.description} /></div>`}
+              `}
+            </div>
           `}
 
-          <div class="pf-agd-task-actions">
-            ${canStart && html`
-              <button class="btn-primary btn-sm" onClick=${handleStart} disabled=${starting}>
-                ${starting ? t('profile.agents.tasks.starting') : t('profile.agents.tasks.startThisTask')}
+          ${taskMemory && html`
+            <div class="agt-part poster-row--thing">
+              <div class="agt-part-h">
+                <span class="og-label">${t('profile.agents.tasks.memory.show')}</span>
+              </div>
+              ${taskMemory.loading
+                ? html`<div class="agt-empty">${t('profile.loading')}</div>`
+                : taskMemory.items.length === 0
+                  ? html`<div class="agt-empty">${t('profile.agents.tasks.memory.none')}</div>`
+                  : html`
+                    <div class="pf-agd-task-memory-list">
+                      ${taskMemory.items.map(it => html`<${TaskMemoryEntry} key=${it.key} entry=${it} />`)}
+                    </div>
+                  `}
+            </div>
+          `}
+
+          ${rating && html`
+            <div class="agt-part poster-row--thing">
+              <div class="agt-part-h">
+                <span class="og-label">${t('profile.agents.tasks.rate.rated')}</span>
+              </div>
+              <div class="agt-rating">
+                <span class="agt-stars">${'★'.repeat(stars)}<span class="agt-stars-off">${'★'.repeat(5 - stars)}</span></span>
+                <span class="agt-m">${t(`profile.agents.detail.quality.contexts.${rating.context}`)}</span>
+                ${rating.comment && html`<span class="agt-rating-note">${rating.comment}</span>`}
+              </div>
+            </div>
+          `}
+
+          <div class="agt-actions">
+            ${task.triage !== 'kept' && html`
+              <button type="button" class="og-door" onClick=${(e) => handleTriage(e, 'kept')} title=${t('profile.agents.tasks.triage.keepHint')}>★ ${t('profile.agents.tasks.triage.keep')}</button>
+            `}
+            ${task.triage !== 'archived' && html`
+              <button type="button" class="og-door" onClick=${(e) => handleTriage(e, 'archived')} title=${t('profile.agents.tasks.triage.archiveHint')}>${t('profile.agents.tasks.triage.archive')}</button>
+            `}
+            ${task.triage && html`
+              <button type="button" class="og-door" onClick=${(e) => handleTriage(e, null)}>${t('profile.agents.tasks.triage.restore')}</button>
+            `}
+            <button type="button" class="og-door" onClick=${(e) => { e.stopPropagation(); fetchTaskMemory(); }}>
+              ${t('profile.agents.tasks.memory.show')}
+            </button>
+            ${isDone && html`
+              <button type="button" class="og-door" onClick=${handleOpenRate}>
+                ${rating ? t('profile.agents.tasks.rate.rerate') : t('profile.agents.tasks.rate.button')}
               </button>
             `}
             ${canRequestChanges && html`
-              <button class="btn-outline btn-sm" onClick=${handleOpenRevision}>
-                ${t('profile.agents.tasks.requestChanges')}
+              <button type="button" class="og-door" onClick=${handleOpenRevision}>${t('profile.agents.tasks.requestChanges')}</button>
+            `}
+            ${canStart && html`
+              <button type="button" class="og-slab" onClick=${handleStart} disabled=${starting}>
+                ${starting ? t('profile.agents.tasks.starting') : t('profile.agents.tasks.startThisTask')}
               </button>
             `}
             ${(isActive || task.status === 'stalled') && html`
-              <button class="btn-danger btn-sm" onClick=${handleCancel}>${t('profile.agents.tasks.cancel')}</button>
+              <button type="button" class="og-door og-door--danger" onClick=${handleCancel}>${t('profile.agents.tasks.cancel')}</button>
             `}
             ${canDelete && html`
-              <button class="btn-danger btn-sm" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}</button>
-            `}
-            <span class="pf-agd-task-actions-spacer"></span>
-            ${task.triage !== 'kept' && html`
-              <button class="btn-ghost btn-sm" onClick=${(e) => handleTriage(e, 'kept')} title=${t('profile.agents.tasks.triage.keepHint')}>★ ${t('profile.agents.tasks.triage.keep')}</button>
-            `}
-            ${task.triage !== 'archived' && html`
-              <button class="btn-ghost btn-sm" onClick=${(e) => handleTriage(e, 'archived')} title=${t('profile.agents.tasks.triage.archiveHint')}>${t('profile.agents.tasks.triage.archive')}</button>
-            `}
-            ${task.triage && html`
-              <button class="btn-ghost btn-sm" onClick=${(e) => handleTriage(e, null)}>${t('profile.agents.tasks.triage.restore')}</button>
+              <button type="button" class="og-door og-door--danger" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}</button>
             `}
           </div>
           <${ConfirmUI} />
