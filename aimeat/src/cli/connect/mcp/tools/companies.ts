@@ -22,9 +22,10 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
-/** Optional identity fields, shared by create and update — the server MCP's shape, verbatim. */
+/** The optional fields create and update share — the server MCP's shape, verbatim. */
 const identityShape = {
   description: z.string().optional().describe('One or two sentences about what the company does'),
+  organism_id: z.string().optional().describe('The organism this company keeps its knowledge in. Empty string unlinks it.'),
   business_id: z.string().optional().describe('Company registration number (Finnish Y-tunnus)'),
   vat_id: z.string().optional().describe('VAT number'),
   street_address: z.string().optional().describe('Street address'),
@@ -41,7 +42,8 @@ const identityShape = {
 
 /** Wire name → the record field the GET returns, for the merge below. */
 const RECORD_FIELD: Record<string, string> = {
-  description: 'description', business_id: 'businessId', vat_id: 'vatId',
+  description: 'description', organism_id: 'organismId',
+  business_id: 'businessId', vat_id: 'vatId',
   street_address: 'streetAddress', postal_code: 'postalCode', city: 'city', country: 'country',
   email: 'email', phone: 'phone', iban: 'iban', bic: 'bic',
   einvoice_address: 'einvoiceAddress', einvoice_operator: 'einvoiceOperator',
