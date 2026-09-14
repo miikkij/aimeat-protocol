@@ -1,6 +1,6 @@
 {
   "name": "aimeat",
-  "version": "3.14.3",
+  "version": "3.15.0",
   "description": "AIME AT - AI Memory Exchange and Action Transfer - reference implementation",
   "type": "module",
   "main": "dist/src/index.js",
@@ -143,6 +143,7 @@
     "locale:extract": "tsx scripts/locale-extract.ts",
     "locale:merge": "tsx scripts/locale-merge.ts",
     "screenshot:worker": "tsx scripts/screenshot-worker.ts",
+    "projector:shots": "tsx scripts/projector-shots.ts",
     "generate:types": "openapi-typescript ../openapi.yaml -o src/generated/api-types.ts",
     "db:reset": "node --env-file=.env --import tsx scripts/db-reset.ts",
     "telemetry:stats": "node --env-file=.env --import tsx scripts/telemetry-prune.ts",
