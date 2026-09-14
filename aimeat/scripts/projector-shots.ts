@@ -131,7 +131,9 @@ async function main(): Promise<void> {
   // --only takes a side (settings | admin | apps) or a comma-separated list of pages
   // (settings:scheduler, apps:design-book, or a bare id that matches on any side), so one slow
   // page can be retaken alone.
-  const wanted = (only || '').split(',').map((s) => s.trim()).filter(Boolean);
+  // Commas or spaces: PowerShell turns a comma-separated argument into an array and hands it on
+  // as one space-separated string, so both spellings name the same pages.
+  const wanted = (only || '').split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
   const SIDES = ['settings', 'admin', 'apps'];
   // A side name selects the whole side and nothing else: "apps" is the show, not the Apps tab.
   const keep = (where: Target['where'], id: string) =>
