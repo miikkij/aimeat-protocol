@@ -24,6 +24,7 @@
  *   cd aimeat && pnpm check:instructions      # gate (check:fast, CI)
  * @version-history
  *   v1.0.0 — 2026-09-13 — Initial (wish-claude-code-scoped-to-this-repo-smaller-always-loaded-instru).
+ *   v1.0.1 — 2026-09-14 — Ceiling 38,000 → 39,000 for the reply-language rules.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -38,8 +39,10 @@ const SKILLS_DIR = join(REPO, '.claude', 'skills');
  * Seeded 2026-09-13 with CLAUDE.md at 36,698 bytes after the split, plus room for a few sentences.
  * A session start carries this file, the SessionStart hook's output and the harness's own prompt;
  * this is the part the repository decides.
+ * Raised to 39,000 on 2026-09-14, at Jouni's request, for the two reply-language rules (STE100 and
+ * selkeä kieli), which hold in every session.
  */
-const CEILING_BYTES = 38_000;
+const CEILING_BYTES = 39_000;
 
 function trackedFiles(): string[] {
     return execFileSync('git', ['-C', REPO, 'ls-files'], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })
