@@ -9,9 +9,12 @@
  *   WHY IT IS SHAPED THIS WAY. Writing a capability twice is what produced 315 measured differences
  *   between the MCP surface and REST in the August 2026 audit. The lint rule that refuses
  *   `storage.*` inside an MCP tool is what sent this file into existence, and it was right to.
- * @structure readProgramMap · stateProgramMap · handsOnKey · splitAppRef
+ * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   v2.1.0 — 2026-09-14 — putProgramMap: validate, write, restamp, with no opinion about who may do
+ *     it. The package installer is its second caller, so an installed app arrives with the map its
+ *     author wrote instead of being stamped as having none.
  *   v2.0.0 — 2026-08-25 — spec/2. No derivation to fall back on: an app with no map reads as having
  *     none, which is the honest answer and the one that gets it written.
  *   v1.0.0 — 2026-08-25 — Extracted the moment the same rules needed a second door.
@@ -140,10 +143,35 @@ export async function stateProgramMap(
     return { refusal: { status: 404, code: 'NOT_FOUND', message: `No app "${appRef}" on this node.` } };
   }
 
-  const appId = appIdOf(ref.filename);
+  const put = await putProgramMap(storage, config, caller, record.ownerGaii, ref.filename, body, at);
+  if ('refusal' in put) return put;
+  return { app: appRef, dataMap: put.map, stamp: put.stamp, findings: checkMap(put.map, at).findings };
+}
+
+/**
+ * Store a map beside an app that already exists, and stamp the manifest from it.
+ *
+ * The three steps that make a map real — validate it, write the record, restamp the app — with no
+ * opinion about who may do it. Its two callers answer that differently and both are right:
+ * stateProgramMap above is a person or their agent editing their own app's promises, and the
+ * package installer is an app arriving from somewhere else carrying the map its author wrote.
+ *
+ * The stamp is computed HERE rather than carried, and that is the whole reason a package ships the
+ * map document instead of the stamp: a stamp addresses `apps.<id>.datamap`, and the installed copy's
+ * id is not the author's. Carried, it would point at a record that does not exist on this node.
+ */
+export async function putProgramMap(
+  storage: Storage, config: AimeatConfig, caller: DataMapCaller,
+  ownerGhii: string, filename: string, body: Partial<DataMap>, at: string,
+): Promise<{ map: DataMap; stamp: DataMapStamp } | DataMapRefusal> {
+  const parsed = readMap(body, at);
+  if (typeof parsed === 'string') {
+    return { refusal: { status: 400, code: 'INVALID_INPUT', message: parsed } };
+  }
+  const appId = appIdOf(filename);
   const writeCaller: MemoryWriteCaller = {
     principal: caller.principal,
-    targetGaii: `${ref.owner}@${config.nodeId}`,
+    targetGaii: `${caller.ownerName}@${config.nodeId}`,
     roles: caller.roles,
     scopes: caller.scopes,
   };
@@ -158,8 +186,8 @@ export async function stateProgramMap(
   }
 
   const stamp = stampFor(parsed, appId, at);
-  await storage.updateAppMeta(record.ownerGaii, ref.filename, { dataMap: stamp });
-  return { app: appRef, dataMap: parsed, stamp, findings: checkMap(parsed, at).findings };
+  await storage.updateAppMeta(ownerGhii, filename, { dataMap: stamp });
+  return { map: parsed, stamp };
 }
 
 export interface HandsAnswer {
