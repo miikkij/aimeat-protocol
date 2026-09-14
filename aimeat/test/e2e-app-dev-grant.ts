@@ -10,6 +10,8 @@
  *   asserted in the same group, because that is the path every other app on the node still takes.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-dev-grant
  * @version-history
+ *   v1.2.0 — 2026-09-14 — A builder's PATCH that is refused leaves the fields before the refusal
+ *     alone. It landed the rename and then answered 403 on the reviewer's name.
  *   v1.1.0 — 2026-09-08 — Phase 3: the doors accept a target owner, so the suite stops asserting
  *     that the right reaches nothing and starts asserting what it reaches.
  *   v1.0.0 — 2026-09-08 — Initial.
@@ -324,6 +326,38 @@ await test('a publisher may not touch how the app is offered', async () => {
         body: JSON.stringify({ owner: owner.name, description: 'renamed by the builder' }),
     });
     assert(rename.status === 200, `but a description IS presentation (got ${rename.status})`);
+});
+
+// REFUSE BEFORE THE FIRST WRITE. PATCH walks the body field by field and writes each one as it
+// reaches it; the reviewer's name is read near the end, and is the one field no delegate may set
+// whatever their rung. So a builder's PATCH carrying a description AND an author wrote the
+// description and then answered 403 — a refused request that had already half happened.
+// Invariant 14. Found by the AI triage of 2026-09-13.
+await test('a builder\'s refused PATCH leaves the fields before the refusal alone', async () => {
+    const grant = await json(grantPath(owner.name, builder.name), {
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ level: 'full' }),
+    });
+    assert(grant.status === 200, `the builder needs the full rung for this: ${grant.status}`);
+    const describedNow = async () => {
+        const list = await json('/v1/apps?own=true&limit=200', { headers: auth(owner.token) });
+        assert(list.status === 200, `reading the catalogue back: ${list.status}`);
+        const row = (list.body.data.apps as Array<Record<string, any>>).find(a => a.filename === APP);
+        assert(!!row, `${APP} is not in its owner's own catalogue`);
+        return row!.manifest?.description as string;
+    };
+    const wasDescription = await describedNow();
+
+    const patch = await json(`/v1/apps/${APP}`, {
+        method: 'PATCH', headers: auth(builder.token),
+        body: JSON.stringify({ owner: owner.name, description: 'the builder got this far', author: 'Somebody Real' }),
+    });
+    assert(patch.status === 403, `the reviewer's name is never a delegate's to set: ${patch.status} ${JSON.stringify(patch.body?.error)}`);
+    assert(String(patch.body.error?.message).includes('account holder'),
+        `and the refusal must be the reviewer rule, not the rung: ${JSON.stringify(patch.body?.error)}`);
+
+    const nowDescription = await describedNow();
+    assert(nowDescription === wasDescription,
+        `a refused PATCH must change nothing: description went "${wasDescription}" → "${nowDescription}"`);
 });
 
 await test('taking the right back stops the next publish', async () => {
