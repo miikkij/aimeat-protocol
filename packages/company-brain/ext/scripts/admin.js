@@ -16,17 +16,30 @@ export default async function (ctx, input) {
 
   const MAX_RETRIES = 5;
 
-  /** One source, cleaned. Unknown fields are dropped: the register is a contract, not a bag. */
+  /**
+   * One source, cleaned. Unknown fields are dropped: the register is a contract, not a bag.
+   *
+   * An unknown KIND is refused by name rather than quietly rewritten. Until 2026-09-14 anything
+   * outside the list became 'chat', so a register that had been told `workspace`, `memory` and
+   * `email` answered ok and stored three sources as chat: the caller was never told, and the
+   * register then described feeds that do not exist. A contract that silently stores something
+   * else is worse than one that refuses. Reported from a node running this package.
+   */
   function cleanSource(raw, previous) {
     const prev = previous || {};
-    const kinds = ['company', 'connection', 'extension', 'upload', 'web', 'chat'];
+    const kinds = ['company', 'connection', 'extension', 'upload', 'web', 'chat',
+      // Added 2026-09-14: three address spaces this platform has and this list did not name.
+      'workspace', 'memory', 'email'];
     const kind = String((raw && raw.kind) || prev.kind || 'chat');
+    if (kinds.indexOf(kind) < 0) {
+      return { error: 'unknown kind: ' + kind + '. One of: ' + kinds.join(', ') };
+    }
     const days = Number((raw && raw.cadence_days) != null ? raw.cadence_days : prev.cadence_days);
     return {
       id: String((raw && raw.id) || prev.id || ''),
-      kind: kinds.indexOf(kind) >= 0 ? kind : 'chat',
+      kind: kind,
       // What it points at: a company id, a connection id, a URL, a filename. Free text on purpose,
-      // because the six kinds above name six different address spaces.
+      // because the kinds above name that many different address spaces.
       ref: String((raw && raw.ref) != null ? raw.ref : (prev.ref || '')),
       feeds: String((raw && raw.feeds) != null ? raw.feeds : (prev.feeds || '')),
       // Zero means "this one does not repeat" — a one-off import is a real source and it should not
@@ -104,6 +117,9 @@ export default async function (ctx, input) {
     return await withRegister(function (items) {
       const at = items.findIndex(function (s) { return s && s.id === raw.id; });
       const merged = cleanSource(raw, at >= 0 ? items[at] : null);
+      // A refused kind travels out as the register's own refusal shape, so nothing is written and
+      // the caller is told which value was wrong.
+      if (merged && merged.error) return merged;
       if (at >= 0) items[at] = merged; else items.push(merged);
       return items;
     });
