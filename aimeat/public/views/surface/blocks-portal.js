@@ -18,6 +18,7 @@
  *   StatsBlock · TransparencyBlock · PortalTextBlock · PortalBoardBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   v1.3.0 — 2026-09-14 — Seven V2* blocks: the front page as the message frame says it (TARGET-075).
  *   v1.2.0 — 2026-08-30 — portal.board shows a notice's category and its poster's name beside the
  *     date, now that a board is the notice board people and agents publish to (RFC §27).
  *   v1.1.0 — 2026-08-28 — The six showroom blocks (hero, wall intro, store, trust, rooms, close).
@@ -38,6 +39,9 @@ import NodeChangeLog from '/views/landing-changelog.js';
 import { WelcomeDoor } from '/views/home/welcome-door.js';
 import { ShowroomHero, WallIntro, ShowroomClose } from '/views/landing-showroom.js';
 import { StoreSection, TrustList, Rooms } from '/views/landing-showroom-rooms.js';
+import { Hero2, TenSeconds, LinuxLine, Close2 } from '/views/landing-v2.js';
+import { Projector } from '/views/landing-v2-projector.js';
+import { PromptCards, Wall2 } from '/views/landing-v2-cards.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -163,6 +167,37 @@ export function RoomsBlock() {
 
 export function CloseBlock() {
   return html`<${ShowroomClose} />`;
+}
+
+// The message frame's page (2026-09-14, TARGET-075): the seven portal.frame-* blocks over
+// views/landing-v2*.js. The counters, the store and the safety list between them are the
+// showroom's blocks above.
+export function V2HeroBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx, props = {} }) {
+  return html`<${Hero2} navigate=${nav(ctx)} picture=${props.picture !== false} />`;
+}
+
+export function V2TenBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx }) {
+  return html`<${TenSeconds} navigate=${nav(ctx)} />`;
+}
+
+export function V2ProjectorBlock() {
+  return html`<${Projector} />`;
+}
+
+export function V2CardsBlock() {
+  return html`<${PromptCards} />`;
+}
+
+export function V2WallBlock() {
+  return html`<${Wall2} />`;
+}
+
+export function V2LinuxBlock() {
+  return html`<${LinuxLine} />`;
+}
+
+export function V2CloseBlock() {
+  return html`<${Close2} />`;
 }
 
 /** The latest posts from one board. Only system and public boards ever answer. */

@@ -8,6 +8,7 @@
  *   offset shadows in ink, sun and coral, and every colour a theme token so the dark theme inverts.
  *   Mobile first: the base rules are the phone, and the wider screens add columns.
  * @version-history
+ *   v0.2.0 — 2026-09-14 — The cloud's words are buttons, and the apps in the show are a third group.
  *   v0.1.0 — 2026-09-14 — Design round.
  */
 
@@ -111,11 +112,16 @@
 .ld-v2-cloud-group { display: flex; flex-direction: column; gap: .3rem; }
 .ld-v2-cloud-groupname { font-family: var(--font-showroom); text-transform: uppercase; font-size: .72rem; letter-spacing: .06em; color: var(--text-dim); }
 .ld-v2-cloud-words { display: flex; flex-wrap: wrap; gap: .35rem .45rem; }
+/* Every word is a button: press it and the projector jumps to that slide. */
 .ld-v2-word {
+  appearance: none; cursor: pointer; border-radius: 0;
   font-family: var(--font-showroom-body); font-size: .82rem; font-weight: 700; line-height: 1.2; padding: .2rem .45rem;
   border: 2px solid var(--border);
   transition: background 200ms ease, color 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
 }
+.ld-v2-word:hover { border-color: var(--text); color: var(--text); }
+.ld-v2-word:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.ld-v2-cloud--apps { order: 4; }
 /* Zero specificity on purpose, so the lit word's composed sun class wins over the resting colours. */
 :where(.ld-v2-word) { color: var(--text-dim); background: transparent; }
 .ld-v2-word.is-lit { border-color: var(--text); box-shadow: 3px 3px 0 var(--text); transform: scale(1.06); }
@@ -124,6 +130,7 @@
   .ld-v2-cloud--settings { order: 1; }
   .ld-v2-projector { order: 2; }
   .ld-v2-cloud--admin { order: 3; }
+  .ld-v2-cloud--apps { order: 4; grid-column: 1 / -1; }
 }
 
 /* ── Prompts and what they made ─────────────────────────────────────────────────────────────── */

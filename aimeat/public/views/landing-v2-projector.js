@@ -2,16 +2,23 @@
  * @file landing-v2-projector.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The slide projector on the front page's design round (TARGET-075): an old carousel
- *   projector with one big button. CLICK-ZIG, and the picture changes. One slide is one page of
- *   Settings & Controls or Admin and one sentence about what it did for somebody, never what it
- *   can do. Around the slide sits the word cloud: the two menus exactly as the product has them
- *   (profile.js TABS and admin.js NAV_GROUPS, the same locale keys), and the word the slide is
- *   about lights up. It runs on its own, quickly, and the button stops it.
+ * @description The slide projector on the front page (TARGET-075): an old carousel projector with
+ *   one big button. CLICK-ZIG, and the picture changes. Every page of Settings & Controls and of
+ *   Admin is a slide, and so is every app chosen for the show, so the counter says how many there
+ *   really are. Around the slide sits the word cloud: the two menus exactly as the product has
+ *   them (profile.js TABS and admin.js NAV_GROUPS, the same locale keys) and the apps, and the word
+ *   the slide is about lights up. Every word is a button: press it and the projector jumps there.
+ *   It runs on its own, quickly, and the big button or any word stops it.
  *
- *   THE PICTURES ARE REAL SCREENSHOTS, TAKEN LATER. Each slide looks for
- *   /img/frontdemo/projector/<where>-<id>.png; until the file exists, the slide shows the page's
- *   name on a placeholder, so the section reads and the slot is obvious.
+ *   A SLIDE CARRIES A SENTENCE WHERE ONE IS WRITTEN. The sentence names what the page did for
+ *   somebody, never what it can do (LINES below, the frame's own list first). A page without one
+ *   yet shows its name and a marked placeholder, so the missing sentence is visible rather than
+ *   invented. An app slide carries the app's own description.
+ *
+ *   THE PICTURES ARE REAL SCREENSHOTS, TAKEN BY scripts/projector-shots.ts in the operator's
+ *   session. Each menu slide looks for /img/frontdemo/projector/<where>-<id>.png; until the file
+ *   exists the slide shows the page's name on a placeholder. An app slide uses the catalogue's own
+ *   screenshot.
  *
  *   THE SOUND IS SYNTHESISED. WebAudio, no file: a noise click, a square wave sliding down as the
  *   carousel turns, and a second click as the slide seats. The context is created on the first
@@ -19,9 +26,12 @@
  *   run is silent until then.
  *
  *   The section is optional and its title says so: this is for whoever wants to see everything.
- * @structure SETTINGS_TABS · ADMIN_GROUPS · SLIDES · clickZig · Projector
+ * @structure SETTINGS_TABS · ADMIN_GROUPS · LINES · pickApps · clickZig · Projector
  * @usage import { Projector } from './landing-v2-projector.js';
  * @version-history
+ *   v0.2.0 — 2026-09-14 — Every menu page is a slide and every word is a button that jumps to it;
+ *     the apps chosen for the show are the third group of the cloud, with the catalogue's own
+ *     screenshots. Jouni, on seeing the first round.
  *   v0.1.0 — 2026-09-14 — Design round, TARGET-075.
  */
 import { h } from 'preact';
@@ -34,7 +44,11 @@ import { swallowed } from '/js/swallowed.js';
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-/** Settings & Controls, the tab list of profile.js in its own order and with its own keys. */
+/**
+ * Settings & Controls, the tab list of profile.js in its own order and with its own keys.
+ * scripts/projector-shots.ts carries the same ids; a tab added here is added there.
+ * @type {[string, string][]}
+ */
 const SETTINGS_TABS = [
   ['messages', 'profile.tabs.inbox'], ['contacts', 'contacts.tabLabel'], ['discover', 'discover.tabLabel'],
   ['portfolio', 'portfolio.tabLabel'], ['fleet', 'profile.tabs.fleet'], ['agents', 'profile.tabs.agents'],
@@ -88,36 +102,54 @@ const ADMIN_GROUPS = [
 ];
 
 /**
- * The slides: which page, and what it did. The sentence names an outcome in the frame's own
- * words (the doc's list, then one per page in the same spirit). Figures in a sentence are the
- * ones the page itself shows; the design round carries them as written, and a later round reads
- * them live from the same endpoints the pages use.
+ * The sentence a slide carries, where one is written: "<where>:<id>" → [locale key, English].
+ * Outcomes in the frame's own words (the doc's list first). Figures in a sentence are the ones
+ * the page itself shows; this round carries them as written, a later one reads them live.
+ * @type {Record<string, [string, string]>}
  */
-const SLIDES = [
-  { where: 'settings', id: 'apps', page: 'profile.tabs.apps', key: 'landing2.slideApps', en: 'Installed on your phone and your desktop. No app store in between.' },
-  { where: 'settings', id: 'access', page: 'profile.tabs.access', key: 'landing2.slideAccess', en: 'You sign in with a finger or a QR code. There is no password.' },
-  { where: 'settings', id: 'appdev', page: 'profile.tabs.appDev', key: 'landing2.slideAppdev', en: 'Forked somebody\'s app. The origin is recorded and the copy is yours.' },
-  { where: 'settings', id: 'portfolio', page: 'portfolio.tabLabel', key: 'landing2.slidePortfolio', en: 'Seven versions of the same app, every one of them restorable.' },
-  { where: 'settings', id: 'organisms', page: 'profile.tabs.organisms', key: 'landing2.slideOrganisms', en: 'Your team edits the same app. The working copy and the published one stay apart.' },
-  { where: 'settings', id: 'actions', page: 'profile.tabs.services', key: 'landing2.slideServices', en: 'Your app sells tool calls to other agents, and the money lands in your wallet.' },
-  { where: 'admin', id: 'discovery', page: 'dashboard.seo.tab', key: 'landing2.slideDiscovery', en: 'Search engines and AI chats find your app, because you told them how.' },
-  { where: 'settings', id: 'scheduler', page: 'profile.tabs.scheduler', key: 'landing2.slideScheduler', en: '29 schedules, 15 of them made by agents themselves, 0 failed.' },
-  { where: 'settings', id: 'agents', page: 'profile.tabs.agents', key: 'landing2.slideAgents', en: 'Four agents on the payroll, each with a name, its own permissions and its own hours.' },
-  { where: 'settings', id: 'memory', page: 'profile.tabs.memory', key: 'landing2.slideMemory', en: 'What you told your AI in March is still here in September.' },
-  { where: 'settings', id: 'offers', page: 'profile.tabs.offers', key: 'landing2.slideOffers', en: 'An agent bid for you at three in the morning and won.' },
-  { where: 'settings', id: 'mcp', page: 'profile.tabs.mcp', key: 'landing2.slideMcp', en: 'Claude, ChatGPT and Claude Code all plugged in. Same memory, same rules.' },
-  { where: 'settings', id: 'companies', page: 'profile.tabs.companies', key: 'landing2.slideCompanies', en: 'Two companies, separate books, one sign-in.' },
-  { where: 'settings', id: 'pnl', page: 'profile.tabs.pnl', key: 'landing2.slidePnl', en: 'Every euro an agent spent, next to what it earned.' },
-  { where: 'settings', id: 'usage', page: 'profile.tabs.usage', key: 'landing2.slideUsage', en: 'Each model call, with who asked and what it cost.' },
-  { where: 'settings', id: 'security', page: 'profile.tabs.security', key: 'landing2.slideSecurity', en: 'Two-step sign-in on, and every session listed by device.' },
-  { where: 'admin', id: 'config', page: 'dashboard.config', key: 'landing2.slideConfig', en: '109 settings changed, each with a name, a key and a default.' },
-  { where: 'admin', id: 'security', page: 'admin.security.title', key: 'landing2.slideAdminSecurity', en: 'Every action signed by whoever did it, and the trail is yours to read.' },
-  { where: 'admin', id: 'compliance', page: 'admin.compliance.title', key: 'landing2.slideCompliance', en: 'The EU AI Act statement, written from what actually runs here.' },
-  { where: 'admin', id: 'federation', page: 'dashboard.federation', key: 'landing2.slideFederation', en: 'Signed in from a friend\'s AIMEAT, and your own things are still at home.' },
-];
+const LINES = {
+  'settings:apps': ['landing2.slideApps', 'Installed on your phone and your desktop. No app store in between.'],
+  'settings:access': ['landing2.slideAccess', 'You sign in with a finger or a QR code. There is no password.'],
+  'settings:appdev': ['landing2.slideAppdev', 'Forked somebody\'s app. The origin is recorded and the copy is yours.'],
+  'settings:portfolio': ['landing2.slidePortfolio', 'Seven versions of the same app, every one of them restorable.'],
+  'settings:organisms': ['landing2.slideOrganisms', 'Your team edits the same app. The working copy and the published one stay apart.'],
+  'settings:actions': ['landing2.slideServices', 'Your app sells tool calls to other agents, and the money lands in your wallet.'],
+  'admin:discovery': ['landing2.slideDiscovery', 'Search engines and AI chats find your app, because you told them how.'],
+  'settings:scheduler': ['landing2.slideScheduler', '29 schedules, 15 of them made by agents themselves, 0 failed.'],
+  'settings:agents': ['landing2.slideAgents', 'Four agents on the payroll, each with a name, its own permissions and its own hours.'],
+  'settings:memory': ['landing2.slideMemory', 'What you told your AI in March is still here in September.'],
+  'settings:offers': ['landing2.slideOffers', 'An agent bid for you at three in the morning and won.'],
+  'settings:mcp': ['landing2.slideMcp', 'Claude, ChatGPT and Claude Code all plugged in. Same memory, same rules.'],
+  'settings:companies': ['landing2.slideCompanies', 'Two companies, separate books, one sign-in.'],
+  'settings:pnl': ['landing2.slidePnl', 'Every euro an agent spent, next to what it earned.'],
+  'settings:usage': ['landing2.slideUsage', 'Each model call, with who asked and what it cost.'],
+  'settings:security': ['landing2.slideSecurity', 'Two-step sign-in on, and every session listed by device.'],
+  'admin:config': ['landing2.slideConfig', '109 settings changed, each with a name, a key and a default.'],
+  'admin:security': ['landing2.slideAdminSecurity', 'Every action signed by whoever did it, and the trail is yours to read.'],
+  'admin:compliance': ['landing2.slideCompliance', 'The EU AI Act statement, written from what actually runs here.'],
+  'admin:federation': ['landing2.slideFederation', 'Signed in from a friend\'s AIMEAT, and your own things are still at home.'],
+};
 
 const AUTO_MS = 1600;
 const SWIPE_PX = 40;
+const APPS_IN_SHOW = 12;
+
+/**
+ * The apps in the show: the ones tagged `reference` in their manifest, which is how the catalogue
+ * curates (the frame's own rule), or the most opened when nobody has tagged one yet.
+ * @param {any[]} apps
+ */
+function pickApps(apps) {
+  const tagged = apps.filter((a) => (a.manifest?.tags || []).some((x) => String(x).toLowerCase() === 'reference'));
+  const chosen = tagged.length > 0 ? tagged : [...apps].sort((a, b) => (b.downloads || 0) - (a.downloads || 0)).slice(0, APPS_IN_SHOW);
+  return chosen.map((a) => ({
+    where: 'apps',
+    id: `${a.owner}/${a.filename}`,
+    name: a.manifest?.name || a.filename,
+    shot: a.has_screenshot && a.screenshot_url ? a.screenshot_url : null,
+    line: (a.manifest?.description || '').slice(0, 160),
+  }));
+}
 
 /**
  * CLICK-ZIG. A noise click, a square wave sliding down as the carousel turns, a second click as
@@ -158,11 +190,29 @@ export function Projector() {
   const [auto, setAuto] = useState(false);
   const [started, setStarted] = useState(false);
   const [missing, setMissing] = useState({});
+  const [appSlides, setAppSlides] = useState([]);
   const audio = useRef(null);
   const ref = useRef(null);
   const touchX = useRef(null);
-  const total = SLIDES.length;
-  const slide = SLIDES[idx];
+
+  // The slides, in the order of the cloud: every settings page, every admin page, every app in the
+  // show. The same list the words are drawn from, so a word and its slide cannot drift apart.
+  const slides = [
+    ...SETTINGS_TABS.map(([id, page]) => ({ where: 'settings', id, page })),
+    ...ADMIN_GROUPS.flatMap(([, items]) => items.map(([id, page]) => ({ where: 'admin', id, page }))),
+    ...appSlides,
+  ];
+  const total = slides.length;
+  const slide = slides[Math.min(idx, total - 1)];
+  const indexOf = new Map(slides.map((s, i) => [`${s.where}:${s.id}`, i]));
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/v1/apps?sort=popular&limit=200').then(r => r.json())
+      .then(j => { if (alive) setAppSlides(pickApps(j?.data?.apps || [])); })
+      .catch(err => { swallowed('landing-v2: projector apps', err); });
+    return () => { alive = false; };
+  }, []);
 
   // The automatic run starts when the projector scrolls into view, silent, and the first press
   // takes over: the person now holds the button.
@@ -180,7 +230,7 @@ export function Projector() {
 
   useEffect(() => {
     if (!auto) return undefined;
-    const iv = setInterval(() => setIdx((i) => (i + 1) % total), AUTO_MS);
+    const iv = setInterval(() => setIdx((i) => (i + 1) % Math.max(total, 1)), AUTO_MS);
     return () => clearInterval(iv);
   }, [auto, total]);
 
@@ -188,6 +238,11 @@ export function Projector() {
     setAuto(false);
     clickZig(audio);
     setIdx((i) => (i + dir + total) % total);
+  };
+  const jump = (i) => {
+    setAuto(false);
+    clickZig(audio);
+    setIdx(i);
   };
   const onKey = (e) => {
     if (e.key === 'ArrowRight') { e.preventDefault(); press(1); }
@@ -202,10 +257,19 @@ export function Projector() {
     if (Math.abs(dx) >= SWIPE_PX) press(dx < 0 ? 1 : -1);
   };
 
-  const src = `/img/frontdemo/projector/${slide.where}-${slide.id}.png`;
-  const pageName = tr(slide.page, slide.id);
+  const src = slide.where === 'apps' ? slide.shot : `/img/frontdemo/projector/${slide.where}-${slide.id}.png`;
+  const pageName = slide.where === 'apps' ? slide.name : tr(slide.page, slide.id);
+  const whereName = slide.where === 'admin' ? tr('nav.admin', 'Admin')
+    : slide.where === 'apps' ? tr('landing2.cloudApps', 'Apps in the show')
+    : tr('nav.profile', 'Settings & Controls');
+  const line = LINES[`${slide.where}:${slide.id}`];
+  const sentence = line ? tr(...line)
+    : (slide.where === 'apps' && slide.line) ? slide.line
+    : tr('landing2.slideGeneric', '[What this page did for someone: the sentence comes later.]');
   const isLit = (where, id) => slide.where === where && slide.id === id;
-  const word = (where, id, key) => html`<span class=${`ld-v2-word ${isLit(where, id) ? 'is-lit showroom-slab--sun' : ''}`} key=${where + ':' + id}>${tr(key, id)}</span>`;
+  const word = (where, id, label) => html`
+    <button type="button" class=${`ld-v2-word ${isLit(where, id) ? 'is-lit showroom-slab--sun' : ''}`} key=${where + ':' + id}
+      aria-pressed=${isLit(where, id)} onClick=${() => jump(indexOf.get(`${where}:${id}`) ?? 0)}>${label}</button>`;
 
   return html`
     <section class="ld-v2-proj" ref=${ref} onKeyDown=${onKey}>
@@ -219,14 +283,14 @@ export function Projector() {
       <div class="ld-v2-proj-grid">
         <div class="ld-v2-cloud ld-v2-cloud--settings" aria-label=${tr('nav.profile', 'Settings & Controls')}>
           <span class="ld-v2-cloud-title poster-section-title">${tr('nav.profile', 'Settings & Controls')}</span>
-          <div class="ld-v2-cloud-words">${SETTINGS_TABS.map(([id, key]) => word('settings', id, key))}</div>
+          <div class="ld-v2-cloud-words">${SETTINGS_TABS.map(([id, key]) => word('settings', id, tr(key, id)))}</div>
         </div>
         <div class="ld-v2-projector">
           ${/* Lowercase on purpose: Preact registers a camel-cased touch handler under the camel-cased
                 name on a browser without touch, and the lowercase form is 'touchstart' everywhere. */''}
           <div class="ld-v2-slide" ontouchstart=${onTouchStart} ontouchend=${onTouchEnd}>
             <div class="ld-v2-slide-frame" key=${idx}>
-              ${missing[src] ? html`
+              ${!src || missing[src] ? html`
                 <div class="ld-v2-slide-placeholder">
                   <span class="ld-v2-slide-page">${pageName}</span>
                   <span class="ld-v2-slide-note">${tr('landing2.projShotHere', 'Screenshot of this page goes here')}</span>
@@ -234,8 +298,8 @@ export function Projector() {
                 <img class="ld-v2-slide-img" src=${src} alt=${pageName} onError=${() => setMissing((m) => ({ ...m, [src]: true }))} />`}
             </div>
             <p class="ld-v2-slide-caption" aria-live="polite">
-              <span class="ld-v2-slide-where">${tr(slide.where === 'admin' ? 'nav.admin' : 'nav.profile', slide.where)} · ${pageName}</span>
-              <span class="ld-v2-slide-text">${tr(slide.key, slide.en)}</span>
+              <span class="ld-v2-slide-where">${whereName} · ${pageName}</span>
+              <span class="ld-v2-slide-text">${sentence}</span>
             </p>
           </div>
           <div class="ld-v2-controls">
@@ -257,9 +321,14 @@ export function Projector() {
           ${ADMIN_GROUPS.map(([gkey, items]) => html`
             <div class="ld-v2-cloud-group" key=${gkey}>
               <span class="ld-v2-cloud-groupname">${tr(gkey, gkey)}</span>
-              <div class="ld-v2-cloud-words">${items.map(([id, key]) => word('admin', id, key))}</div>
+              <div class="ld-v2-cloud-words">${items.map(([id, key]) => word('admin', id, tr(key, id)))}</div>
             </div>`)}
         </div>
+        ${appSlides.length > 0 ? html`
+          <div class="ld-v2-cloud ld-v2-cloud--apps" aria-label=${tr('landing2.cloudApps', 'Apps in the show')}>
+            <span class="ld-v2-cloud-title poster-section-title">${tr('landing2.cloudApps', 'Apps in the show')}</span>
+            <div class="ld-v2-cloud-words">${appSlides.map((s) => word('apps', s.id, s.name))}</div>
+          </div>` : ''}
       </div>
     </section>`;
 }
