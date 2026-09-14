@@ -12691,6 +12691,8 @@
     "projCounter": "Slide {n} of {total}",
     "projStop": "Stop",
     "projAuto": "Run it",
+    "cloudApps": "Apps in the show",
+    "slideGeneric": "[What this page did for someone: the sentence comes later.]",
     "slideApps": "Installed on your phone and your desktop. No app store in between.",
     "slideAccess": "You sign in with a finger or a QR code. There is no password.",
     "slideAppdev": "Forked somebody's app. The origin is recorded and the copy is yours.",
@@ -19373,6 +19375,34 @@
         "rooms": {
           "label": "Agents to adopt, and a private space",
           "summary": "Two cards: agents a visitor can take into use from the incubator, and a space only they can see."
+        },
+        "frame-hero": {
+          "label": "Headline, wish box and the two doors",
+          "summary": "The claim at the top: say what you want, then make sure it happens. The box a visitor types a wish into, plug in the AI you already use, get your own, and the showroom picture."
+        },
+        "frame-ten": {
+          "label": "Ten seconds under the hood",
+          "summary": "Six outcomes one after another, the question why a visitor should care, and the answer: their AI gets these powers and they get them through it."
+        },
+        "frame-projector": {
+          "label": "Slide projector",
+          "summary": "One big button, one slide per page of Settings & Controls and Admin and per app in the show, the menus around it as a word cloud with the current word lit. Optional for the visitor."
+        },
+        "frame-cards": {
+          "label": "Prompts and what they made",
+          "summary": "Four cards: the prompt to copy, what it produced, how long it took and with which model."
+        },
+        "frame-wall": {
+          "label": "App list, community first",
+          "summary": "The apps published here, the ones other people built first and this site's own after them."
+        },
+        "frame-linux": {
+          "label": "Why the safety list is checkable",
+          "summary": "One line above the safety list: AIMEAT is the Linux of AI, open code, your server, your rules."
+        },
+        "frame-close": {
+          "label": "Closing line",
+          "summary": "AI & me at work, at the shop, at 7 am, at the start, and the two buttons back to the demo and to the shop."
         },
         "close": {
           "label": "Closing words",

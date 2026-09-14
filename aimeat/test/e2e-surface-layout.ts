@@ -167,7 +167,8 @@ await test('GET /v1/site/blocks?surface=portal — the showroom blocks, and the 
     const { status, body } = await json('/v1/site/blocks?surface=portal', op());
     assert(status === 200, `status ${status}`);
     const ids = body.data.blocks.map((b: any) => b.id);
-    for (const id of ['portal.showroom-hero', 'portal.wall-intro', 'portal.trust', 'portal.rooms', 'portal.close']) {
+    for (const id of ['portal.showroom-hero', 'portal.wall-intro', 'portal.trust', 'portal.rooms', 'portal.close',
+        'portal.frame-hero', 'portal.frame-ten', 'portal.frame-projector', 'portal.frame-cards', 'portal.frame-wall', 'portal.frame-linux', 'portal.frame-close']) {
         assert(ids.includes(id), `${id} is offered`);
     }
     assert(ids.includes('portal.store'), 'portal.store is offered when AIMEAT_SITE_STORE_URL is set');
@@ -179,13 +180,20 @@ await test('GET /v1/site/blocks?surface=portal — the showroom blocks, and the 
         'the blocks the showroom order dropped are still in the catalogue');
 });
 
-await test('GET /v1/site/layout/portal — the built-in front page is the showroom order', async () => {
+// The message frame's page (2026-09-14, TARGET-075): the hero leads, the counters sit directly
+// under it as its evidence, the answer ("ten seconds under the hood") comes before the projector,
+// the store is there because this node has one, and the closing line is last.
+await test('GET /v1/site/layout/portal — the built-in front page is the message frame\'s order', async () => {
     const { body } = await json('/v1/site/layout/portal');
     const ids = (body.data?.layout?.blocks ?? []).map((b: any) => b.id);
-    assert(ids[0] === 'portal.showroom-hero', `the hero leads, got ${ids[0]}`);
-    assert(ids.indexOf('portal.wall-intro') === ids.indexOf('portal.gallery') - 1, 'the introduction sits directly above the wall');
+    assert(ids[0] === 'portal.frame-hero', `the hero leads, got ${ids[0]}`);
+    assert(ids.indexOf('portal.totals') === ids.indexOf('portal.frame-hero') + 1, 'the counters sit directly under the hero');
+    assert(ids.indexOf('portal.frame-ten') < ids.indexOf('portal.frame-projector'), 'the answer comes before the projector');
     assert(ids.includes('portal.store'), 'the store is in the default because this node has one');
-    assert(ids[ids.length - 1] === 'portal.close', 'the last word is last');
+    assert(ids[ids.length - 1] === 'portal.frame-close', 'the closing line is last');
+    for (const id of ['portal.showroom-hero', 'portal.wall-intro', 'portal.gallery', 'portal.rooms', 'portal.close']) {
+        assert(!ids.includes(id), `${id} left the default (it stays in the catalogue)`);
+    }
 });
 
 // The store's ladder comes from the store itself, through the node. The test store address does

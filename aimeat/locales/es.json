@@ -10905,6 +10905,8 @@
     "projCounter": "Diapositiva {n} de {total}",
     "projStop": "Detener",
     "projAuto": "Ponlo a andar",
+    "cloudApps": "Aplicaciones de la muestra",
+    "slideGeneric": "[Lo que esta página hizo por alguien: la frase llega después.]",
     "slideApps": "Instalada en tu celular y en tu computadora. Sin tienda de aplicaciones en medio.",
     "slideAccess": "Entras con el dedo o con un código QR. No hay contraseña.",
     "slideAppdev": "Hiciste un fork de la aplicación de otro. El origen queda registrado y la copia es tuya.",
@@ -17236,6 +17238,34 @@
         },
         "rooms": {
           "label": "Agentes para adoptar y un espacio propio"
+        },
+        "frame-hero": {
+          "label": "Titular, caja de deseos y las dos puertas",
+          "summary": "La afirmación de arriba: di lo que quieres, luego asegúrate de que pase. La caja donde el visitante escribe un deseo, conecta la IA que ya usas, consigue el tuyo, y la imagen de la sala de exposición."
+        },
+        "frame-ten": {
+          "label": "Diez segundos bajo el capó",
+          "summary": "Seis resultados uno tras otro, la pregunta de por qué le importaría al visitante, y la respuesta: su IA recibe estos poderes y él los recibe a través de ella."
+        },
+        "frame-projector": {
+          "label": "Proyector de diapositivas",
+          "summary": "Un botón grande, una diapositiva por cada página de Configuración y controles y de Admin y por cada aplicación de la muestra, los menús alrededor como nube de palabras con la palabra actual encendida. Opcional para el visitante."
+        },
+        "frame-cards": {
+          "label": "Prompts y lo que hicieron",
+          "summary": "Cuatro tarjetas: el prompt para copiar, lo que produjo, cuánto tardó y con qué modelo."
+        },
+        "frame-wall": {
+          "label": "Lista de aplicaciones, la comunidad primero",
+          "summary": "Las aplicaciones publicadas aquí, primero las que construyeron otras personas y después las de este sitio."
+        },
+        "frame-linux": {
+          "label": "Por qué la lista de seguridad se puede comprobar",
+          "summary": "Una línea sobre la lista de seguridad: AIMEAT es el Linux de la IA, código abierto, tu servidor, tus reglas."
+        },
+        "frame-close": {
+          "label": "Línea final",
+          "summary": "AI & me at work, at the shop, at 7 am, at the start, y los dos botones de vuelta a la demo y a la tienda."
         },
         "close": {
           "label": "Palabras finales"

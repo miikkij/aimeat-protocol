@@ -12678,6 +12678,8 @@
     "projCounter": "Dia {n} / {total}",
     "projStop": "Pysäytä",
     "projAuto": "Pyöritä",
+    "cloudApps": "Esityksen apit",
+    "slideGeneric": "[Mitä tämä sivu teki jollekulle: lause tulee myöhemmin.]",
     "slideApps": "Asennettu puhelimeen ja työpöydälle. Ei sovelluskauppaa välissä.",
     "slideAccess": "Kirjaudut sormella tai QR-koodilla. Salasanaa ei ole.",
     "slideAppdev": "Forkkasit toisen apin. Alkuperä kirjattu, oma versio sinun.",
@@ -19342,6 +19344,34 @@
         "rooms": {
           "label": "Adoptoitavat agentit ja oma tila",
           "summary": "Kaksi korttia: agentit jotka kävijä voi ottaa käyttöön hautomosta, ja tila jonka vain hän näkee."
+        },
+        "frame-hero": {
+          "label": "Otsikko, toivelaatikko ja kaksi ovea",
+          "summary": "Väite sivun ylälaidassa: sano mitä haluat, pidä huolta että se tapahtuu. Laatikko johon kävijä kirjoittaa toiveensa, kytke tekoäly jota jo käytät, hanki oma, ja näyttelykuva."
+        },
+        "frame-ten": {
+          "label": "Kymmenen sekuntia konepellin alta",
+          "summary": "Kuusi lopputulosta peräkkäin, kysymys miksi kävijän pitäisi välittää, ja vastaus: hänen tekoälynsä saa nämä kyvyt ja hän saa ne sen kautta."
+        },
+        "frame-projector": {
+          "label": "Diaprojektori",
+          "summary": "Yksi iso nappi, yksi dia jokaisesta Asetusten ja hallinnan ja Adminin sivusta ja jokaisesta esityksen apista, valikot sanapilvenä ympärillä ja nykyinen sana sytytettynä. Kävijälle vapaaehtoinen."
+        },
+        "frame-cards": {
+          "label": "Promptit ja mitä niistä syntyi",
+          "summary": "Neljä korttia: kopioitava prompti, mitä se tuotti, kuinka kauan kesti ja millä mallilla."
+        },
+        "frame-wall": {
+          "label": "Appilista, yhteisö ensin",
+          "summary": "Täällä julkaistut apit, ensin muiden rakentamat ja niiden jälkeen tämän palvelun omat."
+        },
+        "frame-linux": {
+          "label": "Miksi turvalista on tarkistettavissa",
+          "summary": "Yksi rivi turvalistan yläpuolella: AIMEAT on tekoälyn Linux, avoin koodi, oma palvelin, omat säännöt."
+        },
+        "frame-close": {
+          "label": "Loppurivi",
+          "summary": "AI & me at work, at the shop, at 7 am, at the start, ja kaksi nappia takaisin demoon ja kauppaan."
         },
         "close": {
           "label": "Loppusanat",
