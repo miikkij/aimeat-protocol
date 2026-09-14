@@ -30,9 +30,17 @@ import {
 } from '../services/company/company-service.js';
 import { publishCompanyPortfolio } from '../services/company/company-portfolio.js';
 
-/** Optional identity fields, shared by create and update. */
+/**
+ * The optional fields create and update share. All but one are the seller party an invoice reads.
+ *
+ * `organism_id` is the exception and it is here because REST takes it: a tool that does not declare
+ * a field its own route accepts SUCCEEDS while writing nothing, which is what a peer operator hit
+ * on 2026-09-14 following our own package instructions. Nothing compares a tool against the route
+ * it fronts, only the two MCP surfaces against each other.
+ */
 const identityShape = {
     description: z.string().optional().describe('One or two sentences about what the company does'),
+    organism_id: z.string().optional().describe('The organism this company keeps its knowledge in. Empty string unlinks it.'),
     business_id: z.string().optional().describe('Company registration number (Finnish Y-tunnus)'),
     vat_id: z.string().optional().describe('VAT number'),
     street_address: z.string().optional().describe('Street address'),
@@ -55,7 +63,8 @@ type IdentityInput = { [K in keyof typeof identityShape]?: string };
  */
 function toRecordFields(input: IdentityInput): Record<string, string> {
     const map: Record<keyof IdentityInput, string> = {
-        description: 'description', business_id: 'businessId', vat_id: 'vatId',
+        description: 'description', organism_id: 'organismId',
+        business_id: 'businessId', vat_id: 'vatId',
         street_address: 'streetAddress', postal_code: 'postalCode', city: 'city', country: 'country',
         email: 'email', phone: 'phone', iban: 'iban', bic: 'bic',
         einvoice_address: 'einvoiceAddress', einvoice_operator: 'einvoiceOperator',

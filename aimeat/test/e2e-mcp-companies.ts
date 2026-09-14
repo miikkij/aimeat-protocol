@@ -239,6 +239,26 @@ await test('4. a second update keeps what the first one wrote', async () => {
     assert(second.company.city === 'Espoo', 'the second update blanked the city from creation');
 });
 
+await test('4b. the organism a company keeps its knowledge in is reachable from the tool', async () => {
+  // A field the REST route accepts and the tool does not declare is stripped before the handler
+  // sees it, so the call SUCCEEDS and writes nothing. A peer operator hit exactly this on
+  // 2026-09-14 following our own package instructions: updated_fields came back empty and the
+  // company's organism stayed null, with nothing to say why.
+  const out = toolJson(await mcpRpc(full.session, 'tools/call', {
+    name: 'aimeat_company_update',
+    arguments: { company_id: companyId, organism_id: 'org-brain-test' },
+  }, nextId()));
+  assert(out.updated_fields.includes('organismId'),
+    `the field did not reach the record: updated_fields ${JSON.stringify(out.updated_fields)}`);
+  assert(out.company.organismId === 'org-brain-test',
+    `the organism was not linked: ${JSON.stringify(out.company.organismId)}`);
+  // It is on the merge path like every other field, so a later update must not unlink it.
+  const after = toolJson(await mcpRpc(full.session, 'tools/call', {
+    name: 'aimeat_company_update', arguments: { company_id: companyId, phone: '+358401234567' },
+  }, nextId()));
+  assert(after.company.organismId === 'org-brain-test', 'a later update unlinked the organism');
+});
+
 console.log('\nPhase 3 — publishing the page and pointing the address at it');
 
 const MARKER = 'MCP JULKAISI TAMAN';

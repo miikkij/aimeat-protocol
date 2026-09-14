@@ -19,8 +19,13 @@
  */
 import type { AimeatToolDefinition } from './types.js';
 
-/** Shared across create and update — the seller-party snapshot an invoice reads. */
+/**
+ * Shared across create and update. All but `organism_id` are the seller-party snapshot an invoice
+ * reads; that one is here because the REST route takes it, and a tool missing a field its own route
+ * accepts answers "done" while writing nothing.
+ */
 const IDENTITY_FIELDS: AimeatToolDefinition['input'] = {
+    organism_id: { type: 'string', description: 'The organism this company keeps its knowledge in. An empty string unlinks it.' },
     business_id: { type: 'string', description: 'Company registration number (Finnish Y-tunnus, e.g. "1234567-8").' },
     vat_id: { type: 'string', description: 'VAT number (e.g. "FI12345678").' },
     street_address: { type: 'string', description: 'Street address of the registered office.' },
