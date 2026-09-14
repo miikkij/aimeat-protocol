@@ -45,10 +45,19 @@ export const LIVING_HOOKS_LIB_JS = String.raw`
  * "http://allowed.example@evil.example/" resolves to evil.example and is refused, rather than
  * matching an allowlist on the part before the '@'. The allowlist and safeFetch have to agree
  * about which host is being called, or the check guards a different address than the fetch uses.
+ *
+ * A BACKSLASH ENDS THE AUTHORITY, because the URL parser says so. For a special scheme the WHATWG
+ * parser treats '\' exactly as '/', so "http://evil.example\.allowed.example/" is a request to
+ * evil.example with the path "/.allowed.example/". This function used to read the authority up to
+ * the first '/', '?' or '#' only, so it answered "evil.example\.allowed.example" — which a
+ * ".allowed.example" entry admits, while the fetch went to evil.example. Worse with an '@' after
+ * it: "http://evil.example\@allowed.example/" answered a bare "allowed.example" and cleared even an
+ * EXACT-host allowlist, the '@' stripping above defeating itself. Both measured against new URL()
+ * on 2026-09-14; found by the AI triage of 2026-09-13.
  */
 function livingHost(url) {
   var s = String(url === null || url === undefined ? '' : url).trim();
-  var m = /^https?:\/\/([^\/?#]+)/i.exec(s);
+  var m = /^https?:\/\/([^\\\/?#]+)/i.exec(s);
   if (!m) return null;
   var authority = m[1];
   var at = authority.lastIndexOf('@');

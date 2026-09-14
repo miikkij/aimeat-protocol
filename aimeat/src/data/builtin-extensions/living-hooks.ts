@@ -25,6 +25,10 @@
  * @usage
  *   import { LIVING_HOOKS } from '../data/builtin-extensions/index.js';
  * @version-history
+ *   v1.1.1 — 2026-09-14 — livingHost ends the authority at a backslash, so the allowlist judges the
+ *     host the fetch will actually use. WITHOUT THIS BUMP the fix reaches no node that already has
+ *     the extension: the seeder only replaces an installed copy when the shipped version is newer,
+ *     which is pitfalls §82 in its other clothes.
  *   v1.1.0 — 2026-09-06 — The secret is the PLATFORM's now. This extension resolved
  *     {{secret:NAME}} inside its own sandbox until today, which meant the credential was handed to
  *     the guest; ctx.fetch does it instead, after the script has let go of the request. Two things
@@ -38,7 +42,7 @@ import { LIVING_HOOKS_LIB_JS } from './living-hooks-lib.js';
 import { LIVING_HOOKS_GATE_JS } from './living-hooks-gate.js';
 
 /** The version the node ships. The seeder compares this against what is installed. */
-export const LIVING_HOOKS_VERSION = '1.1.0';
+export const LIVING_HOOKS_VERSION = '1.1.1';
 
 /**
  * The manifest, in the same YAML the install route reads from anybody else. It goes through

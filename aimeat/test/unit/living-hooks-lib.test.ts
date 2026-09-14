@@ -48,6 +48,27 @@ describe('livingHost — which host will actually be called', () => {
     expect(lib.livingHost('https://user:pw@api.example.com/x')).toBe('api.example.com');
   });
 
+  it('ends the authority at a backslash, because the URL parser does', () => {
+    // For a special scheme the WHATWG parser treats '\' as '/'. new URL() contacts evil.example in
+    // both of these, so the allowlist has to judge evil.example — and it judged the string instead.
+    for (const url of ['http://evil.example\\.allowed.example/', 'http://evil.example\\@allowed.example/']) {
+      expect(new URL(url).host).toBe('evil.example');          // what the fetch will do
+      expect(lib.livingHost(url)).toBe('evil.example');        // what the check must see
+    }
+  });
+
+  it('…so neither spelling clears an allowlist that does not name evil.example', () => {
+    // The first used to end in ".allowed.example" and pass a suffix entry; the second used to
+    // answer a bare "allowed.example" and pass even an EXACT entry, the '@' stripping defeating
+    // itself. A suffix entry and an exact entry, both refused.
+    const list = ['.allowed.example', 'allowed.example'];
+    for (const url of ['http://evil.example\\.allowed.example/', 'http://evil.example\\@allowed.example/']) {
+      expect(lib.livingHostAllowed(lib.livingHost(url), list)).toBe(false);
+    }
+    // And the honest address on the same list still passes, so this is a fence and not a ban.
+    expect(lib.livingHostAllowed(lib.livingHost('https://api.allowed.example/x'), list)).toBe(true);
+  });
+
   it('keeps an IPv6 host in its brackets', () => {
     expect(lib.livingHost('http://[::1]:8080/x')).toBe('[::1]');
   });
