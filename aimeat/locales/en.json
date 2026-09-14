@@ -11657,7 +11657,11 @@
       "chat": "Chat",
       "controls": "Settings & controls"
     },
-    "loadFailed": "Your home could not be loaded just now. Try again in a moment."
+    "loadFailed": "Your home could not be loaded just now. Try again in a moment.",
+    "turn": {
+      "title": "Waiting for your answer",
+      "more": "{n} more are waiting"
+    }
   },
   "home.mat.improve": "Make my welcome page better",
   "home.mat.teachDots": "The three dots in the corner are how you act on anything here. Every card has them, always in that same corner.",
@@ -12655,6 +12659,85 @@
     "logAll": "Every entry by month, each with its own link →",
     "wallIntroStory": "How an app gets built here →"
   },
+  "landing2": {
+    "title1": "Say what you want.",
+    "title2": "Then make sure it happens.",
+    "position": "That is the whole job now. AIMEAT is where it happens.",
+    "body": "You already talk to an AI. It is smart, but it works alone and it forgets. Here it gets hands, a memory and colleagues. You learn nothing new: you keep talking to the same AI, and it picks up its powers from here. Everything it does happens in your place, with your permission, on your record. So you can let others in.",
+    "wishPh": "What do you want done?",
+    "wishLead": "Type it, hit GO. A chat opens and starts on it with you. New here? You get an account on the way, and nothing you typed is lost.",
+    "plugIn": "Plug in the AI you already use →",
+    "getOwn": "Get your own AIMEAT →",
+    "tenTitle1": "Ten seconds",
+    "tenTitle2": "under the hood",
+    "ten1": "A website went up.",
+    "ten2": "A shop opened.",
+    "ten3": "An auction closed.",
+    "ten4": "The report went out.",
+    "ten5": "A 3D world got built.",
+    "ten6": "An agent woke at seven and did it again.",
+    "tenMore": "And more. But why should you care?",
+    "tenAnswer": "Because your AI gets these powers, and you get them through it.",
+    "tenReplay": "Play it again",
+    "tenAfter": "Nothing new to learn. You keep talking to the AI you already use, and it picks its powers up here.",
+    "projTitle1": "Want to see everything?",
+    "projTitle2": "The slide projector.",
+    "projSub": "Optional. This is for whoever wants to see the whole cockpit. Every slide is one page of Settings & Controls or Admin, and what it did for someone.",
+    "projShotHere": "Screenshot of this page goes here",
+    "projPrev": "Previous slide",
+    "projNext": "Next slide",
+    "projClick": "Next slide",
+    "projButton": "CLICK",
+    "projCounter": "Slide {n} of {total}",
+    "projStop": "Stop",
+    "projAuto": "Run it",
+    "cloudApps": "Apps in the show",
+    "slideGeneric": "[What this page did for someone: the sentence comes later.]",
+    "slideApps": "Installed on your phone and your desktop. No app store in between.",
+    "slideAccess": "You sign in with a finger or a QR code. There is no password.",
+    "slideAppdev": "Forked somebody's app. The origin is recorded and the copy is yours.",
+    "slidePortfolio": "Seven versions of the same app, every one of them restorable.",
+    "slideOrganisms": "Your team edits the same app. The working copy and the published one stay apart.",
+    "slideServices": "Your app sells tool calls to other agents, and the money lands in your wallet.",
+    "slideDiscovery": "Search engines and AI chats find your app, because you told them how.",
+    "slideScheduler": "29 schedules, 15 of them made by agents themselves, 0 failed.",
+    "slideAgents": "Four agents on the payroll, each with a name, its own permissions and its own hours.",
+    "slideMemory": "What you told your AI in March is still here in September.",
+    "slideOffers": "An agent bid for you at three in the morning and won.",
+    "slideMcp": "Claude, ChatGPT and Claude Code all plugged in. Same memory, same rules.",
+    "slideCompanies": "Two companies, separate books, one sign-in.",
+    "slidePnl": "Every euro an agent spent, next to what it earned.",
+    "slideUsage": "Each model call, with who asked and what it cost.",
+    "slideSecurity": "Two-step sign-in on, and every session listed by device.",
+    "slideConfig": "109 settings changed, each with a name, a key and a default.",
+    "slideAdminSecurity": "Every action signed by whoever did it, and the trail is yours to read.",
+    "slideCompliance": "The EU AI Act statement, written from what actually runs here.",
+    "slideFederation": "Signed in from a friend's AIMEAT, and your own things are still at home.",
+    "cardsTitle1": "What to do on day one:",
+    "cardsTitle2": "a prompt, and what it made",
+    "cardsSub": "Four things that exist because somebody pasted a prompt here. Copy one, paste it into your own AI, and yours exists too. The time and the model are on each card so you know what to expect.",
+    "cardPromptPh": "[PROMPT: the exact words this was asked with. Jouni fills this in.]",
+    "cardTook": "Took",
+    "cardTookPh": "[time]",
+    "cardModel": "Model",
+    "cardModelPh": "[model]",
+    "cardCopy": "Copy the prompt",
+    "cardCopied": "Copied. Paste it into your AI",
+    "cardOpen": "Open what it made →",
+    "cardTinki": "An auction house where agents bid for you, sealed, every bid covered by a payment hold.",
+    "cardParvi": "An agent that reads the emissions off Porkkala and disagrees with three ships about where they are.",
+    "cardPalkka": "A Finnish salary calculator for 2026 with the tax rules built in, and your history kept when you sign in.",
+    "cardMusic": "The weekly chart of AI-made music, and every entry says who, which model and how much human work.",
+    "wallTitle": "Built by people and their AI.",
+    "wallCommunity": "These were built by people who came here with their own AI. Every one of them is proof from somebody we have never met.",
+    "wallOwn": "And by us, here, every day.",
+    "linuxLabel": "Why the list below is checkable:",
+    "linuxText": "AIMEAT is the Linux of AI. The code is open, the server is yours and the rules are yours, so every item on the list is something to read for yourself rather than take on trust.",
+    "closeWork": "AI & me at work.",
+    "closeShop": "AI & me at the shop.",
+    "closeSeven": "AI & me at 7 am.",
+    "closeStart": "AI & me at the start, Founder #NN/50."
+  },
   "landing.transCta": "How AI content is marked here →",
   "landing.transLine": "Content a model wrote here carries a record of how it was made, and a label where a person reads it.",
   "launcher": {
@@ -13010,6 +13093,8 @@
       "backToWorkspace": "Back to the workspace",
       "kindDoc": "document space",
       "kindRecord": "record type",
+      "kindRows": "row space",
+      "kindTasks": "task space",
       "more": "… {n} more"
     },
     "railTitle": "In this organism",
@@ -13275,6 +13360,7 @@
     "reAdopt": "Re-adopt",
     "bareContract": "contract",
     "spaceTasksBacked": "This space points at the task system: its items are tasks, not workspace records. Manage them in the Tasks views.",
+    "spaceRowsBacked": "This space holds rows the group accumulates. They are appended and never edited, and this page does not list them: they are read with the row tools, which filter and page through them.",
     "spaceBackingUnsupported": "This space's backing is not supported, so its content is not shown here. Edit the workspace (manifest) and set this space's backing to \"memory\" to restore it. Files and knowledge packages attach via Sources or document images instead.",
     "onePerLine": "one per line",
     "autoIdHint": "Pre-filled automatically. Change it if you want a memorable id.",
@@ -19203,6 +19289,10 @@
         "steps": {
           "label": "Setup path for someone new",
           "summary": "The setup path a new person walks before the account does anything. Its own order is not arrangeable."
+        },
+        "your-turn": {
+          "label": "Waiting on an answer",
+          "summary": "Which conversations are waiting on an answer from them."
         }
       },
       "portal": {
@@ -19285,6 +19375,34 @@
         "rooms": {
           "label": "Agents to adopt, and a private space",
           "summary": "Two cards: agents a visitor can take into use from the incubator, and a space only they can see."
+        },
+        "frame-hero": {
+          "label": "Headline, wish box and the two doors",
+          "summary": "The claim at the top: say what you want, then make sure it happens. The box a visitor types a wish into, plug in the AI you already use, get your own, and the showroom picture."
+        },
+        "frame-ten": {
+          "label": "Ten seconds under the hood",
+          "summary": "Six outcomes one after another, the question why a visitor should care, and the answer: their AI gets these powers and they get them through it."
+        },
+        "frame-projector": {
+          "label": "Slide projector",
+          "summary": "One big button, one slide per page of Settings & Controls and Admin and per app in the show, the menus around it as a word cloud with the current word lit. Optional for the visitor."
+        },
+        "frame-cards": {
+          "label": "Prompts and what they made",
+          "summary": "Four cards: the prompt to copy, what it produced, how long it took and with which model."
+        },
+        "frame-wall": {
+          "label": "App list, community first",
+          "summary": "The apps published here, the ones other people built first and this site's own after them."
+        },
+        "frame-linux": {
+          "label": "Why the safety list is checkable",
+          "summary": "One line above the safety list: AIMEAT is the Linux of AI, open code, your server, your rules."
+        },
+        "frame-close": {
+          "label": "Closing line",
+          "summary": "AI & me at work, at the shop, at 7 am, at the start, and the two buttons back to the demo and to the shop."
         },
         "close": {
           "label": "Closing words",

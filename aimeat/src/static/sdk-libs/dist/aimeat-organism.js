@@ -239,7 +239,7 @@
             var slug = String(ot.name || "type" + oi).replace(/[^a-zA-Z0-9_-]/g, "-");
             ot.schemaRef = "schema:" + name + "-" + slug + "@1";
           }
-          if (ot && ot.namespace && sc[ot.namespace] === void 0 && (ot.mode || "records") === "records") {
+          if (ot && ot.namespace && sc[ot.namespace] === void 0 && (ot.backing || "memory") === "memory" && (ot.mode || "records") === "records") {
             sc[ot.namespace] = { type: "object", additionalProperties: true };
           }
         }

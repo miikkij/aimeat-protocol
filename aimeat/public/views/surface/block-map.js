@@ -16,6 +16,7 @@
  * @structure BLOCKS · blockFor
  * @usage const load = BLOCKS['home.feed']; const Component = await load();
  * @version-history
+ *   v1.3.0 — 2026-09-14 — The seven blocks of the message frame's front page (TARGET-075).
  *   v1.2.0 — 2026-08-28 — The six showroom blocks of the front page.
  *   v1.1.0 — 2026-08-27 — home.mcp-connect.
  *   v1.0.0 — 2026-08-26 — Initial.
@@ -34,6 +35,7 @@ export const BLOCKS = {
   'home.mcp-connect': () => import('/views/surface/blocks-home.js').then(m => m.McpConnectBlock),
   'home.mat': () => import('/views/surface/blocks-home.js').then(m => m.MatBlock),
   'home.mailbox': () => import('/views/surface/blocks-home.js').then(m => m.MailboxBlock),
+  'home.your-turn': () => import('/views/surface/blocks-home.js').then(m => m.YourTurnBlock),
   'home.chat-door': () => import('/views/surface/blocks-home.js').then(m => m.ChatDoorBlock),
   'home.fleet': () => import('/views/surface/blocks-home.js').then(m => m.FleetBlock),
   'home.things': () => import('/views/surface/blocks-home.js').then(m => m.ThingsBlock),
@@ -69,6 +71,14 @@ export const BLOCKS = {
   'portal.trust': () => import('/views/surface/blocks-portal.js').then(m => m.TrustBlock),
   'portal.rooms': () => import('/views/surface/blocks-portal.js').then(m => m.RoomsBlock),
   'portal.close': () => import('/views/surface/blocks-portal.js').then(m => m.CloseBlock),
+  // The message frame's page (2026-09-14, TARGET-075). Its sections live in views/landing-v2*.js.
+  'portal.frame-hero': () => import('/views/surface/blocks-portal.js').then(m => m.V2HeroBlock),
+  'portal.frame-ten': () => import('/views/surface/blocks-portal.js').then(m => m.V2TenBlock),
+  'portal.frame-projector': () => import('/views/surface/blocks-portal.js').then(m => m.V2ProjectorBlock),
+  'portal.frame-cards': () => import('/views/surface/blocks-portal.js').then(m => m.V2CardsBlock),
+  'portal.frame-wall': () => import('/views/surface/blocks-portal.js').then(m => m.V2WallBlock),
+  'portal.frame-linux': () => import('/views/surface/blocks-portal.js').then(m => m.V2LinuxBlock),
+  'portal.frame-close': () => import('/views/surface/blocks-portal.js').then(m => m.V2CloseBlock),
 };
 
 /**

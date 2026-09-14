@@ -32,6 +32,8 @@
  *   v1.4.0 -- 2026-07-25 -- _create backfills the whole manifest envelope (manifestVersion/id/name/kind/
  *     status) via backfillManifestEnvelope() instead of only id+status, matching the server MCP fix so a
  *     create supplying just objectTypes validates first try over the connector too.
+ *   v1.6.0 -- 2026-09-14 -- _update's `add_spaces` says how a ROW space is declared, matching the
+ *     server MCP surface: backing:'rows' + indexOn, and no mode.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -232,7 +234,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       organism_id: z.string(), ws: z.string(),
       name: z.string().optional().describe('New workspace name (synced to manifest + registry)'),
       readme: z.string().optional().describe('New markdown readme/intro (replaces the current one)'),
-      add_spaces: z.any().optional().describe('ADDITIVE (safe): an ARRAY of objectTypes to UNION into the manifest — the server keeps everything else and skips any whose name/namespace already exists. Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. Prefer this over `manifest` to add spaces. Cannot remove/rename.'),
+      add_spaces: z.any().optional().describe('ADDITIVE (safe): an ARRAY of objectTypes to UNION into the manifest — the server keeps everything else and skips any whose name/namespace already exists. Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. A ROW space is { name, namespace, backing:"rows", indexOn:[…] } and takes no mode. Prefer this over `manifest` to add spaces. Cannot remove/rename.'),
       manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. For genuine restructuring (rename/remove a space, change policy.alwaysGate). Read the workspace first; the id is preserved.'),
       schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space. REPLACES the locked schema rather than merging into it, so read the current ones first: aimeat_workspace_read (the default index call) returns them as `schemas`, keyed by namespace, in exactly this shape — read, edit the one entry, send the map back. Do not invent a maxLength — the real ceiling is the memory value budget the node enforces on the whole record.'),
     },

@@ -130,6 +130,9 @@
  *     supplying just objectTypes validates on the first call (the missing manifestVersion default was
  *     the recurring "workspace create stumbles at the start" cause). The top-level `name` param now
  *     backfills manifest.name too.
+ *   v1.19.0 -- 2026-09-14 -- _update's `add_spaces` says how a ROW space is declared. The parameter
+ *     documented only the memory shape ({ name, namespace, mode }), and the server filled memory
+ *     defaults to match, so a row space added here died on a `versioned: true` nobody had asked for.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -433,7 +436,7 @@ export function registerWorkspaceTools(
             ws: z.string(),
             name: z.string().optional().describe('New workspace name (synced to the manifest + the registry)'),
             readme: z.string().optional().describe('New markdown readme/intro (replaces the current one)'),
-            add_spaces: z.any().optional().describe('ADDITIVE (safe): an ARRAY of objectTypes to UNION into the manifest — the server keeps everything else and skips any whose name/namespace already exists. Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. Use this to provision spaces instead of sending the whole manifest. Cannot remove/rename — use `manifest` for that.'),
+            add_spaces: z.any().optional().describe('ADDITIVE (safe): an ARRAY of objectTypes to UNION into the manifest — the server keeps everything else and skips any whose name/namespace already exists. Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. A ROW space is { name, namespace, backing:"rows", indexOn:[…] } and takes no mode. Use this to provision spaces instead of sending the whole manifest. Cannot remove/rename — use `manifest` for that.'),
             manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. For genuine restructuring (rename/remove a space, change policy.alwaysGate). Read the workspace first; the id is preserved. To only ADD spaces, prefer `add_spaces`.'),
             schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space. REPLACES the locked schema rather than merging into it, so read the current ones first: aimeat_workspace_read (the default index call) returns them as `schemas`, keyed by namespace, in exactly this shape — read, edit the one entry, send the map back. Do not invent a maxLength — the real ceiling is the memory value budget the node enforces on the whole record.'),
             apps: z.any().optional().describe('FULL replacement list of apps pinned to this workspace ([] clears). ARRAY of { owner, filename, label? } referencing published apps (/v1/apps). Pinning is launch-context/presentation only — workspace data access stays gated per call. Creator/admin only.'),

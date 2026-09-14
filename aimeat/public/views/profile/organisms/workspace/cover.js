@@ -15,6 +15,8 @@
  * @structure renderWorkspaceView (cover or page) · renderCover · renderPage · renderRail · renderTree
  * @usage import { renderWorkspaceView } from './workspace/cover.js';
  * @version-history
+ *   2026-09-14 -- An opened space says what it is: a row space and a task space are named as such
+ *     instead of "record type", and the count they never had is a dash rather than a 0.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
@@ -359,7 +361,15 @@ export function renderWorkspaceView(ctx) {
     const docMode = memory && isDocSpace(ot);
     const n = memory ? new Set([...ctx.draftsFor(ot.name), ...ctx.objectsFor(ot.name)].map(d => d.id)).size : 0;
     const u = unseenOf('space:' + ot.name);
-    const sub = html`<span>${docMode ? tr('organisms.ws.kindDoc', 'document space') : tr('organisms.ws.kindRecord', 'record type')}</span><span>${n}</span>${u > 0 ? newChip(u) : null}`;
+    // What the space IS, in its own words. A space whose data lives elsewhere used to read "record
+    // type · 0" here, which is two wrong things about a row space at once: it holds no records, and
+    // the zero is this page not counting them rather than the space being empty.
+    const kind = docMode ? tr('organisms.ws.kindDoc', 'document space')
+      : memory ? tr('organisms.ws.kindRecord', 'record type')
+      : ot.backing === 'rows' ? tr('organisms.ws.kindRows', 'row space')
+      : ot.backing === 'tasks' ? tr('organisms.ws.kindTasks', 'task space')
+      : String(ot.backing);
+    const sub = html`<span>${kind}</span><span>${memory ? n : '·'}</span>${u > 0 ? newChip(u) : null}`;
     const doors = !memory ? null : docMode ? html`
         <button type="button" class="og-door og-door--quiet" onClick=${() => addSection(ot.name, null)}>${'+ '}${tr('organisms.section', 'Section')}</button>
         <button type="button" class="og-door" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${tr('organisms.newPage', 'New document')}</button>`
