@@ -224,9 +224,18 @@ export interface PublishAppResult {
  * change the answer. "As stored" means after the serve marks an uploaded served copy carried were
  * taken back out, which is the first thing this function does.
  */
+/** What a dry run answers when nothing refused it: this publish would have gone through. */
+export interface PublishAppWouldPass { dryRun: true }
+
+export async function publishApp(
+  storage: Storage, config: AimeatConfig, input: PublishAppInput & { dryRun: true },
+): Promise<PublishAppWouldPass | PublishAppRefusal>;
 export async function publishApp(
   storage: Storage, config: AimeatConfig, input: PublishAppInput,
-): Promise<PublishAppResult | PublishAppRefusal> {
+): Promise<PublishAppResult | PublishAppRefusal>;
+export async function publishApp(
+  storage: Storage, config: AimeatConfig, input: PublishAppInput & { dryRun?: boolean },
+): Promise<PublishAppResult | PublishAppRefusal | PublishAppWouldPass> {
   const { ownerName, ownerGhii, callerGaii, filename, mimeType, requested } = input;
 
   // A SERVED COPY IS STORED AS ITS SOURCE (the developer's decision, 2026-09-13). The node's own
@@ -306,6 +315,18 @@ export async function publishApp(
       ));
     if (forbidden) return { refusal: { status: 403, code: 'FORBIDDEN', message: 'Your development right does not permit changing these app settings.' } };
   }
+
+  // A DRY RUN STOPS HERE, and this line is only correct because of how the rest of the function is
+  // ordered. Every refusal publishApp can make is ABOVE it — the publish right, the roadmap, the
+  // per-owner quota, the artifact lint and the delegated-settings check — and everything below
+  // builds the manifest, mints provenance and writes. `pnpm check:route-scopes` will not tell you
+  // that; the three `return { refusal` sites will.
+  //
+  // WHO ASKS FOR ONE. services/package-migrate.ts, whose `replace` and `custom` actions delete the
+  // owner's installed component before registering its replacement. Without a way to ask "would
+  // this register?", a lint or quota refusal left the owner with neither copy. One implementation:
+  // the answer comes from the same checks the real publish runs, not from a second reading of them.
+  if (input.dryRun) return { dryRun: true as const };
 
   // A description is REQUIRED for a NEW app so the catalogue and the landing wall always have one.
   // On an update, silence carries the existing one forward — a re-publish or a restore must never

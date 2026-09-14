@@ -865,6 +865,42 @@ await test('Migration prompt with empty components returns 400', async () => {
   assert(status === 400, `Expected 400, got ${status}`);
 });
 
+// REFUSE BEFORE YOU DELETE. `replace` and `custom` remove the owner's installed component and then
+// register the replacement, because createCsm and its siblings throw NAME_TAKEN rather than
+// overwrite. The pre-flight only answered for `extension`, so an app the artifact lint refuses was
+// found AFTER the delete: the owner kept neither copy, and the code said so in a comment instead of
+// preventing it. The pre-flight runs the real registration dry now. Found by the AI triage of
+// 2026-09-13.
+await test('A migration whose replacement cannot register refuses before deleting anything', async () => {
+  const before = await json(`/v1/instances/${instanceId}`, { headers: authed(ownerToken) });
+  assert(before.status === 200, `setup read: ${before.status}`);
+  const versionBefore = before.body.data?.version ?? before.body.data?.packageVersion;
+
+  // An inline script that does not parse is one of the two findings lintAppArtifact calls blocking.
+  const broken = '<!doctype html><html><body><script>function (</script></body></html>';
+  const { status, body } = await json(`/v1/instances/${instanceId}/apply-migration`, {
+    method: 'POST',
+    headers: authed(ownerToken),
+    body: JSON.stringify({
+      targetVersion: thirdVersion,
+      components: [
+        { componentId: 'csm-main', action: 'replace' },
+        { componentId: 'app-ui', action: 'custom', content: broken },
+      ],
+    }),
+  });
+  assert(status === 400, `expected the whole migration refused, got ${status}: ${JSON.stringify(body?.data ?? body?.error)}`);
+  assert(body.error?.code === 'INVALID_COMPONENT', `expected INVALID_COMPONENT, got ${body.error?.code}`);
+  assert(/app-ui/.test(body.error?.message ?? ''), `the refusal names the component: ${body.error?.message}`);
+
+  // Nothing moved: the instance is on the version it was, and csm-main — the FIRST item, which the
+  // old order would have deleted before reaching app-ui — is still there to migrate below.
+  const after = await json(`/v1/instances/${instanceId}`, { headers: authed(ownerToken) });
+  assert(after.status === 200, `read after: ${after.status}`);
+  assert((after.body.data?.version ?? after.body.data?.packageVersion) === versionBefore,
+    'a refused migration must not move the instance version');
+});
+
 await test('Apply migration (POST /v1/instances/:id/apply-migration)', async () => {
   const { status, body } = await json(`/v1/instances/${instanceId}/apply-migration`, {
     method: 'POST',
