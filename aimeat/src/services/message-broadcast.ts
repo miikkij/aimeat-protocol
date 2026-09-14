@@ -13,6 +13,10 @@
  * @structure resolveAudience(ctx, senderGhii, sel) → string[] · sendBroadcast(ctx, input) → BroadcastResult
  * @usage import { resolveAudience, sendBroadcast } from '../services/message-broadcast.js';
  * @version-history
+ *   v1.3.0 — 2026-09-14 — broadcastFromPrincipal() takes stampProvenance() and calls it below its
+ *     own refusals. Both doors stamped the record first, and stamping WRITES one, so a broadcast
+ *     refused for an operator-only audience or an empty recipient list left a row describing the
+ *     caller's content behind for a message nobody received. Invariant 14.
  *   v1.2.0 — 2026-09-06 — broadcastFromPrincipal(): the whole send-to-many, minus the HTTP, so
  *     aimeat_dm_broadcast is not a second copy of the route's five decisions. A broadcast carries a
  *     `subject` (titling the thread each recipient sees) and one aiProvenanceId across every copy.
@@ -166,12 +170,27 @@ export async function broadcastFromPrincipal(
     subject?: string;
     attachments?: DirectMessageAttachment[];
     interactive?: InteractivePayload;
-    /** Stamped by the caller, because the two doors declare it differently: the MCP tool carries the
-     *  agent's own declaration, the REST route stamps from the principal. Both end on every copy. */
-    aiProvenanceId?: string;
+    /**
+     * Stamps the AI-provenance record and answers with its id. A FUNCTION rather than a value,
+     * because stamping it WRITES one, and both doors were calling that before this function could
+     * refuse the audience — so an agent told "a node-wide audience is operator-only", or handed
+     * an empty recipient list, left a provenance row in the database for a message nobody ever
+     * received. Called here, below both refusals and above the first delivery. Invariant 14, found
+     * by the AI triage of 2026-09-13.
+     *
+     * It stays the caller's to supply, because the two doors declare it differently: the MCP tool
+     * carries the agent's own declaration, the REST route stamps from the principal. Both end on
+     * every copy.
+     */
+    stampProvenance?: () => Promise<string | undefined>;
   },
 ): Promise<
-  | { ok: true; broadcastId: string; recipients: number; sent: number; failed: { recipient: string; code: string }[]; federationPeers: number }
+  | {
+      ok: true; broadcastId: string; recipients: number; sent: number;
+      failed: { recipient: string; code: string }[]; federationPeers: number;
+      /** What stampProvenance answered, for the door that echoes the record back to its caller. */
+      aiProvenanceId?: string;
+    }
   | { ok: false; status: number; code: string; message: string }
 > {
   // "All node users" and "all federation users" are operator-only: a node-wide announcement reaches
@@ -188,10 +207,13 @@ export async function broadcastFromPrincipal(
     return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'No valid recipients in the audience' };
   }
 
+  // Nothing above this line has written anything, which is the point of the line being here.
+  const aiProvenanceId = await input.stampProvenance?.();
+
   const result = await sendBroadcast(ctx, {
     senderGhii: input.senderGhii, recipients, mode: input.mode, body: input.body, subject: input.subject,
     attachments: input.attachments, interactive: input.interactive, skipContactGate: isOperatorAudience,
-    aiProvenanceId: input.aiProvenanceId,
+    aiProvenanceId,
   });
 
   let federationPeers = 0;
@@ -203,7 +225,7 @@ export async function broadcastFromPrincipal(
     federationPeers = fed.peers;
   }
 
-  return { ok: true, broadcastId: result.broadcastId, recipients: recipients.length, sent: result.sent, failed: result.failed, federationPeers };
+  return { ok: true, broadcastId: result.broadcastId, recipients: recipients.length, sent: result.sent, failed: result.failed, federationPeers, aiProvenanceId };
 }
 
 /** Delegated federation broadcast: send the announcement to each ACTIVE peer's /v1/federation/broadcast

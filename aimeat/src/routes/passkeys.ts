@@ -23,6 +23,8 @@
  *   - POST /v1/ghii/login/passkey/options|verify: sign in with a device
  * @usage app.use(passkeysRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-09-14 — The verify door takes the account record from finishLogin, which now
+ *     refuses a missing or deactivated account before it marks the device as used.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 import { Router } from 'express';
@@ -180,16 +182,12 @@ export function passkeysRouter(config: AimeatConfig, storage: Storage): Router {
     const r = await finishLogin(config, storage, { ceremonyId: ceremony_id, response });
     if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
 
-    const ghiiRecord = await storage.getGHIIByOwner(r.data.passkey.owner);
-    if (!ghiiRecord) {
-      // The credential outlived its account. Refuse rather than mint a session for nobody.
-      res.status(401).json(error(config.nodeId, 'PASSKEY_UNKNOWN', 'That device is not registered here. Sign in with your password, then add it under Account security.'));
-      return;
-    }
-
+    // The credential outliving its account, and the account being deactivated, are both refused
+    // inside finishLogin — before it marks the device as used, so a refused sign-in leaves no
+    // trace of a sign-in on the owner's device list. The record comes back from there.
     // From here it is a login like any other, in the same code the password door runs.
     await completeOwnerLogin(config, storage, req, res, {
-      ghiiRecord,
+      ghiiRecord: r.data.ghiiRecord,
       loginName: r.data.passkey.owner,
       wantsOwnerKey: want_owner_key === true,
     });
