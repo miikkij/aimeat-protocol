@@ -212,6 +212,45 @@ await test('8. The "all node users" audience is operator-only (a non-operator ge
     assert(body.error?.code === 'FORBIDDEN', `code, got ${body.error?.code}`);
 });
 
+// REFUSE BEFORE THE WRITE. An agent's broadcast is AI-authored text delivered to named people, so
+// every copy carries an AI-provenance record — and STAMPING it writes that record. Both doors
+// stamped it before the service could refuse the audience, so a refused broadcast left a row
+// describing the caller's content behind, for a message nobody received. Invariant 14, found by the
+// AI triage of 2026-09-13. The same shape refused an empty recipient list.
+await test('8b. A broadcast refused by the audience rule writes no provenance record', async () => {
+    const agentName = `bcagent${stamp}`;
+    const made = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${carol.token}` },
+        body: JSON.stringify({
+            name: agentName, owner: `bccarol${stamp}`, display_name: 'Broadcaster',
+            capabilities: [], scopes: ['messages:send'],
+        }),
+    });
+    assert(made.status === 201, `agent: ${made.status} ${JSON.stringify(made.body?.error)}`);
+    const gaii = made.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(made.body.data.private_key, gaii + ts) }),
+    });
+    assert(tok.status === 200, `the agent's own session: ${tok.status} ${JSON.stringify(tok.body?.error)}`);
+    const agentToken = tok.body.data.token as string;
+
+    // The body IS the content the record would be hashed from, so a unique one names this attempt
+    // and nothing else on the node.
+    const text = `node-wide notice from an agent ${stamp}`;
+    const refused = await json('/v1/messages/broadcast', {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ audience: 'node-users', mode: 'announcement', body: text }),
+    });
+    assert(refused.status === 403, `a non-operator agent must be refused: ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+
+    const hash = createHash('sha256').update(text).digest('hex');
+    const found = await json(`/v1/provenance/by-hash/${hash}`, { headers: { Authorization: `Bearer ${carol.token}` } });
+    const count = found.status === 200 ? found.body.data.count : 0;
+    assert(count === 0, `a refused broadcast must leave no record of its content: ${count} found`);
+});
+
 // A29 (E2E test-quality audit). Test 5 broadcasts to a group Alice owns, so the audience gate was
 // never asked a question it could answer no to. Holding the id was the whole check: a group id is a
 // v4 UUID and therefore not guessable, but every REMOVED member still knows it, and resolving the

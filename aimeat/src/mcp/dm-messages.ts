@@ -288,20 +288,6 @@ export function registerDmMessageTools(
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'A broadcast must have a body, an attachment, or questions.' }) }] };
             }
             const mapped = attachments?.length ? mapMessageAttachments(attachments, senderGhii, config.nodeId) : undefined;
-            const aiProvenanceId = await provenanceForWrite(storage, {
-                principal: senderGhii,
-                // The questions are content a person reads, exactly as in aimeat_dm_ask, so they are
-                // hashed with the body rather than left out of the record.
-                content: [body ?? '', ...(interactive?.questions ?? []).map(q => `${q.header ?? ''} ${q.prompt ?? ''}`)].join('\n'),
-                declaredId: ai_provenance_id,
-                declared: toDeclaredProvenance(ai_provenance),
-                pipeline: 'mcp.dm_broadcast',
-                surface: { visibility: 'private', humanAudience: true },
-                labelPolicy: config.aiLabelPublic,
-                nodeId: config.nodeId,
-                baseUrl: config.baseUrl,
-                enabled: config.aiProvenance,
-            });
             // isOperator: false, deliberately. Other tools on this surface read the OWNER's record and
             // treat the agent as an operator when the human is one. A node-wide announcement is not the
             // place for that: it reaches every human here and auto-accepts the contact for each of them,
@@ -312,7 +298,22 @@ export function registerDmMessageTools(
                 senderGhii, isOperator: false,
                 to, groupId: group_id, audience,
                 mode: mode ?? 'broadcast', body: body ?? '', subject, attachments: mapped, interactive,
-                aiProvenanceId,
+                // A FUNCTION, so the service stamps it after its own refusals: stamping writes a
+                // row, and this tool was writing it before the service could refuse the audience.
+                stampProvenance: () => provenanceForWrite(storage, {
+                    principal: senderGhii,
+                    // The questions are content a person reads, exactly as in aimeat_dm_ask, so they
+                    // are hashed with the body rather than left out of the record.
+                    content: [body ?? '', ...(interactive?.questions ?? []).map(q => `${q.header ?? ''} ${q.prompt ?? ''}`)].join('\n'),
+                    declaredId: ai_provenance_id,
+                    declared: toDeclaredProvenance(ai_provenance),
+                    pipeline: 'mcp.dm_broadcast',
+                    surface: { visibility: 'private', humanAudience: true },
+                    labelPolicy: config.aiLabelPublic,
+                    nodeId: config.nodeId,
+                    baseUrl: config.baseUrl,
+                    enabled: config.aiProvenance,
+                }),
             });
             if (!result.ok) {
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: result.message, code: result.code }) }] };
@@ -333,7 +334,7 @@ export function registerDmMessageTools(
                             ? `${result.sent} delivered, ${result.failed.length} refused — see failed[] for which and why.`
                             : `Delivered to ${result.sent}. Each recipient has their own thread and can reply to you in it.`,
                         read_results_with: `GET /v1/messages/broadcast/${result.broadcastId}`,
-                        ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
+                        ...(await writeProvenanceEcho(storage, config, result.aiProvenanceId)),
                     }, null, 2),
                 }],
             };
