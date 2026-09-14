@@ -13,6 +13,9 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   v1.5.0 — 2026-09-14 — requireLocalSession. requireOwnerPrincipal admits a federated login,
+ *     which carries roles ['owner'] and the local part of the visitor's HOME name, so the name
+ *     comparison matched the LOCAL account and a visitor exported everything it had ever stored.
  *   v1.4.0 — 2026-09-09 — The `listings`, `purchases` and per-agent `escrow_holds` sections are gone
  *     with the storage methods behind them: nothing on any node ever wrote a marketplace listing, a
  *     purchase or a generic escrow hold, so the sections could only ever be empty (e2e-owner-export
@@ -37,7 +40,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireOwnerPrincipal } from '../../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal, requireLocalSession } from '../../auth/middleware.js';
 import { error, success } from '../../middleware/envelope.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { getPendingConsentAudit } from '../../services/consent-audit-buffer.js';
@@ -46,7 +49,13 @@ import { getPendingConsentAudit } from '../../services/consent-audit-buffer.js';
 export function registerOwnerExportRoute(router: Router, config: AimeatConfig, storage: Storage): void {
   // GET /v1/owners/:name/export — GDPR data export (account holder or operator)
   // Exports ALL data types associated with the owner for full GDPR compliance.
-  router.get('/v1/owners/:name/export', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
+  //
+  // requireLocalSession for the same reason the deletion door has it: a federated login mints
+  // `owner` as the local part of the visitor's HOME name with roles ['owner'], so
+  // requireOwnerPrincipal admitted a visitor called `alice` and the name comparison below matched
+  // the LOCAL alice — one call and a visitor from any peer held everything she had ever stored.
+  // Found by the AI triage of 2026-09-13.
+  router.get('/v1/owners/:name/export', requireAuth(), requireLocalSession(), requireOwnerPrincipal(), async (req, res) => {
     const name = req.params.name as string;
     if (req.auth!.owner !== name && !req.auth!.roles.includes('operator')) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only export your own data'));

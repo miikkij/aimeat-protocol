@@ -5,6 +5,9 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 -- 2026-09-14 -- The owner branch of the listing is for a LOCAL owner session. It built
+ *     the GHII from the owner name, which for a session signed in from another node is the local
+ *     part of THEIR name, so a same-named visitor listed the local account's files and its agents'.
  *   v1.3.0 -- 2026-09-13 -- POST /v1/memory/files answers versioned_url, as the storage upload doors do.
  *   v1.2.0 -- 2026-09-06 -- Review item 3.2: the tag PATCH, the listing and the DELETE take the
  *     storage words their siblings already carried, and the DELETE goes through the shared
@@ -219,7 +222,14 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // GET /v1/memory/files — list files (owner sees all agents' files + GHII files)
   // ...and listing them is a read, which GET /v1/memory/files/:key beside it has always said.
   router.get('/v1/memory/files', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    // `!federated` for the same reason /v1/work/sent has it: the owner branch builds the GHII from
+    // the owner NAME, and a session signed in from another node carries the local part of THEIR
+    // name — so a visitor called `alice` listed the local alice's files and every one of her
+    // agents'. requireExternalPrincipal admits the `owner` role and asks nothing about which node
+    // the session came from. A federated session falls to the else branch and sees its own `sub`,
+    // which is what a visitor should see. Found by the AI triage of 2026-09-13.
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
+      && !req.auth!.federated;
     let files: Awaited<ReturnType<typeof storage.listStorageFiles>>;
     if (isOwnerSession) {
       const callerOwner = req.auth!.owner as string;

@@ -390,6 +390,22 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required'));
       return;
     }
+    // A SESSION FROM ANOTHER NODE IS NOT THE LOCAL ACCOUNT OF THE SAME NAME, and this door is where
+    // that mattered most. A federated login mints `owner` as the local part of the visitor's HOME
+    // name (routes/ghii/register-login.ts), so the read below finds the LOCAL account called that,
+    // and the final `else` handed the visitor its roles — operator included where the local
+    // namesake is one — on a token minted with no `federated` marker and none of the receiving
+    // node's federation scopes. One refresh turned a visitor into the full owner of somebody else's
+    // account. The federated token is short-lived on purpose (an hour at most) and is renewed by
+    // signing in again, which re-checks the home node's attestation; renewing it here would be
+    // minting a local credential on a remote node's say-so, from a check nobody re-ran.
+    // Found by the AI triage of 2026-09-13.
+    if (req.auth!.federated) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+        'A session from your home node is renewed by signing in again, not here.'));
+      return;
+    }
+
     // Re-read roles from storage to prevent stale privilege persistence
     const ownerRecord = await storage.getOwner(req.auth!.owner);
     if (!ownerRecord) {

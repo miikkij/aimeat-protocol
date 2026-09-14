@@ -7,6 +7,9 @@
  *   and their docblocks moved unchanged, and middleware.ts re-exports all three, so every existing
  *   import keeps working.
  * @version-history
+ *   v1.1.0 — 2026-09-14 — isSignedInCaller(auth): is there anybody behind this call, on a node that
+ *     hands passers-by a credential. `!req.auth` is not that question in anonymous mode, and two
+ *     doors reading a setting called `authenticated` had it wrong.
  *   v1.0.1 — 2026-09-13 — requireOwnerPrincipal's 401 also refuses the anonymous identity.
  *   v1.0.0 — 2026-09-12 — Pure extraction from src/auth/middleware.ts (max-file-lines), on the day
  *     isThirdPartyPrincipal joined the family and pushed that file past 800.
@@ -91,6 +94,21 @@ export function isOwnerPrincipal(auth: Request['auth'] | undefined): boolean {
  * nothing about which person is being read, and a door that skips the owner comparison is open
  * whatever this returns.
  */
+/**
+ * Is there a PERSON or an agent behind this call, as opposed to nobody?
+ *
+ * `!req.auth` is not that question on this node. In anonymous mode the middleware hands every
+ * caller with no credential a shared anonymous identity, so `req.auth` is set for a passer-by and
+ * the absence test never matches — which is how a setting that says "signed-in callers only"
+ * answered anybody who asked. /v1/stats and /v1/metrics both read `authenticated` that way, and the
+ * two doors that got it right (owner-mailbox-gate.ts, account-security.ts's own 401) spelled the
+ * pair out by hand. Named here so the next door asks the question rather than re-deriving it.
+ * Found by the AI triage of 2026-09-13.
+ */
+export function isSignedInCaller(auth: Request['auth'] | undefined): boolean {
+  return !!auth && !auth.anonymous;
+}
+
 export function isThirdPartyPrincipal(auth: Request['auth'] | undefined): boolean {
   if (!auth) return false;
   return auth.roles.includes('app') || auth.roles.includes('ecosystem');
