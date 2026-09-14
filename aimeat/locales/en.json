@@ -12784,6 +12784,12 @@
     "slideAdminPackages": "Packages installed on the server, with a dry run before and a rollback after.",
     "slideAdminMsm": "An outside API described once, and every app calling it the same way.",
     "slideAdminGenesis": "Two federations joined, their catalogues shared, and memory read only with consent.",
+    "signageTitle1": "One whole system, built by asking:",
+    "signageTitle2": "digital signage",
+    "signageSub": "An admin panel, the screens it drives, and the screen itself, all made here by telling an AI what was wanted. The frame below is that screen, live: what you see is what the sign shows right now.",
+    "signageFrameTitle": "The live signage screen",
+    "signageOpenScreen": "Open the screen full size →",
+    "signageOpenAdmin": "Open the admin panel it was made in →",
     "cardsTitle1": "What to do on day one:",
     "cardsTitle2": "a prompt, and what it made",
     "cardsSub": "Four prompts, four very different things. Copy one, paste it into your own AI, and see what comes back. The time it took and the model go on the card once each one has been run.",
@@ -19462,6 +19468,10 @@
         "frame-projector": {
           "label": "Slide projector",
           "summary": "One big button, one slide per page of Settings & Controls and Admin and per app in the show, the menus around it as a word cloud with the current word lit. Optional for the visitor."
+        },
+        "frame-signage": {
+          "label": "Digital signage, live",
+          "summary": "The digital signage example as one app: the live screen framed on the page, with doors to the full-size screen and to the admin panel it was made in."
         },
         "frame-cards": {
           "label": "Prompts and what they made",

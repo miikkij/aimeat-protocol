@@ -176,6 +176,7 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
         b('portal.totals'),
         b('portal.frame-ten'),
         b('portal.frame-projector'),
+        b('portal.frame-signage'),
         b('portal.frame-cards'),
         b('portal.frame-wall'),
         b('portal.store'),

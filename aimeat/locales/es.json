@@ -10998,6 +10998,12 @@
     "slideAdminPackages": "Paquetes instalados en el servidor, con un ensayo antes y una reversión después.",
     "slideAdminMsm": "Una API externa descrita una vez, y cada aplicación la llama de la misma manera.",
     "slideAdminGenesis": "Dos federaciones unidas, sus catálogos compartidos, y la memoria leída solo con consentimiento.",
+    "signageTitle1": "Un sistema completo, hecho pidiéndolo:",
+    "signageTitle2": "señalización digital",
+    "signageSub": "Un panel de administración, las pantallas que maneja y la pantalla misma, todo hecho aquí diciéndole a una IA lo que se quería. El marco de abajo es esa pantalla, en vivo: lo que ves es lo que el letrero muestra ahora mismo.",
+    "signageFrameTitle": "La pantalla de señalización en vivo",
+    "signageOpenScreen": "Abrir la pantalla a tamaño completo →",
+    "signageOpenAdmin": "Abrir el panel de administración con el que se hizo →",
     "cardsTitle1": "Qué hacer el primer día:",
     "cardsTitle2": "un prompt, y lo que hizo",
     "cardsSub": "Cuatro prompts, cuatro cosas muy distintas. Copia uno, pégalo en tu propia IA y mira qué vuelve. El tiempo que tardó y el modelo se anotan en la tarjeta cuando cada uno se haya corrido.",
@@ -17325,6 +17331,10 @@
         "frame-projector": {
           "label": "Proyector de diapositivas",
           "summary": "Un botón grande, una diapositiva por cada página de Configuración y controles y de Admin y por cada aplicación de la muestra, los menús alrededor como nube de palabras con la palabra actual encendida. Opcional para el visitante."
+        },
+        "frame-signage": {
+          "label": "Señalización digital, en vivo",
+          "summary": "El ejemplo de señalización digital como una sola aplicación: la pantalla en vivo enmarcada en la página, con puertas a la pantalla completa y al panel de administración con el que se hizo."
         },
         "frame-cards": {
           "label": "Prompts y lo que hicieron",

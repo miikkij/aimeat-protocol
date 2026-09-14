@@ -119,6 +119,7 @@ import { StoreSection, TrustList } from './landing-showroom-rooms.js';
 import { Hero2, TenSeconds, LinuxLine, Close2 } from './landing-v2.js';
 import { Projector } from './landing-v2-projector.js';
 import { PromptCards, Wall2 } from './landing-v2-cards.js';
+import { SignageShowcase } from './landing-v2-signage.js';
 import { storeHref } from '/js/site.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -222,7 +223,9 @@ export default function Landing({ navigate }) {
       <!-- 3. The slide projector: optional, for whoever wants to see everything. -->
       <${Projector} />
 
-      <!-- 4. Prompts and what they produced. -->
+      <!-- 4. One whole system built by asking, live in the page: the signage screen. Then the
+              prompts and what they produced. -->
+      <${SignageShowcase} />
       <${PromptCards} />
 
       <!-- 5. Built by people and their AI: the community first, then the house. -->

@@ -168,7 +168,7 @@ await test('GET /v1/site/blocks?surface=portal — the showroom blocks, and the 
     assert(status === 200, `status ${status}`);
     const ids = body.data.blocks.map((b: any) => b.id);
     for (const id of ['portal.showroom-hero', 'portal.wall-intro', 'portal.trust', 'portal.rooms', 'portal.close',
-        'portal.frame-hero', 'portal.frame-ten', 'portal.frame-projector', 'portal.frame-cards', 'portal.frame-wall', 'portal.frame-linux', 'portal.frame-close']) {
+        'portal.frame-hero', 'portal.frame-ten', 'portal.frame-projector', 'portal.frame-signage', 'portal.frame-cards', 'portal.frame-wall', 'portal.frame-linux', 'portal.frame-close']) {
         assert(ids.includes(id), `${id} is offered`);
     }
     assert(ids.includes('portal.store'), 'portal.store is offered when AIMEAT_SITE_STORE_URL is set');

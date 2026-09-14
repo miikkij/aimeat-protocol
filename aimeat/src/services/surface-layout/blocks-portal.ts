@@ -359,6 +359,29 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         summary: 'The slide projector: one big button, one slide per page of Settings & Controls and Admin and per app in the show, the menus around it as a word cloud with the current word lit. Optional for the visitor.',
     },
     {
+        id: 'portal.frame-signage',
+        surfaces: ['portal'],
+        presence: { kind: 'always' },
+        localeStem: 'landing2.signage',
+        liveDomains: [],
+        props: {
+            url: {
+                type: 'string',
+                default: 'https://signage-kiosk.apps.aimeat.io/?org=cd750579-99a2-44fe-a996-88ab502a679a&ws=ws-mrgbxgh294h&screen=aimeat-launch',
+                maxLength: 400,
+                description: 'The address of the signage screen the frame shows. A public screen, so a visitor sees it without signing in.',
+            },
+            admin: {
+                type: 'string',
+                default: 'https://signage-admin.apps.aimeat.io/',
+                maxLength: 400,
+                description: 'The address of the admin panel the screen was made in, behind the second door.',
+            },
+        },
+        maxPerSurface: 1,
+        summary: 'The digital signage example as one app: the live screen framed on the page, with doors to the full-size screen and to the admin panel it was made in.',
+    },
+    {
         id: 'portal.frame-cards',
         surfaces: ['portal'],
         presence: { kind: 'always' },
