@@ -20,9 +20,12 @@
  *   after that, like the screenshot worker.
  * @usage
  *   AIMEAT_SHOT_BASE=https://aimeat.io AIMEAT_SHOT_USER=<owner> AIMEAT_SHOT_PASSWORD=<password> \
- *     pnpm projector:shots [--only settings|admin] [--width 1600] [--height 1000] [--settle 1800]
- * @structure SETTINGS · ADMIN · arg · launchBrowser · main
+ *     pnpm projector:shots [--only settings|admin|settings:scheduler,admin:config] [--width 1600] \
+ *     [--height 1000] [--settle 1800]
+ * @structure SETTINGS · ADMIN · SLOW_MS · arg · launchBrowser · main
  * @version-history
+ *   v1.1.0 — 2026-09-14 — A settle per slow page (scheduler 16 s, messages 11 s, measured on
+ *     aimeat.io) and --only takes a list of pages, so one page can be retaken alone.
  *   v1.0.0 — 2026-09-14 — Initial, with the front page as the message frame says it (TARGET-075).
  */
 import { chromium, type Browser } from 'playwright-core';
@@ -49,6 +52,16 @@ const ADMIN = [
   'msm',
   'federation', 'genesis',
 ];
+
+/**
+ * Pages that take longer than the rest to fill: the settle before the shutter, in milliseconds,
+ * where the default (--settle) is not enough. Measured on aimeat.io on 2026-09-14: the scheduler
+ * needs about 15 s and the messages page about 10 s before they show their content.
+ */
+const SLOW_MS: Record<string, number> = {
+  'settings:scheduler': 16_000,
+  'settings:messages': 11_000,
+};
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -84,10 +97,19 @@ async function main(): Promise<void> {
   const outDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'img', 'frontdemo', 'projector');
   mkdirSync(outDir, { recursive: true });
 
+  // --only takes a side (settings | admin) or a comma-separated list of pages (settings:scheduler,
+  // admin:config, or a bare id that matches on either side), so one slow page can be retaken alone.
+  const wanted = (only || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const keep = (where: 'settings' | 'admin', id: string) =>
+    wanted.length === 0 || wanted.some((w) => w === where || w === id || w === `${where}:${id}`);
   const targets: Array<{ where: 'settings' | 'admin'; id: string; url: string }> = [
-    ...(only === 'admin' ? [] : SETTINGS.map((id) => ({ where: 'settings' as const, id, url: `${base}/v1/profile?tab=${encodeURIComponent(id)}` }))),
-    ...(only === 'settings' ? [] : ADMIN.map((id) => ({ where: 'admin' as const, id, url: `${base}/v1/admin?tab=${encodeURIComponent(id)}` }))),
+    ...SETTINGS.filter((id) => keep('settings', id)).map((id) => ({ where: 'settings' as const, id, url: `${base}/v1/profile?tab=${encodeURIComponent(id)}` })),
+    ...ADMIN.filter((id) => keep('admin', id)).map((id) => ({ where: 'admin' as const, id, url: `${base}/v1/admin?tab=${encodeURIComponent(id)}` })),
   ];
+  if (targets.length === 0) {
+    console.error(`--only ${only} matches no page. Use settings, admin, or pages like settings:scheduler,admin:config.`);
+    process.exit(2);
+  }
 
   const browser = await launchBrowser();
   let ok = 0; let fail = 0;
@@ -115,7 +137,7 @@ async function main(): Promise<void> {
     for (const tgt of targets) {
       try {
         await page.goto(tgt.url, { waitUntil: 'load', timeout: 30_000 });
-        await page.waitForTimeout(settle);
+        await page.waitForTimeout(Math.max(settle, SLOW_MS[`${tgt.where}:${tgt.id}`] ?? 0));
         const png = await page.screenshot({ type: 'png' });
         const file = resolve(outDir, `${tgt.where}-${tgt.id}.png`);
         writeFileSync(file, png);
