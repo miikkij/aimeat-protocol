@@ -6,6 +6,8 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-09-14 — The welcome bonus is creditWelcomeBonus() from owner-provisioning, not a
+ *     transaction this route writes itself.
  *   v1.7.0 -- 2026-09-06 -- Review item 2.5: both BR-04 refusals move ABOVE the writes they were
  *     standing beside. The magic-link verify used to replace the owner's pinned public key and the
  *     app agent's and THEN answer 403, so a refused sign-in destroyed the person's signing key and
@@ -39,12 +41,12 @@ import { logger } from '../../utils/logger.js';
 import { appendMailLog } from '../../services/notification-settings.js';
 import { validateOwnerName, buildGAII } from '../../utils/gaii.js';
 import { issueJWT } from '../../auth/jwt.js';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { GhiiWebRegistrationSchema, validateBody } from '../../models/schemas.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
-import { registrationRefusal } from '../../services/owner-provisioning.js';
+import { registrationRefusal, creditWelcomeBonus } from '../../services/owner-provisioning.js';
 
 export function registerWebVerifyRoutes(
     router: Router,
@@ -172,16 +174,8 @@ export function registerWebVerifyRoutes(
             updatedAt: now,
         });
 
-        // Record welcome bonus transaction
-        if (config.welcomeBonus > 0) {
-            await storage.addTransaction({
-                id: `tx-${randomUUID()}`,
-                gaii: ghii,
-                type: 'welcome_bonus',
-                amount: config.welcomeBonus,
-                timestamp: now,
-            });
-        }
+        // The welcome bonus, decided in one place for every door that creates an account.
+        await creditWelcomeBonus(storage, config, ghii, now);
 
         // Store interest profile in memory if interests provided
         if (Array.isArray(interests) && interests.length > 0) {

@@ -8,9 +8,15 @@
  *   lifetime had summed four legacy row kinds and said "earned 0" over a wallet that had earned 190
  *   through extension_earn rows (aimeat.io, 2026-09-04).
  * @version-history
+ *   v1.1.0 — 2026-09-14 — The web registration door's welcome bonus is read too. Both doors that
+ *     create an account now have a test over the credit, which is what lets the three copies of it
+ *     collapse into creditWelcomeBonus().
  *   v1.0.0 — 2026-09-04 — Initial.
  */
+import * as ed from '@noble/ed25519';
+
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
+const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -54,6 +60,37 @@ await test('Register and log in', async () => {
   const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username, password }) });
   jwt = login.body.data?.token;
   assert(typeof jwt === 'string' && jwt.length > 0, 'missing token');
+});
+
+// The SECOND door that creates an account. It writes the same welcome bonus, and until 2026-09-14
+// it wrote it with its own copy of the transaction — no test read the result, so the copy could have
+// drifted from the other two in silence. It is creditWelcomeBonus() now, and this is what says so.
+await test('The web registration door credits the same welcome bonus', async () => {
+  const webName = `wallweb${Date.now()}`;
+  const reg = await json('/v1/ghii/register-web', {
+    method: 'POST', body: JSON.stringify({ username: webName, display_name: 'Wallet Web' }),
+  });
+  assert(reg.status === 201, `register-web ${reg.status}: ${JSON.stringify(reg.body.error)}`);
+
+  // No password on this door, so the session comes from the owner key it just handed back.
+  const timestamp = new Date().toISOString();
+  const message = webName + NODE_ID + timestamp;
+  const sig = await ed.signAsync(
+    new TextEncoder().encode(message),
+    Buffer.from(reg.body.data.private_key as string, 'base64'),
+  );
+  const tok = await json('/v1/auth/token', {
+    method: 'POST',
+    body: JSON.stringify({ owner: webName, timestamp, signature: Buffer.from(sig).toString('base64') }),
+  });
+  assert(tok.status === 200, `owner token ${tok.status}: ${JSON.stringify(tok.body.error)}`);
+
+  const { status, body } = await json('/v1/wallet', { headers: { Authorization: `Bearer ${tok.body.data.token}` } });
+  assert(status === 200, `wallet ${status}: ${JSON.stringify(body.error)}`);
+  const l = body.data.lifetime;
+  const bonus = Number(l.welcome_bonus) || 0;
+  assert(bonus === body.data.balance, `a web-registered wallet is its welcome bonus: balance ${body.data.balance}, welcome_bonus ${bonus}`);
+  assert(l.total_rows === (bonus > 0 ? 1 : 0), `the bonus wrote exactly one row, got total_rows ${l.total_rows}`);
 });
 
 let welcome = 0;
