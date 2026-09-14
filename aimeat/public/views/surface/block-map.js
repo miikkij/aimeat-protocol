@@ -34,6 +34,7 @@ export const BLOCKS = {
   'home.mcp-connect': () => import('/views/surface/blocks-home.js').then(m => m.McpConnectBlock),
   'home.mat': () => import('/views/surface/blocks-home.js').then(m => m.MatBlock),
   'home.mailbox': () => import('/views/surface/blocks-home.js').then(m => m.MailboxBlock),
+  'home.your-turn': () => import('/views/surface/blocks-home.js').then(m => m.YourTurnBlock),
   'home.chat-door': () => import('/views/surface/blocks-home.js').then(m => m.ChatDoorBlock),
   'home.fleet': () => import('/views/surface/blocks-home.js').then(m => m.FleetBlock),
   'home.things': () => import('/views/surface/blocks-home.js').then(m => m.ThingsBlock),

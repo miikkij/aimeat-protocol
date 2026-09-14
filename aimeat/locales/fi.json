@@ -11644,7 +11644,11 @@
       "chat": "Chat",
       "controls": "Asetukset ja hallinta"
     },
-    "loadFailed": "Kotisi ei nyt latautunut. Yritä hetken päästä uudelleen."
+    "loadFailed": "Kotisi ei nyt latautunut. Yritä hetken päästä uudelleen.",
+    "turn": {
+      "title": "Odottavat vastaustasi",
+      "more": "{n} muuta odottaa"
+    }
   },
   "home.mat.improve": "Tee tervetulosivustani parempi",
   "home.mat.teachDots": "Kortin nurkassa olevat kolme pistettä ovat se, mistä asioita tehdään. Ne ovat joka kortissa, aina samassa nurkassa.",
@@ -19172,6 +19176,10 @@
         },
         "steps": {
           "label": "Aloittajan polku"
+        },
+        "your-turn": {
+          "label": "Odottavat vastausta",
+          "summary": "Mitkä keskustelut odottavat häneltä vastausta."
         }
       },
       "portal": {

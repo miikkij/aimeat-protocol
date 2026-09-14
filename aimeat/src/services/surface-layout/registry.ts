@@ -187,6 +187,10 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
         b('home.mcp-connect'),
         b('home.mat'),
         b('home.mailbox'),
+        // Straight under the unread count, because it answers the question the count raises. The
+        // count says something is waiting; this says which conversations, and it renders nothing on
+        // a day when nobody is waiting.
+        b('home.your-turn'),
         // The two status lines first and the door after them: on the poster home the door is the
         // coral band, and a band reads as the close of the "now" group, not as a line inside it.
         b('home.fleet'),

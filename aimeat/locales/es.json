@@ -9943,7 +9943,11 @@
       "chat": "Chat",
       "controls": "Configuración y controles"
     },
-    "loadFailed": "Tu página de inicio no se ha podido cargar ahora. Inténtalo dentro de un momento."
+    "loadFailed": "Tu página de inicio no se ha podido cargar ahora. Inténtalo dentro de un momento.",
+    "turn": {
+      "title": "Esperan tu respuesta",
+      "more": "{n} más están esperando"
+    }
   },
   "home.mat.improve": "Mejorar mi página de bienvenida",
   "home.mat.teachDots": "Los tres puntos de la esquina son la forma de actuar sobre cualquier cosa de aquí. Todas las tarjetas los tienen, siempre en esa misma esquina.",
@@ -17086,6 +17090,10 @@
         },
         "steps": {
           "label": "Recorrido para quien empieza"
+        },
+        "your-turn": {
+          "label": "Esperan respuesta",
+          "summary": "Qué conversaciones esperan una respuesta suya."
         }
       },
       "portal": {

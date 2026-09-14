@@ -11657,7 +11657,11 @@
       "chat": "Chat",
       "controls": "Settings & controls"
     },
-    "loadFailed": "Your home could not be loaded just now. Try again in a moment."
+    "loadFailed": "Your home could not be loaded just now. Try again in a moment.",
+    "turn": {
+      "title": "Waiting for your answer",
+      "more": "{n} more are waiting"
+    }
   },
   "home.mat.improve": "Make my welcome page better",
   "home.mat.teachDots": "The three dots in the corner are how you act on anything here. Every card has them, always in that same corner.",
@@ -19203,6 +19207,10 @@
         "steps": {
           "label": "Setup path for someone new",
           "summary": "The setup path a new person walks before the account does anything. Its own order is not arrangeable."
+        },
+        "your-turn": {
+          "label": "Waiting on an answer",
+          "summary": "Which conversations are waiting on an answer from them."
         }
       },
       "portal": {
