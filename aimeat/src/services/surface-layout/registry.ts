@@ -28,6 +28,8 @@
  *   import { blocksForSurface, defaultLayout } from './registry.js';
  *   const offered = blocksForSurface('home', config);
  * @version-history
+ *   v1.3.0 — 2026-09-14 — The built-in portal is the message frame's page (TARGET-075): seven
+ *     portal.frame-* blocks and a new default order; the showroom blocks stay in the catalogue.
  *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v1.2.1 — 2026-08-28 — The default home puts the fleet line before the chat door: the door is
  *     the coral band of the poster home and closes the status group. Stored layouts are untouched.
@@ -167,16 +169,19 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
     // under the "built with itself" claim. The blocks this replaced (the front door, the pitch line,
     // the folded builder, the connect invitation, the owner-or-tenant hero, the two prompts, today's
     // stats and the transparency line) stay in the catalogue for an operator to put back.
+    // The message frame's order (2026-09-14, TARGET-075). The showroom's blocks the frame dropped
+    // (wall-intro, gallery, rooms, changelog, showroom-hero, close) stay in the catalogue.
     portal: [
-        b('portal.showroom-hero'),
+        b('portal.frame-hero'),
         b('portal.totals'),
-        b('portal.wall-intro'),
-        b('portal.gallery'),
+        b('portal.frame-ten'),
+        b('portal.frame-projector'),
+        b('portal.frame-cards'),
+        b('portal.frame-wall'),
         b('portal.store'),
+        b('portal.frame-linux'),
         b('portal.trust'),
-        b('portal.rooms'),
-        b('portal.changelog'),
-        b('portal.close'),
+        b('portal.frame-close'),
     ],
     home: [
         b('home.nameplate'),
@@ -187,6 +192,10 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
         b('home.mcp-connect'),
         b('home.mat'),
         b('home.mailbox'),
+        // Straight under the unread count, because it answers the question the count raises. The
+        // count says something is waiting; this says which conversations, and it renders nothing on
+        // a day when nobody is waiting.
+        b('home.your-turn'),
         // The two status lines first and the door after them: on the poster home the door is the
         // coral band, and a band reads as the close of the "now" group, not as a line inside it.
         b('home.fleet'),

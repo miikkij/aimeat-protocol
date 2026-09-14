@@ -11,6 +11,10 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   v1.6.0 — 2026-09-14 — DELETE /v1/owners/:name is behind requireLocalSession as well.
+ *     requireOwnerPrincipal admits a federated login — roles ['owner'], the local part of the
+ *     visitor's HOME name — and the name comparison then matched the LOCAL account, so a visitor
+ *     from any peer could erase the account of whoever here shares their name.
  *   v1.5.1 — 2026-09-13 — GET /v1/owners/:name no longer treats a federated session as the account
  *     whose name it carries: a visitor from another node gets the public card, not the local
  *     namesake's roles and agent roster, and is never read as this node's operator.
@@ -33,7 +37,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
-import { requireAuth, requireOwnerPrincipal, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal, requireRole, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
@@ -270,7 +274,13 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
   // DELETE /v1/owners/:name — GDPR delete (cascade) (account holder or operator)
   // The check below says which ACCOUNT may be erased; requireOwnerPrincipal says which of that
   // account's principals may ask. Erasing everything the person owns is the person's decision.
-  router.delete('/v1/owners/:name', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
+  //
+  // AND requireLocalSession says which NODE may ask. A federated login mints `owner` as the local
+  // part of the visitor's HOME name, with roles ['owner'], so requireOwnerPrincipal admitted a
+  // visitor called `alice` and the name comparison below matched the LOCAL alice: a visitor from
+  // any peer could erase the account of whoever here shares their name. Found by the AI triage of
+  // 2026-09-13; the same question is answered the same way in routes/contacts.ts.
+  router.delete('/v1/owners/:name', requireAuth(), requireLocalSession(), requireOwnerPrincipal(), async (req, res) => {
     const name = req.params.name as string;
     if (req.auth!.owner !== name && !req.auth!.roles.includes('operator')) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own account'));

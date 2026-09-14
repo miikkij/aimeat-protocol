@@ -447,7 +447,7 @@ export function requireRole(role: string) {
 // The account-security family — which PRINCIPAL of an account is calling, whose SOFTWARE it is,
 // and the door that admits only the first — lives in ./account-security.ts, moved there unchanged
 // when this file passed 800 lines. Re-exported so every existing import of it still resolves here.
-export { isOwnerPrincipal, isThirdPartyPrincipal, requireOwnerPrincipal } from './account-security.js';
+export { isOwnerPrincipal, isThirdPartyPrincipal, isSignedInCaller, requireOwnerPrincipal } from './account-security.js';
 
 /**
  * Require the NODE OPERATOR, or something the operator explicitly sent. For the break-glass doors

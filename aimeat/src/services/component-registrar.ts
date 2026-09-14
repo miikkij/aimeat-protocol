@@ -15,6 +15,11 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.6.0 — 2026-09-14 — An installed app keeps the data map its author wrote. The package carries
+ *     the map document in `meta.app.datamap` and the installer writes it under the name this node
+ *     gave the app, then stamps the manifest from it; the stamp itself cannot travel, because it
+ *     addresses a memory key under the author's app id. Every packaged app used to install as
+ *     having no map at all.
  *   v1.5.0 — 2026-09-13 — A package's extension component whose flagged action carries text past an ODPS
  *     length cap is refused before it is created (ODPS_FIELD_TOO_LONG), as every install door refuses it.
  *   v1.4.0 — 2026-08-23 — An installed app keeps the crew-defs it bundles. The manifest built here
@@ -47,6 +52,7 @@ import { logger } from '../utils/logger.js';
 import { parseBundledCrews } from './app-bundled-crews.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { publishApp } from './app-publish.js';
+import { putProgramMap } from './data-map/data-map-access.js';
 import { forgetDependencies, appRef } from './dependency-map.js';
 import { odpsWriteRefusal, extensionOdpsKey } from './exchange-odps-write.js';
 
@@ -503,6 +509,32 @@ export async function registerComponent(
             // "component failed".
             error: `${published.refusal.code}: ${published.refusal.message}`,
           };
+        }
+
+        // THE MAP THE AUTHOR WROTE, UNDER THE NAME THIS NODE GAVE THE APP. publishApp above stamped
+        // the manifest from whatever map exists here, which for a fresh install is none — so a
+        // packaged app arrived saying nothing about where it puts its data, however carefully its
+        // author had written that down. The document travels in `meta.app.datamap`; the stamp never
+        // could, because it addresses `apps.<id>.datamap` and the id is this instance's, not theirs.
+        //
+        // AFTER the publish, not before: a refused publish must not leave a map behind for an app
+        // that does not exist, and the installer's reverse rollback removes the app rather than the
+        // records beside it.
+        //
+        // Never fails the component. A map is a statement about storage, not a property of the
+        // bytes, and the app itself installed fine — the same reason publishApp warns rather than
+        // refuses over one. It is logged, so an operator can see which map did not land.
+        if (!input.dryRun && app.datamap && typeof app.datamap === 'object') {
+          const put = await putProgramMap(
+            storage, input.config,
+            { principal: input.callerGaii ?? ownerGaii, ownerName: owner, roles: ['owner'], scopes: [] },
+            ownerGaii, registeredAs, app.datamap as Record<string, unknown>, now,
+          );
+          if ('refusal' in put) {
+            logger.warn('component-registrar: the package app\'s data map was not stored', {
+              app: registeredAs, code: put.refusal.code, message: put.refusal.message,
+            });
+          }
         }
         break;
       }

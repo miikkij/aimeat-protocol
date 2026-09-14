@@ -17,6 +17,7 @@
  *   one section ended. The rule now means a row; the slab means a section. The onboarding steps
  *   keep their plain card shape: one job at a time, nothing pulling the eye away from the open step.
  * @version-history
+ *   2026-09-14: .koti-turn* — the band that names the threads waiting on an answer.
  *   2026-09-14: .koti-toast leaves; the home's failure line is the shared .toast in theme.css.
  *   2026-09-13: Compose the existing home shapes with shared poster classes.
  *   v3.4.0 — 2026-09-13 — The settings dialog is sized by the site's one dialog, and its door out is a
@@ -415,6 +416,24 @@ body:has(.koti) .page-content { background: var(--bg); }
 }
 .koti-band > * + * { margin-top: 1.5rem; }
 .koti-band > .koti-band-title + * { margin-top: 0; }
+
+/* ── Waiting for your answer: one row per thread, the other party's name first and what they said
+   after it. The line truncates rather than wraps, because the row is a pointer into the mailbox and
+   a three-line row would make five threads fill the screen the band exists to summarise. ── */
+.koti-turn-list { list-style: none; margin: 0; padding: 0; }
+.koti-turn-row + .koti-turn-row { border-top: 1px solid var(--border); }
+.koti-turn-link {
+  display: flex; gap: 0.75rem; align-items: baseline;
+  padding: 0.7rem 0; color: inherit; text-decoration: none;
+}
+.koti-turn-link:hover .koti-turn-who { text-decoration: underline; }
+.koti-turn-who { flex: 0 0 auto; font-weight: 600; }
+.koti-turn-said { flex: 1 1 auto; min-width: 0; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.koti-turn-more { color: var(--text-dim); }
+@media (max-width: 640px) {
+  .koti-turn-link { flex-direction: column; gap: 0.15rem; }
+  .koti-turn-said { white-space: normal; }
+}
 
 /* ── Named rows: the category word in a fixed left column, the content on the right ── */
 .koti-things-row { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; }

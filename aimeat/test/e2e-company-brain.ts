@@ -185,6 +185,36 @@ await test('6. the app was rewritten to its own instance names, not the authorâ€
     'the author short name survived the rewrite');
 });
 
+await test('6b. the installed brain says where it puts a company\'s knowledge', async () => {
+  // The map is what an AI opening an unknown app reads before it touches it. It travels in the
+  // package as a DOCUMENT, because the stamp an app manifest carries addresses `apps.<id>.datamap`
+  // and this copy's id is the installer's, not the author's â€” carried, it would point at a record
+  // that does not exist here. Until 2026-09-14 the whole thing was left out and every packaged app
+  // installed as having no map at all.
+  const r = await json(`/v1/datamap/apps/${encodeURIComponent(A.owner)}/${encodeURIComponent(appName)}`,
+    { headers: authed(A.token) });
+  assert(r.status === 200, `the map door refused: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+  const map = r.body.data?.data_map;
+  assert(map, 'the installed app has no data map: the package did not carry it, or install dropped it');
+  assert(map.spec === 'aimeat.datamap/2', `wrong spec: ${map.spec}`);
+  assert(typeof map.what === 'string' && map.what.length > 40, 'the map must say what the app IS');
+  assert(map.held?.length >= 8, `expected the brain's key families, got ${map.held?.length}`);
+
+  // The split this package's whole shape rests on: the knowledge in the owner's own organism, the
+  // machinery in the extension's private namespace. If a future edit moved one, the map would say so
+  // and this assertion is what makes the reader notice.
+  const wheres = new Set(map.held.map((row: any) => row.where));
+  assert(wheres.has('organism-workspace'), 'the knowledge rows must say they live in a workspace');
+  assert(wheres.has('extension-namespace'), 'the machinery rows must say they live in the extension');
+
+  // The stamp on the manifest is computed HERE from what was written, so it addresses this
+  // instance's own record rather than the author's.
+  const stamp = r.body.data?.stamp;
+  assert(stamp && stamp.missing === false, `the manifest still reads as having no map: ${JSON.stringify(stamp)}`);
+  assert(stamp.docKey === `apps.${appName.replace(/\.html$/i, '')}.datamap`,
+    `the stamp points at somebody else's record: ${stamp.docKey}`);
+});
+
 await test('7. a second install is a separate brain, sharing nothing with the first', async () => {
   const r = await json(`/v1/packages/${encodeURIComponent(GROUP)}/install`, {
     method: 'POST', headers: authed(A.token), body: JSON.stringify({ label: 'Second company brain' }),

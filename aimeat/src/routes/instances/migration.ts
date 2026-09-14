@@ -6,6 +6,9 @@
  *   and apply a migration to an instance (replace/skip/custom/install_new actions).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-09-14 — requireLocalSession on all three doors, as on the rest of the instance
+ *     surface: the owner comparison reads `req.auth.owner`, which a federated session carries as
+ *     the local part of the visitor's HOME name.
  *   v1.2.1 — 2026-09-12 — The same bare-name trap the v1.2.0 entry below describes is now closed at
  *     its source: resolveGhii takes the node and no longer accepts a fallback identity from a
  *     caller, so a route cannot hand it `sub` by accident. wish-identity-gate-sees-resolveghii.
@@ -25,7 +28,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireScope } from '../../auth/middleware.js';
+import { requireAuth, requireScope, requireLocalSession } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { fetchComponentContent } from '../../services/component-registrar.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
@@ -39,7 +42,7 @@ export function registerMigrationRoutes(
   storage: Storage,
 ): void {
   // POST /v1/instances/:id/migration-prompt — Generate AI migration prompts
-  router.post('/v1/instances/:id/migration-prompt', requireAuth(), async (req, res) => {
+  router.post('/v1/instances/:id/migration-prompt', requireAuth(), requireLocalSession(), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
 
@@ -179,7 +182,7 @@ export function registerMigrationRoutes(
   });
 
   // POST /v1/instances/:id/apply-migration — Apply migration to instance
-  router.post('/v1/instances/:id/apply-migration', requireAuth(), requireScope('packages:write'), async (req, res) => {
+  router.post('/v1/instances/:id/apply-migration', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
     const ownerGaii = await resolveGhii(storage, owner, config);
@@ -210,7 +213,7 @@ export function registerMigrationRoutes(
   //
   // dry_run answers the same shape and writes nothing, which is what lets a page say
   // "three update, one needs you" before anybody presses anything.
-  router.post('/v1/instances/:id/update', requireAuth(), requireScope('packages:write'), async (req, res) => {
+  router.post('/v1/instances/:id/update', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
     const ownerGaii = await resolveGhii(storage, owner, config);

@@ -554,10 +554,18 @@ export type PackageComponentType = 'csm' | 'extension' | 'cortex' | 'app' | 'msm
  * absent, and the absences are the design rather than an oversight: `seo` (an operator's search
  * approval must not ride into another owner's copy), `marks`/`authorship`/`legal` (the named human
  * who answers for the app — carrying them puts one person's name and legal statements on another
- * person's copy), `dataMap` (its stamp addresses a memory key that does not exist under the
- * installed filename), `aiPosture`/`track`/`specCheck` (re-derived from the bytes at publish),
+ * person's copy), `aiPosture`/`track`/`specCheck` (re-derived from the bytes at publish),
  * `protection`/`priceMorsels`/`licenseType`/`forkedFrom`/`aiProvenanceId` (the source owner's own
  * commercial decisions and the provenance of the version published THERE).
+ *
+ * THE DATA MAP IS THE ONE THAT TRAVELS AS A DOCUMENT RATHER THAN A STAMP. `AppManifest.dataMap` is
+ * a summary whose `docKey` addresses `apps.<id>.datamap`, and the installed copy's id is not the
+ * author's, so the stamp would point at a record that does not exist on this node — which is why it
+ * was left out entirely, and why every packaged app installed as having no map at all. `datamap`
+ * here is the MAP, the paragraph about what the app is for and the row-by-row account of where its
+ * data goes; the installer writes it under the name this node gave the app and stamps the manifest
+ * from what it wrote. The promise the app makes about its data is the author's to make, and it is
+ * the first thing an AI opening an unknown app reads.
  */
 export interface PackageAppMeta {
   name?: string;
@@ -568,6 +576,14 @@ export interface PackageAppMeta {
   tags?: string[];
   icon?: string;
   usesCortex?: string[];
+  /**
+   * The app's data map, spec `aimeat.datamap/2` (services/data-map/data-map-types.ts).
+   *
+   * Typed loosely HERE and nowhere else: a storage type may not import a service's, and a package is
+   * somebody else's file besides. The installer validates the spec and every field before a byte is
+   * written, and a map of an unknown spec is dropped rather than coerced.
+   */
+  datamap?: Record<string, unknown>;
 }
 
 /** A single component within a package version. */

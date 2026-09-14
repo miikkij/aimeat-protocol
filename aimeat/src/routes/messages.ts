@@ -86,7 +86,7 @@ import { resolveGroupTarget, soleParticipantNote } from '../services/message-ali
 import { sendGroupMessage } from '../services/conversation-group.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
-import { broadcastFromPrincipal } from '../services/message-broadcast.js';
+import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message-broadcast.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 import { mailboxReaderOf, readOwnerInbox, readOwnerConversations, readOwnerThread, readOwnerOverview } from '../services/owner-mailbox-reads.js';
 import { requireOwnerMailboxRead } from '../auth/owner-mailbox-gate.js';
@@ -295,16 +295,11 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       senderGhii, isOperator: req.auth!.roles.includes('operator'),
       to: input.to, groupId: input.group_id, audience: input.audience,
       mode: input.mode, body: input.body, subject: input.subject, attachments, interactive: input.interactive,
-      stampProvenance: () => provenanceForWrite(storage, {
+      stampProvenance: broadcastProvenanceStamp({ storage, config }, {
         principal: senderGhii,
-        content: [input.body ?? '', ...(input.interactive?.role === 'questions'
-          ? input.interactive.questions.map(q => `${q.header ?? ''} ${q.prompt ?? ''}`) : [])].join('\n'),
+        body: input.body,
+        questions: input.interactive?.role === 'questions' ? input.interactive.questions : undefined,
         pipeline: 'rest.messages_broadcast',
-        surface: { visibility: 'private', humanAudience: true },
-        labelPolicy: config.aiLabelPublic,
-        nodeId: config.nodeId,
-        baseUrl: config.baseUrl,
-        enabled: config.aiProvenance,
       }),
     });
     if (!result.ok) {
