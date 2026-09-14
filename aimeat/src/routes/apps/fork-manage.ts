@@ -6,6 +6,10 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-09-14 — PATCH asks every refusal the body can produce BEFORE its first write.
+ *     It wrote each field as the walk reached it and refused where each was read, in a different
+ *     order, so a delegated developer's PATCH carrying a rename and a reviewer's name landed the
+ *     rename and then answered 403. Invariant 14.
  *   v1.5.0 — 2026-08-29 — PATCH takes `legal` (the app's own pages) through services/app-legal.ts,
  *     with `ai_provenance` / `ai_provenance_id` as every publish door takes them, and every field
  *     it changes lands in the app's audit log (services/app-audit.ts).
@@ -34,12 +38,105 @@ import { emitChange } from '../../services/event-bus.js';
 import { forkApp, deleteOwnedApp } from '../../services/app-lifecycle.js';
 import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
-import { applyOwnerSeoUpdate, appSeoState } from '../../services/app-seo.js';
-import { applyOwnerMarksUpdate, appMarksState } from '../../services/app-marks.js';
-import { applyOwnerLegalUpdate, appLegalState, legalReadiness, appSellsForMoney } from '../../services/app-legal.js';
+import { applyOwnerSeoUpdate, appSeoState, parseOwnerSeoInput } from '../../services/app-seo.js';
+import {
+    applyOwnerMarksUpdate, appMarksState, parseMarksInput, parseAuthorInput, AUTHOR_NEEDS_OWNER_PRINCIPAL,
+} from '../../services/app-marks.js';
+import {
+    applyOwnerLegalUpdate, appLegalState, legalReadiness, appSellsForMoney, parseLegalInput,
+} from '../../services/app-legal.js';
 import { recordAppAudit, type AppAuditAction } from '../../services/app-audit.js';
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.js';
+
+/** What PATCH /v1/apps/:filename answers when the body cannot be carried out, before it writes. */
+interface PatchRefusal { status: number; code: string; message: string; }
+
+const bad = (message: string): PatchRefusal => ({ status: 400, code: 'INVALID_INPUT', message });
+
+/**
+ * Every refusal PATCH /v1/apps/:filename can produce from the body and the principal alone, asked
+ * once, before the first write — see the comment at the call site for why the order is the point.
+ *
+ * It answers `null` when nothing in the body can be refused. What it deliberately does NOT cover is
+ * the refusals that need storage: the app itself is looked up before this runs, and a page that
+ * disappears mid-request is a 404 no ordering can prevent.
+ */
+function patchRefusal(body: Record<string, unknown>, roles: string[], delegated: unknown): PatchRefusal | null {
+    if ('name' in body) {
+        if (typeof body.name !== 'string') return bad('name must be a string');
+        const trimmed = body.name.trim();
+        if (trimmed.length < 1 || trimmed.length > 120) return bad('name must be 1-120 characters');
+    }
+    if ('description' in body) {
+        if (typeof body.description !== 'string') return bad('description must be a string');
+        const trimmed = body.description.trim();
+        if (trimmed.length > 10_000) return bad('description must be at most 10000 characters');
+        if (trimmed.length === 0) return bad('description cannot be empty — apps require a description');
+    }
+    if ('descriptions' in body) {
+        if (typeof body.descriptions !== 'object' || body.descriptions === null || Array.isArray(body.descriptions)) {
+            return bad('descriptions must be an object mapping locale → text');
+        }
+        for (const [loc, val] of Object.entries(body.descriptions as Record<string, unknown>)) {
+            if (typeof val !== 'string') return bad(`descriptions.${loc} must be a string`);
+            if (val.trim().length > 10_000) return bad(`descriptions.${loc} must be at most 10000 characters`);
+        }
+    }
+    if ('cortex' in body && !isCortexClear(body.cortex)) {
+        if (typeof body.cortex !== 'object' || body.cortex === null || Array.isArray(body.cortex)) {
+            return bad('cortex must be an object (e.g. { "agents": [ ... ] }) or null to clear');
+        }
+        const check = validateCortexAgents((body.cortex as Record<string, unknown>).agents);
+        if (!check.ok) return { status: 400, code: 'INVALID_CREW_DEF', message: check.errors.join('; ') };
+    }
+    if ('access_code' in body) {
+        const code = body.access_code;
+        if (typeof code === 'string' && code.length > 0 && (code.length < 4 || code.length > 64)) {
+            return bad('access_code must be 4-64 characters');
+        }
+    }
+    if ('parked' in body && typeof body.parked !== 'boolean') return bad('parked must be a boolean');
+    if ('forkable' in body && typeof body.forkable !== 'boolean') return bad('forkable must be a boolean');
+    if ('protection' in body && sanitizeProtection(body.protection) === undefined) {
+        return bad('protection must be an object of booleans (obfuscate, domainLock, watermark, noRawDownload)');
+    }
+    if ('seo' in body) {
+        const parsed = parseOwnerSeoInput(body.seo);
+        if ('error' in parsed) return bad(parsed.error);
+    }
+    if ('marks' in body) {
+        const parsed = parseMarksInput(body.marks);
+        if ('error' in parsed) return bad(parsed.error);
+    }
+    if ('author' in body) {
+        // Never for a delegate, whatever rung they hold. Declaring the natural person who answers
+        // for an app is the account holder's own act, and somebody signed in as the owner of THEIR
+        // account is not the owner of this one. The same test services/app-marks.ts applies.
+        const ownerPrincipal = delegated === null
+            && roles.includes('owner') && !roles.includes('app')
+            && !roles.includes('agent') && !roles.includes('ecosystem');
+        if (!ownerPrincipal) return { status: 403, code: 'ACCESS_DENIED', message: AUTHOR_NEEDS_OWNER_PRINCIPAL };
+        const parsed = parseAuthorInput(body.author);
+        if ('error' in parsed) return bad(parsed.error);
+    }
+    if ('legal' in body) {
+        if (!parseDeclaredProvenanceInput(body.ai_provenance).ok) {
+            return bad('Invalid ai_provenance declaration.');
+        }
+        const parsed = parseLegalInput(body.legal, '');
+        if ('error' in parsed) return bad(parsed.error);
+        if (!Object.keys(parsed.legal).length) return bad('legal names no page to set or remove');
+    }
+    return null;
+}
+
+/** `cortex: null` and `{ agents: [] }` both mean "take the bundled crew-defs off". */
+function isCortexClear(cortex: unknown): boolean {
+    return cortex === null || (typeof cortex === 'object' && cortex !== null && !Array.isArray(cortex)
+        && Array.isArray((cortex as { agents?: unknown }).agents)
+        && ((cortex as { agents: unknown[] }).agents).length === 0);
+}
 
 export function registerForkManageRoutes(
     router: Router,
@@ -179,6 +276,23 @@ export function registerForkManageRoutes(
         }
 
         const body = req.body ?? {};
+
+        // REFUSE BEFORE THE FIRST WRITE. Every field below is written as the walk reaches it and
+        // refused where it is read, and the two are not in the same order: a delegated developer's
+        // PATCH carrying `name`, `access_code`, `parked` and `author` together wrote the first
+        // three and THEN answered 403 on the fourth, so a refused request left most of itself
+        // standing. The same shape is every 400 here — a malformed `parked` landed the rename.
+        //
+        // So every refusal the body alone can produce is asked first, in one pass, and the write
+        // phase below is reached only when nothing can say no. The parsers run twice, on purpose:
+        // this pass calls the same exported parser the service that owns the field calls, so there
+        // is one implementation of each rule and this is a second CALL, not a second copy.
+        // Invariant 14. Found by the AI triage of 2026-09-13.
+        const refusal = patchRefusal(body, req.auth!.roles, delegated);
+        if (refusal) {
+            res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message));
+            return;
+        }
 
         // Each field is independent and only touched when present in the body, so a
         // parked-only PATCH never clears the access code (and vice-versa).

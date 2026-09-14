@@ -282,29 +282,30 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const senderGhii = resolve(req);
     const attachments = input.attachments ? mapMessageAttachments(input.attachments, senderGhii, config.nodeId) : undefined;
 
+    // The whole send-to-many lives in the service, because aimeat_dm_broadcast calls the same five
+    // decisions and a copy of them here is how one door ends up gating what the other does not.
+    //
     // TARGET-058, same rule as the 1:1 door above: an agent broadcasting through REST is writing
     // AI-authored text delivered to named people, and one set of bytes goes to all of them, so every
     // copy carries the SAME record. Stamped from the principal here; the MCP tool stamps the agent's
-    // own declaration instead and hands the id to the same service. A human sender is a no-op.
-    const aiProvenanceId = await provenanceForWrite(storage, {
-      principal: senderGhii,
-      content: [input.body ?? '', ...(input.interactive?.role === 'questions'
-        ? input.interactive.questions.map(q => `${q.header ?? ''} ${q.prompt ?? ''}`) : [])].join('\n'),
-      pipeline: 'rest.messages_broadcast',
-      surface: { visibility: 'private', humanAudience: true },
-      labelPolicy: config.aiLabelPublic,
-      nodeId: config.nodeId,
-      baseUrl: config.baseUrl,
-      enabled: config.aiProvenance,
-    });
-
-    // The whole send-to-many lives in the service, because aimeat_dm_broadcast calls the same five
-    // decisions and a copy of them here is how one door ends up gating what the other does not.
+    // own declaration instead. A human sender is a no-op. Handed over as a FUNCTION so the service
+    // runs it after its own refusals — stamping it writes a row, and this door was writing that row
+    // before the service could say the audience was operator-only.
     const result = await broadcastFromPrincipal(deliveryCtx, {
       senderGhii, isOperator: req.auth!.roles.includes('operator'),
       to: input.to, groupId: input.group_id, audience: input.audience,
       mode: input.mode, body: input.body, subject: input.subject, attachments, interactive: input.interactive,
-      aiProvenanceId,
+      stampProvenance: () => provenanceForWrite(storage, {
+        principal: senderGhii,
+        content: [input.body ?? '', ...(input.interactive?.role === 'questions'
+          ? input.interactive.questions.map(q => `${q.header ?? ''} ${q.prompt ?? ''}`) : [])].join('\n'),
+        pipeline: 'rest.messages_broadcast',
+        surface: { visibility: 'private', humanAudience: true },
+        labelPolicy: config.aiLabelPublic,
+        nodeId: config.nodeId,
+        baseUrl: config.baseUrl,
+        enabled: config.aiProvenance,
+      }),
     });
     if (!result.ok) {
       res.status(result.status).json(error(config.nodeId, result.code, result.message));

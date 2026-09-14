@@ -25,6 +25,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=passkeys
  * @version-history
+ *   v1.1.0 — 2026-09-14 — A sign-in refused because the account is deactivated leaves no "last
+ *     used" on the device. It moved the mark before it read the account.
  *   v1.0.0 — 2026-09-04 — Initial, with passkeys.
  */
 import * as ed from '@noble/ed25519';
@@ -400,8 +402,17 @@ async function main() {
         assert(del.status === 403, `delete: expected 403, got ${del.status}`);
     });
 
-    await test('a deactivated account gets no session from this door either', async () => {
+    await test('a deactivated account gets no session from this door either, and no mark on the device', async () => {
         if (!enabled) return;
+        // REFUSE BEFORE THE WRITE. The device's answer checks out and the account is then found
+        // deactivated — but the counter and "last used" were stored between those two steps, so a
+        // sign-in that never happened showed on the owner's own device list as one that did. That
+        // list is how somebody tells a sign-in they recognise from one they do not.
+        // Invariant 14. Found by the AI triage of 2026-09-13.
+        const listBefore = await json('/v1/ghii/passkeys', { headers: auth(aliceToken) });
+        const usedBefore = listBefore.body.data.passkeys.find((p: any) => p.id === aliceKeyId)?.last_used_at;
+        assert(typeof usedBefore === 'string', 'the device has signed in at least once by now');
+
         const off = await json(`/v1/admin/owners/${alice}/disable`, { method: 'POST', headers: auth(operatorToken) });
         assert(off.status === 200, `disable: ${off.status} ${JSON.stringify(off.body.error)}`);
 
@@ -411,6 +422,23 @@ async function main() {
 
         const on = await json(`/v1/admin/owners/${alice}/enable`, { method: 'POST', headers: auth(operatorToken) });
         assert(on.status === 200, `enable: ${on.status}`);
+
+        // Read the device list through the PASSWORD door, which touches no passkey, so what it
+        // shows is what the refused sign-in left behind and nothing else.
+        let pw = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: alice, password: PASSWORD }) });
+        for (let i = 0; pw.status === 429 && i < 13; i++) {
+            await new Promise(res => setTimeout(res, 5000));
+            pw = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: alice, password: PASSWORD }) });
+        }
+        assert(pw.status === 200, `password sign-in after reactivation: ${pw.status} ${JSON.stringify(pw.body.error)}`);
+        // Held now rather than at the end of the test: deactivation ended every session in her
+        // name, and a failure in the assertion below must not leave the tests after this one with
+        // no session at all to run on.
+        aliceToken = pw.body.data.token;
+        const listAfter = await json('/v1/ghii/passkeys', { headers: auth(pw.body.data.token) });
+        const usedAfter = listAfter.body.data.passkeys.find((p: any) => p.id === aliceKeyId)?.last_used_at;
+        assert(usedAfter === usedBefore,
+            `a refused sign-in must leave no "last used" behind: ${usedBefore} → ${usedAfter}`);
         // Deactivation ended every session in her name, so she needs a fresh one for what follows.
         const again = await passkeyLogin(device, alice);
         assert(again.status === 200, `signing in after reactivation: ${again.status} ${JSON.stringify(again.body.error)}`);
