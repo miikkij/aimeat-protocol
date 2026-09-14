@@ -13014,6 +13014,8 @@
       "backToWorkspace": "Back to the workspace",
       "kindDoc": "document space",
       "kindRecord": "record type",
+      "kindRows": "row space",
+      "kindTasks": "task space",
       "more": "… {n} more"
     },
     "railTitle": "In this organism",
@@ -13279,6 +13281,7 @@
     "reAdopt": "Re-adopt",
     "bareContract": "contract",
     "spaceTasksBacked": "This space points at the task system: its items are tasks, not workspace records. Manage them in the Tasks views.",
+    "spaceRowsBacked": "This space holds rows the group accumulates. They are appended and never edited, and this page does not list them: they are read with the row tools, which filter and page through them.",
     "spaceBackingUnsupported": "This space's backing is not supported, so its content is not shown here. Edit the workspace (manifest) and set this space's backing to \"memory\" to restore it. Files and knowledge packages attach via Sources or document images instead.",
     "onePerLine": "one per line",
     "autoIdHint": "Pre-filled automatically. Change it if you want a memorable id.",
