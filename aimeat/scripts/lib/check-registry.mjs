@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.3.0 (2026-09-14): check:field-reach, the REST-only record field ratchet.
  *  - 1.2.1 (2026-09-13): check:viewport also holds the library-packs registry to the manifests.
  *  - 1.2.0 (2026-09-13): Hold the always-loaded instruction size and every path rule's globs.
  *  - 1.1.0 (2026-09-13): Refuse new copies of the shared poster shapes.
@@ -48,6 +49,9 @@ export const FAST_CHECKS = [
     { script: 'check:doc-counts -- --strict', label: 'The counts this project states about itself' },
     { script: 'check:instructions', label: 'What every session loads stays small, and every path rule names real files' },
     { script: 'check:scope-parity', label: 'One permission word, every door' },
+    // Built on 2026-09-03 for exactly this axis and wired into nothing until 2026-09-14, when an
+    // agent's company update dropped organism_id in silence: REST took the field and MCP did not.
+    { script: 'check:field-reach', label: 'A record field REST can set, an agent can set too' },
     { script: 'check:liaison-surface', label: 'Published surfaces match, and neither needs a release' },
     // The whole-tree silent-exception pass, which until 2026-09-13 ran nowhere: the hook sees only
     // staged files and nothing else called it, so the three cleaned shapes were held at zero by
