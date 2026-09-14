@@ -30,7 +30,8 @@
  * @structure MIN_LINES · normalise() · main()
  * @usage pnpm check:copied-logic  ·  --strict fails the build  ·  --list prints every pair
  * @version-history
- *   v1.1.0 — 2026-09-14 — Seed 5 → 4: the welcome bonus is one function instead of three copies.
+ *   v1.1.0 — 2026-09-14 — Seed 5 → 3: the provenance stamp and the welcome bonus are each one
+ *     function instead of two and three copies.
  *   v1.0.0 — 2026-08-11 — Initial. Written after the audit's own diff was found to have repaired
  *     four differences by copying the rule into the second door.
  */
@@ -60,12 +61,13 @@ const MIN_LINES = 6;
  * Lower it as pairs are cleared. Never raise it: a new pair means somebody repaired a difference by
  * copying the rule, which is the failure this whole exercise exists to prevent.
  *
- * 2026-09-14: 5 → 4. The welcome bonus was written out at all three doors that create an account
- * (services/owner-provisioning.ts, routes/ghii/register-login.ts, routes/ghii/web-verify.ts), so
- * the amount, the condition and the transaction's shape lived in three places. It is now
- * creditWelcomeBonus() in owner-provisioning.ts, called from all three. Two pairs gone.
+ * 2026-09-14: 5 → 3, in two steps on the same day. The broadcast's AI-provenance stamp was written
+ * once (ce0a967a5). Then the welcome bonus, which was written out at all three doors that create an
+ * account (services/owner-provisioning.ts, routes/ghii/register-login.ts, routes/ghii/web-verify.ts)
+ * so its amount, its condition and the transaction's shape lived in three places, became
+ * creditWelcomeBonus() in owner-provisioning.ts, called from all three. Three pairs gone.
  */
-const SEED = 4;
+const SEED = 3;
 
 const SIDES = [
     { name: 'mcp', dir: 'src/mcp' },
