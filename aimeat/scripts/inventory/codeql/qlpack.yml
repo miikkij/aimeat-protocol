@@ -1,0 +1,7 @@
+# The inventory queries behind check:field-reach. Run by scripts/inventory/rest-reads.ts with the
+# CodeQL CLI, never by the CodeQL workflow: these answer "which request fields does a handler read",
+# which is an inventory question and not a vulnerability, so they stay off the Security tab.
+name: aimeat/inventory-queries
+version: 0.0.1
+dependencies:
+  codeql/javascript-all: "*"

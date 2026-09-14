@@ -201,6 +201,7 @@
     "check:scope-parity:report": "tsx scripts/check-scope-parity.ts",
     "check:scope-parity:seed": "tsx scripts/check-scope-parity.ts --seed",
     "check:field-reach": "tsx scripts/check-field-reach.ts --strict",
+    "field-reach:measure": "tsx scripts/check-field-reach.ts --measure-only",
     "debt": "tsx scripts/debt.ts",
     "check:liaison-surface": "tsx scripts/check-liaison-surface.ts --strict",
     "check:storage-parity": "tsx scripts/check-storage-parity.ts --strict",

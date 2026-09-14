@@ -17,6 +17,8 @@
  *   pnpm check:mcp-schemas               # pre-commit + CI gate (input drift only)
  *   pnpm audit:mcp-schemas -- --strict   # full report, both axes
  * @version-history
+ *   v1.3.2 -- 2026-09-14 -- The capture (fake MCP server, captureServer, captureConnector) moved to
+ *     scripts/inventory/mcp-capture.ts unchanged, so check:field-reach reads the same one.
  *   v1.3.1 -- 2026-09-13 -- aimeat_extension_install leaves KNOWN_INPUT_DRIFT: both MCP surfaces take
  *     manifest, scripts, update and activate. aimeat_app_draft_publish leaves it too: the audit
  *     reported the entry stale (the connector door now takes spec_token and spec_ack).
@@ -40,108 +42,11 @@
  *     that lost its own output. An audit nobody runs is a document, not a gate. The nine remaining
  *     drifts are recorded in KNOWN_INPUT_DRIFT with what each one costs a caller.
  */
-import type { AimeatConfig } from '../src/config.js';
-import type { Storage } from '../src/storage/interface.js';
-import type { AgentRegistry } from '../src/cli/connect/agent-registry.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/mcp/catalog/definitions.js';
 import { MCP_SURFACES, V2_ROLES, validateSurfaces } from '../src/mcp/catalog/surfaces.js';
 
-// ── The server's own registration, not a copy of it ──
-import { registerAllServerTools } from '../src/mcp/register-all.js';
-
-// ── Connector register entrypoint ──
-import { registerAllTools } from '../src/cli/connect/mcp/tools/index.js';
-
-interface CapturedTool {
-    inputKeys: string[];
-    hasOutputSchema: boolean;
-}
-
-/** Extract the top-level input-schema keys from an mcp.tool(...) call's arguments. */
-function keysFromToolArgs(args: unknown[]): string[] {
-    // Codebase forms: tool(name, descString, schemaObj, annObj?, handler) or tool(name, schemaObj, handler)
-    const candidate = typeof args[1] === 'string' ? args[2] : args[1];
-    return candidate && typeof candidate === 'object' && !Array.isArray(candidate) ? Object.keys(candidate) : [];
-}
-
-/** A Proxy that satisfies whatever the register functions call; records tool registrations. */
-function makeFakeMcp(sink: Map<string, CapturedTool>) {
-    const server = {};
-    return new Proxy({} as Record<string, unknown>, {
-        get(_t, prop: string) {
-            if (prop === 'server') return server;
-            if (prop === 'tool') {
-                return (...args: unknown[]) => {
-                    sink.set(args[0] as string, { inputKeys: keysFromToolArgs(args), hasOutputSchema: false });
-                    return undefined;
-                };
-            }
-            if (prop === 'registerTool') {
-                return (...args: unknown[]) => {
-                    const cfg = (args[1] ?? {}) as { inputSchema?: object; outputSchema?: unknown };
-                    sink.set(args[0] as string, {
-                        inputKeys: cfg.inputSchema ? Object.keys(cfg.inputSchema) : [],
-                        hasOutputSchema: cfg.outputSchema !== undefined,
-                    });
-                    return undefined;
-                };
-            }
-            return () => undefined; // resource / registerResource / prompt / etc. — no-op
-        },
-        set() { return true; },
-    });
-}
-
-/**
- * Register what the SERVER registers — through mcp/register-all.ts, the same call /v1/mcp makes.
- *
- * This used to be a hand-kept list of register functions here, and it fell behind: on 2026-09-03 it
- * loaded 26 groups while the server called 52. The audit did not go silent about it — it printed
- * twenty-seven whole families as "not server-registered" and still exited green, because they were
- * tracked as known. A blind spot with a plausible explanation for its own noise is worse than a
- * blind spot, because a real drift inside those families would have printed as one more line in a
- * list nobody could read. There is nothing to keep in step now: one list, both callers.
- */
-function captureServer(): Map<string, CapturedTool> {
-    const sink = new Map<string, CapturedTool>();
-    const mcp = makeFakeMcp(sink) as never;
-    const noop = () => { };
-    registerAllServerTools(mcp, {
-        storage: {} as Storage,
-        // Every optional feature ON, for the same reason the scopes below are '*': this asks what
-        // the surface CAN register, not what one node has turned on. commerce and portfolio each
-        // return early from their whole group when their flag is off, and with the flags absent the
-        // audit read sixteen live tools as missing.
-        config: {
-            nodeId: 'audit-node', baseUrl: 'http://localhost', mcpEnforceScopes: true,
-            commerceEnabled: true, portfolioEnabled: true,
-        } as unknown as AimeatConfig,
-        agentGaii: () => 'auditor#owner@audit-node',
-        owner: () => 'owner',
-        // Every scope, because this asks what the surface CAN register, not what one agent holds.
-        scopes: ['*'],
-        peers: new Map(),
-        getToken: () => undefined,
-        emitResourceUpdated: noop,
-        emitResourceListChanged: noop,
-    });
-    return sink;
-}
-
-function captureConnector(): Map<string, CapturedTool> {
-    const sink = new Map<string, CapturedTool>();
-    // Some connector modules call registry.resolve()/list() at registration time, so stub them.
-    const fakeAgent = { client: new Proxy({}, { get: () => () => undefined }), agent: 'auditor', owner: 'owner' };
-    const fakeRegistry = new Proxy({}, {
-        get(_t, prop: string) {
-            if (prop === 'list') return () => [fakeAgent];
-            if (prop === 'size') return () => 1;
-            return () => fakeAgent; // resolve() and anything else
-        },
-    }) as unknown as AgentRegistry;
-    registerAllTools(makeFakeMcp(sink) as never, fakeRegistry);
-    return sink;
-}
+// ── Both surfaces, registered for real against a fake MCP server (shared with check:field-reach) ──
+import { captureServer, captureConnector } from './inventory/mcp-capture.js';
 
 /** Connector tools carry an extra agent-routing param; it is an intentional difference, not drift. */
 const CONNECTOR_EXTRA = new Set(['agent_name']);
