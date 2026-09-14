@@ -32,6 +32,10 @@
  *   - PasskeyCeremony: what a caller gets back, and the refusal shape both doors render
  * @usage const r = await beginLogin(config, storage, 'alice');
  * @version-history
+ *   v1.1.0 — 2026-09-14 — finishLogin refuses a missing or deactivated account BEFORE it marks the
+ *     device as used, and returns the account record it read. The counter and "last used" were
+ *     stored between the signature check and the account check, so a refused sign-in showed on the
+ *     owner's own device list as one that happened. Invariant 14.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 import {
@@ -39,7 +43,7 @@ import {
   generateAuthenticationOptions, verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, GHIIRecord } from '../storage/interface.js';
 import type { PasskeyRecord } from '../storage/types/passkeys.js';
 import { logger } from '../utils/logger.js';
 
@@ -250,6 +254,8 @@ export async function beginLogin(
 
 export interface FinishLoginData {
   passkey: PasskeyRecord;
+  /** The account the device answered for, read here so the route does not read it a second time. */
+  ghiiRecord: GHIIRecord;
 }
 
 /**
@@ -305,9 +311,28 @@ export async function finishLogin(
     return { ok: false, status: 401, code: 'PASSKEY_INVALID', message: 'That device\'s answer did not check out.' };
   }
 
+  // REFUSE BEFORE THE WRITE. The device's answer is good, but the account behind it may be gone or
+  // deactivated, and the mark this makes is the device's "last used" — the line an owner reads on
+  // their own device list to tell a sign-in they do not recognise from one they do. Writing it for
+  // a sign-in that is then refused says the device signed in when it did not. Asked HERE and not
+  // before the signature, for the same reason the password door refuses a deactivated account after
+  // the password: answering earlier would tell anyone who types a username what state it is in.
+  // Invariant 14. Found by the AI triage of 2026-09-13.
+  const ghiiRecord = await storage.getGHIIByOwner(stored.owner);
+  if (!ghiiRecord) {
+    return { ok: false, status: 401, code: 'PASSKEY_UNKNOWN', message: 'That device is not registered here. Sign in with your password, then add it under Account security.' };
+  }
+  const owner = await storage.getOwner(stored.owner);
+  if (owner?.disabledAt) {
+    return { ok: false, status: 403, code: 'ACCOUNT_DISABLED', message: 'This account has been deactivated' };
+  }
+
   const usedAt = new Date().toISOString();
   await storage.touchPasskey(stored.id, verification.authenticationInfo.newCounter, usedAt);
-  return { ok: true, data: { passkey: { ...stored, counter: verification.authenticationInfo.newCounter, lastUsedAt: usedAt } } };
+  return {
+    ok: true,
+    data: { passkey: { ...stored, counter: verification.authenticationInfo.newCounter, lastUsedAt: usedAt }, ghiiRecord },
+  };
 }
 
 /** TEST SEAM: forget every pending ceremony. Never called by the server. */
