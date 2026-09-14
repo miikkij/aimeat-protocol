@@ -25,10 +25,20 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
+import { checkDeleteGuard } from './write-guards.js';
+import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 
 export interface MemoryBinDeps { storage: Storage; config: AimeatConfig }
 
-export interface MemoryBinRefusal { ok: false; code: 'NOT_FOUND' | 'NOT_RESTORABLE'; message: string }
+export interface MemoryBinRefusal {
+  ok: false;
+  code: 'NOT_FOUND' | 'NOT_RESTORABLE' | 'WRITE_CONFLICT' | 'AUTH_REQUIRED' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED';
+  message: string;
+  /** What the door should answer. 404 for the two original codes, so an old caller reads the same. */
+  status?: number;
+  /** The write guard's own list, for the door that carries it in `details`. */
+  violations?: unknown[];
+}
 export type MemoryBinOutcome =
   | { ok: true; key: string; ownerGaii: string; restorableUntil: string | null; graceDays: number }
   | MemoryBinRefusal;
@@ -50,6 +60,12 @@ export interface MemoryBinRequest {
   ownerScope?: boolean;
   /** An operator naming somebody else's namespace outright. Callers gate the role themselves. */
   ownerOverride?: string | null;
+  /**
+   * The caller's roles as the token carries them. The organism namespace check below reads them,
+   * and an operator who named `ownerOverride` skips that check the way the admin door always has.
+   * Absent means "no roles", which is the safe reading: an unnamed caller is not an operator.
+   */
+  roles?: string[];
 }
 
 /** Find the record this caller means, across the reach they are entitled to. Null when there is
@@ -72,6 +88,32 @@ async function locate(
  * person needs after pressing delete and the one thing a "deleted: true" never told them.
  */
 export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequest): Promise<MemoryBinOutcome> {
+  // BOTH REFUSALS BELONG HERE, NOT ON ONE DOOR. DELETE /v1/memory/:key ran the organism namespace
+  // check as middleware and the append-only write guard inline, and `aimeat_memory_delete` ran
+  // neither: it called this function straight and this function asked nothing. So the MCP tool
+  // removed a `.latest` or `.version` event out of a workspace whose manifest says create_only, and
+  // reached an organism namespace the REST door would have refused. Found by the AI triage of
+  // 2026-09-13. This file's own header already said why they belong here — "the tools bring
+  // parameters and this brings the rules" — and these two rules had not arrived yet.
+  const operatorOverride = !!req.ownerOverride && (req.roles ?? []).includes('operator');
+  if (!operatorOverride) {
+    const denied = await checkOrganismNamespaceAccess(deps, {
+      principal: req.caller, owner: req.ownerName, roles: req.roles ?? [],
+    }, req.key, 'write');
+    if (denied) return { ok: false, code: denied.code, message: denied.message, status: denied.status };
+  }
+
+  // An append-only workspace namespace refuses .latest/.version deletes on every path — existing
+  // events can never be erased, and that holds for an operator too.
+  const guard = await checkDeleteGuard(req.key, deps.storage);
+  if (!guard.valid) {
+    return {
+      ok: false, code: 'WRITE_CONFLICT', status: 409,
+      message: guard.errors?.[0]?.message ?? 'Delete refused by the workspace write guard',
+      violations: guard.errors,
+    };
+  }
+
   const found = await locate(deps, req, async gaii => !!(await deps.storage.getMemory(gaii, req.key)));
   if (!found) {
     return { ok: false, code: 'NOT_FOUND', message: `Memory key not found: ${req.key}` };

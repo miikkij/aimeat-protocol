@@ -29,7 +29,6 @@ import { MemoryUpdateSchema, validateBody } from '../../models/schemas.js';
 import { checkMemoryQuota, chargeOverage } from '../../services/quota.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
-import { checkDeleteGuard } from '../../services/write-guards.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { enqueueMemoryReplication } from '../../services/memory-replication.js';
@@ -205,22 +204,21 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       key,
       ownerScope: isOwnerSession || req.query.owner_scope === 'true',
       ownerOverride: (ownerOverride && req.auth!.roles.includes('operator')) ? ownerOverride : null,
+      roles: req.auth!.roles,
     };
-
-    // TARGET-009 S1/S3: an append-only workspace namespace (manifest create_only) refuses
-    // .latest/.version deletes on every path — existing events can never be erased.
-    const delGuard = await checkDeleteGuard(key, storage);
-    if (!delGuard.valid) {
-      res.status(409).json(error(config.nodeId, 'WRITE_CONFLICT', delGuard.errors?.[0]?.message ?? 'Delete refused by the workspace write guard', 409, { violations: delGuard.errors }));
-      return;
-    }
 
     // Who to ask, if somebody later wonders where it went. The principal, not the owner name:
     // `req.auth.owner` is the human on an agent token too, so it would name the wrong party.
     // The tombstone, and the moment it stops being takeable back.
+    //
+    // The append-only write guard used to be run here, inline, and the MCP tool that calls the same
+    // service ran nothing. It is inside deleteMemoryRecord now, with the organism namespace check,
+    // so a fourth door cannot arrive without them. The answer is unchanged: 409 WRITE_CONFLICT with
+    // the violations, 404 for the two codes this door has always returned.
     const outcome = await deleteMemoryRecord({ storage, config }, binReq);
     if (!outcome.ok) {
-      res.status(404).json(error(config.nodeId, outcome.code, outcome.message));
+      res.status(outcome.status ?? 404).json(error(config.nodeId, outcome.code, outcome.message,
+        outcome.status ?? 404, outcome.violations ? { violations: outcome.violations } : undefined));
       return;
     }
 

@@ -259,6 +259,51 @@ await test('8b. MCP aimeat_memory_write of a knowledge-backing manifest → reje
     assert(!mcpErr(ok2), `plain write still works: ${mcpText(ok2)}`);
 });
 
+// ── The same shape on the DELETE side, found by the AI triage of 2026-09-13. DELETE /v1/memory/:key
+// ran the append-only write guard inline and the organism namespace check as middleware;
+// aimeat_memory_delete called the shared service straight, and the service asked neither. So the
+// tool erased an event out of a create_only space that the REST door refuses, which is the one
+// promise an append-only namespace makes. Both checks live in deleteMemoryRecord now. ──
+
+await test('8c. MCP aimeat_memory_delete cannot erase an append-only event the REST door refuses', async () => {
+    const add = await json(`/v1/organisms/${orgId}/workspace?ws=${wsId}`, {
+        method: 'PUT', headers: authH(),
+        body: JSON.stringify({
+            add_spaces: [{
+                name: 'ledger', namespace: 'shared.ledger', schemaRef: 'schema:ledger@1', backing: 'memory',
+                writeRole: 'member', cardinality: 'many', mode: 'records', create_only: true,
+            }],
+        }),
+    });
+    assert(add.status === 200, `add append-only space: ${add.status} ${JSON.stringify(add.body?.error)}`);
+
+    // Through the draft flow, because a direct `.latest` write is refused by the same guard family:
+    // the published event is what an append-only space promises never to lose.
+    const key = `organism.${orgId}.w.${wsId}.shared.ledger.e1.latest`;
+    const draft = await A.client.call('aimeat_workspace_write', {
+        organism_id: orgId, ws: wsId, space: 'ledger', id: 'e1',
+        value: { id: 'e1', what: 'an event that may never be erased' },
+    }, 2111);
+    assert(!mcpErr(draft), `write the draft: ${mcpText(draft)}`);
+    const published = await A.client.call('aimeat_workspace_publish', {
+        organism_id: orgId, ws: wsId, namespace: 'shared.ledger', id: 'e1',
+    }, 2112);
+    assert(!mcpErr(published), `publish it: ${mcpText(published)}`);
+    const exists = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: authH() });
+    assert(exists.status === 200, `the published event is there to begin with: ${exists.status}`);
+
+    // The REST door refuses, which is the behaviour the tool has to match rather than undercut.
+    const rest = await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'DELETE', headers: authH() });
+    assert(rest.status === 409, `REST delete must refuse: ${rest.status} ${JSON.stringify(rest.body?.error)}`);
+
+    const viaTool = await A.client.call('aimeat_memory_delete', { key, owner_scope: true }, 211);
+    assert(mcpErr(viaTool), `the tool erased what the door refuses: ${mcpText(viaTool)}`);
+    assert(/WRITE_CONFLICT/.test(mcpText(viaTool)), `and it says why: ${mcpText(viaTool)}`);
+
+    const still = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: authH() });
+    assert(still.status === 200, `the append-only event survives both doors: ${still.status}`);
+});
+
 // ── Seed upgrade: existing nodes' stale system-seeded schema is replaced at startup (in-process,
 // against a throwaway SQLite :memory: storage — no server restart needed to exercise the path) ──
 
