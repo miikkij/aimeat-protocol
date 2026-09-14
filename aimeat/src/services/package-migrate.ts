@@ -254,6 +254,37 @@ export async function applyInstanceMigration(
                 message: `Component "${compId}" was not applied: ${check.error}`,
             };
         }
+
+        // AND THE CHECKS THAT ONLY THE REGISTRATION KNOWS. validateComponentContent above answers
+        // for `extension` and returns ok for every other type, so an app whose artifact lint fails,
+        // a crew-def that does not validate, or a quota ceiling was found AFTER the loop below had
+        // deleted the owner's working copy — and the code admitted it in a comment ("The old copy
+        // was already deleted, so there is nothing to keep") instead of preventing it. The same
+        // registration, run dry: it writes nothing and refuses for the same reasons.
+        const wouldRegister = await registerComponent(storage, {
+            config,
+            dryRun: true,
+            componentId: compId,
+            type: compType,
+            registeredAs: nameFor(compId, compType),
+            content: proposed,
+            label: targetComp?.label ?? compId,
+            owner,
+            ownerGaii: ownerGhii,
+            packageName: targetPkg.name,
+            packageCategory: targetPkg.category,
+            packageTags: targetPkg.tags,
+            packageDescription: targetPkg.description,
+            meta: targetComp?.meta,
+            callerGaii: caller.sub,
+            urlRewrites,
+        });
+        if (!wouldRegister.success) {
+            return {
+                ok: false, status: 400, code: 'INVALID_COMPONENT',
+                message: `Component "${compId}" was not applied: ${wouldRegister.error ?? 'registration would fail'}`,
+            };
+        }
     }
 
     for (const action of actions) {
@@ -277,6 +308,9 @@ export async function applyInstanceMigration(
                 const newContent = action.content ?? targetComp?.content ?? '';
                 const registeredAs = nameFor(compId, type);
 
+                // Safe to delete first ONLY because the loop above already ran this registration
+                // dry and every one of them passed. The delete has to come first: createCsm and its
+                // siblings throw NAME_TAKEN rather than overwrite.
                 if (existing) await deleteComponent(storage, existing.type, registeredAs, ownerGhii);
 
                 const result = await registerComponent(storage, {

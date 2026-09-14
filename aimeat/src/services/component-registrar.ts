@@ -62,6 +62,19 @@ export interface ComponentRegistrationResult {
 }
 
 export interface ComponentRegistrationInput {
+  /**
+   * Run every check this registration would run and write NOTHING, answering with the same
+   * `{ success }` shape. For a caller that has to know whether a component will register BEFORE it
+   * does something it cannot take back.
+   *
+   * services/package-migrate.ts is that caller: its `replace` and `custom` actions delete the
+   * owner's installed component and then register the replacement, because storage.createCsm and
+   * its siblings throw NAME_TAKEN rather than overwrite. A refusal after the delete — an app whose
+   * artifact lint fails, a crew-def that does not validate, a quota ceiling, an extension the
+   * manifest builder rejects — left the owner with neither copy, and the code said so in a comment
+   * rather than preventing it. Found by the AI triage of 2026-09-13.
+   */
+  dryRun?: boolean;
   /** Node config: the extension builder needs it for limit ceilings and currency validation. */
   config: AimeatConfig;
   componentId: string;
@@ -234,6 +247,7 @@ export async function registerComponent(
         }
         const serviceObj = definition.service as Record<string, unknown> | undefined;
         const serviceType = (serviceObj?.type as string) ?? 'other';
+        if (input.dryRun) break;
         await storage.createCsm({
           name: registeredAs,
           definition,
@@ -286,6 +300,7 @@ export async function registerComponent(
         const odps = odpsWriteRefusal(extensionOdpsKey(registeredAs), built.record, null);
         if (odps) return { success: false, componentId, registeredAs, error: `${odps.code}: ${odps.message}` };
 
+        if (input.dryRun) break;
         await storage.createExtension({
           ...built.record,
           name: registeredAs,
@@ -329,6 +344,7 @@ export async function registerComponent(
           return comp;
         });
 
+        if (input.dryRun) break;
         await storage.createCortexExtension({
           name: registeredAs,
           namespace: owner,
@@ -447,7 +463,11 @@ export async function registerComponent(
         // The rewrite and the crew parse stay ABOVE, in that order: the rewrite has to happen before
         // the crews are read, so an `ext:<name>` inside a crew prompt points at this instance's copy.
         const app = (input.meta?.app ?? {}) as Record<string, unknown>;
+        // The dry run goes THROUGH publishApp rather than around it: the artifact lint, the
+        // per-owner quota and the delegated-settings check are its refusals, and a second reading of
+        // them here would be the drift this file's own comment above already names.
         const published = await publishApp(storage, input.config, {
+            ...(input.dryRun ? { dryRun: true as const } : {}),
           ownerName: owner,
           ownerGhii: ownerGaii,
           callerGaii: input.callerGaii ?? ownerGaii,
@@ -498,6 +518,7 @@ export async function registerComponent(
         }
         const auth = definition.auth as Record<string, unknown> | undefined;
         const actionsArr = (definition.actions ?? []) as unknown[];
+        if (input.dryRun) break;
         await storage.createMsm({
           name: registeredAs,
           definition,
@@ -512,6 +533,9 @@ export async function registerComponent(
       }
 
       case 'memory': {
+        // Nothing to validate beyond the parse below, and the writes are keyed puts that cannot
+        // clash: a dry run for these two is a yes.
+        if (input.dryRun) break;
         // Content: JSON { entries: [{ key, value, visibility?, tags? }] } or simple object
         // When entries have explicit keys, use them as-is (no prefix).
         // Fallback: store entire content under registeredAs key.
@@ -554,6 +578,9 @@ export async function registerComponent(
       }
 
       case 'translation': {
+        // Nothing to validate beyond the parse below, and the writes are keyed puts that cannot
+        // clash: a dry run for these two is a yes.
+        if (input.dryRun) break;
         // Content: JSON { "en": { ... }, "fi": { ... } }
         const memKey = `i18n.${registeredAs}`;
         let value: unknown;
