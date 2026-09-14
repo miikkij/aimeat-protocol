@@ -42,6 +42,7 @@ import { StoreSection, TrustList, Rooms } from '/views/landing-showroom-rooms.js
 import { Hero2, TenSeconds, LinuxLine, Close2 } from '/views/landing-v2.js';
 import { Projector } from '/views/landing-v2-projector.js';
 import { PromptCards, Wall2 } from '/views/landing-v2-cards.js';
+import { SignageShowcase } from '/views/landing-v2-signage.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -182,6 +183,12 @@ export function V2TenBlock(/** @type {{ ctx?: any, props?: Record<string, any>, 
 
 export function V2ProjectorBlock() {
   return html`<${Projector} />`;
+}
+
+export function V2SignageBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { props = {} }) {
+  return html`<${SignageShowcase}
+    url=${typeof props.url === 'string' && props.url ? props.url : undefined}
+    admin=${typeof props.admin === 'string' && props.admin ? props.admin : undefined} />`;
 }
 
 export function V2CardsBlock() {

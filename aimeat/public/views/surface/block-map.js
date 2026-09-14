@@ -75,6 +75,7 @@ export const BLOCKS = {
   'portal.frame-hero': () => import('/views/surface/blocks-portal.js').then(m => m.V2HeroBlock),
   'portal.frame-ten': () => import('/views/surface/blocks-portal.js').then(m => m.V2TenBlock),
   'portal.frame-projector': () => import('/views/surface/blocks-portal.js').then(m => m.V2ProjectorBlock),
+  'portal.frame-signage': () => import('/views/surface/blocks-portal.js').then(m => m.V2SignageBlock),
   'portal.frame-cards': () => import('/views/surface/blocks-portal.js').then(m => m.V2CardsBlock),
   'portal.frame-wall': () => import('/views/surface/blocks-portal.js').then(m => m.V2WallBlock),
   'portal.frame-linux': () => import('/views/surface/blocks-portal.js').then(m => m.V2LinuxBlock),

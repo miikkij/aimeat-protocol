@@ -12771,6 +12771,12 @@
     "slideAdminPackages": "Palvelimelle asennetut paketit, koeajo ennen ja peruutus jälkeen.",
     "slideAdminMsm": "Ulkopuolinen rajapinta kuvattu kerran, ja jokainen appi kutsuu sitä samalla tavalla.",
     "slideAdminGenesis": "Kaksi federaatiota yhdistetty, katalogit jaettu, ja muistia luetaan vain luvalla.",
+    "signageTitle1": "Kokonainen järjestelmä, tehty pyytämällä:",
+    "signageTitle2": "digitaalinen opastenäyttö",
+    "signageSub": "Hallintapaneeli, sen ohjaamat näytöt ja itse näyttö, kaikki tehty täällä kertomalla tekoälylle mitä haluttiin. Alla oleva kehys on se näyttö, livenä: näet sen mitä opaste näyttää juuri nyt.",
+    "signageFrameTitle": "Opastenäyttö livenä",
+    "signageOpenScreen": "Avaa näyttö koko kokoon →",
+    "signageOpenAdmin": "Avaa hallintapaneeli jolla se tehtiin →",
     "cardsTitle1": "Mitä teet ensimmäisenä päivänä:",
     "cardsTitle2": "prompti, ja mitä siitä syntyi",
     "cardsSub": "Neljä promptia, neljä aivan erilaista asiaa. Kopioi yksi, liitä se omaan tekoälyysi ja katso mitä tulee takaisin. Kesto ja malli kirjataan korttiin kun kukin on ajettu.",
@@ -19431,6 +19437,10 @@
         "frame-projector": {
           "label": "Diaprojektori",
           "summary": "Yksi iso nappi, yksi dia jokaisesta Asetusten ja hallinnan ja Adminin sivusta ja jokaisesta esityksen apista, valikot sanapilvenä ympärillä ja nykyinen sana sytytettynä. Kävijälle vapaaehtoinen."
+        },
+        "frame-signage": {
+          "label": "Opastenäyttö livenä",
+          "summary": "Opastenäyttöesimerkki yhtenä appina: näyttö kehystettynä sivulle livenä, ja ovet koko kokoon ja hallintapaneeliin jolla se tehtiin."
         },
         "frame-cards": {
           "label": "Promptit ja mitä niistä syntyi",
