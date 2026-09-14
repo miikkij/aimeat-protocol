@@ -20,6 +20,8 @@
  * @structure PROMPTS · CARDS · PromptCards · AppCard · Wall2
  * @usage import { PromptCards, Wall2 } from './landing-v2-cards.js';
  * @version-history
+ *   v0.3.0 — 2026-09-15 — The four prompts were run and the cards carry the results: address,
+ *     time and model, with the show's picture first and the catalogue's screenshot as fallback.
  *   v0.2.0 — 2026-09-14 — Four new prompts, written to be run: a co-op lighthouse game, receipts
  *     into the ledger, a live decision room, a committee of agents. The apps they make come after.
  *   v0.1.0 — 2026-09-14 — Design round, TARGET-075.
@@ -93,11 +95,16 @@ A schedule can reconvene the committee weekly on the same question, and the app 
  * The four cards. `app` is owner/filename once the prompt has been run and the thing exists;
  * `took` and `model` are filled in from that run. Until then the card says "not built yet".
  */
+// Run on 2026-09-14, each prompt as one message to a Claude Code connected over MCP; the times are
+// from the first message to the address being handed over (THE COMMITTEE: 34 min for the brief,
+// 52 with the two follow-ups that added a model per seat and the crew-held seat). `shot` is the
+// id in the projector's show, so `pnpm projector:shots --only apps:<id>` gives the card its picture;
+// the catalogue's screenshot is the fallback.
 const CARDS = [
-  { id: 'lighthouse', name: 'NIGHT WATCH', key: 'landing2.cardLighthouse', en: 'Two keepers in two browsers keep one lighthouse lit through a four-minute night, and the keeper\'s log grows for as long as the app exists.', prompt: PROMPTS.lighthouse, app: null, took: '', model: '' },
-  { id: 'tosite', name: 'TOSITE', key: 'landing2.cardTosite', en: 'Photograph a receipt and it is a voucher in the ledger with its VAT code, the photo filed as evidence, and the month ready for the accountant.', prompt: PROMPTS.tosite, app: null, took: '', model: '' },
-  { id: 'signalroom', name: 'SIGNAL ROOM', key: 'landing2.cardSignalRoom', en: 'Five people, one question, two silent rounds of dials, and a ruling every one of them signed.', prompt: PROMPTS.signalroom, app: null, took: '', model: '' },
-  { id: 'committee', name: 'THE COMMITTEE', key: 'landing2.cardCommittee', en: 'Your own agents deliberate a question, change their minds once, wait for your ruling, and hand you the minutes.', prompt: PROMPTS.committee, app: null, took: '', model: '' },
+  { id: 'lighthouse', name: 'NIGHT WATCH', key: 'landing2.cardLighthouse', en: 'Two keepers in two browsers keep one lighthouse lit through a four-minute night, and the keeper\'s log grows for as long as the app exists.', prompt: PROMPTS.lighthouse, app: 'happydude500001/night-watch.html', shot: 'night-watch', took: '63 min', model: 'Claude Fable 5.1' },
+  { id: 'tosite', name: 'TOSITE', key: 'landing2.cardTosite', en: 'Photograph a receipt and it is a voucher in the ledger with its VAT code, the photo filed as evidence, and the month ready for the accountant.', prompt: PROMPTS.tosite, app: 'happydude500001/tosite.html', shot: 'tosite', took: '27 min', model: 'Claude Fable 5.1' },
+  { id: 'signalroom', name: 'SIGNAL ROOM', key: 'landing2.cardSignalRoom', en: 'Five people, one question, two silent rounds of dials, and a ruling every one of them signed.', prompt: PROMPTS.signalroom, app: 'happydude500001/signal-room.html', shot: 'signal-room', took: '29 min', model: 'Claude Fable 5.1' },
+  { id: 'committee', name: 'THE COMMITTEE', key: 'landing2.cardCommittee', en: 'Your own agents deliberate a question, change their minds once, wait for your ruling, and hand you the minutes.', prompt: PROMPTS.committee, app: 'happydude500001/the-committee.html', shot: 'the-committee', took: '34 min', model: 'Claude Fable 5.1' },
 ];
 
 const EyeMark = html`<svg class="ld-eye" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
@@ -119,13 +126,16 @@ export function PromptCards() {
         ${CARDS.map((c) => {
           const built = !!c.app;
           const href = built ? `/v1/apps/${c.app.split('/').map(encodeURIComponent).join('/')}?mode=inline` : '';
-          const shot = built ? `/v1/apps/${c.app.split('/').map(encodeURIComponent).join('/')}/screenshot` : '';
+          // The show's own picture first, the catalogue's screenshot when that file is missing.
+          const own = c.shot ? `/img/frontdemo/projector/apps-${encodeURIComponent(c.shot)}.png` : '';
+          const catalogue = built ? `/v1/apps/${c.app.split('/').map(encodeURIComponent).join('/')}/screenshot` : '';
+          const shot = (own && !missing[own]) ? own : catalogue;
           const open = (e) => { e.preventDefault(); if (built) openAppSandboxed(href, c.name); };
           return html`
             <article class="ld-v2-card poster-frame" key=${c.id}>
               <div class="ld-v2-card-shot" role=${built ? 'button' : undefined} tabindex=${built ? 0 : undefined} onClick=${open}
                 onKeyDown=${(e) => { if (built && (e.key === 'Enter' || e.key === ' ')) open(e); }}>
-                ${!built || missing[shot]
+                ${!shot || missing[shot]
                   ? html`<span class="ld-v2-card-shot-ph">${c.name}</span>`
                   : html`<img src=${shot} alt=${c.name} onError=${() => setMissing((m) => ({ ...m, [shot]: true }))} />`}
               </div>
