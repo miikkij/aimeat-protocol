@@ -23,6 +23,9 @@
  *     node packages/build-company-brain-pkg.mjs
  * @usage node packages/build-company-brain-pkg.mjs   (run from the repo root)
  * @version-history
+ *   v1.1.0 — 2026-09-14 — The app component carries the data map from packages/company-brain/
+ *     datamap.json, so an installed brain can say where it puts a company's knowledge without
+ *     anyone reading its source.
  *   v1.0.0 — 2026-08-23 — Initial (TARGET-071).
  */
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -53,6 +56,12 @@ const cortex = JSON.stringify({
     manifest: read('cortex/manifest.yaml'),
     libs: { 'company-brain.js': read('cortex/company-brain.js') },
 });
+
+// The data map travels as the DOCUMENT, not as the stamp an app manifest carries: a stamp addresses
+// `apps.<id>.datamap`, and the installed copy's id is this node's, not ours. The installer writes it
+// under the name it gave the app and stamps from what it wrote. Parsed here rather than inlined as
+// text so a malformed map fails this build instead of every install.
+const datamap = JSON.parse(read('datamap.json'));
 
 /**
  * The app is emitted as its own module. Inlined beside the extension and the cortex it takes the
@@ -118,6 +127,13 @@ const EXT_BRAIN = \`${esc(extension)}\`;
 
 const CORTEX_BRAIN = \`${esc(cortex)}\`;
 
+/**
+ * What this app does with a company's data, in the author's own words. It travels with the bytes so
+ * an installed copy can answer the question without anyone opening the source, and the installer
+ * writes it beside the app under the name this node gave it.
+ */
+const DATAMAP_BRAIN = ${JSON.stringify(datamap, null, 2).replace(/\n/g, '\n')} as const;
+
 export function companyBrainPackage(): ExamplePackageDef {
   return {
     name: 'company-brain',
@@ -135,7 +151,11 @@ export function companyBrainPackage(): ExamplePackageDef {
       // only when the filename ends in .html (routes/subdomains.ts). An extensionless component id
       // therefore produces an app that can never be opened on its own origin — the only place the
       // SSO bridge works — and never gets a subdomain minted for it.
-      { id: 'app-brain.html', type: 'app', label: 'Company brain', content: APP_BRAIN, dependencies: ['ext-brain', 'cortex-brain'] },
+      {
+        id: 'app-brain.html', type: 'app', label: 'Company brain', content: APP_BRAIN,
+        dependencies: ['ext-brain', 'cortex-brain'],
+        meta: { app: { datamap: DATAMAP_BRAIN } },
+      },
     ],
     templateListing: {
       title: 'Company brain',
