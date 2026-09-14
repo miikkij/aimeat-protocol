@@ -13,6 +13,9 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-organism.js"></script>
  *   const ws = await AIMEAT.organism.read(orgId, wsId); ws.spaces[0].items[0].value
  * @version-history
+ *   v1.3.0 — 2026-09-14 — createWorkspace fills a permissive schema only for a MEMORY records space.
+ *     A row space has no schema-validated records, and a missing mode reads as 'records', so every
+ *     row space created through here left a schema lock standing over a namespace nothing validates.
  *   v1.2.0 — 2026-09-13 — A write or publish into a space the workspace manifest does not declare is
  *     refused by the node (422 UNDECLARED_SPACE, the developer's decision), so writeDraft, publish and
  *     publishRecords THROW it like any refusal: `err.code === 'UNDECLARED_SPACE'`, `err.message` says
@@ -249,7 +252,12 @@ var organism = {
           var slug = String(ot.name || ('type' + oi)).replace(/[^a-zA-Z0-9_-]/g, '-');
           ot.schemaRef = 'schema:' + name + '-' + slug + '@1';
         }
-        if (ot && ot.namespace && sc[ot.namespace] === undefined && (ot.mode || 'records') === 'records') {
+        // Only a MEMORY space stores records a schema can validate. A row space's data lives in the
+        // row store, where no schema lock is ever consulted, so filling one here would leave a lock
+        // record standing over a namespace nothing validates — and a missing mode reads as
+        // 'records', so a row space landed in here whether or not its mode was ever set.
+        if (ot && ot.namespace && sc[ot.namespace] === undefined
+            && (ot.backing || 'memory') === 'memory' && (ot.mode || 'records') === 'records') {
           sc[ot.namespace] = { type: 'object', additionalProperties: true };
         }
       }

@@ -11227,6 +11227,8 @@
       "backToWorkspace": "Volver al espacio de trabajo",
       "kindDoc": "espacio de documentos",
       "kindRecord": "tipo de registro",
+      "kindRows": "espacio de filas",
+      "kindTasks": "espacio de tareas",
       "more": "… {n} más"
     },
     "railTitle": "En este organismo",
@@ -11488,6 +11490,7 @@
     "reAdopt": "Volver a adoptar",
     "bareContract": "contrato",
     "spaceTasksBacked": "Este espacio apunta al sistema de tareas: sus elementos son tareas, no registros del espacio de trabajo. Se llevan desde las vistas de Tareas.",
+    "spaceRowsBacked": "En este espacio se acumulan las filas que añade el grupo. Las filas se añaden al final y no se editan, y esta página no las lista: se leen con las herramientas de filas, que las filtran y las paginan.",
     "spaceBackingUnsupported": "El respaldo de este espacio no está soportado, así que su contenido no se ve aquí. Edita el espacio de trabajo (el manifiesto) y pon el respaldo de este espacio en \"memory\" para recuperarlo. Los archivos y los paquetes de conocimiento se enganchan por Fuentes o como imágenes de documento.",
     "onePerLine": "uno por línea",
     "autoIdHint": "Se rellena solo. Cámbialo si quieres un id que se recuerde.",

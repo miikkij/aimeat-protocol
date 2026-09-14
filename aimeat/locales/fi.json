@@ -13001,6 +13001,8 @@
       "backToWorkspace": "Takaisin työtilaan",
       "kindDoc": "dokumenttitila",
       "kindRecord": "tietuetyyppi",
+      "kindRows": "rivitila",
+      "kindTasks": "tehtävätila",
       "more": "… {n} lisää"
     },
     "railTitle": "Tässä organismissa",
@@ -13266,6 +13268,7 @@
     "reAdopt": "Ota uudelleen käyttöön",
     "bareContract": "sopimus",
     "spaceTasksBacked": "Tämä tila osoittaa tehtäväjärjestelmään: sen sisältö on tehtäviä, ei työtilan tietueita. Hallitse niitä Tehtävät-näkymissä.",
+    "spaceRowsBacked": "Tähän tilaan kertyy rivejä, joita ryhmä lisää. Rivit kirjataan perään eikä niitä muokata, eikä niitä listata tällä sivulla: ne luetaan rivityökaluilla, jotka suodattavat ja sivuttavat ne.",
     "spaceBackingUnsupported": "Tämän tilan backing-arvoa ei tueta, joten sen sisältöä ei näytetä tässä. Muokkaa työtilaa (manifestia) ja vaihda tilan backing-arvoksi \"memory\" palauttaaksesi sen. Tiedostot ja tietopaketit liitetään Lähteiden tai dokumenttien kuvien kautta.",
     "onePerLine": "yksi per rivi",
     "autoIdHint": "Esitäytetty automaattisesti: vaihda, jos haluat muistettavan tunnisteen.",
