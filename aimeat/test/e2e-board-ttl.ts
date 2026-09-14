@@ -780,6 +780,73 @@ await test('35c. …and the eleventh cannot be reached by making it private and 
     await json(`/v1/owners/${encodeURIComponent(name)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
 });
 
+// REFUSE BEFORE THE FIRST WRITE. Activating a cortex walks its components and writes each one as it
+// goes; the board ceiling was asked at the board-template case, in the middle of that walk, and a
+// refusal there is a throw. So a manifest that declares a schema BEFORE its public board left the
+// schema lock behind on a refused activation, and nothing recorded it as an artifact to undo. The
+// ceiling is asked once now, for every new public board at once, before the loop starts.
+//
+// This test also had to find why it was not refusing at all: the cortex door passes the bare account
+// name as the caller, and the count read the owner out of `name@node`, so ten public boards counted
+// as zero. Both halves are needed for the assertion below. Found by the AI triage of 2026-09-13.
+await test('35d. A cortex refused by the board ceiling writes none of the components before it', async () => {
+    const name = `bd-cortexq-${Date.now()}`;
+    const { body: oBody } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
+    const token = await getToken(name, oBody.data.private_key, false);
+    for (let i = 1; i <= 10; i++) {
+        const { status } = await json('/v1/boards', {
+            method: 'POST', headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ name: `Cortex quota board ${i}`, visibility: 'public' }),
+        });
+        assert(status === 201, `filling the ceiling, board ${i}: ${status}`);
+    }
+
+    const cortexName = `quota-probe-${Date.now()}`;
+    const keyPattern = `cortexquota.${Date.now()}.note`;
+    const manifest = `apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: ${cortexName}
+  namespace: ${name}
+  description: A schema first, then a public board this account has no room for
+spec:
+  version: "1.0.0"
+  components:
+    - type: schema
+      name: note-lock
+      key_pattern: ${keyPattern}
+      apply_to: exact
+      schema:
+        type: object
+        properties:
+          title:
+            type: string
+    - type: board-template
+      name: overflow
+      title: One board too many
+      visibility: public
+`;
+    const install = await json('/v1/cortex', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ manifest }),
+    });
+    assert(install.status === 201, `install: ${install.status} ${JSON.stringify(install.body?.error)}`);
+
+    const activate = await json(`/v1/cortex/${encodeURIComponent(cortexName)}/activate`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` },
+    });
+    assert(activate.status >= 400, `the activation must be refused, got ${activate.status}`);
+
+    // The schema is declared BEFORE the board in the manifest, so on the old order it was locked and
+    // stayed locked. Nothing may hold that key pattern now.
+    const locked = await json(`/v1/memory/${encodeURIComponent(keyPattern)}/schema`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    assert(locked.body?.data?.has_schema === false, `a refused activation must leave no schema lock behind: ${locked.status} ${JSON.stringify(locked.body?.data)}`);
+
+    await json(`/v1/owners/${encodeURIComponent(name)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+});
+
 await test('36. Unsubscribe when not subscribed → 404', async () => {
     const { status } = await json(`/v1/boards/${privateBoardId}/subscribe`, {
         method: 'DELETE',

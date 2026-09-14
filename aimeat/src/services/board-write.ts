@@ -45,6 +45,10 @@
  *   const out = await createBoard({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.4.0 -- 2026-09-14 -- publicBoardCeiling() counts under the owner GHII and takes the number of
+ *     boards the caller is about to open. It counted with isSameOwner(), which answers the empty
+ *     string for the bare account name the cortex door passes, so that door's ceiling had never
+ *     fired; and asking one board at a time cannot bound an activation that opens several.
  *   v1.3.0 -- 2026-09-13 -- A board reaction counts once per person: a mark the owner or any of their
  *     agents already gave is the caller's mark (react answers ok without a second entry, un-react takes
  *     it back). It counted per identity, so an owner and their agent were two votes.
@@ -184,21 +188,47 @@ export function boardVisibleTo(
  *
  * `null` when the move is allowed — including every move that is not INTO public, and every move by
  * an operator, for whom the count has never applied.
+ *
+ * THE COUNT KEYS ON THE OWNER GHII, because a ceiling is a RIGHT and a right has one coordinate
+ * (utils/gaii.ts, ownerCoordinate). It used to key on `isSameOwner`, which reads the owner out of
+ * `name@node` and answers the empty string for a bare account name — and the cortex door hands it a
+ * bare account name, because CortexCaller.gaii is `req.auth!.sub` and an owner session's `sub` is
+ * the account name. So `alice` was compared against the `alice@node` her own boards carry, matched
+ * nothing, counted zero, and the ceiling the 2026-09-06 review added to the cortex path had never
+ * once fired for an owner session. Measured 2026-09-14: ten public boards held, `mine` came back 0.
+ * A bare name is this node's account, which is what resolveIdentity would have made of it.
  */
+/**
+ * The account a principal's public boards are counted under: the owner GHII, with a bare account
+ * name read as an account on this node. `agent#alice@node`, `alice@node` and `alice` are one.
+ */
+function boardAccountOf(principal: string, nodeId: string): string {
+    return ownerGhiiOf(principal.includes('@') ? principal : `${principal}@${nodeId}`);
+}
+
 export async function publicBoardCeiling(
     deps: BoardWriteDeps,
     caller: BoardWriteCaller,
     visibility: string | undefined,
+    /**
+     * How many public boards the caller is about to open. One by default, which is every door that
+     * creates a board. A cortex activation asks about all of its board-templates at once, because
+     * it has to know BEFORE it writes the first of them — see routes/cortex/activation.ts.
+     */
+    wanted = 1,
 ): Promise<BoardWriteRefusal | null> {
     if (visibility !== 'public') return null;
     if (caller.roles.includes('operator')) return null;
     const { storage, config } = deps;
+    const account = boardAccountOf(caller.gaii, config.nodeId);
     const mine = (await storage.listBoards({ visibility: 'public' }))
-        .filter(b => b.ownerGaii === caller.gaii || isSameOwner(b.ownerGaii, caller.gaii)).length;
-    if (mine < config.boardPublicPerOwnerMax) return null;
+        .filter(b => boardAccountOf(b.ownerGaii, config.nodeId) === account).length;
+    if (mine + wanted <= config.boardPublicPerOwnerMax) return null;
     return {
         ok: false, status: 403, code: 'BOARD_QUOTA',
-        message: `You already keep ${mine} public boards, the most one account may here. Delete one to open another.`,
+        message: wanted > 1
+            ? `You keep ${mine} public boards and this would open ${wanted} more, over the ${config.boardPublicPerOwnerMax} one account may have here. Delete some first.`
+            : `You already keep ${mine} public boards, the most one account may here. Delete one to open another.`,
     };
 }
 

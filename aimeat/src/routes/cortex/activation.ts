@@ -6,6 +6,10 @@
  *   schemas, ontologies, prompts, actions, boards, seed-data and lib registrations. Extracted
  *   from src/routes/cortex.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-14 — The public-board ceiling is asked BEFORE the component walk, for all the
+ *     new public boards at once. It was asked at the board-template case, in the middle of the walk,
+ *     and a refusal there is a throw: every schema, prompt, action and ontology listed before that
+ *     template was already written and nothing recorded it. Invariant 14, refuse before you write.
  *   v1.1.0 — 2026-09-08 — An activated ontology carries a `skos` rendering beside its `concepts`.
  *     The old shape was a concept scheme under names no SKOS tool recognises, so nothing outside
  *     this repo could read it and it could not be pointed at an outside vocabulary. `concepts` is
@@ -41,6 +45,28 @@ export async function activateExtension(
   };
 
   const now = new Date().toISOString();
+
+  // REFUSE BEFORE THE FIRST WRITE, because there is nothing behind this loop that can undo one.
+  // The public-board ceiling used to be asked at the board-template case, in the middle of the
+  // walk, and a refusal there is a `throw` — so every schema lock, prompt, action and ontology
+  // record the manifest listed BEFORE that template was already written, activateCortex never
+  // reached the line that records them in activationArtifacts, and nothing was left that could take
+  // them back. The upsert path is worse: libraries and manifest already swapped, the previous
+  // activation's side effects already torn down. Found by the AI triage of 2026-09-13, twice.
+  //
+  // Asked once, for ALL the new public boards together, because asking per board before creating
+  // any of them would count the same free slot several times over.
+  const wantedPublicBoards: string[] = [];
+  for (const comp of ext.components) {
+    if (comp.type !== 'board-template' || comp.visibility !== 'public') continue;
+    if (await storage.getBoard(`cortex-${ext.name}-${comp.name}`)) continue;   // already there, not new
+    wantedPublicBoards.push(comp.name);
+  }
+  if (wantedPublicBoards.length > 0) {
+    const ceiling = await publicBoardCeiling({ storage, config },
+      { gaii, roles: isOperator ? ['operator'] : [] }, 'public', wantedPublicBoards.length);
+    if (ceiling) throw new Error(ceiling.message);
+  }
 
   for (const comp of ext.components) {
     switch (comp.type) {
@@ -149,6 +175,9 @@ export async function activateExtension(
           // the catalogue that createBoard() bounds at ten per account. Refusing the activation is
           // the honest answer: the cortex asked for a public board and cannot have one, and a board
           // quietly downgraded to private would be a cortex that does not work as it says.
+          // Asked again here on purpose, and it is the pre-pass above that makes the ordinary case
+          // refuse before anything is written. This one closes the window where a second activation
+          // for the same account takes the last slot between that check and this write.
           const ceiling = await publicBoardCeiling({ storage, config }, { gaii, roles: isOperator ? ['operator'] : [] }, comp.visibility);
           if (ceiling) throw new Error(ceiling.message);
           await storage.createBoard({
