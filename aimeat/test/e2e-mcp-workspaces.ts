@@ -351,6 +351,40 @@ await test('9d. an embed pointing at a NON-existent file is left unchanged (neve
     assert(item && (item.value.markdown as string).includes(missing), `unresolved embed left as-is: ${item?.value?.markdown}`);
 });
 
+// REFUSE BEFORE YOU WRITE, on the one write that hid inside a read. Scoping an embedded file to the
+// workspace is a write, and it used to happen while the batch was still being planned — so a second
+// item the schema refuses sent the whole call back 422 with the FIRST item's image already readable
+// by every member and nothing stored. Found by the AI triage of 2026-09-13.
+await test('9e. a refused batch leaves the first item\'s embedded file unscoped', async () => {
+    const key = `img/refused-${Date.now()}.png`;
+    const up = await json('/v1/storage', {
+        method: 'POST', headers: { Authorization: `Bearer ${imgAgentToken}` },
+        body: JSON.stringify({ key, data: PNG_1x1_B64, mime_type: 'image/png', visibility: 'private' }),
+    });
+    assert(up.status === 201, `upload ${up.status}: ${JSON.stringify(up.body.error || up.body)}`);
+
+    const before = await fetch(`${BASE}/v1/storage/${key}`, { method: 'HEAD', headers: { Authorization: `Bearer ${imgAgentToken}` } });
+    assert(before.headers.get('x-aimeat-visibility') === 'private', `starts private, got ${before.headers.get('x-aimeat-visibility')}`);
+
+    // Item 0 embeds it and is fine; item 1 is the schema-invalid record test 4 already pins.
+    const b = await A.client.call('aimeat_workspace_write', {
+        organism_id: orgId, ws: WS,
+        items: [
+            { space: 'page', value: { title: 'Refused batch', markdown: `![x](/v1/storage/${key})` } },
+            { space: 'note', id: 'refused-note', value: { body: 'no title' } },
+        ],
+    }, 196);
+    assert(b.result.isError === true, `the batch must be refused: ${b.result.content?.[0]?.text}`);
+
+    const after = await fetch(`${BASE}/v1/storage/${key}`, { method: 'HEAD', headers: { Authorization: `Bearer ${imgAgentToken}` } });
+    assert(after.headers.get('x-aimeat-visibility') === 'private',
+        `a refused write must not have opened the file to the workspace: ${after.headers.get('x-aimeat-visibility')}`);
+
+    // And nothing was stored, which is the other half of "all or nothing".
+    const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS }, 197);
+    assert(!JSON.stringify(JSON.parse(rd.result.content[0].text)).includes('Refused batch'), 'no half-written item');
+});
+
 await test('8b. delete removes a published object (draft + latest + versions)', async () => {
     const b = await A.client.call('aimeat_workspace_object_delete', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'n1' }, 1081);
     assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
