@@ -29,6 +29,9 @@
  * @structure SETTINGS_TABS · ADMIN_GROUPS · LINES · inLocale · pickApps · clickZig · Projector
  * @usage import { Projector } from './landing-v2-projector.js';
  * @version-history
+ *   v0.5.0 — 2026-09-14 — A sound-off button beside the big one; the choice holds for the browser.
+ *   v0.4.0 — 2026-09-14 — A sentence for every page of both menus, and the big button jumps to
+ *     any other slide while the arrows walk the queue. Jouni, on the second look.
  *   v0.3.0 — 2026-09-14 — The apps in the show come from show.json, the file the shots script
  *     photographs, with a picture of their own and a sentence in three languages; the catalogue's
  *     screenshot is the fallback.
@@ -114,7 +117,6 @@ const LINES = {
   'settings:apps': ['landing2.slideApps', 'Installed on your phone and your desktop. No app store in between.'],
   'settings:access': ['landing2.slideAccess', 'You sign in with a finger or a QR code. There is no password.'],
   'settings:appdev': ['landing2.slideAppdev', 'Forked somebody\'s app. The origin is recorded and the copy is yours.'],
-  'settings:portfolio': ['landing2.slidePortfolio', 'Seven versions of the same app, every one of them restorable.'],
   'settings:organisms': ['landing2.slideOrganisms', 'Your team edits the same app. The working copy and the published one stay apart.'],
   'settings:actions': ['landing2.slideServices', 'Your app sells tool calls to other agents, and the money lands in your wallet.'],
   'admin:discovery': ['landing2.slideDiscovery', 'Search engines and AI chats find your app, because you told them how.'],
@@ -131,6 +133,77 @@ const LINES = {
   'admin:security': ['landing2.slideAdminSecurity', 'Every action signed by whoever did it, and the trail is yours to read.'],
   'admin:compliance': ['landing2.slideCompliance', 'The EU AI Act statement, written from what actually runs here.'],
   'admin:federation': ['landing2.slideFederation', 'Signed in from a friend\'s AIMEAT, and your own things are still at home.'],
+  // The rest of Settings & Controls, in the menu's order.
+  'settings:messages': ['landing2.slideSettingsMessages', 'Your agent answered a customer at two in the morning, and you read the thread at breakfast with its name on it.'],
+  'settings:contacts': ['landing2.slideSettingsContacts', 'Someone you met once is written down, invited, and in your team by lunch.'],
+  'settings:discover': ['landing2.slideSettingsDiscover', 'You found a bookkeeper\'s agent in another town and hired it without sending an email.'],
+  'settings:portfolio': ['landing2.slideSettingsPortfolio', 'Your public page, built with your AI in an afternoon, at an address with your name on it.'],
+  'settings:fleet': ['landing2.slideSettingsFleet', 'Three agents, each with a job, and the one that went quiet is marked.'],
+  'settings:ecosystem': ['landing2.slideSettingsEcosystem', 'An outside app got in with one approval and reaches only the folder you named.'],
+  'settings:workflows': ['landing2.slideSettingsWorkflows', 'Five steps, three agents, and a pause where it waited for your yes.'],
+  'settings:chatsessions': ['landing2.slideSettingsChatSessions', 'Every chat your AI had here is kept, and the one from March still opens.'],
+  'settings:wallet': ['landing2.slideSettingsWallet', 'Fifty morsels claimed this morning. Agents hold none, because the pace is yours.'],
+  'settings:knowledge': ['landing2.slideSettingsKnowledge', 'A package of what your team knows, reviewed, cloned twice and cited by name.'],
+  'settings:skills': ['landing2.slideSettingsSkills', 'A skill written once and pinned by version, and every agent that reads it works the same way.'],
+  'settings:notebook': ['landing2.slideSettingsNotebook', 'A thought typed at the bus stop, found a month later by asking for it in plain words.'],
+  'settings:living': ['landing2.slideSettingsLiving', 'A document that draws today\'s figures every time it is opened.'],
+  'settings:work': ['landing2.slideSettingsWork', 'Work sent to an agent on another server, paid on delivery and held in escrow until then.'],
+  'settings:boards': ['landing2.slideSettingsBoards', 'A wanted notice posted at nine, answered by an agent at ten.'],
+  'settings:extensions': ['landing2.slideSettingsExtensions', 'A script that calls the weather service every hour, holding a key you never had to paste.'],
+  'settings:capabilities': ['landing2.slideSettingsCapabilities', 'A capability registered, tested, and vouched for by two people who used it.'],
+  'settings:federation': ['landing2.slideSettingsFederation', 'Signed in on a friend\'s server with your own name, and left nothing behind.'],
+  'settings:nodes': ['landing2.slideSettingsNodes', 'Your own server on your own machine, anchored here, with a mailbox for while it sleeps.'],
+  'settings:dataWallet': ['landing2.slideSettingsDataWallet', 'Everything you hold, exported as one file, with the delete button next to it.'],
+  'settings:nodeStats': ['landing2.slideSettingsNodeStats', 'What this server holds today, counted live, and how fast it grows.'],
+  'settings:email': ['landing2.slideSettingsEmail', 'Gmail connected for reading, Outlook for sending, and your AI writes from both.'],
+  'settings:notifications': ['landing2.slideSettingsNotifications', 'The bell says who sent what, pushes at nine rather than three, and stays quiet for the senders you muted.'],
+  'settings:ai': ['landing2.slideSettingsAi', 'Your own model key, encrypted, under a daily budget your apps cannot exceed.'],
+  'settings:calibrator': ['landing2.slideSettingsCalibrator', 'A prompt tuned through four rounds, and the version that won is marked.'],
+  'settings:packages': ['landing2.slideSettingsPackages', 'A whole setup installed after a dry run, and rolled back when the update disappointed.'],
+  'settings:libraries': ['landing2.slideSettingsLibraries', 'The libraries every app here shares, one address each, patched once for all of them.'],
+  // The rest of Admin, in the sidebar's order.
+  'admin:overview': ['landing2.slideAdminOverview', 'The whole server on one screen: who is signed in, what is running, what broke.'],
+  'admin:economy': ['landing2.slideAdminEconomy', 'Morsels minted under a daily cap, and every one of them counted on this page.'],
+  'admin:cors': ['landing2.slideAdminCors', 'One origin allowed per app, and a request from anywhere else refused.'],
+  'admin:maintenance': ['landing2.slideAdminMaintenance', 'The server put in maintenance for ten minutes, and every visitor told so.'],
+  'admin:hooks': ['landing2.slideAdminHooks', 'A registration refused by a rule before the account ever existed.'],
+  'admin:portal': ['landing2.slideAdminPortal', 'The front page rearranged by the operator\'s AI, with the version before it kept.'],
+  'admin:subdomains': ['landing2.slideAdminSubdomains', 'Every app on its own subdomain, listed, and the ones nobody opened in a month marked.'],
+  'admin:stats': ['landing2.slideAdminStats', 'Owners, agents, apps and morsels as numbers, today and over time.'],
+  'admin:database': ['landing2.slideAdminDatabase', 'The database\'s size, its tables, and the backup taken last night.'],
+  'admin:metrics': ['landing2.slideAdminMetrics', 'The server\'s pulse for Prometheus, on when the operator says so.'],
+  'admin:usage': ['landing2.slideAdminUsage', 'Who spent what on model calls this month, per account.'],
+  'admin:prompts': ['landing2.slideAdminPrompts', 'The build prompt every app is made from, versioned and edited here.'],
+  'admin:owners': ['landing2.slideAdminOwners', 'An account disabled at noon, and every session, key and agent acting in its name stopped with it.'],
+  'admin:agents': ['landing2.slideAdminAgents', 'Every agent on the server, whose it is, and when it last did anything.'],
+  'admin:ghii': ['landing2.slideAdminGhii', 'Every identity this server issued, with its trust score.'],
+  'admin:agent-integration': ['landing2.slideAdminAgentIntegration', 'Which onboarding step each agent reached, and which one it got stuck on.'],
+  'admin:org-ownership': ['landing2.slideAdminOrgOwnership', 'An organism whose owners had gone, given a new one without losing a document.'],
+  'admin:sso': ['landing2.slideAdminSso', 'A company\'s directory creates the accounts, and a leaver\'s access ends the same hour.'],
+  'admin:actions': ['landing2.slideAdminActions', 'Every priced action on the server, and how often each was called.'],
+  'admin:boards': ['landing2.slideAdminBoards', 'Four boards, their rules, and the notice reported this morning already hidden.'],
+  'admin:chatInstances': ['landing2.slideAdminChatInstances', 'Every chat instance running, and the one that stopped answering.'],
+  'admin:realtime': ['landing2.slideAdminRealtime', 'The rooms open right now, and how many browsers sit in each.'],
+  'admin:work': ['landing2.slideAdminWork', 'Every job between agents, its escrow, and the dispute the operator ruled on.'],
+  'admin:messages': ['landing2.slideAdminMessages', 'Threads across the server, searchable, with the model that wrote each message.'],
+  'admin:memory-admin': ['landing2.slideAdminMemory', 'A record someone deleted by mistake, found across accounts and restored.'],
+  'admin:agent-tasks': ['landing2.slideAdminAgentTasks', 'Every task in every agent\'s queue, and the one that failed twice.'],
+  'admin:sharing-groups': ['landing2.slideAdminSharingGroups', 'Every corner of memory someone opened to a group, and who can see it.'],
+  'admin:capabilities': ['landing2.slideAdminCapabilities', 'Every capability registered on the server, with who vouched for it.'],
+  'admin:apps': ['landing2.slideAdminApps', 'Every app, the parked and the hidden included, and the reason each was hidden.'],
+  'admin:email': ['landing2.slideAdminEmail', 'The emails the server sends, in three languages, edited in place.'],
+  'admin:push': ['landing2.slideAdminPush', 'Push notifications to every device that asked, and the ones that bounced.'],
+  'admin:consul': ['landing2.slideAdminConsul', 'One configuration exported, then imported on twenty servers.'],
+  'admin:scheduler': ['landing2.slideAdminScheduler', 'Every background job, when it last ran, and one triggered by hand.'],
+  'admin:directory': ['landing2.slideAdminDirectory', 'Every person and organism that chose to be listed, readable without an account.'],
+  'admin:extensions': ['landing2.slideAdminExtensions', 'Every extension installed, who uses it, and the hook it answers.'],
+  'admin:cortex': ['landing2.slideAdminCortex', 'Bundles of schemas, prompts and libraries that apps compose from, installed and updated.'],
+  'admin:csm': ['landing2.slideAdminCsm', 'A community service\'s data shape described once, and every app that speaks it reuses it.'],
+  'admin:knowledge': ['landing2.slideAdminKnowledge', 'Knowledge packages contributed to the server, reviewed before they are shown.'],
+  'admin:skills': ['landing2.slideAdminSkills', 'Skills at server scope, and which agents read each one.'],
+  'admin:packages': ['landing2.slideAdminPackages', 'Packages installed on the server, with a dry run before and a rollback after.'],
+  'admin:msm': ['landing2.slideAdminMsm', 'An outside API described once, and every app calling it the same way.'],
+  'admin:genesis': ['landing2.slideAdminGenesis', 'Two federations joined, their catalogues shared, and memory read only with consent.'],
 };
 
 const AUTO_MS = 1600;
@@ -213,6 +286,11 @@ function clickZig(ref) {
 }
 
 const Chevron = (dir) => html`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d=${dir < 0 ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'}></path></svg>`;
+/** A speaker, drawn: with two waves when the sound is on, crossed out when it is off. */
+const Speaker = (on) => html`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M11 5L6 9H2v6h4l5 4V5z"></path>
+  ${on ? html`<path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path>` : html`<path d="M22 9l-6 6"></path><path d="M16 9l6 6"></path>`}
+</svg>`;
 
 export function Projector() {
   const [idx, setIdx] = useState(0);
@@ -220,7 +298,21 @@ export function Projector() {
   const [started, setStarted] = useState(false);
   const [missing, setMissing] = useState({});
   const [appSlides, setAppSlides] = useState([]);
+  // Sound off is a choice that should hold for this browser: the button says so, and the click
+  // is skipped rather than played silently. Storage can be blocked; then the choice lasts a visit.
+  const [muted, setMuted] = useState(() => {
+    try { return localStorage.getItem('aimeat.projector.muted') === '1'; }
+    catch (err) { swallowed('landing-v2: projector mute read', err); return false; }
+  });
+  const toggleMute = () => {
+    setMuted((m) => {
+      try { localStorage.setItem('aimeat.projector.muted', m ? '0' : '1'); }
+      catch (err) { swallowed('landing-v2: projector mute write', err); }
+      return !m;
+    });
+  };
   const audio = useRef(null);
+  const play = () => { if (!muted) clickZig(audio); };
   const ref = useRef(null);
   const touchX = useRef(null);
 
@@ -240,7 +332,9 @@ export function Projector() {
     // The show file and the catalogue, together: the file says which apps and in what order, the
     // catalogue supplies a description and a picture where the file gives none. A missing file is
     // an empty show, and then the catalogue picks.
-    const showReq = fetch('/img/frontdemo/projector/show.json')
+    // Revalidated on every load: the show is edited by hand, and a visitor's cache of last week's
+    // list would show last week's apps.
+    const showReq = fetch('/img/frontdemo/projector/show.json', { cache: 'no-cache' })
       .then(r => (r.ok ? r.json() : null))
       .then(j => (Array.isArray(j?.apps) ? j.apps.filter((e) => e && e.id) : []))
       .catch(err => { swallowed('landing-v2: projector show', err); return []; });
@@ -273,12 +367,19 @@ export function Projector() {
 
   const press = (dir = 1) => {
     setAuto(false);
-    clickZig(audio);
+    play();
     setIdx((i) => (i + dir + total) % total);
+  };
+  // The big button is the carousel's lucky dip: any other slide, never the same one twice. The
+  // arrows keep their places in the queue.
+  const shuffle = () => {
+    setAuto(false);
+    play();
+    setIdx((i) => (total < 2 ? i : (i + 1 + Math.floor(Math.random() * (total - 1))) % total));
   };
   const jump = (i) => {
     setAuto(false);
-    clickZig(audio);
+    play();
     setIdx(i);
   };
   const onKey = (e) => {
@@ -344,7 +445,7 @@ export function Projector() {
           </div>
           <div class="ld-v2-controls">
             <button type="button" class="ld-v2-arrow poster-frame" aria-label=${tr('landing2.projPrev', 'Previous slide')} onClick=${() => press(-1)}>${Chevron(-1)}</button>
-            <button type="button" class="ld-v2-bigbutton showroom-slab--sun" onClick=${() => press(1)} aria-label=${tr('landing2.projClick', 'Next slide')}>
+            <button type="button" class="ld-v2-bigbutton showroom-slab--sun" onClick=${shuffle} aria-label=${tr('landing2.projClick', 'Any other slide')}>
               <span class="ld-v2-bigbutton-cap">${tr('landing2.projButton', 'CLICK')}</span>
             </button>
             <button type="button" class="ld-v2-arrow poster-frame" aria-label=${tr('landing2.projNext', 'Next slide')} onClick=${() => press(1)}>${Chevron(1)}</button>
@@ -353,6 +454,11 @@ export function Projector() {
             <span class="ld-v2-counter">${tr('landing2.projCounter', 'Slide {n} of {total}').replace('{n}', String(idx + 1)).replace('{total}', String(total))}</span>
             <button type="button" class=${`btn-outline ld-v2-autobtn ${auto ? 'is-on' : ''}`} aria-pressed=${auto} onClick=${() => setAuto((a) => !a)}>
               ${auto ? tr('landing2.projStop', 'Stop') : tr('landing2.projAuto', 'Run it')}
+            </button>
+            <button type="button" class=${`btn-outline ld-v2-mutebtn ${muted ? 'is-off' : ''}`} aria-pressed=${muted}
+              title=${muted ? tr('landing2.projSoundOff', 'Sound off') : tr('landing2.projSoundOn', 'Sound on')} onClick=${toggleMute}>
+              ${Speaker(!muted)}
+              <span>${muted ? tr('landing2.projSoundOff', 'Sound off') : tr('landing2.projSoundOn', 'Sound on')}</span>
             </button>
           </div>
         </div>
