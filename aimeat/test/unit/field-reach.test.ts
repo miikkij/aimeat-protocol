@@ -12,6 +12,7 @@
  *   on PUT /v1/companies/:id, which is Kalle's report.
  * @usage cd aimeat && pnpm exec vitest run test/unit/field-reach.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-14 — A service lookup by name is plumbing (requireOwnCompany).
  *   v1.0.0 — 2026-09-14 — Written with field-reach.ts v2 (wish-kenttien-tavoitettavuus-portiksi).
  */
 import { describe, it, expect } from 'vitest';
@@ -136,6 +137,10 @@ describe('isPlumbing', () => {
         expect(isPlumbing('src/utils/gaii.ts#80')).toBe(true);
         expect(isPlumbing('storage.updateCompany')).toBe(false);
         expect(isPlumbing('src/services/company/company-service.ts#134')).toBe(false);
+        expect(isPlumbing('src/services/company/company-service.ts#134#updateCompany')).toBe(false);
+        // The lookup that made aimeat_company_update a twin of the invoice routes (2026-09-14).
+        expect(isPlumbing('src/services/company/company-service.ts#75#requireOwnCompany')).toBe(true);
+        expect(isPlumbing('src/services/issues.ts#10#issueRefund')).toBe(false);
     });
 });
 

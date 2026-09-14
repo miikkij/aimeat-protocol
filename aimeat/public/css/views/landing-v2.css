@@ -105,6 +105,8 @@
 .ld-v2-counter { font-family: var(--font-showroom); text-transform: uppercase; font-size: .85rem; letter-spacing: .04em; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .ld-v2-autobtn { font-family: var(--font-showroom-body); font-weight: 800; min-width: 6rem; }
 .ld-v2-autobtn.is-on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.ld-v2-mutebtn { display: inline-flex; align-items: center; gap: .4rem; font-family: var(--font-showroom-body); font-weight: 800; }
+.ld-v2-mutebtn.is-off { color: var(--text-dim); }
 /* The word cloud: the two menus as they are, and one word lit. */
 .ld-v2-cloud { display: flex; flex-direction: column; gap: .6rem; }
 /* The menu's name is a poster section title at menu size. */
@@ -147,9 +149,12 @@
 /* The prompt: a dashed frame says "this is the placeholder", and the real prompt takes the same box. */
 .ld-v2-card-prompt {
   margin: 0; padding: .8rem .9rem; white-space: pre-wrap; overflow-wrap: anywhere;
-  font-family: var(--font-mono); font-size: .85rem; line-height: 1.5; color: var(--text);
+  max-height: 16rem; overflow-y: auto;
+  font-family: var(--font-mono); font-size: .82rem; line-height: 1.5; color: var(--text);
   background: var(--bg-surface); border: 2px dashed var(--accent);
 }
+.ld-v2-card-prompt:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.ld-v2-card-notyet { font-family: var(--font-showroom-body); font-size: .9rem; font-weight: 700; color: var(--text-dim); }
 .ld-v2-card-facts { margin: 0; display: flex; gap: 1.5rem; flex-wrap: wrap; }
 .ld-v2-card-facts div { display: flex; flex-direction: column; gap: .1rem; }
 .ld-v2-card-facts dt { font-family: var(--font-showroom); text-transform: uppercase; font-size: .72rem; letter-spacing: .04em; color: var(--text-dim); }
