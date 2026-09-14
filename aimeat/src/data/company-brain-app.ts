@@ -213,7 +213,7 @@ entry: index.html
 
     function manifest() {
       return {
-        manifestVersion: '1.0', id: 'brain', name: company.name + ' — brain',
+        manifestVersion: '1.0', id: 'brain', name: company.name + ' brain',
         kind: 'project', status: 'active',
         objectTypes: [
           { name: 'fact', namespace: NS.fact, schemaRef: 'brain.fact', backing: 'memory', writeRole: 'member', mode: 'records', contract: CONTRACT, maxVersions: 5 },
@@ -304,7 +304,7 @@ entry: index.html
               body: JSON.stringify({ organism_id: org }),
             }).catch(function () { /* the brain still works; the link is a convenience */ });
           }
-          var ws = await AIMEAT.organism.createWorkspace(org, company.name + ' — brain', manifest(), schemas());
+          var ws = await AIMEAT.organism.createWorkspace(org, company.name + ' brain', manifest(), schemas());
           var wsId = (ws && (ws.ws || ws.id)) || null;
           if (!wsId) throw new Error('the workspace could not be created');
           CTX = { org: org, ws: wsId };
@@ -326,7 +326,7 @@ entry: index.html
         '1. Create an organism I own, name "' + company.name + '", visibility private (aimeat_organism_create).',
         '2. Point the company at it: aimeat_company_update { company_id: "' + company.id + '", organism_id: "<org>" }.',
         '3. In it, create a workspace (aimeat_workspace_create) with:',
-        '     name: "' + company.name + ' — brain"',
+        '     name: "' + company.name + ' brain"',
         '     manifest: ' + JSON.stringify(manifest()),
         '',
         'The brain finds this workspace by itself afterwards — it looks for the contract',
