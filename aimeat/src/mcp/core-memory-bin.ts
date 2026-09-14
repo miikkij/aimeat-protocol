@@ -48,6 +48,9 @@ mcp.tool(
         const out = await deleteMemoryRecord({ storage, config }, {
             caller: agentGaii, ownerName: parsed?.owner ?? agentGaii, key,
             ownerScope: owner_scope === true,
+            // An agent session, never an operator one: this surface is minted per agent, so the
+            // organism namespace check and the append-only guard inside the service both apply.
+            roles: ['agent'],
         });
         if (!out.ok) {
             return { content: [{ type: 'text' as const, text: JSON.stringify({ error: out.code, message: out.message }, null, 2) }], isError: true };

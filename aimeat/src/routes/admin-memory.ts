@@ -309,9 +309,13 @@ export function adminMemoryRouter(
             ownerName: req.auth!.owner,
             key: req.params.key as string,
             ownerOverride: ownerGaii,
+            // The operator's override skips the organism membership check, which is what this door
+            // has always meant. The append-only guard still holds: "never erased" is not a rule an
+            // operator is above, and this door never claimed it was.
+            roles: req.auth!.roles,
         });
         if (!out.ok) {
-            res.status(404).json(error(config.nodeId, out.code, out.message));
+            res.status(out.status ?? 404).json(error(config.nodeId, out.code, out.message));
             return;
         }
         res.json(success(config.nodeId, {
