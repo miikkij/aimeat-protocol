@@ -6,7 +6,7 @@
     { "id": "app-page", "name": { "en": "An app's own page", "fi": "Appin oma sivu", "es": "La página propia de una aplicación" }, "url": "/app-catalog.html?q=Design%20Book", "detailOf": "happydude500001/design-book.html", "settle": 8000,
       "line": { "en": "Eighteen sections about one app: where its work lives, its versions, its skills, its audit trail, its money.", "fi": "Kahdeksantoista osiota yhdestä apista: missä sen työ on, versiot, taidot, lokit, rahat.", "es": "Dieciocho secciones sobre una aplicación: dónde vive su trabajo, sus versiones, sus habilidades, su registro, su dinero." } },
     { "id": "design-book", "name": "Design Book", "app": "happydude500001/design-book.html", "settle": 20000 },
-    { "id": "laimeat-sanomat", "name": "(L)AIMEAT Sanomat", "app": "happydude500001/laimeat-sanomat.html", "settle": 8000 },
+    { "id": "laimeat-sanomat", "name": "(L)AIMEAT Sanomat", "app": "happydude500001/laimeatsanomat.html", "settle": 8000 },
     { "id": "lifecycle-central", "name": "Lifecycle Central", "app": "happydude500001/lifecycle-central.html", "settle": 10000 },
     { "id": "ai-music-charts", "name": "AI Music Charts", "app": "happydude500001/ai-music-charts.html", "settle": 8000 },
     { "id": "tinki", "name": "TINKI", "app": "happydude500001/tinki.html", "settle": 6000 },
