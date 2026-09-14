@@ -7,9 +7,12 @@
  *   profile (optionally with a password hash, a verified email, and/or a linked external identity),
  *   and records the welcome-bonus transaction. Used by the OIDC signup finalize path and the email
  *   invitation accept path so account creation stays identical across entry points.
- * @structure ProvisionEmailTakenError; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
+ * @structure ProvisionEmailTakenError; creditWelcomeBonus; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
+ *   v1.5.0 — 2026-09-14 — creditWelcomeBonus() is exported, and the two registration routes that
+ *     minted their own accounts call it instead of writing the transaction themselves. The bonus was
+ *     the same eight lines in three files, so its amount and its condition had three homes.
  *   v1.4.0 — 2026-08-24 — via: 'provisioning' (BR-04 SCIM): an organisation's directory pushing an
  *     account is an administrator's act, refused only under `closed`; and it never triggers the
  *     first-owner→operator self-heal, so a directory sync cannot crown a node's operator.
@@ -86,6 +89,34 @@ export function registrationRefusal(config: AimeatConfig, via: RegistrationVia):
     return 'This node creates new accounts by signing in with an approved identity provider, or by invitation. Registering with a username and password is not available here.';
   }
   return null;
+}
+
+/**
+ * The welcome bonus, written once for every door that creates an account.
+ *
+ * Three doors mint accounts: this file's provisionOwner (OAuth, invitation, SCIM), POST /v1/ghii and
+ * POST /v1/ghii/register-web. All three had the same eight lines pasted in, so the amount, the
+ * condition and the transaction's shape lived in three places and a change to the rule would have
+ * reached one of them. What differs between the doors is only WHEN the account exists; the credit
+ * itself is one decision, and it is this one.
+ *
+ * `now` is the account's creation timestamp, passed in so the bonus carries the same instant as the
+ * GHII record rather than a few milliseconds later.
+ */
+export async function creditWelcomeBonus(
+  storage: Storage,
+  config: AimeatConfig,
+  ghii: string,
+  now: string,
+): Promise<void> {
+  if (config.welcomeBonus <= 0) return;
+  await storage.addTransaction({
+    id: `tx-${randomUUID()}`,
+    gaii: ghii,
+    type: 'welcome_bonus',
+    amount: config.welcomeBonus,
+    timestamp: now,
+  });
 }
 
 export interface ProvisionOwnerOpts {
@@ -196,15 +227,7 @@ export async function provisionOwner(
       .catch(err => { logger.warn('provisionOwner: contact promotion is best-effort', { error: String(err) }); });
   }
 
-  if (config.welcomeBonus > 0) {
-    await storage.addTransaction({
-      id: `tx-${randomUUID()}`,
-      gaii: ghii,
-      type: 'welcome_bonus',
-      amount: config.welcomeBonus,
-      timestamp: now,
-    });
-  }
+  await creditWelcomeBonus(storage, config, ghii, now);
 
   // Which onboarding path this account was created on (05-mittaus.md). This is the SHARED
   // account-creation core — invitation accept (including the agent door), OAuth sign-up and

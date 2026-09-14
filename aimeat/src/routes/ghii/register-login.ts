@@ -6,6 +6,8 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-09-14 — The welcome bonus is creditWelcomeBonus() from owner-provisioning, not a
+ *     transaction this route writes itself.
  *   v1.8.0 — 2026-09-09 — Three guards behind the zod schemas are gone (username required, password
  *     must be a string, login's username and password required); validateBody answered first.
  *   v1.7.0 — 2026-09-08 — A signed attestation with `verified: false` is a refusal (401), not a
@@ -44,7 +46,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { validateOwnerName } from '../../utils/gaii.js';
 import { issueJWT } from '../../auth/jwt.js';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { validateTotpCode, validateBackupCode } from '../../services/totp.js';
 import type { TotpConfig } from '../../services/totp.js';
 import { hashPassword, verifyPassword, isLegacyHash } from '../../services/password.js';
@@ -57,7 +59,7 @@ import { GhiiRegistrationSchema, GhiiLoginSchema, validateBody } from '../../mod
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { parseLoginIdentifier } from '../../utils/login-identifier.js';
 import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
-import { registrationRefusal } from '../../services/owner-provisioning.js';
+import { registrationRefusal, creditWelcomeBonus } from '../../services/owner-provisioning.js';
 
 export function registerRegisterLoginRoutes(
     router: Router,
@@ -247,16 +249,8 @@ export function registerRegisterLoginRoutes(
             updatedAt: now,
         });
 
-        // Record welcome bonus transaction
-        if (config.welcomeBonus > 0) {
-            await storage.addTransaction({
-                id: `tx-${randomUUID()}`,
-                gaii: ghii,
-                type: 'welcome_bonus',
-                amount: config.welcomeBonus,
-                timestamp: now,
-            });
-        }
+        // The welcome bonus, decided in one place for every door that creates an account.
+        await creditWelcomeBonus(storage, config, ghii, now);
 
         // Which onboarding path this account was created on (05-mittaus.md). K3: new accounts get
         // the remake. Written here rather than at first sign-in because a cohort is defined by when
