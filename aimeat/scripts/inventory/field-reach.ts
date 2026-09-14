@@ -25,6 +25,8 @@
  * @structure recordFields(files) · fieldReach(files, fields)
  * @usage const reach = fieldReach(sourceFiles, recordFields(sourceFiles));
  * @version-history
+ *   v1.1.0 — 2026-09-14 — The vocabulary is every *Record type in src/ outside src/cli/, not only
+ *     src/storage/types/. 505 fields became 672, and CompanyRecord is in it.
  *   v1.0.0 — 2026-09-03 — Initial (wish-invarianttiauditointi, phase 1, question C).
  */
 import ts from 'typescript';
@@ -52,7 +54,14 @@ function surfaceOf(fileName: string): Surface | null {
 }
 
 /**
- * Every field name declared by a record interface under storage/types.
+ * Every field name declared by a record type anywhere the node declares one.
+ *
+ * A record is an interface, or a type alias of an object literal, whose name ends in `Record`.
+ * Until 2026-09-14 only src/storage/types/ was read, and CompanyRecord lives in src/models/: the
+ * report held no company field at all, which is why it could not see organism_id. Record types sit
+ * in storage/types, models, commerce, services and routes, so the vocabulary is all of src/ except
+ * src/cli/, whose records are the connector's own local state and not something a node surface
+ * sets.
  *
  * Short and very common names are dropped: `id`, `name`, `key` and their like appear in every file
  * on every surface and answer nothing. The list is about fields specific enough that "only one
@@ -62,18 +71,25 @@ export function recordFields(files: readonly ts.SourceFile[]): Map<string, strin
     const COMMON = new Set(['id', 'name', 'key', 'type', 'value', 'data', 'url', 'owner', 'status',
         'title', 'description', 'content', 'version', 'createdAt', 'updatedAt', 'gaii', 'scopes', 'tags']);
     const out = new Map<string, string[]>();
+    const add = (record: string, members: ts.NodeArray<ts.TypeElement>): void => {
+        for (const member of members) {
+            if (ts.isPropertySignature(member) && ts.isIdentifier(member.name)) {
+                const field = member.name.text;
+                if (field.length < 5 || COMMON.has(field)) continue;
+                const records = out.get(field) ?? [];
+                if (!records.includes(record)) out.set(field, [...records, record]);
+            }
+        }
+    };
 
     for (const source of files) {
-        if (!source.fileName.includes('/src/storage/types/')) continue;
+        const path = source.fileName.split('\\').join('/');
+        if (!path.includes('/src/') || path.includes('/src/cli/')) continue;
         const visit = (node: ts.Node): void => {
             if (ts.isInterfaceDeclaration(node) && /Record$/.test(node.name.text)) {
-                for (const member of node.members) {
-                    if (ts.isPropertySignature(member) && ts.isIdentifier(member.name)) {
-                        const field = member.name.text;
-                        if (field.length < 5 || COMMON.has(field)) continue;
-                        out.set(field, [...(out.get(field) ?? []), node.name.text]);
-                    }
-                }
+                add(node.name.text, node.members);
+            } else if (ts.isTypeAliasDeclaration(node) && /Record$/.test(node.name.text) && ts.isTypeLiteralNode(node.type)) {
+                add(node.name.text, node.type.members);
             }
             ts.forEachChild(node, visit);
         };
