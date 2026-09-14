@@ -38,6 +38,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { issueJWT } from '../auth/jwt.js';
 import { credentialRevoked, isOwnerPrincipal } from '../auth/middleware.js';
+import { withCurrentScopes } from '../auth/effective-scopes.js';
 import { signatureTimestampFresh, spendSignature } from '../auth/signed-request.js';
 import { verify } from '../auth/keypair.js';
 import { parseGAII } from '../utils/gaii.js';
@@ -347,7 +348,17 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         // isOwnerPrincipal is requireOwnerPrincipal's own test as a value — the middleware cannot be
         // used because this token arrives in the body rather than the header, and a near-copy of the
         // test is exactly how three of them came to disagree in auth/middleware.ts.
-        if (!isOwnerPrincipal({ ...ownerPayload, scopes: ownerPayload.scopes ?? [] } as unknown as Request['auth'])) {
+        //
+        // THE SCOPES IT IS GIVEN ARE THE CURRENT ONES, not the token's. isOwnerPrincipal admits a
+        // principal carrying ACCOUNT_SECURITY_SCOPE, and a JWT carries what the agent held when it
+        // was minted. Every ordinary route reads the narrowed list, because optionalAuth and
+        // requireAuth both run withCurrentScopes; this door verified the JWT itself and skipped it,
+        // so an agent whose owner had already taken that permission back went on approving OAuth
+        // consents — and each approval mints a credential carrying the target agent's full scope
+        // list — until its old token expired. Found by the AI triage of 2026-09-13. The same call
+        // also refreshes the operator role, which this door has as much reason to want.
+        const current = await withCurrentScopes(storage, ownerPayload);
+        if (!isOwnerPrincipal({ ...current, scopes: current.scopes ?? [] } as unknown as Request['auth'])) {
             res.status(403).json({ error: 'access_denied', error_description: 'Only the account holder can approve this. Sign in as the owner and try again.' });
             return;
         }

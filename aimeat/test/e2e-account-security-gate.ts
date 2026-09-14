@@ -314,6 +314,7 @@ async function main() {
         assert(r.status === 403, `expected 403 for the '*' agent, got ${r.status} ${JSON.stringify(r.body)}`);
     });
 
+
     // A PAT is the person's own credential, minted by them on purpose, and it is how everything gets
     // managed from outside a browser. So it reaches these doors, and that is a decision rather than an
     // oversight — asserted here so that tightening requireOwnerPrincipal() to mean "a browser session"
@@ -369,6 +370,63 @@ async function main() {
         });
         assert(again.body.ok === true, `owner re-auth: ${JSON.stringify(again.body.error)}`);
         ownerAToken = again.body.data.token as string;
+    });
+
+    // TAKING THE PERMISSION BACK HAS TO REACH THE TOKEN ALREADY OUT THERE. A JWT carries what the
+    // agent held when it was minted, so every door reads the narrowed list instead — optionalAuth
+    // and requireAuth both run withCurrentScopes. POST /v1/mcp/authorize-consent verified the JWT
+    // itself and skipped that, and it is the door that mints a credential carrying the target
+    // agent's FULL scope list. Found by the AI triage of 2026-09-13.
+    await test('a revoked account:security stops an agent approving an MCP consent, on its old token', async () => {
+        const made = await json('/v1/agents', {
+            method: 'POST', headers: auth(ownerAToken),
+            body: JSON.stringify({ name: 'revokebot', owner: ownerA, display_name: 'revokebot', capabilities: [], scopes: ['memory:read', 'account:security'] }),
+        });
+        assert(made.status === 201, `create revokebot: ${made.status} ${JSON.stringify(made.body?.error)}`);
+        const targetGaii = made.body.data.agent.gaii as string;
+        const ts0 = new Date().toISOString();
+        const tok0 = await json('/v1/auth/token', {
+            method: 'POST',
+            body: JSON.stringify({ gaii: targetGaii, timestamp: ts0, signature: await signMsg(made.body.data.private_key as string, targetGaii + ts0) }),
+        });
+        assert(tok0.body.ok === true, `revokebot token: ${JSON.stringify(tok0.body.error)}`);
+        const revokeMe = tok0.body.data.token as string;
+
+        // The ordinary door first, so the token is known to work before the permission is taken.
+        const before = await json('/v1/ghii/cors', {
+            method: 'PUT', headers: auth(revokeMe), body: JSON.stringify({ allowed_origins: null }),
+        });
+        assert(before.status === 200, `the token starts out holding it: ${before.status}`);
+
+        const narrowed = await json('/v1/agents/revokebot/scopes', {
+            method: 'PATCH', headers: auth(ownerAToken), body: JSON.stringify({ scopes: ['memory:read'] }),
+        });
+        assert(narrowed.status === 200, `taking it back: ${narrowed.status} ${JSON.stringify(narrowed.body?.error)}`);
+
+        // Same unexpired token. The ordinary door already refuses it…
+        const after = await json('/v1/ghii/cors', {
+            method: 'PUT', headers: auth(revokeMe), body: JSON.stringify({ allowed_origins: null }),
+        });
+        assert(after.status === 403, `the ordinary door reads the record: ${after.status}`);
+
+        // …and so must the consent door. Everything it needs is supplied, so the principal check is
+        // the only thing left to refuse it: a valid registered client, a real agent of this owner as
+        // the target, and the revoked agent's own token in `owner_token`. On the old code it got
+        // past that check and was handed an authorization code for the target agent's FULL scopes.
+        const reg = await json('/v1/mcp/register', {
+            method: 'POST', body: JSON.stringify({ client_name: 'Revoked consent probe', redirect_uris: [REDIRECT] }),
+        });
+        assert(reg.status === 201, `register client: ${reg.status} ${JSON.stringify(reg.body)}`);
+
+        const consent = await json('/v1/mcp/authorize-consent', {
+            method: 'POST',
+            body: JSON.stringify({
+                client_id: reg.body.client_id, redirect_uri: REDIRECT,
+                gaii: targetGaii, owner_token: revokeMe,
+            }),
+        });
+        assert(consent.status === 403, `the consent door must refuse a revoked permission, got ${consent.status}: ${JSON.stringify(consent.body)}`);
+        assert(consent.body?.error === 'access_denied', `and say why: ${JSON.stringify(consent.body)}`);
     });
 
     await test('the owner can delete their own identity record', async () => {
