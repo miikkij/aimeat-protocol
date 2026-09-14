@@ -40,7 +40,7 @@
  *     live gap (libs swapped, never deleted-then-recreated), re-runs init on an active cortex,
  *     and never consumes a quota slot when updating an existing cortex.
  */
-import { Router, type Request } from 'express';
+import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CortexExtensionRecord } from '../storage/interface.js';
 import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.js';
@@ -48,6 +48,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { parseCortexManifest, validateNamespaceOwnership } from '../services/cortex-manifest.js';
 import { cortexInstallRefusal } from '../services/install-quotas.js';
+import { cortexCallerOf } from './cortex/caller.js';
 import {
   installCortex, activateCortex, deactivateCortex, deleteCortex, canSeeCortex, visibleCortexes,
   libsWithoutContent, missingLibsMessage, type CortexCaller,
@@ -328,16 +329,8 @@ export async function upsertCortex(
 export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  /**
-   * The caller as services/cortex-lifecycle.ts sees it. `req.auth!.owner` is the bare owner name
-   * for an owner session and for that owner's agents alike, which is what `installedBy` holds;
-   * `req.auth!.sub` is the acting principal, recorded on whatever an activation materialises.
-   */
-  const callerOf = (req: Request): CortexCaller => ({
-    ownerName: req.auth!.owner,
-    gaii: req.auth!.sub,
-    isOperator: req.auth!.roles.includes('operator'),
-  });
+  /** Who is asking. In ./cortex/caller.ts, which says why a federated session is not the namesake. */
+  const callerOf = cortexCallerOf;
 
   // ── GET /v1/cortex — list installed cortex extensions ──
   router.get('/v1/cortex', requireAuth(), requireScope('catalogue:read'), async (req, res) => {
