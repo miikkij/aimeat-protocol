@@ -28,7 +28,9 @@
  *   v1.0.0 — 2026-06-23 — Initial: explicit-list + Share-Group audiences, announcement/broadcast modes.
  */
 import { randomUUID } from 'node:crypto';
-import type { DirectMessageAttachment, InteractivePayload, SharingGroupRecord } from '../storage/interface.js';
+import type { AimeatConfig } from '../config.js';
+import type { DirectMessageAttachment, InteractivePayload, SharingGroupRecord, Storage } from '../storage/interface.js';
+import { provenanceForWrite, type DeclaredProvenance } from './ai-provenance.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { isAddressableRecipient } from '../utils/messaging.js';
 import type { DeliveryCtx } from './message-delivery.js';
@@ -157,6 +159,44 @@ export async function sendBroadcast(ctx: DeliveryCtx, input: BroadcastInput): Pr
  * `isOperator` is passed in rather than read from a request: a service takes the caller, not the
  * Express object, and the two doors authenticate differently.
  */
+/**
+ * The AI-provenance stamp a broadcast carries, as a function to be called once the audience has
+ * been judged — see `stampProvenance` below for why it is deferred.
+ *
+ * ONE IMPLEMENTATION, because the two doors had a copy each and they had already drifted in what
+ * they hashed. What a broadcast records is the same on both: the body and the questions a person
+ * reads, private, to a human audience, under this node's label policy. What DIFFERS is the caller's
+ * own declaration — the MCP tool carries the agent's, the REST route stamps from the principal —
+ * and which door it was, so those are the arguments.
+ */
+export function broadcastProvenanceStamp(
+  deps: { storage: Storage; config: AimeatConfig },
+  input: {
+    principal: string;
+    body?: string;
+    questions?: Array<{ header?: string; prompt?: string }>;
+    pipeline: 'rest.messages_broadcast' | 'mcp.dm_broadcast';
+    declaredId?: string;
+    declared?: DeclaredProvenance;
+  },
+): () => Promise<string | undefined> {
+  const { storage, config } = deps;
+  return () => provenanceForWrite(storage, {
+    principal: input.principal,
+    // The questions are content a person reads, exactly as in aimeat_dm_ask, so they are hashed
+    // with the body rather than left out of the record.
+    content: [input.body ?? '', ...(input.questions ?? []).map(q => `${q.header ?? ''} ${q.prompt ?? ''}`)].join('\n'),
+    declaredId: input.declaredId,
+    declared: input.declared,
+    pipeline: input.pipeline,
+    surface: { visibility: 'private', humanAudience: true },
+    labelPolicy: config.aiLabelPublic,
+    nodeId: config.nodeId,
+    baseUrl: config.baseUrl,
+    enabled: config.aiProvenance,
+  });
+}
+
 export async function broadcastFromPrincipal(
   ctx: DeliveryCtx,
   input: {

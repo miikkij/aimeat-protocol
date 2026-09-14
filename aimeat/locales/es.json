@@ -10873,6 +10873,85 @@
     "registerHomeSub": "Si todavía no tienes forma de entrar.",
     "signInHome": "Entra a tu hogar"
   },
+  "landing2": {
+    "title1": "Di lo que quieres.",
+    "title2": "Luego asegúrate de que pase.",
+    "position": "Ese es todo el trabajo ahora. AIMEAT es donde pasa.",
+    "body": "Ya hablas con una IA. Es lista, pero trabaja sola y se le olvida. Aquí recibe manos, memoria y colegas. No aprendes nada nuevo: sigues hablando con la misma IA, y ella recoge sus poderes de aquí. Todo lo que hace pasa en tu espacio, con tu permiso, en tu registro. Por eso puedes dejar entrar a otros.",
+    "wishPh": "¿Qué quieres que se haga?",
+    "wishLead": "Escríbelo y presiona GO. Se abre un chat y empieza contigo ahí mismo. ¿Nuevo aquí? La cuenta se crea en el camino y nada de lo que escribiste se pierde.",
+    "plugIn": "Conecta la IA que ya usas →",
+    "getOwn": "Consigue tu propio AIMEAT →",
+    "tenTitle1": "Diez segundos",
+    "tenTitle2": "bajo el capó",
+    "ten1": "Salió un sitio web.",
+    "ten2": "Abrió una tienda.",
+    "ten3": "Cerró una subasta.",
+    "ten4": "Se envió el informe.",
+    "ten5": "Se construyó un mundo 3D.",
+    "ten6": "Un agente despertó a las siete y lo hizo otra vez.",
+    "tenMore": "Y más. Pero ¿por qué te importaría?",
+    "tenAnswer": "Porque tu IA recibe estos poderes, y tú los recibes a través de ella.",
+    "tenReplay": "Verlo otra vez",
+    "tenAfter": "Nada nuevo que aprender. Sigues hablando con la IA que ya usas, y ella recoge sus poderes aquí.",
+    "projTitle1": "¿Quieres verlo todo?",
+    "projTitle2": "El proyector de diapositivas.",
+    "projSub": "Opcional. Esto es para quien quiera ver la cabina completa. Cada diapositiva es una página de Configuración y controles o de Admin, y lo que hizo por alguien.",
+    "projShotHere": "Aquí va la captura de esta página",
+    "projPrev": "Diapositiva anterior",
+    "projNext": "Siguiente diapositiva",
+    "projClick": "Siguiente diapositiva",
+    "projButton": "CLIC",
+    "projCounter": "Diapositiva {n} de {total}",
+    "projStop": "Detener",
+    "projAuto": "Ponlo a andar",
+    "cloudApps": "Aplicaciones de la muestra",
+    "slideGeneric": "[Lo que esta página hizo por alguien: la frase llega después.]",
+    "slideApps": "Instalada en tu celular y en tu computadora. Sin tienda de aplicaciones en medio.",
+    "slideAccess": "Entras con el dedo o con un código QR. No hay contraseña.",
+    "slideAppdev": "Hiciste un fork de la aplicación de otro. El origen queda registrado y la copia es tuya.",
+    "slidePortfolio": "Siete versiones de la misma aplicación, y cada una se puede restaurar.",
+    "slideOrganisms": "Tu equipo edita la misma aplicación. La copia de trabajo y la publicada van por separado.",
+    "slideServices": "Tu aplicación vende llamadas de herramienta a otros agentes, y el dinero llega a tu billetera.",
+    "slideDiscovery": "Los buscadores y los chats de IA encuentran tu aplicación, porque les dijiste cómo.",
+    "slideScheduler": "29 tareas programadas, 15 creadas por los propios agentes, 0 fallidas.",
+    "slideAgents": "Cuatro agentes en nómina, cada uno con nombre, permisos propios y horario propio.",
+    "slideMemory": "Lo que le contaste a tu IA en marzo sigue aquí en septiembre.",
+    "slideOffers": "Un agente pujó por ti a las tres de la mañana y ganó.",
+    "slideMcp": "Claude, ChatGPT y Claude Code, todos conectados. Misma memoria, mismas reglas.",
+    "slideCompanies": "Dos empresas, libros separados, un solo inicio de sesión.",
+    "slidePnl": "Cada euro que gastó un agente, junto a lo que ganó.",
+    "slideUsage": "Cada llamada al modelo, con quién la pidió y cuánto costó.",
+    "slideSecurity": "Verificación en dos pasos activada, y cada sesión listada por dispositivo.",
+    "slideConfig": "109 ajustes cambiados, cada uno con nombre, clave y valor por defecto.",
+    "slideAdminSecurity": "Cada acción firmada por quien la hizo, y el rastro es tuyo para leerlo.",
+    "slideCompliance": "La declaración de la Ley de IA de la UE, escrita a partir de lo que de verdad corre aquí.",
+    "slideFederation": "Entraste desde el AIMEAT de un amigo, y tus cosas siguen en casa.",
+    "cardsTitle1": "Qué hacer el primer día:",
+    "cardsTitle2": "un prompt, y lo que hizo",
+    "cardsSub": "Cuatro cosas que existen porque alguien pegó aquí un prompt. Copia uno, pégalo en tu propia IA, y la tuya también existe. El tiempo y el modelo están en cada tarjeta para que sepas qué esperar.",
+    "cardPromptPh": "[PROMPT: las palabras exactas con las que se pidió esto. Lo completa Jouni.]",
+    "cardTook": "Tardó",
+    "cardTookPh": "[tiempo]",
+    "cardModel": "Modelo",
+    "cardModelPh": "[modelo]",
+    "cardCopy": "Copiar el prompt",
+    "cardCopied": "Copiado. Pégalo en tu IA",
+    "cardOpen": "Abrir lo que hizo →",
+    "cardTinki": "Una casa de subastas donde los agentes pujan por ti, a sobre cerrado, y cada puja está cubierta por una reserva de pago.",
+    "cardParvi": "Un agente que lee las emisiones frente a Porkkala y discute con tres barcos sobre dónde están.",
+    "cardPalkka": "Una calculadora de salario para Finlandia 2026 con las reglas fiscales incluidas, y tu historial guardado cuando inicias sesión.",
+    "cardMusic": "La lista semanal de música hecha con IA, y cada entrada dice quién, con qué modelo y cuánto trabajo humano.",
+    "wallTitle": "Construido por personas y su IA.",
+    "wallCommunity": "Estas las construyeron personas que llegaron aquí con su propia IA. Cada una es una prueba de alguien a quien nunca hemos conocido.",
+    "wallOwn": "Y nosotros, aquí, todos los días.",
+    "linuxLabel": "Por qué la lista de abajo se puede comprobar:",
+    "linuxText": "AIMEAT es el Linux de la IA. El código es abierto, el servidor es tuyo y las reglas son tuyas, así que cada punto de la lista se puede leer por cuenta propia en vez de creerlo.",
+    "closeWork": "AI & me at work.",
+    "closeShop": "AI & me at the shop.",
+    "closeSeven": "AI & me at 7 am.",
+    "closeStart": "AI & me at the start, Founder #NN/50."
+  },
   "landing.transCta": "Cómo se marca aquí el contenido hecho con IA →",
   "landing.transLine": "El contenido que escribió un modelo aquí lleva un registro de cómo se hizo, y una etiqueta donde una persona lo lee.",
   "launcher": {
@@ -11227,6 +11306,8 @@
       "backToWorkspace": "Volver al espacio de trabajo",
       "kindDoc": "espacio de documentos",
       "kindRecord": "tipo de registro",
+      "kindRows": "espacio de filas",
+      "kindTasks": "espacio de tareas",
       "more": "… {n} más"
     },
     "railTitle": "En este organismo",
@@ -11488,6 +11569,7 @@
     "reAdopt": "Volver a adoptar",
     "bareContract": "contrato",
     "spaceTasksBacked": "Este espacio apunta al sistema de tareas: sus elementos son tareas, no registros del espacio de trabajo. Se llevan desde las vistas de Tareas.",
+    "spaceRowsBacked": "En este espacio se acumulan las filas que añade el grupo. Las filas se añaden al final y no se editan, y esta página no las lista: se leen con las herramientas de filas, que las filtran y las paginan.",
     "spaceBackingUnsupported": "El respaldo de este espacio no está soportado, así que su contenido no se ve aquí. Edita el espacio de trabajo (el manifiesto) y pon el respaldo de este espacio en \"memory\" para recuperarlo. Los archivos y los paquetes de conocimiento se enganchan por Fuentes o como imágenes de documento.",
     "onePerLine": "uno por línea",
     "autoIdHint": "Se rellena solo. Cámbialo si quieres un id que se recuerde.",
@@ -17156,6 +17238,34 @@
         },
         "rooms": {
           "label": "Agentes para adoptar y un espacio propio"
+        },
+        "frame-hero": {
+          "label": "Titular, caja de deseos y las dos puertas",
+          "summary": "La afirmación de arriba: di lo que quieres, luego asegúrate de que pase. La caja donde el visitante escribe un deseo, conecta la IA que ya usas, consigue el tuyo, y la imagen de la sala de exposición."
+        },
+        "frame-ten": {
+          "label": "Diez segundos bajo el capó",
+          "summary": "Seis resultados uno tras otro, la pregunta de por qué le importaría al visitante, y la respuesta: su IA recibe estos poderes y él los recibe a través de ella."
+        },
+        "frame-projector": {
+          "label": "Proyector de diapositivas",
+          "summary": "Un botón grande, una diapositiva por cada página de Configuración y controles y de Admin y por cada aplicación de la muestra, los menús alrededor como nube de palabras con la palabra actual encendida. Opcional para el visitante."
+        },
+        "frame-cards": {
+          "label": "Prompts y lo que hicieron",
+          "summary": "Cuatro tarjetas: el prompt para copiar, lo que produjo, cuánto tardó y con qué modelo."
+        },
+        "frame-wall": {
+          "label": "Lista de aplicaciones, la comunidad primero",
+          "summary": "Las aplicaciones publicadas aquí, primero las que construyeron otras personas y después las de este sitio."
+        },
+        "frame-linux": {
+          "label": "Por qué la lista de seguridad se puede comprobar",
+          "summary": "Una línea sobre la lista de seguridad: AIMEAT es el Linux de la IA, código abierto, tu servidor, tus reglas."
+        },
+        "frame-close": {
+          "label": "Línea final",
+          "summary": "AI & me at work, at the shop, at 7 am, at the start, y los dos botones de vuelta a la demo y a la tienda."
         },
         "close": {
           "label": "Palabras finales"

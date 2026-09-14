@@ -13,6 +13,9 @@
  * @structure registerOtkRoutes(router, config, storage)
  * @usage registerOtkRoutes(router, config, storage) from authRouter().
  * @version-history
+ *   v2.1.0 -- 2026-09-14 -- requireLocalSession, which POST /v1/agents has and this older road to
+ *     the same place did not: a federated login carries roles ['owner'], so a visitor minted a key
+ *     naming the LOCAL account of their name, and /v1/agents/connect built the agent from it.
  *   v1.0.0 -- 2026-08-15 -- Extracted from auth.ts (max-file-lines) as part of E2E test-quality
  *     audit finding A8, which gave the mint its scope gate and its reserved-key check and moved the
  *     execution onto the shared memory write.
@@ -23,7 +26,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireLocalSession } from '../auth/middleware.js';
 import { validateAgentName, buildGAII } from '../utils/gaii.js';
 import { generateOtk } from '../utils/otk.js';
 
@@ -34,7 +37,13 @@ export function registerOtkRoutes(
 ): void {
 
   // POST /v1/auth/connectivity-key — generate a connectivity key for AI agent registration
-  router.post('/v1/auth/connectivity-key', requireAuth(), requireRole('owner'), async (req, res) => {
+  //
+  // requireLocalSession, because POST /v1/agents has it and this older road to the same place did
+  // not. A federated login mints roles ['owner'], so requireRole('owner') admitted a visitor from
+  // any peer; the key it minted named the LOCAL account of the same name in `params.owner`, and the
+  // unauthenticated /v1/agents/connect door then created an agent under that account from it.
+  // Found by the AI triage of 2026-09-13.
+  router.post('/v1/auth/connectivity-key', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const { agent_name, description } = req.body ?? {};
     const owner = req.auth!.owner;
 

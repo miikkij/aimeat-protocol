@@ -1,0 +1,22 @@
+{
+  "_readme": "The apps in the slide projector's show, in order. One entry is one slide and one word in the cloud. `app` is owner/filename on this server (the picture is taken at /v1/apps/<app>?mode=inline and the sentence comes from the catalogue unless `line` is given); `url` is any other page; `settle` is how long the page takes to fill before the shutter, in milliseconds; `detailOf` opens that app's own page inside the catalogue before the shutter. `name` and `line` are one string or {en, fi, es}. pnpm projector:shots --only apps takes the pictures into apps-<id>.png.",
+  "apps": [
+    { "id": "app-catalog", "name": { "en": "The app catalogue", "fi": "Appikatalogi", "es": "El catálogo de aplicaciones" }, "url": "/app-catalog.html", "settle": 12000,
+      "line": { "en": "Every app on this server on one page: what it does, who made it, how it was built, what it earns.", "fi": "Jokainen tämän palvelimen appi yhdellä sivulla: mitä se tekee, kuka teki, miten se rakentui, mitä se tuottaa.", "es": "Cada aplicación de este servidor en una página: qué hace, quién la hizo, cómo se construyó, qué gana." } },
+    { "id": "app-page", "name": { "en": "An app's own page", "fi": "Appin oma sivu", "es": "La página propia de una aplicación" }, "url": "/app-catalog.html?q=Design%20Book", "detailOf": "happydude500001/design-book.html", "settle": 8000,
+      "line": { "en": "Eighteen sections about one app: where its work lives, its versions, its skills, its audit trail, its money.", "fi": "Kahdeksantoista osiota yhdestä apista: missä sen työ on, versiot, taidot, lokit, rahat.", "es": "Dieciocho secciones sobre una aplicación: dónde vive su trabajo, sus versiones, sus habilidades, su registro, su dinero." } },
+    { "id": "design-book", "name": "Design Book", "app": "happydude500001/design-book.html", "settle": 20000 },
+    { "id": "laimeat-sanomat", "name": "(L)AIMEAT Sanomat", "app": "happydude500001/laimeat-sanomat.html", "settle": 8000 },
+    { "id": "lifecycle-central", "name": "Lifecycle Central", "app": "happydude500001/lifecycle-central.html", "settle": 10000 },
+    { "id": "ai-music-charts", "name": "AI Music Charts", "app": "happydude500001/ai-music-charts.html", "settle": 8000 },
+    { "id": "tinki", "name": "TINKI", "app": "happydude500001/tinki.html", "settle": 6000 },
+    { "id": "parvi", "name": "PARVI", "app": "happydude500001/parvi.html", "settle": 8000 },
+    { "id": "palkkalaskuri-2026", "name": "Suomen palkkalaskuri 2026", "app": "happydude500001/palkkalaskuri-2026.html", "settle": 5000 },
+    { "id": "drum-sample-slicer", "name": "Fatalii's Drum Sample Slicer", "app": "fatalii/fatalii-s-drum-sample-slicer.html", "settle": 6000 },
+    { "id": "chilikaveri", "name": "Chilikaveri", "app": "fatalii/chilikaveri.html", "settle": 6000 },
+    { "id": "kitkasilma", "name": "Kitkasilmä", "app": "fatalii/kitkasilma.html", "settle": 6000 },
+    { "id": "tarkov-broker", "name": "Tarkov Broker", "app": "jussil/tarkov-broker.html", "settle": 6000 },
+    { "id": "aws-radar", "name": "AWS Radar", "app": "jussil/aws-radar.html", "settle": 6000 },
+    { "id": "av-roadmap", "name": "Action Videos: Roadmap & Portfolio", "app": "jussil/av-roadmap.html", "settle": 6000 }
+  ]
+}
