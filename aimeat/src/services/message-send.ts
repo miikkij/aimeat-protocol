@@ -11,6 +11,9 @@
  * @structure sendDirectMessage(ctx, input) → { ok, message } | { ok:false, code }
  * @usage import { sendDirectMessage } from '../services/message-send.js';
  * @version-history
+ *   v1.7.0 — 2026-09-15 — A message to yourself is written once, inbound, instead of twice under the
+ *     same (id, owner) key. Every system-fault report (operator → operator) and a campaign send to the
+ *     sender's own address threw "duplicate key value violates unique constraint DirectMessage_pkey".
  *   v1.6.0 — 2026-09-08 — An attachment names the identity that HOLDS the file, and a send whose
  *     bytes are nowhere is refused instead of reported delivered. `aimeat_dm_send_as_owner` stamped
  *     the owner on a file its AGENT had uploaded, so the recipient's copy step looked under the
@@ -246,6 +249,26 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
         error: 'blocked', createdAt: now,
       });
       return { ok: false, code: 'BLOCKED' };
+    }
+
+    // A message to YOURSELF is one row, in your own inbox. The two copies below share (id, owner)
+    // when sender and recipient are the same person, so the second insert hit the primary key and
+    // threw. The route refuses a person doing this, but the node does it on purpose: every
+    // system-fault report is operator → operator, and a campaign send to the sender's own address
+    // arrives here too. Both failed with a 500 until 2026-09-15. No contact with yourself, and no
+    // bell for a message you wrote.
+    if (recipientGhii === senderGhii) {
+      const note: DirectMessageRecord = {
+        id, ownerGhii: senderGhii, conversationId, subject, senderGhii, recipientGhii,
+        body, attachments, interactive, broadcastId, respondable, kind,
+        status: 'delivered', direction: 'inbound', replyToId,
+        origin: 'local', originNodeId: config.nodeId, aiProvenanceId,
+        createdAt: now, deliveredAt: now,
+      };
+      await storage.createDirectMessage(note);
+      await logDelivery(ctx, { messageId: id, origin: 'local', targetNodeId: config.nodeId, status: 'delivered', latencyMs: 0 });
+      emitChange('messages');
+      return { ok: true, message: note };
     }
   }
 
