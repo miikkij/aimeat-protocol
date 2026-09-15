@@ -31,6 +31,8 @@
  *   and AIMEAT_SHOT_PASSWORD are set; AIMEAT_SHOT_ENV names another env file.
  * @structure SETTINGS · ADMIN · SLOW_MS · arg · launchBrowser · readShow · loginFromEnvFile · main
  * @version-history
+ *   v1.4.0 — 2026-09-15 — --only front takes the front page itself into public/img/frontdemo/
+ *     front-page.png, the last frame of "ten seconds under the hood".
  *   v1.3.0 — 2026-09-15 — The sign-in falls back to scripts/.env, the file the repo's other
  *     scripts already read, so the command needs no password on the line.
  *   v1.2.0 — 2026-09-14 — The apps in the show, from show.json: their own settle, a page other than
@@ -84,7 +86,7 @@ const SLOW_MS: Record<string, number> = {
 
 type Name = string | Record<string, string>;
 interface ShowEntry { id: string; name: Name; app?: string; url?: string; settle?: number; detailOf?: string; line?: Name }
-interface Target { where: 'settings' | 'admin' | 'apps'; id: string; url: string; settle: number; detailOf?: string }
+interface Target { where: 'settings' | 'admin' | 'apps' | 'front'; id: string; url: string; settle: number; detailOf?: string; file?: string }
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -159,7 +161,7 @@ async function main(): Promise<void> {
   // Commas or spaces: PowerShell turns a comma-separated argument into an array and hands it on
   // as one space-separated string, so both spellings name the same pages.
   const wanted = (only || '').split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
-  const SIDES = ['settings', 'admin', 'apps'];
+  const SIDES = ['settings', 'admin', 'apps', 'front'];
   // A side name selects the whole side and nothing else: "apps" is the show, not the Apps tab.
   const keep = (where: Target['where'], id: string) =>
     wanted.length === 0 || wanted.some((w) => w === where || w === `${where}:${id}` || (!SIDES.includes(w) && w === id));
@@ -175,9 +177,15 @@ async function main(): Promise<void> {
       url: e.url ? (e.url.startsWith('http') ? e.url : `${base}${e.url}`) : appUrl(e.app as string),
       settle: Math.max(settle, Number(e.settle) || 0), detailOf: e.detailOf,
     })),
+    // The front page itself, for the last frame of "ten seconds under the hood": one level up from
+    // the projector's folder, because it is not a slide of the projector.
+    ...(keep('front', 'page') ? [{
+      where: 'front' as const, id: 'page', url: `${base}/v1/portal`, settle: Math.max(settle, 4_000),
+      file: resolve(outDir, '..', 'front-page.png'),
+    }] : []),
   ];
   if (targets.length === 0) {
-    console.error(`--only ${only} matches no page. Use settings, admin, apps, or pages like settings:scheduler,apps:design-book.`);
+    console.error(`--only ${only} matches no page. Use settings, admin, apps, front, or pages like settings:scheduler,apps:design-book.`);
     process.exit(2);
   }
 
@@ -204,22 +212,26 @@ async function main(): Promise<void> {
     }, session);
 
     const page = await ctx.newPage();
+    // The front page is taken as a visitor sees it: a second context with no session at all.
+    const anon = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+    const anonPage = await anon.newPage();
     for (const tgt of targets) {
+      const tab = tgt.where === 'front' ? anonPage : page;
       try {
-        await page.goto(tgt.url, { waitUntil: 'load', timeout: 60_000 });
-        await page.waitForTimeout(tgt.settle);
+        await tab.goto(tgt.url, { waitUntil: 'load', timeout: 60_000 });
+        await tab.waitForTimeout(tgt.settle);
         if (tgt.detailOf) {
           // The catalogue's details view has no address of its own; open it the way a row's ⋯ does.
           const slash = tgt.detailOf.indexOf('/');
           // Runs in the page; `globalThis` there is the window, and this file has no DOM types.
-          await page.evaluate(([owner, filename]) => {
+          await tab.evaluate(([owner, filename]) => {
             const launcher = (globalThis as unknown as { _launcher?: { openPublishedDetail?: (o: string, f: string, l: string, v: number) => void } })._launcher;
             launcher?.openPublishedDetail?.(owner, filename, '', 0);
           }, [tgt.detailOf.slice(0, slash), tgt.detailOf.slice(slash + 1)]);
-          await page.waitForTimeout(Math.max(4_000, Math.floor(tgt.settle / 2)));
+          await tab.waitForTimeout(Math.max(4_000, Math.floor(tgt.settle / 2)));
         }
-        const png = await page.screenshot({ type: 'png' });
-        const file = resolve(outDir, `${tgt.where}-${tgt.id}.png`);
+        const png = await tab.screenshot({ type: 'png' });
+        const file = tgt.file || resolve(outDir, `${tgt.where}-${tgt.id}.png`);
         writeFileSync(file, png);
         console.log(`  ✓ ${tgt.where}/${tgt.id} → ${file}`);
         ok++;
