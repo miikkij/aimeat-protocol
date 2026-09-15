@@ -10,6 +10,7 @@
  *   The suite grows with the programme in docs/internal/agentscanner/ — sitemap.md, AGENTS.md,
  *   llms.txt structure and llms-full.txt land here as their phases ship.
  * @version-history
+ *   v0.3.0 - 2026-09-15 - Full Everything guide across JSON, Markdown and initial HTML.
  *   v0.1.0 — 2026-07-28 — Phase 02: sitemap.xml from the public-page registry
  *   v0.2.0 — 2026-08-11 — The two app-origin guard checks moved to e2e-app-origin.ts. They asked
  *     the shared CI server, which has no app host configured, to behave as an app origin, and the
@@ -442,6 +443,35 @@ function locs(xml: string): string[] {
             const r = await text(p.path, { Accept: 'text/markdown' });
             assert(r.ct.includes('text/markdown'), `${p.path} with Accept: text/markdown → ${r.ct}`);
         }
+    });
+
+    // Coverage audit: the source was complete enough to render a list, but these routes returned
+    // only an introduction. This asserts the hole closed, not merely a successful HTTP response.
+    await test('Everything exposes all feature rows before JavaScript and to Markdown readers', async () => {
+        const data = await text('/data/everything.json');
+        assert(data.status === 200, 'feature JSON unavailable');
+        const guide = JSON.parse(data.body) as { counts: { rows: number }; groups: { slug: string; rows: { slug: string; cells: string[] }[] }[] };
+        const initial = await text('/v1/everything', { Accept: 'text/html' });
+        const mirror = await text('/v1/everything.md');
+        const negotiated = await text('/v1/everything', { Accept: 'text/markdown' });
+        assert(initial.status === 200 && initial.ct.includes('text/html'), 'initial HTML unavailable');
+        for (const md of [mirror, negotiated]) {
+            assert(md.status === 200 && md.ct.includes('text/markdown'), 'complete Markdown unavailable');
+            assert(md.body.includes('Open Data Product Specification'), 'ODPS missing from Markdown');
+        }
+        assert(mirror.body === negotiated.body, 'Markdown representations differ');
+        let rows = 0;
+        for (const group of guide.groups) {
+            assert(initial.body.includes(`id="${group.slug}"`), `missing section ${group.slug}`);
+            for (const row of group.rows) {
+                rows++;
+                assert(initial.body.includes(`id="${row.slug}"`), `HTML omits ${row.slug}`);
+                assert(mirror.body.includes(`id="${row.slug}"`), `Markdown omits ${row.slug}`);
+                for (const cell of row.cells) assert(initial.body.includes(cell), `HTML loses a cell of ${row.slug}`);
+            }
+        }
+        assert(rows === guide.counts.rows, 'JSON count differs from delivered rows');
+        assert(!initial.body.includes('&lt;table'), 'HTML tables were escaped instead of rendered');
     });
 
     await test('each page head describes THAT page, not the shell', async () => {

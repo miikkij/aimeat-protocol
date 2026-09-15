@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Builds the "Everything in AIMEAT" page's data from docs/AIMEAT-Feature-List.md:
  *   the whole list, as it is, into public/data/everything.json (the groups, their leads, their
- *   tables with every row and column) and public/data/everything-meta.json (the row count and
- *   the version stamp the front page's link and the page's header read). The list is the source;
+ *   tables with every row and column), public/data/everything-meta.json (the row count and
+ *   version stamp), and complete Markdown and static HTML. The list is the source;
  *   the page never carries a hand-copied second version of it, and `--check` refuses a committed
  *   artefact that has fallen behind the file.
  *
@@ -18,10 +18,11 @@
  *   from the list's own header line; if the line stops saying it, the stamp is absent and the page
  *   shows none, so the page cannot claim a version the list does not.
  * @usage
- *   pnpm build:everything            # write the two artefacts
+ *   pnpm build:everything            # write all four artefacts
  *   pnpm check:everything            # fail when the committed artefacts are stale
  * @structure inline · parse · main
  * @version-history
+ *   v1.1.0 - 2026-09-15 - Generate complete Markdown and HTML with feature anchors alongside JSON.
  *   v1.0.1 — 2026-09-15 — plain() strips tags until none remain and decodes entities in one pass.
  *     The artefacts it writes are byte-identical; what changed is that `&amp;lt;` no longer decodes
  *     twice and a split tag cannot reassemble (CodeQL #1633, #1634).
@@ -36,10 +37,12 @@ const SOURCE = resolve(HERE, '..', '..', 'docs', 'AIMEAT-Feature-List.md');
 const OUT_DIR = resolve(HERE, '..', 'public', 'data');
 const OUT_FILE = join(OUT_DIR, 'everything.json');
 const META_FILE = join(OUT_DIR, 'everything-meta.json');
+const MD_FILE = join(OUT_DIR, 'everything.md');
+const HTML_FILE = join(OUT_DIR, 'everything.html');
 /** Where a relative link in the list points on the web: the repo's docs folder. */
 const DOCS_URL = 'https://github.com/miikkij/aimeat-protocol/blob/main/docs/';
 
-interface Group { n: number; title: string; slug: string; lead: string[]; columns: string[]; reach: number; rows: { cells: string[]; plain: string }[] }
+interface Group { n: number; title: string; slug: string; lead: string[]; columns: string[]; reach: number; rows: { slug: string; cells: string[]; plain: string }[] }
 interface Everything { title: string; stamp: { version: string; date: string } | null; intro: string[]; groups: Group[]; outro: string; counts: { groups: number; rows: number } }
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -47,6 +50,7 @@ const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
 /** A link target in the list, resolved: anchors stay, http stays, a relative file goes to GitHub. */
 function href(target: string): string {
   if (/^(https?:)?\/\//.test(target) || target.startsWith('#') || target.startsWith('mailto:')) return target;
+  if (target.startsWith('/')) return target;
   // `../openapi.yaml` sits one level above docs/.
   const clean = target.replace(/^\.\//, '');
   return clean.startsWith('../') ? DOCS_URL.replace(/docs\/$/, '') + clean.slice(3) : DOCS_URL + clean;
@@ -143,7 +147,10 @@ export function parse(md: string): Everything {
         const row = cells(lines[i]);
         if (row.length !== header.length) throw new Error(`row with ${row.length} cells under ${header.length} columns at line ${i + 1}: ${lines[i].slice(0, 80)}`);
         const html = row.map(inline);
-        group.rows.push({ cells: html, plain: html.map(plain).join(' ') });
+        const label = plain(inline(row[0].replace(/`\[(off|testnet)\]`/g, '')));
+        const slug = `${group.slug}-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+        if (group.rows.some((r) => r.slug === slug)) throw new Error(`duplicate feature anchor: ${slug}`);
+        group.rows.push({ slug, cells: html, plain: html.map(plain).join(' ') });
         i++;
       }
       continue;
@@ -168,7 +175,51 @@ export function parse(md: string): Everything {
   return out;
 }
 
-function render(): { data: string; meta: string; counts: Everything['counts']; stamp: Everything['stamp'] } {
+/** The Markdown source with web links and the same anchors as the interactive page. */
+export function renderMarkdown(md: string, parsed: Everything): string {
+  let group: Group | undefined;
+  let row = 0;
+  return md.split(/\r?\n/).map((line) => {
+    const heading = line.match(/^## (\d+)\./);
+    if (heading) {
+      group = parsed.groups.find((g) => g.n === Number(heading[1]));
+      row = 0;
+      return `<a id="${group!.slug}"></a>\n\n${line}`;
+    }
+    let result = line.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, target: string) => {
+      const section = target.match(/^#(\d+)-/);
+      return `[${label}](${section ? '#g-' + section[1] : href(target)})`;
+    });
+    if (group && /^\|\s*\*\*/.test(line)) {
+      result = result.replace(/^\|\s*/, `| <a id="${group.rows[row++].slug}"></a> `);
+    }
+    return result;
+  }).join('\n').trimEnd() + '\n';
+}
+
+/** Static, escaped content generated at build time, used by the existing public-page shell. */
+export function renderHtml(parsed: Everything): string {
+  return [
+    '<div class="ev-static">',
+    ...parsed.intro.map((p) => `<p>${p}</p>`),
+    '<nav aria-label="Contents"><ol>',
+    ...parsed.groups.map((g) => `<li><a href="#${g.slug}">${escapeHtml(g.title)}</a></li>`),
+    '</ol></nav>',
+    ...parsed.groups.map((g) => [
+      `<section id="${g.slug}"><h2>${g.n}. ${escapeHtml(g.title)}</h2>`,
+      ...g.lead.map((p) => `<p>${p}</p>`),
+      '<table><thead><tr>',
+      ...g.columns.map((c) => `<th scope="col">${escapeHtml(c)}</th>`),
+      '</tr></thead><tbody>',
+      ...g.rows.map((r) => `<tr id="${r.slug}">${r.cells.map((c) => `<td>${c}</td>`).join('')}</tr>`),
+      '</tbody></table></section>',
+    ].join('\n')),
+    `<p>${parsed.outro}</p>`,
+    '</div>',
+  ].join('\n') + '\n';
+}
+
+function render(): { data: string; meta: string; markdown: string; html: string; counts: Everything['counts']; stamp: Everything['stamp'] } {
   const md = readFileSync(SOURCE, 'utf-8');
   const parsed = parse(md);
   // The count in the source: every table row that is not a header or a separator, outside Contents.
@@ -182,15 +233,16 @@ function render(): { data: string; meta: string; counts: Everything['counts']; s
   if (parsed.counts.rows !== expected) throw new Error(`parsed ${parsed.counts.rows} rows, the source has ${expected}: a row was dropped`);
   if (parsed.groups.some((g) => g.rows.length === 0)) throw new Error('a group parsed with no rows');
   const meta = { rows: parsed.counts.rows, groups: parsed.counts.groups, version: parsed.stamp?.version ?? null, date: parsed.stamp?.date ?? null };
-  return { data: JSON.stringify(parsed, null, 1) + '\n', meta: JSON.stringify(meta, null, 1) + '\n', counts: parsed.counts, stamp: parsed.stamp };
+  return { data: JSON.stringify(parsed, null, 1) + '\n', meta: JSON.stringify(meta, null, 1) + '\n', markdown: renderMarkdown(md, parsed), html: renderHtml(parsed), counts: parsed.counts, stamp: parsed.stamp };
 }
 
 function main(): void {
   const check = process.argv.includes('--check');
   const built = render();
+  const artifacts = [[OUT_FILE, built.data], [META_FILE, built.meta], [MD_FILE, built.markdown], [HTML_FILE, built.html]] as const;
   if (check) {
     let stale = false;
-    for (const [file, content] of [[OUT_FILE, built.data], [META_FILE, built.meta]] as const) {
+    for (const [file, content] of artifacts) {
       let onDisk: string;
       try { onDisk = readFileSync(file, 'utf-8'); } catch { onDisk = ''; }
       if (onDisk !== content) { console.error(`✖ ${file} is behind docs/AIMEAT-Feature-List.md. Run: pnpm build:everything`); stale = true; }
@@ -200,9 +252,8 @@ function main(): void {
     return;
   }
   mkdirSync(OUT_DIR, { recursive: true });
-  writeFileSync(OUT_FILE, built.data, 'utf-8');
-  writeFileSync(META_FILE, built.meta, 'utf-8');
-  console.log(`Wrote ${OUT_FILE} and ${META_FILE}: ${built.counts.groups} groups, ${built.counts.rows} rows, ${built.stamp ? `node ${built.stamp.version} (${built.stamp.date})` : 'no version stamp'}`);
+  for (const [file, content] of artifacts) writeFileSync(file, content, 'utf-8');
+  console.log(`Wrote JSON, metadata, Markdown and HTML: ${built.counts.groups} groups, ${built.counts.rows} rows, ${built.stamp ? `node ${built.stamp.version} (${built.stamp.date})` : 'no version stamp'}`);
 }
 
 main();

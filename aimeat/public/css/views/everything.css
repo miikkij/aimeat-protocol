@@ -7,6 +7,7 @@
  *   scroll sideways inside their own box and the page never does, and the wider screen only adds
  *   room. Shapes come from poster.css; this sheet owns the layout.
  * @version-history
+ *   v1.1.0 - 2026-09-15 - Feature links, readable phone tables and generated initial content.
  *   v1.0.0 — 2026-09-15 — Initial (TARGET-077).
  */
 .ev { max-width: 1280px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; color: var(--text); display: flex; flex-direction: column; gap: 1.25rem; }
@@ -54,10 +55,19 @@
 .ev-h2 { margin: 0; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: clamp(1.4rem, 3vw, 2.2rem); line-height: 1.05; display: flex; align-items: baseline; gap: .5rem; }
 .ev-num { display: inline-block; min-width: 1.6em; padding: 0 .25em; text-align: center; font-size: .75em; line-height: 1.4; box-shadow: 3px 3px 0 var(--text); }
 .ev-tablebox { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; box-shadow: 8px 8px 0 var(--text); }
-.ev-table { width: 100%; min-width: 640px; border-collapse: collapse; font-family: var(--font-showroom-body); font-size: .92rem; line-height: 1.5; }
+.ev-table { width: 100%; border-collapse: collapse; font-family: var(--font-showroom-body); font-size: .92rem; line-height: 1.5; }
 .ev-table th { text-align: left; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: .8rem; letter-spacing: .05em; padding: .6rem .8rem; background: var(--text); color: var(--bg); }
 .ev-table td { padding: .6rem .8rem; border-top: 1px solid var(--border); vertical-align: top; }
-.ev-table td:first-child { width: 22%; min-width: 11rem; }
+.ev-table td:first-child { width: 22%; min-width: 6rem; }
 .ev-table td.ev-reach, .ev-table th.ev-reach { width: 24%; min-width: 12rem; font-family: var(--font-mono); font-size: .8rem; }
 .ev-table th.ev-reach { font-family: var(--font-showroom); font-size: .8rem; }
 .ev-table tbody tr:nth-child(even) td { background: var(--bg-surface); }
+.ev-table tr { scroll-margin-top: calc(var(--nav-height, 56px) + 1rem); }
+.ev-table tr:target td { background: var(--bg-surface); }
+.ev a.ev-feature { color: var(--text); font-weight: var(--font-poster-strong-weight); text-decoration: underline; text-underline-offset: .2em; overflow-wrap: anywhere; }
+.ev-table td { overflow-wrap: anywhere; }
+.ev-controls { flex-wrap: wrap; }
+/* The generated body also works before JavaScript mounts or when JavaScript is unavailable. */
+#crawler-body .ev-static table { width: 100%; border-collapse: collapse; overflow-wrap: anywhere; }
+#crawler-body .ev-static th, #crawler-body .ev-static td { padding: .5rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+#crawler-body .ev-static section, #crawler-body .ev-static tr { scroll-margin-top: calc(var(--nav-height, 56px) + 1rem); }

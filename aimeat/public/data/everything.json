@@ -1,17 +1,17 @@
 {
  "title": "AIMEAT Feature List",
  "stamp": {
-  "version": "3.14.3",
-  "date": "2026-09-14"
+  "version": "3.15.0",
+  "date": "2026-09-15"
  },
  "intro": [
-  "<strong>What an AIMEAT node does today.</strong> Node version 3.14.3, checked against the code on 2026-09-14.",
+  "<strong>What an AIMEAT node does today.</strong> Node version 3.15.0, checked against the code on 2026-09-15.",
   "AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.",
   "This list covers two layers:",
   "- <strong>Core</strong> is the protocol any node can implement: identity, memory, consent, organisms and workspaces, the economy, federation. Specified in <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Core-full.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-RFC-v4.0-Core-full.md</a>.",
   "- <strong>Platform</strong> is what the aimeat.io reference implementation builds on it: apps, the agent fleet, extensions, AI, commerce, the web surfaces. Specified in <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Platform-full.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-RFC-v4.0-Platform-full.md</a>.",
   "The API contract is <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/openapi.yaml\" target=\"_blank\" rel=\"noopener\">openapi.yaml</a>. Where this list and the contract disagree, the contract wins. Individual apps built on the node (Lifecycle Central, the Design Book's apps, games) are not listed here; they are users of these features.",
-  "<strong>Markers.</strong> <span class=\"ev-mark showroom-slab--sun\">off</span> means the feature ships but stays off until the operator switches it on. <span class=\"ev-mark showroom-slab--sun\">testnet</span> means it defaults to a test network. Everything else is on by default.",
+  "<strong>Markers.</strong> <span class=\"ev-mark showroom-slab--sun\">off</span> means the feature ships but stays off until the operator switches it on. <span class=\"ev-mark showroom-slab--sun\">testnet</span> means it defaults to a test network. Unmarked features are implemented; use can still require configuration, credentials, permissions or an installed runtime. This guide does not report which services a particular node has enabled.",
   "<strong>Reach</strong> names the REST prefix and the MCP tool family, so a developer can find the door. An MCP tool family written <code>aimeat_task_*</code> means every tool starting with that name."
  ],
  "groups": [
@@ -30,14 +30,16 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-1-mcp-server",
      "cells": [
       "<strong>MCP server</strong>",
-      "Claude, ChatGPT, Codex, Cursor, VS Code, Grok and any other MCP client can read and act on your node from the chat. The catalog holds 340 tools.",
+      "Claude, ChatGPT, Codex, Cursor, VS Code, Grok and other MCP clients can read and act on your node from the chat. The server advertises its available tools when the client connects.",
       "<code>/v1/mcp</code>"
      ],
-     "plain": "MCP server Claude, ChatGPT, Codex, Cursor, VS Code, Grok and any other MCP client can read and act on your node from the chat. The catalog holds 340 tools. /v1/mcp"
+     "plain": "MCP server Claude, ChatGPT, Codex, Cursor, VS Code, Grok and other MCP clients can read and act on your node from the chat. The server advertises its available tools when the client connects. /v1/mcp"
     },
     {
+     "slug": "g-1-purpose-sized-mcp-surfaces",
      "cells": [
       "<strong>Purpose-sized MCP surfaces</strong>",
       "Seven opt-in tool sets, so an agent sees only the tools its job needs: <code>appdev</code>, <code>agent</code>, <code>service</code>, <code>admin</code>, <code>commerce</code>, <code>primitives</code> (12 tools, everything else through discover and invoke) and <code>full</code>. <code>/v1/mcp</code> stays the complete, frozen set.",
@@ -46,6 +48,7 @@
      "plain": "Purpose-sized MCP surfaces Seven opt-in tool sets, so an agent sees only the tools its job needs: appdev, agent, service, admin, commerce, primitives (12 tools, everything else through discover and invoke) and full. /v1/mcp stays the complete, frozen set. /v2/mcp/<surface>"
     },
     {
+     "slug": "g-1-choose-permissions-when-you-connect",
      "cells": [
       "<strong>Choose permissions when you connect</strong>",
       "The approval window for claude.ai, ChatGPT and other services lets you pick read-only, standard, full access, or exactly the permissions you tick, before the connection completes.",
@@ -54,6 +57,7 @@
      "plain": "Choose permissions when you connect The approval window for claude.ai, ChatGPT and other services lets you pick read-only, standard, full access, or exactly the permissions you tick, before the connection completes. OAuth consent screen"
     },
     {
+     "slug": "g-1-hello-mcp",
      "cells": [
       "<strong>Hello MCP</strong>",
       "One prompt proves the AI is really connected, and your profile carries a mark only a connected AI can produce. Setup instructions are per tool, with every field value.",
@@ -62,6 +66,7 @@
      "plain": "Hello MCP One prompt proves the AI is really connected, and your profile carries a mark only a connected AI can produce. Setup instructions are per tool, with every field value. Profile › MCP"
     },
     {
+     "slug": "g-1-handbook",
      "cells": [
       "<strong>Handbook</strong>",
       "The first thing a connected AI reads: what this node is and which few tools matter for the job in front of it.",
@@ -70,6 +75,7 @@
      "plain": "Handbook The first thing a connected AI reads: what this node is and which few tools matter for the job in front of it. aimeat_handbook_get"
     },
     {
+     "slug": "g-1-capability-hints",
      "cells": [
       "<strong>Capability hints</strong>",
       "Your AI is told what else the node makes possible and mentions it rarely, when it fits. You switch it off on the MCP page or by telling the AI to stop.",
@@ -78,6 +84,7 @@
      "plain": "Capability hints Your AI is told what else the node makes possible and mentions it rarely, when it fits. You switch it off on the MCP page or by telling the AI to stop. Profile › MCP"
     },
     {
+     "slug": "g-1-aimeat-connect-cli",
      "cells": [
       "<strong><code>aimeat connect</code> CLI</strong>",
       "One command creates a dedicated agent and writes the MCP settings for Goose, Claude Code, Claude Desktop, Cursor or VS Code, without writing your key into a settings file. Also runs as a local stdio MCP server and an ACP bridge.",
@@ -86,6 +93,7 @@
      "plain": "aimeat connect CLI One command creates a dedicated agent and writes the MCP settings for Goose, Claude Code, Claude Desktop, Cursor or VS Code, without writing your key into a settings file. Also runs as a local stdio MCP server and an ACP bridge. aimeat connect client <name>"
     },
     {
+     "slug": "g-1-downloadable-client-config",
      "cells": [
       "<strong>Downloadable client config</strong>",
       "Pick your client on the page and save the config file the node generates.",
@@ -94,6 +102,7 @@
      "plain": "Downloadable client config Pick your client on the page and save the config file the node generates. connect-install"
     },
     {
+     "slug": "g-1-prompt-driven-road",
      "cells": [
       "<strong>Prompt-driven road</strong>",
       "For AIs that cannot connect over MCP (a consumer Gemini app, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral.",
@@ -102,6 +111,7 @@
      "plain": "Prompt-driven road For AIs that cannot connect over MCP (a consumer Gemini app, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. Contacts, Email, Workflows, Portfolio, front page and home layout pages"
     },
     {
+     "slug": "g-1-help-from-the-operators",
      "cells": [
       "<strong>Help from the operators</strong>",
       "Write to <code>support@operators</code> and everyone who runs the node gets it in one thread. Your AI uses the same address when it gets stuck.",
@@ -124,6 +134,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-2-account-with-a-global-identity-ghii",
      "cells": [
       "<strong>Account with a global identity (GHII)</strong>",
       "Registering gives you <code>name@node-id</code>, the identity everything you own hangs on: balance, profile, trust, agents.",
@@ -132,6 +143,7 @@
      "plain": "Account with a global identity (GHII) Registering gives you name@node-id, the identity everything you own hangs on: balance, profile, trust, agents. POST /v1/ghii, /v1/ghii/register-web"
     },
     {
+     "slug": "g-2-password-magic-link-reset-recovery",
      "cells": [
       "<strong>Password, magic link, reset, recovery</strong>",
       "Sign in with a password or an emailed link; reset a forgotten password; recover the account.",
@@ -140,6 +152,7 @@
      "plain": "Password, magic link, reset, recovery Sign in with a password or an emailed link; reset a forgotten password; recover the account. /v1/ghii/login, /v1/ghii/magic-link, /v1/ghii/password/*, /v1/ghii/account/recover"
     },
     {
+     "slug": "g-2-passkeys",
      "cells": [
       "<strong>Passkeys</strong>",
       "Sign in with a fingerprint, face or screen lock and no password at all. Name each device and remove one the day you stop using it.",
@@ -148,6 +161,7 @@
      "plain": "Passkeys Sign in with a fingerprint, face or screen lock and no password at all. Name each device and remove one the day you stop using it. /v1/ghii/passkeys/*"
     },
     {
+     "slug": "g-2-two-step-sign-in-totp",
      "cells": [
       "<strong>Two-step sign-in (TOTP)</strong>",
       "QR code for an authenticator app, ten backup codes. An operator can remove it if you lose both, and you are told on your account feed who did it.",
@@ -156,6 +170,7 @@
      "plain": "Two-step sign-in (TOTP) QR code for an authenticator app, ten backup codes. An operator can remove it if you lose both, and you are told on your account feed who did it. /v1/ghii/totp/*, aimeat_admin_totp_reset"
     },
     {
+     "slug": "g-2-sign-in-with-google-microsoft-entra-id-or-casdoor",
      "cells": [
       "<strong>Sign in with Google, Microsoft Entra ID or Casdoor</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
       "One generic OpenID Connect path, switched on per provider.",
@@ -164,6 +179,7 @@
      "plain": "Sign in with Google, Microsoft Entra ID or Casdoor off One generic OpenID Connect path, switched on per provider. /v1/ghii/login/:provider"
     },
     {
+     "slug": "g-2-organisation-sign-in-saml-and-directory-sync-scim",
      "cells": [
       "<strong>Organisation sign-in (SAML) and directory sync (SCIM)</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
       "An organisation connects Entra ID, Okta or any SAML provider. Its directory creates accounts and deactivates them, and a deactivation stops every session, agent credential, key and app permission acting in that person's name. The account's knowledge stays. A setup guide in the admin dashboard shows what the node has actually seen at each step. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/organisation-node-sign-in.md\" target=\"_blank\" rel=\"noopener\">organisation-node-sign-in.md</a>.",
@@ -172,6 +188,7 @@
      "plain": "Organisation sign-in (SAML) and directory sync (SCIM) off An organisation connects Entra ID, Okta or any SAML provider. Its directory creates accounts and deactivates them, and a deactivation stops every session, agent credential, key and app permission acting in that person's name. The account's knowledge stays. A setup guide in the admin dashboard shows what the node has actually seen at each step. See organisation-node-sign-in.md. /v1/ghii/login/saml/:id, /v1/scim/v2/:id, aimeat_admin_sso_*"
     },
     {
+     "slug": "g-2-invitation-by-an-ai",
      "cells": [
       "<strong>Invitation by an AI</strong>",
       "Your AI emails someone a link; they pick a username and get an account. The AI never creates the account itself.",
@@ -180,6 +197,7 @@
      "plain": "Invitation by an AI Your AI emails someone a link; they pick a username and get an account. The AI never creates the account itself. /v1/registration-invites, /v1/invitations/:token"
     },
     {
+     "slug": "g-2-signed-in-devices",
      "cells": [
       "<strong>Signed-in devices</strong>",
       "See every session grouped by device and by agent, end one, or sign out everywhere else.",
@@ -188,6 +206,7 @@
      "plain": "Signed-in devices See every session grouped by device and by agent, end one, or sign out everywhere else. /v1/auth/sessions"
     },
     {
+     "slug": "g-2-the-access-page",
      "cells": [
       "<strong>The Access page</strong>",
       "Every way into your account on one page, in words: sign-in methods, apps and tokens acting in your name (take away one right without revoking the whole key), connected outside accounts, sharing groups, and keys unused for thirty days.",
@@ -196,6 +215,7 @@
      "plain": "The Access page Every way into your account on one page, in words: sign-in methods, apps and tokens acting in your name (take away one right without revoking the whole key), connected outside accounts, sharing groups, and keys unused for thirty days. Account › Access, aimeat_access_list"
     },
     {
+     "slug": "g-2-owner-only-account-controls",
      "cells": [
       "<strong>Owner-only account controls</strong>",
       "Password, email, two-step, account deletion and export answer only to you. An agent can handle them only with a permission of its own name, which &quot;full access&quot; deliberately leaves out.",
@@ -204,6 +224,7 @@
      "plain": "Owner-only account controls Password, email, two-step, account deletion and export answer only to you. An agent can handle them only with a permission of its own name, which \"full access\" deliberately leaves out. requireOwnerPrincipal"
     },
     {
+     "slug": "g-2-identity-verification",
      "cells": [
       "<strong>Identity verification</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
       "EU Digital Identity Wallet (OpenID4VP, SD-JWT) and Finnish Trust Network through Suomi.fi.",
@@ -212,6 +233,7 @@
      "plain": "Identity verification off EU Digital Identity Wallet (OpenID4VP, SD-JWT) and Finnish Trust Network through Suomi.fi. /v1/ghii/verify/eudiw/*, /v1/ghii/verify/ftn/*"
     },
     {
+     "slug": "g-2-verifiable-credential",
      "cells": [
       "<strong>Verifiable credential</strong>",
       "The node issues a W3C identity credential for an account, as JSON or a signed JWT.",
@@ -220,6 +242,7 @@
      "plain": "Verifiable credential The node issues a W3C identity credential for an account, as JSON or a signed JWT. GET /v1/ghii/:ghii/credential"
     },
     {
+     "slug": "g-2-start-page",
      "cells": [
       "<strong>Start page</strong>",
       "Choose where you land when you sign in: Home, Chat, or Settings &amp; Controls.",
@@ -244,6 +267,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-3-agent-identity-gaii",
      "cells": [
       "<strong>Agent identity (GAII)</strong>",
       "Every agent has <code>agent#owner@node-id</code>, its own scoped permissions and trust score, and acts in the owner's name.",
@@ -252,6 +276,7 @@
      "plain": "Agent identity (GAII) Every agent has agent#owner@node-id, its own scoped permissions and trust score, and acts in the owner's name. /v1/agents, aimeat_agents_list, aimeat_agent_profile"
     },
     {
+     "slug": "g-3-device-authorization-rfc-8628",
      "cells": [
       "<strong>Device authorization (RFC 8628)</strong>",
       "The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path.",
@@ -260,14 +285,16 @@
      "plain": "Device authorization (RFC 8628) The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path. /v1/agents device flow"
     },
     {
+     "slug": "g-3-agent-v2-keys-and-signed-cards",
      "cells": [
-      "<strong>Agent keys (Agent v2)</strong>",
-      "An agent holds an Ed25519 key of its own and asks for a one-hour pass when it needs one, so a stolen pass is worth an hour. Another node can verify the agent without asking yours. One press moves a batch of agents onto keys, and the Agents page shows which sign-ins have stopped working.",
-      "<code>/v1/agents-v2/*</code>, <code>aimeat_v2_*</code>, <code>aimeat_agent_basics_*</code>"
+      "<strong>Agent v2 keys and signed cards</strong>",
+      "An agent holds its own Ed25519 key and exchanges it for one-hour credentials. Its signed identity card and published verification key let another node verify the agent. Existing agents can migrate in a batch; the Agents page reports failed sign-ins. Device authorization remains supported.",
+      "<code>/v1/agents/v2/enrol</code>, <code>/v1/agents/v2/token</code>, <code>/v1/agents/v2/migrate</code>, <code>/v1/agents/:gaii/card</code>, <code>/v1/agents/:gaii/jwks.json</code>"
      ],
-     "plain": "Agent keys (Agent v2) An agent holds an Ed25519 key of its own and asks for a one-hour pass when it needs one, so a stolen pass is worth an hour. Another node can verify the agent without asking yours. One press moves a batch of agents onto keys, and the Agents page shows which sign-ins have stopped working. /v1/agents-v2/*, aimeat_v2_*, aimeat_agent_basics_*"
+     "plain": "Agent v2 keys and signed cards An agent holds its own Ed25519 key and exchanges it for one-hour credentials. Its signed identity card and published verification key let another node verify the agent. Existing agents can migrate in a batch; the Agents page reports failed sign-ins. Device authorization remains supported. /v1/agents/v2/enrol, /v1/agents/v2/token, /v1/agents/v2/migrate, /v1/agents/:gaii/card, /v1/agents/:gaii/jwks.json"
     },
     {
+     "slug": "g-3-personal-access-tokens",
      "cells": [
       "<strong>Personal access tokens</strong>",
       "Revocable tokens with chosen scopes, exchanged for a short-lived token.",
@@ -276,6 +303,7 @@
      "plain": "Personal access tokens Revocable tokens with chosen scopes, exchanged for a short-lived token. /v1/access/tokens, POST /v1/auth/token/exchange"
     },
     {
+     "slug": "g-3-ecosystem-apps-geai",
      "cells": [
       "<strong>Ecosystem apps (GEAI)</strong>",
       "A third kind of principal, <code>eco:app#owner@node-id</code>, for outside applications: onboarded through hello, approve and token with key pinning, limited to approved scopes and data areas, revocable like an agent. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-ecosystem-app.md\" target=\"_blank\" rel=\"noopener\">building-an-aimeat-compatible-ecosystem-app.md</a>.",
@@ -284,6 +312,7 @@
      "plain": "Ecosystem apps (GEAI) A third kind of principal, eco:app#owner@node-id, for outside applications: onboarded through hello, approve and token with key pinning, limited to approved scopes and data areas, revocable like an agent. See building-an-aimeat-compatible-ecosystem-app.md. /v1/ecosystem/*, aimeat_action_execute"
     },
     {
+     "slug": "g-3-signed-challenge-sign-in",
      "cells": [
       "<strong>Signed challenge sign-in</strong>",
       "An agent signs its identity and a timestamp with its keypair and gets a token. Kept for federation and node signing; device authorization is the mainline.",
@@ -292,6 +321,7 @@
      "plain": "Signed challenge sign-in An agent signs its identity and a timestamp with its keypair and gets a token. Kept for federation and node signing; device authorization is the mainline. /v1/auth/challenge, /v1/auth/token"
     },
     {
+     "slug": "g-3-key-rotation",
      "cells": [
       "<strong>Key rotation</strong>",
       "Rotate an agent's keypair; its old tokens stop working.",
@@ -300,6 +330,7 @@
      "plain": "Key rotation Rotate an agent's keypair; its old tokens stop working. /v1/agents/:gaii/rekey"
     },
     {
+     "slug": "g-3-agent-portability",
      "cells": [
       "<strong>Agent portability</strong>",
       "Export an agent and import it on another node. Imported trust is capped at 65.",
@@ -308,6 +339,7 @@
      "plain": "Agent portability Export an agent and import it on another node. Imported trust is capped at 65. /v1/agents/:gaii/export, /v1/agents/import, /v1/agents/:gaii/port"
     },
     {
+     "slug": "g-3-identity-attestations",
      "cells": [
       "<strong>Identity attestations</strong>",
       "Two parties co-sign a statement with their existing keys, and anyone can verify it.",
@@ -330,6 +362,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-4-scopes-and-roles",
      "cells": [
       "<strong>Scopes and roles</strong>",
       "Every agent, app and token carries named permissions (<code>memory:read</code>, <code>ai:use</code>, <code>workflow:write</code> and so on). A permission word is enforced on every door, REST and MCP alike. Operator rights are granted on purpose, never inherited.",
@@ -338,6 +371,7 @@
      "plain": "Scopes and roles Every agent, app and token carries named permissions (memory:read, ai:use, workflow:write and so on). A permission word is enforced on every door, REST and MCP alike. Operator rights are granted on purpose, never inherited. /v1/permissions/*"
     },
     {
+     "slug": "g-4-consent",
      "cells": [
       "<strong>Consent</strong>",
       "Grant, list and revoke access to a data pattern for anyone, an agent, an organism, a person, a domain or a node, with an audit log and a receipt.",
@@ -346,6 +380,7 @@
      "plain": "Consent Grant, list and revoke access to a data pattern for anyone, an agent, an organism, a person, a domain or a node, with an audit log and a receipt. /v1/consent*, aimeat_consent_*"
     },
     {
+     "slug": "g-4-app-grants",
      "cells": [
       "<strong>App grants</strong>",
       "A published app gets a short, narrow, revocable token instead of your session. You can narrow it, cap what it spends, or revoke it. The change reaches the app when its current token runs out.",
@@ -354,6 +389,7 @@
      "plain": "App grants A published app gets a short, narrow, revocable token instead of your session. You can narrow it, cap what it spends, or revoke it. The change reaches the app when its current token runs out. /v1/app-grants/*"
     },
     {
+     "slug": "g-4-sharing-groups-and-key-space-shares",
      "cells": [
       "<strong>Sharing groups and key-space shares</strong>",
       "Open a whole corner of your memory, such as everything under <code>news.morning</code>, to a group. What you write there tomorrow is included. The entries stay private to everyone else, and stopping takes effect at once. A &quot;Shared with you&quot; list shows what others opened to you.",
@@ -362,6 +398,7 @@
      "plain": "Sharing groups and key-space shares Open a whole corner of your memory, such as everything under news.morning, to a group. What you write there tomorrow is included. The entries stay private to everyone else, and stopping takes effect at once. A \"Shared with you\" list shows what others opened to you. /v1/groups*, /v1/shares*, aimeat_group_*, aimeat_share_*"
     },
     {
+     "slug": "g-4-the-owner-sees-their-agents-data",
      "cells": [
       "<strong>The owner sees their agents' data</strong>",
       "A file or record your own agent stored is yours to read. The reverse does not hold: an agent reading your private data still passes the ordinary checks.",
@@ -370,6 +407,7 @@
      "plain": "The owner sees their agents' data A file or record your own agent stored is yours to read. The reverse does not hold: an agent reading your private data still passes the ordinary checks. access guard"
     },
     {
+     "slug": "g-4-leaving-ends-access",
      "cells": [
       "<strong>Leaving ends access</strong>",
       "Removing someone from an organism, blocking them, or their leaving, also removes their agents and their workspace permissions. An invitation cannot grant more than its writer holds.",
@@ -378,6 +416,7 @@
      "plain": "Leaving ends access Removing someone from an organism, blocking them, or their leaving, also removes their agents and their workspace permissions. An invitation cannot grant more than its writer holds. organism membership"
     },
     {
+     "slug": "g-4-secrets-vault",
      "cells": [
       "<strong>Secrets vault</strong>",
       "Store an API key that can be written but never read back. The only reader is an extension's outbound request, which fills <code>{{secret:NAME}}</code> in place.",
@@ -386,6 +425,7 @@
      "plain": "Secrets vault Store an API key that can be written but never read back. The only reader is an extension's outbound request, which fills {{secret:NAME}} in place. /v1/secrets, aimeat_secret_*"
     },
     {
+     "slug": "g-4-permission-check",
      "cells": [
       "<strong>Permission check</strong>",
       "Ask what the rules say about a key or a caller before relying on it.",
@@ -394,6 +434,7 @@
      "plain": "Permission check Ask what the rules say about a key or a caller before relying on it. /v1/permissions/check"
     },
     {
+     "slug": "g-4-account-event-log",
      "cells": [
       "<strong>Account event log</strong>",
       "Your account's own history, including who changed what.",
@@ -418,6 +459,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-5-memory-records",
      "cells": [
       "<strong>Memory records</strong>",
       "A JSON store per identity with visibility (private, owner, public, group, workspace), tags, TTL and versions. Up to 1024 kB per value and 1000 keys per identity by default.",
@@ -426,6 +468,7 @@
      "plain": "Memory records A JSON store per identity with visibility (private, owner, public, group, workspace), tags, TTL and versions. Up to 1024 kB per value and 1000 keys per identity by default. /v1/memory, aimeat_memory_*"
     },
     {
+     "slug": "g-5-optimistic-locking",
      "cells": [
       "<strong>Optimistic locking</strong>",
       "A write names the version it read; if someone changed it since, the write is refused rather than lost.",
@@ -434,14 +477,25 @@
      "plain": "Optimistic locking A write names the version it read; if someone changed it since, the write is refused rather than lost. expected_version"
     },
     {
+     "slug": "g-5-memory-bulk-writes",
      "cells": [
-      "<strong>Batch writes</strong>",
-      "Many records or documents in one call, all or nothing: one bad item writes nothing and names itself.",
-      "<code>aimeat_workspace_write</code> <code>items</code>, <code>/v1/memory/bulk</code>"
+      "<strong>Memory bulk writes</strong>",
+      "Write many records in one call. Valid entries are saved; the response lists created, updated, skipped and failed entries. One failed entry does not cancel the others.",
+      "<code>POST /v1/memory/bulk</code>"
      ],
-     "plain": "Batch writes Many records or documents in one call, all or nothing: one bad item writes nothing and names itself. aimeat_workspace_write items, /v1/memory/bulk"
+     "plain": "Memory bulk writes Write many records in one call. Valid entries are saved; the response lists created, updated, skipped and failed entries. One failed entry does not cancel the others. POST /v1/memory/bulk"
     },
     {
+     "slug": "g-5-memory-export-import-and-copy",
+     "cells": [
+      "<strong>Memory export, import and copy</strong>",
+      "Export records as JSON, import them with skip or overwrite choices, bundle selected records and files into a ZIP, or copy readable records under your agent's identity. Access checks still apply.",
+      "<code>/v1/memory/export</code>, <code>/v1/memory/import</code>, <code>/v1/memory/bundle</code>, <code>/v1/memory/copy</code>"
+     ],
+     "plain": "Memory export, import and copy Export records as JSON, import them with skip or overwrite choices, bundle selected records and files into a ZIP, or copy readable records under your agent's identity. Access checks still apply. /v1/memory/export, /v1/memory/import, /v1/memory/bundle, /v1/memory/copy"
+    },
+    {
+     "slug": "g-5-delete-and-restore",
      "cells": [
       "<strong>Delete and restore</strong>",
       "A deleted record leaves every list and search at once and comes back whole for seven days. The operator sets the window.",
@@ -450,6 +504,7 @@
      "plain": "Delete and restore A deleted record leaves every list and search at once and comes back whole for seven days. The operator sets the window. aimeat_memory_delete, aimeat_memory_restore"
     },
     {
+     "slug": "g-5-who-wrote-this",
      "cells": [
       "<strong>Who wrote this</strong>",
       "See every identity that has written a key.",
@@ -458,6 +513,7 @@
      "plain": "Who wrote this See every identity that has written a key. /v1/memory/:key/hands, aimeat_memory_hands"
     },
     {
+     "slug": "g-5-schema-locking",
      "cells": [
       "<strong>Schema locking</strong>",
       "Lock a key to a JSON Schema; every later write must validate.",
@@ -466,6 +522,7 @@
      "plain": "Schema locking Lock a key to a JSON Schema; every later write must validate. /v1/schemas"
     },
     {
+     "slug": "g-5-search",
      "cells": [
       "<strong>Search</strong>",
       "Full-text search over keys, tags and values, to six levels deep inside a record.",
@@ -474,6 +531,7 @@
      "plain": "Search Full-text search over keys, tags and values, to six levels deep inside a record. aimeat_memory_search"
     },
     {
+     "slug": "g-5-librarian",
      "cells": [
       "<strong>Librarian</strong>",
       "One ranked natural-language search across your personal memory and every organism you belong to.",
@@ -482,6 +540,7 @@
      "plain": "Librarian One ranked natural-language search across your personal memory and every organism you belong to. /v1/librarian"
     },
     {
+     "slug": "g-5-files",
      "cells": [
       "<strong>Files</strong>",
       "Upload up to 10 MB in one go or 5 GB in chunks (both set by the operator), resume downloads, set visibility per file. A file you download cannot run as a page on the node's address.",
@@ -490,6 +549,7 @@
      "plain": "Files Upload up to 10 MB in one go or 5 GB in chunks (both set by the operator), resume downloads, set visibility per file. A file you download cannot run as a page on the node's address. /v1/storage, aimeat_storage_*"
     },
     {
+     "slug": "g-5-presigned-uploads",
      "cells": [
       "<strong>Presigned uploads</strong>",
       "An MCP tool hands back an upload address; the client PUTs the file there instead of pasting it into the conversation.",
@@ -498,14 +558,16 @@
      "plain": "Presigned uploads An MCP tool hands back an upload address; the client PUTs the file there instead of pasting it into the conversation. aimeat_app_publish, aimeat_storage_upload, aimeat_extension_install, aimeat_cortex_install"
     },
     {
+     "slug": "g-5-data-map",
      "cells": [
       "<strong>Data map</strong>",
-      "Each app documents what data it keeps and where, so an AI can read it before touching it.",
-      "<code>aimeat_datamap_get</code>, <code>aimeat_datamap_set</code>"
+      "Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. The map identifies personal data and missing explanations.",
+      "<code>/v1/datamap/apps/:owner/:filename</code>, <code>aimeat_datamap_get</code>, <code>aimeat_datamap_set</code>"
      ],
-     "plain": "Data map Each app documents what data it keeps and where, so an AI can read it before touching it. aimeat_datamap_get, aimeat_datamap_set"
+     "plain": "Data map Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. The map identifies personal data and missing explanations. /v1/datamap/apps/:owner/:filename, aimeat_datamap_get, aimeat_datamap_set"
     },
     {
+     "slug": "g-5-open-items",
      "cells": [
       "<strong>Open items</strong>",
       "Your own to-do list, kept as one record.",
@@ -530,6 +592,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-6-organisms",
      "cells": [
       "<strong>Organisms</strong>",
       "Groups, teams and projects with members, owners, join requests and an overview.",
@@ -538,6 +601,7 @@
      "plain": "Organisms Groups, teams and projects with members, owners, join requests and an overview. /v1/organisms, aimeat_organism_*"
     },
     {
+     "slug": "g-6-invitations",
      "cells": [
       "<strong>Invitations</strong>",
       "Invite by account or by email; the invitee accepts, declines or ignores.",
@@ -546,6 +610,7 @@
      "plain": "Invitations Invite by account or by email; the invitee accepts, declines or ignores. aimeat_organism_invite, aimeat_organism_invite_email"
     },
     {
+     "slug": "g-6-workspaces",
      "cells": [
       "<strong>Workspaces</strong>",
       "Spaces of records (validated against a schema) and documents (markdown), each with drafts, publish, versions, comments, members, transfer and revert.",
@@ -554,6 +619,34 @@
      "plain": "Workspaces Spaces of records (validated against a schema) and documents (markdown), each with drafts, publish, versions, comments, members, transfer and revert. aimeat_workspace_*"
     },
     {
+     "slug": "g-6-workspace-batch-writes",
+     "cells": [
+      "<strong>Workspace batch writes</strong>",
+      "Submit several records or documents together. The node checks every item's space, permissions and schema before writing; an invalid item refuses the batch and identifies what to correct.",
+      "<code>aimeat_workspace_write</code> with <code>items</code>"
+     ],
+     "plain": "Workspace batch writes Submit several records or documents together. The node checks every item's space, permissions and schema before writing; an invalid item refuses the batch and identifies what to correct. aimeat_workspace_write with items"
+    },
+    {
+     "slug": "g-6-approval-controls",
+     "cells": [
+      "<strong>Approval controls</strong>",
+      "Request approval for an action, read pending requests and resolve them under the organism's policy. Publishing can require approval; a record can be returned to a draft.",
+      "<code>/v1/organisms/:id/approvals</code>"
+     ],
+     "plain": "Approval controls Request approval for an action, read pending requests and resolve them under the organism's policy. Publishing can require approval; a record can be returned to a draft. /v1/organisms/:id/approvals"
+    },
+    {
+     "slug": "g-6-public-intake-forms",
+     "cells": [
+      "<strong>Public intake forms</strong>",
+      "Collect a response without requiring an account. The owner defines the workspace destination, allowed fields and draft or publish mode. The node validates the response against the declared space and schema, with rate limits and spam screening.",
+      "<code>/v1/intake/forms</code>, <code>/v1/intake/:org/:ws/:formId</code>"
+     ],
+     "plain": "Public intake forms Collect a response without requiring an account. The owner defines the workspace destination, allowed fields and draft or publish mode. The node validates the response against the declared space and schema, with rate limits and spam screening. /v1/intake/forms, /v1/intake/:org/:ws/:formId"
+    },
+    {
+     "slug": "g-6-live-documents",
      "cells": [
       "<strong>Live documents</strong>",
       "A document can embed a mermaid diagram or a live view of a memory key, which shows the current value on every open.",
@@ -562,6 +655,7 @@
      "plain": "Live documents A document can embed a mermaid diagram or a live view of a memory key, which shows the current value on every open. workspace markdown"
     },
     {
+     "slug": "g-6-rows",
      "cells": [
       "<strong>Rows</strong>",
       "Append-only tabular data inside a workspace, with statistics.",
@@ -570,6 +664,7 @@
      "plain": "Rows Append-only tabular data inside a workspace, with statistics. aimeat_workspace_rows_*"
     },
     {
+     "slug": "g-6-extensions-in-a-workspace",
      "cells": [
       "<strong>Extensions in a workspace</strong>",
       "An extension that declares it may read and write a workspace on behalf of whoever called it, under that person's rights, so rules live on the node.",
@@ -578,6 +673,7 @@
      "plain": "Extensions in a workspace An extension that declares it may read and write a workspace on behalf of whoever called it, under that person's rights, so rules live on the node. extension manifest"
     },
     {
+     "slug": "g-6-organism-export-and-import",
      "cells": [
       "<strong>Organism export and import</strong>",
       "Take an organism out as a bundle and bring it back.",
@@ -586,6 +682,7 @@
      "plain": "Organism export and import Take an organism out as a bundle and bring it back. aimeat_organism_export, aimeat_organism_import"
     },
     {
+     "slug": "g-6-knowledge-packages",
      "cells": [
       "<strong>Knowledge packages</strong>",
       "Structured knowledge with content blocks and links between packages, shared, cloned, contributed to an organism, reviewed, with a reputation per package.",
@@ -594,12 +691,22 @@
      "plain": "Knowledge packages Structured knowledge with content blocks and links between packages, shared, cloned, contributed to an organism, reviewed, with a reputation per package. /v1/knowledge/*, aimeat_knowledge_*"
     },
     {
+     "slug": "g-6-skills",
      "cells": [
       "<strong>Skills</strong>",
       "SKILL.md packs at node and user scope, linked to agents, pinned by version, and bound to an app when they are that app's operating guide. Downloadable as a ZIP for Claude and other runtimes. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/skills-registry.md\" target=\"_blank\" rel=\"noopener\">skills-registry.md</a>.",
       "<code>/v1/skills</code>, <code>aimeat_skill_*</code>, <code>/.well-known/agent-skills/index.json</code>"
      ],
      "plain": "Skills SKILL.md packs at node and user scope, linked to agents, pinned by version, and bound to an app when they are that app's operating guide. Downloadable as a ZIP for Claude and other runtimes. See skills-registry.md. /v1/skills, aimeat_skill_*, /.well-known/agent-skills/index.json"
+    },
+    {
+     "slug": "g-6-typed-records-and-shared-vocabularies",
+     "cells": [
+      "<strong>Typed records and shared vocabularies</strong>",
+      "Describe what a record means with JSON-LD types. Keep a SKOS vocabulary with multilingual names, broader and related concepts, and deprecated terms with replacements. Cortex ontologies also expose a SKOS description.",
+      "<code>/v1/ns</code>, <code>aimeat-onto</code>, memory records"
+     ],
+     "plain": "Typed records and shared vocabularies Describe what a record means with JSON-LD types. Keep a SKOS vocabulary with multilingual names, broader and related concepts, and deprecated terms with replacements. Cortex ontologies also expose a SKOS description. /v1/ns, aimeat-onto, memory records"
     }
    ]
   },
@@ -618,6 +725,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-7-hello-integration",
      "cells": [
       "<strong>Hello Integration</strong>",
       "A step-by-step onboarding that proves an agent works: it identifies its platform, installs its skill, reports capabilities, reads its directives, and completes a real test task. Agents that live only inside a chat window (Claude Desktop, VS Code) get the four steps that apply to them.",
@@ -626,6 +734,34 @@
      "plain": "Hello Integration A step-by-step onboarding that proves an agent works: it identifies its platform, installs its skill, reports capabilities, reads its directives, and completes a real test task. Agents that live only inside a chat window (Claude Desktop, VS Code) get the four steps that apply to them. aimeat_onboarding_*"
     },
     {
+     "slug": "g-7-basic-agents-and-runtime-attachment",
+     "cells": [
+      "<strong>Basic agents and runtime attachment</strong>",
+      "The owner can create the basic agent set and enrol it through a connected runtime. An existing agent can be attached when its runtime becomes available. The response states whether the runtime accepted the agent.",
+      "<code>/v1/agents/v2/basic-agents</code>, <code>/v1/agents/v2/agents/:name/attach</code>, <code>aimeat_agent_basics_get</code>, <code>aimeat_agent_basics_request</code>"
+     ],
+     "plain": "Basic agents and runtime attachment The owner can create the basic agent set and enrol it through a connected runtime. An existing agent can be attached when its runtime becomes available. The response states whether the runtime accepted the agent. /v1/agents/v2/basic-agents, /v1/agents/v2/agents/:name/attach, aimeat_agent_basics_get, aimeat_agent_basics_request"
+    },
+    {
+     "slug": "g-7-agent-proposals",
+     "cells": [
+      "<strong>Agent proposals</strong>",
+      "An AI proposes an agent with its purpose and instructions. The account owner approves or declines it. Approval creates the agent and its definition, then attempts to attach it to the owner's runtime.",
+      "<code>/v1/agents/v2/agent-proposals</code>, <code>aimeat_agent_propose</code>"
+     ],
+     "plain": "Agent proposals An AI proposes an agent with its purpose and instructions. The account owner approves or declines it. Approval creates the agent and its definition, then attempts to attach it to the owner's runtime. /v1/agents/v2/agent-proposals, aimeat_agent_propose"
+    },
+    {
+     "slug": "g-7-agent-v2-messages-and-tasks",
+     "cells": [
+      "<strong>Agent v2 messages and tasks</strong>",
+      "Exchange messages between principals of the same account, track work through task handles and configure delivery to a principal that is not connected.",
+      "<code>/v1/agents/v2/messages</code>, <code>/v1/agents/v2/tasks</code>, <code>/v1/agents/v2/push-config</code>, <code>aimeat_v2_*</code>"
+     ],
+     "plain": "Agent v2 messages and tasks Exchange messages between principals of the same account, track work through task handles and configure delivery to a principal that is not connected. /v1/agents/v2/messages, /v1/agents/v2/tasks, /v1/agents/v2/push-config, aimeat_v2_*"
+    },
+    {
+     "slug": "g-7-tasks",
      "cells": [
       "<strong>Tasks</strong>",
       "Give your agents work: draft, queued, active, done or failed, with events, todos, rating and webhooks. A task wakes a parked agent.",
@@ -634,6 +770,7 @@
      "plain": "Tasks Give your agents work: draft, queued, active, done or failed, with events, todos, rating and webhooks. A task wakes a parked agent. /v1/agents/:gaii/tasks, aimeat_task_*"
     },
     {
+     "slug": "g-7-reachability",
      "cells": [
       "<strong>Reachability</strong>",
       "An agent waiting for work over a live link counts as available, on the Agents page, in workflows and on the home card.",
@@ -642,6 +779,7 @@
      "plain": "Reachability An agent waiting for work over a live link counts as available, on the Agents page, in workflows and on the home card. agent presence"
     },
     {
+     "slug": "g-7-capabilities",
      "cells": [
       "<strong>Capabilities</strong>",
       "An agent declares its MCP servers, skills, tools, domains and languages; MCP capabilities verify themselves, and the test task proves the rest.",
@@ -650,6 +788,7 @@
      "plain": "Capabilities An agent declares its MCP servers, skills, tools, domains and languages; MCP capabilities verify themselves, and the test task proves the rest. aimeat_agent_capabilities_report"
     },
     {
+     "slug": "g-7-directives",
      "cells": [
       "<strong>Directives</strong>",
       "Layered instructions from the node, the owner and the agent itself.",
@@ -658,6 +797,7 @@
      "plain": "Directives Layered instructions from the node, the owner and the agent itself. /v1/agents/:name/directives"
     },
     {
+     "slug": "g-7-telemetry-and-activity",
      "cells": [
       "<strong>Telemetry and activity</strong>",
       "Agents report their model calls, which feed the usage ledger; the owner sees what each agent did.",
@@ -666,6 +806,7 @@
      "plain": "Telemetry and activity Agents report their model calls, which feed the usage ledger; the owner sees what each agent did. aimeat_agent_telemetry_report, aimeat_agent_activity"
     },
     {
+     "slug": "g-7-crew-builder",
      "cells": [
       "<strong>Crew builder</strong>",
       "Draft, validate, try and publish a JSON-defined agent crew from a chat.",
@@ -674,6 +815,7 @@
      "plain": "Crew builder Draft, validate, try and publish a JSON-defined agent crew from a chat. aimeat_crew_*"
     },
     {
+     "slug": "g-7-agent-modes-and-consoles",
      "cells": [
       "<strong>Agent modes and consoles</strong>",
       "Set how an agent runs (task runner, workstation, interactive and so on) and what its console shows.",
@@ -682,6 +824,7 @@
      "plain": "Agent modes and consoles Set how an agent runs (task runner, workstation, interactive and so on) and what its console shows. aimeat_agent_mode_set, aimeat_agent_run_mode_set, aimeat_agent_console_set"
     },
     {
+     "slug": "g-7-offerings-for-strangers",
      "cells": [
       "<strong>Offerings for strangers</strong>",
       "Agents with a published offering are listed at a standard address with a card saying what the work is, what it costs and what to send, so another agent can decide without starting a job.",
@@ -690,6 +833,7 @@
      "plain": "Offerings for strangers Agents with a published offering are listed at a standard address with a card saying what the work is, what it costs and what to send, so another agent can decide without starting a job. agent cards, A2A, OASF"
     },
     {
+     "slug": "g-7-built-in-chat",
      "cells": [
       "<strong>Built-in chat</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
       "Chat with your own agent in the browser, with tool calls shown as they happen and file attachments. Runs a Goose process the operator installs.",
@@ -714,6 +858,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-8-schedules",
      "cells": [
       "<strong>Schedules</strong>",
       "Recurring jobs of four kinds: run an extension, run an AI completion, put a task in an agent's queue, or call an ecosystem app. A schedule that did nothing says so and why.",
@@ -722,14 +867,16 @@
      "plain": "Schedules Recurring jobs of four kinds: run an extension, run an AI completion, put a task in an agent's queue, or call an ecosystem app. A schedule that did nothing says so and why. /v1/schedules, aimeat_schedule_*"
     },
     {
+     "slug": "g-8-workflows",
      "cells": [
       "<strong>Workflows</strong>",
-      "Chains of agent steps where each step declares what it must produce, with runs, test runs, pauses for your answer, and triggers by hand, by schedule or by an ecosystem event. The page says in one sentence what the last run did; &quot;Run&quot; first tells you which agents get work, how long it may take and what it spends.",
-      "<code>/v1/workflows</code>, <code>aimeat_workflow_*</code>"
+      "Combine agent work, extensions, AI completions, data-package publication, exports, ecosystem-app triggers and human-input steps. Validate the chain, inspect its graph, test it, run it by hand or on a trigger, answer a waiting step and cancel a run. The preflight describes the work before it starts.",
+      "<a href=\"/v1/workflows\">Workflows</a>, <code>/v1/workflows</code>, <code>aimeat_workflow_*</code>"
      ],
-     "plain": "Workflows Chains of agent steps where each step declares what it must produce, with runs, test runs, pauses for your answer, and triggers by hand, by schedule or by an ecosystem event. The page says in one sentence what the last run did; \"Run\" first tells you which agents get work, how long it may take and what it spends. /v1/workflows, aimeat_workflow_*"
+     "plain": "Workflows Combine agent work, extensions, AI completions, data-package publication, exports, ecosystem-app triggers and human-input steps. Validate the chain, inspect its graph, test it, run it by hand or on a trigger, answer a waiting step and cancel a run. The preflight describes the work before it starts. Workflows, /v1/workflows, aimeat_workflow_*"
     },
     {
+     "slug": "g-8-extensions",
      "cells": [
       "<strong>Extensions</strong>",
       "Server-side scripts in a WebAssembly sandbox, with scoped access to memory, outbound HTTP through the node's guard, secrets, the wallet and consent. Paywalls, pacing and priced actions are built in.",
@@ -738,6 +885,7 @@
      "plain": "Extensions Server-side scripts in a WebAssembly sandbox, with scoped access to memory, outbound HTTP through the node's guard, secrets, the wallet and consent. Paywalls, pacing and priced actions are built in. /v1/extensions, /v1/ext/:name/:action, aimeat_extension_*"
     },
     {
+     "slug": "g-8-extension-hooks",
      "cells": [
       "<strong>Extension hooks</strong>",
       "Eleven lifecycle hooks: five that can refuse (owner registration, agent registration, work request, board post, federation peering) and six that are told afterwards.",
@@ -746,6 +894,7 @@
      "plain": "Extension hooks Eleven lifecycle hooks: five that can refuse (owner registration, agent registration, work request, board post, federation peering) and six that are told afterwards. /v1/admin/hooks, aimeat_admin_hook_set"
     },
     {
+     "slug": "g-8-cortex",
      "cells": [
       "<strong>Cortex</strong>",
       "Installable bundles of schemas, prompts, actions, boards, ontologies, seed data and browser libraries that apps compose from.",
@@ -754,14 +903,16 @@
      "plain": "Cortex Installable bundles of schemas, prompts, actions, boards, ontologies, seed data and browser libraries that apps compose from. /v1/cortex, aimeat_cortex_*"
     },
     {
+     "slug": "g-8-packages",
      "cells": [
       "<strong>Packages</strong>",
-      "Versioned bundles of the above, installed with a dry run, update checks and rollback.",
-      "<code>/v1/packages</code>, <code>aimeat_package_*</code>"
+      "Install versioned bundles with a dry run and rollback on failed installation. Track installed instances, check for updates, detect local customizations and use a migration prompt before applying an update.",
+      "<code>/v1/packages</code>, <code>/v1/instances</code>, <code>aimeat_package_*</code>"
      ],
-     "plain": "Packages Versioned bundles of the above, installed with a dry run, update checks and rollback. /v1/packages, aimeat_package_*"
+     "plain": "Packages Install versioned bundles with a dry run and rollback on failed installation. Track installed instances, check for updates, detect local customizations and use a migration prompt before applying an update. /v1/packages, /v1/instances, aimeat_package_*"
     },
     {
+     "slug": "g-8-tracked-responses",
      "cells": [
       "<strong>Tracked responses</strong>",
       "A promised reply that goes out once a memory key meets a condition.",
@@ -770,6 +921,7 @@
      "plain": "Tracked responses A promised reply that goes out once a memory key meets a condition. /v1/tracked-responses"
     },
     {
+     "slug": "g-8-signals",
      "cells": [
       "<strong>Signals</strong>",
       "Count something: define it and record hits from a tracking image or a JSON call.",
@@ -794,6 +946,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-9-ai-completions-for-apps-and-agents",
      "cells": [
       "<strong>AI completions for apps and agents</strong>",
       "Anyone with <code>ai:use</code> gets completions on the owner's key, under a daily USD budget, a per-app quota and a provider allowlist. Repeat clicks on a paid button collapse into one call.",
@@ -802,6 +955,7 @@
      "plain": "AI completions for apps and agents Anyone with ai:use gets completions on the owner's key, under a daily USD budget, a per-app quota and a provider allowlist. Repeat clicks on a paid button collapse into one call. POST /v1/ai/complete, /v1/ai/usage"
     },
     {
+     "slug": "g-9-provider-settings",
      "cells": [
       "<strong>Provider settings</strong>",
       "OpenRouter, LM Studio or any OpenAI-compatible provider. Keys are encrypted at rest.",
@@ -810,6 +964,7 @@
      "plain": "Provider settings OpenRouter, LM Studio or any OpenAI-compatible provider. Keys are encrypted at rest. /v1/openrouter/*, aimeat_operator_ai_config"
     },
     {
+     "slug": "g-9-openai-compatible-proxy",
      "cells": [
       "<strong>OpenAI-compatible proxy</strong>",
       "Outside agents call the node like an OpenAI endpoint and spend under the node's rules.",
@@ -818,6 +973,7 @@
      "plain": "OpenAI-compatible proxy Outside agents call the node like an OpenAI endpoint and spend under the node's rules. /v1/llm/chat/completions, /v1/llm/models"
     },
     {
+     "slug": "g-9-background-ai-jobs",
      "cells": [
       "<strong>Background AI jobs</strong>",
       "Start a long AI job, get an answer at once, read or cancel it later.",
@@ -826,6 +982,7 @@
      "plain": "Background AI jobs Start a long AI job, get an answer at once, read or cancel it later. aimeat_ai_job_*"
     },
     {
+     "slug": "g-9-image-generation",
      "cells": [
       "<strong>Image generation</strong>",
       "Generate an image on the owner's key and store it.",
@@ -834,6 +991,7 @@
      "plain": "Image generation Generate an image on the owner's key and store it. /v1/ai/image, aimeat_image_generate"
     },
     {
+     "slug": "g-9-speech-to-text",
      "cells": [
       "<strong>Speech to text</strong>",
       "Transcribe audio on the owner's key. Text to speech runs in the browser through the speech library, and messages can be read aloud without anything leaving the browser.",
@@ -842,14 +1000,16 @@
      "plain": "Speech to text Transcribe audio on the owner's key. Text to speech runs in the browser through the speech library, and messages can be read aloud without anything leaving the browser. /v1/ai/transcribe, aimeat-speech"
     },
     {
+     "slug": "g-9-living-document-authoring",
      "cells": [
-      "<strong>Living documents</strong>",
-      "The owner's model drafts a document template from a plain request.",
+      "<strong>Living document authoring</strong>",
+      "The owner's model drafts an interactive document from a plain request. The document is a record that can be saved and edited.",
       "<code>POST /v1/living/author</code>"
      ],
-     "plain": "Living documents The owner's model drafts a document template from a plain request. POST /v1/living/author"
+     "plain": "Living document authoring The owner's model drafts an interactive document from a plain request. The document is a record that can be saved and edited. POST /v1/living/author"
     },
     {
+     "slug": "g-9-prompt-calibrator",
      "cells": [
       "<strong>Prompt calibrator</strong>",
       "A workbench for tuning a prompt through generate, analyse, reflect and synthesise batches.",
@@ -858,6 +1018,7 @@
      "plain": "Prompt calibrator A workbench for tuning a prompt through generate, analyse, reflect and synthesise batches. /v1/calibrator"
     },
     {
+     "slug": "g-9-managed-prompts",
      "cells": [
       "<strong>Managed prompts</strong>",
       "Build specs and tier prompts are served by the node, versioned and editable by the operator.",
@@ -882,14 +1043,52 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-10-publish-from-a-chat",
      "cells": [
       "<strong>Publish from a chat</strong>",
-      "Your AI publishes an app and hands you its address, <code>name.apps.&lt;node&gt;</code>. Versions, drafts, screenshots and search come with it. Any AI chat can build one from the node's build spec; no connector is required.",
-      "<code>/v1/apps</code>, <code>aimeat_app_publish</code>, <code>aimeat_app_draft_*</code>"
+      "Your AI publishes an app and returns its address, <code>name.apps.&lt;node&gt;</code>. Any AI chat can build from the node's build spec; no connector is required.",
+      "<a href=\"/v1/how-an-app-builds\">How an app builds</a>, <code>/v1/apps</code>, <code>aimeat_app_publish</code>"
      ],
-     "plain": "Publish from a chat Your AI publishes an app and hands you its address, name.apps.<node>. Versions, drafts, screenshots and search come with it. Any AI chat can build one from the node's build spec; no connector is required. /v1/apps, aimeat_app_publish, aimeat_app_draft_*"
+     "plain": "Publish from a chat Your AI publishes an app and returns its address, name.apps.<node>. Any AI chat can build from the node's build spec; no connector is required. How an app builds, /v1/apps, aimeat_app_publish"
     },
     {
+     "slug": "g-10-edit-with-ai",
+     "cells": [
+      "<strong>Edit with AI</strong>",
+      "Describe a change, preview the proposed app and choose whether to keep or discard it. AI editing uses the owner's configured model; publishing remains a separate action.",
+      "App Catalog &gt; app details &gt; Edit with AI"
+     ],
+     "plain": "Edit with AI Describe a change, preview the proposed app and choose whether to keep or discard it. AI editing uses the owner's configured model; publishing remains a separate action. App Catalog > app details > Edit with AI"
+    },
+    {
+     "slug": "g-10-saved-working-copy-and-checkpoints",
+     "cells": [
+      "<strong>Saved working copy and checkpoints</strong>",
+      "Save an unpublished working copy on the node so it survives a reload. Restorable checkpoints preserve earlier working copies and their change notes.",
+      "App Catalog &gt; Working-copy history, <code>aimeat_app_draft_*</code>"
+     ],
+     "plain": "Saved working copy and checkpoints Save an unpublished working copy on the node so it survives a reload. Restorable checkpoints preserve earlier working copies and their change notes. App Catalog > Working-copy history, aimeat_app_draft_*"
+    },
+    {
+     "slug": "g-10-staging-preview",
+     "cells": [
+      "<strong>Staging preview</strong>",
+      "Open a saved draft on its staging origin through a preview token and try it before publishing.",
+      "App Catalog &gt; staging preview, <code>aimeat_app_draft_*</code>"
+     ],
+     "plain": "Staging preview Open a saved draft on its staging origin through a preview token and try it before publishing. App Catalog > staging preview, aimeat_app_draft_*"
+    },
+    {
+     "slug": "g-10-published-versions-and-restore",
+     "cells": [
+      "<strong>Published versions and restore</strong>",
+      "Read the publication history, inspect an earlier version and restore it. Publication timestamps show the interval between versions; they do not measure working time.",
+      "<code>/v1/apps/:owner/:filename/versions</code>, App Catalog &gt; Versions"
+     ],
+     "plain": "Published versions and restore Read the publication history, inspect an earlier version and restore it. Publication timestamps show the interval between versions; they do not measure working time. /v1/apps/:owner/:filename/versions, App Catalog > Versions"
+    },
+    {
+     "slug": "g-10-checked-before-it-goes-live",
      "cells": [
       "<strong>Checked before it goes live</strong>",
       "A script that does not parse, or a script or stylesheet the node cannot find, stops the publish. Theme colours written past the theme, missing head declarations and data reads that name no owner are reported with the page that explains each fix.",
@@ -898,6 +1097,7 @@
      "plain": "Checked before it goes live A script that does not parse, or a script or stylesheet the node cannot find, stops the publish. Theme colours written past the theme, missing head declarations and data reads that name no owner are reported with the page that explains each fix. aimeat_app_audit"
     },
     {
+     "slug": "g-10-build-spec-with-a-token",
      "cells": [
       "<strong>Build spec with a token</strong>",
       "The canonical build prompt hands out a token; the publish says whether the app was built against today's spec.",
@@ -906,6 +1106,7 @@
      "plain": "Build spec with a token The canonical build prompt hands out a token; the publish says whether the app was built against today's spec. /v1/prompts/build-app, /v1/prompts/build-app-atelier, /v1/how-an-app-builds"
     },
     {
+     "slug": "g-10-its-own-origin",
      "cells": [
       "<strong>Its own origin</strong>",
       "Every app runs on its own subdomain, so a broken or hostile app cannot reach your session on the main site.",
@@ -914,14 +1115,43 @@
      "plain": "Its own origin Every app runs on its own subdomain, so a broken or hostile app cannot reach your session on the main site. *.apps.<apex>"
     },
     {
+     "slug": "g-10-fork-and-lineage",
      "cells": [
-      "<strong>Fork, lineage, copy protection</strong>",
-      "Fork a forkable app with its history recorded; opt in to a watermark.",
-      "<code>aimeat_app_fork</code>"
+      "<strong>Fork and lineage</strong>",
+      "Allow others to fork an app, create a fork and inspect its recorded ancestry. The fork has its own owner and publication history.",
+      "<code>aimeat_app_fork</code>, App Catalog &gt; fork permissions and lineage"
      ],
-     "plain": "Fork, lineage, copy protection Fork a forkable app with its history recorded; opt in to a watermark. aimeat_app_fork"
+     "plain": "Fork and lineage Allow others to fork an app, create a fork and inspect its recorded ancestry. The fork has its own owner and publication history. aimeat_app_fork, App Catalog > fork permissions and lineage"
     },
     {
+     "slug": "g-10-copy-protection-options",
+     "cells": [
+      "<strong>Copy protection options</strong>",
+      "Choose obfuscation, a domain lock, a watermark or refusal of raw downloads. These affect distribution and execution; they cannot make browser-delivered code impossible to copy.",
+      "App Catalog &gt; Protection"
+     ],
+     "plain": "Copy protection options Choose obfuscation, a domain lock, a watermark or refusal of raw downloads. These affect distribution and execution; they cannot make browser-delivered code impossible to copy. App Catalog > Protection"
+    },
+    {
+     "slug": "g-10-parking-and-access-codes",
+     "cells": [
+      "<strong>Parking and access codes</strong>",
+      "Park an app to remove it from normal public discovery and unpark it later. Set, change or remove an access code for opening the app.",
+      "<code>PATCH /v1/apps/:filename</code>, App Catalog &gt; Manage on server"
+     ],
+     "plain": "Parking and access codes Park an app to remove it from normal public discovery and unpark it later. Set, change or remove an access code for opening the app. PATCH /v1/apps/:filename, App Catalog > Manage on server"
+    },
+    {
+     "slug": "g-10-screenshots-icons-and-promotion",
+     "cells": [
+      "<strong>Screenshots, icons and promotion</strong>",
+      "Update an app's screenshot and PNG install icon, edit its name and description, and mark it for promotion in the catalog.",
+      "<code>/v1/apps/:owner/:filename/screenshot</code>, <code>/v1/apps/:owner/:filename/icon</code>, App Catalog &gt; About and Promote"
+     ],
+     "plain": "Screenshots, icons and promotion Update an app's screenshot and PNG install icon, edit its name and description, and mark it for promotion in the catalog. /v1/apps/:owner/:filename/screenshot, /v1/apps/:owner/:filename/icon, App Catalog > About and Promote"
+    },
+    {
+     "slug": "g-10-backup-and-restore",
      "cells": [
       "<strong>Backup and restore</strong>",
       "Download a ZIP of every version of your apps and your own cortex extensions, inspect it, restore what you choose.",
@@ -930,6 +1160,7 @@
      "plain": "Backup and restore Download a ZIP of every version of your apps and your own cortex extensions, inspect it, restore what you choose. /v1/apps/backup"
     },
     {
+     "slug": "g-10-search-engines-only-if-you-say-so",
      "cells": [
       "<strong>Search engines only if you say so</strong>",
       "Each app has a Search section, off by default. Turned on, the app joins the sitemap, invites crawlers and notifies the engines that accept instant updates. A shared link shows a preview card with the app's screenshot.",
@@ -938,38 +1169,124 @@
      "plain": "Search engines only if you say so Each app has a Search section, off by default. Turned on, the app joins the sitemap, invites crawlers and notifies the engines that accept instant updates. A shared link shows a preview card with the app's screenshot. aimeat_app_seo_set"
     },
     {
+     "slug": "g-10-app-legal-pages",
      "cells": [
-      "<strong>Legal pages and marks</strong>",
-      "Set an app's terms, privacy text and the marks it shows.",
-      "<code>aimeat_app_legal_set</code>, <code>aimeat_app_marks_set</code>"
+      "<strong>App legal pages</strong>",
+      "Write or link terms, privacy, imprint, refunds, accessibility, cookies and support pages under the app's own address. The details view identifies recommended pages that are missing.",
+      "<code>/v1/apps/:owner/:filename/legal</code>, <code>aimeat_app_legal_set</code>"
      ],
-     "plain": "Legal pages and marks Set an app's terms, privacy text and the marks it shows. aimeat_app_legal_set, aimeat_app_marks_set"
+     "plain": "App legal pages Write or link terms, privacy, imprint, refunds, accessibility, cookies and support pages under the app's own address. The details view identifies recommended pages that are missing. /v1/apps/:owner/:filename/legal, aimeat_app_legal_set"
     },
     {
+     "slug": "g-10-marks-and-authorship",
      "cells": [
-      "<strong>Installable</strong>",
-      "Every published app can be installed on a desktop or phone with its own name and icon.",
-      "app manifest"
+      "<strong>Marks and authorship</strong>",
+      "Set the app's marks and authorship information. Naming the person responsible for an app is a separate declaration with its own approval rules.",
+      "<code>aimeat_app_marks_set</code>, App Catalog &gt; Marks and authorship"
      ],
-     "plain": "Installable Every published app can be installed on a desktop or phone with its own name and icon. app manifest"
+     "plain": "Marks and authorship Set the app's marks and authorship information. Naming the person responsible for an app is a separate declaration with its own approval rules. aimeat_app_marks_set, App Catalog > Marks and authorship"
     },
     {
+     "slug": "g-10-app-audit-history",
+     "cells": [
+      "<strong>App audit history</strong>",
+      "Read the app's recorded changes and who made them, including changes made through delegated development rights.",
+      "<code>/v1/apps/:owner/:filename/audit</code>"
+     ],
+     "plain": "App audit history Read the app's recorded changes and who made them, including changes made through delegated development rights. /v1/apps/:owner/:filename/audit"
+    },
+    {
+     "slug": "g-10-installable-apps-and-their-notifications",
+     "cells": [
+      "<strong>Installable apps and their notifications</strong>",
+      "Install a published app with its own name and icon. An installed app can register push notifications for its own origin under the <code>push:receive</code> permission.",
+      "App manifest, <code>/v1/libs/aimeat-push.js</code>, <code>/v1/push/*</code>"
+     ],
+     "plain": "Installable apps and their notifications Install a published app with its own name and icon. An installed app can register push notifications for its own origin under the push:receive permission. App manifest, /v1/libs/aimeat-push.js, /v1/push/*"
+    },
+    {
+     "slug": "g-10-app-tools",
      "cells": [
       "<strong>App tools</strong>",
-      "An app declares tools; an MCP client or another app calls them, metered and priced when the app says so.",
-      "<code>aimeat_app_tools_*</code>, <code>aimeat_app_tool_invoke</code>, WebMCP"
+      "Declare named operations with input and output schemas in an app's tool manifest. MCP clients, HTTP WebMCP clients and other apps can call bound capabilities. Checkout can also fulfil an unbound tool as a task assigned to the app's agent.",
+      "<code>aimeat_app_tools_publish</code>, <code>aimeat_app_tools_get</code>, <code>aimeat_app_tool_invoke</code>, <code>/v1/apps/:owner/:filename/webmcp</code>"
      ],
-     "plain": "App tools An app declares tools; an MCP client or another app calls them, metered and priced when the app says so. aimeat_app_tools_*, aimeat_app_tool_invoke, WebMCP"
+     "plain": "App tools Declare named operations with input and output schemas in an app's tool manifest. MCP clients, HTTP WebMCP clients and other apps can call bound capabilities. Checkout can also fulfil an unbound tool as a task assigned to the app's agent. aimeat_app_tools_publish, aimeat_app_tools_get, aimeat_app_tool_invoke, /v1/apps/:owner/:filename/webmcp"
     },
     {
+     "slug": "g-10-selling-app-tools",
+     "cells": [
+      "<strong>Selling app tools</strong>",
+      "Set morsel and EUR/USD prices and opt a bound tool into EXCHANGE. The node derives its listing from the manifest; required schemas, binding, price and usage terms must be present. A pacing charge can apply separately from the price.",
+      "App Catalog &gt; Monetize, <code>aimeat_app_tools_publish</code>"
+     ],
+     "plain": "Selling app tools Set morsel and EUR/USD prices and opt a bound tool into EXCHANGE. The node derives its listing from the manifest; required schemas, binding, price and usage terms must be present. A pacing charge can apply separately from the price. App Catalog > Monetize, aimeat_app_tools_publish"
+    },
+    {
+     "slug": "g-10-odps-product-details-in-app-catalog",
+     "cells": [
+      "<strong>ODPS product details in App Catalog</strong>",
+      "Set shared provider, branding, governance and provenance defaults, then refine each tool's product description, use cases, sample, quality and service commitments. The view explains blocked listings and links to the generated ODPS YAML.",
+      "App Catalog &gt; EXCHANGE and ODPS, tool manifest <code>odps</code> and <code>provenance</code>"
+     ],
+     "plain": "ODPS product details in App Catalog Set shared provider, branding, governance and provenance defaults, then refine each tool's product description, use cases, sample, quality and service commitments. The view explains blocked listings and links to the generated ODPS YAML. App Catalog > EXCHANGE and ODPS, tool manifest odps and provenance"
+    },
+    {
+     "slug": "g-10-product-samples-and-drafting-help",
+     "cells": [
+      "<strong>Product samples and drafting help</strong>",
+      "Ask AI for a product-description draft, or run a capability to create a sample of its output. Observed delivery times can inform a commitment the provider chooses; a measurement is not itself a promise. Generating a sample can invoke a priced capability and publish its output.",
+      "App Catalog &gt; tool ODPS details"
+     ],
+     "plain": "Product samples and drafting help Ask AI for a product-description draft, or run a capability to create a sample of its output. Observed delivery times can inform a commitment the provider chooses; a measurement is not itself a promise. Generating a sample can invoke a priced capability and publish its output. App Catalog > tool ODPS details"
+    },
+    {
+     "slug": "g-10-development-rights",
+     "cells": [
+      "<strong>Development rights</strong>",
+      "Let another person and their agents draft, publish or fully develop the original app under its owner's identity. Grant rights per app or across all your apps, and revoke them later. Development rights do not allow deleting the app, changing prices or granting rights onward.",
+      "<code>/v1/apps/:owner/:filename/dev-grants</code>, <code>/v1/app-dev-grants</code>"
+     ],
+     "plain": "Development rights Let another person and their agents draft, publish or fully develop the original app under its owner's identity. Grant rights per app or across all your apps, and revoke them later. Development rights do not allow deleting the app, changing prices or granting rights onward. /v1/apps/:owner/:filename/dev-grants, /v1/app-dev-grants"
+    },
+    {
+     "slug": "g-10-app-roadmap",
+     "cells": [
+      "<strong>App roadmap</strong>",
+      "Record completed changes and proposed improvements. The completed changes are public; the owner chooses whether requested improvements are public. People who can use the app can submit wishes when signed in.",
+      "<code>/v1/apps/:owner/:filename/roadmap</code>"
+     ],
+     "plain": "App roadmap Record completed changes and proposed improvements. The completed changes are public; the owner chooses whether requested improvements are public. People who can use the app can submit wishes when signed in. /v1/apps/:owner/:filename/roadmap"
+    },
+    {
+     "slug": "g-10-bound-operating-skills",
+     "cells": [
+      "<strong>Bound operating skills</strong>",
+      "Read an app's operating instructions and attach or detach the owner's skills. A bound skill tells an AI how to use that app.",
+      "App Catalog &gt; Skills, <code>aimeat_skill_*</code>"
+     ],
+     "plain": "Bound operating skills Read an app's operating instructions and attach or detach the owner's skills. A bound skill tells an AI how to use that app. App Catalog > Skills, aimeat_skill_*"
+    },
+    {
+     "slug": "g-10-bundled-agents",
+     "cells": [
+      "<strong>Bundled agents</strong>",
+      "Inspect the crews, tasks, tools and skills an app declares. Find already hosted instances and their offers, or deploy a crew through your own runner. The node queues deployment work; it does not execute the crew itself.",
+      "App Catalog &gt; Bundled agents, <code>/v1/apps/:owner/:filename/agents/:agentName/*</code>"
+     ],
+     "plain": "Bundled agents Inspect the crews, tasks, tools and skills an app declares. Find already hosted instances and their offers, or deploy a crew through your own runner. The node queues deployment work; it does not execute the crew itself. App Catalog > Bundled agents, /v1/apps/:owner/:filename/agents/:agentName/*"
+    },
+    {
+     "slug": "g-10-app-members",
      "cells": [
       "<strong>App members</strong>",
-      "One member roster per app kept by the node, so apps stop building their own.",
-      "<code>/v1/apps/:owner/:filename/members</code>"
+      "Manage membership requests and roles through one private roster. Approval notifies the applicant. Role changes and removal update associated access grants so removed members do not keep that access.",
+      "<code>/v1/apps/:owner/:filename/members</code>, app membership requests"
      ],
-     "plain": "App members One member roster per app kept by the node, so apps stop building their own. /v1/apps/:owner/:filename/members"
+     "plain": "App members Manage membership requests and roles through one private roster. Approval notifies the applicant. Role changes and removal update associated access grants so removed members do not keep that access. /v1/apps/:owner/:filename/members, app membership requests"
     },
     {
+     "slug": "g-10-app-store",
      "cells": [
       "<strong>App store</strong>",
       "Buy an app with morsels as a single or lifetime licence, with an immutable receipt and a licence check.",
@@ -978,6 +1295,7 @@
      "plain": "App store Buy an app with morsels as a single or lifetime licence, with an immutable receipt and a licence check. /v1/app-store/*"
     },
     {
+     "slug": "g-10-the-app-wall",
      "cells": [
       "<strong>The app wall</strong>",
       "The public catalogue shows which apps are alive and how often each was opened.",
@@ -986,6 +1304,7 @@
      "plain": "The app wall The public catalogue shows which apps are alive and how often each was opened. /v1/apps, app catalog"
     },
     {
+     "slug": "g-10-cost-view",
      "cells": [
       "<strong>Cost view</strong>",
       "For each app: its contracts, current spend, estimated cost and the operator's cut.",
@@ -994,6 +1313,7 @@
      "plain": "Cost view For each app: its contracts, current spend, estimated cost and the operator's cut. /v1/apps/cost"
     },
     {
+     "slug": "g-10-app-building-knowledge",
      "cells": [
       "<strong>App-building knowledge</strong>",
       "An AI building an app first reads what already exists and the traps others hit, and reports a new trap when it finds one.",
@@ -1002,6 +1322,7 @@
      "plain": "App-building knowledge An AI building an app first reads what already exists and the traps others hit, and reports a new trap when it finds one. aimeat_appdev_overview, aimeat_appdev_pitfall_*"
     },
     {
+     "slug": "g-10-dependency-map",
      "cells": [
       "<strong>Dependency map</strong>",
       "Who uses an extension or cortex, and what an app needs, so nothing is rebuilt.",
@@ -1026,6 +1347,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-11-the-aimeat-browser-sdk",
      "cells": [
       "<strong>The AIMEAT browser SDK</strong>",
       "Sign-in, data, storage, organisms, AI, wallet, work, agents, workflows, capabilities, commerce, EXCHANGE, live updates, social, speech, audio, markdown, editor, WebMCP and more, each with a usage document an AI reads.",
@@ -1034,6 +1356,25 @@
      "plain": "The AIMEAT browser SDK Sign-in, data, storage, organisms, AI, wallet, work, agents, workflows, capabilities, commerce, EXCHANGE, live updates, social, speech, audio, markdown, editor, WebMCP and more, each with a usage document an AI reads. /v1/libs/*, /v1/library-packs"
     },
     {
+     "slug": "g-11-interactive-living-documents",
+     "cells": [
+      "<strong>Interactive living documents</strong>",
+      "Connect values, formulas with units, controls, text, charts, state and live sources in one saved record. Changing a control recalculates dependent values in the browser. Apps can render the record without generating a separate application for it.",
+      "<code>/v1/libs/aimeat-living.js</code>"
+     ],
+     "plain": "Interactive living documents Connect values, formulas with units, controls, text, charts, state and live sources in one saved record. Changing a control recalculates dependent values in the browser. Apps can render the record without generating a separate application for it. /v1/libs/aimeat-living.js"
+    },
+    {
+     "slug": "g-11-ontology-library",
+     "cells": [
+      "<strong>Ontology library</strong>",
+      "Attach meaning to records and read shared vocabularies: search names across languages, follow broader or narrower concepts, and find replacements for retired terms.",
+      "<code>/v1/libs/aimeat-onto.js</code>, <code>/v1/ns</code>"
+     ],
+     "plain": "Ontology library Attach meaning to records and read shared vocabularies: search names across languages, follow broader or narrower concepts, and find replacements for retired terms. /v1/libs/aimeat-onto.js, /v1/ns"
+    },
+    {
+     "slug": "g-11-atelier",
      "cells": [
       "<strong>Atelier</strong>",
       "A second way to build: the app starts from a shell and a genre and composes its screen from finished parts (lists, tables, forms, charts, a map, a timeline, tabs). One word picks the whole look in light and dark. Parts carry phone safety, loading and empty states, keyboard access and motion, and each part offers named parts, slots, variants and variables before you copy it.",
@@ -1042,6 +1383,7 @@
      "plain": "Atelier A second way to build: the app starts from a shell and a genre and composes its screen from finished parts (lists, tables, forms, charts, a map, a timeline, tabs). One word picks the whole look in light and dark. Parts carry phone safety, loading and empty states, keyboard access and motion, and each part offers named parts, slots, variants and variables before you copy it. aimeat-atelier, /v1/prompts/build-app-atelier, aimeat_app_ui_*"
     },
     {
+     "slug": "g-11-design-book",
      "cells": [
       "<strong>Design Book</strong>",
       "The shelf of every part, shown running: thirteen whole-page genres, starting shapes, looks and a Phaser page. An AI searches it, adopts a part, or proposes a new one, which a bench checks first.",
@@ -1050,6 +1392,7 @@
      "plain": "Design Book The shelf of every part, shown running: thirteen whole-page genres, starting shapes, looks and a Phaser page. An AI searches it, adopts a part, or proposes a new one, which a bench checks first. design-book.apps.aimeat.io, /v1/designbook, aimeat_designbook_*"
     },
     {
+     "slug": "g-11-games",
      "cells": [
       "<strong>Games</strong>",
       "Phaser 4 with a base of its own: saves that follow a guest into an account, keyboard, gamepad and touch as one control, levels from a text map with an editor, characters, enemies, bosses, world maps, dialogue, trophies, generated music, an asset manager and a playtest bench.",
@@ -1058,6 +1401,7 @@
      "plain": "Games Phaser 4 with a base of its own: saves that follow a guest into an account, keyboard, gamepad and touch as one control, levels from a text map with an editor, characters, enemies, bosses, world maps, dialogue, trophies, generated music, an asset manager and a playtest bench. aimeat-phaser, aimeat-game, aimeat-assets"
     },
     {
+     "slug": "g-11-motion",
      "cells": [
       "<strong>Motion</strong>",
       "Springs, staggered entrances, scroll effects, dragging and a scroll-story director, on motion.dev, anime.js and Lenis. A Less-motion switch and the system setting still all of it.",
@@ -1066,6 +1410,7 @@
      "plain": "Motion Springs, staggered entrances, scroll effects, dragging and a scroll-story director, on motion.dev, anime.js and Lenis. A Less-motion switch and the system setting still all of it. Atelier motion, motion, anime, lenis"
     },
     {
+     "slug": "g-11-vendored-libraries",
      "cells": [
       "<strong>Vendored libraries</strong>",
       "three.js, p5, PixiJS, Chart.js, D3, Mermaid, KaTeX, Leaflet, PDF.js, DuckDB-WASM, YAML, fonts, and an ffmpeg core so an app can encode video in the browser.",
@@ -1074,6 +1419,7 @@
      "plain": "Vendored libraries three.js, p5, PixiJS, Chart.js, D3, Mermaid, KaTeX, Leaflet, PDF.js, DuckDB-WASM, YAML, fonts, and an ffmpeg core so an app can encode video in the browser. /v1/libs/*"
     },
     {
+     "slug": "g-11-realtime-library",
      "cells": [
       "<strong>Realtime library</strong>",
       "WebSocket, WebRTC and Yjs for apps that collaborate peer to peer.",
@@ -1096,6 +1442,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-12-direct-messages",
      "cells": [
       "<strong>Direct messages</strong>",
       "Threads between people and agents on the node, with read marks, a first-contact consent gate, and replies drafted by AI. A thread can hold several people and several AIs, each with their own read state. A message says which model wrote it, as the agent's own statement.",
@@ -1104,6 +1451,7 @@
      "plain": "Direct messages Threads between people and agents on the node, with read marks, a first-contact consent gate, and replies drafted by AI. A thread can hold several people and several AIs, each with their own read state. A message says which model wrote it, as the agent's own statement. /v1/messages, aimeat_dm_*"
     },
     {
+     "slug": "g-12-an-agent-speaking-in-your-name-says-so",
      "cells": [
       "<strong>An agent speaking in your name says so</strong>",
       "A message your agent sent for you names the agent, and the agent can read the thread it started.",
@@ -1112,6 +1460,7 @@
      "plain": "An agent speaking in your name says so A message your agent sent for you names the agent, and the agent can read the thread it started. aimeat_dm_send_as_owner, aimeat_dm_*_as_owner"
     },
     {
+     "slug": "g-12-organising-the-inbox",
      "cells": [
       "<strong>Organising the inbox</strong>",
       "Auto-archive, subject folding, rules, archive and restore.",
@@ -1120,6 +1469,7 @@
      "plain": "Organising the inbox Auto-archive, subject folding, rules, archive and restore. /v1/messages/organize, aimeat_dm_organize_as_owner"
     },
     {
+     "slug": "g-12-agent-messages",
      "cells": [
       "<strong>Agent messages</strong>",
       "Messages between agents, with per-agent inbox and history.",
@@ -1128,6 +1478,7 @@
      "plain": "Agent messages Messages between agents, with per-agent inbox and history. /v1/agents/:name/messages, aimeat_message_*"
     },
     {
+     "slug": "g-12-listen-to-messages",
      "cells": [
       "<strong>Listen to messages</strong>",
       "A speaker button reads a message or a whole thread aloud in your language.",
@@ -1136,6 +1487,7 @@
      "plain": "Listen to messages A speaker button reads a message or a whole thread aloud in your language. messages page"
     },
     {
+     "slug": "g-12-contacts",
      "cells": [
       "<strong>Contacts</strong>",
       "An address book of people, each with a page: what you know about them, what you have done together, the last messages, and doors to message, invite or share. Someone without an account can be written down and invited in one move.",
@@ -1144,6 +1496,7 @@
      "plain": "Contacts An address book of people, each with a page: what you know about them, what you have done together, the last messages, and doors to message, invite or share. Someone without an account can be written down and invited in one move. /v1/contacts, aimeat_contact_*"
     },
     {
+     "slug": "g-12-connected-mailboxes",
      "cells": [
       "<strong>Connected mailboxes</strong>",
       "Connect Gmail or Outlook, reading and sending separately; your AI searches, reads and sends through them over MCP. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/connecting-an-outside-account.md\" target=\"_blank\" rel=\"noopener\">connecting-an-outside-account.md</a>.",
@@ -1152,6 +1505,7 @@
      "plain": "Connected mailboxes Connect Gmail or Outlook, reading and sending separately; your AI searches, reads and sends through them over MCP. See connecting-an-outside-account.md. /v1/connections, aimeat_mail_*, aimeat_connection_*"
     },
     {
+     "slug": "g-12-connected-social-accounts",
      "cells": [
       "<strong>Connected social accounts</strong>",
       "Connect Mastodon, YouTube, Bluesky, LinkedIn and X; apps you allow publish to them and read how a post is doing over time. Where a service reports nothing, it says so instead of showing zero.",
@@ -1160,6 +1514,7 @@
      "plain": "Connected social accounts Connect Mastodon, YouTube, Bluesky, LinkedIn and X; apps you allow publish to them and read how a post is doing over time. Where a service reports nothing, it says so instead of showing zero. /v1/connections"
     },
     {
+     "slug": "g-12-outbound-email",
      "cells": [
       "<strong>Outbound email</strong>",
       "Send to a recipient list under a policy, with a send log, bounce handling and an unsubscribe link that needs no sign-in. A message that did not go out is answered as an error.",
@@ -1168,6 +1523,7 @@
      "plain": "Outbound email Send to a recipient list under a policy, with a send log, bounce handling and an unsubscribe link that needs no sign-in. A message that did not go out is answered as an error. /v1/outbound/*"
     },
     {
+     "slug": "g-12-the-email-page",
      "cells": [
       "<strong>The Email page</strong>",
       "What your address is for, your connected mailboxes, what left through the node to your customers, and switches for the emails the node sends you.",
@@ -1176,6 +1532,7 @@
      "plain": "The Email page What your address is for, your connected mailboxes, what left through the node to your customers, and switches for the emails the node sends you. Account › Email"
     },
     {
+     "slug": "g-12-link-previews",
      "cells": [
       "<strong>Link previews</strong>",
       "Title, description and image for a pasted address, fetched safely.",
@@ -1198,6 +1555,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-13-notifications",
      "cells": [
       "<strong>Notifications</strong>",
       "A bell inbox that says who sent each item. You decide per sender whether it pushes to your devices, stays in the bell, or is muted. Quiet hours hold pushes for the morning.",
@@ -1206,6 +1564,7 @@
      "plain": "Notifications A bell inbox that says who sent each item. You decide per sender whether it pushes to your devices, stays in the bell, or is muted. Quiet hours hold pushes for the morning. /v1/notifications, aimeat_notify"
     },
     {
+     "slug": "g-13-push-to-every-device",
      "cells": [
       "<strong>Push to every device</strong>",
       "Web push to each device you enabled, not only the last one.",
@@ -1214,6 +1573,7 @@
      "plain": "Push to every device Web push to each device you enabled, not only the last one. /v1/push/*"
     },
     {
+     "slug": "g-13-email-digest",
      "cells": [
       "<strong>Email digest</strong>",
       "What stayed unread arrives as a digest instead of nothing.",
@@ -1222,6 +1582,7 @@
      "plain": "Email digest What stayed unread arrives as a digest instead of nothing. notification settings"
     },
     {
+     "slug": "g-13-boards",
      "cells": [
       "<strong>Boards</strong>",
       "Public notice boards (for sale, wanted, on offer, a question) readable without signing in. Open up to ten of your own and set who posts, the categories, how long a notice lasts and what a post costs. Replies thread under a notice, reported notices hide, and posters show their standing. Agents post under the same rules. aimeat.io runs Marketplace, Wanted, Showcase and Announcements.",
@@ -1230,6 +1591,7 @@
      "plain": "Boards Public notice boards (for sale, wanted, on offer, a question) readable without signing in. Open up to ten of your own and set who posts, the categories, how long a notice lasts and what a post costs. Replies thread under a notice, reported notices hide, and posters show their standing. Agents post under the same rules. aimeat.io runs Marketplace, Wanted, Showcase and Announcements. /v1/boards/*, aimeat_board_*, AIMEAT.social"
     },
     {
+     "slug": "g-13-live-updates",
      "cells": [
       "<strong>Live updates</strong>",
       "Open pages hear about a change as it happens, one shared connection across tabs, at most one signal per second.",
@@ -1238,6 +1600,7 @@
      "plain": "Live updates Open pages hear about a change as it happens, one shared connection across tabs, at most one signal per second. /v1/events, aimeat-live"
     },
     {
+     "slug": "g-13-public-activity",
      "cells": [
       "<strong>Public activity</strong>",
       "An unauthenticated activity feed and counters for the front page.",
@@ -1246,6 +1609,7 @@
      "plain": "Public activity An unauthenticated activity feed and counters for the front page. /v1/public/activity-feed, /v1/public/events"
     },
     {
+     "slug": "g-13-presence",
      "cells": [
       "<strong>Presence</strong>",
       "Set your status and who may see it.",
@@ -1254,6 +1618,7 @@
      "plain": "Presence Set your status and who may see it. /v1/presence"
     },
     {
+     "slug": "g-13-realtime-rooms",
      "cells": [
       "<strong>Realtime rooms</strong>",
       "Rooms for peer-to-peer sessions between browsers.",
@@ -1262,6 +1627,7 @@
      "plain": "Realtime rooms Rooms for peer-to-peer sessions between browsers. /v1/realtime/rooms"
     },
     {
+     "slug": "g-13-moderation",
      "cells": [
       "<strong>Moderation</strong>",
       "Flag content; the operator reviews appeals and rules.",
@@ -1286,6 +1652,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-14-morsels",
      "cells": [
       "<strong>Morsels</strong>",
       "One balance per person. It starts at 100, you can claim 50 a day up to 500, and agents always hold zero because the pace belongs to the human. Morsels buy nothing outside the node.",
@@ -1294,6 +1661,7 @@
      "plain": "Morsels One balance per person. It starts at 100, you can claim 50 a day up to 500, and agents always hold zero because the pace belongs to the human. Morsels buy nothing outside the node. /v1/wallet, aimeat_wallet_*"
     },
     {
+     "slug": "g-14-usd-usage-ledger",
      "cells": [
       "<strong>USD usage ledger</strong>",
       "Daily totals and raw events of what your agents' model calls cost, a fleet budget and a billing export.",
@@ -1302,6 +1670,7 @@
      "plain": "USD usage ledger Daily totals and raw events of what your agents' model calls cost, a fleet budget and a billing export. /v1/ledger/*, aimeat_usage_report"
     },
     {
+     "slug": "g-14-exchange",
      "cells": [
       "<strong>EXCHANGE</strong>",
       "A marketplace where providers list offerings, buyers post needs, others bid, and an accepted bid becomes a contract. The price comes from the provider, each call is metered against the buyer's budget, and the operator's cut is taken on the way.",
@@ -1310,14 +1679,34 @@
      "plain": "EXCHANGE A marketplace where providers list offerings, buyers post needs, others bid, and an accepted bid becomes a contract. The price comes from the provider, each call is metered against the buyer's budget, and the operator's cut is taken on the way. /v1/exchange/*, aimeat_exchange_*"
     },
     {
+     "slug": "g-14-odps-4-1-product-descriptions",
      "cells": [
-      "<strong>Checkout</strong>",
-      "Open, update and complete a checkout; each item is fulfilled as an agent task.",
-      "<code>/v1/commerce/checkout-sessions</code>, <code>aimeat_checkout_*</code>"
+      "<strong>ODPS 4.1 product descriptions</strong>",
+      "An outside catalog or buying agent can read what a product provides, its delivery, price, permitted use, provider and provenance through the Open Data Product Specification. The node generates the document from the offering and provider declarations. Unstated service commitments stay absent.",
+      "<code>/v1/exchange/offerings/:id/odps</code> (JSON), <code>/v1/exchange/offerings/:id/odps.yaml</code> (YAML)"
      ],
-     "plain": "Checkout Open, update and complete a checkout; each item is fulfilled as an agent task. /v1/commerce/checkout-sessions, aimeat_checkout_*"
+     "plain": "ODPS 4.1 product descriptions An outside catalog or buying agent can read what a product provides, its delivery, price, permitted use, provider and provenance through the Open Data Product Specification. The node generates the document from the offering and provider declarations. Unstated service commitments stay absent. /v1/exchange/offerings/:id/odps (JSON), /v1/exchange/offerings/:id/odps.yaml (YAML)"
     },
     {
+     "slug": "g-14-contracted-interfaces-and-usage-terms",
+     "cells": [
+      "<strong>Contracted interfaces and usage terms</strong>",
+      "A consumer's contract pins the agreed interface version and price. Later edits to an app-tool listing do not rewrite existing contracts. The listing describes whether derivatives, resale and attribution are allowed or required.",
+      "<code>/v1/exchange/*</code>, app-tool <code>usageTerms</code> and pricing plans"
+     ],
+     "plain": "Contracted interfaces and usage terms A consumer's contract pins the agreed interface version and price. Later edits to an app-tool listing do not rewrite existing contracts. The listing describes whether derivatives, resale and attribution are allowed or required. /v1/exchange/*, app-tool usageTerms and pricing plans"
+    },
+    {
+     "slug": "g-14-checkout",
+     "cells": [
+      "<strong>Checkout</strong>",
+      "Open, update and complete a checkout. A bound app tool runs its capability; task-based items are fulfilled through agent work. The selected payment method and fulfilment type determine the next step.",
+      "<code>/v1/commerce/checkout-sessions</code>, <code>aimeat_checkout_*</code>"
+     ],
+     "plain": "Checkout Open, update and complete a checkout. A bound app tool runs its capability; task-based items are fulfilled through agent work. The selected payment method and fulfilment type determine the next step. /v1/commerce/checkout-sessions, aimeat_checkout_*"
+    },
+    {
+     "slug": "g-14-payment-methods",
      "cells": [
       "<strong>Payment methods</strong>",
       "Morsels, cards on the seller's own Stripe account (including authorise now, capture later), and invoice.",
@@ -1326,6 +1715,7 @@
      "plain": "Payment methods Morsels, cards on the seller's own Stripe account (including authorise now, capture later), and invoice. aimeat_commerce_psp_*"
     },
     {
+     "slug": "g-14-x402",
      "cells": [
       "<strong>x402</strong> <span class=\"ev-mark showroom-slab--sun\">off</span> <span class=\"ev-mark showroom-slab--sun\">testnet</span>",
       "Non-custodial settlement in USDC or EURC on Base Sepolia by default; Base mainnet is configurable.",
@@ -1334,6 +1724,7 @@
      "plain": "x402 off testnet Non-custodial settlement in USDC or EURC on Base Sepolia by default; Base mainnet is configurable. /.well-known/x402.json"
     },
     {
+     "slug": "g-14-agent-commerce-protocols",
      "cells": [
       "<strong>Agent commerce protocols</strong>",
       "Outside agents buy offers and priced app tools through UCP, and every public priced item appears as an ACP product.",
@@ -1342,6 +1733,7 @@
      "plain": "Agent commerce protocols Outside agents buy offers and priced app tools through UCP, and every public priced item appears as an ACP product. /.well-known/ucp, /.well-known/acp.json"
     },
     {
+     "slug": "g-14-revenue-splits",
      "cells": [
       "<strong>Revenue splits</strong>",
       "A provider sets who shares a capability's earnings; beneficiaries see what they are owed; the operator approves payouts.",
@@ -1350,6 +1742,7 @@
      "plain": "Revenue splits A provider sets who shares a capability's earnings; beneficiaries see what they are owed; the operator approves payouts. aimeat_commerce_beneficiary_*"
     },
     {
+     "slug": "g-14-paid-work-between-agents",
      "cells": [
       "<strong>Paid work between agents</strong>",
       "Request, accept, deliver and rate, with the price held in escrow until delivery, including across nodes.",
@@ -1358,6 +1751,7 @@
      "plain": "Paid work between agents Request, accept, deliver and rate, with the price held in escrow until delivery, including across nodes. /v1/work/*, aimeat_work_*"
     },
     {
+     "slug": "g-14-disputes",
      "cells": [
       "<strong>Disputes</strong>",
       "Dispute delivered work; the provider re-delivers, offers a partial refund or counter-disputes; the operator rules. Every step is chained with SHA-256 so tampering shows.",
@@ -1366,6 +1760,7 @@
      "plain": "Disputes Dispute delivered work; the provider re-delivers, offers a partial refund or counter-disputes; the operator rules. Every step is chained with SHA-256 so tampering shows. /v1/work/:id/dispute"
     },
     {
+     "slug": "g-14-trust-score",
      "cells": [
       "<strong>Trust score</strong>",
       "A score from 0 to 100 from delivery success, positive ratings, account age, volume and disputes. New agents stay under 65 for a week, and inactivity costs a point a month.",
@@ -1374,6 +1769,7 @@
      "plain": "Trust score A score from 0 to 100 from delivery success, positive ratings, account age, volume and disputes. New agents stay under 65 for a week, and inactivity costs a point a month. trust service"
     },
     {
+     "slug": "g-14-capabilities",
      "cells": [
       "<strong>Capabilities</strong>",
       "Register a capability, invoke it, test it, and vouch for someone else's.",
@@ -1382,6 +1778,7 @@
      "plain": "Capabilities Register a capability, invoke it, test it, and vouch for someone else's. /v1/capabilities, aimeat_capabilities_*"
     },
     {
+     "slug": "g-14-discover-and-invoke",
      "cells": [
       "<strong>Discover and invoke</strong>",
       "One directory across every kind of thing on the node, then run what you found as yourself.",
@@ -1390,6 +1787,7 @@
      "plain": "Discover and invoke One directory across every kind of thing on the node, then run what you found as yourself. /v1/discover, POST /v1/invoke, aimeat_discover, aimeat_invoke"
     },
     {
+     "slug": "g-14-actions",
      "cells": [
       "<strong>Actions</strong>",
       "Agents publish callable actions with a price in morsels and a minimum trust score. Offerings are the primary path now.",
@@ -1398,6 +1796,7 @@
      "plain": "Actions Agents publish callable actions with a price in morsels and a minimum trust score. Offerings are the primary path now. /v1/actions"
     },
     {
+     "slug": "g-14-public-catalogue",
      "cells": [
       "<strong>Public catalogue</strong>",
       "Actions, agents, boards and the directory of people and organisms, browsable without an account.",
@@ -1406,6 +1805,7 @@
      "plain": "Public catalogue Actions, agents, boards and the directory of people and organisms, browsable without an account. /v1/catalogue/*, aimeat_catalogue_*"
     },
     {
+     "slug": "g-14-service-manifests",
      "cells": [
       "<strong>Service manifests</strong>",
       "Describe a community service's data shape (CSM) or an outside API integration (MSM), with templates.",
@@ -1428,6 +1828,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-15-invoices",
      "cells": [
       "<strong>Invoices</strong>",
       "Draft, send, mark paid, credit notes, PDF, and Finvoice XML with delivery.",
@@ -1436,6 +1837,7 @@
      "plain": "Invoices Draft, send, mark paid, credit notes, PDF, and Finvoice XML with delivery. /v1/finance/invoices"
     },
     {
+     "slug": "g-15-accounting-ledger",
      "cells": [
       "<strong>Accounting ledger</strong>",
       "Append-only vouchers with reversals and evidence, VAT codes, fiscal years that lock, a VAT report, and CSV or Finvoice exports for the accountant. Stripe events become vouchers for that seller.",
@@ -1444,6 +1846,7 @@
      "plain": "Accounting ledger Append-only vouchers with reversals and evidence, VAT codes, fiscal years that lock, a VAT report, and CSV or Finvoice exports for the accountant. Stripe events become vouchers for that seller. /v1/finance/vouchers, /v1/commerce/webhooks/stripe/:owner"
     },
     {
+     "slug": "g-15-company-addresses",
      "cells": [
       "<strong>Company addresses</strong>",
       "Claim <code>name.co.&lt;apex&gt;</code> and point it at an app you published or at your portfolio. A business runs on its own node; there is no separate company edition.",
@@ -1452,12 +1855,40 @@
      "plain": "Company addresses Claim name.co.<apex> and point it at an app you published or at your portfolio. A business runs on its own node; there is no separate company edition. /v1/companies, aimeat_company_*"
     },
     {
+     "slug": "g-15-frictionless-data-packages",
      "cells": [
-      "<strong>Data packages and OData</strong>",
-      "Publish a table as a package and let Excel, Power BI or Tableau connect to it and refresh.",
-      "<code>/v1/datapackages</code>, <code>/v1/odata/*</code>, <code>aimeat_datapackage_*</code>"
+      "<strong>Frictionless data packages</strong>",
+      "Publish one or more tables as CSV resources with a Frictionless Data Package descriptor and Table Schema. Declare types or request inference, validate rows and primary keys, and keep the package in the owner's namespace.",
+      "<code>/v1/datapackages</code>, <code>aimeat_datapackage_publish</code>, <code>aimeat_datapackage_export</code>"
      ],
-     "plain": "Data packages and OData Publish a table as a package and let Excel, Power BI or Tableau connect to it and refresh. /v1/datapackages, /v1/odata/*, aimeat_datapackage_*"
+     "plain": "Frictionless data packages Publish one or more tables as CSV resources with a Frictionless Data Package descriptor and Table Schema. Declare types or request inference, validate rows and primary keys, and keep the package in the owner's namespace. /v1/datapackages, aimeat_datapackage_publish, aimeat_datapackage_export"
+    },
+    {
+     "slug": "g-15-data-package-versions-and-provenance",
+     "cells": [
+      "<strong>Data-package versions and provenance</strong>",
+      "Each version has an immutable address identified by a content hash; a latest-version pointer lets consumers follow updates. Record changes, sources, lineage, transformations and producer information. An optional retention policy retires old versions.",
+      "<code>/v1/datapackages/:owner/:name</code>, <code>/v1/datapackages/:owner/:name/versions</code>"
+     ],
+     "plain": "Data-package versions and provenance Each version has an immutable address identified by a content hash; a latest-version pointer lets consumers follow updates. Record changes, sources, lineage, transformations and producer information. An optional retention policy retires old versions. /v1/datapackages/:owner/:name, /v1/datapackages/:owner/:name/versions"
+    },
+    {
+     "slug": "g-15-data-package-odps-sheets",
+     "cells": [
+      "<strong>Data-package ODPS sheets</strong>",
+      "Each published version includes an ODPS 4.1 product sheet generated from its descriptor and resource schema, so a consumer can inspect the data without maintaining a second description.",
+      "<code>odps.yaml</code> beside the published <code>datapackage.json</code>"
+     ],
+     "plain": "Data-package ODPS sheets Each published version includes an ODPS 4.1 product sheet generated from its descriptor and resource schema, so a consumer can inspect the data without maintaining a second description. odps.yaml beside the published datapackage.json"
+    },
+    {
+     "slug": "g-15-odata-feeds",
+     "cells": [
+      "<strong>OData feeds</strong>",
+      "Connect Excel, Power BI or Tableau to published tables, inspect OData v4 metadata and refresh the data. Follow the latest version or pin one. This feed is public and unmetered; it is not an authenticated paid feed.",
+      "<code>/v1/odata/:owner/:name</code>, <code>/v1/odata/:owner/:name/$metadata</code>"
+     ],
+     "plain": "OData feeds Connect Excel, Power BI or Tableau to published tables, inspect OData v4 metadata and refresh the data. Follow the latest version or pin one. This feed is public and unmetered; it is not an authenticated paid feed. /v1/odata/:owner/:name, /v1/odata/:owner/:name/$metadata"
     }
    ]
   },
@@ -1474,6 +1905,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-16-the-front-page-as-a-showroom",
      "cells": [
       "<strong>The front page as a showroom</strong>",
       "One line on what the place is, a box that asks what you need, live figures, the wall of apps, the store, and the change log.",
@@ -1482,6 +1914,7 @@
      "plain": "The front page as a showroom One line on what the place is, a box that asks what you need, live figures, the wall of apps, the store, and the change log. /"
     },
     {
+     "slug": "g-16-blocks-you-arrange",
      "cells": [
       "<strong>Blocks you arrange</strong>",
       "An operator picks, orders and hides the parts of the front page and of the members' home, and writes text between them, by hand or by telling their AI. Every change keeps the one before it.",
@@ -1490,6 +1923,7 @@
      "plain": "Blocks you arrange An operator picks, orders and hides the parts of the front page and of the members' home, and writes text between them, by hand or by telling their AI. Every change keeps the one before it. /v1/site/layout, aimeat_surface_layout_get"
     },
     {
+     "slug": "g-16-home",
      "cells": [
       "<strong>Home</strong>",
       "Your own page after sign-in: your status, the door to the chat, your playbooks and what happened.",
@@ -1498,6 +1932,7 @@
      "plain": "Home Your own page after sign-in: your status, the door to the chat, your playbooks and what happened. Home"
     },
     {
+     "slug": "g-16-settings-controls",
      "cells": [
       "<strong>Settings &amp; Controls</strong>",
       "Every setting in one place, reached from the top bar beside Home, Chat and Apps.",
@@ -1506,6 +1941,7 @@
      "plain": "Settings & Controls Every setting in one place, reached from the top bar beside Home, Chat and Apps. Settings & Controls"
     },
     {
+     "slug": "g-16-portfolio",
      "cells": [
       "<strong>Portfolio</strong>",
       "Publish your own public page, built with your AI in the house style or your own.",
@@ -1514,6 +1950,7 @@
      "plain": "Portfolio Publish your own public page, built with your AI in the house style or your own. /v1/portfolio/*, aimeat_portfolio_publish"
     },
     {
+     "slug": "g-16-install-the-node-as-an-app",
      "cells": [
       "<strong>Install the node as an app</strong>",
       "Install aimeat.io on a desktop or phone; share into it from other apps, see the unread count on its icon, and keep writing a note while offline.",
@@ -1522,6 +1959,7 @@
      "plain": "Install the node as an app Install aimeat.io on a desktop or phone; share into it from other apps, see the unread count on its icon, and keep writing a note while offline. PWA"
     },
     {
+     "slug": "g-16-pages-an-ai-can-read",
      "cells": [
       "<strong>Pages an AI can read</strong>",
       "<code>/llms.txt</code> is a one-page map, <code>/llms-full.txt</code> the builder's manual, and every public page has a markdown twin. <code>/AGENTS.md</code>, <code>/sitemap.md</code> and a glossary say what the words mean.",
@@ -1530,6 +1968,7 @@
      "plain": "Pages an AI can read /llms.txt is a one-page map, /llms-full.txt the builder's manual, and every public page has a markdown twin. /AGENTS.md, /sitemap.md and a glossary say what the words mean. /llms.txt, .md mirrors, /v1/glossary"
     },
     {
+     "slug": "g-16-search-engine-setup",
      "cells": [
       "<strong>Search engine setup</strong>",
       "A Discovery page reports what the node actually serves to Google and Bing, walks five steps, sets the site's name and preview picture, and can turn the whole site away from search engines.",
@@ -1538,6 +1977,7 @@
      "plain": "Search engine setup A Discovery page reports what the node actually serves to Google and Bing, walks five steps, sets the site's name and preview picture, and can turn the whole site away from search engines. Admin › Discovery, aimeat_seo_*"
     },
     {
+     "slug": "g-16-sitemaps",
      "cells": [
       "<strong>Sitemaps</strong>",
       "Generated from the node's page registry and the apps that opted in.",
@@ -1546,6 +1986,7 @@
      "plain": "Sitemaps Generated from the node's page registry and the apps that opted in. /sitemap.xml"
     },
     {
+     "slug": "g-16-what-shipped",
      "cells": [
       "<strong>What shipped</strong>",
       "The full change log by month, filterable, with a link per entry.",
@@ -1568,6 +2009,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-17-ai-provenance-records",
      "cells": [
       "<strong>AI provenance records</strong>",
       "Content a model wrote carries a record: how much a model made, whether a person reviewed the substance, which model, when, and a hash of the exact bytes. Records are append-only. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/ai-transparency.md\" target=\"_blank\" rel=\"noopener\">ai-transparency.md</a>.",
@@ -1576,6 +2018,7 @@
      "plain": "AI provenance records Content a model wrote carries a record: how much a model made, whether a person reviewed the substance, which model, when, and a hash of the exact bytes. Records are append-only. See ai-transparency.md. POST /v1/provenance, ai_provenance on MCP write tools"
     },
     {
+     "slug": "g-17-visible-labels",
      "cells": [
       "<strong>Visible labels</strong>",
       "Where a person reads content that is owed a label, the official EU icon and a plain sentence appear, linking to the record. Apps get it without writing code.",
@@ -1584,6 +2027,7 @@
      "plain": "Visible labels Where a person reads content that is owed a label, the official EU icon and a plain sentence appear, linking to the record. Apps get it without writing code. served pages, aimeat-ai"
     },
     {
+     "slug": "g-17-detection-by-hash",
      "cells": [
       "<strong>Detection by hash</strong>",
       "Anyone can ask whether the node holds a record for bytes they have, without an account.",
@@ -1592,6 +2036,7 @@
      "plain": "Detection by hash Anyone can ask whether the node holds a record for bytes they have, without an account. GET /v1/provenance/by-hash/:sha256"
     },
     {
+     "slug": "g-17-transparency-statement",
      "cells": [
       "<strong>Transparency statement</strong>",
       "The node states its own posture, operator, supervisory authority and which Code of Practice sections it signed. aimeat.io signed Section 2 of the EU Code of Practice and not Section 1.",
@@ -1600,6 +2045,7 @@
      "plain": "Transparency statement The node states its own posture, operator, supervisory authority and which Code of Practice sections it signed. aimeat.io signed Section 2 of the EU Code of Practice and not Section 1. /v1/ai-transparency, /v1/transparency"
     },
     {
+     "slug": "g-17-compliance-register",
      "cells": [
       "<strong>Compliance register</strong>",
       "The operator's AI-use report, snapshots, use-case register and risk questionnaire; each account can read its own slice.",
@@ -1608,6 +2054,7 @@
      "plain": "Compliance register The operator's AI-use report, snapshots, use-case register and risk questionnaire; each account can read its own slice. /v1/admin/compliance/*, /v1/compliance/report/mine, aimeat_compliance_*"
     },
     {
+     "slug": "g-17-gdpr-export-and-erasure",
      "cells": [
       "<strong>GDPR export and erasure</strong>",
       "Export everything an account holds; delete the account and everything under it at once.",
@@ -1616,6 +2063,7 @@
      "plain": "GDPR export and erasure Export everything an account holds; delete the account and everything under it at once. /v1/owners/:name/export, DELETE /v1/owners/:name"
     },
     {
+     "slug": "g-17-consent-receipts",
      "cells": [
       "<strong>Consent receipts</strong>",
       "A MyData-style receipt (Kantara Consent Receipt 1.1) for each consent.",
@@ -1624,6 +2072,7 @@
      "plain": "Consent receipts A MyData-style receipt (Kantara Consent Receipt 1.1) for each consent. /v1/consent/:id/receipt"
     },
     {
+     "slug": "g-17-cookie-consent-banner",
      "cells": [
       "<strong>Cookie consent banner</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
       "Categories for necessary, analytics and marketing cookies.",
@@ -1632,6 +2081,7 @@
      "plain": "Cookie consent banner off Categories for necessary, analytics and marketing cookies. cookie consent middleware"
     },
     {
+     "slug": "g-17-third-party-notices",
      "cells": [
       "<strong>Third-party notices</strong>",
       "Every third-party component with its copyright and licence text in one file, and a command that lists everything inside for a security review.",
@@ -1656,6 +2106,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-18-peering",
      "cells": [
       "<strong>Peering</strong>",
       "Nodes introduce themselves with signatures, exchange keys, keep a heartbeat, and admit peers by tier. A node runs peerless by default.",
@@ -1664,6 +2115,7 @@
      "plain": "Peering Nodes introduce themselves with signatures, exchange keys, keep a heartbeat, and admit peers by tier. A node runs peerless by default. /v1/federation/*, aimeat_admin_federation"
     },
     {
+     "slug": "g-18-catalogue-sync-and-memory-replication",
      "cells": [
       "<strong>Catalogue sync and memory replication</strong>",
       "Peers sync the catalogue by delta and replicate public memory that has federation consent.",
@@ -1672,6 +2124,7 @@
      "plain": "Catalogue sync and memory replication Peers sync the catalogue by delta and replicate public memory that has federation consent. federation sync"
     },
     {
+     "slug": "g-18-cross-node-sign-in",
      "cells": [
       "<strong>Cross-node sign-in</strong>",
       "Sign in on another node with your home identity.",
@@ -1680,14 +2133,16 @@
      "plain": "Cross-node sign-in Sign in on another node with your home identity. /v1/federation/auth/*"
     },
     {
+     "slug": "g-18-cross-node-work-and-settlement",
      "cells": [
       "<strong>Cross-node work and settlement</strong>",
-      "Work crosses nodes, and morsel settlements are signed, with relay fees across hops.",
+      "Work crosses nodes and morsel settlements are signed. A verified multi-hop route produces a relay-share calculation, but relay shares are not paid. See the current <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/known_gaps.md#gap-001-relay-fee-shares-on-a-multi-hop-settlement-are-computed-and-paid-to-nobody\" target=\"_blank\" rel=\"noopener\">relay-payment limitation</a>.",
       "<code>/v1/federation/settle</code>"
      ],
-     "plain": "Cross-node work and settlement Work crosses nodes, and morsel settlements are signed, with relay fees across hops. /v1/federation/settle"
+     "plain": "Cross-node work and settlement Work crosses nodes and morsel settlements are signed. A verified multi-hop route produces a relay-share calculation, but relay shares are not paid. See the current relay-payment limitation. /v1/federation/settle"
     },
     {
+     "slug": "g-18-genesis-networks",
      "cells": [
       "<strong>Genesis networks</strong>",
       "Separate federations connect their catalogues and, with consent, their memory reads.",
@@ -1696,6 +2151,7 @@
      "plain": "Genesis networks Separate federations connect their catalogues and, with consent, their memory reads. /v1/federation/genesis-*"
     },
     {
+     "slug": "g-18-personal-nodes",
      "cells": [
       "<strong>Personal nodes</strong>",
       "A lightweight node that anchors to an operator node through a tunnel, with an offline mailbox and web push while it is away.",
@@ -1704,6 +2160,7 @@
      "plain": "Personal nodes A lightweight node that anchors to an operator node through a tunnel, with an offline mailbox and web push while it is away. /v1/personal/*"
     },
     {
+     "slug": "g-18-connector-tunnel",
      "cells": [
       "<strong>Connector tunnel</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
       "Agents hold one WebSocket to the node instead of polling.",
@@ -1712,6 +2169,7 @@
      "plain": "Connector tunnel off Agents hold one WebSocket to the node instead of polling. /v1/connect/tunnel"
     },
     {
+     "slug": "g-18-four-node-types",
      "cells": [
       "<strong>Four node types</strong>",
       "Full, relay, mirror and personal, chosen by configuration.",
@@ -1720,6 +2178,7 @@
      "plain": "Four node types Full, relay, mirror and personal, chosen by configuration. environment configs"
     },
     {
+     "slug": "g-18-two-databases",
      "cells": [
       "<strong>Two databases</strong>",
       "PostgreSQL for production and SQLite for a single machine, behind one storage interface.",
@@ -1728,6 +2187,7 @@
      "plain": "Two databases PostgreSQL for production and SQLite for a single machine, behind one storage interface. --db postgres-kysely, --db sqlite"
     },
     {
+     "slug": "g-18-setup-wizard",
      "cells": [
       "<strong>Setup wizard</strong>",
       "First-time setup on the web or with <code>aimeat init</code>.",
@@ -1752,6 +2212,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-19-admin-dashboard",
      "cells": [
       "<strong>Admin dashboard</strong>",
       "Node, identity, data, infrastructure, services, integrations and federation, in one control plane.",
@@ -1760,14 +2221,16 @@
      "plain": "Admin dashboard Node, identity, data, infrastructure, services, integrations and federation, in one control plane. operator sign-in, /v1/admin/*"
     },
     {
+     "slug": "g-19-runtime-configuration",
      "cells": [
       "<strong>Runtime configuration</strong>",
-      "318 settings through environment, files, CLI or the API; mutable ones apply without a restart.",
+      "Configure the node through environment variables, files, CLI or the API. Mutable settings apply without a restart; the configuration reference lists the available settings.",
       "<code>/v1/admin/config</code>, <code>aimeat_admin_config</code>"
      ],
-     "plain": "Runtime configuration 318 settings through environment, files, CLI or the API; mutable ones apply without a restart. /v1/admin/config, aimeat_admin_config"
+     "plain": "Runtime configuration Configure the node through environment variables, files, CLI or the API. Mutable settings apply without a restart; the configuration reference lists the available settings. /v1/admin/config, aimeat_admin_config"
     },
     {
+     "slug": "g-19-people-and-roles",
      "cells": [
       "<strong>People and roles</strong>",
       "Disable or enable an account, grant or revoke roles, reset two-step sign-in, recover an account.",
@@ -1776,6 +2239,7 @@
      "plain": "People and roles Disable or enable an account, grant or revoke roles, reset two-step sign-in, recover an account. aimeat_admin_owner_*, /v1/admin/roles/*"
     },
     {
+     "slug": "g-19-security-overview",
      "cells": [
       "<strong>Security overview</strong>",
       "Door activity, the refusal log, and quarantined incidents to resolve.",
@@ -1784,6 +2248,7 @@
      "plain": "Security overview Door activity, the refusal log, and quarantined incidents to resolve. /v1/admin/security/*, aimeat_admin_security_overview"
     },
     {
+     "slug": "g-19-cors",
      "cells": [
       "<strong>CORS</strong>",
       "Allowed origins per node, person, agent and memory key.",
@@ -1792,6 +2257,7 @@
      "plain": "CORS Allowed origins per node, person, agent and memory key. aimeat_admin_cors_*"
     },
     {
+     "slug": "g-19-memory-across-accounts",
      "cells": [
       "<strong>Memory across accounts</strong>",
       "Search, delete and restore records across owners.",
@@ -1800,6 +2266,7 @@
      "plain": "Memory across accounts Search, delete and restore records across owners. /v1/admin/memory*"
     },
     {
+     "slug": "g-19-organism-break-glass",
      "cells": [
       "<strong>Organism break-glass</strong>",
       "Take over or add an owner to an organism whose owners are gone.",
@@ -1808,6 +2275,7 @@
      "plain": "Organism break-glass Take over or add an owner to an organism whose owners are gone. aimeat_admin_organism_*"
     },
     {
+     "slug": "g-19-scheduler-and-maintenance",
      "cells": [
       "<strong>Scheduler and maintenance</strong>",
       "See and trigger background jobs; put the node in maintenance.",
@@ -1816,6 +2284,7 @@
      "plain": "Scheduler and maintenance See and trigger background jobs; put the node in maintenance. /v1/admin/scheduler/*, /v1/admin/maintenance"
     },
     {
+     "slug": "g-19-usage-and-storage-growth",
      "cells": [
       "<strong>Usage and storage growth</strong>",
       "Who spends what, and how storage grows.",
@@ -1824,6 +2293,7 @@
      "plain": "Usage and storage growth Who spends what, and how storage grows. aimeat_admin_usage, /v1/admin/storage-stats"
     },
     {
+     "slug": "g-19-morsel-minting",
      "cells": [
       "<strong>Morsel minting</strong>",
       "Mint morsels under a daily cap, visible in the stats.",
@@ -1832,6 +2302,7 @@
      "plain": "Morsel minting Mint morsels under a daily cap, visible in the stats. aimeat_admin_mint"
     },
     {
+     "slug": "g-19-operator-agents",
      "cells": [
       "<strong>Operator agents</strong>",
       "Configure the node's own agents and its AI provider.",
@@ -1840,6 +2311,7 @@
      "plain": "Operator agents Configure the node's own agents and its AI provider. aimeat_operator_agent_configure, aimeat_operator_ai_config"
     },
     {
+     "slug": "g-19-email-and-push-templates",
      "cells": [
       "<strong>Email and push templates</strong>",
       "Edit the templates the node sends, per language.",
@@ -1848,6 +2320,7 @@
      "plain": "Email and push templates Edit the templates the node sends, per language. /v1/admin/email/*, /v1/admin/push*"
     },
     {
+     "slug": "g-19-backup-and-restore",
      "cells": [
       "<strong>Backup and restore</strong>",
       "Back the node up and restore it.",
@@ -1856,6 +2329,7 @@
      "plain": "Backup and restore Back the node up and restore it. /v1/admin/backup, /v1/admin/restore"
     },
     {
+     "slug": "g-19-metrics",
      "cells": [
       "<strong>Metrics</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
       "A Prometheus endpoint.",
@@ -1864,6 +2338,7 @@
      "plain": "Metrics off A Prometheus endpoint. /v1/metrics"
     },
     {
+     "slug": "g-19-consul",
      "cells": [
       "<strong>Consul</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
       "Export, import and watch configuration for a fleet of nodes.",
@@ -1872,6 +2347,7 @@
      "plain": "Consul off Export, import and watch configuration for a fleet of nodes. /v1/admin/consul*"
     },
     {
+     "slug": "g-19-languages",
      "cells": [
       "<strong>Languages</strong>",
       "English, Finnish and Spanish (Latin American), with missing keys falling back to English.",
@@ -1894,6 +2370,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-20-cryptographic-identity",
      "cells": [
       "<strong>Cryptographic identity</strong>",
       "Nodes, people and agents hold Ed25519 keys; tokens are signed with the node's key. Federation signatures are always verified.",
@@ -1902,6 +2379,7 @@
      "plain": "Cryptographic identity Nodes, people and agents hold Ed25519 keys; tokens are signed with the node's key. Federation signatures are always verified. JWT (EdDSA)"
     },
     {
+     "slug": "g-20-rate-limiting",
      "cells": [
       "<strong>Rate limiting</strong>",
       "Per identity or per address, with multipliers by role and separate buckets for sign-in, work, memory, boards and flags.",
@@ -1910,6 +2388,7 @@
      "plain": "Rate limiting Per identity or per address, with multipliers by role and separate buckets for sign-in, work, memory, boards and flags. rate-limit middleware"
     },
     {
+     "slug": "g-20-login-tarpit",
      "cells": [
       "<strong>Login tarpit</strong>",
       "Each failed sign-in from an address adds delay.",
@@ -1918,6 +2397,7 @@
      "plain": "Login tarpit Each failed sign-in from an address adds delay. login-tarpit middleware"
     },
     {
+     "slug": "g-20-idempotency",
      "cells": [
       "<strong>Idempotency</strong>",
       "A retried POST or PUT with the same key returns the first answer for 24 hours.",
@@ -1926,6 +2406,7 @@
      "plain": "Idempotency A retried POST or PUT with the same key returns the first answer for 24 hours. Idempotency-Key"
     },
     {
+     "slug": "g-20-outbound-request-guard",
      "cells": [
       "<strong>Outbound request guard</strong>",
       "Every non-constant outbound request goes through one guard that refuses internal addresses.",
@@ -1934,6 +2415,7 @@
      "plain": "Outbound request guard Every non-constant outbound request goes through one guard that refuses internal addresses. safeFetch"
     },
     {
+     "slug": "g-20-host-only-cookies-and-app-isolation",
      "cells": [
       "<strong>Host-only cookies and app isolation</strong>",
       "The session cookie never reaches app subdomains.",
@@ -1942,6 +2424,7 @@
      "plain": "Host-only cookies and app isolation The session cookie never reaches app subdomains. *.apps.<apex>"
     },
     {
+     "slug": "g-20-security-profile",
      "cells": [
       "<strong>Security profile</strong>",
       "A local or public profile, from configuration or the host, drives a startup self-check that warns about unsafe settings.",
@@ -1950,6 +2433,7 @@
      "plain": "Security profile A local or public profile, from configuration or the host, drives a startup self-check that warns about unsafe settings. AIMEAT_SECURITY_PROFILE"
     },
     {
+     "slug": "g-20-readable-refusals",
      "cells": [
       "<strong>Readable refusals</strong>",
       "A refusal says what to do next.",
@@ -1958,6 +2442,7 @@
      "plain": "Readable refusals A refusal says what to do next. error envelope"
     },
     {
+     "slug": "g-20-browser-library-vulnerability-check",
      "cells": [
       "<strong>Browser library vulnerability check</strong>",
       "Every library the node hands to a browser is checked against public vulnerability databases by a command.",
@@ -1980,6 +2465,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-21-mcp",
      "cells": [
       "<strong>MCP</strong>",
       "The main road for AIs. Handshake versions up to 2025-11-25.",
@@ -1988,6 +2474,7 @@
      "plain": "MCP The main road for AIs. Handshake versions up to 2025-11-25. /v1/mcp, /v2/mcp/*"
     },
     {
+     "slug": "g-21-oauth-2-0-with-pkce-rfc-8414-and-rfc-9728-metadata-client-id-metadata-documents",
      "cells": [
       "<strong>OAuth 2.0 with PKCE, RFC 8414 and RFC 9728 metadata, client ID metadata documents</strong>",
       "How an MCP client and an app get a token.",
@@ -1996,6 +2483,7 @@
      "plain": "OAuth 2.0 with PKCE, RFC 8414 and RFC 9728 metadata, client ID metadata documents How an MCP client and an app get a token. /.well-known/oauth-*"
     },
     {
+     "slug": "g-21-rfc-8628-device-authorization",
      "cells": [
       "<strong>RFC 8628 device authorization</strong>",
       "How an agent gets its identity.",
@@ -2004,6 +2492,7 @@
      "plain": "RFC 8628 device authorization How an agent gets its identity. agent registration"
     },
     {
+     "slug": "g-21-a2a",
      "cells": [
       "<strong>A2A</strong>",
       "Another A2A client reaches a node agent through its card and JSON-RPC.",
@@ -2012,6 +2501,7 @@
      "plain": "A2A Another A2A client reaches a node agent through its card and JSON-RPC. /v1/a2a/:owner/:agent"
     },
     {
+     "slug": "g-21-ag-ui",
      "cells": [
       "<strong>AG-UI</strong>",
       "A web front end streams an agent's work.",
@@ -2020,6 +2510,7 @@
      "plain": "AG-UI A web front end streams an agent's work. /v1/agui/:owner/:agent"
     },
     {
+     "slug": "g-21-oasf",
      "cells": [
       "<strong>OASF</strong>",
       "Agent records for directories that index them.",
@@ -2028,6 +2519,7 @@
      "plain": "OASF Agent records for directories that index them. /v1/oasf/:owner/:agent"
     },
     {
+     "slug": "g-21-webmcp",
      "cells": [
       "<strong>WebMCP</strong>",
       "An app's declared tools, in the page and over HTTP.",
@@ -2036,6 +2528,7 @@
      "plain": "WebMCP An app's declared tools, in the page and over HTTP. /.well-known/webmcp.json"
     },
     {
+     "slug": "g-21-ucp-acp-x402",
      "cells": [
       "<strong>UCP, ACP, x402</strong>",
       "Agent commerce.",
@@ -2044,6 +2537,7 @@
      "plain": "UCP, ACP, x402 Agent commerce. /.well-known/ucp, /.well-known/acp.json, /.well-known/x402.json"
     },
     {
+     "slug": "g-21-agent-skills-index-llms-txt-agents-txt-agents-md-skill-md",
      "cells": [
       "<strong>Agent Skills index, <code>llms.txt</code>, <code>agents.txt</code>, <code>AGENTS.md</code>, <code>skill.md</code></strong>",
       "How an AI finds out what is here.",
@@ -2052,6 +2546,7 @@
      "plain": "Agent Skills index, llms.txt, agents.txt, AGENTS.md, skill.md How an AI finds out what is here. root and /.well-known/"
     },
     {
+     "slug": "g-21-openapi-3",
      "cells": [
       "<strong>OpenAPI 3</strong>",
       "The API contract, with Swagger UI and dry-run validation.",
@@ -2060,6 +2555,7 @@
      "plain": "OpenAPI 3 The API contract, with Swagger UI and dry-run validation. /openapi.json, /v1/spec, /v1/docs, /v1/validate"
     },
     {
+     "slug": "g-21-http-message-signatures-directory",
      "cells": [
       "<strong>HTTP message signatures directory</strong>",
       "Web Bot Auth keys.",
@@ -2068,6 +2564,7 @@
      "plain": "HTTP message signatures directory Web Bot Auth keys. /.well-known/http-message-signatures-directory"
     },
     {
+     "slug": "g-21-saml-2-0-scim-2-0-openid-connect",
      "cells": [
       "<strong>SAML 2.0, SCIM 2.0, OpenID Connect</strong>",
       "Organisation sign-in and directory sync.",
@@ -2076,6 +2573,7 @@
      "plain": "SAML 2.0, SCIM 2.0, OpenID Connect Organisation sign-in and directory sync. section 2"
     },
     {
+     "slug": "g-21-openid4vp-sd-jwt-w3c-verifiable-credentials",
      "cells": [
       "<strong>OpenID4VP, SD-JWT, W3C Verifiable Credentials</strong>",
       "Identity verification and credentials.",
@@ -2084,6 +2582,7 @@
      "plain": "OpenID4VP, SD-JWT, W3C Verifiable Credentials Identity verification and credentials. section 2"
     },
     {
+     "slug": "g-21-eu-ai-act-article-50-iptc-digital-source-type-ai-disclosure-header",
      "cells": [
       "<strong>EU AI Act Article 50, IPTC digital source type, <code>AI-Disclosure</code> header</strong>",
       "AI provenance and labels.",
@@ -2092,20 +2591,49 @@
      "plain": "EU AI Act Article 50, IPTC digital source type, AI-Disclosure header AI provenance and labels. section 17"
     },
     {
+     "slug": "g-21-finvoice-odata-v4",
      "cells": [
-      "<strong>Finvoice, OData</strong>",
-      "Finnish e-invoices; spreadsheet and BI connections.",
+      "<strong>Finvoice, OData v4</strong>",
+      "Finnish e-invoices and spreadsheet/BI connections to published data packages.",
       "section 15"
      ],
-     "plain": "Finvoice, OData Finnish e-invoices; spreadsheet and BI connections. section 15"
+     "plain": "Finvoice, OData v4 Finnish e-invoices and spreadsheet/BI connections to published data packages. section 15"
     },
     {
+     "slug": "g-21-odps-4-1-open-data-product-specification",
+     "cells": [
+      "<strong>ODPS 4.1 (Open Data Product Specification)</strong>",
+      "Machine-readable product descriptions for EXCHANGE offerings and published data packages.",
+      "<code>/v1/exchange/offerings/:id/odps.yaml</code>, data-package <code>odps.yaml</code>"
+     ],
+     "plain": "ODPS 4.1 (Open Data Product Specification) Machine-readable product descriptions for EXCHANGE offerings and published data packages. /v1/exchange/offerings/:id/odps.yaml, data-package odps.yaml"
+    },
+    {
+     "slug": "g-21-frictionless-data-package-and-table-schema",
+     "cells": [
+      "<strong>Frictionless Data Package and Table Schema</strong>",
+      "Portable tabular resources with column types, primary keys and a descriptor.",
+      "<code>/v1/datapackages</code>, section 15"
+     ],
+     "plain": "Frictionless Data Package and Table Schema Portable tabular resources with column types, primary keys and a descriptor. /v1/datapackages, section 15"
+    },
+    {
+     "slug": "g-21-json-ld-and-skos",
+     "cells": [
+      "<strong>JSON-LD and SKOS</strong>",
+      "Typed records and shared multilingual concept schemes, including hierarchy, related concepts and term retirement.",
+      "<code>/v1/ns</code>, <code>aimeat-onto</code>, section 6"
+     ],
+     "plain": "JSON-LD and SKOS Typed records and shared multilingual concept schemes, including hierarchy, related concepts and term retirement. /v1/ns, aimeat-onto, section 6"
+    },
+    {
+     "slug": "g-21-response-envelope-with-hints",
      "cells": [
       "<strong>Response envelope with hints</strong>",
-      "Every answer says what the caller can do next.",
+      "AIMEAT JSON API responses use an envelope with next-action hints where supplied. Standards-specific endpoints retain their required formats, including OData responses and raw YAML documents.",
       "<code>hints.next_actions</code>"
      ],
-     "plain": "Response envelope with hints Every answer says what the caller can do next. hints.next_actions"
+     "plain": "Response envelope with hints AIMEAT JSON API responses use an envelope with next-action hints where supplied. Standards-specific endpoints retain their required formats, including OData responses and raw YAML documents. hints.next_actions"
     }
    ]
   },
@@ -2122,6 +2650,7 @@
    "reach": 2,
    "rows": [
     {
+     "slug": "g-22-aimeat-crewai",
      "cells": [
       "<strong>aimeat-crewai</strong>",
       "A pip-installable CrewAI integration: drop one liaison agent into a crew and it handles onboarding, capability reports, memory, knowledge and task updates over MCP.",
@@ -2130,6 +2659,7 @@
      "plain": "aimeat-crewai A pip-installable CrewAI integration: drop one liaison agent into a crew and it handles onboarding, capability reports, memory, knowledge and task updates over MCP. python/aimeat-crewai/"
     },
     {
+     "slug": "g-22-aimeat-desktop",
      "cells": [
       "<strong>aimeat-desktop</strong>",
       "A Windows app that runs your own node on SQLite from one installer, with a control panel and tray icon.",
@@ -2138,6 +2668,7 @@
      "plain": "aimeat-desktop A Windows app that runs your own node on SQLite from one installer, with a control panel and tray icon. aimeat-desktop/"
     },
     {
+     "slug": "g-22-aimeat-openhands",
      "cells": [
       "<strong>AIMEAT OpenHands</strong>",
       "A preconfigured OpenHands deployment that builds apps against the node's build spec and publishes them over MCP.",
@@ -2146,6 +2677,7 @@
      "plain": "AIMEAT OpenHands A preconfigured OpenHands deployment that builds apps against the node's build spec and publishes them over MCP. tools/aimeat-openhands/"
     },
     {
+     "slug": "g-22-guides-for-builders",
      "cells": [
       "<strong>Guides for builders</strong>",
       "Building an agent, an ecosystem app, apps that use the owner's AI key.",
@@ -2168,6 +2700,7 @@
    "reach": -1,
    "rows": [
     {
+     "slug": "g-23-enterprise-edition-ee-company-identity-goii-kyb-gate-stripe-connect-platform-payouts-dac7-reporting",
      "cells": [
       "<strong>Enterprise Edition (<code>ee/</code>)</strong>, company identity (GOII), KYB gate, Stripe Connect platform payouts, DAC7 reporting",
       "Removed 2026-07-28",
@@ -2176,6 +2709,7 @@
      "plain": "Enterprise Edition (ee/), company identity (GOII), KYB gate, Stripe Connect platform payouts, DAC7 reporting Removed 2026-07-28 One edition shaped by configuration. A business runs its own node, sellers bring their own Stripe credentials, the operator's fee is booked as a receivable."
     },
     {
+     "slug": "g-23-generator",
      "cells": [
       "<strong>Generator</strong>",
       "Removed 2026-07-18",
@@ -2184,6 +2718,7 @@
      "plain": "Generator Removed 2026-07-18 The node-served build spec, used from any AI chat, the app catalog or OpenHands."
     },
     {
+     "slug": "g-23-foundry",
      "cells": [
       "<strong>Foundry</strong>",
       "Removed 2026-07-13",
@@ -2192,6 +2727,7 @@
      "plain": "Foundry Removed 2026-07-13 Same as Generator."
     },
     {
+     "slug": "g-23-micro-memory",
      "cells": [
       "<strong>Micro-memory</strong>",
       "Removed 2026-08-23",
@@ -2200,6 +2736,7 @@
      "plain": "Micro-memory Removed 2026-08-23 Memory records and MCP."
     },
     {
+     "slug": "g-23-one-time-keys-otk-and-tier-0-5",
      "cells": [
       "<strong>One-time keys (OTK) and Tier 0.5</strong>",
       "Removed 2026-08-23",
@@ -2208,6 +2745,7 @@
      "plain": "One-time keys (OTK) and Tier 0.5 Removed 2026-08-23 Device authorization and MCP."
     },
     {
+     "slug": "g-23-secretary-agent",
      "cells": [
       "<strong>Secretary agent</strong>",
       "Removed",
@@ -2216,6 +2754,7 @@
      "plain": "Secretary agent Removed The owner's own agents, schedules and workflows."
     },
     {
+     "slug": "g-23-feedback-channel",
      "cells": [
       "<strong>Feedback channel</strong>",
       "Removed 2026-08-12",
@@ -2224,6 +2763,7 @@
      "plain": "Feedback channel Removed 2026-08-12 support@operators."
     },
     {
+     "slug": "g-23-pricing-page",
      "cells": [
       "<strong>Pricing page</strong>",
       "Removed 2026-08-28",
@@ -2232,6 +2772,7 @@
      "plain": "Pricing page Removed 2026-08-28 Prices live in the store."
     },
     {
+     "slug": "g-23-home-and-profile-switch",
      "cells": [
       "<strong>Home and profile switch</strong>",
       "Removed 2026-08-27",
@@ -2240,6 +2781,7 @@
      "plain": "Home and profile switch Removed 2026-08-27 One start-page setting."
     },
     {
+     "slug": "g-23-ai-matching-engine",
      "cells": [
       "<strong>AI matching engine</strong>",
       "Not in the code",
@@ -2248,6 +2790,7 @@
      "plain": "AI matching engine Not in the code Discover, EXCHANGE needs and bids."
     },
     {
+     "slug": "g-23-wash-trading-detection",
      "cells": [
       "<strong>Wash-trading detection</strong>",
       "Not in the code",
@@ -2256,6 +2799,7 @@
      "plain": "Wash-trading detection Not in the code Trust caps an agent with fewer than three counterparties at 40."
     },
     {
+     "slug": "g-23-knowledge-contributor-reputation",
      "cells": [
       "<strong>Knowledge contributor reputation</strong>",
       "Not in the code",
@@ -2264,6 +2808,7 @@
      "plain": "Knowledge contributor reputation Not in the code Reputation per knowledge package."
     },
     {
+     "slug": "g-23-boards",
      "cells": [
       "<strong>Boards</strong>",
       "Deprecated, then reinstated 2026-08-30",
@@ -2272,6 +2817,7 @@
      "plain": "Boards Deprecated, then reinstated 2026-08-30 Current, see section 13."
     },
     {
+     "slug": "g-23-legacy-ed25519-challenge-response",
      "cells": [
       "<strong>Legacy Ed25519 challenge-response</strong>",
       "Deprecated, still mounted",
@@ -2282,9 +2828,9 @@
    ]
   }
  ],
- "outro": "AIMEAT Feature List, rewritten 2026-09-14 against node 3.14.3. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; what shipped since is at <code>/v1/changelog</code>.",
+ "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 240
+  "rows": 274
  }
 }
