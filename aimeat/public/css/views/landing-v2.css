@@ -34,6 +34,18 @@
 .ld-v2-stage--more, .ld-v2-frame--more { background: var(--text); color: var(--bg); box-shadow: 10px 10px 0 var(--accent); }
 .ld-v2-stage--answer, .ld-v2-frame--answer { box-shadow: 10px 10px 0 var(--accent); }
 .ld-v2-stage--answer .ld-v2-stage-text { font-size: clamp(1.5rem, 4vw, 3rem); }
+/* The last frame: this page's own picture, and the sentence as a band across its foot. */
+.ld-v2-stage--self { padding: 0; background: var(--text); color: var(--bg); overflow: hidden; }
+.ld-v2-self { position: relative; width: 100%; min-height: 12rem; display: flex; align-items: flex-end; justify-content: center; }
+.ld-v2-self-img { display: block; width: 100%; height: auto; max-height: 26rem; object-fit: cover; object-position: top; }
+.ld-v2-self-ph { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 14rem; font-family: var(--font-showroom); text-transform: uppercase; font-size: 1.4rem; color: var(--text-dim); border: 3px dashed var(--text-dim); box-sizing: border-box; }
+.ld-v2-self-text {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: .7rem 1rem;
+  background: var(--text); color: var(--sun); font-family: var(--font-showroom); text-transform: uppercase;
+  font-size: clamp(1.1rem, 2.6vw, 1.9rem); line-height: 1.15; text-align: center;
+}
+.ld-v2-frame--self { position: relative; padding: 0; overflow: hidden; }
+.ld-v2-frame--self .ld-v2-self-text { font-size: 1rem; }
 @keyframes ld-v2-pop { from { opacity: 0; transform: translateY(.3em) scale(.98); } to { opacity: 1; transform: none; } }
 .ld-v2-stage-text { display: block; max-width: 22ch; animation: ld-v2-pop 260ms ease-out; }
 .ld-v2-ten-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }

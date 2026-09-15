@@ -21,6 +21,8 @@
  * @structure Hero2 · WishBox2 · TenSeconds · LinuxLine · Close2
  * @usage import { Hero2, TenSeconds, LinuxLine, Close2 } from '/views/landing-v2.js';
  * @version-history
+ *   v1.1.0 — 2026-09-15 — Built here, with itself: the kicker says it, and the ten seconds end on a
+ *     frame of this very page. Jouni, as the proof of the hero's claim.
  *   v1.0.0 — 2026-09-14 — The front page. The sections are exported for the block registry and the
  *     page composition moved to the layout; /v1/portal-v2 is gone because /v1/portal is this now.
  *   v0.1.0 — 2026-09-14 — Design round, built to "Viestikehys normipopulaatiolle" (Marketing,
@@ -85,7 +87,7 @@ export function Hero2({ navigate, picture = true }) {
   const go = (path) => (e) => { e.preventDefault(); navigate(path); };
   return html`
     <section class="ld-sh-hero">
-      <span class="ld-sh-kicker">${tr('landing.showKicker', 'This is the demo. It runs for real, every day.')}</span>
+      <span class="ld-sh-kicker">${tr('landing.showKicker', 'This is the demo. It runs for real, every day.')} ${tr('landing2.kickerBuilt', 'Built here, with itself.')}</span>
       <h1 class="ld-sh-title ld-v2-title">
         <span>${tr('landing2.title1', 'Say what you want.')}</span>
         <span>${tr('landing2.title2', 'Then make sure it happens.')}</span>
@@ -124,17 +126,21 @@ const FRAMES = [
 ];
 const MORE = ['landing2.tenMore', 'And more. But why should you care?'];
 const ANSWER = ['landing2.tenAnswer', 'Because your AI gets these powers, and you get them through it.'];
+/** The last frame: this very page, as the proof of the claim. The picture is scripts/projector-shots.ts --only front. */
+const SELF = ['landing2.tenSelf', 'Including this page. Built here, with itself.'];
+const SELF_SHOT = '/img/frontdemo/front-page.png';
 const TEN_STEP_MS = 1400;
 
 /**
  * Ten seconds under the hood: one outcome at a time, quickly, then a black frame with the
- * question, then the answer. The run starts when the section scrolls into view and stops at the
- * answer; a click on the stage steps it by hand, and "play again" runs it once more. With reduced
- * motion every frame is on screen at once, because a sequence that cannot be paused is not one
- * everybody can read.
+ * question, then the answer, then this page itself as the last proof. The run starts when the
+ * section scrolls into view and stops at the last frame; a click on the stage steps it by hand,
+ * and "play again" runs it once more. With reduced motion every frame is on screen at once,
+ * because a sequence that cannot be paused is not one everybody can read.
  */
 export function TenSeconds({ navigate }) {
-  const total = FRAMES.length + 2;
+  const total = FRAMES.length + 3;
+  const [shotMissing, setShotMissing] = useState(false);
   const [idx, setIdx] = useState(0);
   const [running, setRunning] = useState(false);
   const [started, setStarted] = useState(false);
@@ -167,8 +173,19 @@ export function TenSeconds({ navigate }) {
 
   const replay = () => { setIdx(0); setRunning(true); };
   const step = () => { setRunning(false); setIdx((i) => (i + 1) % total); };
-  const phase = idx < FRAMES.length ? 'frame' : (idx === FRAMES.length ? 'more' : 'answer');
-  const text = idx < FRAMES.length ? tr(...FRAMES[idx]) : (idx === FRAMES.length ? tr(...MORE) : tr(...ANSWER));
+  const phase = idx < FRAMES.length ? 'frame'
+    : idx === FRAMES.length ? 'more'
+    : idx === FRAMES.length + 1 ? 'answer'
+    : 'self';
+  const text = idx < FRAMES.length ? tr(...FRAMES[idx])
+    : idx === FRAMES.length ? tr(...MORE)
+    : idx === FRAMES.length + 1 ? tr(...ANSWER)
+    : tr(...SELF);
+  // The last frame carries the page's own picture behind its sentence; a missing file leaves a
+  // named placeholder rather than a broken image.
+  const selfPicture = shotMissing
+    ? html`<span class="ld-v2-self-ph">${tr('landing2.tenSelfPh', 'aimeat.io front page')}</span>`
+    : html`<img class="ld-v2-self-img" src=${SELF_SHOT} alt=${tr('landing2.tenSelfPh', 'aimeat.io front page')} onError=${() => setShotMissing(true)} />`;
 
   return html`
     <section class="ld-v2-ten" ref=${ref}>
@@ -181,11 +198,13 @@ export function TenSeconds({ navigate }) {
           ${FRAMES.map(([k, f], i) => html`<div class=${`ld-v2-frame poster-frame ld-v2-frame--${i % 3} ${i % 3 === 0 ? 'showroom-slab--sun' : ''}`} key=${k}>${tr(k, f)}</div>`)}
           <div class="ld-v2-frame poster-frame ld-v2-frame--more">${tr(...MORE)}</div>
           <div class="ld-v2-frame poster-frame ld-v2-frame--answer showroom-slab--sun">${tr(...ANSWER)}</div>
+          <div class="ld-v2-frame poster-frame ld-v2-frame--self">${selfPicture}<span class="ld-v2-self-text">${tr(...SELF)}</span></div>
         </div>` : html`
         <div class=${`ld-v2-stage ld-v2-stage--${phase} ld-v2-frame--${idx % 3} ${(phase === 'frame' && idx % 3 === 0) || phase === 'answer' ? 'showroom-slab--sun' : ''}`} role="button" tabindex="0"
           aria-live="polite" onClick=${step}
           onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); step(); } }}>
-          <span class="ld-v2-stage-text" key=${idx}>${text}</span>
+          ${phase === 'self' ? html`<div class="ld-v2-self" key="self">${selfPicture}<span class="ld-v2-self-text">${text}</span></div>`
+            : html`<span class="ld-v2-stage-text" key=${idx}>${text}</span>`}
         </div>
         <div class="ld-v2-ten-bar">
           <div class="ld-v2-dots" aria-hidden="true">
