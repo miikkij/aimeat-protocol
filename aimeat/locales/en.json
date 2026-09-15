@@ -3905,6 +3905,7 @@
       "workflow": "your automations",
       "ai": "your AI budget",
       "notifications": "notifications to you",
+      "push": "notifications on this device",
       "organism": "your workspaces",
       "app": "apps published in your name",
       "work": "work between your agents",
@@ -3921,6 +3922,9 @@
       "secrets": "the keys you keep here"
     },
     "scopeText": {
+      "push": {
+        "receive": "Show this app's notifications on your device, under its own name and icon. It can switch off only the device it switched on, and it cannot see your other devices."
+      },
       "task": {
         "read": "See your agents' tasks, their runs and their results.",
         "write": "Create and start tasks for your own agents."

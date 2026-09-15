@@ -3904,6 +3904,7 @@
       "workflow": "automaatiosi",
       "ai": "AI-budjettisi",
       "notifications": "ilmoitukset sinulle",
+      "push": "ilmoitukset tällä laitteella",
       "organism": "työtilasi",
       "app": "nimissäsi julkaistut appit",
       "work": "agenttiesi välinen työ",
@@ -3920,6 +3921,9 @@
       "secrets": "täällä pitämäsi avaimet"
     },
     "scopeText": {
+      "push": {
+        "receive": "Näyttää tämän sovelluksen ilmoitukset laitteellasi, sen omalla nimellä ja kuvakkeella. Se voi sammuttaa vain sen laitteen, jonka itse kytki päälle, eikä näe muita laitteitasi."
+      },
       "task": {
         "read": "Näkee agenttiesi tehtävät, ajot ja tulokset.",
         "write": "Luo ja käynnistää tehtäviä omille agenteillesi."

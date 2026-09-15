@@ -87,6 +87,12 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // secret silently stops whatever was using it, which is a decision the owner makes per app.
   'secrets:manage': 'Store and remove the named keys and passwords in your vault (it can never read one back)',
   'notifications:send': 'Send you notifications (bell + browser push) that open this app',
+  // NARROWER THAN push:manage ON PURPOSE. That word lists and removes every device the person has,
+  // across every app and the node itself, and no app has any business there. This one registers and
+  // removes THIS app's own device and nothing else, which is what an installed app needs so its
+  // notifications arrive as itself. The node stamps which app a subscription belongs to from the
+  // grant, so the word cannot be used to reach another app's devices.
+  'push:receive': 'Show this app\'s notifications on this device, under its own name and icon',
   'organism:read': 'Read the published content of workspaces you are a member of (e.g. gated curriculum an app renders for you)',
   'organism:invite': 'Invite people into organisms you belong to (send email invitations / access keys on your behalf)',
   'organism:write': 'Create organisms and workspaces on your behalf (an app that provisions its own structured data space)',

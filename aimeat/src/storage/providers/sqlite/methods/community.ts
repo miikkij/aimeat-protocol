@@ -29,6 +29,7 @@ function toPushSubscription(row: Record<string, unknown>): PushSubscriptionRecor
     keys: JSON.parse(row.keys as string),
     createdAt: row.createdAt as string,
     lastUsedAt: (row.lastUsedAt as string | null) || null,
+    appId: (row.appId as string | null) ?? null,
   };
 }
 
@@ -342,12 +343,13 @@ export const communityMethods = {
     this.db.prepare(
       // The conflict path refreshes the keys and nothing else: re-subscribing is not a delivery, and
       // writing lastUsedAt here is what made the column mean either (migration 0074).
-      `INSERT INTO push_subscriptions (ownerName, endpoint, keys, createdAt, lastUsedAt)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(ownerName, endpoint) DO UPDATE SET keys = excluded.keys`
+      `INSERT INTO push_subscriptions (ownerName, endpoint, keys, createdAt, lastUsedAt, appId)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(ownerName, endpoint) DO UPDATE SET keys = excluded.keys, appId = excluded.appId`
     ).run(
       record.ownerName, record.endpoint,
       JSON.stringify(record.keys), record.createdAt, record.lastUsedAt,
+      record.appId ?? null,
     );
     return record;
   },

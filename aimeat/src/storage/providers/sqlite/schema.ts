@@ -531,6 +531,11 @@ export function initializeSchema(db: Database.Database): void {
   // migration 0074.
   relaxPushLastUsedAt(db);
 
+  // Which app's own origin a device subscribed from, NULL for the node's own pages. An installed app
+  // is a separate origin and therefore a separate endpoint, and what arrives on it wears that app's
+  // face. Mirrors Postgres migration 0075.
+  safeAddColumn('push_subscriptions', 'appId', 'TEXT');
+
   // organismId became NULLable when the node-level registration invite joined this table.
   // SQLite cannot drop a NOT NULL constraint with ALTER, and an upgraded database keeps it —
   // harmless, because every row it refuses is one this node would only write on a FRESH

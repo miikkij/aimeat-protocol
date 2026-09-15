@@ -85,6 +85,9 @@ export function relaxPushLastUsedAt(db: Database.Database): void {
         keys           TEXT NOT NULL DEFAULT '{}',
         createdAt      TEXT NOT NULL,
         lastUsedAt     TEXT,
+        -- Listed even though schema.ts adds it AFTER this runs: a database that has it already must
+        -- not lose it here, and one that does not is unaffected by a nullable column nothing fills.
+        appId          TEXT,
         PRIMARY KEY (ownerName, endpoint)
       );
       INSERT INTO push_subscriptions_new (${carried}) SELECT ${carried} FROM push_subscriptions;

@@ -8,6 +8,8 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.8.0 - 2026-09-15 - aimeat-push.js joins SDK_LIB_NAMES: an installed app turns on notifications
+ *   for its own origin (register /sw.js, permission, VAPID key, subscribe), holding `push:receive`.
  * v2.7.0 - 2026-09-08 - aimeat-onto.js joins SDK_LIB_NAMES, the second time a lib was built and
  *   listed in the packs table but not here (rows, 2026-08-29, was the first).
  * v2.6.0 - 2026-09-05 - New library aimeat-living.js: the living document — ONE JSON record
@@ -198,6 +200,10 @@ const SDK_LIB_NAMES = [
   // aimeat-onto.js — what a record MEANS. Registered in scripts/build-sdk-libs.ts on 2026-09-08 and
   // not here, so the same 404 as rows: the packs table named it and e2e-library-packs went red.
   'onto',
+  // aimeat-push.js — an installed app receives notifications on its own origin, under its own name
+  // and icon. It registers the app-origin worker (src/static/app-sw.js, served at /sw.js there) and
+  // needs the `push:receive` app grant on the two /v1/push/subscribe doors.
+  'push',
 ] as const;
 
 function sendJavascriptLibrary(res: Response, source: string): void {

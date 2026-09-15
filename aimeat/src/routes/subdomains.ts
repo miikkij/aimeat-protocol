@@ -110,7 +110,7 @@ import { appCsp } from '../utils/app-csp.js';
 import { appContentType } from '../utils/app-content-type.js';
 import { appToolNames } from '../services/app-tool-names.js';
 import { wantsWebmcpBridge } from '../utils/app-agent-discovery.js';
-import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales } from '../services/app-seo.js';
+import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales, appHasIconImage } from '../services/app-seo.js';
 import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
 import { recordAppOpen } from '../services/usage/record-app-open.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
@@ -387,6 +387,11 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
             seoDescription: app.manifest?.seo?.description,
             image: seoMeta.image,
             lang: seoMeta.lang,
+            // Whether the home-screen icon on an iPhone is this app's face or the apex heart. Asked
+            // on every HTML serve rather than only a search-visible one, because installing has
+            // nothing to do with being indexed: an app nobody may find is still one its owner puts
+            // on their own phone.
+            hasIconImage: await appHasIconImage(storage, app),
             // The owner's switch on the browser install offer (services/app-marks.ts).
             installChip: appInstallChipOn(app.manifest),
             // The declared reviewer becomes the JSON-LD author and editor, which is how a byline

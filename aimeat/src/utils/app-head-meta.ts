@@ -93,6 +93,16 @@ export interface AppHeadSpec {
   keywords?: string[];
   /** Absolute URL of the social image (the app's own screenshot, usually). */
   image?: string;
+  /**
+   * True when this app has an icon IMAGE of its own, so the home-screen icon can be the app's face.
+   *
+   * iOS reads the installed icon from `apple-touch-icon` and ignores SVG there, and the per-app icon
+   * this node holds is an emoji character rather than a picture. So every published app installed on
+   * an iPhone wore the apex heart, whoever made it. An author who uploads an icon gets their own;
+   * one who has not still gets the heart, which is what the emoji could never be turned into without
+   * a font pipeline in the node.
+   */
+  hasIconImage?: boolean;
   /** BCP-47 tag the app declares for itself. Empty leaves the document's own `lang` alone. */
   lang?: string;
   /** Lifetime opens, for the JSON-LD interaction count. */
@@ -246,9 +256,14 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
     add.push(`<meta name="theme-color" content="#FAFAF8">`);
   }
   if (!has(text, /<link rel="apple-touch-icon"/i)) {
-    // A PNG, because iOS ignores SVG here. The apex heart stands in for every app: the per-app
-    // emoji icon is an SVG and rasterizing emoji server-side would need a font pipeline.
-    add.push(`<link rel="apple-touch-icon" href="${spec.baseUrl.replace(/\/$/, '')}/icons/apple-touch-icon.png">`);
+    // A PNG, because iOS ignores SVG here, and the per-app icon this node holds is an emoji
+    // character rather than a picture. An author who has uploaded an icon image gets their own face
+    // on the home screen, served from the app's own origin; one who has not gets the apex heart,
+    // which is what the apps installed before this line could ever wear. Rasterizing the emoji
+    // instead would need a font pipeline in the node, which is a bigger thing than a picture upload.
+    add.push(spec.hasIconImage
+      ? `<link rel="apple-touch-icon" href="${spec.origin.replace(/\/$/, '')}/apple-touch-icon.png">`
+      : `<link rel="apple-touch-icon" href="${spec.baseUrl.replace(/\/$/, '')}/icons/apple-touch-icon.png">`);
   }
   if (spec.installChip !== false && !has(text, /install-chip\.js/i)) {
     // The suggestion half of installability: when the browser hands over an install offer, this

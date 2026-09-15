@@ -70,6 +70,7 @@ import type { AimeatConfig } from '../config.js';
 import { serveSpa } from '../routes/portal.js';
 import { buildAuthMd } from '../services/auth-md.js';
 import { resolveAssetDir } from './asset-dirs.js';
+import { appOriginServiceWorker } from '../utils/app-sw-source.js';
 
 /**
  * This module's own directory, which is what asset-dirs.ts measures the asset trees against:
@@ -315,6 +316,32 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     // changes and the browser receives the fresh version automatically — no manual
     // cache clearing needed, no hard refresh, works after every server restart.
     // Static assets (images, fonts, etc.) keep the 7-day cache — they rarely change.
+
+    /**
+     * AN APP ORIGIN GETS ITS OWN SERVICE WORKER, and it has to be decided HERE.
+     *
+     * A push subscription belongs to an origin. Without a worker of its own, a published app could
+     * only ever be notified through the node's pages, wearing the node's name and icon, and on iOS
+     * that is permanent: Safari ignores the icon inside a payload and takes it from whichever app
+     * the notification came from. The apex worker cannot stand in — public/sw.js carries the SPA's
+     * share-target intake, its offline page and its caches, none of which belong on somebody else's
+     * app, and a worker registered at an app origin's root controls that whole origin.
+     *
+     * Before the mount below, because `express.static` answers /sw.js with the apex worker on every
+     * host it is asked on, so a route registered later never sees the request. `req.appOrigin` is
+     * already set: subdomainMiddleware runs ahead of this function, and it is the normalized marker
+     * rather than a header, so it cannot be claimed by a caller. The apex falls through untouched.
+     *
+     * Not cached: a worker a browser holds forever is a fix nobody receives.
+     */
+    app.get('/sw.js', (req, res, next) => {
+      if (!req.appOrigin) { next(); return; }
+      const source = appOriginServiceWorker();
+      if (!source) { next(); return; }
+      res.setHeader('Cache-Control', 'no-cache');
+      res.type('application/javascript').send(source);
+    });
+
     app.use(express.static(publicDir, {
       maxAge: '7d',
       etag: true,

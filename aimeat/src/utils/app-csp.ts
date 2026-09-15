@@ -13,6 +13,9 @@
  *   res.setHeader('Content-Security-Policy', appCsp(apexOrigin));   // app origin
  *   res.setHeader('Content-Security-Policy', appCsp());             // inline / draft preview
  * @version-history
+ *   v1.3.0 — 2026-09-15 — worker-src 'self' blob:. The third directive to fall to this shape: a
+ *     service worker the app origin serves itself was refused, so an installed app could not
+ *     receive a notification under its own name and icon.
  *   v1.2.0 — 2026-08-26 — media-src 'self' blob: data: https:. Same shape as the manifest-src bug
  *     below and found the same way — on a live app: <video> and <audio> are fetched under this
  *     directive, it had no entry, so it fell back to default-src 'none' and NO published app could
@@ -73,7 +76,13 @@ export function appCsp(apexOrigin = '', grantedOrigin = ''): string {
     + "media-src 'self' data: blob: https: http://localhost:*; "
     + "font-src 'self' data: https:; "
     + `connect-src 'self' https: http://localhost:* wss: ws: data: blob:${apexAllow}; `
-    + 'worker-src blob:; '
+    // SERVICE-WORKER REGISTRATION IS GOVERNED BY worker-src, and 'blob:' alone refuses a worker the
+    // origin serves itself. So `navigator.serviceWorker.register('/sw.js')` was refused on every app
+    // origin, which is the one thing an installed app needs in order to receive a notification under
+    // its own name and icon. Third time this file has made the same mistake: manifest-src and
+    // media-src both fell back to default-src 'none' the same way, and the directive's absence is
+    // never visible as an error in the code, only as a thing that does not work in a browser.
+    + "worker-src 'self' blob:; "
     + "manifest-src 'self'; "
     + "object-src 'none'; "
     + `frame-src 'self' blob: data: https: http://localhost:*${apexAllow}; `

@@ -26673,6 +26673,84 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404': { description: App not found or agent not declared }
 
+  /v1/apps/{owner}/{filename}/icon:
+    parameters:
+      - name: owner
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Owner name (bare handle; a legacy owner@node segment is tolerated).
+      - name: filename
+        in: path
+        required: true
+        schema:
+          type: string
+        description: App filename.
+    get:
+      operationId: getAppIcon
+      summary: Serve an app's own icon image
+      description: >
+        Returns the icon image the app's author uploaded, or 404 when it has none. No auth: it is
+        the icon of a page anyone with the link can open. The app's own origin serves the same
+        bytes at /apple-touch-icon.png.
+      tags: [App Store]
+      responses:
+        '200':
+          description: Icon image bytes
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: setAppIcon
+      summary: Set or replace an app's icon image without re-publishing
+      description: >
+        Stores a base64-encoded PNG as the app's icon image, which is what an iPhone puts on its
+        home screen when the app is installed and what Android mints a WebAPK with. An app's icon
+        on this node is otherwise an emoji character: it renders on the node's surfaces and as an
+        SVG on the app's origin, and iOS ignores SVG in `apple-touch-icon`, so an app without an
+        image wears this node's own icon there. PNG only, checked by reading the bytes rather than
+        the declared type, because an SVG stored here would be accepted and then silently ignored
+        by the one surface it exists for. Max 1 MB. Idempotent. The app's owner, somebody they gave
+        a rung carrying `presentation`, or a node operator.
+      tags: [App Store]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [icon]
+              properties:
+                icon:
+                  type: string
+                  description: Base64-encoded PNG image data.
+      responses:
+        '200':
+          description: Icon stored
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          description: Icon exceeds the 1 MB limit
+
   /v1/apps/{owner}/{filename}/screenshot:
     parameters:
       - name: owner

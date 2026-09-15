@@ -607,6 +607,71 @@ async function main() {
         }
     });
 
+    console.log('\nPhase 7: push:receive — an app registers ITS OWN device and reaches no other');
+
+    // An installed app is its own origin, so allowing notifications inside it produces a second
+    // endpoint, and what arrives there wears the app's name and icon rather than the node's. On iOS
+    // that is the only way it ever does. The word that opens this is narrow on purpose: `push:manage`
+    // lists and removes every device the person has, across every app and the node itself.
+    const appDeviceEndpoint = `${BASE}/push-test-device/installed-app`;
+    const otherDeviceEndpoint = `${BASE}/push-test-device/somebody-elses`;
+    let pushAppToken = '';
+
+    await test('an app holding push:receive registers a device, stamped with the app', async () => {
+        pushAppToken = (await grantAppToken('push:receive')).access_token;
+        assert(!!pushAppToken, 'push:receive app token minted');
+        const r = await json('/v1/push/subscribe', {
+            method: 'POST', headers: { Authorization: `Bearer ${pushAppToken}` },
+            body: JSON.stringify({ endpoint: appDeviceEndpoint, keys: { p256dh: 'test-p256dh', auth: 'test-auth' } }),
+        });
+        assert(r.status === 201, `expected 201, got ${r.status} ${JSON.stringify(r.body)}`);
+        // The app is read from the GRANT, never from the body: a caller naming its own app could
+        // otherwise put the person's device into somebody else's stream.
+        assert(r.body.data.subscription.app === `${owner}/${FILENAME}`,
+            `expected the grant's app, got ${JSON.stringify(r.body.data.subscription.app)}`);
+    });
+
+    await test('push:receive does NOT open the list of every device the person has', async () => {
+        const r = await json('/v1/push/subscriptions', { headers: { Authorization: `Bearer ${pushAppToken}` } });
+        assert(r.status === 403, `listing stays behind push:manage; got ${r.status} ${JSON.stringify(r.body)}`);
+    });
+
+    await test('an app cannot sign every device out by naming none', async () => {
+        const r = await json('/v1/push/subscribe', {
+            method: 'DELETE', headers: { Authorization: `Bearer ${pushAppToken}` },
+        });
+        assert(r.status === 400, `expected 400, got ${r.status} ${JSON.stringify(r.body)}`);
+        assert(r.body.error?.code === 'ENDPOINT_REQUIRED', `expected ENDPOINT_REQUIRED, got ${r.body.error?.code}`);
+    });
+
+    await test('an app cannot take back a device it did not register', async () => {
+        // The owner's own browser registers one, the way the node's pages do.
+        const mine = await json('/v1/push/subscribe', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ endpoint: otherDeviceEndpoint, keys: { p256dh: 'test-p256dh', auth: 'test-auth' } }),
+        });
+        assert(mine.status === 201, `owner subscribe ${mine.status}: ${JSON.stringify(mine.body)}`);
+
+        const r = await json(`/v1/push/subscribe?endpoint=${encodeURIComponent(otherDeviceEndpoint)}`, {
+            method: 'DELETE', headers: { Authorization: `Bearer ${pushAppToken}` },
+        });
+        // Absent and not-yours answer identically, so this cannot be used to ask which other apps
+        // the person has allowed notifications in.
+        assert(r.status === 404, `expected 404, got ${r.status} ${JSON.stringify(r.body)}`);
+
+        // And it is still there: a refusal must not remove what it refused to remove.
+        const list = await json('/v1/push/subscriptions', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(JSON.stringify(list.body.data).includes(otherDeviceEndpoint),
+            `the owner's device must survive the refused delete: ${JSON.stringify(list.body.data)}`);
+    });
+
+    await test('an app CAN take back the device it registered itself', async () => {
+        const r = await json(`/v1/push/subscribe?endpoint=${encodeURIComponent(appDeviceEndpoint)}`, {
+            method: 'DELETE', headers: { Authorization: `Bearer ${pushAppToken}` },
+        });
+        assert(r.status === 200, `expected 200, got ${r.status} ${JSON.stringify(r.body)}`);
+    });
+
     console.log('\n─────────────────────────────────────');
     console.log(`Results: ${passed} passed, ${failed} failed, ${passed + failed} total`);
     if (failed === 0) console.log('✅ All tests passed!');

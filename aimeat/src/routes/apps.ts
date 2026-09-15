@@ -110,6 +110,7 @@ import type { AppTargetFor, CanonicalOwner } from './apps/helpers.js';
 import { resolveAppTarget, type AppDevAct } from '../services/app-dev-grant.js';
 import { registerCatalogueAdminRoutes } from './apps/catalogue-admin.js';
 import { registerReadRoutes } from './apps/read.js';
+import { registerAppIconRoutes } from './apps/icon.js';
 import { registerPublishRoutes } from './apps/publish.js';
 import { registerDraftRoutes } from './apps/drafts.js';
 import { registerForkManageRoutes } from './apps/fork-manage.js';
@@ -172,6 +173,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
     registerCatalogueAdminRoutes(router, config, storage, peers, canonicalOwner);
     registerReadRoutes(router, config, storage, canonicalOwner, appTarget);
+    registerAppIconRoutes(router, config, storage, appTarget);
     registerPublishRoutes(router, config, storage, appTarget);
     registerDraftRoutes(router, config, storage, appTarget);
     registerForkManageRoutes(router, config, storage, canonicalOwner, appTarget);

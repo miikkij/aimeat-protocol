@@ -1855,11 +1855,12 @@ export interface Purchase {
 }
 
 export interface PushSubscription {
+  appId: string | null;
   createdAt: Generated<Timestamp>;
   endpoint: string;
   id: Generated<string>;
   keys: Json;
-  lastUsedAt: Generated<Timestamp>;
+  lastUsedAt: Timestamp | null;
   ownerName: string;
 }
 

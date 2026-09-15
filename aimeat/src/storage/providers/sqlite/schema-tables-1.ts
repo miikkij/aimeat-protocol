@@ -595,6 +595,10 @@ export function applySchemaTables1(db: Database.Database): void {
       -- NULL until this device has actually ACCEPTED a notification. Registering writes createdAt
       -- and nothing else; only a successful send stamps this. Mirrors Postgres migration 0074.
       lastUsedAt     TEXT,
+      -- The app whose own origin this device subscribed from, NULL for the node's own pages.
+      -- A subscription belongs to an origin, so an installed app is a separate endpoint whose
+      -- notifications wear that app's face. Mirrors Postgres migration 0075.
+      appId          TEXT,
       PRIMARY KEY (ownerName, endpoint)
     );
 
