@@ -19,6 +19,7 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as ed from '@noble/ed25519';
@@ -66,7 +67,7 @@ async function startServer(gateOn: boolean, freshDb: boolean): Promise<ChildProc
         AIMEAT_RL_MEMORY: '1000', AIMEAT_RL_BOARDS: '1000',
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
     };
-    const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the login-attach node' });
 }

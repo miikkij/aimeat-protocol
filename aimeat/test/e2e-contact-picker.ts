@@ -16,6 +16,7 @@
 // Run: cd aimeat && pnpm exec node --import tsx test/e2e-contact-picker.ts
 
 import { randomBytes, createHash } from 'node:crypto';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { waitForServer } from './helpers/wait-for-server.js';
@@ -40,7 +41,7 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_APP_HOST: APP_HOST, AIMEAT_APP_ORIGIN_ENABLED: 'true',
         AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_DEFAULT_AGENT_SCOPES: '*',
     };
-    const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the contact-picker node' });
 }

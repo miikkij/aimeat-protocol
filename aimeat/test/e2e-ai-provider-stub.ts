@@ -51,6 +51,7 @@
  *   v1.0.0 — 2026-09-08 — Initial.
  */
 import * as ed from '@noble/ed25519';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
@@ -120,7 +121,7 @@ async function startServer(): Promise<ChildProcess> {
         // One slot, so the second job of a pair is genuinely queued rather than racing to finish.
         AIMEAT_AI_JOB_SLOTS: '1',
     };
-    const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
         { env: env as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     // The stderr tail and the exit check that used to live here are the helper now, so the other
     // sixteen suites that spawn a node get them too.

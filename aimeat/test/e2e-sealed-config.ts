@@ -24,6 +24,7 @@
  *   v1.0.0 — 2026-08-18 — Initial.
  */
 import * as ed from '@noble/ed25519';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
@@ -135,7 +136,7 @@ async function startServer(sealed: boolean): Promise<ChildProcess> {
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
         AIMEAT_SEALED_CONFIG_KEYS: sealed ? SEALED_LIST : '',
     };
-    const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', ...dbArgs],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...dbArgs],
         { env: env as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the sealed-config node' });
 }

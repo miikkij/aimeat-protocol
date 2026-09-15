@@ -19,6 +19,7 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
@@ -183,7 +184,7 @@ function cleanupAltDb() {
 
 async function startAllowlistNode(): Promise<ChildProcess> {
     cleanupAltDb();
-    const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', ALT_DB], {
+    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', ALT_DB], {
         env: {
             ...process.env,
             AIMEAT_PORT: ALT_PORT,

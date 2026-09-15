@@ -50,6 +50,7 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { once } from 'node:events';
 import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -160,7 +161,7 @@ async function spawnNode(port: string, extraEnv: Record<string, string> = {}): P
         AIMEAT_ANONYMOUS: 'false',
         ...extraEnv,
     };
-    const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', dbPath],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', dbPath],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     try {
         await waitForServer(child, base, { label: `the node on port ${port}` });
@@ -460,7 +461,7 @@ try {
         // those routes unreachable today, and it is asserted rather than assumed.
         const dir = mkdtempSync(join(tmpdir(), 'aimeat-eudiw-'));
         try {
-            const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', join(dir, 'x.db')], {
+            const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', join(dir, 'x.db')], {
                 env: {
                     ...process.env,
                     AIMEAT_PORT: SECOND_PORT, AIMEAT_BASE_URL: `http://localhost:${SECOND_PORT}`,

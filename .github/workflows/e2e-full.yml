@@ -75,8 +75,25 @@ jobs:
       # core while its neighbours get all they ask for is not losing a fair fight for the processor,
       # and a bigger budget only makes a red night four minutes longer. What the next occurrence
       # needs is where it is stuck, which wait-for-server.ts now reports per thread.
+      # EVERY NODE IN THE SWEEP STARTS FROM THE BUILD, NOT THROUGH tsx. From 2026-09-10 to
+      # 2026-09-15 this job was red every night, and apart from two stale assertions every red suite
+      # was one failure: a node that never bound its port. The stuck nodes printed only the warnings
+      # the static import graph emits and no log line after them, sat in ep_poll for the whole budget
+      # on a few per cent of a core, and stopped at the first dynamic import of a boot, where tsx has
+      # to compile a few dozen provider files through its esbuild child. On 2026-09-11 a lane server
+      # did the same inside its 60-second restart budget and took the whole Postgres run down with
+      # no total. A node started from dist/ involves no compiler and no pipe to one, and boots in
+      # about half the time of a warm tsx and a fifth of a cold one (measured 2026-09-15), which on a
+      # runner restarting a node before every suite is also most of the load. The variable is read
+      # by test/helpers/node-entry.ts; locally it stays unset, so one suite needs no build.
+      - name: Build the node the sweep starts
+        working-directory: aimeat
+        run: pnpm build
+
       - name: Full sweep (${{ matrix.backend }})
         working-directory: aimeat
+        env:
+          AIMEAT_E2E_NODE_ENTRY: dist
         run: pnpm test:e2e:${{ matrix.backend }}
 
       - name: Open or update the issue for a red sweep

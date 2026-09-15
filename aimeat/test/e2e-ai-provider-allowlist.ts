@@ -23,6 +23,7 @@
  *   v1.0.0 — 2026-09-13 — Initial, with the two doors it covers.
  */
 import * as ed from '@noble/ed25519';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
@@ -85,7 +86,7 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_RL_AUTH: '1000', AIMEAT_RL_MEMORY: '1000',
         AIMEAT_REGISTRATION_RATE_LIMIT_MAX: '1000',
     };
-    const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
         { env: env as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the allowlisted AI node' });
 }

@@ -55,6 +55,7 @@ async function json(path: string, opts: RequestInit = {}, base: string = BASE) {
 }
 
 import * as ed from '@noble/ed25519';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
@@ -232,7 +233,7 @@ function removeStallDb() {
 
 async function startStallNode(): Promise<ChildProcess> {
     removeStallDb();
-    const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', STALL_DB], {
+    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', STALL_DB], {
         // The suite process is handed the runner's pins, so inheriting them is how this node gets the
         // same rate limits, ceilings and pinned-shut credentials the shared one has.
         env: {

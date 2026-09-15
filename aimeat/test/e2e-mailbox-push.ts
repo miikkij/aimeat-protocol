@@ -49,6 +49,7 @@
  *   v1.0.0 -- 2026-09-08 -- Initial.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { once } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -158,7 +159,7 @@ const dbDir = mkdtempSync(join(tmpdir(), 'aimeat-mbxpush-'));
 const vapid = webPush.generateVAPIDKeys();
 
 async function startNode(): Promise<void> {
-    node = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', join(dbDir, 'mailbox-push.db'), '--port', String(PORT)], {
+    node = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', join(dbDir, 'mailbox-push.db'), '--port', String(PORT)], {
         cwd: process.cwd(),
         env: {
             ...process.env,

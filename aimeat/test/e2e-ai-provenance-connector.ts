@@ -26,6 +26,7 @@
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 11.
  */
 import * as ed from '@noble/ed25519';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
@@ -85,7 +86,7 @@ function writeConnectorHome(home: string, agents: Array<{ agent: string; owner: 
 
 function spawnDaemon(home: string): { child: ChildProcess; output: () => string } {
   let buf = '';
-  const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'connect', 'serve', '--http'], {
+  const child = spawn('node', [...nodeEntryArgs(), 'connect', 'serve', '--http'], {
     cwd: process.cwd(),
     env: { ...process.env, AIMEAT_HOME: home },
     stdio: ['ignore', 'pipe', 'pipe'],

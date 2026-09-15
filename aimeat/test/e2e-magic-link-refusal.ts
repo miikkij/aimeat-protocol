@@ -29,6 +29,7 @@
  *   v1.0.0 — 2026-09-06 — Written with the fix for review item 2.5.
  */
 import { createServer, type Server, type Socket } from 'node:net';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -187,7 +188,7 @@ let sink: Server | null = null;
 const dbDir = mkdtempSync(join(tmpdir(), 'aimeat-magiclink-'));
 
 async function startNode(): Promise<void> {
-    node = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', join(dbDir, 'magic.db'), '--port', String(PORT)], {
+    node = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', join(dbDir, 'magic.db'), '--port', String(PORT)], {
         cwd: process.cwd(),
         env: {
             ...process.env,

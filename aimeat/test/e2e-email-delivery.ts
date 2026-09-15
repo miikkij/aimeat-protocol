@@ -44,6 +44,7 @@
  *   v1.0.0 -- 2026-09-08 -- Initial. Written with the fix for sendWithAttachments dropping opts.headers.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { once } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -136,7 +137,7 @@ let smtp: FakeSmtp | null = null;
 const dbDir = mkdtempSync(join(tmpdir(), 'aimeat-email-'));
 
 async function startNode(): Promise<void> {
-    node = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', join(dbDir, 'email.db'), '--port', String(PORT)], {
+    node = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', join(dbDir, 'email.db'), '--port', String(PORT)], {
         cwd: process.cwd(),
         env: {
             ...process.env,

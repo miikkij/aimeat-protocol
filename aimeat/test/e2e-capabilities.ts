@@ -49,6 +49,7 @@ async function json(path: string, opts: RequestInit = {}, base = BASE) {
 }
 
 import * as ed from '@noble/ed25519';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
@@ -976,7 +977,7 @@ function cleanupAltDb() {
 
 async function startAllowlistNode(): Promise<ChildProcess> {
     cleanupAltDb();
-    const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', ALT_DB], {
+    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', ALT_DB], {
         env: {
             ...process.env,
             AIMEAT_PORT: ALT_PORT,

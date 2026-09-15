@@ -35,6 +35,7 @@
  *   v1.0.0 — 2026-09-08 — Written to cover src/services/personal-tunnel.ts end to end.
  */
 import { WebSocket } from 'ws';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -533,7 +534,7 @@ let hbDir = '';
 
 async function startHeartbeatNode(): Promise<void> {
     hbDir = mkdtempSync(join(tmpdir(), 'aimeat-tunnel-hb-'));
-    hbNode = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', join(hbDir, 'tunnel.db'), '--port', String(HB_PORT)], {
+    hbNode = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', join(hbDir, 'tunnel.db'), '--port', String(HB_PORT)], {
         cwd: process.cwd(),
         env: {
             ...process.env,
