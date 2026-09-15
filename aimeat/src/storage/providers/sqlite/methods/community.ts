@@ -28,7 +28,7 @@ function toPushSubscription(row: Record<string, unknown>): PushSubscriptionRecor
     endpoint: row.endpoint as string,
     keys: JSON.parse(row.keys as string),
     createdAt: row.createdAt as string,
-    lastUsedAt: row.lastUsedAt as string,
+    lastUsedAt: (row.lastUsedAt as string | null) || null,
   };
 }
 
@@ -340,14 +340,22 @@ export const communityMethods = {
     // ON CONFLICT rather than INSERT OR REPLACE: the same device re-subscribing refreshes its keys
     // and keeps its createdAt, and a DIFFERENT device does not collide at all.
     this.db.prepare(
+      // The conflict path refreshes the keys and nothing else: re-subscribing is not a delivery, and
+      // writing lastUsedAt here is what made the column mean either (migration 0074).
       `INSERT INTO push_subscriptions (ownerName, endpoint, keys, createdAt, lastUsedAt)
        VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(ownerName, endpoint) DO UPDATE SET keys = excluded.keys, lastUsedAt = excluded.lastUsedAt`
+       ON CONFLICT(ownerName, endpoint) DO UPDATE SET keys = excluded.keys`
     ).run(
       record.ownerName, record.endpoint,
       JSON.stringify(record.keys), record.createdAt, record.lastUsedAt,
     );
     return record;
+  },
+
+  async markPushSubscriptionDelivered(this: SqliteStorage, ownerName: string, endpoint: string, at: string): Promise<void> {
+    this.db.prepare(
+      'UPDATE push_subscriptions SET lastUsedAt = ? WHERE ownerName = ? AND endpoint = ?'
+    ).run(at, ownerName, endpoint);
   },
 
   async getPushSubscription(this: SqliteStorage, ownerName: string): Promise<PushSubscriptionRecord | null> {

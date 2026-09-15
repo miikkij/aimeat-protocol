@@ -78,7 +78,9 @@ export function createPushService(config: AimeatConfig, storage: Storage): PushS
         endpoint: subscription.endpoint,
         keys: subscription.keys,
         createdAt: new Date().toISOString(),
-        lastUsedAt: new Date().toISOString(),
+        // Registering is not receiving. A device that has just subscribed has accepted nothing yet,
+        // and saying so is the whole point of the column (migration 0074).
+        lastUsedAt: null,
       };
       return storage.createPushSubscription(record);
     },
@@ -103,9 +105,17 @@ export function createPushService(config: AimeatConfig, storage: Storage): PushS
             JSON.stringify(payload),
             { TTL: 86400 },
           );
-          await storage.createPushSubscription({ ...sub, lastUsedAt: new Date().toISOString() });
+          // COUNT THE DELIVERY BEFORE WRITING IT DOWN. The notification has arrived; stamping when
+          // this device last accepted one is bookkeeping. With the write above this line, a storage
+          // hiccup threw into the catch below and a delivered notification was counted as failed and
+          // logged as one, which is the same lie in the other direction from the one being fixed
+          // here. Best-effort, and it says so when it does not happen.
           getStats()?.incrementTyped('push_sent', 'general');
           delivered++;
+          await storage.markPushSubscriptionDelivered(ownerName, sub.endpoint, new Date().toISOString())
+            .catch(err => logger.warn('Push delivered, but its timestamp was not written', {
+              ownerName, endpoint: sub.endpoint, error: String(err),
+            }));
         } catch (err: unknown) {
           const statusCode = (err as { statusCode?: number }).statusCode;
           if (statusCode === 404 || statusCode === 410) {
@@ -115,7 +125,20 @@ export function createPushService(config: AimeatConfig, storage: Storage): PushS
             logger.info('Push subscription expired, removed', { ownerName, endpoint: sub.endpoint });
             getStats()?.increment('push_expired_subs');
           } else {
-            logger.warn('Push notification failed', { ownerName, endpoint: sub.endpoint, error: String(err) });
+            // THE ANSWER IS ALREADY IN HAND, so it goes on the line. `String(err)` renders a
+            // WebPushError as "Received unexpected response code" and drops both the status and the
+            // service's own words, so a 403 with {"reason":"BadJwtToken"} reached nobody. A peer
+            // operator spent an hour on a malformed AIMEAT_VAPID_SUBJECT (a space after "mailto:",
+            // which Apple refuses and FCM does not) and could only see it by re-running the send by
+            // hand, reading the fields the node had held all along. Reported 2026-09-15.
+            const body = (err as { body?: unknown }).body;
+            logger.warn('Push notification failed', {
+              ownerName, endpoint: sub.endpoint, statusCode,
+              // The push service's own refusal, capped: it is a short JSON reason in every service
+              // we speak to, and an unbounded body from a remote host does not belong in a log line.
+              body: typeof body === 'string' ? body.slice(0, 500) : undefined,
+              error: String(err),
+            });
           }
           getStats()?.incrementTyped('push_failed', 'general');
         }

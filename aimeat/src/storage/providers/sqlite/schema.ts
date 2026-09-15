@@ -55,7 +55,7 @@ import { applySchemaTables1 } from './schema-tables-1.js';
 import { applySchemaTables2 } from './schema-tables-2.js';
 import { applySchemaTables3 } from './schema-tables-3.js';
 import { applySchemaTables4 } from './schema-tables-4.js';
-import { splitPushSubscriptionsPerDevice, relaxInvitationsOrganismId } from './schema-rebuilds.js';
+import { splitPushSubscriptionsPerDevice, relaxPushLastUsedAt, relaxInvitationsOrganismId } from './schema-rebuilds.js';
 
 export function initializeSchema(db: Database.Database): void {
   // CREATE TABLE/INDEX DDL, applied in numeric order (same order as the original single
@@ -525,6 +525,11 @@ export function initializeSchema(db: Database.Database): void {
   // A push subscription belongs to a device, not to a person: rebuild an older push_subscriptions,
   // whose only key was ownerName. Mirrors Postgres migration 0032.
   splitPushSubscriptionsPerDevice(db);
+
+  // lastUsedAt says when a device last ACCEPTED something, and NULL when it never has. It used to be
+  // written by the subscribe upsert too, so a fresh timestamp proved nothing. Mirrors Postgres
+  // migration 0074.
+  relaxPushLastUsedAt(db);
 
   // organismId became NULLable when the node-level registration invite joined this table.
   // SQLite cannot drop a NOT NULL constraint with ALTER, and an upgraded database keeps it —
