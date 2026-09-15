@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   v2.1.0 — 2026-09-15 — A wish that arrived from the front page's GO also puts the cursor in
+ *     the box, at the end of the sentence. Jouni: the sentence was there but the focus was not.
  *   2026-09-13 -- V2z: compose the welcome section heading with the shared B1 class.
  *   v2.0.1 — 2026-09-03 — The bring-your-own-key link goes to ?tab=ai, the AI page's route id.
  *   v2.0.0 — 2026-08-28 — The poster chat, vertical space first (Jouni: "the chat space is what
@@ -52,6 +54,7 @@
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
+import { swallowed } from '/js/swallowed.js';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { hasSession } from '/js/services/auth.js';
@@ -478,13 +481,33 @@ export default function ChatView() {
     // the same contract as the intake queue above: the person reads it and presses send
     // themselves. Drained once, on mount — a wish is one sentence, not a subscription.
     useEffect(() => {
+        let wish = '';
         try {
-            const wish = sessionStorage.getItem('aimeat.wish');
+            wish = sessionStorage.getItem('aimeat.wish') || '';
             if (wish) {
                 setDraft((d) => [d.trim(), wish].filter(Boolean).join('\n\n'));
                 sessionStorage.removeItem('aimeat.wish');
             }
         } catch (err) { console.warn('[chat] the wish could not be read:', err.message); }
+        if (!wish) return undefined;
+        // The person arrived by pressing GO on the front page, so the box already holds their
+        // sentence: the cursor goes there too, at its end, so the next keystroke continues it. The
+        // composer mounts a moment after this effect and stays disabled until the chat is ready
+        // (a disabled box cannot take focus), hence the retry for a few seconds rather than one look.
+        let tries = 0;
+        let timer = 0;
+        const focusComposer = () => {
+            const box = /** @type {HTMLTextAreaElement|null} */ (document.querySelector('.chat-input'));
+            if (box && box.value && !box.disabled) {
+                box.focus();
+                const end = box.value.length;
+                try { box.setSelectionRange(end, end); } catch (err) { swallowed('chat: caret to end', err); }
+                if (document.activeElement === box) return;
+            }
+            if (tries++ < 50) timer = window.setTimeout(focusComposer, 100);
+        };
+        timer = window.setTimeout(focusComposer, 50);
+        return () => window.clearTimeout(timer);
     }, []);
 
     const dropAttachment = useCallback((id) => {
