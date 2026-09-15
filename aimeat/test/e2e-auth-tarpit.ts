@@ -18,6 +18,7 @@
 // Run: cd aimeat && pnpm exec node --import tsx test/e2e-auth-tarpit.ts
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { existsSync, unlinkSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -102,7 +103,7 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_LOGIN_RATE_LIMIT_MAX: '500',
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
     };
-    const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the tarpit node' });
 }

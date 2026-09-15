@@ -39,6 +39,7 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createServer } from 'node:net';
 import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -668,7 +669,7 @@ export async function startServer(target: RunnerTarget): Promise<ChildProcess> {
     authLogs.delete(target);
 
     const env = { ...process.env, ...pinnedEnv(target) };
-    const serverArgs = ['--import', 'tsx', 'src/index.ts', 'start', '--db', target.dbType];
+    const serverArgs = [...nodeEntryArgs(), 'start', '--db', target.dbType];
     if (target.dbType === 'sqlite') {
         serverArgs.push('--db-path', target.dbPath);
     } else if (target.dbType === 'postgres-kysely' && target.dbUrl) {

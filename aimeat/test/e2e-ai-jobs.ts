@@ -31,6 +31,7 @@
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 import * as ed from '@noble/ed25519';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createHash } from 'node:crypto';
 import { createServer, type Server, type ServerResponse } from 'node:http';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -155,7 +156,7 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_AI_JOB_MAX_CHAIN: String(MAX_CHAIN),
         AIMEAT_AI_JOB_MAX_PROMPT_BYTES: String(MAX_PROMPT_BYTES),
     };
-    const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', ...dbArgs],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...dbArgs],
         { env: env as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the AI-jobs node' });
 }

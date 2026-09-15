@@ -13,6 +13,7 @@
  *   v1.0.0 — 2026-07-25 — Initial: pacing applies to a money contract, is a burn, and spares the owner.
  */
 import { spawn } from 'node:child_process';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -50,7 +51,7 @@ async function balance(token: string) {
 }
 
 const dbPath = `test/.pacing-${Date.now()}.db`;
-const server = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', dbPath], {
+const server = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', dbPath], {
   env: {
     ...process.env,
     AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE, AIMEAT_EXTENSIONS_ENABLED: 'true',

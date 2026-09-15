@@ -26,6 +26,7 @@
  */
 
 import * as ed from '@noble/ed25519';
+import { nodeEntryArgs } from './node-entry.js';
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -105,7 +106,7 @@ export function cleanEnv(extra: Record<string, string> = {}): Record<string, str
   return { ...stripped, AIMEAT_TOTP_ENABLED: 'false', ...extra };
 }
 
-const CLI_ARGS = ['--import', 'tsx', 'src/index.ts'];
+const CLI_ARGS = [...nodeEntryArgs()];
 
 /** Start the CLI and leave it running. The caller owns the process and must stop it. */
 export function spawnCli(args: string[], opts: CliOptions = {}): {

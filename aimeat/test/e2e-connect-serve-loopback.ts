@@ -18,6 +18,7 @@
 //     listening line — starts with the local date and time.
 
 import * as ed from '@noble/ed25519';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
@@ -94,7 +95,7 @@ function writeConnectorHome(home: string, agent: string, owner: string, nodeUrl:
 
 function spawnDaemon(home: string): { child: ChildProcess; stderr: () => string } {
   let errBuf = '';
-  const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'connect', 'serve', '--http'], {
+  const child = spawn('node', [...nodeEntryArgs(), 'connect', 'serve', '--http'], {
     cwd: process.cwd(),
     env: { ...process.env, AIMEAT_HOME: home },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -818,7 +819,7 @@ await test('POST /local/shutdown stops the daemon and removes serve.json', async
 console.log('\nPhase 6 — Degraded fallback (node with the tunnel disabled)');
 
 await test('Start a second node with AIMEAT_CONNECT_TUNNEL_ENABLED=false', async () => {
-  node2 = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', node2Db, '--port', String(NODE2_PORT)], {
+  node2 = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', node2Db, '--port', String(NODE2_PORT)], {
     cwd: process.cwd(),
     env: {
       ...process.env,

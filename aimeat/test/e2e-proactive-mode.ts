@@ -19,6 +19,7 @@
  *   v1.0.0 — 2026-08-22 — Initial.
  */
 import * as ed from '@noble/ed25519';
+import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
@@ -131,7 +132,7 @@ async function startServer(port: string, base: string, dbPath: string, extraEnv:
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
         ...extraEnv,
     };
-    const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', ...dbArgs(dbPath)],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...dbArgs(dbPath)],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, base, { label: `the node on port ${port}` });
 }
