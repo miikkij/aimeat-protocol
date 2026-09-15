@@ -16,6 +16,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts \
  *     --test=e2e-admin-doors-2
  * @version-history
+ *   v1.2.0 — 2026-09-15 — The seed-examples collision is fixed, so its pinned test asserts the new
+ *     rule: a second press answers 200 and publishes nothing unchanged.
  *   v1.1.0 — 2026-09-09 — The revoke test asserts live operator roles and the reachable
  *     last-operator guard instead of pinning the frozen JWT.
  *   v1.0.0 — 2026-09-08 — Written for the coverage work.
@@ -658,24 +660,12 @@ await test('POST /v1/admin/setup/token: a session cookie stands in for the passw
 
 console.log('\nSection D — seeding, redirects, translations, enable');
 
-/**
- * A REAL DEFECT, pinned rather than fixed. buildRecords() stamps the version from the wall clock to
- * the MINUTE (`v2026-09-08-1811`, example-packages.ts:63-67) and a package row is unique on
- * (packageGroupId, version), so two seeds inside one minute collide — the archive the route does
- * first flips the old row's status but leaves it in the table. The node auto-seeds these same
- * packages at boot (services/package-seeder.ts), so an operator who presses re-seed within a minute
- * of a restart gets a 500 SEED_FAILED / PACKAGE_EXISTS and no explanation. Which of the two answers
- * comes back here depends on whether the clock has crossed a minute since boot, so this asserts the
- * rule rather than one of its outcomes: a seed answers 200, and a second seed in the same minute as
- * a successful one always fails that way.
- */
-// A REAL DEFECT, pinned rather than fixed, and the reason the three tests below assert the AUTH
-// arms rather than a seeded list. buildRecords() stamps the version from the wall clock to the
-// MINUTE (`v2026-09-08-1811`, data/example-packages.ts:63-67) and a package row is unique on
-// (packageGroupId, version), so two seeds inside one minute collide: the archive the route does
-// first only flips the old row's status, it does not free the version. The node auto-seeds these
-// same packages at boot, so an operator who presses re-seed within a minute of a restart gets a
-// 500 SEED_FAILED / PACKAGE_EXISTS and no explanation of what to do about it.
+// The defect this section used to pin, fixed on 2026-09-15: the door republished every example
+// package with a minute-stamped version, so a second press inside one minute of the boot seed
+// collided on (packageGroupId, version) and answered 500 SEED_FAILED / PACKAGE_EXISTS. It now runs
+// the boot's own sync (services/package-seeder.ts), which publishes only a package whose bundled
+// content changed. The node has already seeded these at boot, so here every press finds them
+// unchanged.
 await test('POST /v1/admin/seed-examples: the operator JWT gets past the gate', async () => {
     const { status, body } = await json('/v1/admin/seed-examples', op({ method: 'POST' }));
     assert(body.error?.code !== 'UNAUTHORIZED',
@@ -690,14 +680,14 @@ await test('...and the admin password alone opens it too, with no JWT at all', a
         `the admin password must open this door: ${status} ${JSON.stringify(body)}`);
 });
 
-await test('TODAY: two seeds inside one minute collide on the minute-stamped version', async () => {
-    // The seed above ran a moment ago (and the node auto-seeds these same packages at boot,
-    // services/package-seeder.ts), so this is the second seed within the same minute — which fails.
-    // The only escape is the clock crossing a minute between the two calls, milliseconds apart.
+await test('a second press inside the same minute answers 200 and publishes nothing unchanged', async () => {
+    // The two presses above and the boot seed all ran within moments of each other.
     const { status, body } = await json('/v1/admin/seed-examples', op({ method: 'POST' }));
-    assert(status === 500 && body.error?.code === 'SEED_FAILED'
-        && String(body.error?.message).includes('PACKAGE_EXISTS'),
-        `expected the known collision, got ${status} ${JSON.stringify(body)}`);
+    assert(status === 200, `expected 200, got ${status} ${JSON.stringify(body)}`);
+    assert(Array.isArray(body.data.unchanged) && body.data.unchanged.includes('company-brain'),
+        `company-brain already matches this build: ${JSON.stringify(body.data)}`);
+    assert(body.data.seeded.length === 0 && body.data.updated.length === 0,
+        `nothing changed, so nothing is published: ${JSON.stringify(body.data)}`);
 });
 
 await test('POST /v1/admin/seed-examples with neither a JWT nor the password → 401', async () => {

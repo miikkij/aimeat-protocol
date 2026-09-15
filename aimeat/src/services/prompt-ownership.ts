@@ -21,6 +21,7 @@
  *   import { promptSourceKind, promptDiffersFromDefault } from './prompt-ownership.js';
  *   const kind = promptSourceKind(record.id, record.group);   // 'code' | 'yours' | 'orphan'
  * @version-history
+ *   v1.1.0 — 2026-09-15 — 'yours' is described as it now behaves: an unchanged prompt follows updates.
  *   v1.0.0 — 2026-09-12 — Initial, with the System Prompts page in the poster face.
  */
 import { PROMPT_SEEDS } from './prompt-defaults.js';
@@ -40,7 +41,11 @@ export const PROMPT_SYNC_IDS: readonly string[] = ['site-portal', 'bootstrap-ano
 export type PromptSourceKind =
     /** Written from source on every boot: an operator's edit survives only in the version history. */
     | 'code'
-    /** The operator's. No update ever writes over it; taking the current version is the only way in. */
+    /**
+     * The operator's once they change it. Until then an update brings the newer shipped text
+     * (prompt-seeder.ts decidePromptContent); after a change, no update writes over it and taking
+     * the current version is the only way in.
+     */
     | 'yours'
     /** The software no longer ships it. Served as stored, for good; there is no current version. */
     | 'orphan';

@@ -366,15 +366,14 @@ if (subcommand === 'config') {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPw },
   });
-  const seedData = await seedResp.json() as { ok: boolean; data?: { seeded?: Array<{ name: string; templateId: string; packageGroupId: string }> }; error?: { message?: string } };
+  const seedData = await seedResp.json() as { ok: boolean; data?: { created?: string[]; updated?: string[]; unchanged?: string[] }; error?: { message?: string } };
   if (!seedData.ok) {
     console.error(`  Failed: ${seedData.error?.message ?? JSON.stringify(seedData)}`);
     process.exit(1);
   }
-  for (const pkg of seedData.data?.seeded ?? []) {
-    const status = pkg.templateId === '(already exists)' ? 'already exists' : 'created';
-    console.log(`  ${status === 'created' ? '+' : '='} ${pkg.name} (${status})`);
-  }
+  for (const name of seedData.data?.created ?? []) console.log(`  + ${name} (published)`);
+  for (const name of seedData.data?.updated ?? []) console.log(`  ↑ ${name} (new version)`);
+  for (const name of seedData.data?.unchanged ?? []) console.log(`  = ${name} (unchanged)`);
   console.log('\n  Done!\n');
   process.exit(0);
 } else if (subcommand === 'start' || subcommand === 'serve') {

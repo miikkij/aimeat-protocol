@@ -17,12 +17,14 @@
  *   histories.
  *
  *   THREE KINDS OF PROMPT, AND THE PAGE SAYS WHICH. `source_kind` comes from the node: 'code' is
- *   rewritten from source on every boot, 'yours' is never touched by an update, and 'orphan' is one
+ *   rewritten from source on every boot, 'yours' follows an update only until the operator changes
+ *   it and is never touched after that, and 'orphan' is one
  *   the software no longer ships, which cannot be reset at all. An operator used to learn the first
  *   of those by watching an hour's work vanish at the next deploy.
  * @structure PromptsTab (default) · RightNow · TakingCurrent · WhatChanged
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   2026-09-15 -- Header describes 'yours' as it now behaves: unchanged prompts follow updates.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared poster headings and external reset-note spacing.

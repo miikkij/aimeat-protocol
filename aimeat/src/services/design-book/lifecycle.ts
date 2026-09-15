@@ -6,10 +6,12 @@
  *
  *   SEEDING: the six layout presets (app-ui/layouts.ts) become the Book's first PUBLISHED parts
  *   at boot, so a fresh node's Book is never an empty shelf — the first adopt has something
- *   proven to pick. Idempotent and non-authoritative: a part is created only when its address is
- *   empty, so an operator who ages, retires or replaces a seeded part is never overruled by the
- *   next restart. Every seed still passes the SAME bench a proposal passes; a preset the
- *   validator has stopped accepting is skipped with a log line, never stored on trust.
+ *   proven to pick. Idempotent: a restart with the same registry writes nothing. A part the system
+ *   seeded follows the registry when it changes (the leiskat were rewritten on 2026-09-05 and every
+ *   node seeded before that kept the bare ones), with its status kept, so an operator who ages or
+ *   retires a seeded part is never overruled by the next restart; a retired part is not touched at
+ *   all. Every seed still passes the SAME bench a proposal passes; a preset the validator has
+ *   stopped accepting is skipped with a log line, never stored on trust.
  *
  *   FORGETTING: the aging job answers "how does this go stale" for the Book itself — a published
  *   part nobody has adopted within the window is marked `aging` (still adoptable, visibly
@@ -20,6 +22,8 @@
  *   await seedDesignBook(storage, config);                    // server-bootstrap/service-init.ts
  *   scheduler.registerCoreHandler('designbook-aging', ...);   // services/core-jobs.ts
  * @version-history
+ *   v1.3.0 — 2026-09-15 — A seeded part follows its registry entry when this build changes it, keeping
+ *     its status; a retired part and a part someone else holds are left alone.
  *   v1.2.0 — 2026-09-05 — The nine EFFECTS are seeded published, each at its defaults where the
  *     registry says it lands (the hero band, the figure, the layer) on the first look it fits;
  *     the ambient seeds grow to nine with the generators, named
@@ -40,7 +44,8 @@ import { AMBIENTS, type AtelierAmbient } from '../../data/atelier-ambients.js';
 import { EFFECTS, type AtelierEffect } from '../../data/atelier-effects.js';
 import { defaultEffectTarget } from './validate.js';
 import { DesignBookService, type DesignBookPart } from './service.js';
-import { DesignBookError, type PartKind } from './validate.js';
+import { DesignBookError, validatePartInput, type PartKind } from './validate.js';
+import { stableStringify } from '../../utils/stable-json.js';
 
 /** A published part with no adoption for this long fades to `aging`. One adopt un-fades it. */
 export const AGING_AFTER_DAYS = 60;
@@ -79,14 +84,33 @@ interface SeedPart {
   tags: string[];
 }
 
-/** Propose and publish each seed whose address is still free; a refusal is logged, never thrown. */
+/** The parts of a part that a seed decides, normalised so a jsonb round trip is not a change. */
+function seedShape(p: Pick<DesignBookPart, 'kind' | 'title' | 'summary' | 'body' | 'tags'>): string {
+  return stableStringify({ kind: p.kind, title: p.title, summary: p.summary, body: p.body, tags: p.tags });
+}
+
+/**
+ * Propose and publish each seed whose address is still free, and bring a seeded part the system
+ * still holds up to this build's registry. A refusal is logged, never thrown.
+ *
+ * A part at a seed's address is updated only when the SYSTEM proposed it and it is not retired.
+ * Nobody else can write a system part (propose refuses another owner's id), so the seed is its only
+ * author; its status is the operator's and propose keeps it, so an aging part stays aging.
+ */
 async function seedParts(book: DesignBookService, system: string, seeds: SeedPart[]): Promise<void> {
   for (const seed of seeds) {
     try {
       const existing = await book.getRecordVersion(seed.id);
-      if (existing !== null) continue; // the address is claimed — an operator's Book is theirs
+      if (existing === null) {
+        await book.propose(system, seed, { principal: system });
+        await book.setStatus(system, true, seed.id, 'published');
+        continue;
+      }
+      const { part, owner } = await book.get(seed.id);
+      if (owner !== system || part.status === 'retired') continue;
+      if (seedShape(part) === seedShape(validatePartInput(seed))) continue;
       await book.propose(system, seed, { principal: system });
-      await book.setStatus(system, true, seed.id, 'published');
+      logger.info(`design-book seed: "${seed.id}" changed in this build — updated, status ${part.status} kept`);
     } catch (err) {
       if (err instanceof DesignBookError) {
         // A seed the bench refuses is a REGISTRY drift, not a seeding problem: say so and move on.

@@ -14,6 +14,9 @@
  *   - ReviewBoard lives in packages-tab.review.js
  *
  * @version-history
+ *   v2.2.0 — 2026-09-15 — The example-packages section describes the sync the node now runs: a
+ *     changed package gets a new version, the listing and its counts stay, so the confirm is no
+ *     longer a danger dialog.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face. The four sub-tabs go: with six packages, six listings
  *     and one instance the whole page fits on one screen, and hiding three quarters of it cost a
@@ -142,14 +145,14 @@ export default function PackagesAdminTab() {
   const oldest = packages.reduce((min, p) => (!min || String(p.createdAt) < min ? String(p.createdAt) : min), '');
   const shownListings = storeStatus === LISTED ? templates : storeRows;
 
-  /** Re-seeding is a write that throws things away, so it says what and asks first. */
+  /** Publishing a new version is still a write every installer sees, so it says what and asks first. */
   function askSeed() {
-    const body = html`<span>
+    const body = html`<span class="adm-pk-ask">
       <span>${P('seedAskBody')}</span>
       <span class="adm-pk-note">${P('seedAskArchives')}</span>
-      <span class="adm-pk-note">${P('seedAskDeletes')}</span>
+      <span class="adm-pk-note">${P('seedAskKeeps')}</span>
     </span>`;
-    confirm(body, doSeed, { title: P('seedAskTitle'), confirmLabel: P('seedBtn'), danger: true });
+    confirm(body, doSeed, { title: P('seedAskTitle'), confirmLabel: P('seedBtn') });
   }
 
   async function doSeed() {
@@ -160,7 +163,7 @@ export default function PackagesAdminTab() {
       if (res.ok === false) setSaid({ ok: false, msg: res.error?.message ?? P('failed') });
       else {
         const names = (res.data?.seeded ?? []).map((s) => s.name);
-        setSaid({ ok: true, msg: P('seedDone', { n: num(names.length), names: names.join(', ') }) });
+        setSaid({ ok: true, msg: names.length === 0 ? P('seedNone') : P('seedDone', { n: num(names.length), names: names.join(', ') }) });
         loadData();
       }
     } catch (e) { setSaid({ ok: false, msg: e.message }); }
@@ -350,8 +353,7 @@ export default function PackagesAdminTab() {
         <div class="og-sec-h"><h2 class="poster-section-title">${P('examples')}<small>06</small></h2></div>
         <p class="adm-pk-lead">${P('examplesLead')}</p>
         <${Row} title=${P('rowArchives')} why=${P('rowArchivesWhy')} value=${P('systemPackages')} />
-        <${Row} title=${P('rowDeletes')} why=${P('rowDeletesWhy')}
-          chip=${html`<${Badge} type="watch" label=${P('countsReset')} />`}
+        <${Row} title=${P('rowKeeps')} why=${P('rowKeepsWhy')}
           value=${P('systemListings')} last=${true} />
         <div class="adm-pk-acts">
           <button class="adm-btn" disabled=${seeding} onClick=${askSeed}>
