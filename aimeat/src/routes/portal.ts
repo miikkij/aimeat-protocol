@@ -534,6 +534,9 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     // The connect story (2026-08-29): the road from "connect the AI you already use" to the
     // guided path, told before the account exists.
     '/v1/connect-your-ai',
+    // Everything in AIMEAT (2026-09-15): the whole feature list as a page. Registered here AND in
+    // spa.html's ROUTES, or F5 is a 404; /everything below is its short address.
+    '/v1/everything',
     '/v1/glossary',
     '/v1/business',
     // The human sibling of the machine-readable statement at /v1/ai-transparency. A different
@@ -544,6 +547,11 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/app-grant',   // H-2 app-grant consent page (SPA)
     '/v1/invite',      // Email-invitation accept page (SPA, token in ?token=)
   ];
+
+  // The short address of the whole feature list, the one the front page and the footer hand out.
+  router.get('/everything', (_req, res) => {
+    res.redirect(301, '/v1/everything');
+  });
 
   // Short link used in LinkedIn posts — preserve the ?from= entrance slug.
   router.get('/start', (req, res) => {

@@ -294,6 +294,27 @@ same story with the real pieces, and ends with the generator itself, open.
 `,
   },
   {
+    // The whole feature list as a page (2026-09-15), generated from docs/AIMEAT-Feature-List.md by
+    // scripts/build-everything.ts. The count and the version stamp live in the generated data and
+    // not here, so this entry cannot claim a number the list does not.
+    path: '/v1/everything',
+    title: 'Everything in AIMEAT: the whole feature list',
+    description: 'Every feature of an AIMEAT node in 23 groups, as the repository keeps it: what you get from each one, and, when you ask for it, where the door is (the REST prefix and the MCP tool family).',
+    changefreq: 'weekly',
+    priority: '0.7',
+    markdown: `Everything an AIMEAT node does today, as one list: the identity and permissions, memory and
+workspaces, agents and schedules, messages and the economy, apps, extensions and skills, the public
+surfaces, transparency and compliance, federation, operation, security, and the standards the node
+speaks. Each row says what you get, and the Reach column names the door: the REST prefix and the
+MCP tool family.
+
+The page at [{{BASE_URL}}/v1/everything]({{BASE_URL}}/v1/everything) shows the list with a search
+box and a switch for the doors. The same list is served as JSON at
+[{{BASE_URL}}/data/everything.json]({{BASE_URL}}/data/everything.json), and its source is
+docs/AIMEAT-Feature-List.md in the repository, from which the page is generated.
+`,
+  },
+  {
     path: '/v1/app-store',
     title: 'Applications published here, openable without an account',
     description: 'The applications people have published on this node: what each one does, who made it, and the address to open it. Anything listed can be opened without an account.',

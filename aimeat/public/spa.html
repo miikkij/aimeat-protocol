@@ -89,6 +89,7 @@
   <link rel="stylesheet" href="/css/views/landing.css">
   <link rel="stylesheet" href="/css/views/landing-showroom.css">
   <link rel="stylesheet" href="/css/views/landing-v2.css">
+  <link rel="stylesheet" href="/css/views/everything.css">
   <link rel="stylesheet" href="/css/views/changelog.css">
   <link rel="stylesheet" href="/css/views/build-story.css">
   <link rel="stylesheet" href="/css/views/portal-classic.css">
@@ -545,6 +546,9 @@
       // gets built here. Both are also spaRoutes in routes/portal.ts, or F5 is a 404.
       '/v1/changelog':   () => import('/views/changelog.js' + B),
       '/v1/how-an-app-builds': () => import('/views/build-story.js' + B),
+      // Everything in AIMEAT (2026-09-15): the whole feature list, generated from the repo's file.
+      // A spaRoute in routes/portal.ts too, and /everything redirects here.
+      '/v1/everything':  () => import('/views/everything.js' + B),
       // The connect story (2026-08-29): what "connect the AI you already use" means, told before
       // the account exists. A spaRoute in routes/portal.ts too, or F5 is a 404.
       '/v1/connect-your-ai': () => import('/views/connect-story.js' + B),
@@ -1008,7 +1012,7 @@
       // The front page is served at the root as well as at /v1/portal, and it is the page most
       // visitors leave from; without '/' here the footer was missing exactly there.
       '/', '/v1/portal', '/v1/how-it-works', '/v1/business', '/v1/changelog', '/v1/how-an-app-builds',
-      '/v1/connect-your-ai', '/v1/members', '/v1/help', '/v1/glossary', '/v1/transparency',
+      '/v1/connect-your-ai', '/v1/members', '/v1/help', '/v1/glossary', '/v1/transparency', '/v1/everything',
     ]);
 
     function SiteFooter({ navigate }) {
@@ -1042,6 +1046,7 @@
             <a href="/v1/help" onClick=${(e) => go(e, '/v1/help')}>${tr('nav.help', 'Help')}</a>
             <a href="/v1/how-it-works" onClick=${(e) => go(e, '/v1/how-it-works')}>${tr('nav.howItWorks', 'How it works')}</a>
             <a href="/v1/how-an-app-builds" onClick=${(e) => go(e, '/v1/how-an-app-builds')}>${tr('footer.buildStory', 'How an app gets built')}</a>
+            <a href="/v1/everything" target="_blank" rel="noopener">${tr('footer.everything', 'Everything in AIMEAT')}</a>
             <a href="/v1/changelog" onClick=${(e) => go(e, '/v1/changelog')}>${tr('footer.changelog', 'What shipped')}</a>
             <a href="/v1/business" onClick=${(e) => go(e, '/v1/business')}>${tr('nav.business', 'For your business')}</a>
             <a href="/v1/members" onClick=${(e) => go(e, '/v1/members')}>${tr('nav.members', 'Members')}</a>

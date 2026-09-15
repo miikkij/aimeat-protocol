@@ -39,7 +39,7 @@ await test('GET /v1/portal — returns HTML', async () => {
 // Each is an SPA route (spa.html ROUTES + routes/portal.ts spaRoutes, or F5 is a 404) and a
 // public-page registry entry, which is what puts its title in the head and its address in the
 // sitemap. The pricing page left both on the same day.
-for (const [path, title] of [['/v1/changelog', 'What shipped here'], ['/v1/how-an-app-builds', 'How an app gets built here']]) {
+for (const [path, title] of [['/v1/changelog', 'What shipped here'], ['/v1/how-an-app-builds', 'How an app gets built here'], ['/v1/everything', 'Everything in AIMEAT']]) {
     await test(`GET ${path} — the SPA shell with the page's own title`, async () => {
         const res = await fetch(`${BASE}${path}`);
         assert(res.status === 200, `status ${res.status}`);
@@ -65,7 +65,30 @@ await test('GET /sitemap.xml — lists the two new pages and not the pricing pag
     const xml = await res.text();
     assert(xml.includes('/v1/changelog'), '/v1/changelog is in the sitemap');
     assert(xml.includes('/v1/how-an-app-builds'), '/v1/how-an-app-builds is in the sitemap');
+    assert(xml.includes('/v1/everything'), '/v1/everything is in the sitemap');
     assert(!xml.includes('/v1/pricing'), '/v1/pricing has left the sitemap');
+});
+
+// Everything in AIMEAT (2026-09-15): the whole feature list, generated from docs/AIMEAT-Feature-List.md.
+// The short address redirects, the data the page reads is served with every group, and a row count
+// that is not the list's own would be a page claiming what the list does not say.
+await test('GET /everything — the short address redirects to the page', async () => {
+    const res = await fetch(`${BASE}/everything`, { redirect: 'manual' });
+    assert(res.status === 301, `status ${res.status}`);
+    assert((res.headers.get('location') ?? '').endsWith('/v1/everything'), `location ${res.headers.get('location')}`);
+});
+
+await test('GET /data/everything.json — the list the page reads, every group with rows and the stamp from the source', async () => {
+    const res = await fetch(`${BASE}/data/everything.json`);
+    assert(res.status === 200, `status ${res.status}`);
+    const data = await res.json();
+    assert(Array.isArray(data.groups) && data.groups.length === 23, `${data.groups?.length} groups`);
+    assert(data.groups.every((g: any) => Array.isArray(g.rows) && g.rows.length > 0), 'every group has rows');
+    const rows = data.groups.reduce((s: number, g: any) => s + g.rows.length, 0);
+    assert(rows === data.counts.rows && rows > 200, `${rows} rows, counts says ${data.counts.rows}`);
+    const meta = await (await fetch(`${BASE}/data/everything-meta.json`)).json();
+    assert(meta.rows === rows, `meta says ${meta.rows} rows`);
+    assert(data.stamp === null || (typeof data.stamp.version === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.stamp.date)), 'the stamp is a version and a date, or absent');
 });
 
 // ─── GET /v1/portal/platforms — JSON ───
