@@ -13,6 +13,7 @@
  *   pressing the delete cross beside a JSON blob they did not recognise.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=surface-layout
  * @version-history
+ *   v1.2.0 — 2026-09-15 — home.own-aimeat is offered on both homes with a store and built into neither.
  *   v1.1.0 — 2026-08-28 — The showroom: the portal catalogue offers the six new blocks and the
  *     config-gated store, the built-in portal layout is the showroom order, and /v1/pricing
  *     redirects to the store.
@@ -158,6 +159,20 @@ await test('GET /v1/site/blocks?surface=home — lists blocks with the settings 
     assert(feed.props?.limit?.type === 'number', 'the feed declares its limit setting');
     assert(typeof feed.summary === 'string' && feed.summary.length > 10, 'each block says what it is');
     assert(feed.label_key === 'surface.blocks.home.feed.label', `label key ${feed.label_key}`);
+});
+
+// A demo site's "get your own AIMEAT" card (2026-09-15). The test env has a store, so the operator
+// is offered it on both homes; neither built-in home carries it, because only the operator of a demo
+// site should put a buy prompt in front of members. The no-store half is the unit suite's.
+await test('home.own-aimeat — offered on both homes when this node has a store, in neither built-in home', async () => {
+    for (const surface of ['home', 'home-onboarding']) {
+        const offered = await json(`/v1/site/blocks?surface=${surface}`, op());
+        assert(offered.status === 200, `blocks ${surface}: status ${offered.status}`);
+        assert(offered.body.data.blocks.some((b: any) => b.id === 'home.own-aimeat'), `offered on ${surface}`);
+        const built = await json(`/v1/site/layout/${surface}`, op());
+        const ids = (built.body.data?.layout?.blocks ?? []).map((b: any) => b.id);
+        assert(!ids.includes('home.own-aimeat'), `not in the built-in ${surface}`);
+    }
 });
 
 // The store block is the first portal block gated on config: it exists only when the node has a

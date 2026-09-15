@@ -1,0 +1,31 @@
+/**
+ * @file own-aimeat.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The home's "get your own AIMEAT" card on a demo site (views/surface/blocks-home.js
+ *   OwnAimeatBlock). The box, the label, the headline and the button are the poster shapes from
+ *   poster.css; this file only stacks them and sets the reading width of the one paragraph.
+ * @version-history
+ *   v1.0.0 — 2026-09-15 — Initial.
+ */
+
+.koti-own {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-block: 1.5rem;
+}
+
+.koti-own-text {
+  margin: 0;
+  max-width: 60ch;
+  font-family: var(--font-showroom-body);
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.koti-own-cta {
+  display: inline-block;
+  margin-top: 0.4rem;
+}

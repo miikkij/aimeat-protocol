@@ -16,6 +16,7 @@
  * @structure BLOCKS · blockFor
  * @usage const load = BLOCKS['home.feed']; const Component = await load();
  * @version-history
+ *   v1.4.0 — 2026-09-15 — home.own-aimeat.
  *   v1.3.0 — 2026-09-14 — The seven blocks of the message frame's front page (TARGET-075).
  *   v1.2.0 — 2026-08-28 — The six showroom blocks of the front page.
  *   v1.1.0 — 2026-08-27 — home.mcp-connect.
@@ -44,6 +45,7 @@ export const BLOCKS = {
   'home.feed': () => import('/views/surface/blocks-home.js').then(m => m.FeedBlock),
   'home.open-items': () => import('/views/surface/blocks-home.js').then(m => m.OpenItemsBlock),
   'home.install-cta': () => import('/views/surface/blocks-home.js').then(m => m.InstallCtaBlock),
+  'home.own-aimeat': () => import('/views/surface/blocks-home.js').then(m => m.OwnAimeatBlock),
   'home.trust': () => import('/views/surface/blocks-home.js').then(m => m.TrustBlock),
   'home.steps': () => import('/views/surface/blocks-home.js').then(m => m.StepsBlock),
 

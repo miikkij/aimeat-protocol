@@ -14,9 +14,11 @@
  *   and re-ran all eleven on any SSE event whatsoever. Here a mailbox arriving re-reads the mailbox.
  * @structure NameplateBlock · McpConnectBlock · MatBlock · MailboxBlock · YourTurnBlock · ChatDoorBlock · FleetBlock ·
  *   ThingsBlock · PlaybooksBlock · AchievementsBlock · FeedBlock · OpenItemsBlock · InstallCtaBlock ·
- *   TrustBlock · StepsBlock
+ *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-09-15: OwnAimeatBlock, a demo site's card that sends a person to the store for their own
+ *     AIMEAT. The operator adds it; no built-in home has it.
  *   2026-09-14: YourTurnBlock, which lists the threads whose last word was somebody else's. The
  *     mailbox row had the unread count and nothing said WHICH conversations were waiting; the
  *     conversations list already carries who spoke last, so this needed no new door.
@@ -45,6 +47,7 @@ import { InstallCta } from '/components/InstallCta.js';
 import { McpQuickConnect } from '/components/McpInstall.js';
 import { listApps } from '/js/services/apps.js';
 import { swallowed } from '/js/swallowed.js';
+import { storeHref } from '/js/site.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -270,6 +273,30 @@ export function OpenItemsBlock(/** @type {{ ctx?: any, props?: Record<string, an
 
 export function InstallCtaBlock() {
   return html`<${InstallCta} />`;
+}
+
+/**
+ * A demo site's one prompt to buy: this is the showroom, and your own AIMEAT is in the store. The
+ * node offers the block only when it has a store, and the operator has to add it, so it never turns
+ * up on a real installation. The store address is read again here and an empty one draws nothing:
+ * a stored layout can outlive the store setting it was made under.
+ */
+export function OwnAimeatBlock() {
+  const store = storeHref();
+  if (!store) return null;
+  return html`
+    <section class="koti-own poster-record">
+      <span class="poster-label">${tr('home.ownAimeat.label', 'Demo')}</span>
+      <h2 class="poster-record-title poster-record-title--small">
+        ${tr('home.ownAimeat.title', 'This is a demo. Get your own AIMEAT.')}
+      </h2>
+      <p class="koti-own-text">
+        ${tr('home.ownAimeat.text', 'Many people share this site to try things out. Your own AIMEAT is the same whole system, at an address with your name on it. We keep it running and up to date for a monthly fee, and everything in it belongs to you.')}
+      </p>
+      <a class="koti-own-cta poster-slab" href=${store} target="_blank" rel="noopener">
+        ${tr('home.ownAimeat.cta', 'Go to the store →')}
+      </a>
+    </section>`;
 }
 
 export function TrustBlock() {

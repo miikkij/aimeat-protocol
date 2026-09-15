@@ -28,6 +28,8 @@
  * @usage
  *   import { HOME_BLOCKS } from './blocks-home.js';
  * @version-history
+ *   v1.3.0 — 2026-09-15 — home.own-aimeat: a demo site's card pointing at the store, added by the
+ *     operator and never part of a built-in home.
  *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v1.2.0 — 2026-08-27 — home.chat-door is offered on the onboarding home as well, replacing the
  *     chat as a new account's landing page.
@@ -215,6 +217,22 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
         props: {},
         maxPerSurface: 1,
         summary: 'An offer to install this as an app on their device. Only ever shown when the browser offers it.',
+    },
+    {
+        // A demo site's one prompt to buy (2026-09-15): this site is a showroom, and the person's own
+        // AIMEAT is in the store. Offered only where there is a store (the same gate as the front
+        // page's store block), and deliberately absent from both built-in homes, against the
+        // registry's usual rule: a node that sells something is not automatically a demo, and the
+        // operator of a real installation must never find its members being told to buy elsewhere.
+        // The operator of the demo adds it in Admin > Portal.
+        id: 'home.own-aimeat',
+        surfaces: ['home', 'home-onboarding'],
+        presence: { kind: 'config', configKey: 'storeEnabled' },
+        localeStem: 'home.ownAimeat',
+        liveDomains: [],
+        props: {},
+        maxPerSurface: 1,
+        summary: 'Tells the person this site is a demo and links to the store where they can get their own AIMEAT. Not on the page until you add it, and offered only when this site has a store set up (AIMEAT_SITE_STORE_URL).',
     },
     {
         id: 'home.trust',
