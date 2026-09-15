@@ -36,7 +36,7 @@
   // src/static/sdk-libs/events/index.js
   var { authFetch: authFetch2 } = makeSession("aimeat-events.js");
   async function record(kind, data, opts = {}) {
-    const res = await authFetch2("/v1/account/events", {
+    const body = await authFetch2("/v1/account/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -46,15 +46,13 @@
         ...opts.subject ? { subject: opts.subject } : {}
       })
     });
-    const body = await res.json();
-    if (!body.ok) throw new Error(body.error?.message || "Could not record the event");
+    if (!body?.ok) throw new Error(body?.error?.message || "Could not record the event");
     return body.data;
   }
   async function list(opts = {}) {
     const qs = opts.limit ? `?limit=${encodeURIComponent(String(opts.limit))}` : "";
-    const res = await authFetch2(`/v1/account/events${qs}`);
-    const body = await res.json();
-    if (!body.ok) throw new Error(body.error?.message || "Could not read the events");
+    const body = await authFetch2(`/v1/account/events${qs}`);
+    if (!body?.ok) throw new Error(body?.error?.message || "Could not read the events");
     return body.data;
   }
   async function archive(opts = {}) {
@@ -63,9 +61,8 @@
       if (opts[key] !== void 0 && opts[key] !== null) params.set(key, String(opts[key]));
     }
     const qs = params.toString();
-    const res = await authFetch2(`/v1/account/events/archive${qs ? `?${qs}` : ""}`);
-    const body = await res.json();
-    if (!body.ok) throw new Error(body.error?.message || "Could not read the archive");
+    const body = await authFetch2(`/v1/account/events/archive${qs ? `?${qs}` : ""}`);
+    if (!body?.ok) throw new Error(body?.error?.message || "Could not read the archive");
     return body.data;
   }
   attach("events", { record, list, archive });
