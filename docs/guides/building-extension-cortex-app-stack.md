@@ -817,9 +817,9 @@ same memory keys, the dashboard re-renders on SSE.
    `{content, model, usage, budget}`. `AIMEAT.ai.completeJson()` returns
    `{...same, parsed}`. Always check the actual shape; don't assume.
 
-10. **max_tokens caps silently truncate.** Prefer the daily-budget
-    bound and omit `max_tokens` unless you need a hard ceiling. If you
-    DO cap, surface the cap in the UI so users know why output stopped.
+10. **Keep AI output complete.** Omit `max_tokens`. Describe the required length
+    and format in the prompt. The owner's daily budget controls spend;
+    report truncation if the provider still ends the response early.
 
 11. **AI output is malformed by default.** Models wrap JSON in
     ```` ```json ```` fences, sometimes truncate mid-output, sometimes

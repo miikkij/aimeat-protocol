@@ -290,11 +290,11 @@ Top-level metadata about the community service.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | yes | Human-readable service name. Can be in any language. |
-| `type` | string | yes | One of the eight service types (see below). |
+| `type` | string | yes | A non-empty, free-form service type. Common examples follow. |
 | `description` | string | yes | One-line summary of what this service does. |
 | `locale` | string | no | Primary language code (`"en"`, `"fi"`, `"sv"`, etc.). Defaults to `"en"`. |
 
-**The eight service types:**
+**Common service types:**
 
 | Type | Purpose | Example |
 |------|---------|---------|
@@ -655,7 +655,7 @@ ui_hints:
   search_fields: ["title", "category", "tags", "location.city"]
 ```
 
-**What makes it tick:** The `economy` block introduces morsel-based listing fees (5 morsels per listing) and escrow that releases on buyer confirmation. This creates trust: sellers pay a small cost to list (preventing spam), and buyers know their payment is held safely until they confirm receipt. Moderation threshold is tighter (3 flags) because financial transactions demand higher trust. Appeals are enabled so legitimate sellers can contest flags.
+**What makes it tick:** The `economy` block introduces morsel-based listing fees (5 morsels per listing) and escrow that releases on buyer confirmation. These fields express intended behavior. The CSM parser does not implement payment or escrow; the service extension must implement and verify it. Moderation threshold is tighter (3 flags) because financial transactions demand higher trust. Appeals are enabled so legitimate sellers can contest flags.
 
 ### 5.3 Dating -- Kohtaamispaikka (Meeting Place)
 

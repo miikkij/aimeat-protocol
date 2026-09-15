@@ -1,5 +1,8 @@
 # Open core -rajan auditointi (AIMEAT)
 
+> Historical document. Retained for design or audit context. It does not describe
+> the current release. Use the [documentation index](../README.md) for current guidance.
+
 **Päiväys:** 2026-06-10
 **Laajuus:** `aimeat-protocol` (julkinen, `miikkij/aimeat-protocol`) ja sisarrepo `crewfive` (julkinen, `miikkij/crewaimeat`) + `crewfive-backup-pre-filterrepo.bundle`. Muut `e:\dev\GitHub`-kansiot eivät ole AIMEAT-repoja.
 **Menetelmä:** Kolme rinnakkaista tarkastusta (hakemistoluokittelu, työpuun salaisuusskannaus, git-historian salaisuusskannaus) + kriittisten löydösten manuaalinen verifiointi (`git ls-files`, `git log -S`, sisällön tarkistus). Salaisuusarvot on raportissa peitetty (8 ensimmäistä merkkiä).

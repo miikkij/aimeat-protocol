@@ -1,104 +1,66 @@
-# AIMEAT PWA Guide
+# Installed web apps and push notifications
 
-## Overview
+The AIMEAT web interface can use a web app manifest and a service worker.
+The current worker provides notifications, share-sheet intake and an offline page.
+It does not cache API responses or queue arbitrary API writes for later replay.
 
-AIMEAT nodes support Progressive Web App (PWA) capabilities, enabling offline-capable access to portal interfaces. When configured, the node serves a service worker, web manifest, and offline fallback page alongside the standard API.
+Sources: [the service worker](../aimeat/public/sw.js),
+[static routing](../aimeat/src/server-bootstrap/static-files.ts),
+[push routes](../aimeat/src/routes/push.ts) and
+[app-origin discovery](../aimeat/src/routes/subdomain-origin-docs.ts).
 
-## Prerequisites
+## What happens offline
 
-PWA features require VAPID key configuration for push notifications. Generate a VAPID keypair and set the following environment variables:
+The worker pre-caches `/offline.html`. A failed page navigation can show that page.
+It does not store authenticated documents, API results or static assets as an
+offline copy of the system. Reconnect before performing work that needs the node.
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `AIMEAT_PUSH_ENABLED` | Yes | Set to `true` to activate PWA and push features |
-| `AIMEAT_VAPID_PUBLIC_KEY` | Yes | Base64url-encoded VAPID public key |
-| `AIMEAT_VAPID_PRIVATE_KEY` | Yes | Base64url-encoded VAPID private key |
-| `AIMEAT_VAPID_SUBJECT` | Yes | Contact URI, e.g. `mailto:admin@example.com` |
-| `AIMEAT_PWA_SHORT_NAME` | No | Short name shown on home screen (default: node ID) |
-| `AIMEAT_PWA_THEME_COLOR` | No | Theme color hex value (default: `#1a1a2e`) |
-| `AIMEAT_OFFLINE_PAGE` | No | Path to custom offline HTML (default: built-in fallback) |
+A share-sheet POST to `/share-target` is a separate intake flow. The worker stores
+that incoming content and sends the user to the chat. This is not a general API retry queue.
 
-## Architecture
+When changing the offline page, update the worker's `OFFLINE_CACHE` version as
+described in the worker source.
 
-Three static assets are served when PWA is enabled:
+## Push configuration
 
-- **`/sw.js`** -- Service worker script handling caching, offline fallback, push event listeners, and background sync registration.
-- **`/manifest.json`** -- Web app manifest declaring name, icons, start URL, display mode (`standalone`), and theme colors.
-- **Offline page** -- A minimal HTML page displayed when the user is offline and no cached version of the requested page exists.
+The node reads these settings in [config.ts](../aimeat/src/config.ts):
 
-The service worker is registered by a small inline script injected into portal HTML responses.
+| Variable | Purpose |
+|---|---|
+| `AIMEAT_PUSH_ENABLED` | Push switch, defaults to true |
+| `AIMEAT_VAPID_PUBLIC_KEY` | VAPID public key |
+| `AIMEAT_VAPID_PRIVATE_KEY` | VAPID private key |
+| `AIMEAT_VAPID_SUBJECT` | Contact URI for the push service |
+| `AIMEAT_PUSH_NOTIFY_TYPES` | Notification types eligible for delivery |
+| `AIMEAT_PUSH_COOLDOWN_MIN` | Delivery cooldown |
+| `AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE` | Subscription limit |
+| `AIMEAT_PUSH_MAX_FAILURES` | Failure limit before a subscription is removed |
 
-## Cache Strategies
+Push also requires browser permission and a valid subscription. The setting alone
+does not prove delivery. Use the current [configuration reference](b-config.md)
+and the node's admin settings for resolved values.
 
-The service worker applies different caching strategies depending on the request type:
+## Subscription API
 
-### Cache-First (Static Assets)
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/v1/push/vapid-key` | Read the public key |
+| POST | `/v1/push/subscribe` | Register a browser subscription |
+| DELETE | `/v1/push/subscribe` | Remove a subscription |
+| GET | `/v1/push/subscriptions` | List the owner's devices |
 
-Requests matching `/public/**`, icon files, and font resources are served from the cache when available. The cache is updated in the background on each fetch. This minimizes latency for assets that change infrequently.
+Use [OpenAPI](../openapi.yaml) for body fields and errors. Subscription management
+uses `push:manage`. Hosted apps can request `push:receive` to register and remove
+their own subscription. An app cannot remove all of an owner's subscriptions.
 
-### Network-First (API Calls)
+## Hosted apps
 
-All requests to `/v1/**` API endpoints attempt the network first. On network failure, the service worker returns a cached response if one exists, or a JSON error payload indicating offline status. API responses are cached with a short TTL (5 minutes by default).
+A hosted app has its own origin, manifest and worker. Its notifications use the
+app's identity. Use the served `AIMEAT.push` SDK and the app's granted permissions.
+The main site's worker is not a replacement for an app's worker.
 
-### Stale-While-Revalidate (Portal Pages)
+## Removed guidance
 
-Portal HTML pages (`/v1/portal`, `/v1/profile`, `/v1/guides`, etc.) serve the cached version immediately while fetching an updated version in the background. This provides instant page loads while keeping content reasonably fresh.
-
-## Push Notifications
-
-Four endpoints manage push notification subscriptions and delivery:
-
-### `POST /v1/push/subscribe`
-
-Registers a push subscription for the authenticated user. Accepts a standard PushSubscription object (endpoint, keys).
-
-### `DELETE /v1/push/unsubscribe`
-
-Removes a push subscription by its endpoint URL.
-
-### `POST /v1/push/send`
-
-Sends a push notification to a specific GHII. Requires `operator` or `owner` role. Accepts `title`, `body`, `url`, and optional `icon` fields.
-
-### `GET /v1/push/subscriptions`
-
-Lists active subscriptions for the authenticated user. Operators can query subscriptions for any GHII.
-
-All endpoints require authentication via `requireAuth()`.
-
-## Background Sync
-
-When the device is offline, mutation requests (POST, PUT, DELETE to API endpoints) are queued in IndexedDB by the service worker. The queue is tagged with the sync registration name `aimeat-sync`.
-
-When connectivity is restored, the browser triggers a `sync` event. The service worker replays queued requests in order, skipping any that have expired (default TTL: 24 hours). Failed replays are retried up to 3 times before being discarded.
-
-Queued mutations are visible in the offline page UI so users can see pending changes.
-
-## Installation
-
-Users can install the AIMEAT portal as a standalone app through the browser's "Add to Home Screen" prompt:
-
-1. Navigate to the AIMEAT portal URL in a supported browser.
-2. The browser displays an install banner (or use the browser menu).
-3. Confirm installation. The app appears on the home screen or app launcher.
-4. Launching the installed app opens in standalone mode without browser chrome.
-
-The `manifest.json` `display` field is set to `standalone`. The `start_url` points to `/v1/portal`. Icons should be provided at 192x192 and 512x512 pixel sizes in the `public/icons/` directory.
-
-## Config Reference
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_PUSH_ENABLED` | `false` | Enable PWA and push notification features |
-| `AIMEAT_VAPID_PUBLIC_KEY` | -- | VAPID public key (base64url) |
-| `AIMEAT_VAPID_PRIVATE_KEY` | -- | VAPID private key (base64url) |
-| `AIMEAT_VAPID_SUBJECT` | -- | VAPID contact URI |
-| `AIMEAT_PWA_SHORT_NAME` | node ID | App short name |
-| `AIMEAT_PWA_THEME_COLOR` | `#1a1a2e` | Theme and status bar color |
-| `AIMEAT_OFFLINE_PAGE` | built-in | Custom offline fallback page path |
-| `AIMEAT_SYNC_MAX_AGE_HOURS` | `24` | Max age for queued background sync mutations |
-| `AIMEAT_CACHE_API_TTL_SECONDS` | `300` | TTL for cached API responses |
-
----
-
-*AIMEAT Protocol -- Overscale Solutions Oy, 2026*
+Earlier versions of this page described API caching, background mutation replay and
+PWA-specific environment variables for cache TTL, names, colours and offline-page paths.
+Those instructions do not describe the current implementation.

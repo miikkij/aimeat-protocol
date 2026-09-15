@@ -129,6 +129,7 @@
     "check:surface-focus": "cd aimeat && pnpm check:surface-focus",
     "check:sse-parity": "cd aimeat && pnpm check:sse-parity",
     "check:copied-logic": "cd aimeat && pnpm check:copied-logic",
+    "check:docs": "cd aimeat && pnpm check:docs",
     "check:doc-counts": "cd aimeat && pnpm check:doc-counts",
     "check:instructions": "cd aimeat && pnpm check:instructions",
     "eval:skill": "node scripts/eval-skill.mjs",

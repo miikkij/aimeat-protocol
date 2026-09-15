@@ -1,14 +1,15 @@
-# Identity Model — GHII vs GAII (full reference)
+# Identity model: GHII, GAII and GEAI
 
 > Quick reference (identity table, `resolveIdentity()` rule, key files) lives in `CLAUDE.md`.
 > This doc holds the worked patterns and the morsel-pacing detail.
 
-## The two identities
+## The principal types
 
 | Identity | Format | Example | What it is |
 |----------|--------|---------|------------|
 | **GHII** | `owner@node-id` | `alice@aimeat-fi-001-genesis` | Human user. Owns everything. Has morsel balance, profile, trust score. |
 | **GAII** | `agent#owner@node-id` | `claude#alice@aimeat-fi-001-genesis` | AI agent. Scoped permissions and its own trust score. Its morsel balance is always 0: pacing belongs to the owner. |
+| **GEAI** | `eco:app#owner@node-id` | `eco:example#alice@aimeat-fi-001-genesis` | Ecosystem app. Scoped permissions and a data-area allowlist. The owner holds the balance. |
 
 There is also a bare **Owner** name (`alice`) which is the account layer. It appears in `req.auth!.sub` for owner JWTs and `req.auth!.owner` for both.
 
@@ -35,27 +36,28 @@ const gaii = resolve(req);  // Returns GHII for owners, GAII for agents
 
 - Owner session (`roles: ['owner']`, no `'agent'`) → converts bare username to GHII: `alice` → `alice@node-id`
 - Agent session (`roles: ['agent']`) → returns `req.auth!.sub` as-is (already full GAII)
+- Ecosystem session returns its GEAI. A federated owner resolves to the home-node
+  GHII, even when a local account has the same name.
+- Hosted apps use `resolveIdentity()` for their permitted owner data and
+  `callerPrincipal()` for app attribution. The scoped app grant still controls access.
+
+Use `requireOwnerPrincipal()` for owner-account operations. A shared `owner` claim
+does not itself authorize an agent or app to manage that account.
 
 **Why this matters:** Owner JWT `sub` is a bare username (`alice`), not a valid storage identity. Without `resolveIdentity()`, data gets stored under `alice` instead of `alice@node-id`, making it invisible to list/search/update operations.
 
 ## Owner sessions — aggregation pattern
 
-For **list** endpoints where the owner should see all their data (GHII + all agents):
+Owner list operations include the owner's GHII data and the owned agents' data
+where that route permits aggregation. Use the route's existing shared aggregation
+helper and pagination. Do not copy a full-memory loop into a new list route.
 
-```typescript
-const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-if (isOwnerSession) {
-  const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
-  const agents = await storage.getAgentsByOwner(req.auth!.owner);
-  // ALWAYS include GHII's own data first
-  results.push(...await storage.listMemory(ownerGhii));
-  for (const agent of agents) {
-    results.push(...await storage.listMemory(agent.gaii));
-  }
-}
-```
+Keep federated owners, scoped agents and hosted-app grants distinct. Deriving a
+local GHII from a federated caller's bare owner name can expose a local namesake's
+data. `resolveIdentity()` preserves the home-node identity.
 
-For **single-key** operations (GET/PUT/DELETE by key), `resolveIdentity()` handles it — the owner's data is stored under GHII.
+For single-key operations, resolve the identity and apply the operation's ownership,
+scope and access checks. Identity resolution alone does not authorize a read or write.
 
 ## Morsel pacing — single balance (GHII)
 
@@ -78,7 +80,7 @@ in whose name an agent acts.
 - **`storage.creditBalance()`**, **`creditBalanceCapped()`** — same internal resolution.
 - **Transactions:** Keyed to GHII identity (`owner@nodeId`)
 - **Wallet API:** Returns single GHII balance, no aggregation needed
-- **Per-agent spending limits:** Optional `AgentRecord.dailySpendLimit` (not yet enforced, field ready)
+- **Per-agent spending limits:** `AgentRecord.dailySpendLimit` is used by schedule constraints when configured. It is not a universal limit on every debit path.
 - **Welcome bonus:** Granted to GHII during owner registration (`ghii.ts`), NOT during agent creation
 
 ## Ownership checks

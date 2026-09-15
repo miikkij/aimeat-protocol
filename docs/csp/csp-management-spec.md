@@ -1,5 +1,8 @@
 # CSP Management Specification
 
+> Historical document. Retained for design or audit context. It does not describe
+> the current release. Use the [documentation index](../README.md) for current guidance.
+
 > Configurable Content Security Policy for AIMEAT nodes — operator and user levels.
 
 ## Problem

@@ -4,7 +4,9 @@ Machine service manifest on kirjoitettu kuvaus ulkopuolisesta palvelusta: mitä 
 on, mitä se ottaa ja mitä se antaa takaisin. Tekoäly lukee kuvauksen ja kutsuu palvelua itse. Tämä
 sivusto säilyttää kuvauksen eikä koskaan tee sitä kutsua.
 
-Nämä kymmenen ovat valmiita malleja. Solmu lukee ne käynnistyessään ja tarjoilee ne osoitteessa
+Nämä kymmenen ovat mukana toimitettavia esimerkkejä. Ulkopuolisten palvelujen
+osoitteita, hintoja tai todennusta ei ole tarkistettu tässä dokumentaatiosiivoamisessa.
+Tarkista ne palveluntarjoajan nykyisestä dokumentaatiosta ennen käyttöä. Solmu lukee ne käynnistyessään ja tarjoilee ne osoitteessa
 `GET /v1/msm/templates`, ja ylläpidon MSM-sivu näyttää ne osiossa "Ready-made ones that ship with
 this site". Jokainen on täydellinen: todennus, toiminnot, mitä kukin toiminto ottaa ja antaa, ja
 terveystarkistus. Ne ovat nopein tapa nähdä miltä hyvä manifesti näyttää: avaa yksi, vaihda osoite

@@ -52,7 +52,7 @@ and their AI.** Apps are tools.
 A published AIMEAT app runs on a **separate, isolated origin** — `*.apps.<domain>`
 (e.g. `apps.aimeat.io`), **not** the apex (`aimeat.io`). That is a different
 browser origin, by design (security finding H-2 — see
-[`docs/internal/app-origin-deployment.md`](internal/app-origin-deployment.md)
+[deployment checklist](security/deployment-checklist.md)
 for the origin setup). What this means for your app:
 
 - **No ambient login session.** The app **cannot** read the user's `aimeat.io`
@@ -248,7 +248,6 @@ async function setupAiButton() {
       const r = await AIMEAT.ai.complete({
         prompt: 'Suggest 5 short comma-separated genre tags for this comic series summary. Output ONLY the tags, nothing else.\n\n' + summary,
         modelRole: 'execution',                   // cheaper/faster model for routine tasks
-        max_tokens: 60,
         app_id: 'comicland-v2',                   // for per-app spend tracking and quota
       });
       document.getElementById('series-tags').value = r.content.trim();  // ← editable, user reviews
@@ -325,7 +324,7 @@ Run one completion.
 | `modelRole` | `'reasoning'` \| `'execution'` | Pick from user's per-role default. Use `'execution'` for cheap routine tasks; `'reasoning'` for hard ones. |
 | `temperature` | number | 0–2. Falls back to user's default. |
 | `top_p` | number | Falls back to user's default. |
-| `max_tokens` | number | Falls back to user's default. No hard server cap on the per-call value — the provider enforces its own per-model output limit, and spend stays bounded by the daily USD budget. (The user's *saved default* is clamped to ≤128,000 when set via `/v1/openrouter/settings`.) |
+| `max_tokens` | number | Omit in new app code. Specify output shape in the prompt and use the owner's daily budget for spend control. |
 | `app_id` | string | **Always set this.** Identifies your app for per-app quotas and the user's spend dashboard. |
 
 Returns:
@@ -516,8 +515,8 @@ mismatches the user's intent.
 - **Constrain output shape.** "Output ONLY tags, comma-separated." "Output
   ONLY valid JSON matching {...}." Models do better with clear shape
   contracts.
-- **Budget your max_tokens.** A "suggest a title" call needs 30 tokens, not
-  500. Cap it.
+- **Specify output length in the prompt.** Omit `max_tokens`; the owner's daily
+  budget controls spend. Check for truncation before accepting the result.
 
 ---
 
@@ -565,7 +564,6 @@ budget at all.
 const r = await AIMEAT.ai.complete({
   prompt: `Translate the following from Finnish to English. Keep tone and length.\n\n${textFi}`,
   modelRole: 'execution',
-  max_tokens: Math.max(120, textFi.length * 2),
   app_id: 'comicland-v2',
 });
 englishField.value = r.content;
@@ -587,7 +585,6 @@ tagsInput.value = r.parsed.tags.join(', ');
 const r = await AIMEAT.ai.complete({
   prompt: `Compare these two episode summaries for tone/style continuity. List any inconsistencies in 1-3 short bullet points. If none, output "Consistent."\n\nEpisode 1:\n${ep1summary}\n\nEpisode 2:\n${ep2summary}`,
   modelRole: 'reasoning',                        // hard task → smarter model
-  max_tokens: 300,
   app_id: 'comicland-v2',
 });
 continuityReport.textContent = r.content;
@@ -599,7 +596,6 @@ continuityReport.textContent = r.content;
 const r = await AIMEAT.ai.completeJson({
   prompt: `Review this comic script for: (a) typos, (b) unclear panel directions, (c) anachronisms vs the series setting "${seriesGenre}". Output JSON: {"issues": [{"type": "typo|unclear|anachronism", "panel": N, "text": "..."}]}. If no issues, return {"issues": []}.\n\nScript:\n${scriptJson}`,
   modelRole: 'reasoning',
-  max_tokens: 600,
   app_id: 'comicland-v2',
 });
 if (r.parsed.issues.length === 0) toast('No issues found.');
@@ -614,7 +610,7 @@ else renderIssueList(r.parsed.issues);
 - **Not a chat session.** No history. Each `complete()` is one round-trip.
   If you need history, you compose it into the prompt yourself.
 - **Not for streaming yet.** Long completions feel slow. Streaming SSE may
-  land later; for now, set realistic `max_tokens` and a "Working…" indicator.
+  land later; for now, specify the output shape in the prompt and show a "Working…" indicator.
 - **Not for hidden loops.** This is a human-in-the-loop primitive. Don't
   use it to power agents that run autonomously — AIMEAT has the
   capabilities + work-queue system for that.
@@ -627,7 +623,7 @@ else renderIssueList(r.parsed.issues);
 
 - API endpoint source: [`aimeat/src/routes/ai.ts`](../aimeat/src/routes/ai.ts)
 - Browser library source: [`aimeat/src/static/sdk-libs/ai/index.js`](../aimeat/src/static/sdk-libs/ai/index.js)
-- Design doc with rationale: [`docs/research/2026-05-29-aimeat-ai-capability.md`](research/2026-05-29-aimeat-ai-capability.md)
+- Current contract: [Platform specification](AIMEAT-RFC-v4.0-Platform-full.md)
 - E2E tests as examples of expected behaviour:
   [`aimeat/test/ai.ts`](../aimeat/test/ai.ts)
 - The OpenRouter settings panel UI lives in

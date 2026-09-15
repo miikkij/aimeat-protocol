@@ -1,5 +1,8 @@
 # Sealed configuration: settings the node's host sets and its operator cannot move
 
+> Historical document. Retained for design or audit context. It does not describe
+> the current release. Use the [documentation index](../README.md) for current guidance.
+
 **Created:** 2026-08-18
 **Status:** Built. `src/services/config-sealing.ts` holds the rule; 24 tests across
 `test/unit/config-sealing.test.ts` (10) and `test/e2e-sealed-config.ts` (14, on both backends).

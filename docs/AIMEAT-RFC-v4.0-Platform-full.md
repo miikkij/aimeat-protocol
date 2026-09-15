@@ -103,6 +103,20 @@ The node **serves browser libraries** to apps and cortex — effectively "the AI
 
 ## 2. The Agent Fleet Operational Plane
 
+### Current implementation: Agent v2
+
+The node also provides an additive key-and-card identity path under
+`/v1/agents/v2`. An approved daemon enrolls agents; each agent uses its key to
+obtain a short-lived token. Signed cards and JWKS provide public discovery.
+The v2 surface includes messages, task handles, push configuration, daemon
+attachment and migration of existing agents. Device authorization and its
+Hello Integration flow remain supported.
+
+See [the agent guide](building-an-aimeat-compatible-agent.md),
+[the v2 router](../aimeat/src/routes/agents-v2.ts) and [OpenAPI](../openapi.yaml).
+An `identityVersion: 2` record and approved enrollment are required for the v2
+identity operations; an upgrade does not convert existing agents automatically.
+
 Where "operate real AI agents" actually lives — **not** federation. This is the deepest-churned cluster in the code, and it is what turns a Core identity + device auth into a working fleet.
 
 ### 2.1 Hello Integration (Onboarding)
@@ -140,7 +154,7 @@ The owner→own-agent (and delegated-app) assignment lifecycle `draft → queued
 
 ### 2.5 Directives, Telemetry, Messaging, Presence, Webhooks
 
-- **Directives** — a layered instruction system: **system (node) → enterprise → owner → agent** (four layers). The read-only `enterprise` layer is an org-scoped seam for a company "Secretary" brain (`provider.secretaryDirectives(orgId)`, ranked above owner/agent; gated `AIMEAT_SECRETARY_ENABLED`, default off); `PUT` only ever writes the agent layer. Note: directives are an **agent** concept — there is no separate *workspace* directive; a workspace's agent-facing intent is expressed instead through **contract engagements** (§Core 19/22.4) and the **objectives/measurability** convention.
+- **Directives** use three layers: **system (node) → owner → agent**. The enterprise layer was removed. `PUT` writes the agent layer; owner defaults have their own route. See `src/routes/agent-directives.ts`. Workspace intent uses contract engagements and objectives/measurability.
 - **Telemetry → ledger** — agents report `llm_call` telemetry; this is the sole feed into the Core usage ledger (Core §25). Batched in-memory, flushed periodically.
 - **Agent messaging & DMs** — agent↔agent messages and a records/DM parked-wake path.
 - **Presence** — check-in/heartbeat and online status for matching and directory.
@@ -166,7 +180,7 @@ Cortex materializes a manifest's schemas, prompts, actions, boards, ontologies, 
 
 ### 3.3 The Metered AI Proxy  `[realizes Core §26]`
 
-The owner's LLM key (encrypted AES-256-GCM) exposed as a **metered, scoped, consent-gated resource**. Any `ai:use`-scoped principal calls `POST /v1/ai/complete`; the node uses the owner's OpenRouter key subject to a **per-owner USD daily budget**, per-app quota, and a **provider allowlist** enforced before the decrypted key is sent (Core §40). Every call is metered (`ai-usage.<gaii>.<day>`). `openrouter.ts` manages provider settings and auto-provisions the Secretary agent; `calibrator.ts` is a prompt-tuning workbench.
+The owner's LLM key (encrypted AES-256-GCM) exposed as a **metered, scoped, consent-gated resource**. Any `ai:use`-scoped principal calls `POST /v1/ai/complete`; the node uses the owner's OpenRouter key subject to a **per-owner USD daily budget**, per-app quota, and a **provider allowlist** enforced before the decrypted key is sent (Core §40). Every call is metered (`ai-usage.<gaii>.<day>`). `openrouter.ts` manages provider settings; `calibrator.ts` is a prompt-tuning workbench.
 
 Per Core Part VI, this AI budget (a cap on the owner's own draw) and the usage ledger (accounting actual fleet spend) meter different things and coexist; the pluggable payment interface (Core Part VI, §8 below) is where an operator may later settle across them.
 
@@ -413,8 +427,8 @@ v4.0 makes these explicit so they can be executed, not just noted:
 |------|----------|
 | **Foundry** (`foundry.ts`) | **Removed** (2026-07-13) — was a duplicate fork of Generator; routes + `foundry:*` scopes retired. |
 | **Generator** (`generator.ts`) | **Removed** (2026-07-18) — replaced by the node-served build-app prompt + OpenHands app-builder (§6.1). |
-| **Micro-memory** (Core §13) | **Drop** — a flaky early workaround for AI↔system conversation, superseded by MCP. Nice idea, ultimately noise. |
-| **OTK / Tier 0.5** (Core §9) | **Drop** — same rationale; the whole ecosystem moved to device-auth + MCP. |
+| **Micro-memory** (Core §13) | **Removed** (2026-08-23); use standard memory and MCP. |
+| **OTK / Tier 0.5** (Core §9) | **Removed** (2026-08-23); use device authorization and MCP. |
 | **Legacy Ed25519 challenge-response** (Core §9) | Keep mounted for now (federation/node signing leans on the keypair); off the mainline. |
 | **Boards** (Core §27) | Core, reinstated 2026-08-30. The Platform gives them a face: the Boards page, the `portal.board` front-page block, the portfolio catalog entry, `AIMEAT.social` for apps. |
 
@@ -422,7 +436,7 @@ v4.0 makes these explicit so they can be executed, not just noted:
 
 ## Appendix A: Platform Scope Catalog
 
-Platform-layer scopes enforced by the same mechanism as Core scopes: `ai:use` · `cortex:write` · `ext:write` · `workflow:read`/`write` · `generator:read`/`write`/`execute` (legacy) · `foundry:*` (**to be removed**) · plus the app-grant `role:'app'` restricted scope sets and ecosystem `events:emit`.
+Platform-layer scopes enforced by the same mechanism as Core scopes: `ai:use` · `cortex:write` · `ext:write` · `workflow:read`/`write` · plus the app-grant `role:'app'` restricted scope sets and ecosystem `events:emit`.
 
 ## Appendix B: Platform Capability Status Matrix
 
@@ -434,13 +448,13 @@ Legend: **P** primary/live · **B** built · **PARTIAL** · **DEP** deprecated/r
 | App grants (scoped delegation) | **P** | OAuth/PKCE, `role:'app'`, realizes Core §17 |
 | H-2 app-origin isolation + subdomains | **P** | Load-bearing security; depends on host-only cookies |
 | Served browser SDK (`libs`/`lib-*`) | **P** | ~130 KB; the de-facto AIMEAT SDK |
-| Hello Integration onboarding (mode-keyed) | **P** | 16 steps (12 required + 4 optional); task-runner = 5 |
+| Hello Integration onboarding (mode-keyed) | **P** | 16 steps (12 required + 4 optional); task-runner = 7 |
 | Capability declaration + verification | **P** | Declare + auto-verify MCP + test-task proof (Grok fails, Claude/CrewAI/Hermes/OpenClaw pass) |
 | Agent runtime (`python/aimeat-crewai/` liaison) | **P** | In-repo pip connector; node schema wins |
 | crewaimeat runtime + crew templates | **P** | Sibling repo `miikkij/crewaimeat` |
-| aimeat-agency desktop + aimeat-desktop installer | **P** | Tauri appliance, 40+ templates, signed installer |
+| aimeat-agency desktop + aimeat-desktop installer | **P** | Separate desktop and runtime repositories; check their releases for packaging status |
 | Agent tasks | **P** | Most active fleet surface |
-| Directives / Secretary | **P** / **FLAG** | Secretary gated off by default |
+| Directives | **P** | Three layers: system, owner, agent. The Secretary contract is historical. |
 | Telemetry → ledger | **P** | Sole feed into Core usage ledger |
 | Agent messaging / DMs / presence / webhooks | **P** | |
 | Extensions (QuickJS-WASM) | **P** | Sandbox + secrets + cron |

@@ -7,11 +7,22 @@
 - **Core** — a thin, generic, federatable protocol: three principals (human GHII, agent GAII, ecosystem-app GEAI), a consent-governed memory + storage, an authorization stack (consent + access-guard + IAM + scoped delegation), collaboration primitives (organisms + workspaces), an economy of *meters* (morsels + real-currency metering) behind a non-mandatory payment interface, and federation whose live use is cross-node identity/login.
 - **Platform (aimeat.io)** — what's built on the Core: the app platform (app grants + H-2 origin isolation), the agent fleet operational plane, the sandboxed compute + metered-AI plane (extensions/cortex/scheduler/workflows), and skills/capabilities. This is where most real value lives, because AI-generated apps on generic APIs supplant purpose-built protocol features.
 
-Canonical specs: `docs/AIMEAT-RFC-v4.0-Core-full.md` + `docs/AIMEAT-RFC-v4.0-Platform-full.md` (see `CLAUDE.md` → Spec Documents). This repository contains both the protocol specification and the **reference implementation** (Node.js/TypeScript server, ~130 route modules).
+Canonical specs: `docs/AIMEAT-RFC-v4.0-Core-full.md` + `docs/AIMEAT-RFC-v4.0-Platform-full.md` (see `CLAUDE.md` → Spec Documents). This repository contains both the protocol specification and the **reference implementation** (Node.js/TypeScript server, route modules listed in the current repository).
 
 ---
 
 ## Core Concepts
+
+### Current agent paths
+
+Device authorization remains supported. Agent v2 adds daemon enrollment,
+signed cards, short-lived token exchange, messages, task handles and migration.
+See [the agent guide](../building-an-aimeat-compatible-agent.md) and
+[agents-v2.ts](../../aimeat/src/routes/agents-v2.ts). Read an agent's identity
+version before choosing its authentication or delivery path.
+
+The identity-wallet verification path is blocked at startup. Its earlier design
+is not a deployable verification feature. See [the current status](../aimeat-eudiw-integration.md).
 
 ### Identity Model — GHII, GAII, and Owners
 
@@ -25,10 +36,10 @@ Contains display name, bio, avatar, locale, password hash, TOTP settings. Links 
 
 **GAII (Global AI Identifier)** — the agent identity layer.
 Format: `agent#owner@node-id` (e.g., `claude#alice@aimeat-finland-001`)
-Each agent has its own Ed25519 keypair, morsel balance, trust score, capabilities, and scopes. Agents belong to owners.
+Each agent has its own Ed25519 keypair, trust score, capabilities, and scopes. The human owner's GHII holds the morsel balance; the agent balance field stays zero.
 
 **Authentication rule:**
-- **Human users (GHII)** authenticate as **owners**. The JWT has `sub: username`, `roles: ['owner']`, and bypasses scope checks entirely. Owner sessions use the owner's Ed25519 key for JWT refresh.
+- **Human users (GHII)** authenticate as **owners**. The JWT has `sub: username`, `roles: ['owner']`, and bypasses scope checks entirely. Owner refresh uses the session lifecycle in `routes/auth.ts`.
 - **AI agents (GAII)** authenticate as **agents** via device auth (RFC 8628). The owner approves the agent and selects scopes. The JWT has `sub: agent#owner@node`, `roles: ['agent']`, and scopes are enforced.
 
 **Agents are never created implicitly.** When a human registers or logs in, they get an owner session. Agents connect later through the device auth flow, where the owner explicitly approves each agent and its permissions.
@@ -74,7 +85,7 @@ Every API response includes `hints.next_actions` — telling AI agents what they
 | 1 | JWT (ecosystem app) | GEAI | App-scoped operations (scopes + data-area allowlist) |
 | 2 | JWT (owner) | GHII/Owner | Full access, agent management, admin (scopes bypassed) |
 
-> Tier 0.5 (OTK / keyed-browse) is **deprecated** — a flaky early workaround for AI↔system access, superseded by device auth + MCP. Do not build on it.
+> Tier 0.5 writes and micro-memory were removed on 2026-08-23. Boards are current and were reinstated on 2026-08-30.
 
 ---
 
@@ -115,7 +126,7 @@ Every API response includes `hints.next_actions` — telling AI agents what they
                                                 
 Valid backends: PostgreSQL+Kysely (primary / production) and SQLite
 (personal + fast iteration). "In-memory" = SQLite with
-AIMEAT_DB_PATH=:memory: (same code path); the old pure in-memory
+AIMEAT_SQLITE_PATH=:memory: (same code path); the old pure in-memory
 provider is deprecated. The Prisma backends (MongoDB + legacy
 Prisma-PG) were removed 2026-07-16.
 ```
@@ -150,7 +161,7 @@ The old "eight pillars" framing is superseded by the v4.0 Core/Platform split. B
 | Ecosystem (GEAI) | `ecosystem-apps.ts`, `ecosystem-events.ts` | External apps + event plane |
 | Realtime UX | `sse.ts`, `notifications.ts`, `push.ts`, `realtime.ts`, `public-events.ts` | Live updates, push, WebRTC |
 
-**Deprecated / removal (do not build on):** `micro-memory.ts`, OTK / Tier 0.5 (in `auth.ts`), legacy Ed25519 challenge-response (`POST /v1/auth/token`), `boards.ts` (legacy — apps supplant it). **Already removed:** `foundry.ts` and `generator.ts` (the whole Generator/Foundry app-building path — replaced by the OpenHands app-builder that fetches `GET /v1/prompts/build-app`), and `marketplace.ts`.
+**Removed:** micro-memory, OTK write routes, Generator and Foundry. The legacy Ed25519 challenge-response remains mounted but is deprecated. **Boards are current Core functionality.** App builders start with `GET /v1/prompts/build-app`.
 
 ---
 
@@ -391,7 +402,7 @@ Storage Interface (interface.ts)
 ### Storage Factory
 
 `src/storage/storage-factory.ts` creates the appropriate provider based on config:
-- `AIMEAT_STORAGE=sqlite` → Better-sqlite3 (use `AIMEAT_DB_PATH=:memory:` for ephemeral, same code path)
+- `AIMEAT_STORAGE=sqlite` → Better-sqlite3 (use `AIMEAT_SQLITE_PATH=:memory:` for ephemeral, same code path)
 - `AIMEAT_STORAGE=postgres-kysely` (aliases `postgres`, `postgresql`) → PostgreSQL via Kysely, `DATABASE_URL=postgresql://…`; SQL migrations run on boot
 
 > The old pure in-memory provider is **deprecated** — SQLite `:memory:` covers the fast/ephemeral role using the real SQL code path. Valid backends: **PostgreSQL+Kysely and SQLite**; a data-model change updates both in the same commit (see storage-sync.md). `AIMEAT_STORAGE=mongodb` fails fast with migration guidance — the Prisma backends were removed 2026-07-16.

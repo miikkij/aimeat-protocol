@@ -275,7 +275,7 @@ Agent stores the result:
 ## Related Resources
 
 - [System Prompt for OpenClaw Agent](../init-prompts/openclaw-aimeat-agent.md) — Copy-paste ready prompt
-- [AIMEAT RFC v1.2](../AIMEAT-RFC-v1.2-full.md) — Full protocol specification
+- [AIMEAT RFC v1.2](../AIMEAT-RFC-v4.0-Core-full.md) — Full protocol specification
 - [API Endpoint Reference](../a-endpoints.md) — All REST endpoints
 - [Config Reference](../b-config.md) — All configuration options
 
