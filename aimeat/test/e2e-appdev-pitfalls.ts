@@ -8,6 +8,9 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-pitfalls).
  * @version-history
+ *   v1.1.1 — 2026-09-15 — The full-entry test reads its marker from the entry's title instead of a
+ *     hard-coded `mountLoginButton`, which the guidance dropped on 2026-09-13 and which kept the
+ *     nightly sweep red on both backends since.
  *   v1.1.0 — 2026-09-04 — The curated half is public; the learned half is not. This suite read only
  *     the registry meant to answer any agent, and the same router carries three per-owner doors
  *     holding what somebody's own agents got wrong while building. One of the 34 seeded into
@@ -105,7 +108,16 @@ await test('GET /v1/appdev/pitfalls/:id returns the full entry', async () => {
   assert(status === 200, `Expected 200, got ${status}`);
   const p = body.data?.pitfall;
   assert(p?.id === 'login-is-silent-only', 'wrong entry');
-  assert(/mountLoginButton/.test(p.fix), 'fix body missing expected guidance');
+  // What this proves is that the FULL entry comes back, fix body included, not what the fix says.
+  // The marker is therefore taken from the entry's own title rather than written out here: this line
+  // used to look for `mountLoginButton`, the guidance moved to `AIMEAT.auth.signIn()` on 2026-09-13
+  // when that function arrived, and the nightly sweep stayed red on both backends for a sentence
+  // that had been improved on purpose. The title names the function the fix is about, so the two
+  // change together. The title names two functions and the fix is about the second one.
+  const named = String(p.title ?? '').match(/AIMEAT\.auth\.\w+\(\)/g)?.pop();
+  assert(!!named, `the title names no AIMEAT.auth function: ${p.title}`);
+  assert(typeof p.fix === 'string' && p.fix.length > 80, 'the fix body is missing or truncated');
+  assert(p.fix.includes(named!), `the fix body does not mention ${named}, which its own title names`);
 });
 
 await test('unknown id → 404 NOT_FOUND', async () => {

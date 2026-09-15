@@ -22,6 +22,9 @@
  *   pnpm check:everything            # fail when the committed artefacts are stale
  * @structure inline · parse · main
  * @version-history
+ *   v1.0.1 — 2026-09-15 — plain() strips tags until none remain and decodes entities in one pass.
+ *     The artefacts it writes are byte-identical; what changed is that `&amp;lt;` no longer decodes
+ *     twice and a split tag cannot reassemble (CodeQL #1633, #1634).
  *   v1.0.0 — 2026-09-15 — Initial (TARGET-077).
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -66,7 +69,23 @@ export function inline(md: string): string {
   return s;
 }
 
-const plain = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+/**
+ * A rendered cell as text, for the page's search and for reading the version stamp. It is never put
+ * back into HTML (views/everything.js only lowercases it and tests `includes`), but the decoder is
+ * written correctly regardless, because a wrong one is wrong wherever its output lands and CodeQL
+ * cannot see where that is (#1633, #1634):
+ *   - tags are stripped until none are left, so a fragment like `<scr<b>ipt>` cannot reassemble
+ *     into a tag after the inner one is removed;
+ *   - the four entities are decoded in ONE pass, so `&amp;lt;` becomes the text `&lt;`. Decoding
+ *     `&amp;` first and `&lt;` after it turned that into `<`, a second round of unescaping the
+ *     source never asked for.
+ */
+const ENTITY: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"' };
+function plain(html: string): string {
+  let s = html;
+  for (let prev = ''; prev !== s;) { prev = s; s = s.replace(/<[^>]*>/g, ''); }
+  return s.replace(/&(?:amp|lt|gt|quot);/g, (entity) => ENTITY[entity]);
+}
 
 /** A table line into its cells; a cell may hold `|` inside backticks, which is not a boundary. */
 function cells(line: string): string[] {
