@@ -418,6 +418,20 @@ describe('storage providers agree on what they do, not just on their signatures'
             const afterResubscribe = (await storage.listPushSubscriptionsByOwner(owner))
                 .find(s => s.endpoint === phone)?.lastUsedAt ?? null;
 
+            // WHICH APP'S ORIGIN a device subscribed from, so an installed app's notifications can
+            // reach its own copy and wear its own face. Null for the node's own pages, which is what
+            // every row above carries and what every row written before this field carries.
+            const appDevice = `https://push.example.test/${owner}/installed`;
+            await storage.createPushSubscription({
+                ownerName: owner, endpoint: appDevice, keys, createdAt: now, lastUsedAt: null,
+                appId: `${owner}/brain.html`,
+            });
+            const byApp = (await storage.listPushSubscriptionsByOwner(owner))
+                .find(s => s.endpoint === appDevice)?.appId ?? null;
+            const nodeSide = (await storage.listPushSubscriptionsByOwner(owner))
+                .find(s => s.endpoint === laptop)?.appId ?? null;
+            await storage.deletePushSubscription(owner, appDevice);
+
             // A dead endpoint is pruned on its own: the other device must survive it.
             const prunedOne = await storage.deletePushSubscription(owner, phone);
             const afterPrune = (await storage.listPushSubscriptionsByOwner(owner)).map(s => s.endpoint);
@@ -431,6 +445,7 @@ describe('storage providers agree on what they do, not just on their signatures'
                 both, count: afterRefresh.length, rotated, prunedOne, afterPrune, prunedAll,
                 left: afterAll_.length, missing,
                 freshlySubscribed, afterDelivery, afterResubscribe,
+                byApp, nodeSide,
             };
             expect(shapes[name], `${name}: per-device subscriptions`).toEqual({
                 both: [laptop, phone].sort(), count: 2, rotated: 'rotated',
@@ -438,6 +453,8 @@ describe('storage providers agree on what they do, not just on their signatures'
                 freshlySubscribed: null,
                 afterDelivery: '2030-01-02T03:04:05.000Z',
                 afterResubscribe: '2030-01-02T03:04:05.000Z',
+                byApp: `${owner}/brain.html`,
+                nodeSide: null,
             });
 
             await storage.deleteOwner(owner);

@@ -15,6 +15,8 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.10.0 — 2026-09-15 — Register aimeat-push (an installed app receives notifications on its own
+ *     origin, under its own name and icon; needs the push:receive app grant).
  *   v1.9.0 — 2026-09-08 — Register aimeat-onto (what a record MEANS: types, and a SKOS vocabulary
  *     kept in one memory record).
  *   v1.8.0 — 2026-09-05 — Register aimeat-living (the living document: one JSON record, one
@@ -90,6 +92,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'atelier', entry: 'atelier/index.js' },
   { name: 'living', entry: 'living/index.js' },
   { name: 'onto', entry: 'onto/index.js' },
+  { name: 'push', entry: 'push/index.js' },
 ];
 
 function banner(name: string): string {

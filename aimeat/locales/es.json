@@ -2843,6 +2843,7 @@
       "workflow": "tus automatizaciones",
       "ai": "tu presupuesto de IA",
       "notifications": "los avisos que te llegan",
+      "push": "los avisos en este dispositivo",
       "organism": "tus espacios de trabajo",
       "app": "las aplicaciones publicadas a tu nombre",
       "work": "el trabajo entre tus agentes",
@@ -2859,6 +2860,9 @@
       "secrets": "las claves que guardas aquí"
     },
     "scopeText": {
+      "push": {
+        "receive": "Mostrar los avisos de esta aplicación en tu dispositivo, con su propio nombre e icono. Solo puede apagar el dispositivo que encendió, y no ve los demás."
+      },
       "task": {
         "read": "Ver las tareas de tus agentes, sus ejecuciones y sus resultados.",
         "write": "Crear e iniciar tareas para tus propios agentes."

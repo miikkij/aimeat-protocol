@@ -295,6 +295,90 @@ async function main() {
                 'the app CSP allows fetching the manifest');
         });
 
+        // ── The app origin's own service worker ────────────────────────────────────────────
+        await test('the app origin serves its OWN service worker, not the node’s', async () => {
+            const res = await onAppOrigin('/sw.js', SUB);
+            assert(res.status === 200, `expected 200, got ${res.status}`);
+            assert((res.header('content-type') ?? '').includes('javascript'), 'served as script');
+            // The apex worker carries the SPA's share-target intake, its offline page and its
+            // caches. A worker at an app origin's root controls that whole origin, so serving the
+            // node's there would put all of that on somebody else's app. The static mount answers
+            // /sw.js with the apex file on every host, which is why this is decided before it.
+            // Asserted against what the worker DOES, not what its prose says: the app worker's own
+            // header names the apex one to explain why it is not it, so a substring search for
+            // "share-target" matches the right file too. A `fetch` handler is the apex worker's
+            // share-target intake and offline fallback, and this one must register none.
+            assert(!/addEventListener\((['"])fetch\1/.test(res.body),
+                'the apex worker, with its fetch handler, must not be served here');
+            assert(/addEventListener\((['"])push\1/.test(res.body), 'it handles push');
+            // A worker a browser holds forever is a fix nobody receives.
+            assert((res.header('cache-control') ?? '').includes('no-cache'), 'not cached');
+        });
+
+        await test('the app CSP permits registering a worker this origin serves', async () => {
+            // worker-src governs registration and had no 'self', so every register('/sw.js') was
+            // refused by the browser with nothing in the code to show for it. Third directive in
+            // this file to fall the same way, after manifest-src and media-src.
+            const res = await onAppOrigin('/', SUB);
+            const csp = res.header('content-security-policy') ?? '';
+            assert(/worker-src[^;]*'self'/.test(csp), `worker-src must allow 'self': ${csp}`);
+        });
+
+        // ── The app's own face on a home screen ────────────────────────────────────────────
+        // iOS reads the installed icon from `apple-touch-icon` and ignores SVG there, so `/icon.svg`
+        // above cannot serve it and every published app installed on an iPhone wore this node's own
+        // heart, whoever made it. An author who uploads a PNG gets their own. Reported from another
+        // node on 2026-09-15.
+        await test('an app with no icon image keeps the node’s apple-touch-icon', async () => {
+            const res = await onAppOrigin('/', SUB);
+            assert(res.status === 200, `expected 200, got ${res.status}`);
+            assert(/rel="apple-touch-icon"[^>]*\/icons\/apple-touch-icon\.png/.test(res.body),
+                `expected the apex icon while the app has none of its own: ${res.body.slice(0, 400)}`);
+            const own = await onAppOrigin('/apple-touch-icon.png', SUB);
+            assert(own.status === 404, `nothing to serve yet, got ${own.status}`);
+        });
+
+        await test('an uploaded PNG becomes the app’s own installed icon', async () => {
+            // A 1x1 PNG is enough: what is asserted is which bytes come back and what the head says,
+            // not what the picture looks like.
+            const onePixelPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+            const up = await json(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/icon`, {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ icon: onePixelPng }),
+            });
+            assert(up.status === 200, `icon upload ${up.status}: ${JSON.stringify(up.body).slice(0, 200)}`);
+
+            const served = await onAppOrigin('/apple-touch-icon.png', SUB);
+            assert(served.status === 200, `the app origin must serve it, got ${served.status}`);
+            assert((served.header('content-type') ?? '').includes('image/png'), 'served as a PNG');
+            // Owner-supplied bytes: the browser must not be allowed to guess a different type.
+            assert(served.header('x-content-type-options') === 'nosniff', 'nosniff on owner-supplied bytes');
+
+            const res = await onAppOrigin('/', SUB);
+            assert(/rel="apple-touch-icon"[^>]*\/apple-touch-icon\.png/.test(res.body)
+                && !/rel="apple-touch-icon"[^>]*\/icons\/apple-touch-icon\.png/.test(res.body),
+                `the head must now point at the app's own icon: ${res.body.slice(0, 400)}`);
+
+            // And Android, which mints its WebAPK from the manifest and refuses SVG, gets a PNG that
+            // is the app's rather than falling past the SVG to the apex heart.
+            const man = (await onAppOrigin('/manifest.webmanifest', SUB))
+                .json<{ icons?: Array<{ src: string; type?: string }> }>();
+            const pngs = (man.icons ?? []).filter(i => i.type === 'image/png');
+            assert(pngs[0]?.src === '/apple-touch-icon.png',
+                `the app's own PNG comes before the apex ones: ${JSON.stringify(man.icons)}`);
+        });
+
+        await test('an SVG offered as an icon is refused by its bytes, not by its label', async () => {
+            // A caller's mime type is a claim about bytes the same caller supplied. An SVG stored
+            // here would be accepted, served, and silently ignored by the one surface it is for.
+            const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>').toString('base64');
+            const r = await json(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/icon`, {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ icon: svg }),
+            });
+            assert(r.status === 400, `expected 400, got ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+        });
+
         await test('an icon with markup in it comes out as text, not as elements', async () => {
             const hostileFile = 'origin-hostile-icon.html';
             const pub = await json('/v1/apps', {

@@ -36,7 +36,7 @@ import { appToolNames } from '../services/app-tool-names.js';
 import { buildAppAgentFace } from '../services/agent-face.js';
 import { appLlmsTxt, appAgentsMd, appSitemapMd, appRootMirrorMd } from '../services/app-agent-surfaces.js';
 import { sendMarkdown } from '../services/markdown-negotiation.js';
-import { appSeoIndexable } from '../services/app-seo.js';
+import { appSeoIndexable, appHasIconImage, appIconKey } from '../services/app-seo.js';
 import { legalLinksFor, renderLegalPage, LEGAL_KIND_INFO } from '../services/app-legal.js';
 import { APP_LEGAL_KINDS } from '../storage/types/apps.js';
 import { detectLocale } from '../i18n.js';
@@ -232,11 +232,15 @@ export function registerAppOriginDocs(
       display: 'standalone',
       background_color: '#FAFAF8',
       theme_color: '#FAFAF8',
-      // The emoji icon first (it is the app's own face); the apex heart PNGs behind it for
-      // surfaces that refuse SVG (Android's WebAPK minting is the known one).
+      // The emoji icon first (it is the app's own face); then the author's own PNG when they have
+      // uploaded one, because Android's WebAPK minting refuses SVG and would otherwise fall past it
+      // to the apex heart; the apex PNGs last, for an app with no picture of its own.
       icons: [
         { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
         { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
+        ...(await appHasIconImage(storage, app)
+          ? [{ src: '/apple-touch-icon.png', sizes: '512x512', type: 'image/png' }]
+          : []),
         { src: `${apex}/icons/icon-192.png`, sizes: '192x192', type: 'image/png' },
         { src: `${apex}/icons/icon-512.png`, sizes: '512x512', type: 'image/png' },
       ],
@@ -259,6 +263,33 @@ export function registerAppOriginDocs(
       + `<rect width="512" height="512" fill="#FAFAF8"/>`
       + `<text x="256" y="256" text-anchor="middle" dominant-baseline="central" font-size="300" fill="#E8564A">${safe}</text>`
       + `</svg>`);
+  });
+
+  // The app origin's own service worker is NOT here, and could not be: `express.static(publicDir)`
+  // is mounted before any route and answers /sw.js with the apex SPA's worker on every host it is
+  // asked on. It is served in server-bootstrap/static-files.ts, ahead of that mount, off the marker
+  // subdomainMiddleware has already set. Same reasoning as the node's robots.txt, in the other
+  // direction: that one had to move LATER so an app origin could answer first.
+
+  // THE APP'S OWN FACE ON A HOME SCREEN. iOS reads the installed icon from `apple-touch-icon` and
+  // ignores SVG there, so `/icon.svg` above cannot serve it and every published app installed on an
+  // iPhone wore the apex heart. An author who uploads an icon image gets their own; one who has not
+  // falls through to `next()`, and app-head-meta points them at the apex PNG exactly as before.
+  //
+  // No auth: it is the icon of a page anyone with the link can open, and it is the same picture the
+  // apex serves at /v1/apps/:owner/:filename/icon.
+  router.get('/apple-touch-icon.png', async (req: Request, res: Response, next) => {
+    const app = await appForOrigin(req);
+    if (!app) return next();
+    const file = await storage.getStorageFile(app.ownerGaii, appIconKey(app.filename));
+    if (!file) return next();
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Length', String(file.size));
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    // Owner-supplied bytes served from the app's own origin: name the type and refuse to let a
+    // browser guess a different one, the same rule every stored-file download follows.
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.send(Buffer.from(file.data));
   });
 
   // One SOURCE, three shapes. Pointing all of these at the Agent Face was one document too few:

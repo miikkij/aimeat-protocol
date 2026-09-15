@@ -228,7 +228,13 @@ export async function notify(storage: Storage, recipientGhii: string, input: Not
       tag: `notif:${input.type}`,
       actions: actions.slice(0, 2).map(a => ({ action: a.id, title: a.label })),
       data: { notifId: id, actions },
-    }).catch(err => { logger.warn('notify: push is best-effort', { error: String(err) }); });
+      // WHICH APP THIS IS FROM, passed as the app rather than as an icon URL. When the person has
+      // installed it and allowed notifications there, this arrives on the app's OWN origin and wears
+      // its name and icon on every platform, iOS included, where the icon inside a payload is
+      // ignored. It is read from `source`, which the node resolves, and never from the caller: an
+      // icon a caller could name is one app wearing another's face.
+    }, source.kind === 'app' ? source.id ?? null : null)
+      .catch(err => { logger.warn('notify: push is best-effort', { error: String(err) }); });
   } catch (err) {
     /* notifications are best-effort — swallow so the triggering action still succeeds */
     logger.warn('notify: continuing after a suppressed failure', { error: String(err) });

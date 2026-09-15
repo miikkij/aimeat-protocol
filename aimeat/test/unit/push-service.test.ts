@@ -70,13 +70,18 @@ function makeMockStorage() {
     };
 }
 
-function makeSubscription(ownerName: string, endpoint = `https://push.example.com/${ownerName}`): PushSubscriptionRecord {
+function makeSubscription(
+    ownerName: string,
+    endpoint = `https://push.example.com/${ownerName}`,
+    appId: string | null = null,
+): PushSubscriptionRecord {
     return {
         ownerName,
         endpoint,
         keys: { p256dh: 'test-p256dh', auth: 'test-auth' },
         createdAt: new Date().toISOString(),
         lastUsedAt: new Date().toISOString(),
+        appId,
     };
 }
 
@@ -218,6 +223,54 @@ describe('Push Service', () => {
 
             const left = await storage.listPushSubscriptionsByOwner('alice');
             expect(left.map(s => s.endpoint)).toEqual([alive]);
+        });
+
+        it('an app notifies the devices of its own installed copy, and only those', async () => {
+            // An installed app is its own origin, so what arrives there wears the app's name and
+            // icon rather than the node's. On iOS that is the ONLY way it ever does, because Safari
+            // ignores the icon inside the payload. Sending to the node's devices as well would
+            // notify the person twice for one event.
+            const nodeDevice = 'https://push.example.com/node';
+            const appDevice = 'https://push.example.com/kalle-app';
+            const otherApp = 'https://push.example.com/someone-else';
+            storage.subscriptions.set(rowKey('alice', nodeDevice), makeSubscription('alice', nodeDevice, null));
+            storage.subscriptions.set(rowKey('alice', appDevice), makeSubscription('alice', appDevice, 'alice/brain.html'));
+            storage.subscriptions.set(rowKey('alice', otherApp), makeSubscription('alice', otherApp, 'alice/other.html'));
+            const sent = vi.spyOn(webpush, 'sendNotification').mockResolvedValue({} as never);
+
+            const service = createPushService(ENABLED_CONFIG, storage);
+            expect(await service.sendNotification('alice', testPayload, 'alice/brain.html')).toBe(true);
+
+            expect(sent.mock.calls.map(c => (c[0] as { endpoint: string }).endpoint)).toEqual([appDevice]);
+        });
+
+        it('an app with no installed copy reaches the node\'s devices instead', async () => {
+            // Choosing not to install anything must not cost the person the notification.
+            const nodeDevice = 'https://push.example.com/node';
+            const otherApp = 'https://push.example.com/someone-else';
+            storage.subscriptions.set(rowKey('alice', nodeDevice), makeSubscription('alice', nodeDevice, null));
+            storage.subscriptions.set(rowKey('alice', otherApp), makeSubscription('alice', otherApp, 'alice/other.html'));
+            const sent = vi.spyOn(webpush, 'sendNotification').mockResolvedValue({} as never);
+
+            const service = createPushService(ENABLED_CONFIG, storage);
+            expect(await service.sendNotification('alice', testPayload, 'alice/brain.html')).toBe(true);
+
+            // The node's device, and NOT the other app's: a notification from one app must never
+            // arrive wearing a different app's face.
+            expect(sent.mock.calls.map(c => (c[0] as { endpoint: string }).endpoint)).toEqual([nodeDevice]);
+        });
+
+        it('a notification from the node itself never lands in an app\'s stream', async () => {
+            const nodeDevice = 'https://push.example.com/node';
+            const appDevice = 'https://push.example.com/kalle-app';
+            storage.subscriptions.set(rowKey('alice', nodeDevice), makeSubscription('alice', nodeDevice, null));
+            storage.subscriptions.set(rowKey('alice', appDevice), makeSubscription('alice', appDevice, 'alice/brain.html'));
+            const sent = vi.spyOn(webpush, 'sendNotification').mockResolvedValue({} as never);
+
+            const service = createPushService(ENABLED_CONFIG, storage);
+            expect(await service.sendNotification('alice', testPayload)).toBe(true);
+
+            expect(sent.mock.calls.map(c => (c[0] as { endpoint: string }).endpoint)).toEqual([nodeDevice]);
         });
 
         it('a delivery that could not be written down is still a delivery', async () => {

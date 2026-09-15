@@ -27,7 +27,7 @@ import type { Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PushService } from '../services/push.js';
-import { requireAuth, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
@@ -57,6 +57,33 @@ import { emitChange } from '../services/event-bus.js';
 const PUSH_SCOPE = 'push:manage';
 
 /**
+ * The word a published app holds to register ITS OWN device, and nothing else.
+ *
+ * An installed app is its own origin, so allowing notifications inside it produces a second, separate
+ * endpoint, and what arrives there wears the app's name and icon rather than the node's. On iOS that
+ * is the only way it ever does, because Safari ignores the icon in the payload.
+ *
+ * It opens exactly two doors, subscribe and unsubscribe, and both are fenced to the caller's own app:
+ * the app a subscription belongs to is stamped from the GRANT, so this word can neither put a device
+ * into another app's stream nor take one out of it. Listing every device the person has stays behind
+ * `push:manage`, where an app has no business at all.
+ */
+const APP_PUSH_SCOPE = 'push:receive';
+
+/**
+ * The app this session IS, when it is one, as "owner/filename.html".
+ *
+ * From the token and never from the request: an app naming its own id in a body could put the
+ * person's device into another app's stream, or quietly take it out of one. A person's own browser
+ * and an agent have no app and get null, which is what a node-level subscription carries.
+ */
+function callerApp(req: Request): string | null {
+  const auth = req.auth!;
+  if (!auth.roles?.includes('app')) return null;
+  return typeof auth.app === 'string' && auth.app ? auth.app : null;
+}
+
+/**
  * Which device the caller means. A client that knows which one it is names the endpoint, in the body
  * or the query. One that names nothing clears the whole account, which is what the routes did before
  * they were per-device: today the profile page sends no endpoint, so its Turn-off button still means
@@ -74,7 +101,7 @@ export function pushRouter(config: AimeatConfig, storage: Storage, pushService: 
   const router = Router();
 
   // POST /v1/push/subscribe — Register push subscription
-  router.post('/v1/push/subscribe', requireAuth(), requireScope(PUSH_SCOPE), async (req, res) => {
+  router.post('/v1/push/subscribe', requireAuth(), requireAnyScope(PUSH_SCOPE, APP_PUSH_SCOPE), async (req, res) => {
     try {
       // The owner claim of the caller's own token. Push rows are owner-scoped (one person, many
       // devices) rather than GHII-scoped, so this is the account layer on purpose; it is never read
@@ -95,9 +122,12 @@ export function pushRouter(config: AimeatConfig, storage: Storage, pushService: 
           `That push endpoint is not a valid destination: ${endpointCheck.reason}`));
         return;
       }
-      const record = await pushService.subscribe(ownerName, { endpoint, keys });
+      const record = await pushService.subscribe(ownerName, { endpoint, keys }, callerApp(req));
       res.status(201).json(success(config.nodeId, {
-        subscription: { ownerName: record.ownerName, endpoint: record.endpoint, createdAt: record.createdAt },
+        subscription: {
+          ownerName: record.ownerName, endpoint: record.endpoint, createdAt: record.createdAt,
+          app: record.appId ?? null,
+        },
       }, [
         { description: 'Test push notification', method: 'POST', url: '/v1/push/test' },
         { description: 'Unsubscribe this device', method: 'DELETE', url: '/v1/push/subscribe' },
@@ -131,10 +161,32 @@ export function pushRouter(config: AimeatConfig, storage: Storage, pushService: 
     }));
   });
 
-  router.delete('/v1/push/subscribe', requireAuth(), requireScope(PUSH_SCOPE), async (req, res) => {
+  router.delete('/v1/push/subscribe', requireAuth(), requireAnyScope(PUSH_SCOPE, APP_PUSH_SCOPE), async (req, res) => {
     try {
       const ownerName = req.auth!.owner;
       const endpoint = requestedEndpoint(req);
+
+      // AN APP TAKES BACK ITS OWN DEVICE AND NOTHING ELSE. Without this, `push:receive` would carry
+      // the unnamed-endpoint form, which means "sign every device out", and one app could switch off
+      // the person's notifications everywhere including the node's own. It must name an endpoint,
+      // and that endpoint must be one this app registered.
+      const app = callerApp(req);
+      if (app) {
+        if (!endpoint) {
+          res.status(400).json(error(config.nodeId, 'ENDPOINT_REQUIRED',
+            'Say which device to switch off. An app can switch off the one it registered, not every device you have.'));
+          return;
+        }
+        const mine = (await storage.listPushSubscriptionsByOwner(ownerName))
+          .some(s => s.endpoint === endpoint && s.appId === app);
+        if (!mine) {
+          // Absent and not-yours answer identically, so this cannot be used to ask which other apps
+          // a person has allowed notifications in.
+          res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No push subscription found'));
+          return;
+        }
+      }
+
       const removed = await pushService.unsubscribe(ownerName, endpoint);
       if (!removed) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No push subscription found'));

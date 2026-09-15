@@ -42,12 +42,29 @@ export interface PushPayload {
 
 export interface PushService {
   readonly enabled: boolean;
-  /** Register one device. A second device joins the first rather than replacing it (audit H-8). */
-  subscribe(ownerName: string, subscription: { endpoint: string; keys: { p256dh: string; auth: string } }): Promise<PushSubscriptionRecord>;
+  /**
+   * Register one device. A second device joins the first rather than replacing it (audit H-8).
+   *
+   * `appId` names the app whose OWN ORIGIN this subscription came from, and is omitted for the
+   * node's own pages. It is the caller's to resolve from the session, never from a request body.
+   */
+  subscribe(
+    ownerName: string,
+    subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
+    appId?: string | null,
+  ): Promise<PushSubscriptionRecord>;
   /** With `endpoint`, drop that one device; without it, every device this owner has. */
   unsubscribe(ownerName: string, endpoint?: string): Promise<boolean>;
-  /** Deliver to every device the owner has registered. True when at least one accepted it. */
-  sendNotification(ownerName: string, payload: PushPayload): Promise<boolean>;
+  /**
+   * Deliver to every device the owner has registered. True when at least one accepted it.
+   *
+   * `fromApp` names the app the notification is FROM. When that app has devices of its own, they are
+   * the only ones that receive: a person who installed the app and allowed notifications there wants
+   * it to arrive as that app, and sending to both would notify them twice for one event. When it has
+   * none, the node's own devices receive instead, so an app's notification is never lost for want of
+   * being installed.
+   */
+  sendNotification(ownerName: string, payload: PushPayload, fromApp?: string | null): Promise<boolean>;
   broadcastToOrganism(organismId: string, payload: PushPayload): Promise<number>;
 }
 
@@ -72,7 +89,7 @@ export function createPushService(config: AimeatConfig, storage: Storage): PushS
   return {
     get enabled() { return enabled && webpush !== null; },
 
-    async subscribe(ownerName, subscription) {
+    async subscribe(ownerName, subscription, appId) {
       const record: PushSubscriptionRecord = {
         ownerName,
         endpoint: subscription.endpoint,
@@ -81,6 +98,7 @@ export function createPushService(config: AimeatConfig, storage: Storage): PushS
         // Registering is not receiving. A device that has just subscribed has accepted nothing yet,
         // and saying so is the whole point of the column (migration 0074).
         lastUsedAt: null,
+        appId: appId ?? null,
       };
       return storage.createPushSubscription(record);
     },
@@ -89,13 +107,20 @@ export function createPushService(config: AimeatConfig, storage: Storage): PushS
       return storage.deletePushSubscription(ownerName, endpoint);
     },
 
-    async sendNotification(ownerName, payload) {
+    async sendNotification(ownerName, payload, fromApp) {
       if (!webpush) return false;
       // FAN OUT. A person has more than one browser, and each is its own row since 2026-08-11.
       // Delivery is per device: one endpoint failing says nothing about the others, so a dead one is
       // pruned on its own and the rest still receive. Sequential on purpose — this is a handful of
       // rows per person, and the push services rate-limit a burst from one sender anyway.
-      const subs = await storage.listPushSubscriptionsByOwner(ownerName);
+      const all = await storage.listPushSubscriptionsByOwner(ownerName);
+      // THE APP'S OWN DEVICES WIN, AND THEY WIN ALONE. An installed app is its own origin, so a
+      // notification arriving there wears the app's name and icon rather than this node's, which on
+      // iOS is the only way it ever does. Sending to the node's devices as well would notify the
+      // person twice for one event. An app with no devices of its own falls back to them, so
+      // choosing not to install anything loses nothing.
+      const own = fromApp ? all.filter(s => s.appId === fromApp) : [];
+      const subs = own.length > 0 ? own : all.filter(s => !s.appId);
       if (!subs.length) return false;
       let delivered = 0;
       for (const sub of subs) {

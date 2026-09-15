@@ -292,6 +292,28 @@ export function seoNote(state: AppSeoState): string {
  * is worth a query. Pointing og:image at the route unconditionally and letting it 404 was the
  * cheaper option and the wrong one: a card with a broken image reads worse than a card with none.
  */
+/** Where an app's own icon image lives, when its author has uploaded one. */
+export const appIconKey = (filename: string): string => `apps/icons/${filename}`;
+
+/**
+ * Does this app carry an icon IMAGE of its own?
+ *
+ * The answer decides what an iPhone puts on its home screen when the app is installed: iOS reads
+ * `apple-touch-icon`, ignores SVG there, and the icon this node holds for an app is an emoji
+ * character. So an app without one wears the apex heart, as every app did before authors could
+ * upload a picture.
+ *
+ * One owner-scoped listing, the same call `appScreenshotUrl` already makes, so a serve that asks
+ * both questions pays for one lookup rather than two when the caller passes the files in.
+ */
+export async function appHasIconImage(
+  storage: { listStorageFiles(ownerGaii: string): Promise<Array<{ key: string }>> },
+  app: AppSummaryRecord,
+): Promise<boolean> {
+  const files = await storage.listStorageFiles(app.ownerGaii);
+  return files.some((f) => f.key === appIconKey(app.filename));
+}
+
 export async function appScreenshotUrl(
   storage: { listStorageFiles(ownerGaii: string): Promise<Array<{ key: string }>> },
   app: AppSummaryRecord,

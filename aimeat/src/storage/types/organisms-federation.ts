@@ -187,6 +187,20 @@ export interface PushSubscriptionRecord {
    * registration time and this is the delivery time; nothing writes both.
    */
   lastUsedAt: string | null;
+  /**
+   * The app whose OWN ORIGIN this device subscribed from ("owner/filename.html"), and null for the
+   * node's own pages.
+   *
+   * A push subscription belongs to an origin, not to a site: a person who installs an app from its
+   * own subdomain and allows notifications there has registered a second, separate endpoint, and a
+   * notification sent to it arrives wearing that app's name and icon rather than this node's. That
+   * is the whole reason the field exists, and on iOS it is the only way an app's notification wears
+   * its own face, because Safari ignores the icon in the payload.
+   *
+   * Taken from the app-grant token server-side, never from the request: a caller naming its own app
+   * could otherwise put its device in another app's stream.
+   */
+  appId?: string | null;
 }
 
 // Phase 3.2 — Notification Templates (editable, per-locale)

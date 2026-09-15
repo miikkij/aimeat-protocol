@@ -33,6 +33,7 @@ function toPushSub(r: Selectable<PushSubscription>): PushSubscriptionRecord {
     keys: r.keys as unknown as PushSubscriptionRecord['keys'],
     createdAt: iso(r.createdAt),
     lastUsedAt: r.lastUsedAt ? iso(r.lastUsedAt) : null,
+    appId: r.appId ?? null,
   };
 }
 function toTrustedIssuer(r: Selectable<TrustedIssuer>): TrustedIssuerRecord {
@@ -68,6 +69,7 @@ export const nodeInfraMethods = {
     const shared = {
       endpoint: record.endpoint, keys: jsonb(record.keys),
       lastUsedAt: record.lastUsedAt ? new Date(record.lastUsedAt) : null,
+      appId: record.appId ?? null,
     };
     await this.db.insertInto('PushSubscription')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -76,7 +78,7 @@ export const nodeInfraMethods = {
       // so it leaves lastUsedAt where the last successful send put it. Writing it here is what made
       // the column mean two things (migration 0074).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .onConflict(oc => oc.columns(['ownerName', 'endpoint']).doUpdateSet({ keys: shared.keys } as any)).execute();
+      .onConflict(oc => oc.columns(['ownerName', 'endpoint']).doUpdateSet({ keys: shared.keys, appId: shared.appId } as any)).execute();
     return record;
   },
   async markPushSubscriptionDelivered(this: PostgresKyselyStorage, ownerName: string, endpoint: string, at: string): Promise<void> {
