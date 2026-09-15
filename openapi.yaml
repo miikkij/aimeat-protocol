@@ -56076,9 +56076,12 @@ paths:
       tags: [Admin]
       summary: Seed example packages
       description: |
-        Seeds example packages and template listings into the node. Authenticated by an operator
-        JWT (Bearer) OR the admin password via the `X-Admin-Password` header / `admin_session`
-        cookie. System-seeded packages are authored as `system`.
+        Brings the bundled example packages and their template listings into step with this build.
+        A package that is missing is published; a package whose bundled content differs from its
+        latest published version gets a new version and the old one is archived; an unchanged
+        package is left alone. The node runs the same step at every startup. Authenticated by an
+        operator JWT (Bearer) OR the admin password via the `X-Admin-Password` header /
+        `admin_session` cookie. System-seeded packages are authored as `system`.
       security:
         - BearerAuth: []
       responses:
@@ -56096,13 +56099,26 @@ paths:
                         properties:
                           seeded:
                             type: array
+                            description: The packages this call published, new or updated.
                             items:
                               type: object
                               properties:
                                 name: { type: string }
                                 packageGroupId: { type: string }
-                                templateId: { type: string }
+                          created:
+                            type: array
+                            items: { type: string }
+                            description: Names of packages that were not on the node and were published.
+                          updated:
+                            type: array
+                            items: { type: string }
+                            description: Names of packages whose bundled content changed and got a new version.
+                          unchanged:
+                            type: array
+                            items: { type: string }
+                            description: Names of packages that already match this build.
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/AimeatError' }
   /v1/admin/setup/auth:
     post:
       operationId: adminSetupAuth

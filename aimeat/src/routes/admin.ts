@@ -11,6 +11,8 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   v1.7.0 — 2026-09-15 — POST /v1/admin/seed-examples runs the boot's package sync: only a package
+ *     whose bundled content changed gets a new version, and the listing keeps its counts.
  *   v1.6.0 — 2026-09-12 — GET /v1/admin/owners answers display_name as null rather than dropping
  *     the key: a row for an owner with no display name was a different shape from every other row,
  *     and openapi.yaml now states the three lifecycle fields the answer has carried since v1.3.0.
@@ -636,7 +638,6 @@ export function adminRouter(
         // System-seeded packages always use 'system' as author so they don't
         // appear in users' "my packages" lists.  Templates still show them.
         const operator = 'system';
-        const operatorGhii = 'system';
 
         // Auth: JWT operator OR admin password
         if (req.auth?.sub && req.auth.roles?.includes('operator')) {
@@ -652,33 +653,20 @@ export function adminRouter(
         }
 
         try {
-            const { getExamplePackages, buildRecords } = await import('../data/example-packages.js');
-            const examples = getExamplePackages();
-
-            const results: { name: string; packageGroupId: string; templateId: string }[] = [];
-
-            for (const def of examples) {
-                const groupId = `${def.name}::${operator}`;
-
-                // Archive existing package versions and delete listing for this group (reseed)
-                const { packages: existingPkgs } = await storage.listPackages({ author: operator, search: def.name, limit: 100, offset: 0 });
-                for (const oldPkg of existingPkgs.filter(p => p.packageGroupId === groupId)) {
-                    await storage.archivePackage(oldPkg.id);
-                }
-                try {
-                    const oldListing = await storage.getListingByPackage(groupId);
-                    if (oldListing) await storage.deleteTemplateListing(oldListing.id);
-                // eslint-disable-next-line aimeat/no-silent-catch -- no listing to delete
-                } catch { /* no listing to delete */ }
-
-                const { pkg, listing } = buildRecords(def, operator, operatorGhii);
-                await storage.createPackage(pkg);
-                await storage.createTemplateListing(listing);
-                results.push({ name: def.name, packageGroupId: pkg.packageGroupId, templateId: listing.id });
+            // The same function the boot runs (services/package-seeder.ts): a package whose bundled
+            // content changed gets a new version, an unchanged one is left alone. This door used to
+            // republish all of them, so every installer saw an update for a package that had not
+            // changed, and a second press inside one minute collided on the version.
+            const { syncExamplePackages } = await import('../services/package-seeder.js');
+            const r = await syncExamplePackages(storage, `${operator}@${config.nodeId}`);
+            const seeded = [...r.created, ...r.updated].map(name => ({ name, packageGroupId: `${name}::${operator}` }));
+            if (seeded.length > 0) emitChange('packages');
+            if (r.failed.length > 0) {
+                res.status(500).json(error(config.nodeId, 'SEED_FAILED',
+                    `These example packages could not be published: ${r.failed.join(', ')}. The node log names the cause.`));
+                return;
             }
-
-            emitChange('packages');
-            res.json(success(config.nodeId, { seeded: results }));
+            res.json(success(config.nodeId, { seeded, created: r.created, updated: r.updated, unchanged: r.unchanged }));
         } catch (e) {
             res.status(500).json(error(config.nodeId, 'SEED_FAILED', e instanceof Error ? e.message : 'Seed failed'));
         }

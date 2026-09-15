@@ -8,6 +8,7 @@
  *   the doors come from admin.css and organism.css; only what this page adds is here. Every value
  *   is a theme.css token, so the page flips with the theme.
  * @version-history
+ *   v1.2.0 — 2026-09-15 — The example-packages confirm shows its three lines as three lines.
  *   v1.1.0 — 2026-09-13 — Own the seed-action note spacing formerly written inline.
  *   v1.0.0 — 2026-09-12 — Initial. The page had no rules of its own: four sub-tabs of .adm-card
  *     tables, and the moderation panels carried hardcoded hex (#818cf8, rgba(79,70,229,…)).
@@ -16,6 +17,8 @@
 .adm-pk-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 96ch; }
 .adm-pk-note { margin: 12px 0 0; font-size: .8rem; line-height: 1.55; color: var(--text-dim); max-width: 92ch; }
 .adm-pk-note--flush { margin: 0; }
+/* The confirm dialog wraps its message in a <p>, so the three lines are spans; each is its own line. */
+.adm-pk-ask > span { display: block; }
 .adm-pk-quiet { padding: 10px 0; font-size: .9rem; line-height: 1.55; color: var(--text-dim); max-width: 92ch; }
 .adm-pk .adm-mrow--last { border-bottom: 0; }
 .adm-pk .adm-mrow { grid-template-columns: minmax(0, 1fr) auto minmax(11rem, auto); }

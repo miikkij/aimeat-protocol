@@ -7,6 +7,7 @@
  * @usage
  *   cd aimeat && pnpm seed:examples
  * @version-history
+ *   v2.1.0 — 2026-09-15 — Prints the admin sync's answer: published, or unchanged.
  *   v1.0.0 — 2026-03-15 — initial implementation
  *   v2.0.0 — 2026-03-16 — auto-auth via admin password, uses admin seed endpoint
  *   v2.0.1 — 2026-03-16 — fix: support AIMEAT_ADMIN_PASSWORD env var name and quoted values
@@ -70,7 +71,11 @@ async function main() {
     },
   });
 
-  const data = await res.json() as any;
+  const data = await res.json() as {
+    ok: boolean;
+    data?: { seeded?: Array<{ name: string; packageGroupId: string }>; unchanged?: string[] };
+    error?: { message?: string };
+  };
 
   if (!data.ok) {
     console.error(`  Failed: ${data.error?.message ?? JSON.stringify(data)}`);
@@ -78,14 +83,11 @@ async function main() {
     return;
   }
 
-  const seeded = data.data?.seeded ?? [];
-  for (const pkg of seeded) {
-    const status = pkg.templateId === '(already exists)' ? 'already exists' : 'created';
-    console.log(`  ${status === 'created' ? '+' : '='} ${pkg.name} (${status})`);
-    if (status === 'created') {
-      console.log(`    Browse:  ${BASE_URL}/v1/packages/${encodeURIComponent(pkg.packageGroupId)}`);
-    }
+  for (const pkg of data.data?.seeded ?? []) {
+    console.log(`  + ${pkg.name} (published)`);
+    console.log(`    Browse:  ${BASE_URL}/v1/packages/${encodeURIComponent(pkg.packageGroupId)}`);
   }
+  for (const name of data.data?.unchanged ?? []) console.log(`  = ${name} (unchanged)`);
 
   console.log('\n  Done!\n');
 }
