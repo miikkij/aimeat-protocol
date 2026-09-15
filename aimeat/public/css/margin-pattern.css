@@ -25,6 +25,7 @@
  *   (Temani Afif, MIT, https://github.com/Afif13/CSS-Pattern, copyright (c) 2022 Temani Afif)
  *   with the colours replaced by tokens; the shapes are the author's.
  * @version-history
+ *   v1.2.0 — 2026-09-15 — The front page joins: strips beside its 1280px column, for visitors too.
  *   v1.1.0 — 2026-08-29 — The patterns are variable blocks shared by the strips and the settings
  *     dialog's preview (.mp-swatch), so the dialog shows the very figure the page draws.
  *   v1.0.0 — 2026-08-29 — Initial: eight patterns, three pages, one personal setting.
@@ -81,6 +82,10 @@ html[data-margin-pattern] #app::after {
    left; only the right remainder is empty, and it fades toward the content, reaching 44px into
    the content's own right padding. */
 #app:has(.pf-shell) { --mp-wl: 0px; --mp-wr: max(0px, calc(100vw - 250px - 1452px + 44px)); }
+/* The front page: a 1280px column with 20px of padding a side; the strip reaches 40px into it.
+   A visitor with no account sees the default pattern here (js/margin-pattern.js), so the front
+   page wears the same margins as the home behind it. */
+#app:has(.ld) { --mp-wl: max(0px, calc((100vw - 1280px) / 2 + 40px)); --mp-wr: var(--mp-wl); }
 @media (max-width: 1279px) {
   html[data-margin-pattern] #app::before, html[data-margin-pattern] #app::after { display: none; }
 }

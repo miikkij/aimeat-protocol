@@ -12,6 +12,7 @@
  * @usage
  *   import { loadMarginPattern, applyMarginPattern, MARGIN_PATTERNS } from '/js/margin-pattern.js';
  * @version-history
+ *   v1.1.0 — 2026-09-15 — A visitor with no session gets the default pattern, for the front page's margins.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 import { apiGet } from '/js/api.js';
@@ -44,9 +45,13 @@ export function marginPatternOf(prefs) {
   return v === undefined ? DEFAULT_MARGIN_PATTERN : v;
 }
 
-/** Read the record and apply it. Signed out, there is no record and no pattern. */
+/**
+ * Read the record and apply it. Signed out, there is no record: the default pattern goes on, and
+ * only the pages that declare strip widths (the front page) show it, so a visitor sees the front
+ * page wearing the same margins as the home and every other public page looks as before.
+ */
 export async function loadMarginPattern() {
-  if (!getSession()) { applyMarginPattern(''); return; }
+  if (!getSession()) { applyMarginPattern(DEFAULT_MARGIN_PATTERN); return; }
   try {
     const r = await apiGet('/v1/memory/home.prefs?soft=1');
     const prefs = r?.data?.exists === false ? {} : (r?.data?.value ?? {});
