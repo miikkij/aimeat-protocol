@@ -35,6 +35,7 @@
  * @usage
  *   html = injectPageBody(html, page, config, isShell);
  * @version-history
+ *   v1.1.0 - 2026-09-15 - Use trusted build-generated HTML when a page has a complete table guide.
  *   v1.0.0 — 2026-09-11 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -220,7 +221,7 @@ export function injectPageBody(
 
   const block = `<div id="crawler-body" class="md-body">`
     + `<h2>${esc(page.title)}</h2>`
-    + renderMarkdownBody(markdown)
+    + (opts.markdown === undefined && page.generatedHtml ? page.generatedHtml : renderMarkdownBody(markdown))
     + `<p><a href="${esc(baseUrl + (page.path === '/' ? '/index.md' : `${page.path}.md`))}">`
     + `This page as markdown</a></p>`
     + `</div>`;

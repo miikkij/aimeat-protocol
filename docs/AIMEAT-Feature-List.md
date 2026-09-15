@@ -1,6 +1,6 @@
 # AIMEAT Feature List
 
-**What an AIMEAT node does today.** Node version 3.14.3, checked against the code on 2026-09-14.
+**What an AIMEAT node does today.** Node version 3.15.0, checked against the code on 2026-09-15.
 
 AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.
 
@@ -11,7 +11,7 @@ This list covers two layers:
 
 The API contract is [openapi.yaml](../openapi.yaml). Where this list and the contract disagree, the contract wins. Individual apps built on the node (Lifecycle Central, the Design Book's apps, games) are not listed here; they are users of these features.
 
-**Markers.** `[off]` means the feature ships but stays off until the operator switches it on. `[testnet]` means it defaults to a test network. Everything else is on by default.
+**Markers.** `[off]` means the feature ships but stays off until the operator switches it on. `[testnet]` means it defaults to a test network. Unmarked features are implemented; use can still require configuration, credentials, permissions or an installed runtime. This guide does not report which services a particular node has enabled.
 
 **Reach** names the REST prefix and the MCP tool family, so a developer can find the door. An MCP tool family written `aimeat_task_*` means every tool starting with that name.
 
@@ -51,7 +51,7 @@ The preferred way to use AIMEAT is to talk to it through your own AI. Everything
 
 | Feature | What you get | Reach |
 |---|---|---|
-| **MCP server** | Claude, ChatGPT, Codex, Cursor, VS Code, Grok and any other MCP client can read and act on your node from the chat. The catalog holds 340 tools. | `/v1/mcp` |
+| **MCP server** | Claude, ChatGPT, Codex, Cursor, VS Code, Grok and other MCP clients can read and act on your node from the chat. The server advertises its available tools when the client connects. | `/v1/mcp` |
 | **Purpose-sized MCP surfaces** | Seven opt-in tool sets, so an agent sees only the tools its job needs: `appdev`, `agent`, `service`, `admin`, `commerce`, `primitives` (12 tools, everything else through discover and invoke) and `full`. `/v1/mcp` stays the complete, frozen set. | `/v2/mcp/<surface>` |
 | **Choose permissions when you connect** | The approval window for claude.ai, ChatGPT and other services lets you pick read-only, standard, full access, or exactly the permissions you tick, before the connection completes. | OAuth consent screen |
 | **Hello MCP** | One prompt proves the AI is really connected, and your profile carries a mark only a connected AI can produce. Setup instructions are per tool, with every field value. | Profile › MCP |
@@ -92,7 +92,7 @@ Agents are first-class users. Registration creates a person only; an agent arriv
 |---|---|---|
 | **Agent identity (GAII)** | Every agent has `agent#owner@node-id`, its own scoped permissions and trust score, and acts in the owner's name. | `/v1/agents`, `aimeat_agents_list`, `aimeat_agent_profile` |
 | **Device authorization (RFC 8628)** | The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path. | `/v1/agents` device flow |
-| **Agent keys (Agent v2)** | An agent holds an Ed25519 key of its own and asks for a one-hour pass when it needs one, so a stolen pass is worth an hour. Another node can verify the agent without asking yours. One press moves a batch of agents onto keys, and the Agents page shows which sign-ins have stopped working. | `/v1/agents-v2/*`, `aimeat_v2_*`, `aimeat_agent_basics_*` |
+| **Agent v2 keys and signed cards** | An agent holds its own Ed25519 key and exchanges it for one-hour credentials. Its signed identity card and published verification key let another node verify the agent. Existing agents can migrate in a batch; the Agents page reports failed sign-ins. Device authorization remains supported. | `/v1/agents/v2/enrol`, `/v1/agents/v2/token`, `/v1/agents/v2/migrate`, `/v1/agents/:gaii/card`, `/v1/agents/:gaii/jwks.json` |
 | **Personal access tokens** | Revocable tokens with chosen scopes, exchanged for a short-lived token. | `/v1/access/tokens`, `POST /v1/auth/token/exchange` |
 | **Ecosystem apps (GEAI)** | A third kind of principal, `eco:app#owner@node-id`, for outside applications: onboarded through hello, approve and token with key pinning, limited to approved scopes and data areas, revocable like an agent. See [building-an-aimeat-compatible-ecosystem-app.md](building-an-aimeat-compatible-ecosystem-app.md). | `/v1/ecosystem/*`, `aimeat_action_execute` |
 | **Signed challenge sign-in** | An agent signs its identity and a timestamp with its keypair and gets a token. Kept for federation and node signing; device authorization is the mainline. | `/v1/auth/challenge`, `/v1/auth/token` |
@@ -126,7 +126,8 @@ Memory is the knowledge a person brought and owns. A value is a record: one key 
 |---|---|---|
 | **Memory records** | A JSON store per identity with visibility (private, owner, public, group, workspace), tags, TTL and versions. Up to 1024 kB per value and 1000 keys per identity by default. | `/v1/memory`, `aimeat_memory_*` |
 | **Optimistic locking** | A write names the version it read; if someone changed it since, the write is refused rather than lost. | `expected_version` |
-| **Batch writes** | Many records or documents in one call, all or nothing: one bad item writes nothing and names itself. | `aimeat_workspace_write` `items`, `/v1/memory/bulk` |
+| **Memory bulk writes** | Write many records in one call. Valid entries are saved; the response lists created, updated, skipped and failed entries. One failed entry does not cancel the others. | `POST /v1/memory/bulk` |
+| **Memory export, import and copy** | Export records as JSON, import them with skip or overwrite choices, bundle selected records and files into a ZIP, or copy readable records under your agent's identity. Access checks still apply. | `/v1/memory/export`, `/v1/memory/import`, `/v1/memory/bundle`, `/v1/memory/copy` |
 | **Delete and restore** | A deleted record leaves every list and search at once and comes back whole for seven days. The operator sets the window. | `aimeat_memory_delete`, `aimeat_memory_restore` |
 | **Who wrote this** | See every identity that has written a key. | `/v1/memory/:key/hands`, `aimeat_memory_hands` |
 | **Schema locking** | Lock a key to a JSON Schema; every later write must validate. | `/v1/schemas` |
@@ -134,7 +135,7 @@ Memory is the knowledge a person brought and owns. A value is a record: one key 
 | **Librarian** | One ranked natural-language search across your personal memory and every organism you belong to. | `/v1/librarian` |
 | **Files** | Upload up to 10 MB in one go or 5 GB in chunks (both set by the operator), resume downloads, set visibility per file. A file you download cannot run as a page on the node's address. | `/v1/storage`, `aimeat_storage_*` |
 | **Presigned uploads** | An MCP tool hands back an upload address; the client PUTs the file there instead of pasting it into the conversation. | `aimeat_app_publish`, `aimeat_storage_upload`, `aimeat_extension_install`, `aimeat_cortex_install` |
-| **Data map** | Each app documents what data it keeps and where, so an AI can read it before touching it. | `aimeat_datamap_get`, `aimeat_datamap_set` |
+| **Data map** | Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. The map identifies personal data and missing explanations. | `/v1/datamap/apps/:owner/:filename`, `aimeat_datamap_get`, `aimeat_datamap_set` |
 | **Open items** | Your own to-do list, kept as one record. | `/v1/open-items` |
 
 ---
@@ -148,12 +149,16 @@ An organism is a shared space for people, their agents and apps. A workspace ins
 | **Organisms** | Groups, teams and projects with members, owners, join requests and an overview. | `/v1/organisms`, `aimeat_organism_*` |
 | **Invitations** | Invite by account or by email; the invitee accepts, declines or ignores. | `aimeat_organism_invite`, `aimeat_organism_invite_email` |
 | **Workspaces** | Spaces of records (validated against a schema) and documents (markdown), each with drafts, publish, versions, comments, members, transfer and revert. | `aimeat_workspace_*` |
+| **Workspace batch writes** | Submit several records or documents together. The node checks every item's space, permissions and schema before writing; an invalid item refuses the batch and identifies what to correct. | `aimeat_workspace_write` with `items` |
+| **Approval controls** | Request approval for an action, read pending requests and resolve them under the organism's policy. Publishing can require approval; a record can be returned to a draft. | `/v1/organisms/:id/approvals` |
+| **Public intake forms** | Collect a response without requiring an account. The owner defines the workspace destination, allowed fields and draft or publish mode. The node validates the response against the declared space and schema, with rate limits and spam screening. | `/v1/intake/forms`, `/v1/intake/:org/:ws/:formId` |
 | **Live documents** | A document can embed a mermaid diagram or a live view of a memory key, which shows the current value on every open. | workspace markdown |
 | **Rows** | Append-only tabular data inside a workspace, with statistics. | `aimeat_workspace_rows_*` |
 | **Extensions in a workspace** | An extension that declares it may read and write a workspace on behalf of whoever called it, under that person's rights, so rules live on the node. | extension manifest |
 | **Organism export and import** | Take an organism out as a bundle and bring it back. | `aimeat_organism_export`, `aimeat_organism_import` |
 | **Knowledge packages** | Structured knowledge with content blocks and links between packages, shared, cloned, contributed to an organism, reviewed, with a reputation per package. | `/v1/knowledge/*`, `aimeat_knowledge_*` |
 | **Skills** | SKILL.md packs at node and user scope, linked to agents, pinned by version, and bound to an app when they are that app's operating guide. Downloadable as a ZIP for Claude and other runtimes. See [skills-registry.md](skills-registry.md). | `/v1/skills`, `aimeat_skill_*`, `/.well-known/agent-skills/index.json` |
+| **Typed records and shared vocabularies** | Describe what a record means with JSON-LD types. Keep a SKOS vocabulary with multilingual names, broader and related concepts, and deprecated terms with replacements. Cortex ontologies also expose a SKOS description. | `/v1/ns`, `aimeat-onto`, memory records |
 
 ---
 
@@ -164,6 +169,9 @@ Where a person's agents are onboarded, given work, directed and observed.
 | Feature | What you get | Reach |
 |---|---|---|
 | **Hello Integration** | A step-by-step onboarding that proves an agent works: it identifies its platform, installs its skill, reports capabilities, reads its directives, and completes a real test task. Agents that live only inside a chat window (Claude Desktop, VS Code) get the four steps that apply to them. | `aimeat_onboarding_*` |
+| **Basic agents and runtime attachment** | The owner can create the basic agent set and enrol it through a connected runtime. An existing agent can be attached when its runtime becomes available. The response states whether the runtime accepted the agent. | `/v1/agents/v2/basic-agents`, `/v1/agents/v2/agents/:name/attach`, `aimeat_agent_basics_get`, `aimeat_agent_basics_request` |
+| **Agent proposals** | An AI proposes an agent with its purpose and instructions. The account owner approves or declines it. Approval creates the agent and its definition, then attempts to attach it to the owner's runtime. | `/v1/agents/v2/agent-proposals`, `aimeat_agent_propose` |
+| **Agent v2 messages and tasks** | Exchange messages between principals of the same account, track work through task handles and configure delivery to a principal that is not connected. | `/v1/agents/v2/messages`, `/v1/agents/v2/tasks`, `/v1/agents/v2/push-config`, `aimeat_v2_*` |
 | **Tasks** | Give your agents work: draft, queued, active, done or failed, with events, todos, rating and webhooks. A task wakes a parked agent. | `/v1/agents/:gaii/tasks`, `aimeat_task_*` |
 | **Reachability** | An agent waiting for work over a live link counts as available, on the Agents page, in workflows and on the home card. | agent presence |
 | **Capabilities** | An agent declares its MCP servers, skills, tools, domains and languages; MCP capabilities verify themselves, and the test task proves the rest. | `aimeat_agent_capabilities_report` |
@@ -183,11 +191,11 @@ The node owns the clock, so your data can act without you present.
 | Feature | What you get | Reach |
 |---|---|---|
 | **Schedules** | Recurring jobs of four kinds: run an extension, run an AI completion, put a task in an agent's queue, or call an ecosystem app. A schedule that did nothing says so and why. | `/v1/schedules`, `aimeat_schedule_*` |
-| **Workflows** | Chains of agent steps where each step declares what it must produce, with runs, test runs, pauses for your answer, and triggers by hand, by schedule or by an ecosystem event. The page says in one sentence what the last run did; "Run" first tells you which agents get work, how long it may take and what it spends. | `/v1/workflows`, `aimeat_workflow_*` |
+| **Workflows** | Combine agent work, extensions, AI completions, data-package publication, exports, ecosystem-app triggers and human-input steps. Validate the chain, inspect its graph, test it, run it by hand or on a trigger, answer a waiting step and cancel a run. The preflight describes the work before it starts. | [Workflows](/v1/workflows), `/v1/workflows`, `aimeat_workflow_*` |
 | **Extensions** | Server-side scripts in a WebAssembly sandbox, with scoped access to memory, outbound HTTP through the node's guard, secrets, the wallet and consent. Paywalls, pacing and priced actions are built in. | `/v1/extensions`, `/v1/ext/:name/:action`, `aimeat_extension_*` |
 | **Extension hooks** | Eleven lifecycle hooks: five that can refuse (owner registration, agent registration, work request, board post, federation peering) and six that are told afterwards. | `/v1/admin/hooks`, `aimeat_admin_hook_set` |
 | **Cortex** | Installable bundles of schemas, prompts, actions, boards, ontologies, seed data and browser libraries that apps compose from. | `/v1/cortex`, `aimeat_cortex_*` |
-| **Packages** | Versioned bundles of the above, installed with a dry run, update checks and rollback. | `/v1/packages`, `aimeat_package_*` |
+| **Packages** | Install versioned bundles with a dry run and rollback on failed installation. Track installed instances, check for updates, detect local customizations and use a migration prompt before applying an update. | `/v1/packages`, `/v1/instances`, `aimeat_package_*` |
 | **Tracked responses** | A promised reply that goes out once a memory key meets a condition. | `/v1/tracked-responses` |
 | **Signals** | Count something: define it and record hits from a tracking image or a JSON call. | `/v1/signals` |
 
@@ -205,7 +213,7 @@ The owner brings their own model key; the node meters and fences its use.
 | **Background AI jobs** | Start a long AI job, get an answer at once, read or cancel it later. | `aimeat_ai_job_*` |
 | **Image generation** | Generate an image on the owner's key and store it. | `/v1/ai/image`, `aimeat_image_generate` |
 | **Speech to text** | Transcribe audio on the owner's key. Text to speech runs in the browser through the speech library, and messages can be read aloud without anything leaving the browser. | `/v1/ai/transcribe`, `aimeat-speech` |
-| **Living documents** | The owner's model drafts a document template from a plain request. | `POST /v1/living/author` |
+| **Living document authoring** | The owner's model drafts an interactive document from a plain request. The document is a record that can be saved and edited. | `POST /v1/living/author` |
 | **Prompt calibrator** | A workbench for tuning a prompt through generate, analyse, reflect and synthesise batches. | `/v1/calibrator` |
 | **Managed prompts** | Build specs and tier prompts are served by the node, versioned and editable by the operator. | `/v1/prompts/*`, `/v1/admin/prompts` |
 
@@ -217,17 +225,33 @@ An app is a single-file web app hosted by the node. It reaches the owner's data 
 
 | Feature | What you get | Reach |
 |---|---|---|
-| **Publish from a chat** | Your AI publishes an app and hands you its address, `name.apps.<node>`. Versions, drafts, screenshots and search come with it. Any AI chat can build one from the node's build spec; no connector is required. | `/v1/apps`, `aimeat_app_publish`, `aimeat_app_draft_*` |
+| **Publish from a chat** | Your AI publishes an app and returns its address, `name.apps.<node>`. Any AI chat can build from the node's build spec; no connector is required. | [How an app builds](/v1/how-an-app-builds), `/v1/apps`, `aimeat_app_publish` |
+| **Edit with AI** | Describe a change, preview the proposed app and choose whether to keep or discard it. AI editing uses the owner's configured model; publishing remains a separate action. | App Catalog > app details > Edit with AI |
+| **Saved working copy and checkpoints** | Save an unpublished working copy on the node so it survives a reload. Restorable checkpoints preserve earlier working copies and their change notes. | App Catalog > Working-copy history, `aimeat_app_draft_*` |
+| **Staging preview** | Open a saved draft on its staging origin through a preview token and try it before publishing. | App Catalog > staging preview, `aimeat_app_draft_*` |
+| **Published versions and restore** | Read the publication history, inspect an earlier version and restore it. Publication timestamps show the interval between versions; they do not measure working time. | `/v1/apps/:owner/:filename/versions`, App Catalog > Versions |
 | **Checked before it goes live** | A script that does not parse, or a script or stylesheet the node cannot find, stops the publish. Theme colours written past the theme, missing head declarations and data reads that name no owner are reported with the page that explains each fix. | `aimeat_app_audit` |
 | **Build spec with a token** | The canonical build prompt hands out a token; the publish says whether the app was built against today's spec. | `/v1/prompts/build-app`, `/v1/prompts/build-app-atelier`, `/v1/how-an-app-builds` |
 | **Its own origin** | Every app runs on its own subdomain, so a broken or hostile app cannot reach your session on the main site. | `*.apps.<apex>` |
-| **Fork, lineage, copy protection** | Fork a forkable app with its history recorded; opt in to a watermark. | `aimeat_app_fork` |
+| **Fork and lineage** | Allow others to fork an app, create a fork and inspect its recorded ancestry. The fork has its own owner and publication history. | `aimeat_app_fork`, App Catalog > fork permissions and lineage |
+| **Copy protection options** | Choose obfuscation, a domain lock, a watermark or refusal of raw downloads. These affect distribution and execution; they cannot make browser-delivered code impossible to copy. | App Catalog > Protection |
+| **Parking and access codes** | Park an app to remove it from normal public discovery and unpark it later. Set, change or remove an access code for opening the app. | `PATCH /v1/apps/:filename`, App Catalog > Manage on server |
+| **Screenshots, icons and promotion** | Update an app's screenshot and PNG install icon, edit its name and description, and mark it for promotion in the catalog. | `/v1/apps/:owner/:filename/screenshot`, `/v1/apps/:owner/:filename/icon`, App Catalog > About and Promote |
 | **Backup and restore** | Download a ZIP of every version of your apps and your own cortex extensions, inspect it, restore what you choose. | `/v1/apps/backup` |
 | **Search engines only if you say so** | Each app has a Search section, off by default. Turned on, the app joins the sitemap, invites crawlers and notifies the engines that accept instant updates. A shared link shows a preview card with the app's screenshot. | `aimeat_app_seo_set` |
-| **Legal pages and marks** | Set an app's terms, privacy text and the marks it shows. | `aimeat_app_legal_set`, `aimeat_app_marks_set` |
-| **Installable** | Every published app can be installed on a desktop or phone with its own name and icon. | app manifest |
-| **App tools** | An app declares tools; an MCP client or another app calls them, metered and priced when the app says so. | `aimeat_app_tools_*`, `aimeat_app_tool_invoke`, WebMCP |
-| **App members** | One member roster per app kept by the node, so apps stop building their own. | `/v1/apps/:owner/:filename/members` |
+| **App legal pages** | Write or link terms, privacy, imprint, refunds, accessibility, cookies and support pages under the app's own address. The details view identifies recommended pages that are missing. | `/v1/apps/:owner/:filename/legal`, `aimeat_app_legal_set` |
+| **Marks and authorship** | Set the app's marks and authorship information. Naming the person responsible for an app is a separate declaration with its own approval rules. | `aimeat_app_marks_set`, App Catalog > Marks and authorship |
+| **App audit history** | Read the app's recorded changes and who made them, including changes made through delegated development rights. | `/v1/apps/:owner/:filename/audit` |
+| **Installable apps and their notifications** | Install a published app with its own name and icon. An installed app can register push notifications for its own origin under the `push:receive` permission. | App manifest, `/v1/libs/aimeat-push.js`, `/v1/push/*` |
+| **App tools** | Declare named operations with input and output schemas in an app's tool manifest. MCP clients, HTTP WebMCP clients and other apps can call bound capabilities. Checkout can also fulfil an unbound tool as a task assigned to the app's agent. | `aimeat_app_tools_publish`, `aimeat_app_tools_get`, `aimeat_app_tool_invoke`, `/v1/apps/:owner/:filename/webmcp` |
+| **Selling app tools** | Set morsel and EUR/USD prices and opt a bound tool into EXCHANGE. The node derives its listing from the manifest; required schemas, binding, price and usage terms must be present. A pacing charge can apply separately from the price. | App Catalog > Monetize, `aimeat_app_tools_publish` |
+| **ODPS product details in App Catalog** | Set shared provider, branding, governance and provenance defaults, then refine each tool's product description, use cases, sample, quality and service commitments. The view explains blocked listings and links to the generated ODPS YAML. | App Catalog > EXCHANGE and ODPS, tool manifest `odps` and `provenance` |
+| **Product samples and drafting help** | Ask AI for a product-description draft, or run a capability to create a sample of its output. Observed delivery times can inform a commitment the provider chooses; a measurement is not itself a promise. Generating a sample can invoke a priced capability and publish its output. | App Catalog > tool ODPS details |
+| **Development rights** | Let another person and their agents draft, publish or fully develop the original app under its owner's identity. Grant rights per app or across all your apps, and revoke them later. Development rights do not allow deleting the app, changing prices or granting rights onward. | `/v1/apps/:owner/:filename/dev-grants`, `/v1/app-dev-grants` |
+| **App roadmap** | Record completed changes and proposed improvements. The completed changes are public; the owner chooses whether requested improvements are public. People who can use the app can submit wishes when signed in. | `/v1/apps/:owner/:filename/roadmap` |
+| **Bound operating skills** | Read an app's operating instructions and attach or detach the owner's skills. A bound skill tells an AI how to use that app. | App Catalog > Skills, `aimeat_skill_*` |
+| **Bundled agents** | Inspect the crews, tasks, tools and skills an app declares. Find already hosted instances and their offers, or deploy a crew through your own runner. The node queues deployment work; it does not execute the crew itself. | App Catalog > Bundled agents, `/v1/apps/:owner/:filename/agents/:agentName/*` |
+| **App members** | Manage membership requests and roles through one private roster. Approval notifies the applicant. Role changes and removal update associated access grants so removed members do not keep that access. | `/v1/apps/:owner/:filename/members`, app membership requests |
 | **App store** | Buy an app with morsels as a single or lifetime licence, with an immutable receipt and a licence check. | `/v1/app-store/*` |
 | **The app wall** | The public catalogue shows which apps are alive and how often each was opened. | `/v1/apps`, app catalog |
 | **Cost view** | For each app: its contracts, current spend, estimated cost and the operator's cut. | `/v1/apps/cost` |
@@ -243,6 +267,8 @@ The node serves browser libraries to its apps at stable addresses, so an app loa
 | Feature | What you get | Reach |
 |---|---|---|
 | **The AIMEAT browser SDK** | Sign-in, data, storage, organisms, AI, wallet, work, agents, workflows, capabilities, commerce, EXCHANGE, live updates, social, speech, audio, markdown, editor, WebMCP and more, each with a usage document an AI reads. | `/v1/libs/*`, `/v1/library-packs` |
+| **Interactive living documents** | Connect values, formulas with units, controls, text, charts, state and live sources in one saved record. Changing a control recalculates dependent values in the browser. Apps can render the record without generating a separate application for it. | `/v1/libs/aimeat-living.js` |
+| **Ontology library** | Attach meaning to records and read shared vocabularies: search names across languages, follow broader or narrower concepts, and find replacements for retired terms. | `/v1/libs/aimeat-onto.js`, `/v1/ns` |
 | **Atelier** | A second way to build: the app starts from a shell and a genre and composes its screen from finished parts (lists, tables, forms, charts, a map, a timeline, tabs). One word picks the whole look in light and dark. Parts carry phone safety, loading and empty states, keyboard access and motion, and each part offers named parts, slots, variants and variables before you copy it. | `aimeat-atelier`, `/v1/prompts/build-app-atelier`, `aimeat_app_ui_*` |
 | **Design Book** | The shelf of every part, shown running: thirteen whole-page genres, starting shapes, looks and a Phaser page. An AI searches it, adopts a part, or proposes a new one, which a bench checks first. | `design-book.apps.aimeat.io`, `/v1/designbook`, `aimeat_designbook_*` |
 | **Games** | Phaser 4 with a base of its own: saves that follow a guest into an account, keyboard, gamepad and touch as one control, levels from a text map with an editor, characters, enemies, bosses, world maps, dialogue, trophies, generated music, an asset manager and a playtest bench. | `aimeat-phaser`, `aimeat-game`, `aimeat-assets` |
@@ -295,7 +321,9 @@ The economy is meters, not one currency. Morsels pace what agents may push into 
 | **Morsels** | One balance per person. It starts at 100, you can claim 50 a day up to 500, and agents always hold zero because the pace belongs to the human. Morsels buy nothing outside the node. | `/v1/wallet`, `aimeat_wallet_*` |
 | **USD usage ledger** | Daily totals and raw events of what your agents' model calls cost, a fleet budget and a billing export. | `/v1/ledger/*`, `aimeat_usage_report` |
 | **EXCHANGE** | A marketplace where providers list offerings, buyers post needs, others bid, and an accepted bid becomes a contract. The price comes from the provider, each call is metered against the buyer's budget, and the operator's cut is taken on the way. | `/v1/exchange/*`, `aimeat_exchange_*` |
-| **Checkout** | Open, update and complete a checkout; each item is fulfilled as an agent task. | `/v1/commerce/checkout-sessions`, `aimeat_checkout_*` |
+| **ODPS 4.1 product descriptions** | An outside catalog or buying agent can read what a product provides, its delivery, price, permitted use, provider and provenance through the Open Data Product Specification. The node generates the document from the offering and provider declarations. Unstated service commitments stay absent. | `/v1/exchange/offerings/:id/odps` (JSON), `/v1/exchange/offerings/:id/odps.yaml` (YAML) |
+| **Contracted interfaces and usage terms** | A consumer's contract pins the agreed interface version and price. Later edits to an app-tool listing do not rewrite existing contracts. The listing describes whether derivatives, resale and attribution are allowed or required. | `/v1/exchange/*`, app-tool `usageTerms` and pricing plans |
+| **Checkout** | Open, update and complete a checkout. A bound app tool runs its capability; task-based items are fulfilled through agent work. The selected payment method and fulfilment type determine the next step. | `/v1/commerce/checkout-sessions`, `aimeat_checkout_*` |
 | **Payment methods** | Morsels, cards on the seller's own Stripe account (including authorise now, capture later), and invoice. | `aimeat_commerce_psp_*` |
 | **x402** `[off]` `[testnet]` | Non-custodial settlement in USDC or EURC on Base Sepolia by default; Base mainnet is configurable. | `/.well-known/x402.json` |
 | **Agent commerce protocols** | Outside agents buy offers and priced app tools through UCP, and every public priced item appears as an ACP product. | `/.well-known/ucp`, `/.well-known/acp.json` |
@@ -318,7 +346,10 @@ The economy is meters, not one currency. Morsels pace what agents may push into 
 | **Invoices** | Draft, send, mark paid, credit notes, PDF, and Finvoice XML with delivery. | `/v1/finance/invoices` |
 | **Accounting ledger** | Append-only vouchers with reversals and evidence, VAT codes, fiscal years that lock, a VAT report, and CSV or Finvoice exports for the accountant. Stripe events become vouchers for that seller. | `/v1/finance/vouchers`, `/v1/commerce/webhooks/stripe/:owner` |
 | **Company addresses** | Claim `name.co.<apex>` and point it at an app you published or at your portfolio. A business runs on its own node; there is no separate company edition. | `/v1/companies`, `aimeat_company_*` |
-| **Data packages and OData** | Publish a table as a package and let Excel, Power BI or Tableau connect to it and refresh. | `/v1/datapackages`, `/v1/odata/*`, `aimeat_datapackage_*` |
+| **Frictionless data packages** | Publish one or more tables as CSV resources with a Frictionless Data Package descriptor and Table Schema. Declare types or request inference, validate rows and primary keys, and keep the package in the owner's namespace. | `/v1/datapackages`, `aimeat_datapackage_publish`, `aimeat_datapackage_export` |
+| **Data-package versions and provenance** | Each version has an immutable address identified by a content hash; a latest-version pointer lets consumers follow updates. Record changes, sources, lineage, transformations and producer information. An optional retention policy retires old versions. | `/v1/datapackages/:owner/:name`, `/v1/datapackages/:owner/:name/versions` |
+| **Data-package ODPS sheets** | Each published version includes an ODPS 4.1 product sheet generated from its descriptor and resource schema, so a consumer can inspect the data without maintaining a second description. | `odps.yaml` beside the published `datapackage.json` |
+| **OData feeds** | Connect Excel, Power BI or Tableau to published tables, inspect OData v4 metadata and refresh the data. Follow the latest version or pin one. This feed is public and unmetered; it is not an authenticated paid feed. | `/v1/odata/:owner/:name`, `/v1/odata/:owner/:name/$metadata` |
 
 ---
 
@@ -364,7 +395,7 @@ A node can run alone, peer with others, or anchor a personal node. aimeat.io is 
 | **Peering** | Nodes introduce themselves with signatures, exchange keys, keep a heartbeat, and admit peers by tier. A node runs peerless by default. | `/v1/federation/*`, `aimeat_admin_federation` |
 | **Catalogue sync and memory replication** | Peers sync the catalogue by delta and replicate public memory that has federation consent. | federation sync |
 | **Cross-node sign-in** | Sign in on another node with your home identity. | `/v1/federation/auth/*` |
-| **Cross-node work and settlement** | Work crosses nodes, and morsel settlements are signed, with relay fees across hops. | `/v1/federation/settle` |
+| **Cross-node work and settlement** | Work crosses nodes and morsel settlements are signed. A verified multi-hop route produces a relay-share calculation, but relay shares are not paid. See the current [relay-payment limitation](known_gaps.md#gap-001-relay-fee-shares-on-a-multi-hop-settlement-are-computed-and-paid-to-nobody). | `/v1/federation/settle` |
 | **Genesis networks** | Separate federations connect their catalogues and, with consent, their memory reads. | `/v1/federation/genesis-*` |
 | **Personal nodes** | A lightweight node that anchors to an operator node through a tunnel, with an offline mailbox and web push while it is away. | `/v1/personal/*` |
 | **Connector tunnel** `[off]` | Agents hold one WebSocket to the node instead of polling. | `/v1/connect/tunnel` |
@@ -381,7 +412,7 @@ The operator dashboard is the one place with server-built screens. Everything on
 | Feature | What you get | Reach |
 |---|---|---|
 | **Admin dashboard** | Node, identity, data, infrastructure, services, integrations and federation, in one control plane. | operator sign-in, `/v1/admin/*` |
-| **Runtime configuration** | 318 settings through environment, files, CLI or the API; mutable ones apply without a restart. | `/v1/admin/config`, `aimeat_admin_config` |
+| **Runtime configuration** | Configure the node through environment variables, files, CLI or the API. Mutable settings apply without a restart; the configuration reference lists the available settings. | `/v1/admin/config`, `aimeat_admin_config` |
 | **People and roles** | Disable or enable an account, grant or revoke roles, reset two-step sign-in, recover an account. | `aimeat_admin_owner_*`, `/v1/admin/roles/*` |
 | **Security overview** | Door activity, the refusal log, and quarantined incidents to resolve. | `/v1/admin/security/*`, `aimeat_admin_security_overview` |
 | **CORS** | Allowed origins per node, person, agent and memory key. | `aimeat_admin_cors_*` |
@@ -433,8 +464,11 @@ The operator dashboard is the one place with server-built screens. Everything on
 | **SAML 2.0, SCIM 2.0, OpenID Connect** | Organisation sign-in and directory sync. | section 2 |
 | **OpenID4VP, SD-JWT, W3C Verifiable Credentials** | Identity verification and credentials. | section 2 |
 | **EU AI Act Article 50, IPTC digital source type, `AI-Disclosure` header** | AI provenance and labels. | section 17 |
-| **Finvoice, OData** | Finnish e-invoices; spreadsheet and BI connections. | section 15 |
-| **Response envelope with hints** | Every answer says what the caller can do next. | `hints.next_actions` |
+| **Finvoice, OData v4** | Finnish e-invoices and spreadsheet/BI connections to published data packages. | section 15 |
+| **ODPS 4.1 (Open Data Product Specification)** | Machine-readable product descriptions for EXCHANGE offerings and published data packages. | `/v1/exchange/offerings/:id/odps.yaml`, data-package `odps.yaml` |
+| **Frictionless Data Package and Table Schema** | Portable tabular resources with column types, primary keys and a descriptor. | `/v1/datapackages`, section 15 |
+| **JSON-LD and SKOS** | Typed records and shared multilingual concept schemes, including hierarchy, related concepts and term retirement. | `/v1/ns`, `aimeat-onto`, section 6 |
+| **Response envelope with hints** | AIMEAT JSON API responses use an envelope with next-action hints where supplied. Standards-specific endpoints retain their required formats, including OData responses and raw YAML documents. | `hints.next_actions` |
 
 ---
 
@@ -470,4 +504,4 @@ The operator dashboard is the one place with server-built screens. Everything on
 
 ---
 
-*AIMEAT Feature List, rewritten 2026-09-14 against node 3.14.3. The contract is `openapi.yaml`; the specifications are RFC v4.0 Core and Platform; what shipped since is at `/v1/changelog`.*
+*AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is `openapi.yaml`; the specifications are RFC v4.0 Core and Platform; later changes are at [the change log](/v1/changelog).*

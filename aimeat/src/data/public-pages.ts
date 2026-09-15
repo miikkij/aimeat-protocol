@@ -34,6 +34,7 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   v1.7.0 - 2026-09-15 - Everything reads its complete generated Markdown and static HTML.
  *   v1.6.0 — 2026-09-11 — Every title long enough to summarise its own page. Eleven of them were
  *     not: "Help" was four characters, "Privacy" seven, "Glossary" eight, and a search result is
  *     where a title has to do its whole job with no page around it. Bing had listed seven pages of
@@ -59,6 +60,8 @@
  *   v1.0.0 — 2026-07-28 — Initial: one registry behind sitemap.xml; API endpoints dropped from the
  *     sitemap (docs/internal/agentscanner/02-vaihe-sitemap-xml.md)
  */
+
+import { everythingMarkdown, everythingHtml } from '../utils/everything-page.js';
 
 /** How often a crawler should expect the page to change (sitemaps.org changefreq). */
 export type ChangeFreq = 'always' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'never';
@@ -103,6 +106,8 @@ export interface PublicPage {
    * Omitted for pages whose HTML is real content already (the static info pages convert cleanly).
    */
   markdown?: string;
+  /** Build-generated HTML from the same repository source as markdown, never caller-supplied. */
+  generatedHtml?: string;
 }
 
 /**
@@ -299,20 +304,11 @@ same story with the real pieces, and ends with the generator itself, open.
     // not here, so this entry cannot claim a number the list does not.
     path: '/v1/everything',
     title: 'Everything in AIMEAT: the whole feature list',
-    description: 'Every feature of an AIMEAT node in 23 groups, as the repository keeps it: what you get from each one, and, when you ask for it, where the door is (the REST prefix and the MCP tool family).',
+    description: 'The AIMEAT capability guide: what each feature provides, with searchable descriptions, feature links and optional API and MCP details.',
     changefreq: 'weekly',
     priority: '0.7',
-    markdown: `Everything an AIMEAT node does today, as one list: the identity and permissions, memory and
-workspaces, agents and schedules, messages and the economy, apps, extensions and skills, the public
-surfaces, transparency and compliance, federation, operation, security, and the standards the node
-speaks. Each row says what you get, and the Reach column names the door: the REST prefix and the
-MCP tool family.
-
-The page at [{{BASE_URL}}/v1/everything]({{BASE_URL}}/v1/everything) shows the list with a search
-box and a switch for the doors. The same list is served as JSON at
-[{{BASE_URL}}/data/everything.json]({{BASE_URL}}/data/everything.json), and its source is
-docs/AIMEAT-Feature-List.md in the repository, from which the page is generated.
-`,
+    markdown: everythingMarkdown,
+    generatedHtml: everythingHtml,
   },
   {
     path: '/v1/app-store',
