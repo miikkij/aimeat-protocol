@@ -19,8 +19,8 @@ declaration.
 > - Onboarding routes: `aimeat/src/routes/ecosystem-apps.ts` · events: `aimeat/src/routes/ecosystem-events.ts`
 >
 > **Companion docs:** the full design rationale + the richer target lives in
-> [internal/ecosystem-developer-guide.md](internal/ecosystem-developer-guide.md) and the spec set under
-> [internal/ecosystem-applications-architecture.md](internal/ecosystem-applications-architecture.md). The
+> [Core specification](AIMEAT-RFC-v4.0-Core-full.md) and the spec set under
+> [Platform specification](AIMEAT-RFC-v4.0-Platform-full.md). The
 > agent equivalent: [building-an-aimeat-compatible-agent.md](building-an-aimeat-compatible-agent.md).
 
 ---

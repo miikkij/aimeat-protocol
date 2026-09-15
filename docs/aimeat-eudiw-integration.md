@@ -1,125 +1,59 @@
-# AIMEAT EUDIW Integration Guide
+# Identity wallet verification: implementation status
 
-## Overview
+**EUDIW verification cannot be enabled in this release.**
+Setting `AIMEAT_EUDIW_ENABLED=true` makes configuration loading fail.
+The [startup guard](../aimeat/src/config-eudiw-guard.ts) records why: the SD-JWT path
+does not yet verify holder binding, the request nonce and the verifier audience together.
+The earlier guide's claim of complete verification was incorrect.
 
-AIMEAT supports EU Digital Identity Wallet (EUDIW) verification to provide Level 3 identity assurance. This integration allows node operators to verify user identities through eIDAS-compliant digital wallets, including the Finnish Trust Network (FTN) as a national implementation.
+This page describes the code that exists. It is not an instruction to enable EUDIW
+and does not establish certification or compatibility with a wallet provider.
 
-## Identity Tiers
+## Existing routes
 
-AIMEAT defines four identity verification levels for GHII (Global Human Identity Identifier) records:
+The routes are defined in [verification.ts](../aimeat/src/routes/verification.ts).
+Use [OpenAPI](../openapi.yaml) for request and response fields.
 
-| Level | Name | Method | Trust Score Bonus |
-|-------|------|--------|-------------------|
-| 0 | Anonymous | No verification | 0 |
-| 1 | Email-verified | Email confirmation link | +10 |
-| 2 | TOTP-verified | Time-based one-time password setup | +20 |
-| 3 | eIDAS-verified | EUDIW or national eID (e.g., FTN) | +50 |
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/v1/ghii/verify/eudiw/request` | Construct a wallet verification request |
+| POST | `/v1/ghii/verify/eudiw` | Submit a presentation |
+| POST | `/v1/ghii/verify/eudiw/callback` | Receive a wallet response |
+| GET | `/v1/ghii/verify/ftn/authorize` | Begin the separate FTN OIDC flow |
+| GET | `/v1/ghii/verify/ftn/callback` | Receive the FTN authorization response |
+| POST | `/v1/ghii/verify/ftn` | Submit an FTN assertion |
+| POST | `/v1/trusted-issuers` | Operator registers a trusted issuer |
+| GET | `/v1/trusted-issuers` | List issuers |
 
-Level 3 verification is the highest tier. Once achieved, the GHII record is annotated with the verification method, timestamp, and issuer country code.
+Owner-facing verification routes require an owner session. Callback routes validate
+their flow state. FTN is a separate, optional integration; a configured provider and
+successful provider verification are required before treating it as operational.
 
-## Verification Flow
+## Configuration that exists
 
-The EUDIW verification follows an OpenID4VP (Verifiable Presentation) flow:
+See [config.ts](../aimeat/src/config.ts) and
+[the field schema](../aimeat/src/services/config-schema.ts).
 
-```
-User (Browser)          AIMEAT Node              EUDIW Wallet App
-      |                      |                          |
-      |-- GET /v1/eudiw/request -->|                    |
-      |                      |-- generate nonce ------->|
-      |<-- redirect URI -----|                          |
-      |                      |                          |
-      |-- open wallet link -------------------------------->|
-      |                      |                          |
-      |                      |<-- POST /v1/eudiw/callback --|
-      |                      |-- validate VP response --|
-      |                      |-- update GHII level=3 ---|
-      |<-- confirmation -----|                          |
-```
+| Variable | Purpose |
+|---|---|
+| `AIMEAT_EUDIW_ENABLED` | Defaults to false; true is refused at startup |
+| `AIMEAT_EUDIW_CLIENT_ID` | Verifier client identifier |
+| `AIMEAT_EUDIW_REDIRECT_URI` | Wallet callback address |
+| `AIMEAT_FTN_ENABLED` | Enable the separate FTN integration |
+| `AIMEAT_FTN_PROVIDER_URL` | FTN OIDC provider address |
+| `AIMEAT_FTN_CLIENT_ID` | Provider client identifier |
+| `AIMEAT_FTN_CLIENT_SECRET` | Provider client secret |
+| `AIMEAT_NATIONAL_EID_PID_CLAIM` | Claim containing the national identifier |
+| `AIMEAT_VC_ISSUER_DID` | Issuer identifier for credentials this node issues |
 
-For FTN (Finnish Trust Network), a separate flow is used where the user is redirected to the FTN broker, authenticates with their bank credentials, and the broker posts identity attributes back to the callback endpoint.
+The old presentation-definition, nonce-TTL and FTN issuer-URL settings listed here
+were not implemented under those names.
 
-## Endpoints
+## When this page must change
 
-### `GET /v1/eudiw/request`
+Remove the blocked status only after the startup guard is removed through an approved,
+tested implementation of holder binding, nonce consumption and audience validation.
+Test rejected and replayed presentations as well as successful verification.
 
-Initiates a verification request. Returns a redirect URI or QR code payload that the user's wallet app can process. Requires authentication.
-
-Query parameters:
-- `method` -- `eudiw` (default) or `ftn`
-
-Response includes `request_uri`, `nonce`, and `state` fields.
-
-### `POST /v1/eudiw/verify`
-
-Manually submits a Verifiable Presentation for verification. Used when the wallet app cannot reach the callback URL directly (e.g., same-device flow).
-
-Request body: `{ vp_token, state, nonce }`
-
-### `POST /v1/eudiw/callback`
-
-Receives the wallet's Verifiable Presentation response. This is the redirect target configured in the EUDIW request. The node validates the presentation, extracts identity claims, and updates the GHII verification level.
-
-This endpoint is unauthenticated (called by the wallet infrastructure) but validates the `state` and `nonce` parameters against the original request.
-
-### `POST /v1/ftn/verify`
-
-FTN-specific verification endpoint. Receives the identity assertion from the FTN broker. Extracts `given_name`, `family_name`, `birthdate`, and `personal_identity_code` (hashed, not stored in plaintext).
-
-Request body: FTN broker assertion format.
-
-## Trusted Issuers
-
-Operators can configure which credential issuers are accepted for Level 3 verification.
-
-### `POST /v1/trusted-issuers`
-
-Adds a trusted issuer. Requires `operator` role.
-
-```json
-{
-  "issuer_id": "did:web:issuer.example.com",
-  "name": "Example National eID Provider",
-  "country": "FI",
-  "trusted_credentials": ["VerifiableId", "EuropeanHealthInsuranceCard"]
-}
-```
-
-### `GET /v1/trusted-issuers`
-
-Lists all configured trusted issuers. Public endpoint.
-
-## Configuration
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AIMEAT_EUDIW_ENABLED` | `false` | Enable EUDIW verification endpoints |
-| `AIMEAT_EUDIW_CLIENT_ID` | -- | Client ID registered with the EUDIW infrastructure |
-| `AIMEAT_EUDIW_REDIRECT_URI` | -- | Callback URL for wallet responses |
-| `AIMEAT_EUDIW_PRESENTATION_DEF` | built-in | Custom presentation definition JSON path |
-| `AIMEAT_FTN_ENABLED` | `false` | Enable Finnish Trust Network verification |
-| `AIMEAT_FTN_CLIENT_ID` | -- | FTN broker client ID |
-| `AIMEAT_FTN_CLIENT_SECRET` | -- | FTN broker client secret |
-| `AIMEAT_FTN_ISSUER_URL` | -- | FTN broker discovery URL |
-| `AIMEAT_EUDIW_NONCE_TTL_SECONDS` | `300` | Expiry for verification nonces |
-
-## Implementation Status
-
-The EUDIW integration implements cryptographically complete verification:
-
-- **SD-JWT parsing and signature verification** -- VP tokens are decoded and cryptographically verified against trusted issuer public keys (JWK format). Supports ES256 and EdDSA algorithms.
-- **Nonce/state validation** -- All verification flows use database-backed nonces with configurable TTL for CSRF protection and replay prevention.
-- **FTN integration** -- Generic OIDC client supporting any FTN broker (Signicat, DVV/Suomi.fi, Telia). Configurable via `AIMEAT_FTN_PROVIDER_URL`, `AIMEAT_FTN_CLIENT_ID`, `AIMEAT_FTN_CLIENT_SECRET`.
-- **Multi-country eID support** -- The national PID claim name is configurable via `AIMEAT_NATIONAL_EID_PID_CLAIM` (Finland: `personal_identity_code`, Sweden: `personalNumber`, Denmark: `dk.cpr`).
-- **Trusted issuer validation** -- Issuer signatures are verified against public keys stored as JWK in the trusted issuer registry.
-
-**Production deployment requires:**
-- Registering with a licensed FTN broker to obtain OIDC client credentials
-- Configuring trusted issuers with their real public keys (JWK format)
-- For EUDIW: registering as a verifier with the EUDIW infrastructure
-
-**Not yet implemented:**
-- Credential revocation checking (status lists)
-
----
-
-*AIMEAT Protocol -- Overscale Solutions Oy, 2026*
+Issuing a node credential is a separate capability. See
+[verifiable credentials](aimeat-vc-spec.md).

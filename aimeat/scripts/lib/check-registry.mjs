@@ -9,6 +9,7 @@
  *  - 1.0.0 (2026-09-08): A4: share the CI check registry with audit consumers.
  */
 export const FAST_CHECKS = [
+    { script: 'check:docs', label: 'Documentation catalog, links, data syntax and help copies agree' },
     { script: 'check:importmap', label: 'Importmap ↔ imports in sync' },
     { script: 'check:prompt-groups', label: 'Every prompt group has a translated heading on the admin page' },
     { script: 'check:profile-tabs', label: 'Every profile tab reachable from the menu' },

@@ -20,15 +20,15 @@
 ### 2. Containment
 - **Compromised owner key:** Operator uses `POST /v1/owners/:name/recover` to regenerate keys
 - **Compromised node key:** Rotate node keys, re-establish federation peer connections
-- **Compromised JWT:** Revoke via `POST /v1/auth/revoke`, all sessions via `DELETE /v1/auth/sessions`
-- **Malicious federation peer:** Emergency de-peer via `DELETE /v1/federation/peer/:nodeId?emergency=true`
+- **Compromised JWT:** Revoke via `POST /v1/auth/revoke`, the authenticated owner's human sessions via `DELETE /v1/auth/sessions`. Revoke agent and ecosystem credentials through their own management routes
+- **Malicious federation peer:** Emergency de-peer via `DELETE /v1/federation/peers/:nodeId?emergency=true`
 - **Malicious extension:** Disable the extension via admin API
 
 ### 3. Eradication
 - Identify root cause (logs, audit trail)
 - Apply security patch
 - Run `aimeat validate` to check configuration
-- Run security E2E tests (`npx tsx test/e2e-security.ts`)
+- Run security E2E tests (`pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=security`)
 
 ### 4. Recovery
 - Re-enable affected services
@@ -44,18 +44,18 @@
 ## Key Commands
 
 ```bash
-# Revoke all sessions for an owner
-curl -X DELETE https://node/v1/auth/sessions -H "Authorization: Bearer $OPERATOR_JWT"
+# Revoke the authenticated owner's human sessions, including the current session
+curl -X DELETE https://node/v1/auth/sessions -H "Authorization: Bearer $OWNER_JWT"
 
 # Emergency de-peer
-curl -X DELETE "https://node/v1/federation/peer/malicious-node?emergency=true" -H "Authorization: Bearer $OPERATOR_JWT"
+curl -X DELETE "https://node/v1/federation/peers/malicious-node?emergency=true" -H "Authorization: Bearer $OPERATOR_JWT"
 
 # Check for security audit issues
 pnpm audit
 
 # Run security tests
-npx tsx test/e2e-security.ts
+pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=security
 
 # Validate environment
-node --import tsx src/index.ts validate
+aimeat validate
 ```

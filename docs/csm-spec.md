@@ -4,6 +4,20 @@
 
 ---
 
+## Current parser limits
+
+The [parser](../aimeat/src/services/csm-parser.ts) is the implementation authority.
+Its field constraints use `min` and `max`, including string lengths and array
+sizes. Raw JSON Schema keywords such as `minLength`, `maxLength`, `minimum`
+and `maximum` in a CSM field are not equivalent and are ignored. Nested field
+requiredness uses each property's `required` flag, not an object-level array.
+A manifest parsing successfully does not prove that every annotation is enforced.
+
+The examples in root `docs/csm-examples` and package `aimeat/docs/csm-examples`
+are different sets. The package set is loaded at runtime and includes older
+constraint spellings. Inspect the compiled schema before relying on those limits.
+This documentation cleanup preserves their runtime content.
+
 ## 1. Overview
 
 A **Community Service Manifest** (CSM) is a declarative YAML document that defines a community service on an AIMEAT node. Each CSM describes the data schema, consent rules, moderation policy, and UI rendering hints for a single service instance. Nodes use the parsed CSM to generate JSON Schema for input validation (via Schema Locking), enforce consent and moderation at runtime, and provide layout guidance to rendering agents.
@@ -49,7 +63,7 @@ All YAML keys use **snake_case**. The parser converts to camelCase internally (e
 | Field | Required | Type | Default | Description |
 |-------|----------|------|---------|-------------|
 | `name` | yes | string | -- | Human-readable service name. Any language. Must be non-empty. |
-| `type` | yes | string | `"directory"` | One of the eight valid service types (Section 5). |
+| `type` | yes | string | `"directory"` | Non-empty service type; Section 5 lists common examples. |
 | `description` | yes | string | -- | One-line summary. Must be non-empty. |
 | `version` | no | string | `"1.0"` | Version of this service definition (not the CSM format). |
 | `author` | no | string | -- | GAII of the service creator. |
@@ -59,7 +73,7 @@ All YAML keys use **snake_case**. The parser converts to camelCase internally (e
 
 ## 5. Service Types
 
-The `service.type` field must be one of exactly eight values:
+The `service.type` field is a non-empty, free-form string. These are common examples:
 
 | Type | Purpose |
 |------|---------|
@@ -237,11 +251,10 @@ data means, so a prefix that expands to nothing would be published under this no
 | `csm` version non-empty | `"csm version is required"` |
 | `service.name` non-empty | `"service.name is required"` |
 | `service.type` non-empty | `"service.type is required"` |
-| `service.type` is valid | `"service.type must be one of: directory, marketplace, forum, dating, news, opinion, auction, media"` |
 | `service.description` non-empty | `"service.description is required"` |
 | At least one required field | `"data_schema.required must have at least one field"` |
 | Every field has a `type` | `"data_schema field \"<name>\" is missing type"` |
-| `visibility_default` is valid | `"consent_requirements.visibility_default must be one of: private, federation, public"` |
+| `visibility_default` is valid | `"consent_requirements.visibility_default must be one of: private, dmz, local, federation, public"` |
 | Every prefix in `service.semantic` resolves | `"service.semantic: \"@type\": \"shop:Directory\" uses the prefix \"shop:\", which no @context defines…"` |
 
 **Not currently validated:** `data_retention` format, `auto_hide_threshold` range, `ui_hints` field names against `data_schema`. The semantic block's prefixes are checked (above); whether a vocabulary really has the term named is not, and cannot be — this node does not hold anyone else's vocabulary.

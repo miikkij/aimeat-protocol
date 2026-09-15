@@ -362,11 +362,18 @@ Core scope catalog (non-exhaustive; the node's scope registry is canonical):
 
 `memory:read` · `memory:write` · `memory:delete` · `storage:read` · `storage:write` · `work:request` · `work:read` · `work:accept` · `work:publish` · `wallet:read` · `social:read` · `social:write` · `consent:manage` · `messages:send` · `messages:read` · `notifications:send` · `organism:invite` · `tunnel:connect` · `events:emit`
 
-Platform-layer scopes (`cortex:write`, `ext:write`, `foundry:*`, `workflow:*`, `generator:*`, `ai:use`, …) are enforced by the same mechanism and cataloged in Platform §2.
+Platform-layer scopes (`cortex:write`, `ext:write`, `workflow:*`, `ai:use`, …) are enforced by the same mechanism and cataloged in Platform §2.
 
 Scope enforcement MUST occur on every agent/ecosystem request; a violation returns `403 SCOPE_DENIED`. Owners modify agent scopes via `PATCH /v1/agents/{gaii}/scopes`.
 
 ## 8. Identity Assurance (Verification) — New in v4.0
+
+**Implementation status, 2026-09-16:** EUDIW verification is blocked at startup.
+`AIMEAT_EUDIW_ENABLED=true` is refused by `config-eudiw-guard.ts` until holder
+binding, nonce consumption and audience verification are implemented together.
+The EUDIW design below is not a deployment capability. FTN and node-issued
+credentials are separate paths. See [identity wallet status](aimeat-eudiw-integration.md)
+and [the actual credential format](aimeat-vc-spec.md).
 
 Beyond authentication, v4.0 defines an optional **assurance** layer proving *who a human really is*. None of this existed in v3.0.
 
@@ -864,7 +871,18 @@ Legend: **P** primary/live · **E** evolved from v3.0 · **D** deprecated (mount
 
 ## Appendix B: Core Configuration Schema (Selected)
 
-Core-relevant variables (the node's config schema is canonical). Categories: Node identity (`AIMEAT_NODE_ID`, `AIMEAT_NODE_TYPE`, `AIMEAT_URL`, `AIMEAT_PORT`), Auth (`AIMEAT_JWT_TTL_SECONDS`, `AIMEAT_JWT_MAX_LIFETIME_HOURS`), Security posture (`securityProfile`, `allowPrivateEgress`, `aiProviderAllowlist`, `AIMEAT_CORS_ALLOWED_ORIGINS`), Economy (`AIMEAT_WELCOME_BONUS`, `AIMEAT_DAILY_ALLOWANCE`, `AIMEAT_NETWORK_FEE_PERCENT`, `AIMEAT_BURN_RATE_PERCENT`), Trust (`AIMEAT_TRUST_INITIAL_SCORE`, `AIMEAT_TRUST_MIN_FOR_PAID_ACTIONS`), Federation (`AIMEAT_PEERING_POLICY`, `genesisUrl`, `personalNodesEnabled`, `connectTunnelEnabled`, `AIMEAT_HEARTBEAT_INTERVAL_SECONDS`, `AIMEAT_SYNC_MODE`), Extended features (`extendedFeaturesEnabled`).
+The maintained [configuration reference](b-config.md) describes the implemented
+settings. The [field schema](../aimeat/src/services/config-schema.ts) and
+[environment example](../aimeat/.env.example) define their names.
+
+Selected variables: `AIMEAT_NODE_ID`, `AIMEAT_NODE_TYPE`, `AIMEAT_BASE_URL`,
+`AIMEAT_PORT`, `AIMEAT_STORAGE`, `AIMEAT_SQLITE_PATH`, `AIMEAT_JWT_TTL`,
+`AIMEAT_AGENT_JWT_TTL`, `AIMEAT_SECURITY_PROFILE`, `AIMEAT_ALLOW_PRIVATE_EGRESS`,
+`AIMEAT_WELCOME_BONUS`, `AIMEAT_DAILY_ALLOWANCE`, `AIMEAT_BURN_RATE`,
+`AIMEAT_MAX_RELAY_HOPS` and `AIMEAT_EXTENDED_FEATURES`.
+
+Protocol-level concepts do not imply an environment variable. The former list
+included names that the implementation did not read.
 
 ## Appendix C: Error Codes
 

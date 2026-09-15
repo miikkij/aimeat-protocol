@@ -1,299 +1,100 @@
-# Environment Configuration by Node Type
+# Environment examples
 
-## Node Types
+The configuration reference is [b-config.md](../b-config.md).
+The full variable list ships in [aimeat/.env.example](../../aimeat/.env.example).
+These examples choose a deployment shape. Configure operator identity,
+authentication and other required settings for the actual node.
 
-AIMEAT supports four node types, each with different resource requirements and configuration profiles.
+## Full node
 
----
-
-## Full Node (Production)
-
-**Use case:** Multi-user production deployment, public-facing, federation-capable.
-
-```bash
-# .env for full node
-AIMEAT_NODE_ID=my-node-production
-AIMEAT_PORT=40050
+```dotenv
+AIMEAT_NODE_ID=my-production-node
 AIMEAT_NODE_TYPE=full
-AIMEAT_BASE_URL=https://my-node.example.com
-
-# Storage: PostgreSQL required
+AIMEAT_BASE_URL=https://node.example.com
+AIMEAT_PORT=40050
 AIMEAT_STORAGE=postgres-kysely
-DATABASE_URL=postgresql://user:pass@localhost:5432/aimeat
-
-# Auth
-AIMEAT_ADMIN_PASSWORD=<strong-random-password>
-AIMEAT_JWT_TTL=3600
-# OTK / Tier-0.5 keyed-browse is deprecated (superseded by device auth + MCP); leave off.
-AIMEAT_OTK_ENABLED=false
-
-# Economy
-AIMEAT_WELCOME_BONUS=100
-AIMEAT_DAILY_ALLOWANCE=10
-AIMEAT_BURN_RATE=0.01
-
-# Federation
-AIMEAT_GENESIS_URL=https://genesis.aimeat.network
-AIMEAT_FEDERATION_ENABLED=true
-
-# Rate limiting (production values)
-AIMEAT_RL_GLOBAL=1000
-AIMEAT_RL_AUTH=100
-AIMEAT_RL_WORK=200
-AIMEAT_RL_MEMORY=500
-AIMEAT_RL_BOARDS=200
-
-# Email (required for user verification)
-AIMEAT_SMTP_HOST=smtp.example.com
-AIMEAT_SMTP_PORT=587
-AIMEAT_SMTP_USER=noreply@example.com
-AIMEAT_SMTP_PASS=<smtp-password>
-AIMEAT_SMTP_FROM=noreply@example.com
-
-# Push notifications (optional)
-AIMEAT_VAPID_PUBLIC_KEY=<generated-vapid-public>
-AIMEAT_VAPID_PRIVATE_KEY=<generated-vapid-private>
-AIMEAT_VAPID_SUBJECT=mailto:admin@example.com
-
-# TOTP 2FA
-AIMEAT_TOTP_ISSUER=MyNode
+DATABASE_URL=postgresql://user:password@database.example.com:5432/aimeat
+AIMEAT_SECURITY_PROFILE=public
 ```
 
-**Requirements:**
-- PostgreSQL 16+ running
-- Reverse proxy (nginx/caddy) with TLS termination
-- Sufficient RAM for concurrent users (recommended: 2GB+)
-- Persistent disk for PostgreSQL data
+SQLite is also supported. PostgreSQL is not required by the `full` node type.
+The database URL above is a placeholder.
 
----
+## Personal node
 
-## Personal Node
-
-**Use case:** Single-user, home/private deployment, IoT, forest cabin. Low resource requirements.
-
-```bash
-# .env for personal node
+```dotenv
 AIMEAT_NODE_ID=my-personal-node
-AIMEAT_PORT=40050
 AIMEAT_NODE_TYPE=personal
 AIMEAT_BASE_URL=http://localhost:40050
-
-# Storage: SQLite (lightweight, file-based)
 AIMEAT_STORAGE=sqlite
 AIMEAT_SQLITE_PATH=./data/aimeat.db
-
-# Auth
-AIMEAT_ADMIN_PASSWORD=<password>
-AIMEAT_JWT_TTL=86400
-
-# Economy (relaxed for personal use)
-AIMEAT_WELCOME_BONUS=1000
-AIMEAT_DAILY_ALLOWANCE=100
-
-# Federation (connect to a parent node)
-AIMEAT_GENESIS_URL=https://genesis.aimeat.network
-AIMEAT_FEDERATION_ENABLED=true
-
-# Personal node specific
-AIMEAT_PERSONAL_MAILBOX_QUOTA=1000
-AIMEAT_PERSONAL_HEARTBEAT_INTERVAL=60000
-AIMEAT_PERSONAL_OFFLINE_TIMEOUT=86400000
-
-# Rate limiting (relaxed for single user)
-AIMEAT_RL_GLOBAL=10000
-AIMEAT_RL_AUTH=1000
-AIMEAT_RL_MEMORY=5000
-
-# Email/Push typically not needed for personal nodes
 ```
 
-**Requirements:**
-- Minimal: Node.js 24, ~256MB RAM
-- Runs on Raspberry Pi, NAS, laptop, or cloud micro instance
-- SQLite data file in `./data/` directory
-- No external database needed
+A personal node defaults to the local security profile. If you expose one publicly,
+set and verify the public profile explicitly. Node type does not configure a firewall
+or a listening address.
 
----
+## Relay and mirror types
 
-## Relay Node
+Configuration accepts `relay` and `mirror`. Runtime guards restrict relay hosting
+and mirror writes. Those names alone do not establish working replication,
+stateless operation or a tested resource budget.
 
-**Use case:** Message relay, routing between nodes. No user data storage.
+Read [the Core specification](../AIMEAT-RFC-v4.0-Core-full.md) and
+[the actual guards](../../aimeat/src/server-bootstrap/middleware-guards.ts)
+before using either role. Verify the required routes on the intended deployment.
 
-```bash
-# .env for relay node
-AIMEAT_NODE_ID=relay-eu-west-001
-AIMEAT_PORT=40050
-AIMEAT_NODE_TYPE=relay
-AIMEAT_BASE_URL=https://relay-eu.example.com
+Use `AIMEAT_MAX_RELAY_HOPS` for the relay-hop setting. There is no general
+`AIMEAT_FEDERATION_ENABLED` setting. See
+[the federation guide](../aimeat-cross-federation.md).
 
-# Storage: ephemeral (relay holds no persistent user data) — SQLite :memory:
-AIMEAT_STORAGE=sqlite
-AIMEAT_DB_PATH=:memory:
+## Local development and tests
 
-# Auth
-AIMEAT_ADMIN_PASSWORD=<password>
+Use `pnpm sandbox` for interactive work.
+An ephemeral SQLite node uses `AIMEAT_STORAGE=sqlite` and
+`AIMEAT_SQLITE_PATH=:memory:`. The old `AIMEAT_DB_PATH` examples did not
+configure SQLite. The CLI equivalent is `--db-path`.
 
-# Federation (core purpose)
-AIMEAT_GENESIS_URL=https://genesis.aimeat.network
-AIMEAT_FEDERATION_ENABLED=true
-AIMEAT_RELAY_HOPS=3
+Claim a free port and initialize the worktree's test environments from `aimeat/`:
 
-# Rate limiting (higher for relay traffic)
-AIMEAT_RL_GLOBAL=5000
-AIMEAT_RL_FEDERATION=2000
-
-# No email, push, economy, or user-facing features needed
+```powershell
+$env:AIMEAT_E2E_PORT = '<port from your claim>'
+pnpm test:env:init
 ```
 
-**Requirements:**
-- Minimal: Node.js 24, ~128MB RAM
-- Good network connectivity
-- No persistent storage needed
-- Should be geographically distributed for latency
+This creates `.env.test.sqlite` and `.env.test.postgres-kysely`.
+Each session uses its own database and port. Test runners empty their database;
+copying another session's configuration can erase its test data.
 
----
+## Personal-node hosting settings
 
-## Mirror Node
+The host side reads:
 
-**Use case:** Read replica, data redundancy, offline access to a parent node's data.
+- `AIMEAT_PERSONAL_MAILBOX_QUOTA_MB`
+- `AIMEAT_PERSONAL_MAILBOX_RETENTION_DAYS`
+- `AIMEAT_PERSONAL_HEARTBEAT_MS`
+- `AIMEAT_PERSONAL_OFFLINE_MS`
+- `AIMEAT_PERSONAL_REQUEST_TIMEOUT_MS`
+- `AIMEAT_PERSONAL_NODE_MAX_SLOTS`
 
-```bash
-# .env for mirror node
-AIMEAT_NODE_ID=mirror-backup-001
-AIMEAT_PORT=40050
-AIMEAT_NODE_TYPE=mirror
-AIMEAT_BASE_URL=https://mirror.example.com
+See [the personal-node guide](../personal-node-setup-guide.md) and
+[config.ts](../../aimeat/src/config.ts) for meanings and defaults.
 
-# Storage: SQLite (sync'd from parent)
-AIMEAT_STORAGE=sqlite
-AIMEAT_SQLITE_PATH=./data/mirror.db
+## Host-sealed settings
 
-# Auth
-AIMEAT_ADMIN_PASSWORD=<password>
+When the host and node operator are different parties, the host can make specific
+settings read-only:
 
-# Federation (sync from parent)
-AIMEAT_GENESIS_URL=https://parent-node.example.com
-AIMEAT_FEDERATION_ENABLED=true
-
-# Read-only settings
-AIMEAT_RL_GLOBAL=2000
-```
-
-**Requirements:**
-- Node.js 24, ~512MB RAM
-- Persistent disk for SQLite data
-- Network access to parent node for sync
-
----
-
-## Development Environment
-
-**Use case:** Local development, debugging, testing.
-
-```bash
-# .env for development (copy from .env.example)
-AIMEAT_NODE_ID=aimeat-local-001-dev
-AIMEAT_PORT=40050
-AIMEAT_NODE_TYPE=full
-AIMEAT_BASE_URL=http://localhost:40050
-
-# Storage: SQLite :memory: (fast, no cleanup, real SQL code path)
-AIMEAT_STORAGE=sqlite
-AIMEAT_DB_PATH=:memory:
-
-# Auth (simple password for dev)
-AIMEAT_ADMIN_PASSWORD=devpass123
-
-# Extended features enabled for testing
-AIMEAT_EXTENDED_FEATURES=true
-
-# Relaxed rate limits for testing
-AIMEAT_RL_GLOBAL=10000
-AIMEAT_RL_AUTH=1000
-AIMEAT_RL_WORK=1000
-AIMEAT_RL_MEMORY=1000
-AIMEAT_RL_BOARDS=1000
-
-# Default agent scopes (permissive for dev)
-AIMEAT_DEFAULT_AGENT_SCOPES=*
-```
-
----
-
-## Testing Environments
-
-Two supported test configs exist for E2E testing:
-
-| File | Backend | Usage |
-|------|---------|-------|
-| `.env.test.sqlite` | SQLite (disk or `:memory:`) | Fast-iteration default (`pnpm test:e2e:sqlite`) |
-| `.env.test.postgres-kysely` | PostgreSQL + Kysely | Primary / prod backend (`pnpm test:e2e:postgres-kysely`) |
-
-> `.env.test.memory` / `pnpm test:e2e:memory` (pure in-memory) is **deprecated** — do not use it for verification.
-
-All test environments use port 40251 and relaxed rate limits.
-
----
-
-## Configuration Reference
-
-Full list of all 80+ environment variables: see `.env.example` in the `aimeat/` directory.
-
-Complete schema documentation: see `docs/b-config.md`.
-
-Configuration priority (highest to lowest):
-1. **Values persisted in the node's own database** (`PUT /v1/admin/config`), re-applied at every
-   boot by `applyConfigOverrides()`. This is the layer that decides what a node actually runs on,
-   and the one most often forgotten: a value set here beats the environment, permanently, across a
-   restart and an image swap.
-2. Consul KV, where it is enabled: loaded at boot and re-applied by a watch loop on every change
-3. CLI arguments (`--db postgres-kysely`)
-4. Config file (`--config production.ini`)
-5. Environment variables (`AIMEAT_*`)
-6. Defaults in `src/config.ts`
-
-Two classes sit above all of it: fields marked `immutable: true` in `CONFIG_FIELDS`, and the paths
-a node's host sealed at boot (next section).
-
----
-
-## Running nodes for other people
-
-Everything above assumes the person who runs the machine and the person who operates the node are
-the same person, which is true of every self-hosted node. When they are not — a hosting provider, a
-university running one node per department, a company running one per team — there is a set of
-settings the operator must be able to READ and must not be able to CHANGE: resource quotas, rate
-limits, whether metrics are collected, how far a federated request may relay.
-
-Putting those in the container environment does not hold on its own, because of priority 1 above.
-Nominate them instead:
-
-```bash
-# Set by whoever STARTS the node. Names paths, not values.
-AIMEAT_SEALED_CONFIG_KEYS=quota.memory_mb,quota.storage_mb,rate_limits.global,metrics.enabled
-
-# The values still come from the ordinary variables.
+```dotenv
+AIMEAT_SEALED_CONFIG_KEYS=quota.memory_mb,quota.storage_mb,rate_limits.global
 AIMEAT_MEMORY_QUOTA_MB=1024
 AIMEAT_STORAGE_QUOTA_MB=2048
 AIMEAT_RL_GLOBAL=500
-AIMEAT_METRICS_ENABLED=true
 ```
 
-What that buys, and what it deliberately does not:
+These are example limits. The seal lists dot paths; values still come from normal
+configuration sources. Admin writes, stored overrides and Consul cannot change a
+sealed path. Unknown paths refuse startup.
 
-- The operator **sees** every sealed value on `GET /v1/admin/config`, marked `sealed: true` with
-  `source: "sealed"`, and on the admin Config tab with a badge and a line saying who set it. Sealing
-  is not hiding.
-- `PUT /v1/admin/config` and `DELETE /v1/admin/config/:path` refuse a sealed path with 403
-  `SEALED_CONFIG`, and a `PUT` carrying one sealed path applies **none** of its other changes.
-- A value already persisted in the node's database on a sealed path is ignored at boot and logged
-  by name. Consul does not move one either, on any of its three roads in (boot, watch loop,
-  `POST /v1/admin/consul/import`), and `aimeat config import` reports it rather than writing it.
-- **An unknown path refuses the boot.** A typo would otherwise produce a node that looks sealed and
-  is not, which nothing would report.
-- Unset — the default, and the right value for every self-hosted node — nothing changes. The
-  operator owns all of these settings, as they should.
-
-There is no new role and no new credential: the seal is a property of how the process was started,
-which is the trust boundary the deployment already has. Design and the reasoning against the
-alternative: `docs/plans/sealed-config-plan.md`. Implementation: `src/services/config-sealing.ts`.
+See [configuration precedence](../b-config.md) and
+[the original design](../plans/sealed-config-plan.md).

@@ -4,11 +4,15 @@ One report per AI platform: can it reach an AIMEAT node, by which road, and what
 in. Vendor facts were checked on **3 September 2026**; every report carries its own check date,
 because plans, prices and whether a chat has an MCP connector all move every few weeks.
 
+These are dated reference reports. This repository audit did not revalidate vendor
+plans, prices or product interfaces. Check the report date and the vendor's own
+current documentation before changing a connection.
+
 ## The three roads in
 
 **MCP** is the road we prefer. Point the client at `POST /v1/mcp` for the whole toolset, or at a
 scoped `/v2/mcp/{agent|appdev|service|admin}` surface for one job, sign in once in the browser, and
-303 tools appear with no token pasting and no per-tool wiring.
+the current tools appear with no token pasting and no per-tool wiring.
 
 **The manual road** works on every platform, including the ones that can reach nothing: the node
 composes a prompt, you read it, you paste it into the chat, and you bring the answer back. Nothing is

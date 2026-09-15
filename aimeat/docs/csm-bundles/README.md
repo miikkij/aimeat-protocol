@@ -15,6 +15,9 @@ JSON Schema; the manifest is just a memory record validated by the global `organ
 schema. A different `kind` (e.g. a Finnish `tutkimus` with `tavoite`/`hypoteesi`) is another bundle
 on the **same** engine — the core never enumerates `goal`/`plan`/`deliverable`.
 
+The [CSM parser limits](../../../docs/csm-spec.md#current-parser-limits) also
+apply to these runtime assets. Validate the compiled schema when changing a bundle.
+
 ## What's seeded at startup
 
 - The **manifest-format schema** (`organism.*.meta.manifest`, wildcard prefix) — every manifest

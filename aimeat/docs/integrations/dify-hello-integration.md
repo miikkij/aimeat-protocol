@@ -3,7 +3,7 @@
 **Status:** Design + reference prototype
 **Date:** 2026-06-05
 **Prototype:** [`aimeat/tools/dify-bridge/`](../../tools/dify-bridge/)
-**Related:** [`docs/coding-guidelines/extension-memory-architecture.md`](../coding-guidelines/extension-memory-architecture.md), capability layer (`src/routes/capabilities.ts`, `src/services/capability-invoke.ts`), access tokens (`src/routes/access-tokens.ts`), device auth (`src/routes/agents.ts`), onboarding (`src/routes/agent-onboarding.ts`).
+**Related:** [`docs/coding-guidelines/extension-memory-architecture.md`](../../../docs/coding-guidelines/extension-memory-architecture.md), capability layer (`src/routes/capabilities.ts`, `src/services/capability-invoke.ts`), access tokens (`src/routes/access-tokens.ts`), device auth (`src/routes/agents.ts`), onboarding (`src/routes/agent-onboarding.ts`).
 
 ![A Dify agent self-running AIMEAT Hello Integration over MCP](../../../assets/screenshots/dify_hello_integration.png)
 
@@ -125,7 +125,7 @@ It expects **HTTP 200** with JSON; in `normal` mode AIMEAT returns `body.result 
 > **Hard constraints (from the code — design around these):**
 > - **10-second timeout.** `capability-invoke.ts` aborts the webhook at 10s. Synchronous Dify workflows that run longer will fail. Fast workflows only — for long ones, use the **async work/escrow queue** instead of a capability.
 > - **No auth is sent to the webhook.** AIMEAT sends only `X-AIMEAT-Node` + `X-AIMEAT-Timestamp`, no bearer/signature. The shim cannot strongly verify the caller (see §6d security).
-> - **SSRF block.** `validateOutboundUrl` rejects loopback/private IPs unless `AIMEAT_DEV_MODE=true`. Local testing needs dev mode; production needs a public (or node-reachable) shim host.
+> - **SSRF block.** `validateOutboundUrl` rejects loopback/private IPs unless private egress is permitted by the security configuration. Local testing needs an explicit local security configuration; production needs a public (or node-reachable) shim host.
 > - **Node-local.** Capability invoke is not federated. Cross-*node* "call the Dify agent" must go through the work queue, not capabilities.
 
 ### 6b. The bridge shim (translation — implemented in the prototype)
@@ -171,7 +171,7 @@ Maps Dify `data.outputs` → `{ "result": … }`. On Dify HTTP error or `data.st
 **Node prerequisites** (`src/config.ts`) — the defaults forbid this, so set:
 - `AIMEAT_CAPABILITY_PUBLISHING=open` (or operator creates it; or `moderated` + operator approval for `public`).
 - `AIMEAT_CAPABILITY_WEBHOOKS=allowlist_only` + `AIMEAT_CAPABILITY_WEBHOOK_DOMAIN_ALLOWLIST=bridge.example.com` (or `open`).
-- For local testing: `AIMEAT_DEV_MODE=true` (allows the loopback shim past SSRF).
+- For local testing: a local security profile or explicitly configured `AIMEAT_ALLOW_PRIVATE_EGRESS` (see the node configuration).
 
 ### 6d. Security of the shim
 
@@ -187,7 +187,7 @@ The shim holds the Dify app key as a secret (env), never logs it, and never retu
 
 ## 7. End-to-end setup checklist
 
-1. **Node:** start AIMEAT with `AIMEAT_CAPABILITY_PUBLISHING=open`, `AIMEAT_CAPABILITY_WEBHOOKS=allowlist_only` (+ allowlist your shim domain), and `AIMEAT_DEV_MODE=true` for local tests.
+1. **Node:** start AIMEAT with `AIMEAT_CAPABILITY_PUBLISHING=open`, `AIMEAT_CAPABILITY_WEBHOOKS=allowlist_only` (+ allowlist your shim domain), and review the private-egress setting for local tests.
 2. **Identity:** device-auth a `dify` agent; owner approves; run Hello Integration (§4). Store the keypair for refresh.
 3. **Shim:** deploy `tools/dify-bridge` with `DIFY_BASE_URL` + `DIFY_APP_KEY` (or `DIFY_MODE=mock` to test without Dify).
 4. **Capability:** owner registers the `manual` capability pointing at the shim (§6c).

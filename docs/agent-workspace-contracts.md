@@ -183,7 +183,7 @@ the loop idempotent and bounded:
 - **For "what changed since X" coordination, prefer the activity-delta primitive**
   (`GET /v1/organisms/:id/activity?since=`) once available, over re-scanning the whole namespace each pass —
   the same picture in one cheap call, so the agent stays light. See
-  [docs/plans/2026-06-09-organism-activity-delta.md](plans/2026-06-09-organism-activity-delta.md).
+  the current [OpenAPI contract](../openapi.yaml).
 
 ## 6. Schema / manifest rules (must-knows)
 

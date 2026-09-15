@@ -1,51 +1,47 @@
-# Coding Guidelines
+# Development guides
 
-Central reference for all development standards, conventions, and practices in the AIMEAT project.
+Start with [CLAUDE.md](../../CLAUDE.md) and the applicable
+[path rules](../../.claude/rules). They define coordination, worktrees, approval
+boundaries and completion requirements.
 
-## Mandatory Rules
+## Find a guide
 
-These are enforced via CLAUDE.md and ESLint. See CLAUDE.md for the authoritative list.
+| Task | Guide |
+|---|---|
+| Set up an isolated session | [Getting started](getting-started.md) |
+| Find a subsystem | [Architecture](architecture.md) |
+| Resolve the caller and owner | [Identity model](identity-model.md) |
+| Preserve access boundaries | [Security development](security-development-dna.md), [security practices](security.md) |
+| Change stored data | [Storage synchronization](storage-sync.md) |
+| Choose and run checks | [Testing requirements](testing-requirements.md) |
+| Change the web interface | [Frontend guide](../frontend-development-guide.md) |
+| Write source code | [Code style](code-style.md), [file headers](file-headers.md) |
+| Add a dependency | [Dependency management](dependency-management.md) |
+| Change configuration | [Node settings](../b-config.md), [environment examples](environment-configs.md), [init wizard](init-wizard.md) |
+| Store shared records | [Memory contracts](memory-contracts.md), [extension memory](extension-memory-architecture.md) |
+| Transfer a file over MCP | [MCP uploads](mcp-uploads.md) |
+| Write prompts | [Prompt writing](prompt-writing.md) |
+| Commit from this environment | [Shell and Git](shell-and-git.md) |
+| Group agents | [Agent tags and modes](agent-tags.md) |
 
-1. **E2E tests must pass** after major changes (`pnpm test:e2e:postgres-kysely` + `pnpm test:e2e:sqlite`)
-2. **Playwright tests must pass** after frontend changes (`npx playwright test`)
-3. **Source file headers required** on all `.ts`, `.js`, `.css` files
-4. **OpenAPI spec must stay in sync** with implementation
-5. **i18n files must stay in sync** (`en.json` + `fi.json`)
-6. **Dependency management rules** must be followed when adding packages
-7. **ESLint must pass** (`pnpm lint`)
+## Verification
 
-## Documents
+Use a private `pnpm sandbox` for interactive checks. Initialize isolated test
+environments with `pnpm test:env:init` and the port in your Lifecycle Central claim.
 
-| Guide | Purpose |
-|-------|---------|
-| [Testing Requirements](./testing-requirements.md) | **MANDATORY** — E2E + Playwright testing rules, multi-backend testing |
-| [File Headers](./file-headers.md) | **MANDATORY** — Source file header format, version history tracking |
-| [Code Style](./code-style.md) | TypeScript/JS conventions, response envelope, route patterns, i18n, logging |
-| [Architecture](./architecture.md) | System design, core vs extended services, directory structure, storage layer |
-| [Security](./security.md) | Auth patterns, input validation, XSS prevention, rate limiting, GDPR |
-| [Getting Started](./getting-started.md) | Installation, setup, development workflow, common tasks, deployment |
-| [Dependency Management](./dependency-management.md) | **MANDATORY** — Adding packages, license checks, security audits |
-| [Environment Configs](./environment-configs.md) | Node type configurations (full, personal, relay, mirror) |
-| [Storage Sync](./storage-sync.md) | Multi-backend synchronization process, adding fields/tables |
+Run the targeted suites the change requires and `pnpm gate` once on the finished
+change. The full E2E sweep requires the developer's approval. Follow CLAUDE.md for
+integration to main and check CI on the pushed commit.
 
-## Enforcement Tools
+The actual checks are defined in
+[check-registry.mjs](../../aimeat/scripts/lib/check-registry.mjs),
+[gate.ts](../../aimeat/scripts/gate.ts) and
+[the Git hooks](../../.githooks).
 
-| Tool | What It Checks | Command |
-|------|---------------|---------|
-| ESLint + custom rules | File headers, file size, TS conventions | `pnpm lint` |
-| TypeScript compiler | Type safety | `npx tsc --noEmit` |
-| E2E test runner | API correctness on all backends | `pnpm test:e2e:postgres-kysely` |
-| Playwright | Frontend rendering, navigation, CSP | `npx playwright test` |
-| Pre-commit script | Headers, file size, i18n sync, lint, typecheck | `bash scripts/pre-commit-checks.sh` |
+## Documentation
 
-## Related Documentation
-
-| Document | Location | Purpose |
-|----------|----------|---------|
-| CLAUDE.md | `/CLAUDE.md` | AI assistant instructions (mandatory rules) |
-| Frontend Guide | `/docs/frontend-development-guide.md` | Preact + HTM SPA conventions, admin dashboard |
-| API Specification | `/openapi.yaml` | Canonical API contract (must stay in sync) |
-| OpenAPI Sync Plan | `/docs/plans/openapi-sync-plan.md` | Plan to sync 271 missing routes |
-| RFC Specification | `/docs/01-core.md` through `/docs/09-community.md` | Protocol specification |
-| Test Plans | `/docs/testing/` | Detailed test plans (T-1 through T-9) |
-| Config Reference | `/docs/b-config.md` | Complete configuration schema |
+[The documentation index](../README.md) covers both documentation trees.
+[OpenAPI](../../openapi.yaml) is the API contract. The conceptual specifications
+are [Core](../AIMEAT-RFC-v4.0-Core-full.md) and
+[Platform](../AIMEAT-RFC-v4.0-Platform-full.md).
+[The archive](../archive/README.md) holds historical plans.

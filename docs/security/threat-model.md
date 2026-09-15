@@ -1,58 +1,46 @@
-# AIMEAT Threat Model
+# Security threat model
 
-## Assets
+Use this map with [Security Development DNA](../coding-guidelines/security-development-dna.md)
+and the [verification matrix](verification-matrix.md). The implementation and
+executable checks determine which controls apply to a route.
 
-| Asset | Sensitivity | Description |
-|-------|-------------|-------------|
-| Owner private keys | Critical | Ed25519 signing keys for authentication |
-| Node private key | Critical | Node identity for federation signing |
-| JWT tokens | High | Bearer tokens for API access |
-| TOTP secrets | High | 2FA secrets (AES-256-GCM encrypted at rest) |
-| Agent memory | Medium-High | User data (visibility-controlled) |
-| Wallet balances | Medium | Morsel economy balances |
-| Trust scores | Medium | Reputation data (system-computed only) |
+## Assets and boundaries
 
-## Adversaries
+| Asset | Boundary |
+|---|---|
+| Owner, agent and node credentials | Authentication, revocation and private-key storage |
+| Memory, files and workspace records | Identity, ownership, membership, consent and scopes |
+| Hosted apps | Separate origin and owner-approved app grant |
+| Extension data and secrets | Extension namespace, caller authority and sandbox bridge |
+| Morsel balance | One owner balance, atomic changes and transaction attribution |
+| AI budget and payment credentials | Owner budget, separate monetary accounting and credential controls |
+| Federation messages and identities | Trusted peer keys, signatures, replay checks and home-node identity |
+| Audit and provenance | Attribution that ordinary writes cannot forge |
 
-### External Attacker
-- **Goal:** Steal data, drain wallets, disrupt service
-- **Capabilities:** Network access, can send arbitrary HTTP requests
-- **Mitigations:** Rate limiting, input validation, auth requirements, SSRF blocking
+## Threats to test
 
-### Malicious Agent Owner
-- **Goal:** Manipulate trust scores, steal other agents' data, game the economy
-- **Capabilities:** Authenticated API access with valid credentials
-- **Mitigations:** Ownership validation, consent enforcement, self-work prevention, counterparty diversity requirements, trust is system-computed only
+| Caller or input | Required checks |
+|---|---|
+| Unauthenticated request | Public/private boundary, bounded work and rate limits |
+| Another owner | Cross-owner reads and writes refused, including lists and exports |
+| Scoped agent or ecosystem app | Scope and data-area checks on REST, MCP and CLI |
+| Hosted app | Grant restrictions, origin isolation, no owner-token exposure |
+| Federated owner with a local namesake | Resolve to the home-node GHII |
+| Extension code | QuickJS-WASM sandbox, scoped memory and bounded host calls |
+| Outbound URL | Shared safe-fetch path, DNS/address validation and redirect checks |
+| Concurrent balance or version update | Atomic operations and conflict handling |
+| Disabled account or revoked credential | Existing sessions and work paths refuse further access |
 
-### Malicious Federation Peer
-- **Goal:** Inject fake settlements, steal morsels, poison trust data
-- **Capabilities:** Network access to federation endpoints
-- **Mitigations:** All settlements require Ed25519 signatures, peer introductions require operator approval, signature verification on heartbeats and replication
+An operator role and unrestricted database or machine access are different trust
+boundaries. Application permissions cannot protect against unrestricted host access.
+An operator role also does not imply that every route permits access to another
+owner's records.
 
-### Malicious Extension
-- **Goal:** Steal data or morsels through the extension API bridge
-- **Capabilities:** Sandboxed V8 isolate with limited API access
-- **Mitigations:** Extensions can only access caller's own wallet (consume/getBalance), trust scores are read-only, memory is scoped per-caller per-extension
+## Current limitations
 
-### Insider (Operator)
-- **Goal:** Abuse elevated privileges
-- **Capabilities:** Read access to all data, admin dashboard access
-- **Mitigations:** Operators have read-only wallet access (no transfers), audit logging for operator data access, MSM installation requires operator role
+EUDIW verification is blocked at startup until holder binding and replay defenses
+are implemented. See [its status](../aimeat-eudiw-integration.md).
 
-## Attack Vectors and Defenses
-
-| Vector | Defense | Priority |
-|--------|---------|----------|
-| Token in URL query params | Removed; Bearer header only | P0 |
-| Private keys in localStorage | Migrated to non-extractable IndexedDB CryptoKey | P0 |
-| Admin password in HTML | Session-based auth, no password in page source | P0 |
-| Race conditions in wallet | Atomic SQL operations (UPDATE ... WHERE balance >= ?) | P0 |
-| Trust score manipulation | System-computed only, self-work blocked, diversity required | P0 |
-| Unsigned federation peers | Signature + timestamp verification, operator approval | P0 |
-| SSRF via webhooks | URL validation with DNS rebinding protection | P1 |
-| Path traversal in filenames | Decoded + validated before use | P1 |
-| Anonymous auth bypass | Explicit anonymous flag, requireAuth rejects anonymous | P1 |
-| Orphaned data on delete | Comprehensive cascade deletes across all tables | P1 |
-| Timing attacks on backup codes | timing-safe comparison (crypto.timingSafeEqual) | P2 |
-| Unbounded data queries | listAll methods capped at 10,000 records | P2 |
-| CSP unsafe-inline | Per-request nonce-based CSP | P3 |
+[Known gaps](../known_gaps.md) records developer-approved deferred work.
+Historical measurements in the verification matrix apply to their stated date and
+commit. Run current checks before making a new security claim.

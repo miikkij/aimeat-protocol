@@ -58,7 +58,7 @@ Error responses set `isError: true` and include a descriptive message in `text`.
 
 Run these manual tests with OpenClaw connected to a local AIMEAT node:
 
-- [ ] MCP session initializes successfully (tools/list returns 18 tools)
+- [ ] MCP session initializes successfully (tools/list returns the current advertised tools)
 - [ ] `aimeat_memory_write` + `aimeat_memory_read` roundtrip works
 - [ ] `aimeat_memory_list` returns written entries
 - [ ] `aimeat_catalogue_search` returns results (if actions exist)

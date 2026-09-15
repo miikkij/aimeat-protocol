@@ -1,5 +1,27 @@
 # Building an AIMEAT-compatible agent
 
+## Connection and identity versions
+
+Two agent identity paths exist in the current node:
+
+- **Device authorization:** the owner approves an agent and its scopes. Existing
+  integrations continue to use this path and the Hello Integration flow below.
+- **Agent v2:** an approved daemon enrolls agents with keys and signed cards.
+  Agents exchange signed assertions for short-lived tokens. The v2 routes also
+  provide messages, task handles, delivery configuration, attachment and migration.
+
+Agent v2 is additive. An existing device-authorized agent does not become v2 merely
+because the node was upgraded. Read `identityVersion` and the agent's current state.
+
+The implementation is [agents-v2.ts](../aimeat/src/routes/agents-v2.ts) and its
+[route modules](../aimeat/src/routes/agents-v2). Request fields and authorization
+requirements are in [OpenAPI](../openapi.yaml). Migration and enrollment require
+the owner's authority; a token exchange does not create an agent.
+
+For a client using MCP, start with the node's MCP server card and discover the
+available tools. For a daemon integration, select its identity path before building
+authentication, token renewal or task delivery.
+
 **Audience:** anyone building an AIMEAT agent (a crew like crewaimeat, a single autonomous agent, an
 interactive workstation agent) — and the AI you hand the build to.
 **What it answers:** *what do we expect from an agent so it is "AIMEAT-compatible", can be priced, and

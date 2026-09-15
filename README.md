@@ -679,7 +679,7 @@ See the [v4.0 Platform spec](docs/AIMEAT-RFC-v4.0-Platform-full.md) for everythi
 
 ```
 aimeat-protocol/
-├── openapi.yaml              canonical API contract (OpenAPI 3.1, 1077 paths)
+├── openapi.yaml              canonical API contract (OpenAPI 3.1)
 ├── startup.prompt.md         paste-to-AI: fresh clone → running node
 ├── aimeat/                   ★ the reference implementation (Node 24 / TypeScript / Express 5)
 │   ├── src/routes/           184 route modules (one per domain)
@@ -723,6 +723,8 @@ cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2
 
 ## Documentation
 
+Start with the [documentation index](docs/README.md). The [file catalog](docs/catalog.md) identifies current guidance, runtime assets, examples and historical records.
+
 - [RFC v4.0 — Core](docs/AIMEAT-RFC-v4.0-Core-full.md), the generic, federatable protocol
 - [RFC v4.0 — Platform](docs/AIMEAT-RFC-v4.0-Platform-full.md), what aimeat.io builds on the Core
 - [OpenAPI spec](openapi.yaml), the machine-readable API contract (OpenAPI 3.1, canonical)
@@ -744,7 +746,7 @@ cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2
 | v2.0 | 2026-03-08 | Node types, moderation, idempotency |
 | v1.x | 2025-2026 | Core protocol and early features |
 
-Those are *specification* versions. The reference implementation has its own line, at 3.13.0 as this page was written. See [CHANGELOG.md](CHANGELOG.md) and the [releases page](https://github.com/miikkij/aimeat-protocol/releases).
+Those are *specification* versions. The reference implementation has its own line, recorded in `aimeat/package.json`. See [CHANGELOG.md](CHANGELOG.md) and the [releases page](https://github.com/miikkij/aimeat-protocol/releases).
 
 ---
 

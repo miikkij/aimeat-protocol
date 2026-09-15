@@ -4,7 +4,7 @@
 
 | Setting | Value |
 |---------|-------|
-| Language | TypeScript 5.9.3, strict mode |
+| Language | TypeScript (version in `aimeat/package.json`), strict mode |
 | Target | ES2022 |
 | Module | NodeNext resolution, ESM (`"type": "module"`) |
 | Runtime | Node.js 24.x |
@@ -164,7 +164,7 @@ router.post('/v1/endpoint', requireAuth(), requireRole('agent'), async (req, res
 
 ## Storage Layer
 
-All data access goes through the `Storage` interface (`src/storage/interface.ts`). Supported backends are **PostgreSQL + Kysely** (primary / production) and **SQLite (better-sqlite3)**; use SQLite with `AIMEAT_DB_PATH=:memory:` for ephemeral runs. (The old pure in-memory provider is deprecated; the Prisma-era MongoDB and legacy Prisma-PG backends were removed 2026-07-16.) A data-model change updates both backends in the same commit — see `storage-sync.md`.
+All data access goes through the `Storage` interface (`src/storage/interface.ts`). Supported backends are **PostgreSQL + Kysely** (primary / production) and **SQLite (better-sqlite3)**; use SQLite with `AIMEAT_SQLITE_PATH=:memory:` for ephemeral runs. (The old pure in-memory provider is deprecated; the Prisma-era MongoDB and legacy Prisma-PG backends were removed 2026-07-16.) A data-model change updates both backends in the same commit — see `storage-sync.md`.
 
 ### Adding New Data Types
 

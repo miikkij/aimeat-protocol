@@ -363,9 +363,9 @@ trusting the file. A checklist would have accepted it and the number would have 
 whether a finding is NEW. A gate that reads its own bookkeeping as the truth is a list, not a gate.
 
 ### 16. Deprecated is not removed
-RFC v4.0 marks One-Time Keys / Tier 0.5 deprecated and says the feature sits behind
-`keyedBrowseEnabled`. Three of its write paths were behind no flag at all, and the flag defaults to
-ON, so they were live on every node: two wrote work status with no task bridge and no event, and the
+Before removal on 2026-08-23, the RFC marked One-Time Keys / Tier 0.5 deprecated
+and described `keyedBrowseEnabled`. Three write paths were behind no flag, and
+the flag defaulted to ON, so they were live on every node: two wrote work status with no task bridge and no event, and the
 third created a board post with no access check, no price, no hook and no provenance.
 
 *Check:* deprecating something names the flag, the default and the version it is removed in. A

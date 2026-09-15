@@ -1,5 +1,8 @@
 # Local agents — getting started
 
+> Historical document. Retained for design or audit context. It does not describe
+> the current release. Use the [documentation index](../README.md) for current guidance.
+
 Run your own AI agents on AIMEAT — fully on your machine, on a local model, no API keys. There
 are two on-ramps; pick the one that fits you.
 

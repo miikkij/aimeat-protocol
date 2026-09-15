@@ -100,7 +100,7 @@ Read this section before you quote anything from section 1.
 ## 3. Which hat are you wearing?
 
 Three distinct legal persons commonly touch one piece of content here. Fuller analysis:
-[docs/internal/EUAct/04-aimeat-role-analysis.md](internal/EUAct/04-aimeat-role-analysis.md).
+the private role-analysis notes (not distributed in this repository).
 
 **You are a deployer, by default.** You run the systems on your node. Article 50(4) — deepfakes and
 text on matters of public interest — lands on the account that publishes, which on a multi-tenant node
@@ -112,7 +112,7 @@ does *not* cover.
 function is to generate text or images, a masthead that publishes generated articles, or a node
 feature you brand as your own. **Plugging in a local model does not change who the deployer is, but it
 does move the Art. 50(2) marking duty for the raw generation onto you** — with a hosted model that
-duty is the vendor's. See [19-future-proofing.md](internal/EUAct/19-future-proofing.md) §3.
+duty is the vendor's. See the private future-proofing notes (not distributed) §3.
 
 **The model vendor** owns the marking duty for the raw generation when you reach a hosted model. That
 is why `generator.upstreamMarks` exists in the record: a downstream provider may rely on an upstream
@@ -261,4 +261,4 @@ AIMEAT_AI_COP_SIGNED_ON="2026-08-01"
 - `GET /v1/ai-transparency` — the live, machine-readable statement for a running node
 - [RFC v4.0 Platform §3.6](AIMEAT-RFC-v4.0-Platform-full.md) — the normative description of the record, the planes and the posture
 - [`openapi.yaml`](../openapi.yaml) — the canonical API contract
-- [docs/internal/EUAct/](internal/EUAct/) — the research, role analysis and design set behind all of this
+- Private EUAct research and role-analysis notes are not distributed in this repository.

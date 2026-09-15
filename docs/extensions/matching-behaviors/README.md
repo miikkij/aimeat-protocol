@@ -1,6 +1,6 @@
 # matching-behaviors
 
-V8 sandbox extension for interest-based matching with geographic proximity scoring. Migrated from the built-in matching service (`src/services/matching.ts`).
+QuickJS-WASM sandbox extension for interest-based matching with geographic proximity scoring. Migrated from the built-in matching service (`src/services/matching.ts`).
 
 ## Overview
 

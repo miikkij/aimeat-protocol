@@ -7,8 +7,8 @@ settings that exist nowhere in the code. It now describes the reference implemen
 against `aimeat/src/services/config-schema.ts` and `aimeat/.env.example` on 3 September 2026.
 
 **One sentence version:** every setting has a dot path (`morsel_policy.daily_allowance`) and an
-environment variable (`AIMEAT_DAILY_ALLOWANCE`); there are about 300 of them; `aimeat config` prints
-what your node is running with, and `GET /v1/admin/config` returns the same thing with types, ranges
+environment variable (`AIMEAT_DAILY_ALLOWANCE`); `aimeat config` prints what the CLI process
+resolves, and `GET /v1/admin/config` returns the running server's settings with types, ranges
 and where each value came from.
 
 ### Where a value comes from
@@ -54,8 +54,7 @@ be reset. Secrets never appear as values: an API key shows up as `<path>_configu
 ### Changing it
 
 **From the environment or a file** for anything, including the immutable fields. `aimeat/.env.example`
-is the authoritative list, 366 documented keys in 71 sections, each with a safe public default
-and the local override written next to it. Copy it to `.env` and uncomment what you need.
+documents the available variables, with defaults and local overrides. Copy it to `.env` and uncomment what you need.
 
 **From the admin dashboard** for the mutable subset, which is a `PUT /v1/admin/config` underneath:
 
@@ -72,39 +71,39 @@ that disappears on restart is worse than no value.
 
 ### The field groups
 
-About 300 fields in some fifty groups. The dot path's first segment is the group.
+The dot path's first segment is the group. The configuration schema lists the current fields.
 
-| Group | Fields | What it governs |
-|---|---|---|
-| `site` | 24 | The node's public face: front page, links, content signals, whether AI training is allowed |
-| `security` | 19 | Login and registration rate limits, password lockout, the login tarpit, body size limits, the auth log |
-| `ai` | 17 | The node's own model key, per-person free allowance, and the default model per role |
-| `operator` | 15 | Who runs this node, as a GDPR data controller. Required, or `/v1/privacy` answers 503 |
-| `quota` | 13 | Per-owner ceilings: memory MB and keys, storage MB, file and app size, workspace rows |
-| `rate_limits` | 13 | Requests per second per endpoint family, multiplied by who is asking: operator 10x, owner 2x, agent 1x, anonymous 0.5x |
-| `seo` | 13 | Titles, descriptions, og-image, indexing posture |
-| `morsel_policy` | 11 | Welcome bonus, daily allowance and its cap, burn rate, pacing toll, operator mint ceiling |
-| `federation` | 11 | Peering policy, relay hops, heartbeats, depeering grace, Web Bot Auth signing |
-| `connections` | 11 | Outbound accounts (Google, Microsoft) an owner can attach |
-| `email` | 10 | SMTP and whether address confirmation is required |
-| `eudiw` | 10 | European digital identity wallet verification |
-| `realtime` | 10 | P2P rooms: how many, how big, how long idle |
-| `federation_sync` | 9 | What is replicated to peers, how often, how large a batch |
-| `node` | 8 | Id, port, type, base URL, sealed keys, and the dev, test and anonymous modes |
-| `totp` | 8 | Two-factor: period, window, failed-attempt ceiling |
-| `extensions` | 8 | The QuickJS-WASM sandbox: memory, timeout, outbound call budget |
-| `push` | 8 | Web push and its VAPID keys |
-| `personal_nodes` | 7 | Slots, mailbox quota and retention for personal nodes anchored here |
-| `connect_tunnel` | 7 | The connector's forward tunnel: heartbeat, offline threshold, timeouts |
-| `work` | 6 | Queue depth, webhook retries, URL length ceiling |
-| `commerce` | 6 | Whether commerce is on, the fee mode, the operator's fee account |
-| `consul` | 6 | Optional fleet configuration source |
-| `auth` | 4 | JWT and agent token lifetimes, the Entra tenant allowlist |
-| `marketplace` | 4 | Listing fee, transaction fee, escrow |
-| `agent` | 4 | System principles, per-task token ceiling, mandatory logging |
-| `consent`, `cortex`, `portfolio`, `cookies`, `cross_federation` | 3 each | Consent retention; cortex install limits; portfolio size; cookie banner; genesis peers |
-| `features`, `stats`, `metrics`, `scopes`, `sso`, `tasks` | 2 each | Feature switches, who may read stats and metrics, default and maximum agent scopes, organisation sign-in, task auto-archive |
-| `storage`, `boards`, `apps`, `cors`, `mcp`, `moderation`, `registration`, `setup`, `msm`, `indexing`, `echat`, `proactive`, `account_events` | 1 each | One knob apiece: backend type, public boards per owner, app SEO mode, allowed origins, MCP session idle, auto-hide threshold, registration mode, setup IP allowlist, MSM install role, IndexNow key, anonymous encrypted chat, proactive guidance, the account-event window |
+| Group | What it governs |
+|---|---|
+| `site` | The node's public face: front page, links, content signals, whether AI training is allowed |
+| `security` | Login and registration rate limits, password lockout, the login tarpit, body size limits, the auth log |
+| `ai` | The node's own model key, per-person free allowance, and the default model per role |
+| `operator` | Who runs this node, as a GDPR data controller. Required, or `/v1/privacy` answers 503 |
+| `quota` | Per-owner ceilings: memory MB and keys, storage MB, file and app size, workspace rows |
+| `rate_limits` | Requests per second per endpoint family, multiplied by who is asking: operator 10x, owner 2x, agent 1x, anonymous 0.5x |
+| `seo` | Titles, descriptions, og-image, indexing posture |
+| `morsel_policy` | Welcome bonus, daily allowance and its cap, burn rate, pacing toll, operator mint ceiling |
+| `federation` | Peering policy, relay hops, heartbeats, depeering grace, Web Bot Auth signing |
+| `connections` | Outbound accounts (Google, Microsoft) an owner can attach |
+| `email` | SMTP and whether address confirmation is required |
+| `eudiw` | Wallet verification settings; enabling EUDIW currently blocks startup |
+| `realtime` | P2P rooms: how many, how big, how long idle |
+| `federation_sync` | What is replicated to peers, how often, how large a batch |
+| `node` | Id, port, type, base URL, sealed keys, and the dev, test and anonymous modes |
+| `totp` | Two-factor: period, window, failed-attempt ceiling |
+| `extensions` | The QuickJS-WASM sandbox: memory, timeout, outbound call budget |
+| `push` | Web push and its VAPID keys |
+| `personal_nodes` | Slots, mailbox quota and retention for personal nodes anchored here |
+| `connect_tunnel` | The connector's forward tunnel: heartbeat, offline threshold, timeouts |
+| `work` | Queue depth, webhook retries, URL length ceiling |
+| `commerce` | Whether commerce is on, the fee mode, the operator's fee account |
+| `consul` | Optional fleet configuration source |
+| `auth` | JWT and agent token lifetimes, the Entra tenant allowlist |
+| `marketplace` | Listing fee, transaction fee, escrow |
+| `agent` | System principles, per-task token ceiling, mandatory logging |
+| `consent`, `cortex`, `portfolio`, `cookies`, `cross_federation` | Consent retention; cortex install limits; portfolio size; cookie banner; genesis peers |
+| `features`, `stats`, `metrics`, `scopes`, `sso`, `tasks` | Feature switches, who may read stats and metrics, default and maximum agent scopes, organisation sign-in, task auto-archive |
+| `storage`, `boards`, `apps`, `cors`, `mcp`, `moderation`, `registration`, `setup`, `msm`, `indexing`, `echat`, `proactive`, `account_events` | Settings for backend type, public boards per owner, app SEO mode, allowed origins, MCP session idle, auto-hide threshold, registration mode, setup IP allowlist, MSM install role, IndexNow key, anonymous encrypted chat, proactive guidance, the account-event window |
 
 Three top-level paths sit outside any group because they are secrets or paths, not policy:
 `database_url`, `sqlite_path`, `admin_password`.
@@ -128,7 +127,7 @@ Defaults as shipped in `.env.example`.
 | `morsel_policy.burn_rate` | `AIMEAT_BURN_RATE` | `0.10` | Share of a transfer that leaves circulation |
 | `morsel_policy.pacing_toll_default` | `AIMEAT_PACING_TOLL_DEFAULT` | `0` | What a write costs by default |
 | `quota.memory_mb` | `AIMEAT_MEMORY_QUOTA_MB` | `10` | Memory per owner |
-| `quota.memory_max_keys_per_agent` | `AIMEAT_MEMORY_MAX_KEYS` | `1000` | Keys per principal. aimeat.io runs this at 100 000; build against 1000 |
+| `quota.memory_max_keys_per_agent` | `AIMEAT_MEMORY_MAX_KEYS` | `1000` | Keys per principal; query the target node for its configured limit |
 | `quota.memory_max_value_size_kb` | `AIMEAT_MEMORY_MAX_VALUE_SIZE_KB` | `1024` | One memory value |
 | `quota.storage_mb` | `AIMEAT_STORAGE_QUOTA_MB` | `100` | Files per owner |
 | `quota.storage_max_file_size_mb` | `AIMEAT_STORAGE_MAX_FILE_SIZE_MB` | `10` | One file |
@@ -144,8 +143,9 @@ Defaults as shipped in `.env.example`.
 | `registration.mode` | `AIMEAT_REGISTRATION_MODE` | `open` | Who may create an account: `open`, `oauth`, `invite` or `closed`. → `docs/organisation-node-sign-in.md` |
 | `node.sealed_config_keys` | `AIMEAT_SEALED_CONFIG_KEYS` | empty | Paths this node's host makes read-only |
 
-**The security posture is environment-only.** `AIMEAT_SECURITY_PROFILE` takes `local` or `public`,
-defaults to `public`, and is read straight from the environment rather than through the field schema,
+**The security posture is environment-only.** `AIMEAT_SECURITY_PROFILE` takes `local` or `public`.
+When unset, `config.ts` selects `local` for a private base URL or a personal node, and `public`
+otherwise. It is read from the environment rather than through the field schema,
 so it has no dot path and cannot be changed from the dashboard. It decides the settings whose safe
 value differs between localhost and the open internet: private-network egress, the AI provider
 allowlist, and whether app origin isolation is on when nothing has said. `aimeat validate` reports

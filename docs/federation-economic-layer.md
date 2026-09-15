@@ -1,5 +1,8 @@
 # Federation Economic Layer — Future Design (Phase C)
 
+> Historical document. Retained for design or audit context. It does not describe
+> the current release. Use the [documentation index](README.md) for current guidance.
+
 **Status:** Design only — **no code in the current implementation.** Deferred by developer decision (2026‑06‑19). This document captures the intended path so the visiting‑node work (Phases A & B) has a clear "why it becomes attractive" follow‑on, without committing to the regulatory and custody surface a real value layer brings.
 
 ## Context
