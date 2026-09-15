@@ -20,6 +20,9 @@
  *       is refused at save too — the second because such a step would green on any return at all.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workflow-extension-step
  * @version-history
+ *   v1.1.0 -- 2026-09-15 -- 6b asserts the bridge's refusal of an undefined argument (3cc14fae6)
+ *     instead of the file it used to write under the key "undefined". It had pinned that defect on
+ *     purpose and kept the nightly sweep red on both backends once the defect was fixed.
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 A3).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -83,8 +86,8 @@ const SCRIPTS = {
   emptyhanded: `export default async function(){ return { looksFine: true }; }`,
   // Throws the way a producer whose source is down throws.
   boom: `export default async function(){ throw new Error('SOURCE_UNAVAILABLE: the upstream register did not answer'); }`,
-  // Calls ctx.files.write with an ABSENT key. The host bridge stringifies every argument, so the
-  // guest's `undefined` arrives as the four characters "undefined" — see test 6b.
+  // Calls ctx.files.write with an ABSENT key. The host bridge used to stringify it into the key
+  // "undefined" and write a file; since 3cc14fae6 it refuses the call. See test 6b.
   sloppy: `export default async function(ctx, input){ var out = await ctx.files.write(input.key, input.b64, { mime: 'text/csv' }); return { wrote: out.key }; }`,
   probe: `export default async function(ctx){ return { gaii: ctx.caller.gaii, roles: ctx.caller.roles, hasFiles: !!ctx.files, hasWallet: !!(ctx.wallet && ctx.wallet.consume) }; }`,
   // A REAL producer's shape: an envelope with the table inside it, which is why a datapackage step
@@ -290,16 +293,25 @@ await test('6. A THROWN error is red, and no result is written', async () => {
   assert(res.status === 404, `a failed run must write no result, got ${res.status}`);
 });
 
-await test('6b. FOUND WHILE TESTING: the host bridge stringifies every argument', async () => {
-  // This test was written expecting a throw and got a green step. The reason is not the workflow
-  // road: registerAsyncHostFn reads its arguments with vm.getString(), so a guest passing `undefined`
-  // sends the four characters "undefined". `ctx.files.write(undefined, undefined)` therefore writes a
-  // real file at the key "undefined" instead of refusing an absent key, and the action returns
-  // successfully. Pinned here because it is the shape of a producer that quietly writes rubbish, and
-  // because a future change that makes the bridge pass real types must not do it by accident.
+await test('6b. The host bridge refuses an absent argument instead of writing a file named "undefined"', async () => {
+  // This assertion used to pin the DEFECT. registerAsyncHostFn read every argument with
+  // vm.getString(), so `ctx.files.write(undefined, undefined)` sent the four characters "undefined",
+  // wrote a real file under that key, and returned normally, which a workflow step records as a
+  // success. It was pinned on purpose, with a note that the change which made the bridge pass real
+  // types must not arrive by accident.
+  //
+  // It arrived on purpose: 3cc14fae6 (2026-09-13) refuses an undefined or null argument before the
+  // host does any work, with a message naming the call and the argument. The nightly sweep went red
+  // on this line on both backends every night from then until the assertion was turned round, which
+  // is the tripwire doing its job rather than a regression. Green again because the SOURCE was broken
+  // and is fixed (testing rule: which of three a green test was).
   const r = await json(`/v1/ext/${EXT}/sloppy`, { method: 'POST', headers: auth(owner.token), body: '{}' });
-  assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body?.error)}`);
-  assert(r.body.data.wrote === `ext/${EXT}/undefined`, `expected a file keyed "undefined", got ${r.body.data.wrote}`);
+  assert(r.status >= 400, `the action should fail, got ${r.status} ${JSON.stringify(r.body)}`);
+  const msg = String(r.body?.error?.message ?? '');
+  assert(/ctx\.files\.write: argument 1 is undefined/.test(msg), `the refusal should name the call and the argument, got: ${msg}`);
+  // And nothing was written under the key the old bridge would have invented.
+  const ghost = await json(`/v1/storage/${encodeURIComponent(`ext/${EXT}/undefined`)}`, { headers: auth(owner.token) });
+  assert(ghost.status === 404, `a file keyed "undefined" exists: ${ghost.status}`);
 });
 
 await test('6c. The fence holds when the extension disappears AFTER the workflow was saved', async () => {

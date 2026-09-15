@@ -23,6 +23,9 @@
  *     node packages/build-company-brain-pkg.mjs
  * @usage node packages/build-company-brain-pkg.mjs   (run from the repo root)
  * @version-history
+ *   v1.1.1 — 2026-09-15 — The data map is inlined as JSON.stringify writes it. A `.replace(/\n/g,
+ *     '\n')` after it replaced every newline with a newline, changed no byte of the output, and was
+ *     flagged by CodeQL (js/identity-replacement, #1632); the generated file is identical without it.
  *   v1.1.0 — 2026-09-14 — The app component carries the data map from packages/company-brain/
  *     datamap.json, so an installed brain can say where it puts a company's knowledge without
  *     anyone reading its source.
@@ -132,7 +135,7 @@ const CORTEX_BRAIN = \`${esc(cortex)}\`;
  * an installed copy can answer the question without anyone opening the source, and the installer
  * writes it beside the app under the name this node gave it.
  */
-const DATAMAP_BRAIN = ${JSON.stringify(datamap, null, 2).replace(/\n/g, '\n')} as const;
+const DATAMAP_BRAIN = ${JSON.stringify(datamap, null, 2)} as const;
 
 export function companyBrainPackage(): ExamplePackageDef {
   return {
