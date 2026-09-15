@@ -24,6 +24,9 @@
  *   recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   v1.5.0 — 2026-09-15 — A contact whose address is the sender's own takes the email channel, not
+ *     the inbox. A campaign test to your own address answered 500 (duplicate key on DirectMessage)
+ *     and sent nothing; an inbox copy to yourself would not have shown the email anyway.
  *   v1.4.0 — 2026-09-13 — A send that did not go out THROWS OutboundError SEND_FAILED (502 when the
  *     channel refused or failed it, 503 when the node had nothing to send through) after it is
  *     logged, with the send-log id and the reason in `details`. It used to come back as a result with
@@ -547,7 +550,10 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   // that renaming a code cannot move a failure from one status to the other without anyone noticing.
   let noTransport = false;
 
-  if (contact.ghii) {
+  // A contact that is the sender's OWN address gets the email. The person is looking at their own
+  // campaign as a recipient sees it, and a copy in their own AIMEAT inbox shows them nothing of that.
+  // Until 2026-09-15 this took the inbox channel and failed with a 500 on the message's primary key.
+  if (contact.ghii && contact.ghii !== ownerGhii) {
     channel = 'inbox';
     const noteLine = attachments.length > 0
       ? `\n\n(${attachments.map((a) => a.filename).join(', ')} — lataa liitteet lähettäjän palvelusta)`

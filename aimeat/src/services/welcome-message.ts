@@ -70,9 +70,8 @@ export async function sendOperatorWelcome(
     // No operator yet: this is the node's first account, which is the operator's own. Nobody is
     // there to welcome them, and inventing a sender would be a lie about who is talking.
     if (!operatorGhii) return;
-    // The operator's own later accounts, and the first-owner case where the cache has warmed: a
-    // message from yourself to yourself collides on (id, ownerGhii) inside sendDirectMessage's
-    // own-agent branch. Guarding here rather than there keeps the general path untouched.
+    // The operator's own later accounts, and the first-owner case where the cache has warmed:
+    // welcoming yourself says nothing, so nothing is sent.
     if (operatorGhii === recipientGhii) return;
 
     const prompt = await storage.getSystemPrompt(WELCOME_PROMPT_ID);

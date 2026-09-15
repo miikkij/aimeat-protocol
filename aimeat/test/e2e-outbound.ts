@@ -13,6 +13,8 @@
  *   reason EMAIL_DISABLED. That answer is what "every policy gate passed" looks like: a refusal from
  *   a gate is 400, 403, 404, 422 or 429 and never reaches the transport.
  * @version-history
+ *   v1.4.0 — 2026-09-15 — Test 6c: a contact that is the sender's own address takes the email
+ *     channel. It took the inbox channel and answered 500 on a duplicate message key on a live node.
  *   v1.3.0 — 2026-09-13 — POST /v1/outbound/send answers a send that did not go out with SEND_FAILED
  *     (503 here, where there is no transport) instead of 200, with the send-log id and the reason in
  *     error.details (the developer's decision of 2026-09-13). Tests 6 and 6b assert the new answer
@@ -254,6 +256,24 @@ await test('6b. a failed send names its send-log row, and the row says the same'
   assert(row !== undefined, 'the failed attempt must be in the send log under the id the answer named');
   assert(row.status === 'failed' && row.error === 'EMAIL_DISABLED', `log row: ${JSON.stringify(row)}`);
   assert(row.subject === 'Sopimusviesti', `the row must be this attempt, got subject ${row.subject}`);
+});
+
+await test('6c. a contact that is the sender\'s OWN address takes the email channel, not a 500', async () => {
+  // 2026-09-15 on a live node: a campaign send to the sender's own verified address took the inbox
+  // channel, wrote the message to the sender twice under one key and answered 500. Nothing was sent.
+  const own = await json('/v1/outbound/contacts', {
+    method: 'POST', headers: authed(recipientToken),
+    body: JSON.stringify({ name: 'Minä itse', email: recipientEmail }),
+  });
+  assert(own.status === 201, `own-address contact: ${own.status} ${JSON.stringify(own.body)}`);
+  assert(own.body.data.contact.ghii === `${recipientUsername}@${NODE_ID}`, `the own address resolves to the sender: ${own.body.data.contact.ghii}`);
+  const r = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(recipientToken),
+    body: JSON.stringify({ contact_id: own.body.data.contact.id, kind: 'marketing', subject: 'Kampanjan testi', body: 'Näin viesti näkyy vastaanottajalle.' }),
+  });
+  assert(r.status !== 500, `a send to your own address must not be a node fault: ${JSON.stringify(r.body)}`);
+  const d = assertNoTransport(r, 'send to own address with SMTP off');
+  assert(d.channel === 'email', `expected the email channel, got ${d.channel}`);
 });
 
 await test('7. opt-out blocks marketing but not transactional', async () => {
