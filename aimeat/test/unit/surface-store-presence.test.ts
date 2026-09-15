@@ -9,6 +9,7 @@
  *   on a config field that is never true simply never appears, on any node, with no error.
  * @usage pnpm exec vitest run test/unit/surface-store-presence.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-15 — The home's "get your own AIMEAT" block: offered with a store, never built in.
  *   v1.0.0 — 2026-08-28 — Initial, with the showroom front page.
  */
 import { describe, it, expect } from 'vitest';
@@ -57,5 +58,30 @@ describe('the store block on the front page', () => {
         expect(ids.indexOf('portal.totals')).toBe(ids.indexOf('portal.frame-hero') + 1);
         expect(ids.indexOf('portal.frame-linux')).toBe(ids.indexOf('portal.trust') - 1);
         expect(ids[ids.length - 1]).toBe('portal.frame-close');
+    });
+});
+
+// The home's "get your own AIMEAT" card (2026-09-15). A demo site's one prompt to buy: it is offered
+// to the operator only where there is a store to send people to, and it is NEVER in a built-in home,
+// because a node that sells nothing must not start telling its members to buy. The operator adds it.
+describe('the "get your own AIMEAT" block on the home', () => {
+    it('is declared on both homes, gated on storeEnabled', () => {
+        const def = blockById('home.own-aimeat');
+        expect(def).toBeDefined();
+        expect(def!.surfaces).toEqual(['home', 'home-onboarding']);
+        expect(def!.presence).toEqual({ kind: 'config', configKey: 'storeEnabled' });
+    });
+
+    it('is offered on both homes when the node has a store, and on neither when it has none', () => {
+        for (const surface of ['home', 'home-onboarding'] as const) {
+            expect(blocksForSurface(surface, configWith(true)).map(b => b.id)).toContain('home.own-aimeat');
+            expect(blocksForSurface(surface, configWith(false)).map(b => b.id)).not.toContain('home.own-aimeat');
+        }
+    });
+
+    it('is in neither built-in home, even on a node with a store', () => {
+        for (const surface of ['home', 'home-onboarding'] as const) {
+            expect(defaultLayout(surface, configWith(true)).blocks.map(b => b.id)).not.toContain('home.own-aimeat');
+        }
     });
 });

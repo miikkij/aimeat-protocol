@@ -214,6 +214,7 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
         b('home.open-items'),
         b('home.install-cta'),
         b('home.trust'),
+        // home.own-aimeat is left out of both homes on purpose: only a demo site's operator adds it.
     ],
     'home-onboarding': [
         b('home.nameplate'),

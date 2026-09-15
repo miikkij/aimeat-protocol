@@ -11429,6 +11429,12 @@
         "step4": "Decide your own rules, and federate with others only if you want to."
       }
     },
+    "ownAimeat": {
+      "label": "Demo",
+      "title": "This is a demo. Get your own AIMEAT.",
+      "text": "Many people share this site to try things out. Your own AIMEAT is the same whole system, at an address with your name on it. We keep it running and up to date for a monthly fee, and everything in it belongs to you.",
+      "cta": "Go to the store →"
+    },
     "trust": {
       "ai": "AI-made content carries its label here, as the EU AI Act asks.",
       "data": "Your data is yours: export it or delete it, and nothing is shared until you share it.",
@@ -19365,6 +19371,10 @@
         "install-cta": {
           "label": "Install as an app",
           "summary": "An offer to install this as an app on their device. Only ever shown when the browser offers it."
+        },
+        "own-aimeat": {
+          "label": "Get your own AIMEAT (demo sites)",
+          "summary": "Tells the person this site is a demo and links to the store where they can get their own AIMEAT. Not on the page until you add it, and offered only when this site has a store set up."
         },
         "trust": {
           "label": "AI labelling and data ownership",

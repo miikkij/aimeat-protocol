@@ -9716,6 +9716,12 @@
         "step4": "Decide tus propias reglas, y federa con otros solo si quieres."
       }
     },
+    "ownAimeat": {
+      "label": "Demo",
+      "title": "Esto es una demo. Consigue tu propio AIMEAT.",
+      "text": "Mucha gente usa este sitio para probar cosas. Tu propio AIMEAT es el mismo sistema completo, en una dirección con tu nombre. Nosotros lo mantenemos en marcha y al día por una cuota mensual, y todo lo que contiene es tuyo.",
+      "cta": "Ir a la tienda →"
+    },
     "trust": {
       "ai": "El contenido hecho con IA lleva aquí su etiqueta, como pide el Reglamento de IA de la UE.",
       "data": "Tus datos son tuyos: expórtalos o bórralos, y nada se comparte hasta que tú lo compartes.",
@@ -17250,6 +17256,10 @@
         },
         "install-cta": {
           "label": "Instalar como aplicación"
+        },
+        "own-aimeat": {
+          "label": "Consigue tu propio AIMEAT (sitios de demo)",
+          "summary": "Dice a la persona que este sitio es una demo y enlaza con la tienda donde puede conseguir su propio AIMEAT. No aparece en la página hasta que lo añades, y solo se ofrece si este sitio tiene una tienda configurada."
         },
         "trust": {
           "label": "Etiquetado de IA y propiedad de los datos"

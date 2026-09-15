@@ -11416,6 +11416,12 @@
         "step4": "Päätä omat sääntösi, ja federoi muiden kanssa vain jos haluat."
       }
     },
+    "ownAimeat": {
+      "label": "Demo",
+      "title": "Tämä on demo. Hanki oma AIMEAT.",
+      "text": "Moni käyttää tätä sivustoa asioiden kokeiluun. Oma AIMEAT on sama kokonaisuus omassa osoitteessasi ja sinun nimelläsi. Me pidämme sen käynnissä ja ajan tasalla kuukausimaksua vastaan, ja kaikki sen sisältö on sinun.",
+      "cta": "Astu kauppaan →"
+    },
     "trust": {
       "ai": "Tekoälyn tekemä sisältö kantaa täällä merkintänsä, kuten EU:n tekoälyasetus edellyttää.",
       "data": "Tietosi ovat sinun: vie ne pois tai poista ne, eikä mitään jaeta ennen kuin itse jaat.",
@@ -19336,6 +19342,10 @@
         },
         "install-cta": {
           "label": "Asenna sovelluksena"
+        },
+        "own-aimeat": {
+          "label": "Hanki oma AIMEAT (demosivustot)",
+          "summary": "Kertoo, että sivusto on demo, ja ohjaa kauppaan, josta saa oman AIMEATin. Osa ei ole sivulla ennen kuin lisäät sen, ja se on tarjolla vain, jos sivustolle on asetettu kauppa."
         },
         "trust": {
           "label": "Tekoälymerkintä ja tietojen omistajuus"
