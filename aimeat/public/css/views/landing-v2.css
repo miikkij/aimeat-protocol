@@ -15,6 +15,10 @@
 /* ── Shared ────────────────────────────────────────────────────────────────────────────────── */
 .ld-v2-h2-row { flex-direction: row; flex-wrap: wrap; gap: .3em; }
 .ld-v2-title { font-size: clamp(2.1rem, 5.4vw, 4.8rem); }
+/* The sticker and, beside it, the door to the whole list; on a phone the door sits under the sticker. */
+.ld-v2-kickerrow { display: flex; flex-direction: column; gap: .75rem; align-items: flex-start; width: 100%; }
+.ld-v2-everything { font-size: 1rem; }
+@media (min-width: 700px) { .ld-v2-kickerrow { flex-direction: row; align-items: center; gap: 1.5rem; flex-wrap: wrap; } }
 .ld-v2-doors { display: flex; flex-direction: column; gap: 1rem; align-items: flex-start; }
 .ld-v2-doors .ld-sh-btn { font-size: 1rem; }
 @media (min-width: 601px) { .ld-v2-doors { flex-direction: row; align-items: center; gap: 1.75rem; } }

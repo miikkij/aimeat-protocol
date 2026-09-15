@@ -1,0 +1,63 @@
+/**
+ * @file everything.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description "Everything in AIMEAT" (views/everything.js, ev- prefix): the whole feature list
+ *   on one page in the showroom's face. Mobile first: the base rules are the phone, the tables
+ *   scroll sideways inside their own box and the page never does, and the wider screen only adds
+ *   room. Shapes come from poster.css; this sheet owns the layout.
+ * @version-history
+ *   v1.0.0 — 2026-09-15 — Initial (TARGET-077).
+ */
+.ev { max-width: 1280px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; color: var(--text); display: flex; flex-direction: column; gap: 1.25rem; }
+.ev-head { display: flex; flex-direction: column; gap: .6rem; align-items: flex-start; }
+.ev-back { font-size: .9rem; }
+.ev-title { margin: 0; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: clamp(2rem, 6vw, 4.5rem); line-height: .96; text-shadow: .075em .075em 0 var(--sun); }
+.ev-stamp { margin: 0; font-family: var(--font-showroom); text-transform: uppercase; font-size: clamp(.8rem, 1.2vw, 1rem); letter-spacing: .04em; color: var(--accent); }
+.ev-intro, .ev-lead, .ev-outro { margin: 0; font-family: var(--font-showroom-body); font-size: 1rem; line-height: 1.6; max-width: 72ch; }
+.ev-intro { font-weight: 600; }
+.ev-outro { color: var(--text-dim); font-size: .9rem; }
+.ev a { color: var(--accent); font-weight: 800; text-decoration: none; }
+.ev a:hover { text-decoration: underline; }
+.ev code { font-family: var(--font-mono); font-size: .85em; background: var(--bg-surface); padding: .05em .3em; }
+/* The [off] / [testnet] marker and the group number wear the sun: showroom-slab--sun in the markup. */
+.ev-mark { display: inline-block; font-family: var(--font-showroom); text-transform: uppercase; font-size: .7em; letter-spacing: .06em; padding: .1em .45em; vertical-align: middle; }
+
+/* The controls: search, the door switch and the count, on one frame. */
+.ev-controls { display: flex; flex-direction: column; gap: .8rem; padding: 1rem; }
+.ev-label { font-family: var(--font-showroom); text-transform: uppercase; font-size: .75rem; letter-spacing: .06em; color: var(--text-dim); }
+.ev-search { display: flex; flex-direction: column; gap: .3rem; flex: 1 1 auto; }
+.ev-search-input {
+  width: 100%; box-sizing: border-box; font-family: var(--font-showroom-body); font-size: 1.05rem; font-weight: 700; padding: .7rem .9rem;
+  border-radius: 0; color: var(--text); box-shadow: 5px 5px 0 var(--accent);
+}
+.ev-search-input:focus { outline: none; box-shadow: 5px 5px 0 var(--text); }
+.ev-toggle { font-family: var(--font-showroom-body); font-weight: 800; align-self: flex-start; }
+.ev-toggle.is-on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.ev-count { font-family: var(--font-showroom); text-transform: uppercase; font-size: .85rem; letter-spacing: .04em; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+@media (min-width: 800px) {
+  .ev-controls { flex-direction: row; align-items: flex-end; }
+  .ev-toggle { align-self: flex-end; }
+  .ev-count { align-self: flex-end; padding-bottom: .8rem; }
+}
+
+/* The contents: the groups as a numbered list of links, in columns where there is room. */
+.ev-toc { display: flex; flex-direction: column; gap: .5rem; }
+.ev-toc-list { margin: 0; padding: 0 0 0 1.4rem; columns: 1; column-gap: 2rem; font-family: var(--font-showroom-body); font-size: .95rem; font-weight: 700; line-height: 1.7; }
+.ev-toc-list li { break-inside: avoid; }
+@media (min-width: 600px) { .ev-toc-list { columns: 2; } }
+@media (min-width: 1000px) { .ev-toc-list { columns: 3; } }
+.ev-legend { margin: 0; font-family: var(--font-showroom-body); font-size: .9rem; color: var(--text-dim); }
+
+/* A group: heading with its number on the sun, the lead, the table in its own scrolling box. */
+.ev-group { display: flex; flex-direction: column; gap: .8rem; padding-top: 1.5rem; scroll-margin-top: calc(var(--nav-height, 56px) + 1rem); }
+.ev-h2 { margin: 0; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: clamp(1.4rem, 3vw, 2.2rem); line-height: 1.05; display: flex; align-items: baseline; gap: .5rem; }
+.ev-num { display: inline-block; min-width: 1.6em; padding: 0 .25em; text-align: center; font-size: .75em; line-height: 1.4; box-shadow: 3px 3px 0 var(--text); }
+.ev-tablebox { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; box-shadow: 8px 8px 0 var(--text); }
+.ev-table { width: 100%; min-width: 640px; border-collapse: collapse; font-family: var(--font-showroom-body); font-size: .92rem; line-height: 1.5; }
+.ev-table th { text-align: left; font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: .8rem; letter-spacing: .05em; padding: .6rem .8rem; background: var(--text); color: var(--bg); }
+.ev-table td { padding: .6rem .8rem; border-top: 1px solid var(--border); vertical-align: top; }
+.ev-table td:first-child { width: 22%; min-width: 11rem; }
+.ev-table td.ev-reach, .ev-table th.ev-reach { width: 24%; min-width: 12rem; font-family: var(--font-mono); font-size: .8rem; }
+.ev-table th.ev-reach { font-family: var(--font-showroom); font-size: .8rem; }
+.ev-table tbody tr:nth-child(even) td { background: var(--bg-surface); }

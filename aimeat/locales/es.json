@@ -9328,6 +9328,7 @@
     "hiddenOne": "1 agente sano oculto"
   },
   "footer": {
+    "everything": "Todo lo que hay en AIMEAT",
     "ownNode": "Monta tu propio nodo",
     "transparency": "Transparencia sobre la IA",
     "glossary": "Glosario",
@@ -10879,7 +10880,26 @@
     "registerHomeSub": "Si todavía no tienes forma de entrar.",
     "signInHome": "Entra a tu hogar"
   },
+  "everything": {
+    "title": "Todo lo que hay en AIMEAT",
+    "stamp": "Versión {v}, verificada contra el código el {d}",
+    "back": "← Portada",
+    "search": "Buscar en la lista",
+    "searchPh": "Una función, una palabra, una puerta…",
+    "toggleOn": "Mostrar dónde está la puerta",
+    "toggleOff": "Ocultar dónde está la puerta",
+    "count": "{n} de {total} filas",
+    "contents": "Contenido",
+    "legendOff": "viene incluido pero apagado hasta que el operador lo encienda",
+    "legendTestnet": "usa una red de prueba por defecto",
+    "noMatch": "Ninguna fila coincide.",
+    "loading": "Cargando la lista…",
+    "error": "No se pudo cargar la lista.",
+    "source": "La lista como archivo, en el repositorio →"
+  },
   "landing2": {
+    "everythingLink": "Mira todo lo que hace AIMEAT, las {n} cosas →",
+    "everythingLinkNoCount": "Mira todo lo que hace AIMEAT →",
     "title1": "Di lo que quieres.",
     "title2": "Luego asegúrate de que pase.",
     "position": "Ese es todo el trabajo ahora. AIMEAT es donde pasa.",

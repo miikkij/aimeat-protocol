@@ -11047,6 +11047,7 @@
     "store": "Store",
     "changelog": "What shipped",
     "buildStory": "How an app gets built",
+    "everything": "Everything in AIMEAT",
     "privacy": "Privacy",
     "terms": "Terms"
   },
@@ -12665,7 +12666,26 @@
     "logAll": "Every entry by month, each with its own link →",
     "wallIntroStory": "How an app gets built here →"
   },
+  "everything": {
+    "title": "Everything in AIMEAT",
+    "stamp": "Version {v}, checked against the code on {d}",
+    "back": "← Front page",
+    "search": "Search the list",
+    "searchPh": "A feature, a word, a door…",
+    "toggleOn": "Show where the door is",
+    "toggleOff": "Hide where the door is",
+    "count": "{n} of {total} rows",
+    "contents": "Contents",
+    "legendOff": "ships but stays off until the operator switches it on",
+    "legendTestnet": "defaults to a test network",
+    "noMatch": "No row matches that.",
+    "loading": "Loading the list…",
+    "error": "The list could not be loaded.",
+    "source": "The list as a file, in the repository →"
+  },
   "landing2": {
+    "everythingLink": "See everything AIMEAT can do, all {n} →",
+    "everythingLinkNoCount": "See everything AIMEAT can do →",
     "title1": "Say what you want.",
     "title2": "Then make sure it happens.",
     "position": "That is the whole job now. AIMEAT is where it happens.",

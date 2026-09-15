@@ -85,9 +85,26 @@ function WishBox2({ navigate }) {
 export function Hero2({ navigate, picture = true }) {
   const store = storeHref();
   const go = (path) => (e) => { e.preventDefault(); navigate(path); };
+  // The whole feature list's row count, from the file the build writes next to the list itself;
+  // until it arrives, or if it never does, the link says the same thing without a number.
+  const [everyCount, setEveryCount] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    fetch('/data/everything-meta.json', { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (alive && j && Number.isFinite(j.rows)) setEveryCount(j.rows); })
+      .catch((err) => swallowed('landing-v2: everything meta', err));
+    return () => { alive = false; };
+  }, []);
+  const everyLabel = everyCount > 0
+    ? tr('landing2.everythingLink', 'See everything AIMEAT can do, all {n} →').replace('{n}', String(everyCount))
+    : tr('landing2.everythingLinkNoCount', 'See everything AIMEAT can do →');
   return html`
     <section class="ld-sh-hero">
-      <span class="ld-sh-kicker">${tr('landing.showKicker', 'This is the demo. It runs for real, every day.')} ${tr('landing2.kickerBuilt', 'Built here, with itself.')}</span>
+      <div class="ld-v2-kickerrow">
+        <span class="ld-sh-kicker">${tr('landing.showKicker', 'This is the demo. It runs for real, every day.')} ${tr('landing2.kickerBuilt', 'Built here, with itself.')}</span>
+        <a class="ld-v2-everything showroom-door" href="/v1/everything" target="_blank" rel="noopener">${everyLabel}</a>
+      </div>
       <h1 class="ld-sh-title ld-v2-title">
         <span>${tr('landing2.title1', 'Say what you want.')}</span>
         <span>${tr('landing2.title2', 'Then make sure it happens.')}</span>

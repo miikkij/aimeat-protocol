@@ -11034,6 +11034,7 @@
     "store": "Kauppa",
     "changelog": "Mitä on julkaistu",
     "buildStory": "Näin appi rakentuu",
+    "everything": "Kaikki mitä AIMEATissa on",
     "privacy": "Tietosuoja",
     "terms": "Käyttöehdot"
   },
@@ -12652,7 +12653,26 @@
     "logAll": "Kaikki merkinnät kuukausittain, jokaisella oma osoite →",
     "wallIntroStory": "Näin appi rakentuu täällä →"
   },
+  "everything": {
+    "title": "Kaikki mitä AIMEATissa on",
+    "stamp": "Versio {v}, tarkistettu koodia vasten {d}",
+    "back": "← Etusivu",
+    "search": "Hae listasta",
+    "searchPh": "Ominaisuus, sana, ovi…",
+    "toggleOn": "Näytä missä ovi on",
+    "toggleOff": "Piilota missä ovi on",
+    "count": "{n} / {total} riviä",
+    "contents": "Sisällys",
+    "legendOff": "on mukana mutta pois päältä, kunnes operaattori kytkee sen",
+    "legendTestnet": "käyttää oletuksena testiverkkoa",
+    "noMatch": "Yksikään rivi ei vastaa hakua.",
+    "loading": "Lista latautuu…",
+    "error": "Listaa ei saatu ladattua.",
+    "source": "Lista tiedostona, repossa →"
+  },
   "landing2": {
+    "everythingLink": "Katso kaikki mitä AIMEAT tekee, kaikki {n} →",
+    "everythingLinkNoCount": "Katso kaikki mitä AIMEAT tekee →",
     "title1": "Sano mitä haluat.",
     "title2": "Pidä huolta että se tapahtuu.",
     "position": "Se on koko työ nykyään. AIMEAT on paikka jossa se tapahtuu.",
