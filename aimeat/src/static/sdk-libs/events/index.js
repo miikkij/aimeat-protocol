@@ -25,6 +25,12 @@
  *   await AIMEAT.events.record('order_placed', { total: '24.90' }, { link: '/orders/9' });
  *   const { events } = await AIMEAT.events.list({ limit: 20 });
  * @version-history
+ *   v1.2.0 — 2026-09-15 — All three functions read the envelope authFetch RESOLVES TO, instead of
+ *     calling .json() on it. `session.fetch` returns the parsed envelope, not a Response, so every
+ *     call here threw "res.json is not a function" from inside the lib, one frame away from the
+ *     button the person pressed: this library had never worked. Found while answering a peer
+ *     operator who had lost an afternoon to the same trap in their own app, which is the whole
+ *     reason it was looked for.
  *   v1.1.0 — 2026-08-17 — Moved to /v1/account/events. /v1/events is the SSE stream and matched
  *     first, so reading the window answered MISSING_TICKET rather than the record.
  *   v1.0.0 — 2026-08-17 — Initial: an app writes its own history into its owner's record.
@@ -51,7 +57,7 @@ import { attach } from '../_core/namespace.js';
  * @returns {Promise<{recorded: boolean, kind: string}>}
  */
 async function record(kind, data, opts = {}) {
-  const res = await authFetch('/v1/account/events', {
+  const body = await authFetch('/v1/account/events', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -61,8 +67,7 @@ async function record(kind, data, opts = {}) {
       ...(opts.subject ? { subject: opts.subject } : {}),
     }),
   });
-  const body = await res.json();
-  if (!body.ok) throw new Error(body.error?.message || 'Could not record the event');
+  if (!body?.ok) throw new Error(body?.error?.message || 'Could not record the event');
   return body.data;
 }
 
@@ -79,9 +84,8 @@ async function record(kind, data, opts = {}) {
  */
 async function list(opts = {}) {
   const qs = opts.limit ? `?limit=${encodeURIComponent(String(opts.limit))}` : '';
-  const res = await authFetch(`/v1/account/events${qs}`);
-  const body = await res.json();
-  if (!body.ok) throw new Error(body.error?.message || 'Could not read the events');
+  const body = await authFetch(`/v1/account/events${qs}`);
+  if (!body?.ok) throw new Error(body?.error?.message || 'Could not read the events');
   return body.data;
 }
 
@@ -98,9 +102,8 @@ async function archive(opts = {}) {
     if (opts[key] !== undefined && opts[key] !== null) params.set(key, String(opts[key]));
   }
   const qs = params.toString();
-  const res = await authFetch(`/v1/account/events/archive${qs ? `?${qs}` : ''}`);
-  const body = await res.json();
-  if (!body.ok) throw new Error(body.error?.message || 'Could not read the archive');
+  const body = await authFetch(`/v1/account/events/archive${qs ? `?${qs}` : ''}`);
+  if (!body?.ok) throw new Error(body?.error?.message || 'Could not read the archive');
   return body.data;
 }
 
