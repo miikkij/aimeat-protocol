@@ -43,6 +43,15 @@ export interface NodeRepository {
    * last owned the person's whole notification stream (audit H-8).
    */
   createPushSubscription(record: PushSubscriptionRecord): Promise<PushSubscriptionRecord>;
+  /**
+   * This device ACCEPTED a notification, at `at`.
+   *
+   * Its own door rather than a field on the upsert above, because registering and receiving are
+   * different events and writing both through one call is what made `lastUsedAt` mean either
+   * (migration 0074). A row that is gone by the time this runs is not an error: the send that
+   * succeeded is what matters, and the endpoint may have been pruned in between.
+   */
+  markPushSubscriptionDelivered(ownerName: string, endpoint: string, at: string): Promise<void>;
   /** ONE of the owner's devices, the most recently used. Use listPushSubscriptionsByOwner to reach them all. */
   getPushSubscription(ownerName: string): Promise<PushSubscriptionRecord | null>;
   /** Every device this owner has registered, oldest first. This is what a notification fans out to. */

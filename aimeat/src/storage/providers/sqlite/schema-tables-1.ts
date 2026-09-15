@@ -592,7 +592,9 @@ export function applySchemaTables1(db: Database.Database): void {
       endpoint       TEXT NOT NULL,
       keys           TEXT NOT NULL DEFAULT '{}',
       createdAt      TEXT NOT NULL,
-      lastUsedAt     TEXT NOT NULL,
+      -- NULL until this device has actually ACCEPTED a notification. Registering writes createdAt
+      -- and nothing else; only a successful send stamps this. Mirrors Postgres migration 0074.
+      lastUsedAt     TEXT,
       PRIMARY KEY (ownerName, endpoint)
     );
 

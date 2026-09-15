@@ -42,11 +42,52 @@ export function splitPushSubscriptionsPerDevice(db: Database.Database): void {
         endpoint       TEXT NOT NULL,
         keys           TEXT NOT NULL DEFAULT '{}',
         createdAt      TEXT NOT NULL,
-        lastUsedAt     TEXT NOT NULL,
+        lastUsedAt     TEXT,
         PRIMARY KEY (ownerName, endpoint)
       );
       INSERT INTO push_subscriptions_new (ownerName, endpoint, keys, createdAt, lastUsedAt)
         SELECT ownerName, endpoint, keys, createdAt, lastUsedAt FROM push_subscriptions;
+      DROP TABLE push_subscriptions;
+      ALTER TABLE push_subscriptions_new RENAME TO push_subscriptions;
+    `);
+  });
+  tx();
+  db.exec('PRAGMA foreign_keys=ON');
+}
+
+/**
+ * Drop the NOT NULL on push_subscriptions.lastUsedAt, so "this device has never accepted anything"
+ * has somewhere to be said.
+ *
+ * The column was written by BOTH the subscribe upsert and a successful send, so a fresh timestamp
+ * meant "registered just now" or "received something just now" with no way to tell which. A peer
+ * operator read one as proof that Apple had taken a message it had refused (2026-09-15). It carries
+ * delivery only now, and a device that has received nothing holds NULL.
+ *
+ * EXISTING VALUES ARE CARRIED OVER UNTOUCHED. An old row's timestamp is a registration time or a
+ * delivery time and nothing here can tell which; clearing them would destroy the real delivery times
+ * along with the ambiguous ones. Gated on PRAGMA table_info, so a fresh database pays nothing.
+ * Mirrors Postgres migration 0074.
+ */
+export function relaxPushLastUsedAt(db: Database.Database): void {
+  const cols = db.prepare("PRAGMA table_info('push_subscriptions')").all() as Array<{ name: string; notnull: number }>;
+  if (!cols.length) return;                                   // table not created yet
+  const lastUsed = cols.find(c => c.name === 'lastUsedAt');
+  if (!lastUsed || lastUsed.notnull === 0) return;            // already nullable — nothing to do
+
+  const carried = cols.map(c => c.name).join(', ');
+  db.exec('PRAGMA foreign_keys=OFF');
+  const tx = db.transaction(() => {
+    db.exec(`
+      CREATE TABLE push_subscriptions_new (
+        ownerName      TEXT NOT NULL,
+        endpoint       TEXT NOT NULL,
+        keys           TEXT NOT NULL DEFAULT '{}',
+        createdAt      TEXT NOT NULL,
+        lastUsedAt     TEXT,
+        PRIMARY KEY (ownerName, endpoint)
+      );
+      INSERT INTO push_subscriptions_new (${carried}) SELECT ${carried} FROM push_subscriptions;
       DROP TABLE push_subscriptions;
       ALTER TABLE push_subscriptions_new RENAME TO push_subscriptions;
     `);

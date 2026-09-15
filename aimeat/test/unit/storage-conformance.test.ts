@@ -123,7 +123,7 @@ async function seedOwner(s: Storage, name: string): Promise<{ ghii: string; gaii
     // of the person, and one person has several.
     await s.createPushSubscription({
         ownerName: name, endpoint: `https://push.example.test/${name}/laptop`,
-        keys: { p256dh: 'conf-p256dh', auth: 'conf-auth' }, createdAt: now, lastUsedAt: now,
+        keys: { p256dh: 'conf-p256dh', auth: 'conf-auth' }, createdAt: now, lastUsedAt: null,
     });
 
     // ── The six tables the parity gate had listed as exempt since 2026-08-10 ──
@@ -391,15 +391,32 @@ describe('storage providers agree on what they do, not just on their signatures'
             const keys = { p256dh: 'conf-p256dh', auth: 'conf-auth' };
 
             // A second device joins the first. Keyed on ownerName alone (before H-8) this replaced it.
-            await storage.createPushSubscription({ ownerName: owner, endpoint: phone, keys, createdAt: now, lastUsedAt: now });
+            // lastUsedAt null, because that is what subscribing writes: services/push.ts stamps it
+            // only on a successful send.
+            await storage.createPushSubscription({ ownerName: owner, endpoint: phone, keys, createdAt: now, lastUsedAt: null });
             const both = (await storage.listPushSubscriptionsByOwner(owner)).map(s => s.endpoint).sort();
 
             // The same device again refreshes its keys rather than adding a row.
             await storage.createPushSubscription({
-                ownerName: owner, endpoint: laptop, keys: { p256dh: 'rotated', auth: 'rotated' }, createdAt: now, lastUsedAt: now,
+                ownerName: owner, endpoint: laptop, keys: { p256dh: 'rotated', auth: 'rotated' }, createdAt: now, lastUsedAt: null,
             });
             const afterRefresh = await storage.listPushSubscriptionsByOwner(owner);
             const rotated = afterRefresh.find(s => s.endpoint === laptop)?.keys.p256dh;
+
+            // REGISTERING IS NOT RECEIVING, and the two must not share a column. Until 2026-09-15
+            // both the subscribe upsert and a successful send wrote lastUsedAt, so a fresh timestamp
+            // meant either, and a peer operator read one as proof of a delivery Apple had refused.
+            // A device that has just subscribed has accepted nothing: that is null, on both backends.
+            const freshlySubscribed = afterRefresh.find(s => s.endpoint === phone)?.lastUsedAt ?? null;
+            await storage.markPushSubscriptionDelivered(owner, phone, '2030-01-02T03:04:05.000Z');
+            const afterDelivery = (await storage.listPushSubscriptionsByOwner(owner))
+                .find(s => s.endpoint === phone)?.lastUsedAt ?? null;
+            // And a re-subscribe afterwards refreshes the keys without erasing the delivery.
+            await storage.createPushSubscription({
+                ownerName: owner, endpoint: phone, keys: { p256dh: 'again', auth: 'again' }, createdAt: now, lastUsedAt: null,
+            });
+            const afterResubscribe = (await storage.listPushSubscriptionsByOwner(owner))
+                .find(s => s.endpoint === phone)?.lastUsedAt ?? null;
 
             // A dead endpoint is pruned on its own: the other device must survive it.
             const prunedOne = await storage.deletePushSubscription(owner, phone);
@@ -413,10 +430,14 @@ describe('storage providers agree on what they do, not just on their signatures'
             shapes[name] = {
                 both, count: afterRefresh.length, rotated, prunedOne, afterPrune, prunedAll,
                 left: afterAll_.length, missing,
+                freshlySubscribed, afterDelivery, afterResubscribe,
             };
             expect(shapes[name], `${name}: per-device subscriptions`).toEqual({
                 both: [laptop, phone].sort(), count: 2, rotated: 'rotated',
                 prunedOne: true, afterPrune: [laptop], prunedAll: true, left: 0, missing: false,
+                freshlySubscribed: null,
+                afterDelivery: '2030-01-02T03:04:05.000Z',
+                afterResubscribe: '2030-01-02T03:04:05.000Z',
             });
 
             await storage.deleteOwner(owner);

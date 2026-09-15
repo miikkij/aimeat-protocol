@@ -17,7 +17,7 @@
  *     device joins the first instead of evicting it (audit H-8). Needs migration 0032.
  *   v1.0.0 — 2026-07-15 — Phase 5: node-infra domain on Postgres+Kysely.
  */
-import type { Selectable } from 'kysely';
+import { sql, type Selectable } from 'kysely';
 import type {
   PushSubscriptionRecord, RealtimeRoomRecord, SiteChangeLogEntry, TrustedIssuerRecord, VerificationNonceRecord,
 } from '../../../interface.js';
@@ -31,7 +31,8 @@ function toPushSub(r: Selectable<PushSubscription>): PushSubscriptionRecord {
   return {
     ownerName: r.ownerName, endpoint: r.endpoint,
     keys: r.keys as unknown as PushSubscriptionRecord['keys'],
-    createdAt: iso(r.createdAt), lastUsedAt: iso(r.lastUsedAt),
+    createdAt: iso(r.createdAt),
+    lastUsedAt: r.lastUsedAt ? iso(r.lastUsedAt) : null,
   };
 }
 function toTrustedIssuer(r: Selectable<TrustedIssuer>): TrustedIssuerRecord {
@@ -64,17 +65,32 @@ export const nodeInfraMethods = {
     // `id` is omitted so the column default (migration 0003, gen_random_uuid()) mints one. It used to
     // be set to ownerName, which is a second per-owner key and would collide on the owner's second
     // device. Rows written before 2026-08-11 keep their id = ownerName; nothing reads it.
-    const shared = { endpoint: record.endpoint, keys: jsonb(record.keys), lastUsedAt: new Date(record.lastUsedAt) };
+    const shared = {
+      endpoint: record.endpoint, keys: jsonb(record.keys),
+      lastUsedAt: record.lastUsedAt ? new Date(record.lastUsedAt) : null,
+    };
     await this.db.insertInto('PushSubscription')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .values({ ownerName: record.ownerName, createdAt: new Date(record.createdAt), ...shared } as any)
+      // The conflict path is a device RE-SUBSCRIBING, which refreshes its keys and is not a delivery,
+      // so it leaves lastUsedAt where the last successful send put it. Writing it here is what made
+      // the column mean two things (migration 0074).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .onConflict(oc => oc.columns(['ownerName', 'endpoint']).doUpdateSet({ keys: shared.keys, lastUsedAt: shared.lastUsedAt } as any)).execute();
+      .onConflict(oc => oc.columns(['ownerName', 'endpoint']).doUpdateSet({ keys: shared.keys } as any)).execute();
     return record;
   },
+  async markPushSubscriptionDelivered(this: PostgresKyselyStorage, ownerName: string, endpoint: string, at: string): Promise<void> {
+    await this.db.updateTable('PushSubscription')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .set({ lastUsedAt: new Date(at) } as any)
+      .where('ownerName', '=', ownerName).where('endpoint', '=', endpoint).execute();
+  },
   async getPushSubscription(this: PostgresKyselyStorage, ownerName: string): Promise<PushSubscriptionRecord | null> {
+    // NULLS LAST, because null now means "never delivered" and Postgres sorts nulls FIRST on a
+    // descending order: without it "the most recently used device" would be a device that has never
+    // received anything.
     const r = await this.db.selectFrom('PushSubscription').selectAll().where('ownerName', '=', ownerName)
-      .orderBy('lastUsedAt', 'desc').orderBy('endpoint', 'asc').executeTakeFirst();
+      .orderBy('lastUsedAt', sql`desc nulls last`).orderBy('endpoint', 'asc').executeTakeFirst();
     return r ? toPushSub(r) : null;
   },
   async listPushSubscriptionsByOwner(this: PostgresKyselyStorage, ownerName: string): Promise<PushSubscriptionRecord[]> {

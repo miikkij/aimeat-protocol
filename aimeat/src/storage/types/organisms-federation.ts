@@ -176,8 +176,17 @@ export interface PushSubscriptionRecord {
     p256dh: string;
     auth: string;
   };
+  /** When this device registered. Kept across a re-subscribe by the upsert. */
   createdAt: string;
-  lastUsedAt: string;
+  /**
+   * When this device last ACCEPTED a notification, and null when it never has.
+   *
+   * Delivery only. Until 2026-09-15 subscribing wrote it too, so a fresh timestamp meant "registered
+   * just now" or "received something just now" with no way to tell which, and a peer operator read
+   * one as proof that Apple had taken a message it had in fact refused. `createdAt` is the
+   * registration time and this is the delivery time; nothing writes both.
+   */
+  lastUsedAt: string | null;
 }
 
 // Phase 3.2 — Notification Templates (editable, per-locale)

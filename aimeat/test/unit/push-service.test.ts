@@ -48,6 +48,10 @@ function makeMockStorage() {
             subscriptions.set(rowKey(record.ownerName, record.endpoint), record);
             return record;
         }),
+        markPushSubscriptionDelivered: vi.fn(async (ownerName: string, endpoint: string, at: string) => {
+            const row = subscriptions.get(rowKey(ownerName, endpoint));
+            if (row) subscriptions.set(rowKey(ownerName, endpoint), { ...row, lastUsedAt: at });
+        }),
         getPushSubscription: vi.fn(async (ownerName: string) =>
             [...subscriptions.values()].find(s => s.ownerName === ownerName) ?? null),
         listPushSubscriptionsByOwner: vi.fn(async (ownerName: string) =>
@@ -214,6 +218,23 @@ describe('Push Service', () => {
 
             const left = await storage.listPushSubscriptionsByOwner('alice');
             expect(left.map(s => s.endpoint)).toEqual([alive]);
+        });
+
+        it('a delivery that could not be written down is still a delivery', async () => {
+            // The notification arrived; stamping when this device last accepted one is bookkeeping.
+            // With the write ahead of the count, a storage hiccup threw into the failure branch and a
+            // delivered notification was counted and logged as failed, which is the same lie as the
+            // one this whole change is fixing, pointing the other way.
+            const endpoint = 'https://push.example.com/stamp-fails';
+            storage.subscriptions.set(rowKey('alice', endpoint), makeSubscription('alice', endpoint));
+            vi.spyOn(webpush, 'sendNotification').mockResolvedValue({} as never);
+            (storage.markPushSubscriptionDelivered as unknown as ReturnType<typeof vi.fn>)
+                .mockRejectedValueOnce(new Error('the database blinked'));
+
+            const service = createPushService(ENABLED_CONFIG, storage);
+            expect(await service.sendNotification('alice', testPayload)).toBe(true);
+            // And the device is still registered: a bookkeeping failure is not a dead endpoint.
+            expect((await storage.listPushSubscriptionsByOwner('alice')).map(s => s.endpoint)).toEqual([endpoint]);
         });
 
         it('an ordinary failure keeps the subscription and reports no delivery', async () => {
