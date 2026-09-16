@@ -15,6 +15,7 @@
  *       split against someone else's revenue, and cannot release someone else's obligation.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=beneficiary-split
  * @version-history
+ *   v1.1.0 — 2026-09-16 — The payout address is set through PUT /v1/commerce/payout/x402.
  *   v1.0.0 — 2026-07-30 — Initial.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -713,11 +714,11 @@ await test('PAYOUT: a beneficiary with no address cannot be pushed to, and is to
 });
 
 await test('PAYOUT: once the beneficiary sets their OWN address, the node quotes what to sign', async () => {
-  const w = await json('/v1/memory', {
-    method: 'POST', headers: auth(gamma.token),
-    body: JSON.stringify({ key: 'commerce.psp', value: { provider: 'x402', payTo: X402_ADDR }, visibility: 'private' }),
+  // The beneficiary's own payout route: commerce.psp is refused by the general memory doors.
+  const w = await json('/v1/commerce/payout/x402', {
+    method: 'PUT', headers: auth(gamma.token), body: JSON.stringify({ address: X402_ADDR }),
   });
-  assert(w.status === 200 || w.status === 201, `psp write ${w.status}`);
+  assert(w.status === 200, `payout address ${w.status}: ${JSON.stringify(w.body?.error)}`);
 
   const r = await payoutQuote(provider.token, gamma.ghii);
   assert(r.body.data.payable === true, `payable: ${JSON.stringify(r.body.data)}`);

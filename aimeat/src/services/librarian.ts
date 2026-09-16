@@ -20,9 +20,11 @@
  *   v1.1.0 — 2026-07-05 — `isOwnerSession` → `fanOutOwner`: the fan-across set is now chosen by the
  *     route from (owner session OR memory:read grant), so app/agent grants with memory:read reach the
  *     owner's full read surface. Corrected the stale "MongoDB $text" note (it is a substring scan).
+ *   v1.2.0 — 2026-09-16 — A credential record is titled and snippeted from its redacted value.
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
+import { shownMemoryValue } from './secret-records.js';
 
 export interface LibrarianHit {
   key: string;
@@ -159,11 +161,13 @@ export async function librarianSearch(
     const v = (record.value && typeof record.value === 'object') ? record.value as Record<string, unknown> : null;
     const isManifest = record.key.endsWith('/manifest') && !!pkg;
     const kind: LibrarianHit['kind'] = pkg ? 'knowledge' : m ? 'document' : 'memory';
-    const text = flatten(record.value);
+    // A record holding a credential is searched and snippeted as its redacted value.
+    const shown = shownMemoryValue(record.key, record.value);
+    const text = flatten(shown);
     return {
       key: record.key,
       ownerGaii: record.ownerGaii,
-      title: isManifest && typeof v?.name === 'string' ? v.name : titleOf(record.value, record.key),
+      title: isManifest && typeof v?.name === 'string' ? v.name : titleOf(shown, record.key),
       snippet: snippetOf(text, tokens),
       score,
       visibility: record.visibility,

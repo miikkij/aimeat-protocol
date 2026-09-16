@@ -30,6 +30,7 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2-a2a
  * @version-history
+ *   v1.2.0 — 2026-09-16 — The payout address is set through its route and compared without case.
  *   v1.1.0 — 2026-09-01 — The foreign caller: a stranger hires a published offering, pays for it,
  *     and reaches nothing else (V6a, the phase criterion).
  *   v1.0.0 — 2026-09-01 — Initial, with the feature.
@@ -782,11 +783,11 @@ async function run(): Promise<void> {
         offeringId = listed.body.data.offering.offeringId;
         assert(listed.body.data.offering.currency === 'USD', `priced in money, got ${listed.body.data.offering.currency}`);
 
-        const psp = await json('/v1/memory', {
-            method: 'POST', headers: authA,
-            body: JSON.stringify({ key: 'commerce.psp', value: { provider: 'x402', payTo: SELLER_ADDR }, visibility: 'private' }),
+        // The seller's payout route: commerce.psp is refused by the general memory doors.
+        const psp = await json('/v1/commerce/payout/x402', {
+            method: 'PUT', headers: authA, body: JSON.stringify({ address: SELLER_ADDR }),
         });
-        assert(psp.status === 200 || psp.status === 201, `psp ${psp.status}: ${JSON.stringify(psp.body?.error)}`);
+        assert(psp.status === 200, `psp ${psp.status}: ${JSON.stringify(psp.body?.error)}`);
     });
 
     await test('the public card now says what is for sale, at what price, and how it is paid for', async () => {
@@ -829,7 +830,8 @@ async function run(): Promise<void> {
         assert(!!quotedRequirements, `with x402 requirements on it, got ${JSON.stringify(task.metadata)}`);
         assert(quotedRequirements.maxAmountRequired === String(PRICE_MICROS),
             `the offering's own price, got ${quotedRequirements.maxAmountRequired}`);
-        assert(quotedRequirements.payTo === SELLER_ADDR, `paid to the seller, got ${quotedRequirements.payTo}`);
+        // The payout route stores the address in its EIP-55 form, so the comparison ignores case.
+        assert(String(quotedRequirements.payTo).toLowerCase() === SELLER_ADDR, `paid to the seller, got ${quotedRequirements.payTo}`);
         assert(String(quotedRequirements.resource).endsWith(`/v1/a2a/${a.owner}/${worker.name}`),
             `signed against the address it is buying from, got ${quotedRequirements.resource}`);
         assert(!JSON.stringify(task).includes(worker.gaii), 'and it still has not learnt the GAII');

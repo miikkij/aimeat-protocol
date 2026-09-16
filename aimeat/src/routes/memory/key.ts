@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key, CORS management, and the public GET /v1/memory/:gaii/:key read. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-09-16 — Every read answer shows a credential record redacted (shownMemoryValue), and
+ *     PUT refuses openrouter.apikey and commerce.psp with SECRET_RECORD.
  *   v1.4.1 — 2026-09-13 — PUT refuses an EXCHANGE listing source whose changed text would break an
  *     ODPS length cap, 422 ODPS_FIELD_TOO_LONG, through odpsWriteRefusal like every other write door.
  *   v1.4.0 — 2026-09-13 — PUT /v1/memory/:key refuses a workspace record whose space the workspace
@@ -37,6 +39,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
+import { isSecretRecordKey, secretRecordWriteRefusal, shownMemoryValue } from '../../services/secret-records.js';
 import { stampAgentWrite, resolveAttachableProvenanceId } from '../../services/ai-provenance.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
@@ -158,7 +161,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // to return no `exists` field at all — so a caller written as `if (!data.exists)` read every
       // successful read as a miss, silently, and only on the path where the data WAS there.
       exists: true,
-      value: record.value,
+      value: shownMemoryValue(record.key, record.value),
       visibility: record.visibility,
       zone: visibilityToZone(record.visibility),
       tags: record.tags,
@@ -298,6 +301,11 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // (openrouter.*/ai-usage.*/profile.*). See utils/reserved-keys.ts.
     if (!appMayWriteKey(req.auth!.roles, key)) {
       res.status(403).json(error(config.nodeId, 'RESERVED_KEY', `The key "${key}" is managed by the account owner and cannot be written by an app.`));
+      return;
+    }
+    // A record that holds a credential is shown redacted here and written only by its own door.
+    if (isSecretRecordKey(key)) {
+      res.status(403).json(error(config.nodeId, 'SECRET_RECORD', secretRecordWriteRefusal(key).message));
       return;
     }
 
@@ -604,7 +612,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
       res.json(success(config.nodeId, {
         key: record.key,
-        value: record.value,
+        value: shownMemoryValue(record.key, record.value),
         visibility: record.visibility,
         zone: visibilityToZone(record.visibility),
         tags: record.tags,
@@ -643,7 +651,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
         res.json(success(config.nodeId, {
           key: record.key,
-          value: record.value,
+          value: shownMemoryValue(record.key, record.value),
           visibility: record.visibility,
           zone: visibilityToZone(record.visibility),
           tags: record.tags,
@@ -705,7 +713,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     res.json(success(config.nodeId, {
       key: record.key,
-      value: record.value,
+      value: shownMemoryValue(record.key, record.value),
       visibility: record.visibility,
       zone: visibilityToZone(record.visibility),
       tags: record.tags,

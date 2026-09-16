@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   v1.2.0 — 2026-09-16 — PATCH refuses openrouter.apikey and commerce.psp with SECRET_RECORD, and the
+ *     answer shows a credential record redacted.
  *   v1.1.0 — 2026-09-13 — A workspace record in a space the manifest does not declare is refused
  *     with 422 UNDECLARED_SPACE before anything is written, as on every other write door. A merged
  *     EXCHANGE listing source whose changed text breaks an ODPS length cap answers 422 ODPS_FIELD_TOO_LONG.
@@ -51,6 +53,7 @@ import { emitEcosystemMemoryWrite } from '../../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../../services/ecosystem-automation.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
+import { isSecretRecordKey, secretRecordWriteRefusal, shownMemoryValue } from '../../services/secret-records.js';
 import { resolveWriteTarget } from './owner-target.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
@@ -109,6 +112,11 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     if (!appMayWriteKey(req.auth!.roles, key, target.delegatedOwnerWrite, target.reservedAllowed)) {
       res.status(403).json(error(config.nodeId, 'RESERVED_KEY', `The key "${key}" is managed by the account owner and cannot be written by an app.`));
+      return;
+    }
+    // A record that holds a credential is shown redacted and written only by its own door.
+    if (isSecretRecordKey(key)) {
+      res.status(403).json(error(config.nodeId, 'SECRET_RECORD', secretRecordWriteRefusal(key).message));
       return;
     }
 
@@ -296,7 +304,7 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     res.status(created ? 201 : 200).json(success(config.nodeId, {
       key: record.key,
       owner_gaii: record.ownerGaii,
-      value: record.value,
+      value: shownMemoryValue(record.key, record.value),
       visibility: record.visibility,
       zone: visibilityToZone(record.visibility),
       tags: record.tags,

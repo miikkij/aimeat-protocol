@@ -18,6 +18,8 @@
  * @structure adminMemoryRouter · search · list · one record · delete · restore
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v2.1.0 — 2026-09-16 — The record read and the search excerpt show a credential record redacted:
+ *     the operator saw another owner's Stripe key ciphertext, or a legacy key in plain text.
  *   v2.0.0 — 2026-09-12 — The page rebuilt around the question. GET /search (node-wide FTS with an
  *     excerpt cut from the hit's own value); the listing reads the value-free META projection and
  *     carries every field including the audience, archived rows and one owner's bin; GET one record
@@ -35,6 +37,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { deleteMemoryRecord, restoreMemoryRecord } from '../services/memory-bin.js';
+import { shownMemoryValue } from '../services/secret-records.js';
 
 /** How much of a value is scanned for the search excerpt. A megabyte value is legal; reading all of
  *  it to highlight one word is not worth the wall clock, and the hit is ranked by the index anyway. */
@@ -154,7 +157,7 @@ export function adminMemoryRouter(
                 // from the row's own byteSize — the one place in this router that does.
                 byte_size: Buffer.byteLength(typeof h.record.value === 'string' ? h.record.value : JSON.stringify(h.record.value) ?? '', 'utf8'),
                 score: h.score,
-                excerpt: excerpt(h.record.value, q),
+                excerpt: excerpt(shownMemoryValue(h.record.key, h.record.value), q),
             })),
             limit,
         }));
@@ -272,7 +275,7 @@ export function adminMemoryRouter(
         res.json(success(config.nodeId, {
             key: rec.key,
             owner_gaii: rec.ownerGaii,
-            value: rec.value,
+            value: shownMemoryValue(rec.key, rec.value),
             visibility: rec.visibility,
             group_id: rec.groupId ?? null,
             workspace_ref: rec.workspaceRef ?? null,

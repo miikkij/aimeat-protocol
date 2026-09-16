@@ -222,7 +222,9 @@ await test('4b. psp_set takes the webhook signing secret too, and stores both en
     const raw = await json('/v1/memory/commerce.psp', { headers: auth(buyerOwner.token) });
     const text = JSON.stringify(raw.body);
     assert(raw.status === 200 && !text.includes(HOOK) && !text.includes(SECRET), `stored in the clear: ${text.slice(0, 200)}`);
-    assert(raw.body.data?.value?.webhookSecret?.encrypted, `the webhook secret was not stored: ${text.slice(0, 300)}`);
+    // The memory door shows the stored secret as configured with its last four characters.
+    assert(raw.body.data?.value?.webhookSecret?.configured === true && raw.body.data.value.webhookSecret.hint === '…5c3e',
+        `the webhook secret was not stored: ${text.slice(0, 300)}`);
 });
 
 await test('5. psp_delete removes the credentials', async () => {

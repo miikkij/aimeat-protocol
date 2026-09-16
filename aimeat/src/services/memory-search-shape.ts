@@ -24,6 +24,7 @@
  * @usage
  *   import { isVersionKey, searchHitShape, matchesType } from '../services/memory-search-shape.js';
  * @version-history
+ *   v1.2.0 — 2026-09-16 — searchHitShape cuts a credential record's snippet from its redacted value.
  *   v1.1.0 — 2026-09-08 — `matchesType`: search narrowed by what a record IS. Records have carried
  *     `@type` since Phase 0.7 and nothing could filter on it, so the annotation was written and
  *     never read — which is what made it decorative.
@@ -32,6 +33,7 @@
  */
 import type { MemoryRecord } from '../storage/interface.js';
 import { contextOf, expandTerm } from '../utils/onto-context.js';
+import { shownMemoryValue } from './secret-records.js';
 
 /** Characters kept either side of the match. Enough to read the sentence, not the record. */
 export const SNIPPET_RADIUS = 120;
@@ -99,7 +101,9 @@ export function matchesType(value: unknown, wanted: string[]): boolean {
 
 /** One hit with the value replaced by a window of it and its size. */
 export function searchHitShape(r: MemoryRecord, query: string): MemorySearchHit {
-    const valStr = typeof r.value === 'string' ? r.value : JSON.stringify(r.value);
+    // A record holding a credential is cut from its redacted value (services/secret-records.ts).
+    const shown = shownMemoryValue(r.key, r.value);
+    const valStr = typeof shown === 'string' ? shown : JSON.stringify(shown);
     return {
         key: r.key,
         snippet: snippetOf(valStr, query.trim()),

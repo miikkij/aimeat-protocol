@@ -19,6 +19,7 @@
  *   AIMEAT_X402_TEST_FACILITATOR=true), so a normal CI sweep never hits the network.
  * @usage cd aimeat && AIMEAT_X402_ENABLED=true pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=x402-testnet
  * @version-history
+ *   v1.2.0 — 2026-09-16 — The payout address is set through PUT /v1/commerce/payout/x402.
  *   v1.1.0 — 2026-07-18 — Self-generated throwaway buyer key (gitignored) + on-chain balance gate +
  *     viem EIP-3009 signing; no operator key involved (TARGET-042 criterion 5)
  *   v1.0.0 — 2026-07-18 — Initial real-testnet acceptance harness
@@ -86,8 +87,9 @@ async function sellerWithUsdOffer(label: string) {
     }] };
     const pub = await json('/v1/agents/vendor/offers', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify(offers) });
     assert(pub.status === 200, `publish offers ${pub.status}: ${JSON.stringify(pub.body.error)}`);
-    const pspWrite = await json('/v1/memory', { method: 'POST', headers: auth(seller.token), body: JSON.stringify({ key: 'commerce.psp', value: { provider: 'x402', address: PAYTO }, visibility: 'private' }) });
-    assert(pspWrite.status === 200 || pspWrite.status === 201, `psp write ${pspWrite.status}`);
+    // The seller's payout route: commerce.psp is refused by the general memory doors.
+    const pspWrite = await json('/v1/commerce/payout/x402', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ address: PAYTO }) });
+    assert(pspWrite.status === 200, `payout address ${pspWrite.status}: ${JSON.stringify(pspWrite.body.error)}`);
     return { ...seller, vendorGaii: `vendor#${seller.name}@${NODE_ID}` };
 }
 

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.1 — 2026-09-16 — Export and bundle show a credential record redacted; bulk and import refuse
+ *     openrouter.apikey and commerce.psp.
  *   v1.4.0 — 2026-09-16 — export and bundle refuse a federated session (requireLocalSession). Both read
  *     the bare owner name, which a visitor shares with the local account of the same name.
  *   v1.3.0 — 2026-09-13 — import lists a workspace record in a space the manifest does not declare
@@ -27,6 +29,7 @@ import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
+import { isSecretRecordKey, secretRecordWriteRefusal, shownMemoryValue } from '../../services/secret-records.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import type { BulkWriteItem } from '../../services/db/memory-db-service.js';
@@ -87,6 +90,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       if (typeof key !== 'string' || !key) { preFailed.push({ key: String(key), status: 'failed', reason: 'missing key' }); continue; }
       if (key.startsWith('organism.')) { preFailed.push({ key, status: 'failed', reason: 'organism.* keys use the workspace publish path' }); continue; }
       if (!appMayWriteKey(req.auth!.roles, key)) { preFailed.push({ key, status: 'failed', reason: 'reserved key — managed by the account owner' }); continue; }
+      if (isSecretRecordKey(key)) { preFailed.push({ key, status: 'failed', reason: secretRecordWriteRefusal(key).message }); continue; }
       if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) { preFailed.push({ key, status: 'failed', reason: 'anonymous agents can only write anonymous.* keys' }); continue; }
       // An EXCHANGE listing source past an ODPS cap, compared with what is stored (2026-09-13).
       if (odpsWriteRefusal(key, e.value, undefined)) {
@@ -179,7 +183,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       count: records.length,
       entries: records.map(r => ({
         key: r.key,
-        value: r.value,
+        value: shownMemoryValue(r.key, r.value),
         visibility: r.visibility,
         tags: r.tags,
         ...(r.ttlHours != null ? { ttl_hours: r.ttlHours } : {}),
@@ -233,6 +237,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       const key = entry?.key;
       if (typeof key !== 'string' || !key) { failed.push({ key: String(key), reason: 'missing key' }); continue; }
       if (!appMayWriteKey(req.auth!.roles, key)) { failed.push({ key, reason: 'reserved key — managed by the account owner' }); continue; }
+      if (isSecretRecordKey(key)) { failed.push({ key, reason: secretRecordWriteRefusal(key).message }); continue; }
       if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) { failed.push({ key, reason: 'anonymous agents can only write anonymous.* keys' }); continue; }
       if (key.startsWith('organism.')) {
         const undeclared = await undeclaredSpaceForKey(storage, key);
@@ -410,7 +415,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         } else {
           const record = await storage.getMemory(owner, key);
           if (!record) { manifest.items.push({ kind, key, owner_gaii: owner, included: false, reason: 'not_found' }); continue; }
-          const content = typeof record.value === 'string' ? record.value : JSON.stringify(record.value, null, 2);
+          const shown = shownMemoryValue(record.key, record.value);
+          const content = typeof shown === 'string' ? shown : JSON.stringify(shown, null, 2);
           archive.append(content, { name: `memory/${sanitize(key)}.json` });
           manifest.items.push({ kind, key, owner_gaii: owner, included: true, visibility: record.visibility, url: `${config.baseUrl}/v1/memory/${encodeURIComponent(owner)}/${encodeURIComponent(key)}` });
         }
