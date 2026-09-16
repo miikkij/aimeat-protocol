@@ -11,6 +11,7 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.5.0 — 2026-09-16 — McpServerRepository exported: remote MCP servers this node connects out to.
  *   v1.4.0 — 2026-09-09 — MarketplaceRepository and AgentTelemetryRepository no longer exported: deleted, no caller.
  *   v1.3.0 — 2026-09-06 — SecretRepository exported: the owner's secrets vault.
  *   v1.2.0 — 2026-09-04 — PasskeyRepository exported.
@@ -64,3 +65,4 @@ export type { DirectMessageRepository } from './direct-message.repository.js';
 export type { AgentWebhookRepository } from './agent-webhook.repository.js';
 export type { AgentOnboardingRepository } from './agent-onboarding.repository.js';
 export type { AiProvenanceRepository } from './ai-provenance.repository.js';
+export type { McpServerRepository } from './mcp-server.repository.js';

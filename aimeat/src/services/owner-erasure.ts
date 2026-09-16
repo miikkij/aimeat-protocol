@@ -24,6 +24,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   v1.2.0 — 2026-09-16 — Remote MCP servers are erased. Added by hand rather than caught by a
+ *     gate: check-storage-parity keys on `ownerGaii` and this table's owner column is `ownerGhii`,
+ *     which that gate deliberately does not look at yet.
  *   v1.1.0 — 2026-08-29 — Outside connections and the client registrations a person brought
  *     themselves are erased. Neither backend's cascade touched `Connection`, and that is worse than
  *     a retention miss: the row holds a sealed refresh token for somebody's own mailbox, it is
@@ -145,6 +148,18 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       let n = await storage.deleteConnectionsByPrincipal(ghii);
       for (const agent of agents) n += await storage.deleteConnectionsByPrincipal(agent.gaii);
       return n ? `connections:${n}` : null;
+    }, deletionLog);
+
+    // Remote MCP servers. Same argument as connections, and it has to be made separately because
+    // check-storage-parity cannot see this table: its owner column is `ownerGhii`, which is
+    // deliberately outside that gate's OWNER_COLUMNS list (see the note there — eighteen tables
+    // are waiting on one triage). So nothing automated would have caught a miss here. Each row
+    // holds a sealed credential to somebody's issue tracker or wiki, addressed by the GHII string.
+    // Only the owner's own servers go: a node-wide server has a NULL ownerGhii and belongs to the
+    // operator, and an organism's belongs to the organism, so neither is this person's to erase.
+    await step('mcp_servers', async () => {
+      const n = await storage.deleteMcpServersByOwner(ghii);
+      return n ? `mcp_servers:${n}` : null;
     }, deletionLog);
 
     // The client registrations a person brought themselves (their own Entra app, their own X app).

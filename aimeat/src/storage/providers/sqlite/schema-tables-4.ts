@@ -6,6 +6,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.8.0 — 2026-09-16 — mcp_servers table: the remote MCP servers this node connects OUT to.
+ *     Mirrors Postgres 0076.
  *   v1.7.0 — 2026-09-06 — secrets table: the owner's write-only credential vault.
  *   v1.6.0 — 2026-09-04 — passkeys table (WebAuthn credentials).
  *   v1.5.0 — 2026-09-03 — dependency_edges and component_versions tables.
@@ -615,6 +617,73 @@ export function applySchemaTables4(db: Database.Database): void {
       PRIMARY KEY (ownerGaii, name)
     );
     CREATE INDEX IF NOT EXISTS idx_secrets_owner ON secrets(ownerGaii);
+
+    -- ── Remote MCP servers (models/mcp-server-schemas.ts; mirrors Postgres 0076) ──
+    -- An MCP server SOMEWHERE ELSE that this node connects out to. The node has been an MCP
+    -- server only; this is the client half, and it is what lets one person's agents, apps and
+    -- chat reach the tools they attached once.
+    --
+    -- NOT a row in "connections". That table holds an outbound ACCOUNT at a provider from a
+    -- closed registry of hand-written recipes, each with its own URL allowlist. An MCP server is
+    -- the opposite shape: an arbitrary endpoint that describes its own tools over the protocol.
+    CREATE TABLE IF NOT EXISTS mcp_servers (
+      id              TEXT PRIMARY KEY,
+      -- The handle a caller names INSTEAD OF A URL, and the prefix on a flattened tool
+      -- (jira__create_issue). Immutable after attach: renaming it silently breaks every grant.
+      slug            TEXT NOT NULL,
+      title           TEXT NOT NULL,
+      description     TEXT NOT NULL DEFAULT '',
+      -- owner | node | organism. 'node' is the operator's registry and has NULL ownerGhii, which
+      -- is what stops it being charged to, or erased with, any one account.
+      ownership       TEXT NOT NULL DEFAULT 'owner',
+      ownerGhii       TEXT,
+      organismId      TEXT,
+      ws              TEXT,
+      createdBy       TEXT NOT NULL,
+      -- JSON McpTransport: {kind:'http'|'sse',url,headers} | {kind:'stdio',command,args,env}
+      -- | {kind:'aimeat',peerNodeId}. The URL lives here and NEVER in a response: a caller that
+      -- learns the endpoint can call it directly and leave every gate in this system behind.
+      transport       TEXT NOT NULL,
+      auth            TEXT NOT NULL DEFAULT 'none',
+      -- Ciphertext iv:authTag:ct under the node key. NULL only when auth = 'none'. A node with
+      -- no key refuses the write rather than storing a token in the clear.
+      credential      TEXT,
+      credentialShape TEXT,
+      -- NULL is a legitimate value, not a missing one: plenty of tokens never expire. Code that
+      -- reads NULL as "expired" parks a working server.
+      expiresAt       TEXT,
+      providerClientId TEXT,
+      -- Whose credential is spent when an agent or app calls through. Separate from "auth"
+      -- because 'the node holds one token' and 'each person holds their own' differ in who the
+      -- far side bills and audits, which is a stored decision rather than a call-time guess.
+      callerIdentity  TEXT NOT NULL DEFAULT 'node-credential',
+      -- gateway | flatten. Per server, because this node already publishes ~340 tools and the
+      -- answer depends on how much the owner uses this one.
+      exposure        TEXT NOT NULL DEFAULT 'gateway',
+      -- The tool list as the far side described it, cached. Asked per call it would make our own
+      -- tools/list as slow as the slowest thing anyone attached.
+      toolCache       TEXT NOT NULL DEFAULT '[]',
+      toolCacheHash   TEXT NOT NULL DEFAULT '',
+      lastListedAt    TEXT,
+      directory       TEXT NOT NULL DEFAULT '{"listed":false,"visibility":"private","tags":[]}',
+      enabled         INTEGER NOT NULL DEFAULT 1,
+      status          TEXT NOT NULL DEFAULT 'active',
+      lastOkAt        TEXT,
+      lastError       TEXT,
+      -- Single-flight refresh claim, for the same reason connections has one: several servers
+      -- invalidate the old refresh token when they issue a new one, so two concurrent calls
+      -- would leave one working token and one server wrongly parked in needs_reauth.
+      refreshClaimedAt TEXT,
+      createdAt       TEXT NOT NULL,
+      updatedAt       TEXT NOT NULL
+    );
+    -- COALESCE, not the bare columns: NULL never equals NULL in a unique index, so without it an
+    -- operator could attach two node-wide servers with the same slug and no lookup could say
+    -- which one a caller meant.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_servers_slug
+      ON mcp_servers(slug, ownership, COALESCE(ownerGhii, ''), COALESCE(organismId, ''));
+    CREATE INDEX IF NOT EXISTS idx_mcp_servers_owner ON mcp_servers(ownerGhii, status);
+    CREATE INDEX IF NOT EXISTS idx_mcp_servers_organism ON mcp_servers(organismId, ws);
 
   `);
 }
