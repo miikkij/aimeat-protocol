@@ -21,6 +21,9 @@
  * @structure McpServersSection — GET /v1/mcp-servers, attach, switch off, remove, and the tool list
  *   on demand.
  * @version-history
+ *   v1.1.0 — 2026-09-16 — Attach and sign-in are not retried. The shared client retries any 5xx, and
+ *     attaching stores the row before it answers, so a dead address was retried into "you already
+ *     have a server called X". Found by pressing the button in a real browser.
  *   v1.0.0 — 2026-09-16 — Initial (MCP proxy phase 1).
  */
 import { h } from 'preact';
@@ -30,7 +33,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
-import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
+import { api, apiGet, apiPatch, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
 const EMPTY_DRAFT = { name: '', url: '', title: '', token: '', header: '', auth: 'token' };
@@ -81,8 +84,10 @@ export function McpServersSection({ showToast }) {
   const authorize = useCallback(async (s) => {
     setBusy(s.id || s.slug);
     try {
-      const res = await apiPost('/v1/mcp-servers/' + encodeURIComponent(s.id || s.slug) + '/authorize', {
-        return_url: '/spa.html#access',
+      // Not retried: starting a sign-in stores a fresh one-time state on the node, and a retry after a
+      // 5xx would start a second round the person never sees.
+      const res = await api('/v1/mcp-servers/' + encodeURIComponent(s.id || s.slug) + '/authorize', {
+        method: 'POST', body: JSON.stringify({ return_url: '/spa.html#access' }), retries: 0,
       });
       const url = res?.data?.authorize_url;
       if (!url) {
@@ -108,13 +113,21 @@ export function McpServersSection({ showToast }) {
     setBusy('attach');
     try {
       const oauth = draft.auth === 'oauth';
-      const res = await apiPost('/v1/mcp-servers', {
-        name: draft.name.trim(),
-        url: draft.url.trim(),
-        ...(draft.title ? { title: draft.title } : {}),
-        ...(oauth ? { auth: 'oauth' } : {}),
-        ...(!oauth && draft.token ? { token: draft.token } : {}),
-        ...(!oauth && draft.header ? { header: draft.header } : {}),
+      // NOT RETRIED, and this is the fix for something only a browser showed. The shared client
+      // retries any 5xx, and attaching stores the row BEFORE it answers, parked, so an address that
+      // does not answer came back 502, was retried, and the retry answered 409. The person was told
+      // "you already have a server called X" instead of "X could not be reached". Found 2026-09-16.
+      const res = await api('/v1/mcp-servers', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: draft.name.trim(),
+          url: draft.url.trim(),
+          ...(draft.title ? { title: draft.title } : {}),
+          ...(oauth ? { auth: 'oauth' } : {}),
+          ...(!oauth && draft.token ? { token: draft.token } : {}),
+          ...(!oauth && draft.header ? { header: draft.header } : {}),
+        }),
+        retries: 0,
       });
       setDraft(EMPTY_DRAFT);
       setAddOpen(false);

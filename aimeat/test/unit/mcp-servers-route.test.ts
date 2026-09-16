@@ -205,6 +205,40 @@ describe('attaching a server', () => {
     });
     expect(res.status).toBe(502);
   });
+
+  it('tells a person their address is RIGHT when the server only wants a token', async () => {
+    // What an AIMEAT node's own /v1/mcp answers without a token: 401, with a body that never says
+    // "401" or "unauthorized". The status is on the SDK error's `.code`.
+    const refuser = http.createServer((_req, res) => {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        jsonrpc: '2.0', id: 0, error: { code: -32001, message: 'Authentication required.' },
+      }));
+    });
+    await new Promise<void>((r) => refuser.listen(40684, '127.0.0.1', () => r()));
+    try {
+      const storage = new SqliteStorage(':memory:');
+      const app = appFor(storage, () => ALICE);
+
+      const res = await call(app, 'POST', '/v1/mcp-servers', {
+        name: 'wantstoken', url: 'http://127.0.0.1:40684/mcp',
+      });
+      // Found on 2026-09-16 by attaching a sandbox node to itself: this answered 502 UNREACHABLE,
+      // twice over. The probe misread the 401, and even once it read it right, all three attach
+      // doors rewrote every failure to UNREACHABLE before a person saw it.
+      expect(res.status).toBe(400);
+      expect((res.body as any).error.code).toBe('UPSTREAM_UNAUTHORIZED');
+      expect((res.body as any).error.message).toMatch(/needs a token or a sign-in/);
+
+      // Parked as needing a sign-in, which the panel renders as a button, not as a dead server.
+      const listed = await call(app, 'GET', '/v1/mcp-servers');
+      const row = ((listed.body as any).data.servers as any[]).find((s) => s.slug === 'wantstoken');
+      expect(row?.status).toBe('needs_reauth');
+    } finally {
+      await mcpClientPool.closeAll();
+      await new Promise<void>((r) => refuser.close(() => r()));
+    }
+  });
 });
 
 describe('calling through a server', () => {

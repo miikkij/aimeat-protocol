@@ -210,10 +210,22 @@ async function resolveCredential(
   return { credential: opened };
 }
 
-/** A 401/403 from the far side means the credential is dead, not that the call was wrong. */
+/**
+ * A 401/403 from the far side means the credential is missing or dead, not that the address is wrong.
+ *
+ * THE STATUS FIRST, THE WORDS SECOND. The SDK's StreamableHTTPError and SseError carry the HTTP
+ * status as a number in `.code`, and their message is whatever the far side wrote in the body. Until
+ * 2026-09-16 only the message was read, and an AIMEAT node's own /v1/mcp answers 401 with "Authentication
+ * required", which contains neither "401" nor "unauthorized". So a server that only needed a token
+ * was parked as NOT ANSWERING, and its owner was told the address was wrong when it was right.
+ * Found by attaching a sandbox node to itself, not by any test, because every test server here
+ * either accepted the call or refused with a message that happened to say "unauthorized".
+ */
 function isUnauthorized(err: unknown): boolean {
+  const status = (err as { code?: unknown } | null)?.code;
+  if (status === 401 || status === 403) return true;
   const m = err instanceof Error ? err.message : String(err);
-  return /\b401\b|\b403\b|unauthorized|forbidden/i.test(m);
+  return /\b401\b|\b403\b|unauthori[sz]ed|forbidden|authentication required/i.test(m);
 }
 
 /**
@@ -281,7 +293,11 @@ async function parkAndDescribe(
     await mcpClientPool.invalidate(server.id);
     return {
       code: 'UPSTREAM_UNAUTHORIZED',
-      message: `"${server.slug}" refused this node's credential. Connect it again.`,
+      // Two different sentences, because they are two different fixes: a server with no credential
+      // at all needs one given to it, and a server whose credential was refused needs a new one.
+      message: server.credential
+        ? `"${server.slug}" did not accept the key this node holds for it. Connect it again.`
+        : `"${server.slug}" answered, and it needs a token or a sign-in first.`,
     };
   }
   await storage.setMcpServerStatus(server.id, 'unreachable', raw);
