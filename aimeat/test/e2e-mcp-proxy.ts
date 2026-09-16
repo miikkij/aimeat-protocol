@@ -390,6 +390,96 @@ await test('an agent WITHOUT mcp:manage cannot attach, whatever else it holds', 
   assert(status === 403, `expected 403, got ${status}`);
 });
 
+// ─── Phase 4b: grants ───
+console.log('\nPhase 4b — Narrowing an agent');
+
+await test('with no grant, the agent may call anything on the server', async () => {
+  const { status } = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: agentAuth(),
+    body: JSON.stringify({ tool: 'echo', arguments: { text: 'before' } }),
+  });
+  assert(status === 200, `expected 200, got ${status}`);
+});
+
+await test('an agent holding only mcp:use cannot write a grant', async () => {
+  const { status } = await json('/v1/mcp-servers/upstream/grants', {
+    method: 'PUT', headers: agentAuth(),
+    body: JSON.stringify({ grantee: agentGaii, tools: '*' }),
+  });
+  // Narrowing somebody is a permission act, so it costs the manage word.
+  assert(status === 403, `expected 403, got ${status}`);
+});
+
+await test('a grant naming one tool refuses the others', async () => {
+  const put = await json('/v1/mcp-servers/upstream/grants', {
+    method: 'PUT', headers: ownerAuth(),
+    body: JSON.stringify({ grantee: agentGaii, tools: ['echo'] }),
+  });
+  assert(put.status === 200, `put: ${put.status}: ${JSON.stringify(put.body)}`);
+
+  const allowed = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: agentAuth(),
+    body: JSON.stringify({ tool: 'echo', arguments: { text: 'still fine' } }),
+  });
+  assert(allowed.status === 200, `the granted tool should work, got ${allowed.status}`);
+
+  const refused = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: agentAuth(), body: JSON.stringify({ tool: 'refuses' }),
+  });
+  assert(refused.status === 502, `expected 502, got ${refused.status}`);
+  assert(JSON.stringify(refused.body).includes('NOT_GRANTED'), 'expected NOT_GRANTED');
+});
+
+await test('the OWNER is not narrowed by a grant on their own server', async () => {
+  // Grants narrow the things acting FOR a person. The grant above names only `echo`, and the
+  // person themselves may still reach everything.
+  const { status } = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: ownerAuth(), body: JSON.stringify({ tool: 'refuses' }),
+  });
+  assert(status === 200, `expected the owner through, got ${status}`);
+});
+
+await test('locked arguments win over what the agent sends', async () => {
+  const put = await json('/v1/mcp-servers/upstream/grants', {
+    method: 'PUT', headers: ownerAuth(),
+    body: JSON.stringify({
+      grantee: agentGaii, tools: ['echo'], locked_input: { text: 'DECIDED' },
+    }),
+  });
+  assert(put.status === 200, `put: ${put.status}`);
+
+  const { status, body } = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: agentAuth(),
+    body: JSON.stringify({ tool: 'echo', arguments: { text: 'the agent chose this' } }),
+  });
+  assert(status === 200, `expected 200, got ${status}`);
+  // The fence held: what came back is the owner's value, not the agent's.
+  assert(JSON.stringify(body).includes('echo:DECIDED'), `got ${JSON.stringify(body.data?.content)}`);
+});
+
+await test('the grant list shows what was written', async () => {
+  const { status, body } = await json('/v1/mcp-servers/grants?server=upstream', { headers: ownerAuth() });
+  assert(status === 200, `expected 200, got ${status}`);
+  const grants = body.data.grants as any[];
+  assert(grants.length === 1, `expected one grant, got ${grants.length}`);
+  assert(grants[0].grantee === agentGaii, 'wrong grantee');
+});
+
+await test('removing the narrowing WIDENS the agent again', async () => {
+  const del = await json(
+    `/v1/mcp-servers/upstream/grants/${encodeURIComponent(agentGaii)}`,
+    { method: 'DELETE', headers: ownerAuth() },
+  );
+  assert(del.status === 200, `delete: ${del.status}`);
+
+  const { status } = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: agentAuth(), body: JSON.stringify({ tool: 'refuses' }),
+  });
+  // Back to what its permissions allow, which is MORE than the grant allowed. The direction people
+  // get wrong, which is why the tool description and the route response both say it.
+  assert(status === 200, `expected 200 after the narrowing went, got ${status}`);
+});
+
 // ─── Phase 5: off, and gone ───
 console.log('\nPhase 5 — Off, and gone');
 

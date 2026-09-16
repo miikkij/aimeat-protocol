@@ -46868,6 +46868,118 @@ paths:
           description: Removed
         '404':
           description: No such server.
+  /v1/mcp-servers/grants:
+    get:
+      operationId: listMcpGrants
+      summary: Which agent may use which attached server, and which tools
+      description: >
+        A server with NO grant is governed by permissions alone: whoever holds mcp:use reaches all of
+        its tools. A grant is a NARROWING of that default, never a widening, so this is only half the
+        answer to "what can this agent do" — the other half is its scopes.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: server
+          in: query
+          schema:
+            type: string
+          description: Only the grants for this server's slug.
+      responses:
+        '200':
+          description: The caller's own grants
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/mcp-servers/{id}/grants:
+    put:
+      operationId: putMcpGrant
+      summary: Narrow one agent or app to named tools
+      description: >
+        Needs mcp:manage. Writing a grant REPLACES any earlier one for the same grantee on the same
+        server. `tools` is required and has no default, because a grant written without it would
+        read as "every tool", which is the opposite of what somebody writing a grant means.
+        `locked_input` values WIN over whatever the caller sends, which is what turns "may call
+        create_issue" into "may create issues in SUPPORT".
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grantee, tools]
+              properties:
+                grantee:
+                  type: string
+                  description: >
+                    An agent's GAII, an ecosystem app's GEAI, app:owner/file, or * for everything
+                    acting for this owner. A grant naming the exact principal beats the catch-all.
+                tools:
+                  oneOf:
+                    - type: string
+                      enum: ['*']
+                    - type: array
+                      items:
+                        type: string
+                locked_input:
+                  type: object
+                  additionalProperties: true
+                  description: Arguments the grantee may not choose. These win over what it sends.
+                call_cap:
+                  type: object
+                  description: >
+                    At most {count} calls in {windowHours} hours, counted from the usage stream
+                    rather than a counter on the grant. A cap that cannot be counted does not refuse.
+                  properties:
+                    count:
+                      type: integer
+                    windowHours:
+                      type: integer
+                expires:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: The grant as stored
+        '400':
+          description: No grantee, or no tools list.
+        '404':
+          description: No such server.
+  /v1/mcp-servers/{id}/grants/{grantee}:
+    delete:
+      operationId: removeMcpGrant
+      summary: Remove a narrowing
+      description: >
+        THIS DOES NOT REMOVE ACCESS. What the grantee may do goes back to being decided by its
+        scopes alone, which is usually MORE than the narrowing allowed. To stop an agent using a
+        server, take the scope away or switch the server off.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: grantee
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Removed
+        '404':
+          description: No such server, or no such narrowing.
   /v1/mcp-servers/{id}/authorize:
     post:
       operationId: authorizeMcpServer

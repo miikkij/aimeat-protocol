@@ -89,6 +89,35 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
         ),
     },
     {
+        // → GET /v1/mcp-servers/grants
+        name: 'aimeat_mcp_grant_list',
+        handler: ({ client }, input) => client.get(
+            '/v1/mcp-servers/grants'
+            + (optionalString(input, 'server') ? `?server=${encodeURIComponent(optionalString(input, 'server') as string)}` : ''),
+        ),
+    },
+    {
+        // → PUT /v1/mcp-servers/:id/grants — a NARROWING, never a widening.
+        name: 'aimeat_mcp_grant_set',
+        handler: ({ client }, input) => client.put(
+            serverPath(requiredString(input, 'server'), '/grants'),
+            {
+                grantee: requiredString(input, 'grantee'),
+                tools: input.tools,
+                ...(input.locked_input ? { locked_input: input.locked_input } : {}),
+                ...(input.call_cap ? { call_cap: input.call_cap } : {}),
+                ...(optionalString(input, 'expires') ? { expires: optionalString(input, 'expires') } : {}),
+            },
+        ),
+    },
+    {
+        // → DELETE /v1/mcp-servers/:id/grants/:grantee — removes the NARROWING, not the access.
+        name: 'aimeat_mcp_grant_revoke',
+        handler: ({ client }, input) => client.delete(
+            serverPath(requiredString(input, 'server'), `/grants/${encodeURIComponent(requiredString(input, 'grantee'))}`),
+        ),
+    },
+    {
         // → DELETE /v1/mcp-servers/:id — the stored credential goes with it.
         name: 'aimeat_mcp_detach',
         handler: ({ client }, input) => client.delete(serverPath(requiredString(input, 'server'))),

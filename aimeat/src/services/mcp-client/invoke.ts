@@ -30,6 +30,7 @@ import type {
 import { mcpClientPool } from './pool.js';
 import { openMcpCredential } from './credential.js';
 import { refreshMcpOAuth } from './oauth.js';
+import { resolveMcpAccess, applyLockedInput } from './grants.js';
 import { recordUsageCall } from '../usage/usage-buffer.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
@@ -55,6 +56,8 @@ export type RemoteCallRefusal =
   | 'TRANSPORT_UNSUPPORTED'
   | 'UNREACHABLE'
   | 'UPSTREAM_UNAUTHORIZED'
+  /** The owner's grant does not cover this tool, or its cap or its expiry ran out. */
+  | 'NOT_GRANTED'
   | 'TOOL_FAILED';
 
 export interface RemoteCallInput {
@@ -63,10 +66,24 @@ export interface RemoteCallInput {
   server: McpServerRecord;
   tool: string;
   args: Record<string, unknown>;
-  /** The exact principal that asked: a GHII, a GAII or a GEAI. Attribution, never authorisation. */
+  /**
+   * The exact principal that asked: a GHII, a GAII or a GEAI.
+   *
+   * Attribution AND, since phase 2, the subject of the grant lookup. The door above still decides
+   * whether the caller may reach this server at all; what happens here is the narrowing the owner
+   * wrote for this particular agent.
+   */
   caller: string;
   /** What kind of principal it is, for the usage row. */
   callerKind?: 'owner' | 'agent' | 'app' | 'eco' | 'operator';
+  /**
+   * The session's scopes, so the grant check can answer the default case.
+   *
+   * Omitted means "the caller already proved its scope at the door", which is what the REST route
+   * and the MCP tools do — requireScope and TOOL_SCOPES ran before this was reached. Passing them
+   * lets a caller that has NOT been through such a door (an app, an extension) be checked here.
+   */
+  scopes?: string[];
 }
 
 /**
@@ -252,6 +269,21 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
     };
   }
 
+  // The owner's narrowing, before anything is spent. A refusal here is `refused` and not `error` in
+  // the usage stream on purpose: the system worked, and what it recorded is a demand signal saying
+  // which agent wanted which tool it could not have.
+  const access = await resolveMcpAccess({
+    storage, server, grantee: caller, tool,
+    scopes: input.scopes ?? ['mcp:use'],
+  });
+  if (!access.allowed) {
+    record('refused', access.code);
+    return { ok: false, code: 'NOT_GRANTED', message: access.message };
+  }
+  // The grant's fixed arguments WIN over what the caller sent. "Only in project SUPPORT" is not a
+  // suggestion, and a caller supplying its own project must not steer out of the fence.
+  const effectiveArgs = applyLockedInput(args, access.lockedInput);
+
   const resolved = await resolveCredential(storage, config, server);
   if ('refusal' in resolved) {
     const refusal = resolved.refusal as { ok: false; code: RemoteCallRefusal; message: string };
@@ -263,7 +295,7 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
 
   try {
     const client = await mcpClientPool.acquire(server, resolved.credential, identity);
-    const result = await client.callTool({ name: tool, arguments: args }, undefined, {
+    const result = await client.callTool({ name: tool, arguments: effectiveArgs }, undefined, {
       timeout: CALL_TIMEOUT_MS,
     });
     await storage.touchMcpServerOk(server.id);

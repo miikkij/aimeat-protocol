@@ -80,6 +80,10 @@ const PROBE_SETUP: Record<string, Record<string, unknown>> = {
   aimeat_operator_ai_config: { daily_budget_usd: 1 },
   aimeat_operator_agent_configure: { mode: 'interactive' },
   aimeat_workspace_write: { space: 'note', id: 'probe', value: { title: 'probe', markdown: 'probe' } },
+  // `tools` is a union of the literal '*' or a list of names, so a generic string placeholder
+  // is refused before anything is called. A setup entry keeps the tool inside the probe's
+  // reach, which is the whole point: an exemption would stop measuring it.
+  aimeat_mcp_grant_set: { grantee: 'probe#someone@node-id', tools: ['probe'] },
 };
 
 /**
