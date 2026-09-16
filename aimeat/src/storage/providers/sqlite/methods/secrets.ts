@@ -9,6 +9,7 @@
  * @structure secretMethods — listSecrets · getSecret · setSecret · deleteSecret · noteSecretUse ·
  *   deleteSecretsByOwner
  * @version-history
+ *   v1.1.0 — 2026-09-16 — hosts column and bindSecretHost; setSecret clears the hosts.
  *   v1.0.0 — 2026-09-06 — Initial.
  */
 import type Database from 'better-sqlite3';
@@ -36,6 +37,19 @@ function parseUsedBy(raw: unknown): SecretUseStamps {
   }
 }
 
+/** The bound hosts, or none. A malformed column throws: reading it as unbound would let the next
+ *  call bind the secret to whatever host it names. */
+function parseHosts(raw: unknown): string[] {
+  if (typeof raw !== 'string' || !raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`secrets: the hosts column does not parse: ${String(err)}`, { cause: err });
+  }
+  return Array.isArray(parsed) ? parsed.filter((h): h is string => typeof h === 'string') : [];
+}
+
 function toRecord(row: Record<string, unknown>): SecretRecord {
   return {
     ownerGaii: row.ownerGaii as string,
@@ -44,6 +58,7 @@ function toRecord(row: Record<string, unknown>): SecretRecord {
     setAt: row.setAt as string,
     updatedAt: row.updatedAt as string,
     usedBy: parseUsedBy(row.usedBy),
+    hosts: parseHosts(row.hosts),
   };
 }
 
@@ -68,17 +83,28 @@ export const secretMethods = {
       ...record,
       setAt: prior?.setAt ?? record.setAt,
       usedBy: prior?.usedBy ?? record.usedBy ?? {},
+      // A new value is the owner's own act, so it clears where the old one was allowed to go.
+      hosts: [],
     };
     if (prior) {
-      this.db.prepare('UPDATE secrets SET ciphertext = ?, updatedAt = ? WHERE ownerGaii = ? AND name = ?')
+      this.db.prepare('UPDATE secrets SET ciphertext = ?, updatedAt = ?, hosts = \'[]\' WHERE ownerGaii = ? AND name = ?')
         .run(stored.ciphertext, stored.updatedAt, stored.ownerGaii, stored.name);
     } else {
       this.db.prepare(
-        'INSERT INTO secrets (ownerGaii, name, ciphertext, setAt, updatedAt, usedBy) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO secrets (ownerGaii, name, ciphertext, setAt, updatedAt, usedBy, hosts) VALUES (?, ?, ?, ?, ?, ?, \'[]\')',
       ).run(stored.ownerGaii, stored.name, stored.ciphertext, stored.setAt, stored.updatedAt,
         JSON.stringify(stored.usedBy ?? {}));
     }
     return stored;
+  },
+
+  async bindSecretHost(this: Db, ownerGaii: string, name: string, host: string): Promise<string[]> {
+    // Conditional on the list being empty, so a second first use cannot add a second host.
+    this.db.prepare('UPDATE secrets SET hosts = ? WHERE ownerGaii = ? AND name = ? AND hosts = \'[]\'')
+      .run(JSON.stringify([host]), ownerGaii, name);
+    const row = this.db.prepare('SELECT hosts FROM secrets WHERE ownerGaii = ? AND name = ?')
+      .get(ownerGaii, name) as Record<string, unknown> | undefined;
+    return row ? parseHosts(row.hosts) : [];
   },
 
   async deleteSecret(this: Db, ownerGaii: string, name: string): Promise<boolean> {

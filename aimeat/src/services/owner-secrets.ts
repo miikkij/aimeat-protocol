@@ -36,6 +36,10 @@
  *   const r = await putOwnerSecret(storage, config, ownerGhii, name, value);
  *   if (!r.ok) res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   v1.1.0 — 2026-09-16 — A vault secret is bound to the host of its first use, and the resolver
+ *     refuses any other host (SECRET_HOST). The address comes from an extension's script, so any
+ *     extension a person ran could send their credential to its author. The list shows `hosts`;
+ *     storing the value again clears them.
  *   v1.0.0 — 2026-09-06 — Initial. The owner's secrets vault.
  */
 import type { AimeatConfig } from '../config.js';
@@ -70,6 +74,8 @@ export interface SecretSummary {
   updatedAt: string;
   /** Extension names that resolved this secret within the last 30 days, most recent first. */
   usedBy: string[];
+  /** The hosts this secret may be sent to. Empty until its first use binds one. */
+  hosts: string[];
 }
 
 /** A refusal the caller turns into an HTTP status or a tool error, with the words already written. */
@@ -98,6 +104,7 @@ export function toSummary(record: SecretRecord, now = Date.now()): SecretSummary
     setAt: record.setAt,
     updatedAt: record.updatedAt,
     usedBy: recentUsers(record, now),
+    hosts: record.hosts ?? [],
   };
 }
 
@@ -161,6 +168,7 @@ export async function putOwnerSecret(
     setAt: now,
     updatedAt: now,
     usedBy: {},
+    hosts: [],
   });
   return { ok: true, data: toSummary(stored) };
 }
@@ -265,6 +273,25 @@ export function extensionConfigSecrets(extConfig: Record<string, unknown> | unde
   }
 }
 
+/** Why a resolution was refused: no such secret, or a secret bound to another host. */
+export type SecretResolutionRefusal =
+  | { ok: false; reason: 'unknown'; headerName: string; secretName: string }
+  | { ok: false; reason: 'host'; headerName: string; secretName: string; boundTo: string[]; host: string };
+
+/** The header that names this secret, so a refusal can say which one. */
+function headerNaming(headers: Record<string, string> | undefined, secretName: string): string {
+  return Object.entries(headers ?? {})
+    .find(([, v]) => typeof v === 'string' && v.includes(`{{secret:${secretName}}}`))?.[0] ?? '';
+}
+
+/** What a refusal for the wrong host says. It names hosts and the secret, never a value. */
+export function secretHostMessage(headerName: string, secretName: string, boundTo: string[], host: string): string {
+  return `The header "${headerName}" asks for the secret ${secretName}, which may be sent only to `
+    + `${boundTo.join(', ') || 'the host it is first used with'}, and this call goes to ${host || 'an address that does not parse'}. `
+    + 'Nothing was sent. To use it with a different host, store the value again on the Access page under Secrets, '
+    + 'or with aimeat_secret_set; the next call then binds it to its host.';
+}
+
 /** What a refused resolution says, and where the caller can go to fix it. */
 export function secretUnknownMessage(headerName: string, secretName: string): string {
   return `The header "${headerName}" asks for the secret ${secretName}, which this account has not set. `
@@ -293,8 +320,10 @@ export async function resolveSecretForHeaders(deps: {
   /** Which extension is asking, for the usedBy stamp. */
   extName: string;
   headers: Record<string, string> | undefined;
-}): Promise<{ ok: true; headers: Record<string, string> } | { ok: false; headerName: string; secretName: string }> {
-  const { storage, config, ownerGhii, extConfig, extName, headers } = deps;
+  /** Where the call is going. A vault secret is sent only to the host it is bound to. */
+  url: string;
+}): Promise<{ ok: true; headers: Record<string, string> } | SecretResolutionRefusal> {
+  const { storage, config, ownerGhii, extConfig, extName, headers, url } = deps;
   const names = secretPlaceholderNames(headers);
   if (!names.length) return { ok: true, headers: headers ?? {} };
 
@@ -302,15 +331,17 @@ export async function resolveSecretForHeaders(deps: {
   const fallback = extensionConfigSecrets(extConfig);
   const resolved = new Map<string, string>();
   const fromVault: string[] = [];
+  // An address that does not parse binds nothing and sends nothing.
+  const host = URL.canParse(url) ? new URL(url).host.toLowerCase() : '';
 
   for (const name of names) {
     // The person's own vault wins over the operator's shared map: a credential belonging to the
     // human must never be shadowed by one somebody else set for everyone on the node.
     const record = await storage.getSecret(ownerGhii, name);
     if (record && key) {
+      let plain = '';
       try {
-        const plain = decrypt(record.ciphertext, key);
-        if (plain) { resolved.set(name, plain); fromVault.push(name); continue; }
+        plain = decrypt(record.ciphertext, key);
       } catch (err) {
         // A row this node's key cannot open is an unset secret from here: the key was rotated, or
         // the row arrived from another node. Fall through to the extension config and then refuse
@@ -319,6 +350,16 @@ export async function resolveSecretForHeaders(deps: {
         logger.warn('secrets: a stored value could not be opened with this node key', {
           name, owner: ownerGhii, error: String(err),
         });
+      }
+      if (plain) {
+        // THE HOST. The address comes from the extension's script, so without this any extension a
+        // person ran could send their credential to its author. The first use binds the host;
+        // every later call must go there. Storing the value again clears the binding.
+        const bound = record.hosts?.length ? record.hosts : (host ? await storage.bindSecretHost(ownerGhii, name, host) : []);
+        if (!host || !bound.includes(host)) {
+          return { ok: false, reason: 'host', headerName: headerNaming(headers, name), secretName: name, boundTo: bound, host };
+        }
+        resolved.set(name, plain); fromVault.push(name); continue;
       }
     }
     const alt = fallback[name];
@@ -330,9 +371,7 @@ export async function resolveSecretForHeaders(deps: {
     // Name the HEADER as well as the secret: an owner reading this is looking at a document with
     // several headers in it, and "which one" is half the answer.
     const missing = substituted.missing;
-    const headerName = Object.entries(headers ?? {})
-      .find(([, v]) => typeof v === 'string' && v.includes(`{{secret:${missing}}}`))?.[0] ?? '';
-    return { ok: false, headerName, secretName: missing };
+    return { ok: false, reason: 'unknown', headerName: headerNaming(headers, missing), secretName: missing };
   }
 
   // Fire-and-forget: the call must not wait on bookkeeping, and a lost stamp costs a line on a list.

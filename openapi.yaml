@@ -28412,6 +28412,11 @@ paths:
         I delete this", because a secret can be named inside a document, an extension config or a
         workflow, none of which the vault can see.
 
+        `hosts` names where the secret may be sent. It is empty until the secret's first use, which
+        binds the host of that call; a call to any other host is refused with SECRET_HOST before
+        anything is sent. The address of a call is chosen by an extension's script, so without the
+        binding any extension could send the secret to its author.
+
         Needs `secrets:manage`, which no wildcard carries. An owner session bypasses scopes as
         always; an agent or an app grant must hold the exact word.
       tags: [Secrets]
@@ -28429,7 +28434,8 @@ paths:
       description: |
         Replacing is this same call: a vault with a separate rotate door is a vault where somebody
         eventually uses the wrong one. Replacing keeps `setAt` (since when you have held this name)
-        and moves `updatedAt` (when the value changed).
+        and moves `updatedAt` (when the value changed). Replacing also clears `hosts`, so the next
+        use binds the secret to its host again.
 
         The value goes in and comes out of nothing. What it is FOR is being named in an outbound
         header as `{{secret:NAME}}`: an extension writes the placeholder, the node fills in the
