@@ -436,6 +436,11 @@ const ALL_SUITES = [
     // bulk/export/import/bulk-delete, discover and copy, TTL expiry on read, the anonymous
     // namespace refusals, the 413 and 422 arms, the CORS inheritance ladder and the bin listing.
     'test/e2e-memory-doors.ts',
+    // The remote MCP proxy: attach against a real upstream MCP server this suite starts
+    // itself, the tool cache, calling, the cross-owner 404 and the scope split. Here and
+    // not only in the unit suites because those run on SQLite alone, and this is what
+    // EXECUTES the Postgres half of the store.
+    'test/e2e-mcp-proxy.ts',
     'test/e2e-hello-mcp.ts',
     'test/e2e-device-token-grace.ts',
     'test/e2e-agent-reapproval.ts',
@@ -986,6 +991,7 @@ const GUARD_SUITES = [
     'test/e2e-mcp-groups-shares.ts',        // sharing groups: who is in, who may read, the refusal codes
     'test/e2e-mcp-onboarding.ts',           // the onboarding ladder an agent climbs, one confirmation at a time
     'test/e2e-mcp-packages-tools.ts',       // package tools and the tool catalogue on the MCP surface
+    'test/e2e-mcp-proxy.ts',                // the remote MCP proxy: attach, list, call, the fences, off and gone
     'test/e2e-memory-doors.ts',             // bulk, export, import, bulk-delete, discover, copy, TTL, CORS, the bin
     'test/e2e-organism-membership-doors.ts', // members hidden, review, promote/demote, transfer, owners, invitations
     'test/e2e-owner-export.ts',             // one export, every section, and who may ask for it
