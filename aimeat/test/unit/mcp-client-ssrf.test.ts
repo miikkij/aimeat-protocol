@@ -29,7 +29,13 @@ const ALWAYS_BLOCKED: Array<{ what: string; url: string; because: RegExp }> = [
   { what: 'RFC1918 192.168/16', url: 'http://192.168.1.1/mcp', because: /private/i },
   { what: 'RFC1918 172.16/12', url: 'http://172.16.0.1/mcp', because: /private/i },
   { what: 'carrier-grade NAT', url: 'http://100.64.0.1/mcp', because: /carrier|private/i },
-  { what: 'IPv4-mapped IPv6 loopback', url: 'http://[::ffff:127.0.0.1]/mcp', because: /loopback/i },
+  // Two acceptable reasons, and this is not the assertion going soft. Windows resolves the
+  // bracketed IPv4-mapped form and the address check answers "Loopback address"; Linux fails the
+  // lookup first and answers "DNS resolution failed". Both are refusals and the request goes
+  // nowhere either way, which is the property this suite exists to hold. Pinning one of them
+  // asserted the MECHANISM rather than the outcome, passed on the machine it was written on and
+  // went red on CI — which is the honest version of the lesson.
+  { what: 'IPv4-mapped IPv6 loopback', url: 'http://[::ffff:127.0.0.1]/mcp', because: /loopback|DNS/i },
 ];
 
 describe('the proxy\'s outbound fetch', () => {
