@@ -53,7 +53,7 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
         ),
     },
     {
-        // → POST /v1/mcp-servers, or POST /v1/mcp-servers/organism when `group` names one.
+        // → POST /v1/mcp-servers, or POST /v1/mcp-servers/organism when `organism_id` names one.
         //   Probes the address before anything is called attached.
         name: 'aimeat_mcp_attach',
         handler: ({ client }, input) => {
@@ -67,7 +67,7 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
                 ...(optionalString(input, 'token') ? { token: optionalString(input, 'token') } : {}),
                 ...(optionalString(input, 'header') ? { header: optionalString(input, 'header') } : {}),
             };
-            const group = optionalString(input, 'group');
+            const group = optionalString(input, 'organism_id');
             // Both paths are written out as LITERALS rather than picked with a ternary: the gate
             // matches a tool to its route by the path it calls, and a computed path matches nothing.
             // See the note in the connector twin, which had the same ternary and the same cost.
