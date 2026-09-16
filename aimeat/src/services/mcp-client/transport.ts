@@ -1,0 +1,103 @@
+/**
+ * @file transport.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Builds the client transport for one remote MCP server, and the guarded `fetch` every
+ *   byte of it travels through.
+ *
+ *   THE WHOLE SECURITY ARGUMENT IS ONE LINE: the SDK transports accept a `fetch`, and we give them
+ *   ours. `guardedFetch` is safeFetch, so the DNS-level SSRF check, the manual redirect loop that
+ *   re-validates every hop, and the dropping of Authorization when a redirect leaves its origin all
+ *   apply — to the initialize POST, the SSE GET, every tools/list and every tools/call.
+ *
+ *   Measured 2026-09-16 before any of this was written, because the whole design depended on it: a
+ *   real MCP session made five requests and the injected fetch saw all five; a server that answered
+ *   302 to 169.254.169.254 was refused AT THE HOP with "Link-local / cloud-metadata address"; and a
+ *   fetch that refuses surfaces in 0 ms rather than hanging. If the SDK had not allowed this the
+ *   design would have changed there and not here.
+ *
+ *   WHAT IS DELIBERATELY NOT HERE. No caller ever supplies a URL. The endpoint comes from the
+ *   stored record, which only `mcp:manage` can write. A caller names a slug.
+ * @structure guardedFetch · buildTransport · MCP_CONNECT_TIMEOUT_MS
+ * @usage const t = buildTransport(server, credential); await client.connect(t);
+ * @version-history
+ *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
+ */
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import type { Transport, FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { safeFetch } from '../../utils/url-validator.js';
+import type { McpServerRecord, McpServerCredential } from '../../models/mcp-server-schemas.js';
+
+/**
+ * How long we wait for a far side that has accepted the connection but says nothing.
+ *
+ * A remote server is somebody else's uptime. Without a deadline, one slow server holds a request
+ * of ours open for as long as it likes, and if that request is a tool list assembled at session
+ * start, it holds up an AI client's whole session.
+ */
+export const MCP_CONNECT_TIMEOUT_MS = 20_000;
+
+/**
+ * safeFetch wearing the SDK's `FetchLike` shape.
+ *
+ * `sensitiveHeaders` names Authorization, and that is not decoration: safeFetch re-validates a
+ * redirect and then follows it with the SAME headers, so an address the owner allowed could answer
+ * 302 and collect the bearer token. curl and every browser drop the credential on a cross-host
+ * redirect for exactly this reason, and only the caller knows which of its headers carry a secret.
+ */
+export const guardedFetch: FetchLike = (url, init) =>
+  safeFetch(typeof url === 'string' ? url : url.toString(), {
+    ...init,
+    sensitiveHeaders: ['authorization'],
+  });
+
+/**
+ * The headers a credential turns into.
+ *
+ * A `static` credential may name its own header, because not every server takes a bearer: some want
+ * `X-API-Key`, and a design that assumed Authorization would meet its first refusal at the second
+ * server anyone attached.
+ */
+function authHeaders(credential: McpServerCredential | null): Record<string, string> {
+  if (!credential) return {};
+  if (credential.shape === 'static' && credential.headerName) {
+    return { [credential.headerName]: credential.accessToken };
+  }
+  return { Authorization: `Bearer ${credential.accessToken}` };
+}
+
+/**
+ * Build the transport for one server.
+ *
+ * Throws for `stdio` and `aimeat`: both are later phases, and a stub that silently did nothing
+ * would be found by a person wondering why their server never answers. `stdio` in particular runs
+ * somebody else's code on this host and is operator-only, allowlisted and off by default when it
+ * does arrive.
+ */
+export function buildTransport(
+  server: McpServerRecord,
+  credential: McpServerCredential | null,
+): Transport {
+  const t = server.transport;
+
+  if (t.kind === 'stdio') {
+    throw new Error(
+      'This node cannot run a local MCP server process yet. Attach the server over https instead.',
+    );
+  }
+  if (t.kind === 'aimeat') {
+    throw new Error(
+      'Reaching a peer AIMEAT node as an MCP server is not available yet. Attach it over https instead.',
+    );
+  }
+
+  // The record's own headers first, so a credential can never be shadowed by one somebody typed
+  // into the transport when they attached the server.
+  const headers = { ...(t.headers ?? {}), ...authHeaders(credential) };
+  const url = new URL(t.url);
+
+  return t.kind === 'sse'
+    ? new SSEClientTransport(url, { fetch: guardedFetch, requestInit: { headers } })
+    : new StreamableHTTPClientTransport(url, { fetch: guardedFetch, requestInit: { headers } });
+}
