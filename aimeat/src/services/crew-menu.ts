@@ -24,12 +24,19 @@
  *   A `model` carries `api_key_env`, the NAME of an environment variable on that machine. No
  *   credential is stored here, and this service refuses one that looks like a key.
  *
- *   THE CATALOGUE IS THE RUNTIME'S TOO. It publishes `crews.llm.catalog` at start; this reads it so
- *   the page can offer what exists rather than a free-text box, and a live `crew.menu` supersedes it
- *   whenever the agent is connected.
+ *   THE CATALOGUE IS THE RUNTIME'S TOO. It publishes `crews.llm.catalog` at start, into the AGENT's
+ *   own namespace; this reads it so the page can offer what exists rather than a free-text box, and a
+ *   live `crew.menu` supersedes it whenever the agent is connected. The agent's own namespace, because
+ *   `crews.llm.` is a reserved prefix in the owner's: an agent writing there needs
+ *   memory:write-reserved, which also reaches openrouter.settings and commerce.psp, and no publisher
+ *   should hold that for a list of model names. A forged catalogue there is read only for the agent
+ *   that wrote it, which already decides what its own runtime calls. It also gives each agent its own
+ *   copy, where one owner key had agents on different machines overwrite each other's list.
  * @structure CrewMenu · crewMenu() · readLlmChoice() · writeLlmChoice()
  * @usage const menu = await crewMenu(deps, caller, 'news-watcher');
  * @version-history
+ *   v1.1.0 — 2026-09-16 — The catalogue is read from the agent's own namespace. In the owner's it could
+ *     not be published without memory:write-reserved, so hosted runtimes got SCOPE_DENIED.
  *   v1.0.0 — 2026-09-09 — Initial: the drift between this node's copy of the tool menu and the
  *     runtime's own, and the owner's model choice for an agent.
  */
@@ -41,7 +48,7 @@ import { logger } from '../utils/logger.js';
 
 /** The owner's key for a default that covers every agent they have. */
 export const LLM_DEFAULT_KEY = 'crews.llm.default';
-/** Where the runtime publishes what this machine can reach. */
+/** Where the runtime publishes what this machine can reach, in the agent's own namespace. */
 export const LLM_CATALOG_KEY = 'crews.llm.catalog';
 /** One agent's own choice. */
 export const llmKeyFor = (agent: string) => `crews.llm.${agent}`;
@@ -185,9 +192,9 @@ export async function crewMenu(deps: Deps, caller: CrewCaller, identifier: strin
   }
 
   // Offline, or a runtime that predates crew.menu. The catalogue it published at its last start is
-  // the next best thing, and it is a plain memory record.
-  const cat = await readOwnerValue(deps, caller.owner, LLM_CATALOG_KEY) as
-    { profiles?: unknown; models?: unknown } | null;
+  // the next best thing, and it is a plain memory record under the agent itself.
+  const catRec = await deps.storage.getMemory(target.agent.gaii, LLM_CATALOG_KEY);
+  const cat = (catRec?.value ?? null) as { profiles?: unknown; models?: unknown } | null;
   return {
     ok: true,
     menu: {
