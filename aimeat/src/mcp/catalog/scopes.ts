@@ -601,6 +601,21 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_mail_read: 'connections:use',
     aimeat_mail_aliases: 'connections:use',
 
+    // Remote MCP servers. The same three-way split as connections above, and for the same reason:
+    // knowing WHICH servers are attached, calling a tool THROUGH one, and attaching another are
+    // three different favours. `mcp:manage` is additionally outside every wildcard
+    // (utils/scope-coverage.ts), because pointing somebody's account at a server of the agent's own
+    // choosing, and storing a credential there, is a human act and not something "Full access"
+    // should carry.
+    aimeat_mcp_list: 'mcp:read',
+    // Reading a server's tool list is `mcp:read` and not `mcp:use`: knowing that a tool called
+    // create_issue exists gives nobody the ability to create an issue. The gate that matters is on
+    // the CALL, which is the same reasoning the node's own capability source states for itself.
+    aimeat_mcp_tools: 'mcp:read',
+    aimeat_mcp_call: 'mcp:use',
+    aimeat_mcp_attach: 'mcp:manage',
+    aimeat_mcp_detach: 'mcp:manage',
+
     // Commerce (TARGET-033/034 over MCP). NOTE: the REST commerce routes are requireAuth-only
     // today — these MCP tools are gated STRICTER than REST on purpose (selling config touches
     // PSP secrets; buying spends the owner's balance). commerce:sell = seller-side config (PSP,

@@ -18,6 +18,9 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.11.0 — 2026-09-16 — The mcp domain: read, use and manage for the other MCP servers this
+ *     account has attached. manage is outside every wildcard; the other two are not, because
+ *     reaching an attached server is what the person attached it for.
  *   v1.10.0 — 2026-09-13 — messages:organize-as-owner, outside every wildcard: archiving the owner's
  *     conversations and writing the rules for their Messages list, as the owner.
  *   v1.9.0 — 2026-09-12 — messages:read-as-owner, outside every wildcard: reading the owner's own
@@ -132,6 +135,14 @@ export const NOT_IN_WILDCARD = [
   // writing the rules that fold, group or archive them. Nothing is deleted, but archiving is how a
   // message stops being seen, so it costs its own tick rather than riding along with "Full access".
   'messages:organize-as-owner',
+  // ── Added 2026-09-16 ─────────────────────────────────────────────────────────────────────────
+  // Attaching another MCP server to this account, or removing one. Its two siblings, mcp:read and
+  // mcp:use, stay inside the wildcard on purpose: reaching an attached server is what the person
+  // attached it FOR, and the whole point is that the AI they already talk to can use it. This word
+  // is the one that changes WHICH servers everything acting for them can reach, and points the
+  // account at an address of the agent's own choosing with a credential stored behind it. "Full
+  // access" is one click, and nobody clicking it is deciding that.
+  'mcp:manage',
 ];
 
 /**
@@ -193,6 +204,12 @@ export const SCOPE_DOMAINS = [
   { key: 'signals',   permissions: ['read', 'write'] },
   { key: 'company',   permissions: ['read', 'write'] },
   { key: 'connections', permissions: ['read', 'write', 'use'] },
+  // The other MCP servers this account has attached — an issue tracker, a wiki, whatever the
+  // person connected. Three words for the same reason connections has three: knowing WHICH servers
+  // are attached, calling a tool THROUGH one, and attaching another are three different favours.
+  // mcp:manage is also outside every wildcard (NOT_IN_WILDCARD below): pointing this account at a
+  // server of the agent's own choosing, and storing a credential there, is a human act.
+  { key: 'mcp',       permissions: ['read', 'use', 'manage'] },
   { key: 'notifications', permissions: ['send'] },
   { key: 'exchange',  permissions: ['read', 'write', 'grant', 'beneficiary'] },
   // commerce:psp — write or destroy the payment credentials money is paid out through.

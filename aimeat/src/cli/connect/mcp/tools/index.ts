@@ -37,6 +37,7 @@ import { registerSkillsTools } from './skills.js';
 import { registerOrganismsTools } from './organisms.js';
 import { registerWorkspaceTools } from './workspaces.js';
 import { registerConnectionTools } from './connections.js';
+import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerSchedulesTools } from './schedules.js';
 import { registerWorkflowTools } from './workflows.js';
 import { registerAiJobTools } from './ai-jobs.js';
@@ -84,6 +85,7 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerOrganismsTools(mcp, registry);
   registerWorkspaceTools(mcp, registry);
   registerConnectionTools(mcp, registry);
+  registerMcpProxyTools(mcp, registry);
   registerSchedulesTools(mcp, registry);
   registerWorkflowTools(mcp, registry);
   registerAiJobTools(mcp, registry);

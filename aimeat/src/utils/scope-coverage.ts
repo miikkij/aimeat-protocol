@@ -30,6 +30,9 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.8.0 — 2026-09-16 — MCP_MANAGE_SCOPE, attaching another MCP server to this account. Outside
+ *     the wildcard from the day it exists; its two siblings mcp:read and mcp:use stay inside it,
+ *     because reaching an attached server is what the person attached it for.
  *   v1.7.0 — 2026-09-13 — messages:organize-as-owner joins the own-tick family: archiving the owner's
  *     conversations and writing the rules for their Messages list, as the owner.
  *   v1.6.0 — 2026-09-12 — messages:read-as-owner joins the own-tick family: an agent reading the
@@ -174,6 +177,25 @@ export const SURFACE_LAYOUT_WRITE_SCOPE = 'site:layout-write';
 export const SECRETS_MANAGE_SCOPE = 'secrets:manage';
 
 /**
+ * Attaching another MCP server to this account, or removing one.
+ *
+ * THREE WORDS, AND ONLY THIS ONE IS OUT. `mcp:read` (what is attached) and `mcp:use` (call a tool
+ * through it) sit inside the wildcard, because they are what the person attached the server FOR:
+ * the whole point is that the AI they already talk to can reach their issue tracker. `mcp:manage`
+ * is the one that changes what every agent, app and chat acting for them can reach, and doing that
+ * is a human act. "Full access" is one click, and nobody clicking it is deciding that an agent may
+ * point their account at a server of its own choosing and store a credential there.
+ *
+ * Nobody is grandfathered onto it (services/scope-vocabulary-migration.ts has no entry), because it
+ * names a capability that did not exist before — no agent can lose one it had.
+ *
+ * Enforced by requireScope on the REST doors and by the same word deciding whether the attach and
+ * detach tools are registered at all, so the tool surface and the HTTP door answer alike
+ * (invariant 15).
+ */
+export const MCP_MANAGE_SCOPE = 'mcp:manage';
+
+/**
  * Scopes no wildcard carries — neither `*` nor `{domain}:*`. Only the exact string counts, anywhere
  * a scope is checked, proposed, or approved.
  *
@@ -227,6 +249,7 @@ const OWN_TICK_SCOPES = [
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [
     WRITE_RESERVED_SCOPE, ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE,
     COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, SECRETS_MANAGE_SCOPE,
+    MCP_MANAGE_SCOPE,
     ...OWN_TICK_SCOPES,
 ];
 

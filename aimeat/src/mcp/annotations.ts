@@ -214,6 +214,19 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // NOT idempotent, and that is the whole point: a blind retry sends the message twice, which is
     // the one mistake in this family a person actually notices.
     aimeat_mail_send: { title: 'Send Mail', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    // Remote MCP servers. `openWorldHint` is true on all but the list, because everything else here
+    // reaches a server this node does not run.
+    aimeat_mcp_list: { title: 'Attached MCP Servers', readOnlyHint: true },
+    aimeat_mcp_tools: { title: 'What an Attached Server Can Do', readOnlyHint: true, openWorldHint: true },
+    // NOT read-only and NOT idempotent, whatever the tool behind it does. This node cannot know
+    // what somebody else's tool is: the honest hint is the widest one, because a client deciding
+    // whether to auto-run a call must not be told "safe" on our guess about a stranger's code.
+    aimeat_mcp_call: { title: 'Call a Tool on an Attached Server', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    // Idempotent: attaching a name that already exists is refused rather than duplicated.
+    aimeat_mcp_attach: { title: 'Attach an MCP Server', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    // Destructive, and the credential goes with it. Everything acting for this person loses those
+    // tools at once.
+    aimeat_mcp_detach: { title: 'Remove an MCP Server', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_update: { title: 'Update Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_organism_overview: { title: 'Organism Structure Overview', readOnlyHint: true },
     aimeat_workspace_overview: { title: 'Workspace Structure Overview', readOnlyHint: true },

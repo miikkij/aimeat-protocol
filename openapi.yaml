@@ -4193,6 +4193,51 @@ components:
           description: >
             needs_reauth is a user-visible state rather than an error; scheduled work parks on it
             instead of retrying.
+    PublicMcpServer:
+      type: object
+      description: >
+        Everything any caller may see about a remote MCP server. Deliberately WITHOUT the endpoint
+        and without the credential, and the endpoint is omitted for the same reason the credential
+        is: a caller that learns the address can call it directly and leave every gate in this
+        system behind. A caller names the slug and the node builds the request.
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+          description: >
+            The short name a caller uses instead of the address, and the prefix a flattened tool
+            carries. Immutable after attach, because renaming it would break every grant naming it.
+        title:
+          type: string
+        description:
+          type: string
+        ownership:
+          type: string
+          enum: [owner, node, organism]
+          description: >
+            Whose server it is. A node-wide server is the operator's registry and belongs to no one
+            account.
+        status:
+          type: string
+          enum: [active, needs_reauth, unreachable, disabled]
+          description: >
+            needs_reauth is a user-visible state rather than an error, and the panel renders it as a
+            button that fixes it; unreachable is the far side being down, which ages the server out
+            of discovery without detaching it.
+        enabled:
+          type: boolean
+        exposure:
+          type: string
+          enum: [gateway, flatten]
+          description: >
+            Whether this server's tools are reached through the three gateway tools, or listed
+            individually with their own schemas.
+        toolCount:
+          type: integer
+        lastOkAt:
+          type: string
+          nullable: true
     SharingGroup:
       type: object
       required: [id, name, ownerGaii, members, createdAt, updatedAt]
@@ -46696,6 +46741,194 @@ paths:
                                       placeholder: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /v1/mcp-servers:
+    get:
+      operationId: listMcpServers
+      summary: Remote MCP servers the caller has attached
+      description: >
+        The caller's own servers and no one else's. Neither the endpoint nor the credential is part
+        of any response. Answers to mcp:read OR mcp:use, because an app granted only the second
+        still has to learn the names it may call.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The caller's servers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          servers:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/PublicMcpServer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: attachMcpServer
+      summary: Attach a remote MCP server
+      description: >
+        Needs mcp:manage, which is outside every wildcard: attaching a server to an account is a
+        human act, and an agent holding full access still cannot do it. The address is PROBED before
+        the server is called attached, so a wrong address or a wrong token is reported now rather
+        than later as a server that never answers. A token given here is sealed with the node key
+        and appears in no response afterwards.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, url]
+              properties:
+                name:
+                  type: string
+                  description: The short name used instead of the address. Lowercase, digits, dashes.
+                url:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
+                transport:
+                  type: string
+                  enum: [http, sse]
+                  default: http
+                token:
+                  type: string
+                  description: Sealed with the node key. Never returned.
+                header:
+                  type: string
+                  description: Which header the token belongs in, when the server takes no bearer.
+      responses:
+        '201':
+          description: Attached, with the tools the server reported
+        '400':
+          description: The name is not one this node accepts, or the address is missing.
+        '409':
+          description: This owner already has a server with that name.
+        '502':
+          description: The server could not be reached, or it refused the credential.
+        '503':
+          description: This node has no encryption key, so it cannot hold a credential.
+  /v1/mcp-servers/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The server's id or its slug; either resolves.
+    patch:
+      operationId: updateMcpServer
+      summary: Change a server's editable fields
+      description: >
+        Title, description, exposure and the on/off switch. NOT the slug and NOT the credential: the
+        slug is what every grant names, and a credential is replaced by connecting again. Switching
+        a server off also drops its pooled client, so it stops at once rather than whenever an idle
+        sweeper next runs.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The updated server
+        '404':
+          description: No such server. Absent and not-yours answer identically.
+    delete:
+      operationId: detachMcpServer
+      summary: Detach a server and forget its credential
+      description: >
+        Everything acting for this person loses those tools at once. This does not revoke anything
+        at the far side: a token created there is still the person's to revoke there.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Removed
+        '404':
+          description: No such server.
+  /v1/mcp-servers/{id}/tools:
+    get:
+      operationId: listMcpServerTools
+      summary: What one attached server can do
+      description: >
+        The tools the server reported, with their own schemas, stored verbatim. Answers from the
+        cache unless refresh is asked for, because reaching the far side on every read would make
+        this as slow as the slowest thing anyone attached.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: refresh
+          in: query
+          schema:
+            type: string
+          description: Set to 1 to ask the server again instead of answering from the cache.
+      responses:
+        '200':
+          description: The server's tools
+        '404':
+          description: No such server.
+        '502':
+          description: The server could not be reached, or its credential is dead.
+  /v1/mcp-servers/{id}/call:
+    post:
+      operationId: callMcpServerTool
+      summary: Run one tool on an attached server
+      description: >
+        Needs mcp:use. The node spends the stored credential; the caller never sees it and never
+        needs it. TWO DIFFERENT REFUSALS COME BACK HERE, and they mean different things: is_error
+        inside a 200 is the TOOL saying no, which is a successful proxy of an unsuccessful call,
+        while a 502 is the server being unreachable or its credential dead, which a person has to
+        repair.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tool]
+              properties:
+                tool:
+                  type: string
+                arguments:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: What the tool returned, with is_error saying whether the tool itself refused.
+        '400':
+          description: No tool was named.
+        '404':
+          description: No such server.
+        '502':
+          description: The server could not be reached, or its credential is dead.
   /v1/connections:
     get:
       operationId: listConnections

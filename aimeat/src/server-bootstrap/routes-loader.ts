@@ -9,6 +9,10 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.17.0 — 2026-09-16 — Mounts mcpServersRouter (/v1/mcp-servers: the remote MCP servers this
+ *     node connects OUT to). To make room, pure extraction of the node robots.txt handler to
+ *     robots-mount.ts — the file was at 800 of 800, where no router could be added at all. Same
+ *     handler, same call site, still after the subdomain router.
  *   v1.16.0 — 2026-09-13 — Mounts messagesOrganizeRouter: the owner's archive, rules and sections for
  *     the Messages list (GET/PUT /v1/messages/organize, POST /v1/messages/organize/archive).
  *   v1.15.0 — 2026-09-12 — Mounts the realtime router whether or not realtime is enabled, so the
@@ -82,6 +86,7 @@ import { nsRouter } from '../routes/ns.js';
 import { markdownMirrorsRouter } from '../routes/markdown-mirrors.js';
 import { agentConventionsRouter } from '../routes/agent-conventions.js';
 import { nodeRobotsTxt } from './static-files.js';
+import { mountNodeRobots } from './robots-mount.js';
 import { wellknownRouter, discoveryLinkHeaders } from '../routes/wellknown.js';
 import { robotsHeader } from '../middleware/robots-header.js';
 import { agentSkillsDiscoveryRouter } from '../routes/agent-skills-discovery.js';
@@ -125,6 +130,7 @@ import { adminSecurityRouter } from '../routes/admin-security.js';
 import { adminCorsRouter } from '../routes/admin-cors.js';
 import { sharingGroupsRouter } from '../routes/sharing-groups.js';
 import { connectionsRouter } from '../routes/connections.js';
+import { mcpServersRouter } from '../routes/mcp-servers.js';
 import { specRouter } from '../routes/spec.js';
 import { disputesRouter } from '../routes/disputes.js';
 import { storageFilesRouter } from '../routes/storage-files.js';
@@ -333,31 +339,9 @@ export async function mountRoutes(
   // Subdomain root serving MUST come before bootstrapRouter — its GET / handles
   // mapped `<sub>.<apex>` requests; apex requests fall through untouched.
   app.use(subdomainServeRouter(config, storage));
-  // The node's robots.txt, registered AFTER the subdomain router so an app origin has already
-  // answered with its own. Registered inside setupStaticFiles it ran before the subdomain
-  // middleware, could not tell which host it was on, and served the node's file everywhere.
-  if (nodeRobotsTxt !== null) {
-    const robots = nodeRobotsTxt;
-    app.get('/robots.txt', (req, res, next) => {
-      // Apex only, and this is the point where that can be decided: subdomainMiddleware has run.
-      // A mapped app origin answered above with its own; an UNMAPPED one gets a 404 rather than
-      // the node's file, because a robots.txt whose Sitemap: line names another host is a document
-      // about somebody else no matter which subdomain asked for it.
-      if (req.appOrigin || req.portfolioOrigin) { next(); return; }
-      res.set('Cache-Control', 'no-cache');
-      // The master switch is read HERE rather than baked into `robots` at boot, because an
-      // operator can flip seo.indexing from the admin config without a restart, and a robots.txt
-      // still inviting crawlers an hour after they turned discovery off is the wrong answer.
-      // No Sitemap line either: pointing a crawler at a sitemap it may not read is a contradiction.
-      if (config.seoIndexing === 'off') {
-        res.type('text/plain; charset=utf-8').send(
-          '# Search-engine discovery is turned off for this node.\nUser-agent: *\nDisallow: /\n',
-        );
-        return;
-      }
-      res.type('text/plain; charset=utf-8').send(robots);
-    });
-  }
+  // The node's robots.txt. In robots-mount.ts because this file is at the line ceiling; it is
+  // still called HERE, after the subdomain router, which is the whole reason it is where it is.
+  mountNodeRobots(app, config, nodeRobotsTxt);
   app.use(bootstrapRouter(config, storage, tunnelManager ?? undefined, siteService));
   app.use(agentDocsRouter(config));  // /sitemap.md + /AGENTS.md (apex only)
   app.use(glossaryRouter(config));   // /v1/glossary.{json,md} + JSON-LD
@@ -594,6 +578,7 @@ export async function mountRoutes(
   app.use(adminCorsRouter(config, storage));
   app.use(sharingGroupsRouter(config, storage));
   app.use(connectionsRouter(config, storage));  // TARGET-057: outbound connections + delegations
+  app.use(mcpServersRouter(config, storage));   // the remote MCP servers this node connects OUT to
   app.use(federationRouter(config, storage, peers, networkDirectory));
   app.use(disputesRouter(config, storage));
   app.use(flagsRouter(config, storage));
