@@ -271,6 +271,15 @@ const AI_PROVENANCE_REQUIRED = [
  * nothing to anyone. `app_draft_save` is the one deliberate content exception; the reason is on it.
  */
 const AI_PROVENANCE_REVIEWED_WITHOUT = [
+  // DECIDED, 2026-09-16. `title` and `description` on a remote MCP server are a LABEL on a settings
+  // row, not authored content. They name a machine the owner attached, so that a list of servers
+  // reads as something other than a column of slugs, and the only person they are ever shown to is
+  // the owner who asked for them. Provenance answers "who wrote what I am reading" for a reader;
+  // there is no reader here and nothing being claimed. The tool changes no content of any kind: its
+  // other field is a boolean that switches a server off. What DOES carry provenance on this path is
+  // anything a remote tool writes back into memory, and that is stamped by the memory write path
+  // where the bytes actually land.
+  'aimeat_mcp_update',
   // DECIDED, 2026-09-06. A secret is a CREDENTIAL, not content: it is a key somebody else's service
   // issued, it is delivered to no reader, and nothing on this node — including the owner — can ever
   // read it back. There is nobody to disclose to and nothing to disclose about. Worse than useless:

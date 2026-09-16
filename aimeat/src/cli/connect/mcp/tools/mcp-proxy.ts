@@ -69,6 +69,19 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     }),
   ));
 
+  mcp.tool('aimeat_mcp_update', descriptionFor('aimeat_mcp_update'), {
+    server: z.string().describe('Which server, by its short name.'),
+    enabled: z.boolean().optional().describe('false switches it off at once; true switches it back on.'),
+    title: z.string().optional().describe('What to call it on screen.'),
+    description: z.string().optional().describe('What it is for, in a sentence.'),
+  }, annotationsFor('aimeat_mcp_update'), async ({ server, enabled, title, description }) => out(
+    await client.patch(path(server), {
+      ...(enabled !== undefined ? { enabled } : {}),
+      ...(title !== undefined ? { title } : {}),
+      ...(description !== undefined ? { description } : {}),
+    }),
+  ));
+
   mcp.tool('aimeat_mcp_detach', descriptionFor('aimeat_mcp_detach'), {
     server: z.string().describe('Which server, by its short name.'),
   }, annotationsFor('aimeat_mcp_detach'), async ({ server }) => out(

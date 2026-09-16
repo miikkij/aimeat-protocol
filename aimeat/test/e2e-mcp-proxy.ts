@@ -160,16 +160,26 @@ await test('register owner (operator) + token', async () => {
   ownerToken = await ownerTokenFor(ownerName, body.private_key);
 });
 
-await test('register an agent of that owner, with the three mcp words', async () => {
+await test('register an agent of that owner, holding mcp:read and mcp:use but NOT mcp:manage', async () => {
   const { status, body } = await json('/v1/agents', {
     method: 'POST', headers: ownerAuth(),
     body: JSON.stringify({
       name: 'mcpproxybot', owner: ownerName, capabilities: ['memory'], model: 'test',
-      default_scopes: ['mcp:read', 'mcp:use'],
     }),
   });
   assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
   agentGaii = body.data.agent.gaii;
+
+  // The scopes go through their own door. POST /v1/agents IGNORES a default_scopes field, so an
+  // agent created "with" scopes silently holds the node's default instead — which on a test node
+  // is '*', and a '*' agent passes every arm below for the wrong reason.
+  const scoped = await json('/v1/agents/mcpproxybot/scopes', {
+    method: 'PATCH', headers: ownerAuth(),
+    body: JSON.stringify({ scopes: ['mcp:read', 'mcp:use'] }),
+  });
+  assert(scoped.status === 200, `scopes: ${scoped.status}: ${JSON.stringify(scoped.body)}`);
+
+  // Minted after the grant: a JWT carries the scopes it was minted from.
   agentToken = await agentTokenFor(agentGaii, body.data.private_key);
 });
 
@@ -349,6 +359,54 @@ await test('disabling a server stops calls at once', async () => {
   });
   assert(status === 502, `expected 502, got ${status}`);
   assert(JSON.stringify(body).includes('SERVER_DISABLED'), 'expected SERVER_DISABLED');
+});
+
+await test('the agent that may USE a server still cannot switch it off', async () => {
+  // mcp:use is not mcp:manage. Spending a server and changing what the account holds are two
+  // different favours, and this is the arm that says the split survives on the editing door too.
+  const { status } = await json('/v1/mcp-servers/upstream', {
+    method: 'PATCH', headers: agentAuth(), body: JSON.stringify({ enabled: false }),
+  });
+  assert(status === 403, `expected 403, got ${status}`);
+});
+
+await test('an agent the owner TRUSTED with mcp:manage can switch it off', async () => {
+  // Why aimeat_mcp_update exists at all: "turn that server off, it is misbehaving" is a sentence
+  // somebody says to their AI, and a capability reachable only by clicking is not finished here.
+  // The gap was found by check:field-reach, which noticed the PATCH door had no agent twin.
+  const made = await json('/v1/agents', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({
+      name: 'mcpproxyadmin', owner: ownerName, capabilities: ['memory'], model: 'test',
+    }),
+  });
+  assert(made.status === 201, `agent: ${made.status}: ${JSON.stringify(made.body)}`);
+
+  // The scopes are set through their own door, and it has to be this way round: POST /v1/agents
+  // ignores a default_scopes field, so an agent created "with" mcp:manage silently holds whatever
+  // the node's default is. That is how the first draft of this test passed a 403 off as a grant.
+  const scoped = await json(`/v1/agents/mcpproxyadmin/scopes`, {
+    method: 'PATCH', headers: ownerAuth(),
+    body: JSON.stringify({ scopes: ['mcp:read', 'mcp:use', 'mcp:manage'] }),
+  });
+  assert(scoped.status === 200, `scopes: ${scoped.status}: ${JSON.stringify(scoped.body)}`);
+
+  // Minted AFTER the grant: a JWT carries the scopes it was minted from, so a token taken before
+  // the PATCH would still say what the agent used to hold.
+  const token = await agentTokenFor(made.body.data.agent.gaii, made.body.data.private_key);
+
+  const patched = await json('/v1/mcp-servers/upstream', {
+    method: 'PATCH', headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ enabled: false }),
+  });
+  assert(patched.status === 200, `expected 200, got ${patched.status}`);
+
+  // And it really stopped, rather than merely being marked.
+  const { status } = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ tool: 'echo', arguments: { text: 'x' } }),
+  });
+  assert(status === 502, `expected the server to be off, got ${status}`);
 });
 
 await test('re-enabling it brings it back', async () => {
