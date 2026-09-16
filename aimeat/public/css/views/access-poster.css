@@ -12,6 +12,7 @@
  *   quieted here. Every column is bounded so a long origin or label wraps inside its cell.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.5.0 -- 2026-09-17 -- .ac-shost: the address line under a secret's "used by".
  *   v1.4.0 -- 2026-09-16 -- MCP servers are section 04, the section comments follow the new numbers,
  *     and an MCP server row wraps on a phone instead of cutting its remove button off.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
@@ -144,6 +145,10 @@
    into a header, and 10.88 px is under the 11 px floor a finished surface is measured against. */
 .ac-snm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); overflow-wrap: anywhere; }
 .ac-secret > .ac-sw { font-size: .85rem; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; }
+/* Where the value may go. .72rem keeps it above the 11 px floor, like the date line beside it. */
+.ac-secret > .ac-sw .ac-shost { display: block; margin-top: .2rem; font-size: .72rem; line-height: 1.45; color: var(--text-dim); overflow-wrap: anywhere; }
+/* One label of a host name: never broken inside (not at its hyphen), only between labels. */
+.ac-shost-h { white-space: nowrap; }
 .ac-secret > .ac-swhen { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
 .ac-secret > .ac-sgo { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
 .ac-sgo .og-door { font-size: .72rem; }

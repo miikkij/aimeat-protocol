@@ -12,6 +12,8 @@
  * @structure keyRow · keyOpen · secretRow · sessionsBlock · federationBlock
  * @usage import { keyRow, secretRow, sessionsBlock, federationBlock } from './rows.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-17 -- A secret row says the one address its value may go to, or that the first
+ *     call that uses it sets that address.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.2.0 -- 2026-09-13 -- Compose access detail frames and extract inline layout.
  *   v1.1.0 — 2026-09-06 — secretRow: the vault's rows for section 04. It shows the name and never
@@ -84,17 +86,23 @@ function keyOpen(ctx, row) {
  * One row of the vault. The sub-line is the spelling an extension writes into a header, because
  * that is the only thing a person needs to carry away from here; the value is not on this row, in
  * this file or in the answer the page read.
- * @param {any} ctx @param {{ name: string, setAt?: string, updatedAt?: string, usedBy?: string[] }} row
+ * The address line under "used by" says where the value may go: a vault secret is bound to the host
+ * of the first call that uses it, and every other host is refused.
+ * @param {any} ctx @param {{ name: string, setAt?: string, updatedAt?: string, usedBy?: string[], hosts?: string[] }} row
  */
 export function secretRow(ctx, row) {
   const open = ctx.replaceName === row.name;
   const busy = ctx.busy === 'secret:' + row.name;
   const used = Array.isArray(row.usedBy) ? row.usedBy : [];
+  const hosts = Array.isArray(row.hosts) ? row.hosts : [];
   const replaced = row.updatedAt && row.updatedAt !== row.setAt ? row.updatedAt : null;
   return html`
     <div class=${`ac-secret ${open ? 'is-open' : ''}`} key=${row.name}>
       <div class="ac-snm"><b>${row.name}</b><small>${'{{secret:' + row.name + '}}'}</small></div>
-      <div class="ac-sw">${used.length ? used.join(', ') : html`<span class="is-dim">${x('secrets.usedByNone')}</span>`}</div>
+      <div class="ac-sw">
+        <span>${used.length ? used.join(', ') : html`<span class="is-dim">${x('secrets.usedByNone')}</span>`}</span>
+        <small class="ac-shost">${hosts.length ? secretHostLine(hosts) : x('secrets.notBound')}</small>
+      </div>
       <div class="ac-swhen">${dateWord(row.setAt)}<br /><span>${replaced ? x('secrets.colReplaced') + ' ' + dateWord(replaced) : x('secrets.neverReplaced')}</span></div>
       <div class="ac-sgo">
         <button type="button" class="og-door" onClick=${() => ctx.openReplace(row.name)}>${open ? x('close') : x('secrets.replace')}</button>
@@ -102,6 +110,24 @@ export function secretRow(ctx, row) {
       </div>
       ${open ? secretReplace(ctx, row, busy) : null}
     </div>`;
+}
+
+/**
+ * "Sent only to <host>". A host may break after a dot and nowhere else: broken at its hyphen it
+ * reads as two addresses, and cut short with an ellipsis it hides the one thing the line is for.
+ * The sentence is split around a marker so the translation decides where the host goes.
+ */
+function secretHostLine(hosts) {
+  const marker = ' ';
+  const [before, after = ''] = x('secrets.goesTo', { host: marker }).split(marker);
+  // The last two labels stay together, so a line never ends up holding only "com".
+  const host = (h) => {
+    const parts = h.split('.');
+    const labels = parts.length > 1 ? [...parts.slice(0, -2), parts.slice(-2).join('.')] : parts;
+    return labels.map((part, i) =>
+      html`<span class="ac-shost-h">${part}${i < labels.length - 1 ? '.' : ''}</span>${i < labels.length - 1 ? html`<wbr />` : null}`);
+  };
+  return html`${before}${hosts.map((h, i) => html`${i ? ', ' : ''}${host(h)}`)}${after}`;
 }
 
 /** The one field that writes a value, on the row it belongs to. It is never filled from the server. */
