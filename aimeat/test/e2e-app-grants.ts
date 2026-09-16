@@ -8,6 +8,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-grants
  * @version-history
+ *   v1.4.0 — 2026-09-16 — Phase 5b: openrouter.apikey and commerce.psp show no credential on any
+ *     generic memory door (app grant, owner, operator), and the generic write doors refuse them.
  *   v1.3.0 — 2026-08-17 — GET /request/:id also proves the `description_keys` localization chain
  *     (override key first, shared sentence tree second) that the consent UI resolves client-side.
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phase 3).
@@ -433,6 +435,98 @@ async function main() {
         const d = await grantAppToken('memory:read');
         const r = await json('/v1/memory/export', { headers: { Authorization: `Bearer ${d.access_token}` } });
         assert(r.status === 200, `expected 200 with memory:read, got ${r.status}: ${JSON.stringify(r.body).slice(0, 160)}`);
+    });
+
+    console.log('\nPhase 5b: The two records that hold a credential show no credential on any memory door');
+    // THE LEAK: openrouter.apikey and commerce.psp are ordinary memory records. The owner's AI key
+    // and the Stripe secrets inside them were returned whole (ciphertext, or a legacy plain value)
+    // by every generic memory door, to an app grant with memory:read, to an agent with owner_scope
+    // and to the operator. Those doors now show { configured: true } and a last-four hint.
+    const AI_KEY = 'sk-or-e2e-owner-own-key-5d2b';
+    const STRIPE_KEY = 'sk_test_e2e_generic_doors_71e0';
+    const HOOK = 'whsec_e2e_generic_doors_c4a9';
+    let readToken = '';
+    const noCredential = (door: string, body: unknown) => {
+        const text = JSON.stringify(body);
+        for (const s of [AI_KEY, STRIPE_KEY, HOOK]) assert(!text.includes(s), `${door} returned a credential in the clear`);
+        assert(!text.includes('"encrypted"'), `${door} returned a credential's ciphertext: ${text.slice(0, 240)}`);
+        // A snippet or an excerpt carries a stretch of the value without its field name, so the
+        // ciphertext itself is looked for too: iv:authTag:ct in hex (services/encryption.ts).
+        assert(!/[0-9a-f]{24}:[0-9a-f]{32}/.test(text), `${door} returned a stretch of a credential's ciphertext: ${text.slice(0, 240)}`);
+    };
+    await test('setup: the owner stores an AI key and Stripe secrets through their own routes', async () => {
+        const ai = await json('/v1/openrouter/settings', {
+            method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ apiKey: AI_KEY }),
+        });
+        assert(ai.status === 200, `AI key: ${ai.status} ${JSON.stringify(ai.body?.error)}`);
+        const st = await json('/v1/commerce/payout/stripe', {
+            method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ secret_key: STRIPE_KEY, webhook_secret: HOOK }),
+        });
+        assert(st.status === 200, `Stripe: ${st.status} ${JSON.stringify(st.body?.error)}`);
+        readToken = (await grantAppToken('memory:read')).access_token;
+        assert(!!readToken, 'an app token with memory:read');
+    });
+    const doors: Array<[string, string]> = [
+        ['GET /v1/memory/openrouter.apikey', '/v1/memory/openrouter.apikey'],
+        ['GET /v1/memory/commerce.psp', '/v1/memory/commerce.psp'],
+        ['GET /v1/memory/commerce.psp?owner_scope=true', '/v1/memory/commerce.psp?owner_scope=true'],
+        ['GET /v1/memory', '/v1/memory?limit=500'],
+        ['GET /v1/memory?prefix=commerce.', '/v1/memory?prefix=commerce.'],
+        ['GET /v1/memory/search?q=apikey', '/v1/memory/search?q=apikey'],
+        ['GET /v1/memory/search?q=psp', '/v1/memory/search?q=psp'],
+        ['GET /v1/memory/export', '/v1/memory/export'],
+        ['GET /v1/librarian/search?q=apikey', '/v1/librarian/search?q=apikey'],
+        ['GET /v1/librarian/search?q=secretKey', '/v1/librarian/search?q=secretKey'],
+    ];
+    for (const [label, path] of doors) {
+        await test(`${label} shows no credential, to the app and to the owner`, async () => {
+            for (const [who, token] of [['app', readToken], ['owner', ownerToken]] as const) {
+                const r = await json(path, { headers: { Authorization: `Bearer ${token}` } });
+                noCredential(`${label} (${who}, ${r.status})`, r.body);
+            }
+        });
+    }
+    await test('the record still says a credential is set, with its last four characters', async () => {
+        const r = await json('/v1/memory/commerce.psp', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(r.status === 200, `read ${r.status}`);
+        assert(r.body.data.value.secretKey?.configured === true && r.body.data.value.secretKey?.hint === '…71e0',
+            `secretKey shows configured and a hint: ${JSON.stringify(r.body.data.value)}`);
+        const ai = await json('/v1/memory/openrouter.apikey', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(ai.body.data.value?.configured === true, `the AI key shows configured: ${JSON.stringify(ai.body.data.value)}`);
+    });
+    await test("the operator's memory screen shows no credential either", async () => {
+        const ghii = encodeURIComponent(`${owner}@${NODE_ID}`);
+        const get = await json(`/v1/admin/memory/${ghii}/commerce.psp`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(get.status === 200, `admin read ${get.status}`);
+        noCredential('GET /v1/admin/memory/:owner/:key', get.body);
+        const search = await json('/v1/admin/memory/search?q=secretKey', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        noCredential(`GET /v1/admin/memory/search (${search.status})`, search.body);
+    });
+    await test('the generic write doors refuse the two records, so a shown value cannot overwrite a key', async () => {
+        const post = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ key: 'commerce.psp', value: { secretKey: { configured: true } } }),
+        });
+        assert(post.status === 403 && post.body?.error?.code === 'SECRET_RECORD', `POST: ${post.status} ${JSON.stringify(post.body?.error)}`);
+        const put = await json('/v1/memory/openrouter.apikey', {
+            method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ value: { configured: true }, version: 1 }),
+        });
+        assert(put.status === 403 && put.body?.error?.code === 'SECRET_RECORD', `PUT: ${put.status} ${JSON.stringify(put.body?.error)}`);
+        const patch = await json('/v1/memory/commerce.psp', {
+            method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ patch: { payTo: null } }),
+        });
+        assert(patch.status === 403 && patch.body?.error?.code === 'SECRET_RECORD', `PATCH: ${patch.status} ${JSON.stringify(patch.body?.error)}`);
+        const imp = await json('/v1/memory/import', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ entries: [{ key: 'openrouter.apikey', value: { configured: true } }] }),
+        });
+        const failed = (imp.body?.data?.failed ?? []) as { key: string; reason: string }[];
+        assert(failed.some(f => f.key === 'openrouter.apikey'), `import must refuse the record: ${JSON.stringify(imp.body).slice(0, 240)}`);
+        // …and the credentials are still in place, because nothing overwrote them.
+        const payout = await json('/v1/commerce/payout', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(payout.body.data.stripe?.configured === true, `Stripe still configured: ${JSON.stringify(payout.body.data.stripe)}`);
+        const settings = await json('/v1/openrouter/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(JSON.stringify(settings.body).includes('"hasApiKey":true'), `AI key still set: ${JSON.stringify(settings.body).slice(0, 200)}`);
     });
 
     /**

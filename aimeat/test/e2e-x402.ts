@@ -22,6 +22,7 @@
  *   e2e-x402-testnet.ts, opted into by setting AIMEAT_X402_TEST_FACILITATOR=false.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=x402
  * @version-history
+ *   v1.2.0 — 2026-09-16 — Payout settings go through their routes; addresses compare without case.
  *   v1.1.2 — 2026-09-16 — The kept Stripe credential is asserted in its encrypted form (commerce/psp-secrets.ts)
  *   v1.1.1 — 2026-07-25 — Runner pins the x402 env, so the suite no longer inherits the dev .env
  *   v1.1.0 — 2026-07-25 — EUR/EURC settlement + the advertise-only-what-can-settle round trip (TARGET-042)
@@ -76,8 +77,17 @@ async function sellerWithUsdOffer(label: string, offerId: string, amountMicros: 
     }] };
     const pub = await json('/v1/agents/vendor/offers', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify(offers) });
     assert(pub.status === 200, `publish offers ${pub.status}: ${JSON.stringify(pub.body.error)}`);
-    const pspWrite = await json('/v1/memory', { method: 'POST', headers: auth(seller.token), body: JSON.stringify({ key: 'commerce.psp', value: psp, visibility: 'private' }) });
-    assert(pspWrite.status === 200 || pspWrite.status === 201, `psp write ${pspWrite.status}: ${JSON.stringify(pspWrite.body.error)}`);
+    // Through the seller's own payout routes: commerce.psp holds a credential, so the general memory
+    // doors refuse it (services/secret-records.ts).
+    const p = psp as { address?: string; secretKey?: string };
+    if (p.address) {
+        const w = await json('/v1/commerce/payout/x402', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ address: p.address }) });
+        assert(w.status === 200, `payout address ${w.status}: ${JSON.stringify(w.body.error)}`);
+    }
+    if (p.secretKey) {
+        const w = await json('/v1/commerce/payout/stripe', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ secret_key: p.secretKey }) });
+        assert(w.status === 200, `stripe key ${w.status}: ${JSON.stringify(w.body.error)}`);
+    }
     return { ...seller, vendorGaii: `vendor#${seller.name}@${NODE_ID}` };
 }
 
@@ -145,7 +155,8 @@ await test('3. Complete with NO proof → 402 carrying the real exact scheme + p
     requirements = (r.body.accepts || []).find((a: any) => a.scheme === 'exact');
     assert(!!requirements, `exact scheme present: ${JSON.stringify(r.body.accepts?.map((a: any) => a.scheme))}`);
     assert(requirements.network === 'base-sepolia', `network: ${requirements.network}`);
-    assert(requirements.payTo === SELLER_ADDR, `payTo is the seller address: ${requirements.payTo}`);
+    // The payout route stores the address in its EIP-55 form, so the comparison ignores case.
+    assert(String(requirements.payTo).toLowerCase() === SELLER_ADDR, `payTo is the seller address: ${requirements.payTo}`);
     assert(requirements.asset === '0x036CbD53842c5426634e7929541eC2318f3dCF7e', `asset is Base Sepolia USDC: ${requirements.asset}`);
     assert(requirements.maxAmountRequired === String(PRICE_MICROS), `maxAmountRequired (USDC atomic = USD micros): ${requirements.maxAmountRequired}`);
     assert(!!requirements.extra?.name, `EIP-712 extra present: ${JSON.stringify(requirements.extra)}`);
@@ -249,7 +260,7 @@ await test('5c. A checkout session belongs to its buyer, and the seller is not t
 });
 
 await test('6. A seller with no USDC address → 422 SELLER_NO_X402_ADDRESS (payTo gate)', async () => {
-    const stripeSeller = await sellerWithUsdOffer('n', 'usd-service', PRICE_MICROS, { provider: 'stripe', secretKey: 'sk_test_x' });
+    const stripeSeller = await sellerWithUsdOffer('n', 'usd-service', PRICE_MICROS, { provider: 'stripe', secretKey: 'sk_test_x_seller' });
     const create = await json('/v1/commerce/checkout-sessions', {
         method: 'POST', headers: auth(buyer.token),
         body: JSON.stringify({ currency: 'USD', items: [{ agent: stripeSeller.vendorGaii, offer_id: 'usd-service' }] }),
@@ -308,7 +319,7 @@ await test('8. A EUR-priced offering yields a 402 whose exact scheme carries the
         `EURC EIP-712 domain: ${JSON.stringify(eurRequirements.extra)}`);
     // EURC carries 6 decimals like USDC, so micros map 1:1 — 2.40 EUR asks for 2.40 EURC.
     assert(eurRequirements.maxAmountRequired === String(EUR_PRICE_MICROS), `maxAmountRequired: ${eurRequirements.maxAmountRequired}`);
-    assert(eurRequirements.network === 'base-sepolia' && eurRequirements.payTo === SELLER_ADDR,
+    assert(eurRequirements.network === 'base-sepolia' && String(eurRequirements.payTo).toLowerCase() === SELLER_ADDR,
         `same network + the seller's one address: ${eurRequirements.network} ${eurRequirements.payTo}`);
 });
 
@@ -388,9 +399,9 @@ await test('Payout status reports the x402 rail and its network', async () => {
 await test('Setting the payout address is validated and merged, keeping the Stripe credential', async () => {
   const bad = await json('/v1/commerce/payout/x402', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ address: 'not-an-address' }) });
   assert(bad.status === 400 && bad.body?.error?.code === 'INVALID_ADDRESS', `expected INVALID_ADDRESS, got ${bad.status}`);
-  const seeded = await json('/v1/memory', { method: 'POST', headers: auth(seller.token),
-    body: JSON.stringify({ key: 'commerce.psp', value: { provider: 'stripe', secretKey: 'sk_test_kept' }, visibility: 'private' }) });
-  assert(seeded.status === 200 || seeded.status === 201, `seed ${seeded.status}`);
+  const seeded = await json('/v1/commerce/payout/stripe', { method: 'PUT', headers: auth(seller.token),
+    body: JSON.stringify({ provider: 'stripe', secret_key: 'sk_test_kept' }) });
+  assert(seeded.status === 200, `seed ${seeded.status}`);
   const addr = '0x' + 'a1b2c3d4'.repeat(5);
   const ok = await json('/v1/commerce/payout/x402', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ address: addr }) });
   assert(ok.status === 200 && ok.body.data.configured === true, `set address ${ok.status}: ${JSON.stringify(ok.body?.error)}`);

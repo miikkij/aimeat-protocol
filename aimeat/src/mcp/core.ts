@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.27.0 — 2026-09-16 — aimeat_memory_read shows a credential record redacted (shownMemoryValue).
  *   v1.26.0 — 2026-09-13 — aimeat_memory_write renders the shared write's UNDECLARED_SPACE refusal
  *     (`{ error, message, namespace, declared_spaces, how_to_fix }`, isError) where it used to carry
  *     the same case as a warning on a stored record: the developer's decision for every door.
@@ -143,6 +144,7 @@ import { flexibleBoolean } from './schema-flags.js';
 import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
 import { versionConflict } from './memory-version-lock.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
+import { shownMemoryValue } from '../services/secret-records.js';
 import { createWorkItem } from '../routes/work.js';
 // Imported, not restated. The route ENFORCES this cap and this surface only announces it; the two
 // disagreeing is how a published number becomes a promise nobody keeps.
@@ -445,7 +447,7 @@ export function registerCoreTools(
             }
             return structuredResult('aimeat_memory_read', response_format, {
                 key: record.key,
-                value: record.value,
+                value: shownMemoryValue(record.key, record.value),
                 visibility: record.visibility,
                 tags: record.tags,
                 version: record.version,

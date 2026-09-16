@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 -- 2026-09-16 -- The list and search answers show openrouter.apikey and commerce.psp through
+ *     shownMemoryValue: a credential reads as configured, never as its ciphertext.
  *   v1.6.0 -- 2026-09-13 -- UNDECLARED_SPACE is no longer a warning here: the shared write refuses a
  *     workspace record whose space the manifest does not declare, 422, nothing stored (the developer's
  *     decision), and this door renders that refusal like every other one. AIMEAT.organism.writeDraft,
@@ -48,6 +50,7 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { exchangeOutcome } from '../../services/exchange-projection.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, MEMORY_LIST_MAX_LIMIT } from './shared.js';
 import { isVersionKey, searchHitShape, matchesType } from '../../services/memory-search-shape.js';
+import { shownMemoryValue } from '../../services/secret-records.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   //  is no longer destructured here: identity for a write now comes from
@@ -394,7 +397,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       items: records.map(r => ({
         key: r.key,
         owner_gaii: r.ownerGaii,
-        value: r.value,
+        value: shownMemoryValue(r.key, r.value),
         visibility: r.visibility,
         zone: visibilityToZone(r.visibility),
         tags: r.tags,
@@ -507,7 +510,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     res.json(success(config.nodeId, {
       results: results.map(r => ({
         key: r.key,
-        value: r.value,
+        value: shownMemoryValue(r.key, r.value),
         visibility: r.visibility,
         zone: visibilityToZone(r.visibility),
         tags: r.tags,

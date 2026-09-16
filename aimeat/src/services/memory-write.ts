@@ -29,6 +29,9 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.8.0 — 2026-09-16 — SECRET_RECORD: openrouter.apikey and commerce.psp are refused on every
+ *     generic write road. The generic read doors show them redacted, so a value saved back would
+ *     overwrite the credential. The commerce tools (pipeline mcp.commerce) still write commerce.psp.
  *   v1.7.0 — 2026-09-13 — UNDECLARED_SPACE is a refusal, decided by the developer on 2026-09-13: a
  *     workspace record whose space the manifest does not declare answers 422 and nothing is written,
  *     no provenance record included. It was a warning on a stored record. The decision and its words
@@ -85,6 +88,7 @@ import { misdirectedCrewKey } from './crew-def-store.js';
 import { parseGAII } from '../utils/gaii.js';
 import { undeclaredSpaceForKey } from './workspace-write-items.js';
 import { odpsWriteRefusal } from './exchange-odps-write.js';
+import { isSecretRecordKey, secretRecordWriteRefusal } from './secret-records.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
 export interface MemoryWriteFanout {
@@ -197,6 +201,8 @@ export type MemoryWriteResult =
             | 'AUTH_REQUIRED' | 'NOT_FOUND' | 'CONSENT_REQUIRED'
             // A workspace record whose space the workspace manifest does not declare.
             | 'UNDECLARED_SPACE'
+            // A record that holds a credential, written through a door that does not own it.
+            | 'SECRET_RECORD'
             // An EXCHANGE listing source whose changed text would break an ODPS length cap.
             | 'ODPS_FIELD_TOO_LONG';
         message: string;
@@ -243,6 +249,15 @@ export async function writeMemoryRecord(
             ok: false, status: 403, code: 'SCOPE_DENIED',
             message: `Writing this needs the "${needed}" permission, which this session does not carry.`,
         };
+    }
+
+    // 1a. A record that holds a credential is written only by the door that owns it. The generic
+    //     doors show it with the credential replaced (services/secret-records.ts), so a value read
+    //     there and saved back would overwrite the key. The commerce tools are that owning door for
+    //     commerce.psp and seal what they write.
+    if (isSecretRecordKey(input.key) && input.pipeline !== 'mcp.commerce') {
+        const refusal = secretRecordWriteRefusal(input.key);
+        return { ok: false, status: 403, code: 'SECRET_RECORD', message: refusal.message };
     }
 
     // 1b. An anonymous identity writes under anonymous.* and nowhere else. The HTTP route has said
