@@ -21,9 +21,6 @@ import {
   requiredString, optionalString, optionalBoolean,
 } from './tool-call-helpers.js';
 
-const serverPath = (server: string, suffix = '') =>
-    `/v1/mcp-servers/${encodeURIComponent(server)}${suffix}`;
-
 export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
     {
         // → GET /v1/mcp-servers
@@ -35,15 +32,14 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
         //   the far side on every read makes this as slow as the slowest thing anyone attached.
         name: 'aimeat_mcp_tools',
         handler: ({ client }, input) => client.get(
-            serverPath(requiredString(input, 'server'), '/tools')
-                + (optionalBoolean(input, 'refresh') ? '?refresh=1' : ''),
+            `/v1/mcp-servers/${encodeURIComponent(requiredString(input, 'server'))}/tools${optionalBoolean(input, 'refresh') ? '?refresh=1' : ''}`,
         ),
     },
     {
         // → POST /v1/mcp-servers/:id/call
         name: 'aimeat_mcp_call',
         handler: ({ client }, input) => client.post(
-            serverPath(requiredString(input, 'server'), '/call'),
+            `/v1/mcp-servers/${encodeURIComponent(requiredString(input, 'server'))}/call`,
             {
                 tool: requiredString(input, 'tool'),
                 // The far side's own argument shape, passed through untouched. Anything this door
@@ -84,7 +80,7 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
         //   can approve it, and fetching the address does nothing.
         name: 'aimeat_mcp_authorize',
         handler: ({ client }, input) => client.post(
-            serverPath(requiredString(input, 'server'), '/authorize'),
+            `/v1/mcp-servers/${encodeURIComponent(requiredString(input, 'server'))}/authorize`,
             {
                 ...(optionalString(input, 'return_url') ? { return_url: optionalString(input, 'return_url') } : {}),
             },
@@ -95,7 +91,7 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
         //   credential: the slug is what every grant names, and a new token means reconnecting.
         name: 'aimeat_mcp_update',
         handler: ({ client }, input) => client.patch(
-            serverPath(requiredString(input, 'server')),
+            `/v1/mcp-servers/${encodeURIComponent(requiredString(input, 'server'))}`,
             {
                 ...(optionalBoolean(input, 'enabled') !== undefined ? { enabled: optionalBoolean(input, 'enabled') } : {}),
                 ...(optionalString(input, 'title') ? { title: optionalString(input, 'title') } : {}),
@@ -140,7 +136,7 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
         // → PUT /v1/mcp-servers/:id/grants — a NARROWING, never a widening.
         name: 'aimeat_mcp_grant_set',
         handler: ({ client }, input) => client.put(
-            serverPath(requiredString(input, 'server'), '/grants'),
+            `/v1/mcp-servers/${encodeURIComponent(requiredString(input, 'server'))}/grants`,
             {
                 grantee: requiredString(input, 'grantee'),
                 tools: input.tools,
@@ -154,12 +150,12 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
         // → DELETE /v1/mcp-servers/:id/grants/:grantee — removes the NARROWING, not the access.
         name: 'aimeat_mcp_grant_revoke',
         handler: ({ client }, input) => client.delete(
-            serverPath(requiredString(input, 'server'), `/grants/${encodeURIComponent(requiredString(input, 'grantee'))}`),
+            `/v1/mcp-servers/${encodeURIComponent(requiredString(input, 'server'))}/grants/${encodeURIComponent(requiredString(input, 'grantee'))}`,
         ),
     },
     {
         // → DELETE /v1/mcp-servers/:id — the stored credential goes with it.
         name: 'aimeat_mcp_detach',
-        handler: ({ client }, input) => client.delete(serverPath(requiredString(input, 'server'))),
+        handler: ({ client }, input) => client.delete(`/v1/mcp-servers/${encodeURIComponent(requiredString(input, 'server'))}`),
     },
 ];

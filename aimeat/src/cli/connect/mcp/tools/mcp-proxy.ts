@@ -27,9 +27,6 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
-  const path = (server: string, suffix = '') =>
-    `/v1/mcp-servers/${encodeURIComponent(server)}${suffix}`;
-
   mcp.tool('aimeat_mcp_list', descriptionFor('aimeat_mcp_list'), {},
     annotationsFor('aimeat_mcp_list'),
     async () => out(await client.get('/v1/mcp-servers')));
@@ -38,7 +35,7 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     server: z.string().describe("Which server, by the short name from aimeat_mcp_list (e.g. 'jira')."),
     refresh: z.boolean().optional().describe('Ask the server again instead of using what was cached.'),
   }, annotationsFor('aimeat_mcp_tools'), async ({ server, refresh }) => out(
-    await client.get(path(server, '/tools') + (refresh ? '?refresh=1' : '')),
+    await client.get(`/v1/mcp-servers/${encodeURIComponent(server)}/tools${refresh ? '?refresh=1' : ''}`),
   ));
 
   mcp.tool('aimeat_mcp_call', descriptionFor('aimeat_mcp_call'), {
@@ -47,7 +44,7 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     arguments: z.record(z.string(), z.unknown()).optional()
       .describe("The arguments that tool asks for, in the shape its own schema names."),
   }, annotationsFor('aimeat_mcp_call'), async ({ server, tool, arguments: args }) => out(
-    await client.post(path(server, '/call'), { tool, arguments: args ?? {} }),
+    await client.post(`/v1/mcp-servers/${encodeURIComponent(server)}/call`, { tool, arguments: args ?? {} }),
   ));
 
   mcp.tool('aimeat_mcp_attach', descriptionFor('aimeat_mcp_attach'), {
@@ -85,7 +82,7 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     server: z.string().describe('Which server, by its short name.'),
     return_url: z.string().optional().describe('A path on this node the browser lands on afterwards.'),
   }, annotationsFor('aimeat_mcp_authorize'), async ({ server, return_url }) => out(
-    await client.post(path(server, '/authorize'), {
+    await client.post(`/v1/mcp-servers/${encodeURIComponent(server)}/authorize`, {
       ...(return_url ? { return_url } : {}),
     }),
   ));
@@ -97,7 +94,7 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     description: z.string().optional().describe('What it is for, in a sentence.'),
     exposure: z.enum(['gateway', 'flatten']).optional().describe('How its tools are reached.'),
   }, annotationsFor('aimeat_mcp_update'), async ({ server, enabled, title, description, exposure }) => out(
-    await client.patch(path(server), {
+    await client.patch(`/v1/mcp-servers/${encodeURIComponent(server)}`, {
       ...(enabled !== undefined ? { enabled } : {}),
       ...(title !== undefined ? { title } : {}),
       ...(description !== undefined ? { description } : {}),
@@ -152,7 +149,7 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     call_cap: z.object({ count: z.number(), windowHours: z.number() }).optional(),
     expires: z.string().optional(),
   }, annotationsFor('aimeat_mcp_grant_set'), async ({ server, grantee, tools, locked_input, call_cap, expires }) => out(
-    await client.put(path(server, '/grants'), {
+    await client.put(`/v1/mcp-servers/${encodeURIComponent(server)}/grants`, {
       grantee, tools,
       ...(locked_input ? { locked_input } : {}),
       ...(call_cap ? { call_cap } : {}),
@@ -164,12 +161,12 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     server: z.string().describe('Which server, by its short name.'),
     grantee: z.string().describe('Whose narrowing to remove.'),
   }, annotationsFor('aimeat_mcp_grant_revoke'), async ({ server, grantee }) => out(
-    await client.delete(path(server, `/grants/${encodeURIComponent(grantee)}`)),
+    await client.delete(`/v1/mcp-servers/${encodeURIComponent(server)}/grants/${encodeURIComponent(grantee)}`),
   ));
 
   mcp.tool('aimeat_mcp_detach', descriptionFor('aimeat_mcp_detach'), {
     server: z.string().describe('Which server, by its short name.'),
   }, annotationsFor('aimeat_mcp_detach'), async ({ server }) => out(
-    await client.delete(path(server)),
+    await client.delete(`/v1/mcp-servers/${encodeURIComponent(server)}`),
   ));
 }
