@@ -85,6 +85,7 @@ everywhere at once, and say so in the Changes section.
 | one thread in Messages | everything said between the same parties under one subject | conversation | keskustelu | conversación |
 | where a person puts conversations away | nothing is deleted; a conversation comes back when someone other than their own agents writes | archive / archive (verb) | arkisto / arkistoida | archivo / archivar |
 | a rule for the Messages list | folds, groups or archives the conversations it matches; the first one that fits decides | rule | sääntö | regla |
+| a tool server a person attaches | somewhere else that offers tools (an issue tracker, a wiki) which their AI, agents and apps call through their AIMEAT; its credentials stay in their AIMEAT | MCP server | MCP-palvelin | servidor MCP |
 
 ## Never translated, in any language
 
@@ -193,6 +194,12 @@ service, the directory, the token, the identifier and the username: the test nam
 
 ## Changes
 
+- **2026-09-16** — MCP server added, with the Access page's section of its own. *MCP-palvelin* and
+  *servidor MCP* are what the panel already shipped on 2026-09-16 and what Finnish guides use; the
+  row records them. Two cold readers, working separately, rejected the same two phrases on evidence:
+  "puolestasi toimiva" / "nada de lo que actúa por ti" (a calque of "anything acting for you", with
+  no hits in natural text) and "tässä AIMEATissa" / "este AIMEAT", which reads as if there were many.
+  The decided *oma AIMEAT* / *tu propio AIMEAT* answers the second.
 - **2026-09-14** — row space added, with the workspace notice that first needed it in all three
   languages. *Rivitila* is the word the developer and the reporting session were already using in
   Finnish before anything was written down, so the row records it rather than proposing it; *fila*

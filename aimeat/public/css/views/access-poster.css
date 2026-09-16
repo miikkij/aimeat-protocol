@@ -12,6 +12,8 @@
  *   quieted here. Every column is bounded so a long origin or label wraps inside its cell.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.4.0 -- 2026-09-16 -- MCP servers are section 04, the section comments follow the new numbers,
+ *     and an MCP server row wraps on a phone instead of cutting its remove button off.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.3.0 -- 2026-09-13 -- Compose access and recovery frames from poster.css.
  *   2026-09-13 -- V2t: let shared card rules survive the access panel cascade.
@@ -130,7 +132,7 @@
 .ac-token code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .ac-token .og-door { flex: none; font-size: .7rem; }
 
-/* ── 04: the secrets ──────────────────────────────────────────────────────────────────────── */
+/* ── 05: the secrets ──────────────────────────────────────────────────────────────────────── */
 .ac-secrets { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 9rem auto; gap: 0 1rem; align-items: stretch; margin-top: .2rem; }
 .ac-secret { display: contents; }
 .ac-secret > div { padding: .65rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
@@ -150,12 +152,15 @@
 .ac-swrite .og-input { flex: 1 1 16rem; min-width: 10rem; }
 .ac-swrite .og-door { font-size: .72rem; }
 
-/* ── 03 and 05: the sections that keep their components ───────────────────────────────────── */
+/* ── 03, 04 and 06: the sections that keep their components ───────────────────────────────── */
 .ac-kept .access-section > .access-h3, .ac-kept > .card-h3, .ac-kept .card-h3.access-h3 { display: none; }
 .ac-kept .section-desc { display: none; }
 .ac-kept .access-section > .text-meta-sm:first-of-type { display: none; }
+/* 04: an MCP server row carries a name and up to four actions. They wrap under the name on a phone
+   instead of running past the edge, where the remove button was cut in half in Spanish. */
+.ac-mcp .mem-item { flex-wrap: wrap; row-gap: .4rem; }
 
-/* ── 05: the addresses ────────────────────────────────────────────────────────────────────── */
+/* ── 07: the addresses ────────────────────────────────────────────────────────────────────── */
 .ac-kv { display: grid; grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr) auto; gap: 0 1.2rem; margin-top: .2rem; align-items: center; }
 .ac-kv > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
 .ac-kv > .ac-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
@@ -165,7 +170,7 @@
 .ac-kv > .ac-go { text-align: right; }
 .ac-kv .og-door { font-size: .72rem; }
 
-/* ── 06: the two roads ────────────────────────────────────────────────────────────────────── */
+/* ── 08: the two roads ────────────────────────────────────────────────────────────────────── */
 .ac-roads { display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.2rem; }
 .ac-road { display: flex; flex-direction: column; gap: .5rem; padding: .9rem 1.1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; }
 .ac-road.is-lead { border-width: 3px; box-shadow: 8px 8px 0 var(--sun); }

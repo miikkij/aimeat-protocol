@@ -19,6 +19,10 @@
  *   secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.6.0 -- 2026-09-16 -- MCP servers get section 04 of their own, with a title, a count and an
+ *     intro, and the sections after it move one number down (05 secrets to 08 your AI). They had sat
+ *     under "Your accounts at other services", where on a server without outside accounts they
+ *     appeared directly under "not enabled on this server". An MCP server is tools, not an account.
  *   v1.5.0 -- 2026-09-16 -- Section 03 says the MCP servers list's own title and explanation. The
  *     .ac-kept rule hid them, so the servers showed unlabelled under "not enabled on this server".
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
@@ -54,10 +58,11 @@ export function renderPage(ctx) {
     ['01', 'ac-signin', x('rail.signIn'), ov ? (ov.sign_in.two_factor.enabled ? x('twoStep.onShort') : x('twoStep.offShort')) : ''],
     ['02', 'ac-keys', x('rail.keys'), ov ? String(ctx.rows.length) : ''],
     ['03', 'ac-accounts', x('rail.elsewhere'), ov ? String(ov.connections?.connections?.length || 0) : ''],
-    ['04', 'ac-secrets', x('rail.secrets'), ctx.secrets ? String(ctx.secrets.length) : ''],
-    ['05', 'ac-groups', x('rail.groups'), ov ? String(ov.groups?.groups?.length || 0) : ''],
-    ['06', 'ac-addresses', x('rail.addresses'), ''],
-    ['07', 'ac-roads', x('rail.ai'), ''],
+    ['04', 'ac-mcp', x('rail.mcp'), ctx.mcpCount == null ? '' : String(ctx.mcpCount)],
+    ['05', 'ac-secrets', x('rail.secrets'), ctx.secrets ? String(ctx.secrets.length) : ''],
+    ['06', 'ac-groups', x('rail.groups'), ov ? String(ov.groups?.groups?.length || 0) : ''],
+    ['07', 'ac-addresses', x('rail.addresses'), ''],
+    ['08', 'ac-roads', x('rail.ai'), ''],
   ];
   return html`
     <div class="og og-ac">
@@ -70,6 +75,7 @@ export function renderPage(ctx) {
             ${secSignIn(ctx)}
             ${secKeys(ctx)}
             ${secAccounts(ctx)}
+            ${secMcp(ctx)}
             ${secSecrets(ctx)}
             ${secGroups(ctx)}
             ${secAddresses(ctx)}
@@ -253,7 +259,7 @@ function tokenFold(ctx) {
     </div>`;
 }
 
-/* ── 03 and 05: the sections that keep their components ─────────────────────────────────────── */
+/* ── 03, 04 and 06: the sections that keep their components ──────────────────────────────────── */
 
 function secAccounts(ctx) {
   const c = ctx.ov.connections;
@@ -262,21 +268,27 @@ function secAccounts(ctx) {
     <${Section} id="ac-accounts" num="03" title=${x('secAccounts')} count=${c?.enabled ? x('secAccountsSub', { n: count, providers: c.providers.length }) : x('secAccountsOff')}>
       <p class="ac-para">${x('accountsIntro')}</p>
       ${c?.enabled ? html`<div class="ac-kept"><${ConnectionsSection} showToast=${ctx.showToast} /></div>` : html`<p class="ac-empty">${x('accountsOffBody')}</p>`}
-      <!-- Beside the accounts, and not in a section of its own: a person looking for "what have I
-           given something else access to" must find all of it in one place. An MCP server is the
-           same promise pointing outward, so it belongs under the same heading. It does NOT follow
-           the connections master switch, because it is a different capability with its own.
-           Its title and first paragraph are said HERE, not inside the component: .ac-kept hides a kept
-           component's own heading and first paragraph, because the section supplies them for the
-           connected accounts. Until 2026-09-16 that same rule hid the MCP list's name and explanation,
-           so the servers appeared unlabelled under "not enabled on this server". Found in a browser. -->
-      <p class="ac-label"><b>${t('profile.access.mcpTitle')}</b></p>
-      <p class="ac-para">${t('profile.access.mcpIntro')}</p>
-      <div class="ac-kept"><${McpServersSection} showToast=${ctx.showToast} /></div>
     <//>`;
 }
 
-/* ── 04: the vault ────────────────────────────────────────────────────────────────────────────── */
+/* ── 04: the MCP servers ─────────────────────────────────────────────────────────────────────── */
+
+/**
+ * The MCP servers this person attached, in a section of their own. They sat under "Your accounts at
+ * other services" until 2026-09-16, which on a server without outside accounts put them directly
+ * under "not enabled on this server", and the kept-component rule hid their own title. An MCP server
+ * is a set of tools, not an account, and it does not follow the accounts switch, so it gets its own
+ * number, title and count. The section supplies the title and intro; `.ac-kept` hides the panel's own.
+ */
+function secMcp(ctx) {
+  return html`
+    <${Section} id="ac-mcp" num="04" title=${x('secMcp')} count=${ctx.mcpCount == null ? '' : x('secMcpSub', { n: ctx.mcpCount })}>
+      <p class="ac-para">${x('mcpIntro')}</p>
+      <div class="ac-kept ac-mcp"><${McpServersSection} showToast=${ctx.showToast} /></div>
+    <//>`;
+}
+
+/* ── 05: the vault ────────────────────────────────────────────────────────────────────────────── */
 
 /**
  * The secrets, and the one thing this section can never do: show a value. The list carries the
@@ -286,7 +298,7 @@ function secAccounts(ctx) {
 function secSecrets(ctx) {
   const list = ctx.secrets || [];
   return html`
-    <${Section} id="ac-secrets" num="04" title=${x('secSecrets')} count=${x('secSecretsSub', { n: list.length })}>
+    <${Section} id="ac-secrets" num="05" title=${x('secSecrets')} count=${x('secSecretsSub', { n: list.length })}>
       <p class="ac-para">${x('secretsIntro')}</p>
       ${ctx.secretsFailed ? html`<p class="ac-empty">${x('secrets.loadFailed')}</p>` : null}
       ${list.length ? html`
@@ -323,12 +335,12 @@ function secretFold(ctx) {
     </div>`;
 }
 
-/* ── 05 ───────────────────────────────────────────────────────────────────────────────────────── */
+/* ── 06 ───────────────────────────────────────────────────────────────────────────────────────── */
 
 function secGroups(ctx) {
   const groups = ctx.ov.groups?.groups || [];
   return html`
-    <${Section} id="ac-groups" num="05" title=${x('secGroups')} count=${x('secGroupsSub', { n: groups.length })}>
+    <${Section} id="ac-groups" num="06" title=${x('secGroups')} count=${x('secGroupsSub', { n: groups.length })}>
       <p class="ac-para">${x('groupsIntro')}</p>
       <div class="ac-kept">
         <${SharingGroupsSection} showToast=${ctx.showToast} initial=${ctx.ov.groups} />
@@ -337,7 +349,7 @@ function secGroups(ctx) {
     <//>`;
 }
 
-/* ── 06 ───────────────────────────────────────────────────────────────────────────────────────── */
+/* ── 07 ───────────────────────────────────────────────────────────────────────────────────────── */
 
 function secAddresses(ctx) {
   const ov = ctx.ov;
@@ -350,7 +362,7 @@ function secAddresses(ctx) {
     ['key', ov.publicKey || '', ov.publicKey ? x('addr.keySub', { n: ov.publicKey.length }) : x('addr.keyNone')],
   ];
   return html`
-    <${Section} id="ac-addresses" num="06" title=${x('secAddresses')} count=${x('secAddressesSub')}>
+    <${Section} id="ac-addresses" num="07" title=${x('secAddresses')} count=${x('secAddressesSub')}>
       <p class="ac-para">${x('addressesIntro')}</p>
       <div class="ac-kv">
         ${rows.map(([k, v, sub]) => html`
@@ -364,12 +376,12 @@ function secAddresses(ctx) {
     <//>`;
 }
 
-/* ── 07 ───────────────────────────────────────────────────────────────────────────────────────── */
+/* ── 08 ───────────────────────────────────────────────────────────────────────────────────────── */
 
 function secRoads() {
   const ask = x('roadAskPrompt');
   return html`
-    <${Section} id="ac-roads" num="07" title=${x('secRoads')}>
+    <${Section} id="ac-roads" num="08" title=${x('secRoads')}>
       <div class="ac-roads">
         <div class="ac-road is-lead">
           <span class="og-box-label">${x('roadAskTitle')}</span>

@@ -23,6 +23,8 @@
  * @structure AccessTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'access'
  * @version-history
+ *   v2.2.0 — 2026-09-16 — MCP SERVERS, section 04, and the sections after it move one number down.
+ *     The page reads how many are attached, for the section count and the rail.
  *   v2.1.0 — 2026-09-06 — SECRETS, section 04. The owner's vault said in the page's own register:
  *     the list with what each secret is used by, one write-only field to add a secret and the same
  *     field on a row to replace it, and a delete behind the confirm. A value is written once and
@@ -92,6 +94,7 @@ export default function AccessTab({ session, showToast }) {
   const [busy, setBusy] = useState(false);
   const [secrets, setSecrets] = useState(null);
   const [secretsFailed, setSecretsFailed] = useState(false);
+  const [mcpCount, setMcpCount] = useState(null);
   const [secretForm, setSecretFormState] = useState(EMPTY_SECRET);
   const [secretMsg, setSecretMsg] = useState(null);
   const [replaceName, setReplaceName] = useState(null);
@@ -131,7 +134,22 @@ export default function AccessTab({ session, showToast }) {
     } catch (e) { swallowed('access-tab: secrets', e); setSecrets([]); setSecretsFailed(true); }
   }, []);
 
-  const loadAll = useCallback(async () => { await Promise.all([load(), loadSecrets()]); }, [load, loadSecrets]);
+  /**
+   * How many MCP servers this person has attached, for section 04's count and the rail. The list
+   * itself is the panel's own; this is only the number, read from the same route. A failed read is a
+   * count left blank, never a section that disappears, because the panel is where the servers are
+   * attached in the first place.
+   */
+  const loadMcp = useCallback(async () => {
+    try {
+      const r = await apiGet('/v1/mcp-servers');
+      const list = r?.data?.servers;
+      if (!Array.isArray(list)) throw new Error('no servers');
+      setMcpCount(list.length);
+    } catch (e) { swallowed('access-tab: mcp servers', e); setMcpCount(null); }
+  }, []);
+
+  const loadAll = useCallback(async () => { await Promise.all([load(), loadSecrets(), loadMcp()]); }, [load, loadSecrets, loadMcp]);
   useEffect(() => { loadAll(); }, [loadAll]);
   const loadRef = useRef(loadAll);
   loadRef.current = loadAll;
@@ -380,7 +398,7 @@ export default function AccessTab({ session, showToast }) {
 
   const ctx = {
     session, ov, failed, rows, basePackage, baseHolders, fed, filter, openKey, shownKeys, form, created, formMsg, spendDraft, fedInput, keyShown, busy,
-    secrets, secretsFailed, secretForm, secretMsg, replaceName, replaceValue,
+    secrets, secretsFailed, secretForm, secretMsg, replaceName, replaceValue, mcpCount,
     setSecretForm, toggleSecretForm, openReplace, setReplaceValue, writeSecret, deleteSecret,
     isOperator, nodeUrl, nodeId, ghii, ownerKey, tokenScopes: TOKEN_SCOPES, passkeysSupported: passkeySupported(), showToast: toast, ConfirmUI,
     load, setFilter, toggleKey, showMoreKeys, setSpendDraft, revokeKey, takeAway, setSpendCap, revokeUnused, signOutOthers, addPasskeyNow,
