@@ -18,6 +18,10 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   v1.3.0 -- 2026-09-16 -- PUT answers a secret field (adminDisplay configured) with
+ *     `{ configured }` in old_value and new_value, not the value. It returned the old value raw,
+ *     and on aimeat.io that was the OpenRouter key the environment injected. GET marks a sealed
+ *     secret's `_configured` row as sealed.
  *   v1.2.0 -- 2026-09-06 -- Review item 4.1: the DURABLE write goes first and the live one only if
  *     it took. A failed persist went to console.warn -- not the logger -- while the loop carried
  *     on, the path went into `applied`, and the answer said "Changes survive restart".
@@ -37,7 +41,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV, serializeConfigValue, readConfigField, writeConfigField } from '../services/config-schema.js';
-import { isSealed, sealRefusal } from '../services/config-sealing.js';
+import { isSealed, isSecretField, sealRefusal } from '../services/config-sealing.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { applyConsulValues } from '../services/consul-config.js';
@@ -69,7 +73,8 @@ export function adminConfigRouter(
             if (field.adminDisplay === 'configured') {
                 // Secret fields — show as boolean indicating whether configured
                 const configuredPath = `${field.dotPath}_configured`;
-                const src = provenance?.getSource(field.dotPath);
+                const sealed = isSealed(config, field.dotPath);
+                const src = sealed ? 'sealed' : provenance?.getSource(field.dotPath);
                 schema[configuredPath] = {
                     value: !!readConfigField(config, field),
                     type: 'boolean',
@@ -79,6 +84,7 @@ export function adminConfigRouter(
                     path: configuredPath,
                     source: src ?? 'default',
                     canReset: false,
+                    ...(sealed ? { sealed: true } : {}),
                 };
                 continue;
             }
@@ -165,7 +171,7 @@ export function adminConfigRouter(
             return;
         }
 
-        const applied: { path: string; old_value: unknown; new_value: unknown }[] = [];
+        const applied: { path: string; old_value: unknown; new_value: unknown; secret?: true }[] = [];
         const errors: { path: string; reason: string }[] = [];
 
         for (const change of changes) {
@@ -204,7 +210,12 @@ export function adminConfigRouter(
             }
             writeConfigField(config, mapping, value);
             if (provenance) provenance.markDatabase([path]);
-            applied.push({ path, old_value: oldValue, new_value: value });
+            // A secret is answered with whether it was and is configured, never with the value.
+            // The old value can be a key the host injected through the environment, which the
+            // operator may replace and must not read. Measured on aimeat.io 2026-09-16.
+            applied.push(isSecretField(mapping)
+                ? { path, old_value: { configured: !!oldValue }, new_value: { configured: !!value }, secret: true }
+                : { path, old_value: oldValue, new_value: value });
         }
 
         if (applied.length === 0 && errors.length > 0) {
