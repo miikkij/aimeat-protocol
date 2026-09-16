@@ -20,6 +20,8 @@
  *     switched on at boot, and updated when the build moves past what is stored. Nothing was
  *     seeded here before, so an extension a feature depends on arrived only if somebody uploaded
  *     it — which for a living document's hooks means the feature did not exist on a fresh node.
+ *   v1.4.0 — 2026-09-16 — sealStoredPspRecords(): encrypts the Stripe secrets of seller records
+ *     written before they were stored sealed (commerce/psp-secrets.ts).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
@@ -45,6 +47,7 @@ import { seedBundledCortexes } from '../services/cortex-seeder.js';
 import { seedBuiltinExtensions } from '../services/builtin-extension-seeder.js';
 import { seedExamplePackages } from '../services/package-seeder.js';
 import { migrateScopeVocabulary } from '../services/scope-vocabulary-migration.js';
+import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
 import { seedBuiltinSkills } from '../services/skill-seeds.js';
 import { DirectoryService } from '../services/directory.js';
 import { RealtimeManager } from '../services/realtime-manager.js';
@@ -208,6 +211,13 @@ export async function initializeServices(
       }
     })
     .catch(err => logger.error('Failed to migrate scope vocabulary', { error: String(err) }));
+
+  // Encrypt the payment secrets of every seller record written before they were stored sealed.
+  // Until this runs, a plain Stripe key is readable through the generic memory doors
+  // (commerce/psp-secrets.ts). Idempotent.
+  sealStoredPspRecords(storage, config)
+    .then(count => { if (count > 0) logger.info(`Encrypted the payment secrets of ${count} seller record(s)`); })
+    .catch(err => logger.error('Failed to encrypt stored payment secrets', { error: String(err) }));
 
   // Data hygiene: legacy publish paths stored app ownerName as the full GHII
   // (owner@node). The catalog "my apps" filter and the by-owner-name delete

@@ -22,6 +22,7 @@
  *   e2e-x402-testnet.ts, opted into by setting AIMEAT_X402_TEST_FACILITATOR=false.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=x402
  * @version-history
+ *   v1.1.2 — 2026-09-16 — The kept Stripe credential is asserted in its encrypted form (commerce/psp-secrets.ts)
  *   v1.1.1 — 2026-07-25 — Runner pins the x402 env, so the suite no longer inherits the dev .env
  *   v1.1.0 — 2026-07-25 — EUR/EURC settlement + the advertise-only-what-can-settle round trip (TARGET-042)
  *   v1.0.0 — 2026-07-18 — Initial x402 settlement suite (TARGET-042)
@@ -397,7 +398,8 @@ await test('Setting the payout address is validated and merged, keeping the Stri
   const v = (rec.body.data?.value ?? rec.body.data?.record?.value) as any;
   // Stored in canonical EIP-55 form (mixed case is what a wallet shows, so it can be eyeballed).
   assert(String(v.payTo).toLowerCase() === addr.toLowerCase(), `address stored: ${JSON.stringify(v)}`);
-  assert(v.secretKey === 'sk_test_kept', `the other rail credential survived: ${JSON.stringify(v)}`);
+  // The address write re-stores the record, and every such write seals the Stripe key it carries.
+  assert(v.secretKey?.hint === '…kept' && !JSON.stringify(v).includes('sk_test_kept'), `the other rail credential survived, encrypted: ${JSON.stringify(v)}`);
 });
 
 await test('The USDC token contract is refused as a payout address', async () => {
@@ -429,7 +431,7 @@ await test('Removing the payout address leaves the fiat rail intact', async () =
   assert(del.status === 200 && del.body.data.configured === false, `delete ${del.status}`);
   const rec = await json('/v1/memory/commerce.psp', { headers: auth(seller.token) });
   const v = (rec.body.data?.value ?? rec.body.data?.record?.value) as any;
-  assert(!v.payTo && v.secretKey === 'sk_test_kept', `only the address was cleared: ${JSON.stringify(v)}`);
+  assert(!v.payTo && v.secretKey?.hint === '…kept', `only the address was cleared: ${JSON.stringify(v)}`);
 });
 
 console.log(`\n${'═'.repeat(50)}`);

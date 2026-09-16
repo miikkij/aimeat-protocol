@@ -18,8 +18,9 @@
  *   refund reverses the intent. Amounts are 6-decimal micro-units everywhere and convert to Stripe
  *   minor units ONLY here, at the settlement rail, through the money chokepoint.
  * @structure STRIPE_HANDLER_ID · stripePaymentHandler · stripeApi (module-local)
- * @usage registerPaymentHandler(stripePaymentHandler());
+ * @usage registerPaymentHandler(stripePaymentHandler(config));
  * @version-history
+ *   v1.2.0 — 2026-09-16 — Takes the node config and opens the sealed Stripe key (commerce/psp-secrets.ts).
  *   v1.1.0 — 2026-08-06 — Hold rail (TINKI phase 1): authorize = manual-capture PaymentIntent
  *     (requires_capture), capture up to the held amount, release = cancel. The uncaptured intent
  *     is the escrow — funds guaranteed, settled onto the seller only at capture.
@@ -27,20 +28,24 @@
  *     platform path: every seller charges on their own credentials (single edition, no fork).
  */
 import type { PaymentHandler } from './types.js';
+import { openPspSecret } from './psp-secrets.js';
 import { PaymentError } from './payment-handlers.js';
 import { bookPayable } from './payable-book.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
 import { MONEY_CURRENCIES, microsToStripeMinor } from './money.js';
 
+type EncryptionConfig = { encryptionKey: string | null; totpSecretEncryptionKey: string | null };
+
 /** Reverse-DNS id advertised in the /.well-known/ucp payment_handlers list. */
 export const STRIPE_HANDLER_ID = 'com.stripe.spt';
 
-/** The seller's own Stripe secret, or a 403 naming the fix. Never logged, never returned. */
-function sellerKey(seller: { psp?: unknown } | undefined): string {
+/** The seller's own Stripe secret, or a 403 naming the fix. Never logged, never returned. The stored
+ *  value is sealed (commerce/psp-secrets.ts) and opened here, at the one call that sends it. */
+function sellerKey(config: EncryptionConfig, seller: { psp?: unknown } | undefined): string {
   const psp = seller?.psp as { secretKey?: unknown } | undefined;
-  const key = psp?.secretKey;
-  if (typeof key !== 'string' || !key) {
+  const key = openPspSecret(config, psp?.secretKey);
+  if (!key) {
     throw new PaymentError(
       'PSP_NOT_CONFIGURED', 403,
       'The seller has no Stripe credentials — set them in the Wallet tab (Selling & payments) or with aimeat_commerce_psp_set',
@@ -90,7 +95,7 @@ async function stripeApi(
  * any selling owner simply never reaches a charge. A seller who has not set a key gets
  * PSP_NOT_CONFIGURED at collect, which names exactly what to do.
  */
-export function stripePaymentHandler(): PaymentHandler {
+export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
   return {
     id: STRIPE_HANDLER_ID,
     title: 'Card payment on the seller\'s own Stripe account',
@@ -108,7 +113,7 @@ export function stripePaymentHandler(): PaymentHandler {
       if (stripeAmount < 1) {
         throw new PaymentError('AMOUNT_TOO_SMALL', 422, 'Card charge below one minor unit — aggregate sub-cent calls before settling');
       }
-      const intent = await stripeApi(sellerKey(seller), 'POST', 'payment_intents', {
+      const intent = await stripeApi(sellerKey(config, seller), 'POST', 'payment_intents', {
         amount: String(stripeAmount),
         currency: currency.toLowerCase(),
         payment_method: instrument,
@@ -135,7 +140,7 @@ export function stripePaymentHandler(): PaymentHandler {
 
     async refund(_ctx, { amount, trackingCode, seller }) {
       try {
-        await stripeApi(sellerKey(seller), 'POST', 'refunds', {
+        await stripeApi(sellerKey(config, seller), 'POST', 'refunds', {
           payment_intent: trackingCode,
           amount: String(microsToStripeMinor(amount)),
         });
@@ -169,7 +174,7 @@ export function stripePaymentHandler(): PaymentHandler {
       // a preview feature limited to US/CA sellers, so this branch is untested from the EU —
       // it is here so an agent that HAS one is not turned away by a parameter name.
       const isSpt = instrument.startsWith('spt_');
-      const intent = await stripeApi(sellerKey(seller), 'POST', 'payment_intents', {
+      const intent = await stripeApi(sellerKey(config, seller), 'POST', 'payment_intents', {
         amount: String(stripeAmount),
         currency: currency.toLowerCase(),
         ...(isSpt
@@ -188,7 +193,7 @@ export function stripePaymentHandler(): PaymentHandler {
     },
 
     async capture(_ctx, { amount, trackingCode, seller }) {
-      const captured = await stripeApi(sellerKey(seller), 'POST', `payment_intents/${trackingCode}/capture`, {
+      const captured = await stripeApi(sellerKey(config, seller), 'POST', `payment_intents/${trackingCode}/capture`, {
         amount_to_capture: String(microsToStripeMinor(amount)),
       });
       if (captured.status !== 'succeeded') {
@@ -197,7 +202,7 @@ export function stripePaymentHandler(): PaymentHandler {
     },
 
     async release(_ctx, { trackingCode, seller }) {
-      await stripeApi(sellerKey(seller), 'POST', `payment_intents/${trackingCode}/cancel`, {
+      await stripeApi(sellerKey(config, seller), 'POST', `payment_intents/${trackingCode}/cancel`, {
         cancellation_reason: 'requested_by_customer',
       });
     },

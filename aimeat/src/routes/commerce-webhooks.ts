@@ -26,6 +26,7 @@
  * @structure verifyStripeSignature · event mapping · commerceWebhooksRouter
  * @usage app.use(commerceWebhooksRouter(config, storage)) in routes-loader
  * @version-history
+ *   v1.0.1 — 2026-09-16 — Opens the sealed webhook secret (commerce/psp-secrets.ts).
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1.
  */
 import { Router } from 'express';
@@ -36,6 +37,7 @@ import { success, error } from '../middleware/envelope.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger as log } from '../utils/logger.js';
+import { openPspSecret } from '../commerce/psp-secrets.js';
 import { FinanceError } from '../services/finance/errors.js';
 import { bookVoucher } from '../services/finance/vouchers.js';
 import { markPaid } from '../services/finance/invoice-service.js';
@@ -89,7 +91,8 @@ export function commerceWebhooksRouter(config: AimeatConfig, storage: Storage): 
     }
     const ownerGhii = `${ownerName}@${config.nodeId}`;
     const psp = (await storage.getMemory(ownerGhii, 'commerce.psp'))?.value as { webhookSecret?: unknown } | undefined;
-    const secret = typeof psp?.webhookSecret === 'string' ? psp.webhookSecret : '';
+    // Stored sealed (commerce/psp-secrets.ts); a record from before that still holds a plain string.
+    const secret = openPspSecret(config, psp?.webhookSecret);
     // Missing seller and missing webhook config answer identically: endpoint paths must not
     // reveal which owners exist or which have Stripe configured.
     if (!secret) {
