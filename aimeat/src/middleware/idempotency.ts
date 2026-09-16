@@ -3,14 +3,16 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Express middleware implementing idempotent POST/PUT requests via an Idempotency-Key
- *   header: caches the first response (24h TTL, bounded LRU-style eviction) and replays it for repeat
- *   keys. Validates the key is a UUID to prevent cache-key abuse.
+ *   header: reserves a key before work starts, refuses concurrent duplicates, then replays the JSON
+ *   response. Process-local, 24h TTL, bounded cache; active reservations are never evicted for space.
  *
  * @structure
  *   - idempotency(): middleware factory; skips non-POST/PUT and keyless requests, validates + caches
  *   - cache / TTL_MS / MAX_CACHE_SIZE: in-memory store with periodic expiry sweep
  *
  * @version-history
+ *   v1.2.0 -- 2026-09-16 -- Reserve before next(), retain interrupted/non-JSON work, expire on
+ *     lookup, and let a refused credential be refreshed without caching its 401.
  *   v1.1.0 — 2026-08-15 — The cache key is principal + method + path + UUID, not the UUID alone.
  *     This middleware is mounted app-wide, so the key was a global address: a second principal
  *     replaying another's key was served that principal's response body while its own write was
@@ -22,8 +24,9 @@
 import type { Request, Response, NextFunction } from 'express';
 
 interface CachedResponse {
-    status: number;
-    body: unknown;
+    state: 'pending' | 'complete' | 'unavailable';
+    status?: number;
+    body?: unknown;
     storedAt: number;
 }
 
@@ -38,7 +41,7 @@ setInterval(() => {
     for (const [key, entry] of cache) {
         if (now - entry.storedAt > TTL_MS) cache.delete(key);
     }
-}, 300_000);
+}, 300_000).unref();
 
 /**
  * What a replay has to match before it is answered from the cache. A client's key says "this is the
@@ -58,7 +61,7 @@ setInterval(() => {
  */
 function cacheKeyFor(req: Request, idempotencyKey: string): string {
     const principal = req.auth?.sub ?? 'anon';
-    return `${principal}|${req.method}|${req.path}|${idempotencyKey}`;
+    return `${principal}|${req.method}|${req.originalUrl}|${idempotencyKey}`;
 }
 
 export function idempotency() {
@@ -78,6 +81,7 @@ export function idempotency() {
         // SECURITY: Validate key format to prevent cache key abuse
         if (!UUID_REGEX.test(idempotencyKey)) {
             res.status(400).json({
+                ok: false,
                 error: { code: 'INVALID_IDEMPOTENCY_KEY', message: 'Idempotency-Key must be a valid UUID (e.g., 550e8400-e29b-41d4-a716-446655440000)' },
             });
             return;
@@ -85,9 +89,22 @@ export function idempotency() {
 
         // Check cache
         const cacheKey = cacheKeyFor(req, idempotencyKey);
-        const cached = cache.get(cacheKey);
+        let cached = cache.get(cacheKey);
+        if (cached && Date.now() - cached.storedAt >= TTL_MS) {
+            cache.delete(cacheKey);
+            cached = undefined;
+        }
         if (cached) {
-            res.status(cached.status).json(cached.body);
+            if (cached.state === 'complete') {
+                res.status(cached.status!).json(cached.body);
+            } else {
+                const running = cached.state === 'pending';
+                res.status(409).json({ ok: false, error: {
+                    code: running ? 'IDEMPOTENCY_IN_PROGRESS' : 'IDEMPOTENCY_RESULT_UNAVAILABLE',
+                    message: running ? 'This request is still running. Check its result before sending it again.'
+                        : 'This request was already accepted, but its response is unavailable. Check its result before sending it again.',
+                } });
+            }
             return;
         }
 
@@ -96,22 +113,38 @@ export function idempotency() {
             let oldestKey: string | null = null;
             let oldestTime = Infinity;
             for (const [key, entry] of cache) {
-                if (entry.storedAt < oldestTime) {
+                if (entry.state === 'complete' && entry.storedAt < oldestTime) {
                     oldestTime = entry.storedAt;
                     oldestKey = key;
                 }
             }
             if (oldestKey) cache.delete(oldestKey);
+            else {
+                res.status(503).json({ ok: false, error: {
+                    code: 'IDEMPOTENCY_CAPACITY',
+                    message: 'The server cannot accept another protected request yet. Try again later.',
+                } });
+                return;
+            }
         }
+
+        // This must happen synchronously before next(): a browser timeout does not stop the work.
+        const entry: CachedResponse = { state: 'pending', storedAt: Date.now() };
+        cache.set(cacheKey, entry);
+        const unavailable = () => {
+            if (entry.state === 'pending') entry.state = 'unavailable';
+        };
+        res.once('finish', unavailable);
+        res.once('close', unavailable);
 
         // Intercept response to cache it
         const originalJson = res.json.bind(res);
         res.json = function (body: unknown) {
-            cache.set(cacheKey, {
-                status: res.statusCode,
-                body,
-                storedAt: Date.now(),
-            });
+            if (cache.get(cacheKey) === entry) {
+                // A 401 means the credential was refused, so a refresh may try the same key.
+                if (res.statusCode === 401) cache.delete(cacheKey);
+                else Object.assign(entry, { state: 'complete', status: res.statusCode, body, storedAt: Date.now() });
+            }
             return originalJson(body);
         };
 
