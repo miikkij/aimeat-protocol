@@ -534,6 +534,12 @@ export interface Connection {
  * names the slug and the node builds the request.
  */
 export interface McpServer {
+  /** Node-wide only: 'all-owners' or 'allowlist'. Null on an owner's own server. */
+  availability: string | null;
+  /** Owner GHIIs, when availability is 'allowlist'. */
+  allowlist: Generated<Json>;
+  /** What one call costs, as {unit, perCall, currency?}. Null is free. */
+  price: Json | null;
   auth: Generated<string>;
   /** Whose credential is spent when an agent or app calls through. */
   callerIdentity: Generated<string>;

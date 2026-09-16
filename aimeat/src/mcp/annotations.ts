@@ -234,6 +234,11 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // authorization server.
     aimeat_mcp_authorize: { title: 'Sign In to an Attached Server', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     aimeat_mcp_update: { title: 'Change an Attached Server', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_mcp_registry_list: { title: "This Node's MCP Registry", readOnlyHint: true },
+    // Idempotent, and NOT destructive in the ordinary sense: switching a server off keeps it and
+    // its credential. What makes it worth a person's attention is the blast radius — every owner
+    // on the node is affected at once — and that is what the description says rather than the hint.
+    aimeat_mcp_registry_set: { title: "Set Who May Use a Node Server", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_mcp_grant_list: { title: 'Who May Use Which Server', readOnlyHint: true },
     // Idempotent: writing the same grant twice leaves the same state. Not destructive, although
     // it REPLACES an earlier grant for the same pair — what it replaces is a permission record,

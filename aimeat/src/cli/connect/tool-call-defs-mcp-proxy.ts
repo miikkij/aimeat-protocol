@@ -17,7 +17,9 @@
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { requiredString, optionalString, optionalBoolean } from './tool-call-helpers.js';
+import {
+  requiredString, optionalString, optionalBoolean, optionalNumber,
+} from './tool-call-helpers.js';
 
 const serverPath = (server: string, suffix = '') =>
     `/v1/mcp-servers/${encodeURIComponent(server)}${suffix}`;
@@ -87,6 +89,29 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
                 ...(optionalString(input, 'exposure') ? { exposure: optionalString(input, 'exposure') } : {}),
             },
         ),
+    },
+    {
+        // → GET /v1/mcp-servers/node — operator only; the node answers 403 to anyone else.
+        name: 'aimeat_mcp_registry_list',
+        handler: ({ client }) => client.get('/v1/mcp-servers/node'),
+    },
+    {
+        // → PATCH /v1/mcp-servers/node/:id, after resolving the slug an operator actually says.
+        name: 'aimeat_mcp_registry_set',
+        handler: async ({ client }, input) => {
+            const slug = requiredString(input, 'server');
+            const listed = await client.get('/v1/mcp-servers/node');
+            const rows = ((listed.data as { servers?: { id: string; slug: string }[] } | undefined)?.servers) ?? [];
+            const row = rows.find((s) => s.slug === slug);
+            if (!row) return { ok: false, status: 404, data: { error: `This node offers no server called "${slug}".` } } as never;
+            const price = optionalNumber(input, 'price_morsels');
+            return client.patch(`/v1/mcp-servers/node/${encodeURIComponent(row.id)}`, {
+                ...(optionalString(input, 'availability') ? { availability: optionalString(input, 'availability') } : {}),
+                ...(Array.isArray(input.allowlist) ? { allowlist: input.allowlist } : {}),
+                ...(price !== undefined ? { price: price > 0 ? { unit: 'morsels', perCall: price } : null } : {}),
+                ...(optionalBoolean(input, 'enabled') !== undefined ? { enabled: optionalBoolean(input, 'enabled') } : {}),
+            });
+        },
     },
     {
         // → GET /v1/mcp-servers/grants

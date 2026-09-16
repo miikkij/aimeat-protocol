@@ -41,7 +41,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import {
   attachMcpServer, listUsableServers, requireUsableServer, detachMcpServer,
-  updateMcpServerSettings,
+  updateMcpServerSettings, listNodeServers, setNodeServerPolicy, findNodeServer,
 } from '../services/mcp-client/registry.js';
 import { callRemoteTool, listRemoteTools } from '../services/mcp-client/invoke.js';
 import { startMcpOAuth } from '../services/mcp-client/oauth.js';
@@ -49,7 +49,10 @@ import {
   listMcpGrants, putMcpGrant, removeMcpGrant, type McpGrant,
 } from '../services/mcp-client/grants.js';
 import { emitChange } from '../services/event-bus.js';
-import { toPublicMcpServer, type McpTransport, type McpServerCredential } from '../models/mcp-server-schemas.js';
+import { resolveOperatorName } from '../services/owner-lifecycle.js';
+import {
+  toPublicMcpServer, type McpTransport, type McpServerCredential,
+} from '../models/mcp-server-schemas.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -228,6 +231,66 @@ export function registerMcpProxyTools(
         ...(exposure !== undefined ? { exposure } : {}),
       });
       return ok({ server: toPublicMcpServer(updated) });
+    });
+
+  // ── The operator's registry ──
+  //
+  // Self-gated at runtime on the OWNER record's operator role, the way every other operator tool
+  // here does it (core-admin.ts). Not a scope word: an operator's own agent holding mcp:manage must
+  // not be able to attach a server to the whole node in their name, and a scope cannot express
+  // "this principal is the operator in person".
+
+  mcp.tool('aimeat_mcp_registry_list', descriptionFor('aimeat_mcp_registry_list'),
+    {},
+    annotationsFor('aimeat_mcp_registry_list'),
+    async (): Promise<TextResult> => {
+      const operator = await resolveOperatorName(storage, getAgentGaii());
+      if (!operator) return fail('Only whoever runs this node can see its registry.');
+      const servers = await listNodeServers(storage);
+      return ok({
+        servers: servers.map((s) => ({
+          ...toPublicMcpServer(s),
+          availability: s.availability,
+          allowlist: s.allowlist,
+          price: s.price,
+        })),
+      });
+    });
+
+  mcp.tool('aimeat_mcp_registry_set', descriptionFor('aimeat_mcp_registry_set'),
+    {
+      server: z.string().describe("Which server on this node's registry, by its short name."),
+      availability: z.enum(['all-owners', 'allowlist']).optional()
+        .describe('Who may use it: everyone with an account here, or only the named owners.'),
+      allowlist: z.array(z.string()).optional()
+        .describe('The owners who may use it, when availability is allowlist. An empty list means nobody.'),
+      price_morsels: z.number().optional()
+        .describe('Morsels charged per call, on the caller\'s own balance. 0 makes it free.'),
+      enabled: z.boolean().optional().describe('false takes it away from everybody at once.'),
+    },
+    annotationsFor('aimeat_mcp_registry_set'),
+    async ({ server, availability, allowlist, price_morsels, enabled }): Promise<TextResult> => {
+      const operator = await resolveOperatorName(storage, getAgentGaii());
+      if (!operator) return fail('Only whoever runs this node can change its registry.');
+
+      const row = await findNodeServer(storage, server);
+      if (!row) return fail(`This node offers no server called "${server}".`);
+
+      // The same service the operator's REST door calls, so switching a server off cannot stop
+      // the pool on one door and leave it answering on the other.
+      const updated = await setNodeServerPolicy(storage, row, {
+        ...(availability ? { availability } : {}),
+        ...(allowlist ? { allowlist } : {}),
+        ...(price_morsels !== undefined
+          ? { price: price_morsels > 0 ? { unit: 'morsels' as const, perCall: price_morsels } : null }
+          : {}),
+        ...(enabled !== undefined ? { enabled } : {}),
+      });
+      return ok({
+        server: toPublicMcpServer(updated),
+        availability: updated.availability,
+        price: updated.price,
+      });
     });
 
   mcp.tool('aimeat_mcp_grant_list', descriptionFor('aimeat_mcp_grant_list'),

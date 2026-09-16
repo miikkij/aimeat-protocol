@@ -51,6 +51,8 @@ export interface McpServerQuery {
 export type McpServerPatch = Partial<Pick<
   McpServerRecord,
   'title' | 'description' | 'transport' | 'callerIdentity' | 'exposure' | 'directory' | 'enabled'
+  // Node-wide only, and only an operator's door sets them.
+  | 'availability' | 'allowlist' | 'price'
 >>;
 
 export interface McpServerRepository {

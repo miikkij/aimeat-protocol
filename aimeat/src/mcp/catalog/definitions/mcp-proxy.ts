@@ -86,6 +86,26 @@ export const mcpProxyTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_mcp_registry_list',
+        description: "What THIS NODE offers everybody who has an account on it: the MCP servers its operator attached once, who may reach each one, and what a call costs. Operator only \u2014 anyone else is refused. A server with no availability set is attached but offered to NOBODY, which is a common half-finished state and looks identical to a broken one, so say which it is.",
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {},
+    },
+    {
+        name: 'aimeat_mcp_registry_set',
+        description: "Decide who may use one of this node's own MCP servers, what a call costs them, and whether it is on at all. Operator only. Availability all-owners means everyone with an account here; allowlist means only the owners named, and an EMPTY allowlist means nobody \u2014 which is the safe reading rather than a bug. A price is in morsels and is charged to the CALLER's own balance per call. Switching it off takes it away from everybody at once, so say what will stop working before you do it.",
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            server: { type: 'string', required: true, description: "Which server on this node's registry, by its short name." },
+            availability: { type: 'string', description: "'all-owners' or 'allowlist'." },
+            allowlist: { type: 'array', description: 'The owners who may use it. An empty list means nobody.' },
+            price_morsels: { type: 'number', description: "Morsels per call, on the caller's own balance. 0 makes it free." },
+            enabled: { type: 'boolean', description: 'false takes it away from everybody at once.' },
+        },
+    },
+    {
         name: 'aimeat_mcp_grant_list',
         description: "Which of this person's agents and apps may use which attached servers, and which tools on them. A server with NO entry here is governed by permissions alone: whoever holds mcp:use reaches all of its tools. An entry is a NARROWING of that, so read this before telling somebody what an agent can do \u2014 the permission is only half the answer.",
         caller: 'agent',

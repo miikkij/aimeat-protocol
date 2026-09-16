@@ -665,6 +665,11 @@ export function applySchemaTables4(db: Database.Database): void {
       toolCache       TEXT NOT NULL DEFAULT '[]',
       toolCacheHash   TEXT NOT NULL DEFAULT '',
       lastListedAt    TEXT,
+      -- Node-wide only. NULL on an owner's own server, because a person neither allowlists
+      -- nor bills themselves. Added with the operator registry (mirrors Postgres 0077).
+      availability    TEXT,
+      allowlist       TEXT NOT NULL DEFAULT '[]',
+      price           TEXT,
       directory       TEXT NOT NULL DEFAULT '{"listed":false,"visibility":"private","tags":[]}',
       enabled         INTEGER NOT NULL DEFAULT 1,
       status          TEXT NOT NULL DEFAULT 'active',

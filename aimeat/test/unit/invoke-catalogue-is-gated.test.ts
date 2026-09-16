@@ -65,7 +65,12 @@ describe('the invoke catalogue is a gated surface', () => {
         // 27 since 2026-09-12: aimeat_admin_hook_set, the same decision. It binds a lifecycle moment
         // to an address, which only whoever runs the node may do, and the handler resolves the
         // operator before it writes; there is no narrower word to name it with.
-        expect(exempt.length).toBeLessThanOrEqual(27);
+        // 28 since 2026-09-16: aimeat_mcp_registry_set, and the same reasoning a third time. It
+        // decides which owners on this node may use one of its own MCP servers and what a call
+        // costs them, the handler resolves the operator from the OWNER record before it writes, and
+        // a scope word cannot say "the operator in person" — one that could would be grantable to
+        // an agent, which is exactly what must not happen to a control over the whole node.
+        expect(exempt.length).toBeLessThanOrEqual(28);
         expect(mutating.length).toBeGreaterThan(100);
     });
 });

@@ -133,6 +133,7 @@ function makeRow(over: Partial<McpServerRecord> = {}): McpServerRecord {
     expiresAt: null, providerClientId: null,
     callerIdentity: 'node-credential', exposure: 'gateway',
     toolCache: [], toolCacheHash: '', lastListedAt: null,
+    availability: null, allowlist: [], price: null,
     directory: { listed: false, visibility: 'private', tags: [] },
     enabled: true, status: 'needs_reauth', lastOkAt: null, lastError: null,
     createdAt: now, updatedAt: now, ...over,

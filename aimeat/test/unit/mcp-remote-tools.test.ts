@@ -51,6 +51,7 @@ function makeServer(over: Partial<McpServerRecord> = {}): McpServerRecord {
       { name: 'create_issue', description: 'Creates one.', inputSchema: { type: 'object', properties: { title: {}, project: {} }, required: ['title'] } },
     ],
     toolCacheHash: 'h', lastListedAt: now,
+    availability: null, allowlist: [], price: null,
     directory: { listed: false, visibility: 'private', tags: [] },
     enabled: true, status: 'active', lastOkAt: now, lastError: null,
     createdAt: now, updatedAt: now, ...over,

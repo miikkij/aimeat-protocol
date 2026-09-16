@@ -18,6 +18,7 @@ import type { McpServerQuery, McpServerPatch } from '../../../repositories/mcp-s
 import type {
   McpServerRecord, McpServerStatus, McpOwnership, McpTransport,
   McpAuthMode, McpCallerIdentity, McpExposure, RemoteToolSnapshot,
+  McpAvailability, McpPrice,
 } from '../../../../models/mcp-server-schemas.js';
 import type Database from 'better-sqlite3';
 
@@ -57,6 +58,9 @@ function toMcpServer(r: Row): McpServerRecord {
     toolCache: JSON.parse((r.toolCache as string) || '[]') as RemoteToolSnapshot[],
     toolCacheHash: (r.toolCacheHash as string) ?? '',
     lastListedAt: (r.lastListedAt as string | null) ?? null,
+    availability: (r.availability as McpAvailability | null) ?? null,
+    allowlist: JSON.parse((r.allowlist as string) || '[]') as string[],
+    price: r.price ? JSON.parse(r.price as string) as McpPrice : null,
     directory: JSON.parse(
       (r.directory as string) || '{"listed":false,"visibility":"private","tags":[]}',
     ) as McpServerRecord['directory'],
@@ -74,14 +78,15 @@ export const mcpServerMethods = {
     this.db.prepare(`
       INSERT INTO mcp_servers (id, slug, title, description, ownership, ownerGhii, organismId, ws,
         createdBy, transport, auth, credential, credentialShape, expiresAt, providerClientId,
-        callerIdentity, exposure, toolCache, toolCacheHash, lastListedAt, directory, enabled,
-        status, lastOkAt, lastError, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        callerIdentity, exposure, toolCache, toolCacheHash, lastListedAt, availability, allowlist,
+        price, directory, enabled, status, lastOkAt, lastError, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       row.id, row.slug, row.title, row.description, row.ownership, row.ownerGhii, row.organismId,
       row.ws, row.createdBy, JSON.stringify(row.transport), row.auth, row.credential,
       row.credentialShape, row.expiresAt, row.providerClientId, row.callerIdentity, row.exposure,
       JSON.stringify(row.toolCache), row.toolCacheHash, row.lastListedAt,
+      row.availability, JSON.stringify(row.allowlist), row.price ? JSON.stringify(row.price) : null,
       JSON.stringify(row.directory), row.enabled ? 1 : 0, row.status, row.lastOkAt, row.lastError,
       row.createdAt, row.updatedAt,
     );
@@ -138,6 +143,9 @@ export const mcpServerMethods = {
     if (patch.exposure !== undefined) { sets.push('exposure = ?'); params.push(patch.exposure); }
     if (patch.directory !== undefined) { sets.push('directory = ?'); params.push(JSON.stringify(patch.directory)); }
     if (patch.enabled !== undefined) { sets.push('enabled = ?'); params.push(patch.enabled ? 1 : 0); }
+    if (patch.availability !== undefined) { sets.push('availability = ?'); params.push(patch.availability); }
+    if (patch.allowlist !== undefined) { sets.push('allowlist = ?'); params.push(JSON.stringify(patch.allowlist)); }
+    if (patch.price !== undefined) { sets.push('price = ?'); params.push(patch.price ? JSON.stringify(patch.price) : null); }
     if (!sets.length) return;
     sets.push('updatedAt = ?');
     params.push(new Date().toISOString(), id);

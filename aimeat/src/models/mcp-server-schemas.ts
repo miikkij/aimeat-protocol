@@ -80,6 +80,33 @@ export type McpCallerIdentity = 'node-credential' | 'per-user-oauth' | 'owner-on
 export type McpExposure = 'gateway' | 'flatten';
 
 /**
+ * Who on this node may use an operator's server.
+ *
+ * Only meaningful when `ownership` is `node`. An owner's own server needs no such word — it is
+ * theirs — and an organism's is decided by membership.
+ */
+export type McpAvailability =
+  /** Everyone with an account here. */
+  | 'all-owners'
+  /** Only the owners the operator named. */
+  | 'allowlist';
+
+/**
+ * What one call costs, when the operator decided it costs something.
+ *
+ * `money` is integer 6-decimal MICRO-units and `morsels` is whole morsels; the two are NEVER
+ * conflated, which is the same rule EntitlementUnit states and the reason this carries the unit
+ * rather than a bare number.
+ */
+export interface McpPrice {
+  unit: 'morsels' | 'money';
+  /** Per call, in the unit above. */
+  perCall: number;
+  /** ISO 4217, for `money` only. */
+  currency?: string;
+}
+
+/**
  * `needs_reauth` is a user-visible state and not an error: it is what a failed refresh resolves to,
  * and the settings panel renders it as a button that fixes it. `unreachable` is the far side being
  * down or gone, which ages a server out of discovery without detaching it.
@@ -186,6 +213,18 @@ export interface McpServerRecord {
   /** sha256 of the normalised tool list. Changing it is what triggers a downstream listChanged. */
   toolCacheHash: string;
   lastListedAt: string | null;
+
+  /**
+   * Node-wide only: who may use it, and what a call costs.
+   *
+   * Both are null or absent on an owner's own server, because neither question applies: a person
+   * does not allowlist themselves and does not bill themselves.
+   */
+  availability: McpAvailability | null;
+  /** Owner GHIIs, when `availability` is `allowlist`. Empty means nobody but the operator. */
+  allowlist: string[];
+  /** What one call costs. Null means free to whoever `availability` admits. */
+  price: McpPrice | null;
 
   /** Whether this server joins the node's directory, and who may see it there. */
   directory: {
