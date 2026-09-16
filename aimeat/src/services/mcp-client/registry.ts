@@ -78,6 +78,8 @@ export type AttachRefusal =
   | 'NO_ENCRYPTION_KEY'
   /** Attaching to a group is governance: only its owners and admins may. */
   | 'NOT_ALLOWED'
+  /** The record names a peer AIMEAT node this one has no routable peering with. */
+  | 'NO_SUCH_PEER'
   | 'UNREACHABLE';
 
 /**
@@ -179,7 +181,13 @@ export async function attachMcpServer(input: AttachInput): Promise<AttachResult>
     // The row stays, parked, rather than being rolled back: an owner who mistyped a token wants to
     // fix the token, not retype the whole attachment. listRemoteTools has already set the status
     // and the reason, so the panel can render the fix.
-    return { ok: false, code: 'UNREACHABLE', message: probed.message };
+    //
+    // A mistyped PEER id is told apart from a server that would not answer, because they are two
+    // different mistakes: one is a name to correct here, the other is somebody else's node being
+    // down. Reporting both as 502 sends a person to look at a node that is fine.
+    return probed.code === 'PEER_UNKNOWN' || probed.code === 'PEER_NOT_ROUTABLE'
+      ? { ok: false, code: 'NO_SUCH_PEER', message: probed.message }
+      : { ok: false, code: 'UNREACHABLE', message: probed.message };
   }
 
   // Attaching a server is news. A CALL through it is not, and there is deliberately no event for

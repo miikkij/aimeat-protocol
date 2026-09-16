@@ -18,7 +18,7 @@
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
 import {
-  requiredString, optionalString, optionalBoolean, optionalNumber,
+  requiredString, optionalString, optionalBoolean,
 } from './tool-call-helpers.js';
 
 const serverPath = (server: string, suffix = '') =>
@@ -57,7 +57,8 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_mcp_attach',
         handler: ({ client }, input) => client.post('/v1/mcp-servers', {
             name: requiredString(input, 'name'),
-            url: requiredString(input, 'url'),
+            ...(optionalString(input, 'url') ? { url: optionalString(input, 'url') } : {}),
+            ...(optionalString(input, 'peer') ? { peer: optionalString(input, 'peer') } : {}),
             ...(optionalString(input, 'title') ? { title: optionalString(input, 'title') } : {}),
             ...(optionalString(input, 'description') ? { description: optionalString(input, 'description') } : {}),
             ...(optionalString(input, 'transport') ? { transport: optionalString(input, 'transport') } : {}),
@@ -104,11 +105,12 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
             const rows = ((listed.data as { servers?: { id: string; slug: string }[] } | undefined)?.servers) ?? [];
             const row = rows.find((s) => s.slug === slug);
             if (!row) return { ok: false, status: 404, data: { error: `This node offers no server called "${slug}".` } } as never;
-            const price = optionalNumber(input, 'price_morsels');
+            const price = input.price as { perCall?: number } | undefined;
             return client.patch(`/v1/mcp-servers/node/${encodeURIComponent(row.id)}`, {
                 ...(optionalString(input, 'availability') ? { availability: optionalString(input, 'availability') } : {}),
                 ...(Array.isArray(input.allowlist) ? { allowlist: input.allowlist } : {}),
-                ...(price !== undefined ? { price: price > 0 ? { unit: 'morsels', perCall: price } : null } : {}),
+                ...(price ? { price: (price.perCall ?? 0) > 0 ? price : null } : {}),
+                ...(optionalString(input, 'exposure') ? { exposure: optionalString(input, 'exposure') } : {}),
                 ...(optionalBoolean(input, 'enabled') !== undefined ? { enabled: optionalBoolean(input, 'enabled') } : {}),
             });
         },

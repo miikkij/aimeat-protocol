@@ -140,7 +140,9 @@ export function registerMcpProxyTools(
     {
       name: z.string()
         .describe("A short name you will use instead of the address, e.g. 'jira'. Lowercase letters, digits and dashes."),
-      url: z.string().describe('The server address, https.'),
+      url: z.string().optional().describe('The server address, https. Give this or peer.'),
+      peer: z.string().optional()
+        .describe('The id of a peer AIMEAT node, instead of url. Its address is looked up on every call, so the link follows the peering rather than outliving it. The peering must carry routing.'),
       title: z.string().optional().describe('What to call it on screen. Defaults to the name.'),
       description: z.string().optional().describe('What it is for, in a sentence.'),
       transport: z.enum(['http', 'sse']).optional()
@@ -151,11 +153,13 @@ export function registerMcpProxyTools(
         .describe("Which header the token belongs in, when the server does not take a bearer (e.g. 'X-API-Key')."),
     },
     annotationsFor('aimeat_mcp_attach'),
-    async ({ name, url, title, description, transport, token, header }): Promise<TextResult> => {
-      const t: McpTransport = {
-        kind: transport === 'sse' ? 'sse' : 'http',
-        url,
-      };
+    async ({ name, url, peer, title, description, transport, token, header }): Promise<TextResult> => {
+      if (!url && !peer) {
+        return fail('Give either the server address, or the id of a peer node as peer.');
+      }
+      const t: McpTransport = peer
+        ? { kind: 'aimeat', peerNodeId: peer }
+        : { kind: transport === 'sse' ? 'sse' : 'http', url: url as string };
       const credential: McpServerCredential | undefined = token
         ? { shape: 'static', accessToken: token, ...(header ? { headerName: header } : {}) }
         : undefined;
@@ -264,12 +268,18 @@ export function registerMcpProxyTools(
         .describe('Who may use it: everyone with an account here, or only the named owners.'),
       allowlist: z.array(z.string()).optional()
         .describe('The owners who may use it, when availability is allowlist. An empty list means nobody.'),
-      price_morsels: z.number().optional()
-        .describe('Morsels charged per call, on the caller\'s own balance. 0 makes it free.'),
+      price: z.object({
+        unit: z.enum(['morsels', 'money']),
+        perCall: z.number(),
+        currency: z.string().optional(),
+      }).optional()
+        .describe("What one call costs the caller. unit 'morsels' spends their own balance; unit 'money' also needs currency, as ISO 4217. perCall 0 makes it free again."),
+      exposure: z.enum(['gateway', 'flatten']).optional()
+        .describe("How its tools are reached: 'gateway' through aimeat_mcp_call, or 'flatten' listed one by one in every caller's own tool list."),
       enabled: z.boolean().optional().describe('false takes it away from everybody at once.'),
     },
     annotationsFor('aimeat_mcp_registry_set'),
-    async ({ server, availability, allowlist, price_morsels, enabled }): Promise<TextResult> => {
+    async ({ server, availability, allowlist, price, exposure, enabled }): Promise<TextResult> => {
       const operator = await resolveOperatorName(storage, getAgentGaii());
       if (!operator) return fail('Only whoever runs this node can change its registry.');
 
@@ -281,9 +291,10 @@ export function registerMcpProxyTools(
       const updated = await setNodeServerPolicy(storage, row, {
         ...(availability ? { availability } : {}),
         ...(allowlist ? { allowlist } : {}),
-        ...(price_morsels !== undefined
-          ? { price: price_morsels > 0 ? { unit: 'morsels' as const, perCall: price_morsels } : null }
-          : {}),
+        // A price of 0 is how somebody says "free again", and storing it as a price of zero would
+        // send every call through the meter to be charged nothing.
+        ...(price ? { price: price.perCall > 0 ? price : null } : {}),
+        ...(exposure ? { exposure } : {}),
         ...(enabled !== undefined ? { enabled } : {}),
       });
       return ok({

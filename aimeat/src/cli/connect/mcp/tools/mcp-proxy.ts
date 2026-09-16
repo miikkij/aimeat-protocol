@@ -52,15 +52,18 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
 
   mcp.tool('aimeat_mcp_attach', descriptionFor('aimeat_mcp_attach'), {
     name: z.string().describe("A short name used instead of the address, e.g. 'jira'."),
-    url: z.string().describe('The server address, https.'),
+    url: z.string().optional().describe('The server address, https. Give this or peer.'),
+    peer: z.string().optional().describe('The id of a peer AIMEAT node, instead of url.'),
     title: z.string().optional().describe('What to call it on screen.'),
     description: z.string().optional().describe('What it is for, in a sentence.'),
     transport: z.enum(['http', 'sse']).optional().describe("'http' is the current transport and the default."),
     token: z.string().optional().describe('A token the server needs. Held encrypted on the node.'),
     header: z.string().optional().describe("Which header the token belongs in, when not a bearer."),
-  }, annotationsFor('aimeat_mcp_attach'), async ({ name, url, title, description, transport, token, header }) => out(
+  }, annotationsFor('aimeat_mcp_attach'), async ({ name, url, peer, title, description, transport, token, header }) => out(
     await client.post('/v1/mcp-servers', {
-      name, url,
+      name,
+      ...(url ? { url } : {}),
+      ...(peer ? { peer } : {}),
       ...(title ? { title } : {}),
       ...(description ? { description } : {}),
       ...(transport ? { transport } : {}),
@@ -101,9 +104,14 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     server: z.string().describe("Which server on this node's registry, by its short name."),
     availability: z.enum(['all-owners', 'allowlist']).optional(),
     allowlist: z.array(z.string()).optional(),
-    price_morsels: z.number().optional(),
+    price: z.object({
+      unit: z.enum(['morsels', 'money']),
+      perCall: z.number(),
+      currency: z.string().optional(),
+    }).optional(),
+    exposure: z.enum(['gateway', 'flatten']).optional(),
     enabled: z.boolean().optional(),
-  }, annotationsFor('aimeat_mcp_registry_set'), async ({ server, availability, allowlist, price_morsels, enabled }) => {
+  }, annotationsFor('aimeat_mcp_registry_set'), async ({ server, availability, allowlist, price, exposure, enabled }) => {
     // The REST door takes an id, and this door takes the slug an operator actually says. One
     // lookup here rather than a second listing route nobody else needs.
     const listed = await client.get('/v1/mcp-servers/node');
@@ -115,9 +123,8 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     return out(await client.patch(`/v1/mcp-servers/node/${encodeURIComponent(row.id)}`, {
       ...(availability ? { availability } : {}),
       ...(allowlist ? { allowlist } : {}),
-      ...(price_morsels !== undefined
-        ? { price: price_morsels > 0 ? { unit: 'morsels', perCall: price_morsels } : null }
-        : {}),
+      ...(price ? { price: price.perCall > 0 ? price : null } : {}),
+      ...(exposure ? { exposure } : {}),
       ...(enabled !== undefined ? { enabled } : {}),
     }));
   });

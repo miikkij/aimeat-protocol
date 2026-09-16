@@ -19,6 +19,8 @@
  * @structure RemoteCallResult · callRemoteTool · listRemoteTools · toolCacheHash
  * @usage const r = await callRemoteTool({ storage, config, server, tool, args, caller });
  * @version-history
+ *   v1.1.0 — 2026-09-16 — Phase 6: a record naming a peer AIMEAT node is resolved to that peer's
+ *     address on EVERY call, so a peering that ends or is demoted stops the calls with it.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 import { createHash } from 'node:crypto';
@@ -29,6 +31,7 @@ import type {
 } from '../../models/mcp-server-schemas.js';
 import { mcpClientPool } from './pool.js';
 import { openMcpCredential } from './credential.js';
+import { resolveWireAddress } from './transport.js';
 import { refreshMcpOAuth } from './oauth.js';
 import { resolveMcpAccess, applyLockedInput } from './grants.js';
 import { recordUsageCall } from '../usage/usage-buffer.js';
@@ -54,6 +57,10 @@ export type RemoteCallRefusal =
   | 'NO_ENCRYPTION_KEY'
   | 'CREDENTIAL_UNREADABLE'
   | 'TRANSPORT_UNSUPPORTED'
+  /** The record names a peer AIMEAT node this one has no active peering with. */
+  | 'PEER_UNKNOWN'
+  /** The peering exists but does not carry routing, which is member and genesis only. */
+  | 'PEER_NOT_ROUTABLE'
   | 'UNREACHABLE'
   | 'UPSTREAM_UNAUTHORIZED'
   /** The owner's grant does not cover this tool, or its cap or its expiry ran out. */
@@ -184,8 +191,11 @@ export async function listRemoteTools(
   const resolved = await resolveCredential(storage, config, server);
   if ('refusal' in resolved) return resolved.refusal as { ok: false; code: RemoteCallRefusal; message: string };
 
+  const wire = await resolveWireAddress(storage, server);
+  if (!wire.ok) return wire;
+
   try {
-    const client = await mcpClientPool.acquire(server, resolved.credential, identity);
+    const client = await mcpClientPool.acquire(wire.server, resolved.credential, identity);
     const listed = await client.listTools();
     const tools: RemoteToolSnapshot[] = listed.tools.map((t) => ({
       name: t.name,
@@ -311,8 +321,16 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
 
   const identity = server.callerIdentity === 'per-user-oauth' ? ownerGhii : 'node';
 
+  // A peer node is an address this node looks up rather than one somebody typed, and the peering
+  // is re-read on every call so a demoted or ended relationship stops the calls with it.
+  const wire = await resolveWireAddress(storage, server);
+  if (!wire.ok) {
+    record('refused', wire.code);
+    return { ok: false, code: wire.code, message: wire.message };
+  }
+
   try {
-    const client = await mcpClientPool.acquire(server, resolved.credential, identity);
+    const client = await mcpClientPool.acquire(wire.server, resolved.credential, identity);
     const result = await client.callTool({ name: tool, arguments: effectiveArgs }, undefined, {
       timeout: CALL_TIMEOUT_MS,
     });

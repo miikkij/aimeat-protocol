@@ -30,6 +30,7 @@ import { createTemplatesSource } from './sources/templates-source.js';
 import { createDesignbookSource } from './sources/designbook-source.js';
 import { createAppToolsSource } from './sources/app-tools-source.js';
 import { createNodeCapabilitiesSource } from './sources/node-capabilities-source.js';
+import { createRemoteMcpSource } from './sources/remote-mcp-source.js';
 
 export function buildDiscoveryRegistry(storage: Storage, config: AimeatConfig): DiscoveryRegistry {
   const registry = createRegistry();
@@ -41,5 +42,6 @@ export function buildDiscoveryRegistry(storage: Storage, config: AimeatConfig): 
   registry.register(createDesignbookSource(storage, config));    // Design Book parts (atelier.book.part.*)
   registry.register(createAppToolsSource(storage, config));      // published app tools (apps.*.tools), one entry per TOOL
   registry.register(createNodeCapabilitiesSource());              // the node's OWN capabilities — what `invoke` can run
+  registry.register(createRemoteMcpSource(storage, config));      // tools on servers this caller has attached
   return registry;
 }

@@ -225,25 +225,42 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     expect(r.message).toContain('AIMEAT_ENCRYPTION_KEY');
   });
 
-  it('refuses the transports that are not built yet, by name', async () => {
+  it('refuses a local process, which is not built yet, by name', async () => {
     const storage = new SqliteStorage(':memory:');
-    // Distinct slugs: one owner may not hold two servers under one name, which is the unique
-    // index doing its job and not something for this test to work around.
-    for (const t of [
-      { kind: 'stdio' as const, command: 'npx', args: ['some-server'] },
-      { kind: 'aimeat' as const, peerNodeId: 'peer-node-001' },
-    ]) {
-      const row = makeRow({ slug: `unbuilt-${t.kind}`, transport: t });
-      await storage.createMcpServer(row);
-      const r = await callRemoteTool({
-        storage, config, server: row, tool: 'echo', args: {}, caller: 'alice@node-a',
-      });
-      expect(r.ok).toBe(false);
-      if (r.ok) return;
-      // A stub that silently did nothing would be found by a person wondering why their server
-      // never answers.
-      expect(r.code).toBe('TRANSPORT_UNSUPPORTED');
-    }
+    const row = makeRow({
+      slug: 'unbuilt-stdio',
+      transport: { kind: 'stdio', command: 'npx', args: ['some-server'] },
+    });
+    await storage.createMcpServer(row);
+
+    const r = await callRemoteTool({
+      storage, config, server: row, tool: 'echo', args: {}, caller: 'alice@node-a',
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    // A stub that silently did nothing would be found by a person wondering why their server
+    // never answers.
+    expect(r.code).toBe('TRANSPORT_UNSUPPORTED');
+  });
+
+  it('refuses a peer node this one has no peering with', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = makeRow({
+      slug: 'unknown-peer',
+      transport: { kind: 'aimeat', peerNodeId: 'peer-node-001' },
+    });
+    await storage.createMcpServer(row);
+
+    const r = await callRemoteTool({
+      storage, config, server: row, tool: 'echo', args: {}, caller: 'alice@node-a',
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    // This used to read TRANSPORT_UNSUPPORTED, because the kind was not built. It is built now
+    // (phase 6), and what refuses the call is the missing PEERING rather than the missing feature,
+    // which is a different sentence for the person reading it. mcp-peer-transport.test.ts holds
+    // the rest of the peering rules.
+    expect(r.code).toBe('PEER_UNKNOWN');
   });
 });
 

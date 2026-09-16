@@ -49,12 +49,13 @@ export const mcpProxyTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_mcp_attach',
-        description: "Attach another MCP server to this person's node, so everything acting for them can use it. Needs the mcp:manage permission, which is deliberately not part of 'full access': attaching a server to somebody's account is a human act. The address is checked before anything is saved, so a wrong address or a wrong token is reported now rather than as a server that mysteriously never answers. A token given here is encrypted on the node and never comes back out, not to you and not to anyone. Ask the person for the address and the token; do not guess either.",
+        description: "Attach another MCP server to this person's node, so everything acting for them can use it. Needs the mcp:manage permission, which is deliberately not part of 'full access': attaching a server to somebody's account is a human act. The address is checked before anything is saved, so a wrong address or a wrong token is reported now rather than as a server that mysteriously never answers. A token given here is encrypted on the node and never comes back out, not to you and not to anyone. Ask the person for the address and the token; do not guess either. Another AIMEAT node is named with peer instead of url, and then the address is looked up on every call so the link ends when the peering does.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             name: { type: 'string', required: true, description: "A short name used instead of the address, e.g. 'jira'. Lowercase letters, digits and dashes." },
-            url: { type: 'string', required: true, description: 'The server address, https.' },
+            url: { type: 'string', description: 'The server address, https. Give this or peer.' },
+            peer: { type: 'string', description: "The id of a peer AIMEAT node, instead of url. Its address is looked up on every call, so the link follows the peering rather than outliving it, and the peering must carry routing (member or genesis)." },
             title: { type: 'string', description: 'What to call it on screen. Defaults to the name.' },
             description: { type: 'string', description: 'What it is for, in a sentence.' },
             transport: { type: 'string', description: "How to speak to it: 'http' (the current transport, and the default) or 'sse' (the older one)." },
@@ -94,14 +95,15 @@ export const mcpProxyTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_mcp_registry_set',
-        description: "Decide who may use one of this node's own MCP servers, what a call costs them, and whether it is on at all. Operator only. Availability all-owners means everyone with an account here; allowlist means only the owners named, and an EMPTY allowlist means nobody \u2014 which is the safe reading rather than a bug. A price is in morsels and is charged to the CALLER's own balance per call. Switching it off takes it away from everybody at once, so say what will stop working before you do it.",
+        description: "Decide who may use one of this node's own MCP servers, what a call costs them, how its tools are listed, and whether it is on at all. Operator only. Availability all-owners means everyone with an account here; allowlist means only the owners named, and an EMPTY allowlist means nobody \u2014 which is the safe reading rather than a bug. A price is charged per call to the CALLER, in morsels off their own balance or in money. Switching it off takes it away from everybody at once, so say what will stop working before you do it.",
         caller: 'operator',
         visibility: agentEverywhere,
         input: {
             server: { type: 'string', required: true, description: "Which server on this node's registry, by its short name." },
             availability: { type: 'string', description: "'all-owners' or 'allowlist'." },
             allowlist: { type: 'array', description: 'The owners who may use it. An empty list means nobody.' },
-            price_morsels: { type: 'number', description: "Morsels per call, on the caller's own balance. 0 makes it free." },
+            price: { type: 'object', description: "What one call costs: {unit: 'morsels'|'money', perCall, currency}. currency is ISO 4217 and only for money. perCall 0 makes it free again." },
+            exposure: { type: 'string', description: "How its tools are reached: 'gateway' through aimeat_mcp_call, or 'flatten' listed one by one." },
             enabled: { type: 'boolean', description: 'false takes it away from everybody at once.' },
         },
     },
