@@ -35,6 +35,7 @@
  *   NODE_OPTIONS="--import tsx --import file:///…/test/helpers/fake-goose-acp.ts"
  *   FAKE_GOOSE_LOG=<path to a JSONL file>
  * @version-history
+ *   v1.1.0 — 2026-09-16 — The started record lists any AIMEAT_* or DATABASE_URL it was given.
  *   v1.0.0 — 2026-09-08 — Initial, with test/e2e-chat-agent.ts.
  */
 import { appendFileSync, writeSync } from 'node:fs';
@@ -114,6 +115,8 @@ async function runPeer(): Promise<void> {
             GOOSE_PATH_ROOT: process.env.GOOSE_PATH_ROOT ?? null,
             OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? null,
         },
+        // Every name the node handed over that it must not: its own configuration and its database.
+        leaked: Object.keys(process.env).filter(k => /^AIMEAT_|^DATABASE_URL$/i.test(k)),
     });
 
     /** A request BACK to the node, answered by services/goose-acp.ts answerAgentRequest(). */
