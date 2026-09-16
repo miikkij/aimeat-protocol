@@ -29,6 +29,7 @@
  */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { McpServerRecord, McpServerCredential } from '../../models/mcp-server-schemas.js';
+import type { AimeatConfig } from '../../config.js';
 import { buildTransport, MCP_CONNECT_TIMEOUT_MS } from './transport.js';
 import { logger } from '../../utils/logger.js';
 
@@ -61,6 +62,12 @@ export class McpClientPool {
     server: McpServerRecord,
     credential: McpServerCredential | null,
     identity: string,
+    /**
+     * Only a `stdio` record reads this, and it decides whether a PROCESS starts. Optional so the
+     * http and sse paths are unchanged, and a missing one is a refusal rather than a default: an
+     * unanswered question about running a program is a no.
+     */
+    config?: Pick<AimeatConfig, 'mcpStdioEnabled' | 'mcpStdioAllowedCommands'>,
   ): Promise<Client> {
     const key = this.key(server.id, identity);
     const existing = this.entries.get(key);
@@ -77,7 +84,7 @@ export class McpClientPool {
       { capabilities: {} },
     );
     const connecting = (async () => {
-      const transport = buildTransport(server, credential);
+      const transport = buildTransport(server, credential, config);
       await client.connect(transport, { timeout: MCP_CONNECT_TIMEOUT_MS });
       const entry = this.entries.get(key);
       if (entry) entry.connecting = null;

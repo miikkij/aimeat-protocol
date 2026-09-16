@@ -225,7 +225,7 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     expect(r.message).toContain('AIMEAT_ENCRYPTION_KEY');
   });
 
-  it('refuses a local process, which is not built yet, by name', async () => {
+  it('refuses a local process on a node that does not run them, by name', async () => {
     const storage = new SqliteStorage(':memory:');
     const row = makeRow({
       slug: 'unbuilt-stdio',
@@ -238,9 +238,11 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
-    // A stub that silently did nothing would be found by a person wondering why their server
-    // never answers.
-    expect(r.code).toBe('TRANSPORT_UNSUPPORTED');
+    // This used to read TRANSPORT_UNSUPPORTED, because the kind was not built at all. It is built
+    // now (phase 7) and OFF, which is a different sentence: the `config` here has no stdio
+    // settings, and an unanswered question about running a program is a no.
+    // mcp-stdio-policy.test.ts holds the three conditions and the near misses.
+    expect(r.code).toBe('STDIO_DISABLED');
   });
 
   it('refuses a peer node this one has no peering with', async () => {

@@ -46839,6 +46839,223 @@ paths:
           description: The server could not be reached, or it refused the credential.
         '503':
           description: This node has no encryption key, so it cannot hold a credential.
+  /v1/mcp-servers/organism:
+    post:
+      operationId: attachOrganismMcpServer
+      summary: Attach a server that belongs to a group
+      description: >
+        The team attaches its wiki once and the team reaches it: nobody hands a token to each person
+        who joins, and nobody loses access when the person who set it up leaves. Membership decides
+        USE, and owners, admins and members count alike, because using a tool the organism attached
+        is not an act of governance. ATTACHING one is, so it stays with owners and admins. Bind it to
+        one workspace with ws and that workspace's own roles decide instead: a contributor may call
+        it, a viewer only sees it is there. The server belongs to the GROUP, so its ownerGhii is
+        null: the group's use is not charged to a member and the row does not die with an account.
+        An outsider, an ordinary member and an organism id that does not exist are all refused in the
+        same words, because confirming existence would be the leak.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, url, organism_id]
+              properties:
+                organism_id:
+                  type: string
+                ws:
+                  type: string
+                  description: >
+                    Bind it to ONE workspace inside the organism. A member with no role in that
+                    workspace reaches nothing, which is what makes this narrower than the organism.
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
+                transport:
+                  type: string
+                  enum: [http, sse]
+                token:
+                  type: string
+                  description: Sealed with the node key. Never returned.
+                header:
+                  type: string
+      responses:
+        '201':
+          description: Attached to the group
+        '400':
+          description: A name this node will not accept, or the caller may not attach here.
+        '409':
+          description: That name is already taken in this group.
+  /v1/mcp-servers/node:
+    get:
+      operationId: listNodeMcpServers
+      summary: What this node offers everybody with an account on it
+      description: >
+        Operator only, and the operator IN PERSON (requireOperatorPrincipal), never something acting
+        on their behalf. Carries availability, the allowlist and the price, which the ordinary
+        projection omits because a caller has no business knowing who else is on the list. A server
+        with NO availability set is attached and offered to NOBODY, which is a common half-finished
+        state that looks identical to a broken one.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Every node-wide server, with its policy
+        '403':
+          description: Not the operator.
+    post:
+      operationId: attachNodeMcpServer
+      summary: Attach a server for the whole node
+      description: >
+        Operator only, and the operator IN PERSON: attaching a server to the whole node, deciding who
+        reaches it and pricing it are three acts nothing may perform in an operator's name, so there
+        is deliberately no agent twin for this door. Attaching is not OFFERING, so set availability
+        or it is reachable by nobody. A price is charged per call to the CALLER, in morsels off their
+        own balance or in money.
+        Passing command attaches a LOCAL PROCESS instead of an address, and this is the only door in
+        the system that can write one. It is refused unless AIMEAT_MCP_STDIO_ENABLED is on, and what
+        may then run is decided again by AIMEAT_MCP_STDIO_ALLOWED_COMMANDS, compared whole. The
+        process is started without a shell, so nothing in args is interpreted.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                  description: The server address. Give this or command.
+                command:
+                  type: string
+                  description: >
+                    A local program to run as the server. Must match an allowed command exactly.
+                args:
+                  type: array
+                  items:
+                    type: string
+                env:
+                  type: object
+                  additionalProperties:
+                    type: string
+                title:
+                  type: string
+                description:
+                  type: string
+                transport:
+                  type: string
+                  enum: [http, sse]
+                auth:
+                  type: string
+                  enum: [oauth]
+                token:
+                  type: string
+                  description: Sealed with the node key. Never returned.
+                header:
+                  type: string
+                availability:
+                  type: string
+                  enum: [all-owners, allowlist]
+                  description: >
+                    Who may use it. An EMPTY allowlist means nobody, which is the safe reading
+                    rather than a bug. Unset means nobody too, and the answer says so.
+                allowlist:
+                  type: array
+                  items:
+                    type: string
+                price:
+                  type: object
+                  description: >
+                    What one call costs: unit (morsels or money), perCall, and currency for money,
+                    as ISO 4217.
+      responses:
+        '201':
+          description: Attached, with a note when nobody may use it yet
+        '400':
+          description: A bad name, or a local process this node does not run.
+        '403':
+          description: Not the operator.
+        '409':
+          description: That name is already taken on this node.
+  /v1/mcp-servers/node/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The node-wide server's id.
+    patch:
+      operationId: setNodeMcpServerPolicy
+      summary: Who may use it, what it costs, how it is listed, and whether it is on
+      description: >
+        Operator only, in person. Scoped to node-wide rows on purpose: this must not become a way for
+        an operator to edit somebody's personal server, which is theirs and not the house's, so a row
+        that is not node-wide answers 404 here.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                availability:
+                  type: string
+                  enum: [all-owners, allowlist]
+                allowlist:
+                  type: array
+                  items:
+                    type: string
+                price:
+                  type: object
+                  nullable: true
+                  description: null makes it free again.
+                exposure:
+                  type: string
+                  enum: [gateway, flatten]
+                enabled:
+                  type: boolean
+                  description: false takes it away from everybody at once.
+      responses:
+        '200':
+          description: The updated policy
+        '403':
+          description: Not the operator.
+        '404':
+          description: No node-wide server with that id.
+    delete:
+      operationId: detachNodeMcpServer
+      summary: Remove a node-wide server
+      description: >
+        Operator only, in person. Everybody on this node loses those tools at once.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Removed
+        '403':
+          description: Not the operator.
+        '404':
+          description: No node-wide server with that id.
   /v1/mcp-servers/{id}:
     parameters:
       - name: id

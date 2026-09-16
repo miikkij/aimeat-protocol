@@ -24,18 +24,25 @@
  *   /v1/mcp over ordinary Streamable HTTP, so every line above still applies to it: the same
  *   guarded fetch, the same credential, the same timeout. What it adds is the federation
  *   relationship as the gate, which is the point of naming a node rather than typing its address.
+ *
+ *   A LOCAL PROCESS IS THE ONE THING HERE THAT IS NOT A NETWORK CALL, and its three conditions live
+ *   in stdio-policy.ts with the argument for each. This file only asks, at the line that spawns.
  * @structure guardedFetch · resolveWireAddress · buildTransport · MCP_CONNECT_TIMEOUT_MS
  * @usage const wire = await resolveWireAddress(storage, server);
  *   if (wire.ok) await client.connect(buildTransport(wire.server, credential));
  * @version-history
+ *   v1.2.0 — 2026-09-16 — Phase 7: `stdio`, behind the node's own policy and off by default.
  *   v1.1.0 — 2026-09-16 — Phase 6: the `aimeat` transport kind resolves through the federation
  *     peer list, gated on allowRouting, which is member and genesis only.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { Transport, FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { safeFetch } from '../../utils/url-validator.js';
+import { checkStdioPolicy } from './stdio-policy.js';
+import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { McpServerRecord, McpServerCredential } from '../../models/mcp-server-schemas.js';
 
@@ -131,24 +138,48 @@ export async function resolveWireAddress(
 /**
  * Build the transport for one server.
  *
- * Throws for `stdio`, which is a later phase: a stub that silently did nothing would be found by a
- * person wondering why their server never answers. It runs somebody else's code on this host and is
- * operator-only, allowlisted and off by default when it does arrive.
+ * A `stdio` record is the one that starts a PROGRAM rather than making a request, so it is checked
+ * against the node's own policy HERE, at the line that would spawn it. checkStdioPolicy is a pure
+ * function and could be called earlier for a nicer message; it is called here as well, and this is
+ * the call that matters, because a second code path that reached this line without asking would
+ * spawn. Refuse before you act, at the point of acting.
  *
- * Throws for `aimeat` too, and that one is a programming error rather than a missing feature:
+ * Throws for `aimeat`, and that one is a programming error rather than a missing feature:
  * resolveWireAddress turns a peer into an http address before anything reaches here, so a record
  * still naming a peer at this point means a caller skipped it.
  */
 export function buildTransport(
   server: McpServerRecord,
   credential: McpServerCredential | null,
+  config?: Pick<AimeatConfig, 'mcpStdioEnabled' | 'mcpStdioAllowedCommands'>,
 ): Transport {
   const t = server.transport;
 
   if (t.kind === 'stdio') {
-    throw new Error(
-      'This node cannot run a local MCP server process yet. Attach the server over https instead.',
-    );
+    // No config passed means nobody has answered the question, and an unanswered question about
+    // running a process is a no.
+    const verdict = config
+      ? checkStdioPolicy(config, t)
+      : {
+        ok: false as const,
+        code: 'STDIO_DISABLED' as const,
+        message: 'This node cannot run a local MCP server process.',
+      };
+    // The code rides on the error because this function is called from inside the pool's connect,
+    // and the chokepoint's catch is the only place that can turn it back into a refusal.
+    if (!verdict.ok) throw Object.assign(new Error(verdict.message), { code: verdict.code });
+
+    // The SDK spawns with an argument ARRAY and no shell, and its own default environment is a
+    // short allowlist rather than this process's whole environment. The record's env is merged
+    // over that, which is the operator's to decide since only they can write one.
+    return new StdioClientTransport({
+      command: t.command,
+      args: t.args,
+      ...(t.env ? { env: t.env } : {}),
+      // Never 'inherit': a child writing to this node's stderr would put whatever it likes into
+      // the operator's logs, in the node's own voice.
+      stderr: 'pipe',
+    });
   }
   if (t.kind === 'aimeat') {
     throw new Error(

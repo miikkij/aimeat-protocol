@@ -54,14 +54,19 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     name: z.string().describe("A short name used instead of the address, e.g. 'jira'."),
     url: z.string().optional().describe('The server address, https. Give this or peer.'),
     peer: z.string().optional().describe('The id of a peer AIMEAT node, instead of url.'),
+    group: z.string().optional().describe("Attach it to a GROUP instead of to this person."),
+    ws: z.string().optional().describe('With group, bind it to one workspace inside that group.'),
     title: z.string().optional().describe('What to call it on screen.'),
     description: z.string().optional().describe('What it is for, in a sentence.'),
     transport: z.enum(['http', 'sse']).optional().describe("'http' is the current transport and the default."),
     token: z.string().optional().describe('A token the server needs. Held encrypted on the node.'),
     header: z.string().optional().describe("Which header the token belongs in, when not a bearer."),
-  }, annotationsFor('aimeat_mcp_attach'), async ({ name, url, peer, title, description, transport, token, header }) => out(
-    await client.post('/v1/mcp-servers', {
+  }, annotationsFor('aimeat_mcp_attach'), async ({ name, url, peer, group, ws, title, description, transport, token, header }) => out(
+    // Two doors, one tool: a group server is the same act with a different owner.
+    await client.post(group ? '/v1/mcp-servers/organism' : '/v1/mcp-servers', {
       name,
+      ...(group ? { organism_id: group } : {}),
+      ...(ws ? { ws } : {}),
       ...(url ? { url } : {}),
       ...(peer ? { peer } : {}),
       ...(title ? { title } : {}),

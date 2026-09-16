@@ -143,10 +143,11 @@ import type { AiCapabilityConfig } from './config-types-ai.js';
 import type { SitePresenceConfig } from './config-site-presence.js';
 import type { SocialLoginConfig } from './config-types-social-login.js';
 import type { ConnectionsConfig } from './config-types-connections.js';
+import type { McpProxyConfig } from './config-types-mcp-proxy.js';
 import type { EnterpriseSsoConfig } from './config-types-enterprise-sso.js';
 import type { AccountSecurityConfig } from './config-types-account-security.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, EnterpriseSsoConfig, AccountSecurityConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig {
   port: number;
   baseUrl: string;
   /**

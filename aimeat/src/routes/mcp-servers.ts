@@ -169,8 +169,13 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
         storage, config,
         organismId,
         ...(typeof b.ws === 'string' && b.ws ? { ws: b.ws } : {}),
-        // The bare owner name, because that is what an organism's rolls are compared against.
-        callerName: resolveIdentity(req.auth!, config.nodeId).split('@')[0],
+        // The bare owner name, because that is what an organism's rolls are compared against, and
+        // `req.auth.owner` is the one field that carries the HUMAN's name on every principal:
+        // an owner session, an agent JWT, an app grant and an ecosystem token alike. Splitting
+        // resolveIdentity() instead gave an agent `claude#alice`, which is on nobody's roll, so
+        // every agent was refused from its own owner's group. Found by an E2E arm written because
+        // check:field-reach noticed this door had no agent twin.
+        callerName: req.auth!.owner as string,
         createdBy: callerPrincipal(req.auth!, config.nodeId),
         slug: name,
         title: typeof b.title === 'string' && b.title ? b.title : name,
@@ -222,9 +227,28 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       const b = (req.body ?? {}) as Record<string, unknown>;
       const name = typeof b.name === 'string' ? b.name : '';
       const url = typeof b.url === 'string' ? b.url : '';
-      if (!name || !url) {
+      // A LOCAL PROCESS, and this is the only door in the system that can write one. It stands
+      // behind requireOperatorPrincipal, which admits the operator IN PERSON and refuses everything
+      // acting in their name; what then runs is decided again by the node's own allowlist at the
+      // line that spawns. Neither the owner's attach door nor any agent tool can name a command.
+      const command = typeof b.command === 'string' ? b.command.trim() : '';
+      if (!name || (!url && !command)) {
         return res.status(400).json(error(
-          config.nodeId, 'BAD_REQUEST', 'A server needs a short name and an address.',
+          config.nodeId, 'BAD_REQUEST',
+          'A server needs a short name and either an address or a command to run.',
+        ));
+      }
+      if (command && !config.mcpStdioEnabled) {
+        // Refused here as well as at the spawn, so an operator learns it while they are still
+        // looking at the form rather than by attaching something that never answers.
+        // The setting goes in `details`, where a technical reader looks for it, and the sentence
+        // says what happened in words anybody can act on.
+        return res.status(400).json(error(
+          config.nodeId, 'STDIO_DISABLED',
+          'This node does not start programs of its own to answer with. Whoever runs it has to '
+          + 'allow that first, and then name which programs may run.',
+          400,
+          { settings: ['AIMEAT_MCP_STDIO_ENABLED', 'AIMEAT_MCP_STDIO_ALLOWED_COMMANDS'] },
         ));
       }
 
@@ -242,7 +266,14 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
         slug: name,
         title: typeof b.title === 'string' && b.title ? b.title : name,
         ...(typeof b.description === 'string' ? { description: b.description } : {}),
-        transport: { kind: b.transport === 'sse' ? 'sse' : 'http', url },
+        transport: command
+          ? {
+            kind: 'stdio',
+            command,
+            args: Array.isArray(b.args) ? b.args.filter((x): x is string => typeof x === 'string') : [],
+            ...(b.env && typeof b.env === 'object' ? { env: b.env as Record<string, string> } : {}),
+          }
+          : { kind: b.transport === 'sse' ? 'sse' : 'http', url },
         ...(credential ? { credential } : {}),
         ...(b.auth === 'oauth' ? { deferCredential: true as const } : {}),
         ...(b.availability === 'all-owners' || b.availability === 'allowlist'

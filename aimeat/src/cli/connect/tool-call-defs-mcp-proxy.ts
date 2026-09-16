@@ -55,8 +55,12 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
     {
         // → POST /v1/mcp-servers — probes the address before anything is called attached.
         name: 'aimeat_mcp_attach',
-        handler: ({ client }, input) => client.post('/v1/mcp-servers', {
+        handler: ({ client }, input) => client.post(
+            // Two doors, one tool: a group server is the same act with a different owner.
+            optionalString(input, 'group') ? '/v1/mcp-servers/organism' : '/v1/mcp-servers', {
             name: requiredString(input, 'name'),
+            ...(optionalString(input, 'group') ? { organism_id: optionalString(input, 'group') } : {}),
+            ...(optionalString(input, 'ws') ? { ws: optionalString(input, 'ws') } : {}),
             ...(optionalString(input, 'url') ? { url: optionalString(input, 'url') } : {}),
             ...(optionalString(input, 'peer') ? { peer: optionalString(input, 'peer') } : {}),
             ...(optionalString(input, 'title') ? { title: optionalString(input, 'title') } : {}),
