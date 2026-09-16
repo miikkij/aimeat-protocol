@@ -59,6 +59,7 @@ import { surfaceLayoutTools } from './definitions/surface-layout.js';
 import { appUiTools } from './definitions/app-ui.js';
 import { designbookTools } from './definitions/designbook.js';
 import { connectionTools } from './definitions/connections.js';
+import { mcpProxyTools } from './definitions/mcp-proxy.js';
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...agentMessagingTools,
@@ -84,6 +85,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...appUiTools,
     ...designbookTools,
     ...connectionTools,
+    ...mcpProxyTools,
 ];
 
 const definitionByName = new Map(CLI_FALLBACK_TOOL_DEFINITIONS.map(definition => [definition.name, definition]));

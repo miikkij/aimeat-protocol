@@ -79,6 +79,14 @@ export type AccountEventKind =
   // call is not.
   | 'app_tool_first_use'
   | 'app_tool_paid'
+  // Remote MCP servers
+  //
+  // Attaching or removing a server is news: it changes what every AI acting for this person can
+  // reach. A CALL through one is not, and has no kind on purpose — the same ruling as
+  // `app_tool_first_use` above, and for the same reason, since the per-call record already exists
+  // in UsageCall under the `mcp-remote` surface.
+  | 'mcp_server_connected'
+  | 'mcp_server_removed'
   // Money
   | 'checkout_completed'
   | 'checkout_cancelled'

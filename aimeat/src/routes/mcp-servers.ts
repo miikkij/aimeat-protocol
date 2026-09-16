@@ -1,0 +1,219 @@
+/**
+ * @file mcp-servers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description REST surface for the remote MCP servers this node connects OUT to.
+ *
+ *   NOTHING HERE RETURNS AN ENDPOINT OR A CREDENTIAL. `toPublicMcpServer()` is the only projection
+ *   any response uses. The URL is omitted for the same reason the credential is: a caller that
+ *   learns the address can call it directly and leave every gate in this system behind, and an app
+ *   holding `mcp:use` is meant to be able to USE somebody's Jira, not to reach it independently
+ *   with a token of its own choosing.
+ *
+ *   ABSENT AND NOT-YOURS ANSWER IDENTICALLY. Every lookup goes through requireUsableServer(), which
+ *   returns null for both, and the route answers one 404 body — otherwise the difference between
+ *   the two answers enumerates other people's servers.
+ *
+ *   THREE WORDS, AND THE SPLIT IS THE DESIGN. `mcp:read` is knowing what is attached, `mcp:use` is
+ *   spending it, `mcp:manage` is attaching another. An app granted only the first must not be able
+ *   to call a tool, and an agent holding "Full access" still cannot attach: `mcp:manage` is outside
+ *   every wildcard. The same three words gate the MCP tools, because a permission word is enforced
+ *   on every door or it does not exist.
+ * @structure mcpServersRouter(config, storage):
+ *   GET    /v1/mcp-servers                  -- the caller's own servers
+ *   POST   /v1/mcp-servers                  -- attach one (probes before it is called attached)
+ *   GET    /v1/mcp-servers/:id/tools        -- what it can do, cached unless ?refresh=1
+ *   POST   /v1/mcp-servers/:id/call         -- run one of its tools
+ *   PATCH  /v1/mcp-servers/:id              -- the editable fields, never the slug or the credential
+ *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
+ * @usage app.use(mcpServersRouter(config, storage));
+ * @version-history
+ *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
+ */
+
+import { Router } from 'express';
+import type { Request, Response } from 'express';
+import type { AimeatConfig } from '../config.js';
+import type { Storage } from '../storage/interface.js';
+import { success, error } from '../middleware/envelope.js';
+import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.js';
+import { resolveIdentity, ownerGhiiOf, callerPrincipal } from '../utils/gaii.js';
+import { toPublicMcpServer, type McpTransport, type McpServerCredential } from '../models/mcp-server-schemas.js';
+import {
+  attachMcpServer, listUsableServers, requireUsableServer, detachMcpServer,
+} from '../services/mcp-client/registry.js';
+import { callRemoteTool, listRemoteTools } from '../services/mcp-client/invoke.js';
+import { recordAccountEvent } from '../services/account-events.js';
+import { mcpClientPool } from '../services/mcp-client/pool.js';
+
+export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router {
+  const router = Router();
+
+  /** The human this call is for. An agent's servers are its owner's — see src/mcp/mcp-proxy.ts. */
+  const ownerOf = (req: Request): string =>
+    ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
+
+  /** Absent and not-yours, in one body. */
+  const notFound = (res: Response): Response =>
+    res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such MCP server.'));
+
+  // ── Reading ─────────────────────────────────────────────────────────────────────────────────
+
+  // read OR use, because an app granted only `mcp:use` still has to learn the names it may call.
+  router.get('/v1/mcp-servers', requireAuth(), requireAnyScope('mcp:read', 'mcp:use'),
+    async (req: Request, res: Response) => {
+      res.json(success(config.nodeId, { servers: await listUsableServers(storage, ownerOf(req)) }));
+    });
+
+  router.get('/v1/mcp-servers/:id/tools', requireAuth(), requireAnyScope('mcp:read', 'mcp:use'),
+    async (req: Request, res: Response) => {
+      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
+      if (!server) return notFound(res);
+
+      // The cache is the normal answer: asking the far side on every read would make this route as
+      // slow as the slowest thing anyone attached.
+      if (req.query.refresh !== '1' && server.toolCache.length) {
+        return res.json(success(config.nodeId, {
+          server: server.slug, tools: server.toolCache, listed_at: server.lastListedAt, cached: true,
+        }));
+      }
+      const listed = await listRemoteTools(storage, config, server);
+      if (!listed.ok) return res.status(502).json(error(config.nodeId, listed.code, listed.message));
+      return res.json(success(config.nodeId, {
+        server: server.slug, tools: listed.tools, listed_at: new Date().toISOString(), cached: false,
+      }));
+    });
+
+  // ── Calling ─────────────────────────────────────────────────────────────────────────────────
+
+  router.post('/v1/mcp-servers/:id/call', requireAuth(), requireScope('mcp:use'),
+    async (req: Request, res: Response) => {
+      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
+      if (!server) return notFound(res);
+
+      const { tool, arguments: args } = (req.body ?? {}) as {
+        tool?: unknown; arguments?: unknown;
+      };
+      if (typeof tool !== 'string' || !tool) {
+        return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'Name the tool to call.'));
+      }
+
+      const result = await callRemoteTool({
+        storage, config, server, tool,
+        args: (args && typeof args === 'object' ? args : {}) as Record<string, unknown>,
+        // The EXACT principal, for attribution. Authorisation happened above, against the owner.
+        caller: callerPrincipal(req.auth!, config.nodeId),
+        callerKind: req.auth!.roles.includes('owner') ? 'owner' : 'agent',
+      });
+
+      if (!result.ok) {
+        // 502 rather than 500: the far side is what failed, or its credential did. A 500 would read
+        // as this node being broken and send somebody to the wrong logs.
+        return res.status(502).json(error(config.nodeId, result.code, result.message));
+      }
+      return res.json(success(config.nodeId, {
+        content: result.content,
+        ...(result.structuredContent !== undefined ? { structured_content: result.structuredContent } : {}),
+        // The TOOL said no. Kept distinct from the proxy failing, which is the 502 above.
+        is_error: result.isError,
+      }));
+    });
+
+  // ── Attaching, which is a human act ─────────────────────────────────────────────────────────
+
+  router.post('/v1/mcp-servers', requireAuth(), requireScope('mcp:manage'),
+    async (req: Request, res: Response) => {
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const name = typeof b.name === 'string' ? b.name : '';
+      const url = typeof b.url === 'string' ? b.url : '';
+      if (!name || !url) {
+        return res.status(400).json(error(
+          config.nodeId, 'BAD_REQUEST', 'A server needs a short name and an address.',
+        ));
+      }
+
+      const transport: McpTransport = {
+        kind: b.transport === 'sse' ? 'sse' : 'http',
+        url,
+      };
+      const credential: McpServerCredential | undefined = typeof b.token === 'string' && b.token
+        ? {
+          shape: 'static',
+          accessToken: b.token,
+          ...(typeof b.header === 'string' && b.header ? { headerName: b.header } : {}),
+        }
+        : undefined;
+
+      const result = await attachMcpServer({
+        storage, config,
+        ownerGhii: ownerOf(req),
+        createdBy: callerPrincipal(req.auth!, config.nodeId),
+        slug: name,
+        title: typeof b.title === 'string' && b.title ? b.title : name,
+        ...(typeof b.description === 'string' ? { description: b.description } : {}),
+        transport,
+        ...(credential ? { credential } : {}),
+      });
+
+      if (!result.ok) {
+        // 409 for a name already taken, 503 for a node that cannot hold a secret, 502 for a server
+        // that would not answer, 400 for a name this node will not accept. Four different things a
+        // person does four different things about.
+        const status = result.code === 'SLUG_TAKEN' ? 409
+          : result.code === 'NO_ENCRYPTION_KEY' ? 503
+            : result.code === 'UNREACHABLE' ? 502 : 400;
+        return res.status(status).json(error(config.nodeId, result.code, result.message));
+      }
+      return res.status(201).json(success(config.nodeId, {
+        server: result.server, tools: result.tools,
+      }));
+    });
+
+  router.patch('/v1/mcp-servers/:id', requireAuth(), requireScope('mcp:manage'),
+    async (req: Request, res: Response) => {
+      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
+      if (!server) return notFound(res);
+
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      // Named one by one rather than spread: the slug and the credential are NOT editable here, and
+      // a spread would make that a matter of what the client happened to send.
+      const patch: Parameters<Storage['updateMcpServer']>[1] = {
+        ...(typeof b.title === 'string' ? { title: b.title } : {}),
+        ...(typeof b.description === 'string' ? { description: b.description } : {}),
+        ...(b.exposure === 'gateway' || b.exposure === 'flatten' ? { exposure: b.exposure } : {}),
+        ...(typeof b.enabled === 'boolean' ? { enabled: b.enabled } : {}),
+      };
+      await storage.updateMcpServer(server.id, patch);
+
+      // Switching a server off has to STOP it, not merely mark it. A pooled client would keep
+      // answering through it until the idle sweeper noticed, and "I turned it off and it kept
+      // working" is the worst possible answer to somebody cutting an integration.
+      if (patch.enabled === false) await mcpClientPool.invalidate(server.id);
+
+      const updated = await storage.getMcpServer(server.id);
+      return res.json(success(config.nodeId, { server: toPublicMcpServer(updated ?? server) }));
+    });
+
+  router.delete('/v1/mcp-servers/:id', requireAuth(), requireScope('mcp:manage'),
+    async (req: Request, res: Response) => {
+      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
+      if (!server) return notFound(res);
+
+      await detachMcpServer(storage, server);
+      await recordAccountEvent(storage, {
+        ownerGhii: ownerOf(req),
+        kind: 'mcp_server_removed',
+        actorGaii: callerPrincipal(req.auth!, config.nodeId),
+        subject: server.slug,
+      }, config);
+
+      return res.json(success(config.nodeId, {
+        removed: server.slug,
+        // Worth saying, because it is the thing a person cutting access actually cares about.
+        note: 'The credential stored here is gone. A token you created at the far side is still '
+          + 'yours to revoke there.',
+      }));
+    });
+
+  return router;
+}

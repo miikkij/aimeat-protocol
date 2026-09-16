@@ -91,6 +91,7 @@ import { registerAgentManagementTools } from './agent-management.js';
 import { registerInvokeTool } from './invoke.js';
 import { registerAgentCrewTools } from './agent-crew.js';
 import { registerConnectionTools } from './connections.js';
+import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerAccessTools } from './access.js';
 import { registerSecretTools } from './secrets.js';
 
@@ -128,6 +129,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerOrganismsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerWorkspaceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerConnectionTools(mcp, storage, config, agentGaii, scopes);
+    registerMcpProxyTools(mcp, storage, config, agentGaii);
     registerKnowledgeTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerAppdevPitfallTools(mcp, storage, config, agentGaii, emitResourceUpdated, scopes);
     registerAppdevResearchTools(mcp, storage, config, agentGaii);

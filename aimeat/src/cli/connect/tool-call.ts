@@ -58,6 +58,7 @@ import { aiJobTools } from './tool-call-defs-ai-jobs.js';
 import { appDraftEditTools } from './tool-call-defs-app-draft-edit.js';
 import { exchangeTools } from './tool-call-defs-exchange.js';
 import { connectionCliTools } from './tool-call-defs-connections.js';
+import { mcpProxyCliTools } from './tool-call-defs-mcp-proxy.js';
 import { adminCliTools } from './tool-call-defs-admin.js';
 import { withProvenanceCarrying } from './ai-provenance-carry.js';
 
@@ -83,6 +84,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...appDraftEditTools,
     ...exchangeTools,
     ...connectionCliTools,
+    ...mcpProxyCliTools,
     ...adminCliTools,
 ].map(withProvenanceCarrying).map(withDeclaredInputOnly);
 
