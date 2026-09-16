@@ -2,13 +2,16 @@
  * @file test/unit/mcp-node-registry.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The operator's registry: who a node-wide server admits, and what a call costs.
+ * @description The operator's registry: who a node-wide server admits, and what a price may be.
  *
  *   Two things here would be invisible if they were wrong. A server attached but not yet offered
  *   must admit NOBODY — the failure would be a whole node silently given an integration on the
- *   strength of a half-finished setup. And a call that never happened must not be charged, which is
- *   the one way a billing bug reaches somebody's balance rather than a log.
+ *   strength of a half-finished setup. And no call may ever take morsels from anybody, because
+ *   morsels are a pacer and buy nothing; that failure reaches a balance rather than a log.
  * @version-history
+ *   v1.1.0 — 2026-09-16 — Morsels are not money. The four tests that asserted a morsel charge, its
+ *     refund and the INSUFFICIENT refusal now assert that no balance ever moves, and a new block
+ *     holds the one check every door uses to refuse a morsel price.
  *   v1.0.0 — 2026-09-16 — Phase 4 of the MCP proxy.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -18,7 +21,7 @@ import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
+import { normalizeMcpPrice, type McpServerRecord } from '../../src/models/mcp-server-schemas.js';
 import {
   nodeWideAdmits, requireUsableServer, listUsableServers,
 } from '../../src/services/mcp-client/registry.js';
@@ -92,11 +95,10 @@ function nodeServer(over: Partial<McpServerRecord> = {}): McpServerRecord {
 }
 
 /**
- * An owner with a balance, because a priced call needs somebody to charge.
+ * An owner with a morsel balance, so a test can prove that no call ever touches it.
  *
- * The balance lives on the GHII record rather than on the owner, which is the whole point of the
- * morsel design: debitBalance resolves every agent to the human it acts for, and the human is the
- * GHII.
+ * The balance lives on the GHII record. Morsels pace how much gets used; nothing on this path may
+ * charge them as a price, and the assertions below are that the number never moves.
  */
 async function ownerWith(storage: SqliteStorage, name: string, morsels: number): Promise<void> {
   const ghii = `${name}@test-node-001`;
@@ -185,12 +187,17 @@ describe('reaching one', () => {
   });
 });
 
-describe('what a call costs', () => {
-  const priced = (perCall: number) => nodeServer({ price: { unit: 'morsels', perCall } });
+describe('a call never takes morsels', () => {
+  /**
+   * A row as phase 4 could store it, before the ruling. The type no longer allows it, and storage
+   * still may hold it, which is exactly why the call path has to be tested against it.
+   */
+  const legacyMorselPriced = (perCall: number) =>
+    nodeServer({ price: { unit: 'morsels', perCall } as unknown as McpServerRecord['price'] });
 
-  it("charges the caller's owner per call", async () => {
+  it('leaves the balance exactly where it was, on a row still priced in morsels', async () => {
     const storage = new SqliteStorage(':memory:');
-    const s = priced(5);
+    const s = legacyMorselPriced(5);
     await storage.createMcpServer(s);
     await ownerWith(storage, 'alice', 100);
 
@@ -198,77 +205,43 @@ describe('what a call costs', () => {
     const r = await callRemoteTool({
       storage, config, server: s, tool: 'quote', args: { symbol: 'AAPL' }, caller: ALICE,
     });
+    // Morsels are a pacer and buy nothing. The row reads as FREE rather than as an error, because
+    // refusing every call on it would punish the owners for the operator's old setting.
     expect(r.ok).toBe(true);
-    expect(await balanceOf(storage, ALICE)).toBe(before - 5);
-  });
-
-  it('GIVES IT BACK when the call never reached anybody', async () => {
-    const storage = new SqliteStorage(':memory:');
-    // A port nothing listens on: the transport fails, so the far side did no work and there is
-    // nothing to pay for. This is the one way a billing bug reaches a balance rather than a log.
-    const s = nodeServer({
-      price: { unit: 'morsels', perCall: 5 },
-      transport: { kind: 'http', url: 'http://127.0.0.1:40685/mcp' },
-    });
-    await storage.createMcpServer(s);
-    await ownerWith(storage, 'alice', 100);
-
-    const before = await balanceOf(storage, ALICE);
-    const r = await callRemoteTool({
-      storage, config, server: s, tool: 'quote', args: { symbol: 'X' }, caller: ALICE,
-    });
-    expect(r.ok).toBe(false);
     expect(await balanceOf(storage, ALICE)).toBe(before);
   });
 
-  it('DOES charge for a tool that ran and failed', async () => {
+  it('answers an owner with NO morsels at all, which a morsel price used to refuse', async () => {
     const storage = new SqliteStorage(':memory:');
-    const s = priced(5);
-    await storage.createMcpServer(s);
-    await ownerWith(storage, 'alice', 100);
-
-    const before = await balanceOf(storage, ALICE);
-    const r = await callRemoteTool({
-      storage, config, server: s, tool: 'explodes', args: {}, caller: ALICE,
-    });
-    // The proxy WORKED and the far side did the work; the tool is what said no. Refunding here
-    // would mean the operator carries the cost of every failed query somebody sends their paid
-    // server, which is not what "the call never happened" means.
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.isError).toBe(true);
-    expect(await balanceOf(storage, ALICE)).toBe(before - 5);
-  });
-
-  it('refuses when the balance will not cover it', async () => {
-    const storage = new SqliteStorage(':memory:');
-    const s = priced(1_000_000);
+    const s = legacyMorselPriced(1_000_000);
     await storage.createMcpServer(s);
     await ownerWith(storage, 'alice', 0);
 
     const r = await callRemoteTool({
       storage, config, server: s, tool: 'quote', args: { symbol: 'AAPL' }, caller: ALICE,
     });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.code).toBe('INSUFFICIENT');
+    // Phase 4 answered INSUFFICIENT here. A person with no morsels is not a person who cannot pay.
+    expect(r.ok).toBe(true);
+    expect(await balanceOf(storage, ALICE)).toBe(0);
   });
 
-  it('refuses a money price by name rather than charging nothing quietly', async () => {
+  it('refuses a money price by name, and does not point the operator at morsels', async () => {
     const storage = new SqliteStorage(':memory:');
     const s = nodeServer({ price: { unit: 'money', perCall: 1_000_000, currency: 'EUR' } });
     await storage.createMcpServer(s);
     await ownerWith(storage, 'alice', 100);
 
+    const before = await balanceOf(storage, ALICE);
     const r = await callRemoteTool({
       storage, config, server: s, tool: 'quote', args: { symbol: 'AAPL' }, caller: ALICE,
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
-    // An operator who priced in money learns why immediately, instead of discovering later that
-    // nobody was ever charged.
+    // An operator who priced in money learns why at once, instead of discovering later that nobody
+    // was ever charged. The phase 4 message told them to "price it in morsels instead".
     expect(r.code).toBe('PRICE_UNSUPPORTED');
-    expect(r.message).toContain('morsels');
+    expect(r.message.toLowerCase()).not.toContain('morsel');
+    expect(await balanceOf(storage, ALICE)).toBe(before);
   });
 
   it('charges nothing for an unpriced server', async () => {
@@ -290,7 +263,7 @@ describe('what a call costs', () => {
     // A price on an owner's own row is meaningless — a person does not bill themselves — and the
     // charge path reads ownership rather than the price field for exactly that reason.
     const mine = nodeServer({
-      ownership: 'owner', ownerGhii: ALICE, price: { unit: 'morsels', perCall: 99 },
+      ownership: 'owner', ownerGhii: ALICE, price: { unit: 'money', perCall: 99, currency: 'EUR' },
     });
     await storage.createMcpServer(mine);
     await ownerWith(storage, 'alice', 100);
@@ -301,5 +274,40 @@ describe('what a call costs', () => {
     });
     expect(r.ok).toBe(true);
     expect(await balanceOf(storage, ALICE)).toBe(before);
+  });
+});
+
+describe('writing a price, the one check every door uses', () => {
+  it('refuses a morsel price, and says why in words', () => {
+    const r = normalizeMcpPrice({ unit: 'morsels', perCall: 3 });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    // Refused rather than quietly dropped: an operator who meant it learns at once, instead of
+    // finding later that the server was free all along.
+    expect(r.message).toMatch(/not money/);
+  });
+
+  it('accepts money, with or without the unit spelled out', () => {
+    expect(normalizeMcpPrice({ unit: 'money', perCall: 250_000, currency: 'EUR' }))
+      .toEqual({ ok: true, price: { unit: 'money', perCall: 250_000, currency: 'EUR' } });
+    // The agent-facing tool has no unit field at all, so a price arrives without one.
+    expect(normalizeMcpPrice({ perCall: 250_000, currency: 'USD' }))
+      .toEqual({ ok: true, price: { unit: 'money', perCall: 250_000, currency: 'USD' } });
+  });
+
+  it('reads nothing, null and zero as free', () => {
+    expect(normalizeMcpPrice(undefined)).toEqual({ ok: true, price: null });
+    expect(normalizeMcpPrice(null)).toEqual({ ok: true, price: null });
+    // A price of zero stored as a price would send every call through a meter to charge nothing.
+    expect(normalizeMcpPrice({ unit: 'money', perCall: 0 })).toEqual({ ok: true, price: null });
+  });
+
+  it('refuses what is not a price at all', () => {
+    for (const bad of [
+      'five euros', { unit: 'gold', perCall: 1 }, { unit: 'money', perCall: -1 },
+      { unit: 'money', perCall: 'lots' }, { unit: 'money', perCall: 1, currency: 'euro' },
+    ]) {
+      expect(normalizeMcpPrice(bad).ok, JSON.stringify(bad)).toBe(false);
+    }
   });
 });

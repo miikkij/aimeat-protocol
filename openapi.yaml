@@ -46919,8 +46919,10 @@ paths:
         Operator only, and the operator IN PERSON: attaching a server to the whole node, deciding who
         reaches it and pricing it are three acts nothing may perform in an operator's name, so there
         is deliberately no agent twin for this door. Attaching is not OFFERING, so set availability
-        or it is reachable by nobody. A price is charged per call to the CALLER, in morsels off their
-        own balance or in money.
+        or it is reachable by nobody. A price is in money, per call, paid by the CALLER. Morsels are
+        never a price: they pace how much gets used and buy nothing, so a morsel price is refused with
+        BAD_PRICE. A proxied call cannot take payment yet, so a priced server refuses its calls with
+        PRICE_UNSUPPORTED until it can.
         Passing command attaches a LOCAL PROCESS instead of an address, and this is the only door in
         the system that can write one. It is refused unless AIMEAT_MCP_STDIO_ENABLED is on, and what
         may then run is decided again by AIMEAT_MCP_STDIO_ALLOWED_COMMANDS, compared whole. The
@@ -46981,8 +46983,18 @@ paths:
                 price:
                   type: object
                   description: >
-                    What one call costs: unit (morsels or money), perCall, and currency for money,
-                    as ISO 4217.
+                    What one call costs, in money only. perCall is whole micro-units (1000000 is one
+                    unit of the currency) and currency is ISO 4217, such as EUR. perCall 0 means free.
+                    unit may be omitted or given as money; morsels is refused with BAD_PRICE.
+                  properties:
+                    unit:
+                      type: string
+                      enum: [money]
+                    perCall:
+                      type: integer
+                      minimum: 0
+                    currency:
+                      type: string
       responses:
         '201':
           description: Attached, with a note when nobody may use it yet
@@ -47027,7 +47039,9 @@ paths:
                 price:
                   type: object
                   nullable: true
-                  description: null makes it free again.
+                  description: >
+                    In money only, the same shape as on attach. null or a perCall of 0 makes it free
+                    again. A morsel price is refused with BAD_PRICE.
                 exposure:
                   type: string
                   enum: [gateway, flatten]

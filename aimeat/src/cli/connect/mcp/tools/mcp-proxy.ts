@@ -111,10 +111,9 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     availability: z.enum(['all-owners', 'allowlist']).optional(),
     allowlist: z.array(z.string()).optional(),
     price: z.object({
-      unit: z.enum(['morsels', 'money']),
       perCall: z.number(),
       currency: z.string().optional(),
-    }).optional(),
+    }).optional().describe('In money only: perCall in micro-units and an ISO 4217 currency. 0 makes it free.'),
     exposure: z.enum(['gateway', 'flatten']).optional(),
     enabled: z.boolean().optional(),
   }, annotationsFor('aimeat_mcp_registry_set'), async ({ server, availability, allowlist, price, exposure, enabled }) => {
@@ -129,7 +128,8 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     return out(await client.patch(`/v1/mcp-servers/node/${encodeURIComponent(row.id)}`, {
       ...(availability ? { availability } : {}),
       ...(allowlist ? { allowlist } : {}),
-      ...(price ? { price: price.perCall > 0 ? price : null } : {}),
+      // Forwarded as sent: the route reads it through normalizeMcpPrice, so this door decides nothing.
+      ...(price ? { price: { unit: 'money', ...price } } : {}),
       ...(exposure ? { exposure } : {}),
       ...(enabled !== undefined ? { enabled } : {}),
     }));

@@ -122,7 +122,10 @@ export function createRemoteMcpSource(storage: Storage, config: AimeatConfig): D
           // expect: another party's uptime, another party's rules.
           server.ownership === 'node' ? 'offered-by-this-node'
             : server.ownership === 'organism' ? 'offered-by-a-group' : 'attached-by-you',
-          ...(server.ownership === 'node' && server.price ? ['costs-morsels'] : []),
+          // Money only: a stored morsel price predates the ruling that morsels buy nothing, and the
+          // call path reads it as free, so the directory must not say it costs anything either.
+          ...(server.ownership === 'node' && (server.price?.unit as string) === 'money'
+            && (server.price?.perCall ?? 0) > 0 ? ['costs-money'] : []),
         ],
         // Never public. The entry exists only inside the reach that produced it.
         visibility: 'private',

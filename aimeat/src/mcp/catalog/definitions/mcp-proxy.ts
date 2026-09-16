@@ -97,14 +97,14 @@ export const mcpProxyTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_mcp_registry_set',
-        description: "Decide who may use one of this node's own MCP servers, what a call costs them, how its tools are listed, and whether it is on at all. Operator only. Availability all-owners means everyone with an account here; allowlist means only the owners named, and an EMPTY allowlist means nobody \u2014 which is the safe reading rather than a bug. A price is charged per call to the CALLER, in morsels off their own balance or in money. Switching it off takes it away from everybody at once, so say what will stop working before you do it.",
+        description: "Decide who may use one of this node's own MCP servers, what a call costs them, how its tools are listed, and whether it is on at all. Operator only. Availability all-owners means everyone with an account here; allowlist means only the owners named, and an EMPTY allowlist means nobody \u2014 which is the safe reading rather than a bug. A price is in money, per call, paid by the CALLER, and a proxied call cannot take payment yet, so a priced server refuses its calls by name until it can: leave it free for now. Never price a server in morsels: morsels pace how much gets used and buy nothing. Switching it off takes it away from everybody at once, so say what will stop working before you do it.",
         caller: 'operator',
         visibility: agentEverywhere,
         input: {
             server: { type: 'string', required: true, description: "Which server on this node's registry, by its short name." },
             availability: { type: 'string', description: "'all-owners' or 'allowlist'." },
             allowlist: { type: 'array', description: 'The owners who may use it. An empty list means nobody.' },
-            price: { type: 'object', description: "What one call costs: {unit: 'morsels'|'money', perCall, currency}. currency is ISO 4217 and only for money. perCall 0 makes it free again." },
+            price: { type: 'object', description: "What one call costs, in money only: {perCall, currency}. perCall is whole micro-units (1000000 is one unit of the currency) and currency is ISO 4217, such as EUR. perCall 0 makes it free again." },
             exposure: { type: 'string', description: "How its tools are reached: 'gateway' through aimeat_mcp_call, or 'flatten' listed one by one." },
             enabled: { type: 'boolean', description: 'false takes it away from everybody at once.' },
         },

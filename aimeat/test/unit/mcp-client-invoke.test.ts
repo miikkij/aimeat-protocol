@@ -22,7 +22,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
-import { callRemoteTool, listRemoteTools, toolCacheHash } from '../../src/services/mcp-client/invoke.js';
+import {
+  callRemoteTool, listRemoteTools, toolCacheHash, statusForRemoteRefusal,
+} from '../../src/services/mcp-client/invoke.js';
 import { sealMcpCredential } from '../../src/services/mcp-client/credential.js';
 import { mcpClientPool } from '../../src/services/mcp-client/pool.js';
 
@@ -263,6 +265,23 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     // which is a different sentence for the person reading it. mcp-peer-transport.test.ts holds
     // the rest of the peering rules.
     expect(r.code).toBe('PEER_UNKNOWN');
+  });
+});
+
+describe('the status a refusal answers with', () => {
+  it('says who has to act, and blames the far side only when it failed', () => {
+    // Every door answered 502 for every refusal until 2026-09-16, which told an agent refused by its
+    // own owner's grant that the server was broken.
+    expect(statusForRemoteRefusal('NOT_GRANTED')).toBe(403);
+    expect(statusForRemoteRefusal('SERVER_DISABLED')).toBe(403);
+    expect(statusForRemoteRefusal('PRICE_UNSUPPORTED')).toBe(402);
+    for (const c of ['NO_ENCRYPTION_KEY', 'CREDENTIAL_UNREADABLE', 'TRANSPORT_UNSUPPORTED',
+      'STDIO_DISABLED', 'STDIO_NOT_ALLOWED', 'PEER_UNKNOWN', 'PEER_NOT_ROUTABLE'] as const) {
+      expect(statusForRemoteRefusal(c), c).toBe(503);
+    }
+    for (const c of ['UNREACHABLE', 'UPSTREAM_UNAUTHORIZED', 'TOOL_FAILED'] as const) {
+      expect(statusForRemoteRefusal(c), c).toBe(502);
+    }
   });
 });
 
