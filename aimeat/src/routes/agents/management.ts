@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 -- 2026-09-16 -- POST /v1/agents/:gaii/export refuses a federated session. It compared the
+ *     owner NAME, so a visitor could export the agents of the local account with the same name.
  *   v1.7.0 -- 2026-09-09 -- Five guards that could not fire are gone: four cross-owner 403s that sat
  *     behind getAgentsByOwner (another owner's agent is a 404 from the lookup itself) and the
  *     self-delete refusal, which the registeredBy rule already covers. A branch that cannot run
@@ -30,7 +32,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
-import { requireAuth, requireRole, requireRoleOrScope } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope, requireLocalSession } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { calculateTrustScore } from '../../services/trust.js';
@@ -43,7 +45,7 @@ import { logger } from '../../utils/logger.js';
 
 export function registerManagementRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // POST /v1/agents/:gaii/export — Export agent data for portability (owner auth)
-  router.post('/v1/agents/:gaii/export', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/agents/:gaii/export', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const gaii = decodeURIComponent(req.params.gaii as string);
     const agent = await storage.getAgent(gaii);
     if (!agent) {

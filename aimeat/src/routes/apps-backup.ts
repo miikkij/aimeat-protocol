@@ -13,6 +13,8 @@
  *   the caller's own account regardless of the backup's source owner.
  * @structure appsBackupRouter(config, storage) — mount BEFORE appsRouter.
  * @version-history
+ *   v1.0.2 — 2026-09-16 — The three doors refuse a federated session: the owner bucket came from the
+ *     owner NAME, which a visitor shares with the local account of the same name.
  *   v1.0.1 — 2026-09-12 — The owner bucket comes from resolveGhii(storage, owner, config); the
  *     `${owner}@${config.nodeId}` this composed by hand is what the helper composes now.
  *     wish-identity-gate-sees-resolveghii.
@@ -22,7 +24,7 @@ import { Router, raw } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
@@ -83,7 +85,7 @@ export function appsBackupRouter(config: AimeatConfig, storage: Storage): Router
   };
 
   // ── GET /v1/apps/backup — streamed ZIP of the caller's whole catalog ──
-  router.get('/v1/apps/backup', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.get('/v1/apps/backup', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const { owner, ownerGhii } = await canonicalOwner(req);
     const exportedAt = new Date().toISOString();
     const date = exportedAt.slice(0, 10);
@@ -106,7 +108,7 @@ export function appsBackupRouter(config: AimeatConfig, storage: Storage): Router
   });
 
   // ── POST /v1/apps/backup/inspect — parse + report, write nothing ──
-  router.post('/v1/apps/backup/inspect', requireAuth(), requireRole('owner'), zipBody, async (req, res) => {
+  router.post('/v1/apps/backup/inspect', requireAuth(), requireLocalSession(), requireRole('owner'), zipBody, async (req, res) => {
     const buf = readZipBody(req);
     if (!buf) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -132,7 +134,7 @@ export function appsBackupRouter(config: AimeatConfig, storage: Storage): Router
   });
 
   // ── POST /v1/apps/backup/restore — selective restore ──
-  router.post('/v1/apps/backup/restore', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/apps/backup/restore', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
     const body = (req.body ?? {}) as {
       backup_token?: string;
       zip_base64?: string;
