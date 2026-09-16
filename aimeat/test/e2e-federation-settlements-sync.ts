@@ -44,6 +44,7 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-federation-settlements-sync.ts
  *   E2E_STACKS=1 adds the stack to every failure, for the ones that come from inside the node.
  * @version-history
+ *   v1.3.0 — 2026-09-16 — A multi-hop relay carries no Authorization header to the relaying peer.
  *   v1.2.0 — 2026-09-09 — The relay-share note reads GAP-001 instead of pinning a loop that is gone.
  *   v1.1.0 — 2026-09-08 — The debounce test asserts the flush drains its own enqueues (fixed the
  *     same day) instead of pinning the race.
@@ -477,6 +478,11 @@ async function run(): Promise<void> {
         assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
         assert(body.data.routed_via === FAKE_ID, `relayed via the peer that answers: ${JSON.stringify(body.data)}`);
         assert(body.data.relay_path.includes(A_ID) && body.data.relay_path.includes(FAKE_ID), `relay path: ${JSON.stringify(body.data.relay_path)}`);
+        // THE LEAK: the relay forwarded the caller's own token to every peer it tried. The token is
+        // valid only on this node, so a relaying peer could replay it here.
+        const relayed = seen.filter(s => s.path === '/v1/federation/route').pop();
+        assert(!!relayed, 'the relaying peer received the hop');
+        assert(!relayed!.authorization, `the caller's token reached the relaying peer: ${String(relayed!.authorization).slice(0, 20)}…`);
     });
 
     await test('…and with every peer already in the relay path there is no route left', async () => {

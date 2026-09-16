@@ -29,6 +29,7 @@
  *   const fake = await startFakePeer();
  *   await addPeer(A, 'aimeat-fake-001', fake.url, peerPublicKey);
  * @version-history
+ *   v1.1.0 — 2026-09-16 — The fake peer records the Authorization header it received.
  *   v1.0.0 — 2026-09-08 — Extracted from test/e2e-federation-settlements-sync.ts.
  */
 
@@ -167,7 +168,7 @@ export const modes = {
 };
 
 /** Every request the fake peer received, so an outbound body can be held to what was claimed. */
-export const seen: { path: string; method: string; body: any }[] = [];
+export const seen: { path: string; method: string; body: any; authorization?: string }[] = [];
 
 function readBody(req: http.IncomingMessage): Promise<string> {
     return new Promise(resolve => {
@@ -195,7 +196,7 @@ export function startFakePeer(): Promise<{ server: Server; url: string }> {
             const raw = await readBody(req);
             let parsed: unknown;
             try { parsed = raw ? JSON.parse(raw) : null; } catch { parsed = { _unparsed: raw }; }
-            seen.push({ path, method: req.method ?? '', body: parsed });
+            seen.push({ path, method: req.method ?? '', body: parsed, authorization: req.headers.authorization });
 
             if (path === '/v1/federation/settle') {
                 if (modes.settle === 'fail') { send(res, 500, { ok: false, error: { code: 'PEER_BROKEN' } }); return; }

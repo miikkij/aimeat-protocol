@@ -5,6 +5,8 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-16 — The multi-hop relay no longer forwards the caller's Authorization header to
+ *     the peers it tries. The token is valid only on this node, so any relaying peer could replay it.
  *   v1.1.0 — 2026-09-03 — Every outbound relay carries a SIGNED relay claim (services/relay-claim.ts)
  *     so the receiving node can refuse a relay it does not want. Until now `allowRouting` was read
  *     only here, on the sender: Stage B measured that demoting peer B on node A did not stop B
@@ -197,7 +199,11 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': req.headers.authorization ?? '',
+                        // NO Authorization. The caller's token was forwarded here, to every peer
+                        // this loop tries. A token is signed with this node's key and means nothing
+                        // on the peer; it means everything back on this node, so any relaying peer
+                        // could replay it against us until it expired. The signed claim below is
+                        // what tells the peer who sent the relay, as on the direct branch above.
                         'X-Forwarded-From': config.nodeId,
                         'X-Relay-Hops': String(hops - 1),
                         'X-Relay-Path': relayPath,
