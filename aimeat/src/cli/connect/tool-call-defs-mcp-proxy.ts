@@ -64,6 +64,19 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
         }),
     },
     {
+        // → PATCH /v1/mcp-servers/:id — the editable fields. Not the slug and not the
+        //   credential: the slug is what every grant names, and a new token means reconnecting.
+        name: 'aimeat_mcp_update',
+        handler: ({ client }, input) => client.patch(
+            serverPath(requiredString(input, 'server')),
+            {
+                ...(optionalBoolean(input, 'enabled') !== undefined ? { enabled: optionalBoolean(input, 'enabled') } : {}),
+                ...(optionalString(input, 'title') ? { title: optionalString(input, 'title') } : {}),
+                ...(optionalString(input, 'description') ? { description: optionalString(input, 'description') } : {}),
+            },
+        ),
+    },
+    {
         // → DELETE /v1/mcp-servers/:id — the stored credential goes with it.
         name: 'aimeat_mcp_detach',
         handler: ({ client }, input) => client.delete(serverPath(requiredString(input, 'server'))),

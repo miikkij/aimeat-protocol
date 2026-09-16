@@ -41,9 +41,10 @@ import { descriptionFor } from './catalog/shape.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import {
   attachMcpServer, listUsableServers, requireUsableServer, detachMcpServer,
+  updateMcpServerSettings,
 } from '../services/mcp-client/registry.js';
 import { callRemoteTool, listRemoteTools } from '../services/mcp-client/invoke.js';
-import type { McpTransport, McpServerCredential } from '../models/mcp-server-schemas.js';
+import { toPublicMcpServer, type McpTransport, type McpServerCredential } from '../models/mcp-server-schemas.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -167,6 +168,29 @@ export function registerMcpProxyTools(
         tools: result.tools,
         next: `Call them with aimeat_mcp_call, naming server "${result.server.slug}".`,
       });
+    });
+
+  mcp.tool('aimeat_mcp_update', descriptionFor('aimeat_mcp_update'),
+    {
+      server: z.string().describe('Which server, by its short name.'),
+      enabled: z.boolean().optional()
+        .describe('false switches it off at once without removing it; true switches it back on.'),
+      title: z.string().optional().describe('What to call it on screen.'),
+      description: z.string().optional().describe('What it is for, in a sentence.'),
+    },
+    annotationsFor('aimeat_mcp_update'),
+    async ({ server, enabled, title, description }): Promise<TextResult> => {
+      const row = await requireUsableServer(storage, ownerGhii(), server);
+      if (!row) return notFound(server);
+
+      // The same service the REST door calls, so neither can switch a server off in a way the
+      // other does not: the pool invalidation and the live-update announcement live in there.
+      const updated = await updateMcpServerSettings(storage, row, {
+        ...(enabled !== undefined ? { enabled } : {}),
+        ...(title !== undefined ? { title } : {}),
+        ...(description !== undefined ? { description } : {}),
+      });
+      return ok({ server: toPublicMcpServer(updated) });
     });
 
   mcp.tool('aimeat_mcp_detach', descriptionFor('aimeat_mcp_detach'),

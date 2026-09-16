@@ -41,11 +41,10 @@ import { resolveIdentity, ownerGhiiOf, callerPrincipal } from '../utils/gaii.js'
 import { toPublicMcpServer, type McpTransport, type McpServerCredential } from '../models/mcp-server-schemas.js';
 import {
   attachMcpServer, listUsableServers, requireUsableServer, detachMcpServer,
+  updateMcpServerSettings,
 } from '../services/mcp-client/registry.js';
 import { callRemoteTool, listRemoteTools } from '../services/mcp-client/invoke.js';
 import { recordAccountEvent } from '../services/account-events.js';
-import { mcpClientPool } from '../services/mcp-client/pool.js';
-import { emitChange } from '../services/event-bus.js';
 
 export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -176,27 +175,15 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       if (!server) return notFound(res);
 
       const b = (req.body ?? {}) as Record<string, unknown>;
-      // Named one by one rather than spread: the slug and the credential are NOT editable here, and
-      // a spread would make that a matter of what the client happened to send.
-      const patch: Parameters<Storage['updateMcpServer']>[1] = {
+      // Named one by one rather than spread: the slug and the credential are NOT editable here,
+      // and a spread would make that a matter of what the client happened to send.
+      const updated = await updateMcpServerSettings(storage, server, {
         ...(typeof b.title === 'string' ? { title: b.title } : {}),
         ...(typeof b.description === 'string' ? { description: b.description } : {}),
         ...(b.exposure === 'gateway' || b.exposure === 'flatten' ? { exposure: b.exposure } : {}),
         ...(typeof b.enabled === 'boolean' ? { enabled: b.enabled } : {}),
-      };
-      await storage.updateMcpServer(server.id, patch);
-
-      // Switching a server off has to STOP it, not merely mark it. A pooled client would keep
-      // answering through it until the idle sweeper noticed, and "I turned it off and it kept
-      // working" is the worst possible answer to somebody cutting an integration.
-      if (patch.enabled === false) await mcpClientPool.invalidate(server.id);
-
-      // Emitted here rather than in the registry service, because this is the one door that edits:
-      // attach and detach announce from the service, where two doors share them.
-      emitChange('mcp-servers', ownerOf(req));
-
-      const updated = await storage.getMcpServer(server.id);
-      return res.json(success(config.nodeId, { server: toPublicMcpServer(updated ?? server) }));
+      });
+      return res.json(success(config.nodeId, { server: toPublicMcpServer(updated) }));
     });
 
   router.delete('/v1/mcp-servers/:id', requireAuth(), requireScope('mcp:manage'),

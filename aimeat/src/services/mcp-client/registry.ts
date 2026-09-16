@@ -210,6 +210,36 @@ export async function requireUsableServer(
   return byId;
 }
 
+/** What either door may change after a server is attached. Not the slug and not the credential. */
+export interface McpServerSettings {
+  enabled?: boolean;
+  title?: string;
+  description?: string;
+  exposure?: McpExposure;
+}
+
+/**
+ * Change a server's settings.
+ *
+ * ONE IMPLEMENTATION, TWO DOORS. The REST route and aimeat_mcp_update both call this, so the
+ * pool invalidation and the change announcement cannot happen on one door and not the other — and
+ * a tool that reached `storage.updateMcpServer` directly would be the second implementation this
+ * project has fixed the same defect in three times.
+ *
+ * SWITCHING OFF STOPS IT, rather than marking it for later. A pooled client would keep answering
+ * through a server the owner has just switched off, for as long as the idle sweeper takes to
+ * notice, and "I turned it off and it kept working" is the worst possible answer to somebody
+ * cutting an integration.
+ */
+export async function updateMcpServerSettings(
+  storage: Storage, server: McpServerRecord, settings: McpServerSettings,
+): Promise<McpServerRecord> {
+  await storage.updateMcpServer(server.id, settings);
+  if (settings.enabled === false) await mcpClientPool.invalidate(server.id);
+  if (server.ownerGhii) emitChange('mcp-servers', server.ownerGhii);
+  return (await storage.getMcpServer(server.id)) ?? server;
+}
+
 /**
  * Detach a server.
  *

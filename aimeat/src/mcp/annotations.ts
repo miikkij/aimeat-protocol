@@ -226,6 +226,10 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_mcp_attach: { title: 'Attach an MCP Server', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     // Destructive, and the credential goes with it. Everything acting for this person loses those
     // tools at once.
+    // Idempotent: setting enabled to the value it already has changes nothing. Not destructive:
+    // switching a server off keeps the setup and the credential, which is the whole difference
+    // between this and detaching.
+    aimeat_mcp_update: { title: 'Change an Attached Server', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_mcp_detach: { title: 'Remove an MCP Server', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_update: { title: 'Update Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_organism_overview: { title: 'Organism Structure Overview', readOnlyHint: true },

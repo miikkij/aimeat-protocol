@@ -63,6 +63,18 @@ export const mcpProxyTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_mcp_update',
+        description: "Change an attached server without removing it: switch it off and on again, or rename it on screen. Switching it off STOPS calls at once rather than marking it for later, so say what will stop working before you do it \u2014 it is the right move when a server is misbehaving and the person wants it quiet without losing the setup. Needs the mcp:manage permission. The address and the stored token cannot be changed here; a new token means connecting it again.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            server: { type: 'string', required: true, description: 'Which server, by its short name.' },
+            enabled: { type: 'boolean', description: 'false switches it off at once without removing it; true switches it back on.' },
+            title: { type: 'string', description: 'What to call it on screen.' },
+            description: { type: 'string', description: 'What it is for, in a sentence.' },
+        },
+    },
+    {
         name: 'aimeat_mcp_detach',
         description: "Remove an attached MCP server and the credential stored with it. Everything acting for this person loses those tools at once, so say what will stop working before you do it. Needs the mcp:manage permission. This does not cancel anything at the far side: a token the person created there is still theirs to revoke, and worth mentioning if the point was to cut access off.",
         caller: 'agent',
