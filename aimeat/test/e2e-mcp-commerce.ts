@@ -7,6 +7,7 @@
  *   end-to-end over the MCP surface (task-path fulfillment + fee arithmetic on the wallets).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-commerce
  * @version-history
+ *   v1.2.0 — 2026-09-16 — Test 4b: psp_set takes webhook_secret, and both secrets are stored encrypted.
  *   v1.1.0 — 2026-08-11 — Test 5b: psp_delete clears the card credentials and leaves the seller's
  *     x402 payout address in the same record standing, which is what the REST delete has always done.
  *   v1.0.0 — 2026-07-14 — Initial MCP commerce suite
@@ -209,6 +210,19 @@ await test('4. psp_status is masked; the raw record is private to the owner', as
     // Cross-owner public read of the record must not exist (visibility private).
     const pub = await json(`/v1/memory/${encodeURIComponent(`${buyerOwner.name}@${NODE_ID}`)}/commerce.psp`);
     assert(pub.status !== 200 || !(JSON.stringify(pub.body).includes(SECRET)), 'commerce.psp must not be publicly readable');
+});
+
+await test('4b. psp_set takes the webhook signing secret too, and stores both encrypted', async () => {
+    // PUT /v1/commerce/payout/stripe took webhook_secret and this tool did not, so an agent setting
+    // up a seller's webhook had the field dropped in silence (check:field-reach).
+    const HOOK = 'whsec_mcp_hook_secret_5c3e';
+    const r = await mcp.call('aimeat_commerce_psp_set', { provider: 'stripe', secret_key: SECRET, webhook_secret: HOOK });
+    assert(!r.isError && r.data.webhook_configured === true, `psp_set with webhook: ${r.text}`);
+    assert(!r.text.includes(HOOK), 'the webhook secret must never appear in the response');
+    const raw = await json('/v1/memory/commerce.psp', { headers: auth(buyerOwner.token) });
+    const text = JSON.stringify(raw.body);
+    assert(raw.status === 200 && !text.includes(HOOK) && !text.includes(SECRET), `stored in the clear: ${text.slice(0, 200)}`);
+    assert(raw.body.data?.value?.webhookSecret?.encrypted, `the webhook secret was not stored: ${text.slice(0, 300)}`);
 });
 
 await test('5. psp_delete removes the credentials', async () => {

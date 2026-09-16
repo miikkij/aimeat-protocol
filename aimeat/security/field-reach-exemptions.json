@@ -282,7 +282,6 @@
     "no-twin:PUT /v1/agents/:name/directives": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (budget_limits, memory_areas, purpose, resources, rules) and no agent tool does the same job.",
     "no-twin:PUT /v1/agents/:name/onboarding/override": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (level, reason) and no agent tool does the same job.",
     "no-twin:PUT /v1/apps/:owner/:filename/members/plan": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (roles) and no agent tool does the same job.",
-    "no-twin:PUT /v1/commerce/payout/stripe": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (provider, secret_key, webhook_secret) and no agent tool does the same job.",
     "no-twin:PUT /v1/commerce/payout/x402": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (address) and no agent tool does the same job.",
     "no-twin:PUT /v1/companies/:id/smtp": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (from_address, from_name, reply_to, secure, username) and no agent tool does the same job.",
     "no-twin:PUT /v1/connections/clients": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (client_id, client_secret, provider, tenant) and no agent tool does the same job.",

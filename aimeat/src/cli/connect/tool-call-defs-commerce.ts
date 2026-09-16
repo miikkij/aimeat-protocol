@@ -28,10 +28,12 @@ export const commerceCliTools: ConnectCliToolDefinition[] = [
         input: {
             provider: { type: 'string', required: true, description: 'PSP identifier, e.g. "stripe".' },
             secret_key: { type: 'string', required: true, description: 'The PSP secret credential.' },
+            webhook_secret: { type: 'string', required: false, description: 'Stripe endpoint signing secret for this seller\'s webhook.' },
         },
         handler: ({ client }, input) => client.put('/v1/commerce/payout/stripe', {
             provider: requiredString(input, 'provider'),
             secret_key: requiredString(input, 'secret_key'),
+            webhook_secret: optionalString(input, 'webhook_secret'),
         }),
     },
     {

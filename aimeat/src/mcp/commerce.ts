@@ -177,15 +177,21 @@ export function registerCommerceTools(
         {
             provider: z.string().min(1).max(60),
             secret_key: z.string().min(4).max(500),
+            webhook_secret: z.string().max(500).optional(),
         },
         annotationsFor('aimeat_commerce_psp_set'),
-        async ({ provider, secret_key }) => {
+        async ({ provider, secret_key, webhook_secret }) => {
             // Same bound the route applies (routes/commerce.ts:210-214). This tool stored whatever
             // arrived, so a blank or truncated key became the seller's configured PSP credential
             // and every money sale failed at settlement instead of at configuration.
             const key = String(secret_key ?? '').trim();
             if (key.length < 8 || key.length > 200) {
                 return fail('INVALID_PSP: secret_key must be your PSP secret (8-200 characters). It is stored server-side and never returned.');
+            }
+            // The same optional signing secret PUT /v1/commerce/payout/stripe takes, with its bound.
+            const hook = String(webhook_secret ?? '').trim();
+            if (hook && (hook.length < 8 || hook.length > 200)) {
+                return fail('INVALID_PSP: webhook_secret must be the Stripe endpoint signing secret (8-200 characters).');
             }
             // MERGE: the same record also holds the seller's x402 USDC payout address. Replacing it
             // wholesale would silently delete the other rail's setting (and vice versa).
@@ -194,10 +200,10 @@ export function registerCommerceTools(
             const encKey = getEncryptionKey(config);
             if (!encKey) return fail('ENCRYPTION_NOT_CONFIGURED: this node has no encryption key, so it cannot store a payment secret safely. Ask whoever runs it to set AIMEAT_ENCRYPTION_KEY.');
             const existing = (await storage.getMemory(ownerGhii, PSP_KEY))?.value as Record<string, unknown> | undefined;
-            const { record: sealed } = sealPspRecord(encKey, { ...(existing ?? {}), provider, secretKey: key });
+            const { record: sealed } = sealPspRecord(encKey, { ...(existing ?? {}), provider, secretKey: key, ...(hook ? { webhookSecret: hook } : {}) });
             const { refusal: pspRefusal } = await putOwnerRecord(PSP_KEY, sealed, 'private', ['commerce'], 'commerce:psp');
             if (pspRefusal) return { content: [{ type: 'text' as const, text: pspRefusal }], isError: true };
-            return ok({ configured: true, provider, key_hint: pspSecretHint(key), note: 'Stored server-side; money sales settle on this PSP account. The secret is never returned by any tool.' });
+            return ok({ configured: true, provider, key_hint: pspSecretHint(key), ...(hook ? { webhook_configured: true } : {}), note: 'Stored server-side; money sales settle on this PSP account. The secret is never returned by any tool.' });
         },
     );
 

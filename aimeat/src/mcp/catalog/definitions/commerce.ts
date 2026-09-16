@@ -117,6 +117,7 @@ export const commerceTools: AimeatToolDefinition[] = [
         input: {
             provider: { type: 'string', required: true, description: 'PSP identifier, e.g. "stripe"' },
             secret_key: { type: 'string', required: true, description: 'The PSP secret credential (stored, never echoed back)' },
+            webhook_secret: { type: 'string', required: false, description: 'Stripe endpoint signing secret for this seller\'s webhook. Stored encrypted, never echoed back' },
         },
     },
     {
