@@ -7,6 +7,9 @@
  *   progress tracking, DELETE cancellation, role enforcement, full 11-step
  *   completion flow, readiness score verification, and auto-check on GET.
  * @version-history
+ *   v1.3.0 -- 2026-09-16 -- 47b: two starts at once. The nightly sweep on Postgres answered
+ *                            INTERNAL_ERROR when a row appeared between the route's read and its
+ *                            create; createOnboarding replaces on conflict now, on both providers.
  *   v1.2.0 -- 2026-06-30 -- Add Hello Integration guidance assertions: GET enriches steps with
  *                            descriptionText + howTo and returns step_guide + summary (3b); completion
  *                            summary (completable/next_required_step) on test 26; contract-freeze unit
@@ -1557,6 +1560,28 @@ await test('47. An agent registering with no mode gets the full flow, configure_
     const steps = sBody.data.onboarding.steps;
     assert(steps.find((s: any) => s.id === 'configure_delivery'),
         `precondition: the default flow must include configure_delivery, got ${steps.map((s: any) => s.id).join(',')}`);
+});
+
+await test('47b. Two starts at once answer twice, instead of one of them 500ing on a duplicate row', async () => {
+    // WHAT THIS PINS. POST /onboarding/start reads the onboarding row, then either updates it or
+    // creates one. Three paths write that row (registration, device authorization, this route), and
+    // a row that appeared between the read and the create used to hit the unique index on agentGaii
+    // and come back as INTERNAL_ERROR. The Postgres sweep of 2026-09-16 failed on exactly that, one
+    // millisecond after Postgres logged the constraint; SQLite has the same key and lost the race
+    // less often. createOnboarding replaces on conflict now, on both providers.
+    //
+    // Two starts at once is the smallest thing that reaches the same window, and it is a real shape:
+    // an owner's page and the agent's own runtime both start onboarding on connect.
+    const [a, b] = await Promise.all([
+        json(`/v1/agents/${inferName}/onboarding/start`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` } }),
+        json(`/v1/agents/${inferName}/onboarding/start`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` } }),
+    ]);
+    assert(a.status === 200, `first start ${a.status}: ${JSON.stringify(a.body)}`);
+    assert(b.status === 200, `second start ${b.status}: ${JSON.stringify(b.body)}`);
+    // And one onboarding, not two: the read-back is the row both of them meant to write.
+    const { status, body } = await json(`/v1/agents/${inferName}/onboarding`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200, `read back ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.onboarding.steps.length > 0, 'the surviving row carries a flow');
 });
 
 await test('48. Reporting a workstation platform switches the mode and drops the steps that cannot pass', async () => {
