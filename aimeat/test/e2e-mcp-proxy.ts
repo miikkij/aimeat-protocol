@@ -250,6 +250,51 @@ await test('neither the endpoint nor the token appears in any response', async (
   assert(!whole.includes('sekrit-e2e-token'), 'THE TOKEN LEAKED INTO THE LISTING');
 });
 
+await test('a server attached for SIGN-IN is parked, not probed', async () => {
+  // A server awaiting a token refuses an anonymous tool list, so probing it would tell the owner
+  // their address was wrong when it was right. It attaches parked in needs_reauth instead, which
+  // the panel already renders as a button that fixes it.
+  const { status, body } = await json('/v1/mcp-servers', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ name: 'signme', url: UPSTREAM_URL, auth: 'oauth' }),
+  });
+  assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body.data.server.status === 'needs_reauth', `status was ${body.data.server.status}`);
+  assert(body.data.tools.length === 0, 'nothing should have been probed');
+});
+
+await test('asking that server to sign in is refused cleanly when it offers no OAuth', async () => {
+  // The upstream here is a plain MCP server with no authorization metadata at all. The honest
+  // answer is "this one does not use OAuth, attach it with a token", not a stack trace.
+  const { status, body } = await json('/v1/mcp-servers/signme/authorize', {
+    method: 'POST', headers: ownerAuth(), body: JSON.stringify({ return_url: '/spa.html#access' }),
+  });
+  assert(status === 400 || status === 502, `expected 400 or 502, got ${status}`);
+  assert(!JSON.stringify(body).includes(String(UPSTREAM_PORT)), 'the endpoint leaked into the refusal');
+});
+
+await test('the callback refuses a state nobody issued', async () => {
+  const { status } = await json('/v1/mcp-servers/callback?state=invented&code=nope');
+  assert(status === 400, `expected 400, got ${status}`);
+});
+
+await test('the callback refuses a request with no code at all', async () => {
+  const { status } = await json('/v1/mcp-servers/callback?state=x');
+  assert(status === 400, `expected 400, got ${status}`);
+});
+
+await test('an agent without mcp:manage cannot start a sign-in', async () => {
+  const { status } = await json('/v1/mcp-servers/signme/authorize', {
+    method: 'POST', headers: agentAuth(), body: JSON.stringify({}),
+  });
+  assert(status === 403, `expected 403, got ${status}`);
+});
+
+await test('clean up the sign-in server', async () => {
+  const { status } = await json('/v1/mcp-servers/signme', { method: 'DELETE', headers: ownerAuth() });
+  assert(status === 200, `expected 200, got ${status}`);
+});
+
 // ─── Phase 2: the tool list ───
 console.log('\nPhase 2 — What it can do');
 

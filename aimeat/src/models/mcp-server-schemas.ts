@@ -113,6 +113,14 @@ export interface McpServerCredential {
   refreshToken?: string;
   /** For `static` servers that want the secret somewhere other than Authorization. */
   headerName?: string;
+  /**
+   * oauth2 only: the client registration that MINTED these tokens.
+   *
+   * Sealed with them rather than stored beside them, because a refresh must use the same client,
+   * and it is as secret as the token it sits next to. Two rows that can disagree is how a
+   * connection authorises fine and then dies on its first renewal.
+   */
+  oauthClient?: { client_id: string; client_secret?: string };
 }
 
 /**

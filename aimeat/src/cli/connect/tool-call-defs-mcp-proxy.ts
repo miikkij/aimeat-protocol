@@ -64,6 +64,17 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
         }),
     },
     {
+        // → POST /v1/mcp-servers/:id/authorize — returns an address a PERSON opens. Nothing here
+        //   can approve it, and fetching the address does nothing.
+        name: 'aimeat_mcp_authorize',
+        handler: ({ client }, input) => client.post(
+            serverPath(requiredString(input, 'server'), '/authorize'),
+            {
+                ...(optionalString(input, 'return_url') ? { return_url: optionalString(input, 'return_url') } : {}),
+            },
+        ),
+    },
+    {
         // → PATCH /v1/mcp-servers/:id — the editable fields. Not the slug and not the
         //   credential: the slug is what every grant names, and a new token means reconnecting.
         name: 'aimeat_mcp_update',

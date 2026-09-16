@@ -44,6 +44,7 @@ import {
   updateMcpServerSettings,
 } from '../services/mcp-client/registry.js';
 import { callRemoteTool, listRemoteTools } from '../services/mcp-client/invoke.js';
+import { startMcpOAuth } from '../services/mcp-client/oauth.js';
 import { toPublicMcpServer, type McpTransport, type McpServerCredential } from '../models/mcp-server-schemas.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
@@ -167,6 +168,35 @@ export function registerMcpProxyTools(
         server: result.server,
         tools: result.tools,
         next: `Call them with aimeat_mcp_call, naming server "${result.server.slug}".`,
+      });
+    });
+
+  mcp.tool('aimeat_mcp_authorize', descriptionFor('aimeat_mcp_authorize'),
+    {
+      server: z.string().describe('Which server, by its short name.'),
+      return_url: z.string().optional()
+        .describe('A path on this node the browser lands on afterwards, e.g. /spa.html#access.'),
+    },
+    annotationsFor('aimeat_mcp_authorize'),
+    async ({ server, return_url }): Promise<TextResult> => {
+      const row = await requireUsableServer(storage, ownerGhii(), server);
+      if (!row) return notFound(server);
+
+      const started = await startMcpOAuth({
+        storage, config, server: row, ownerGhii: ownerGhii(),
+        ...(return_url ? { returnUrl: return_url } : {}),
+      });
+      if (!started.ok) return fail(started.message);
+      // An empty address means the far side needed nobody: a client already registered with a
+      // grant in place. Saying so beats handing an agent an address that goes nowhere.
+      if (!started.authorizeUrl) {
+        return ok({ server: row.slug, connected: true, note: 'That server needed nobody to sign in.' });
+      }
+      return ok({
+        server: row.slug,
+        authorize_url: started.authorizeUrl,
+        next: 'Give this address to the PERSON and wait. Nothing here can approve it for them, and '
+          + 'fetching it yourself does nothing. Say in one sentence what it is for.',
       });
     });
 

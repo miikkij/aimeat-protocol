@@ -63,6 +63,16 @@ export const mcpProxyTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_mcp_authorize',
+        description: "Begin signing in to an attached MCP server that uses OAuth. Returns an address for a PERSON to open: they see exactly what is being asked for and approve it at the far side, and nothing here can approve it for them \u2014 fetching the address yourself does nothing. Hand it over, say in one sentence what it is for, and wait; the server then reports its tools and starts working. Use this for a server attached with auth 'oauth'; a server that takes a plain token needs no round at all. Needs the mcp:manage permission.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            server: { type: 'string', required: true, description: 'Which server, by its short name.' },
+            return_url: { type: 'string', description: 'A path on this node the browser lands on afterwards.' },
+        },
+    },
+    {
         name: 'aimeat_mcp_update',
         description: "Change an attached server without removing it: switch it off and on again, or rename it on screen. Switching it off STOPS calls at once rather than marking it for later, so say what will stop working before you do it \u2014 it is the right move when a server is misbehaving and the person wants it quiet without losing the setup. Needs the mcp:manage permission. The address and the stored token cannot be changed here; a new token means connecting it again.",
         caller: 'agent',

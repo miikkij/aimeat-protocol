@@ -14634,7 +14634,12 @@
       "mcpAttachFailed": "No se ha podido conectar ese servidor",
       "mcpNeedNameUrl": "Un servidor necesita un nombre corto y una dirección.",
       "mcpToggleFailed": "No se ha podido cambiar ese servidor",
-      "mcpToolsFailed": "No se ha podido leer ese servidor ahora mismo"
+      "mcpToolsFailed": "No se ha podido leer ese servidor ahora mismo",
+      "mcpSignIn": "Iniciar sesión",
+      "mcpAuthToken": "Me dio un token",
+      "mcpAuthOauth": "Inicio sesión en él",
+      "mcpNoSignInNeeded": "Ese servidor no necesitaba inicio de sesión. Ya está listo.",
+      "mcpAuthFailed": "No se ha podido iniciar el acceso"
     },
     "nodes": {
       "title": "Tus propios servidores",

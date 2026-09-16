@@ -33,7 +33,7 @@ import { useConfirm } from '/components/Modal.js';
 import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
-const EMPTY_DRAFT = { name: '', url: '', title: '', token: '', header: '' };
+const EMPTY_DRAFT = { name: '', url: '', title: '', token: '', header: '', auth: 'token' };
 
 export function McpServersSection({ showToast }) {
   const [servers, setServers] = useState([]);
@@ -71,6 +71,35 @@ export function McpServersSection({ showToast }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [load]);
 
+  /**
+   * Send the person to the far side's consent screen.
+   *
+   * A full page navigation rather than a pop-up: this is the same window they will come back to,
+   * the callback redirects them here, and a pop-up would need the COOP dance connections.js
+   * documents for a flow that does not need it.
+   */
+  const authorize = useCallback(async (s) => {
+    setBusy(s.id || s.slug);
+    try {
+      const res = await apiPost('/v1/mcp-servers/' + encodeURIComponent(s.id || s.slug) + '/authorize', {
+        return_url: '/spa.html#access',
+      });
+      const url = res?.data?.authorize_url;
+      if (!url) {
+        // The far side needed nobody. Saying so beats silence after a button press.
+        showToast(t('profile.access.mcpNoSignInNeeded') || 'That server needed no sign-in. It is ready.');
+        await load();
+        return;
+      }
+      window.location.href = url;
+    } catch (err) {
+      swallowed('mcp-servers-authorize', err);
+      showToast(err?.message || t('profile.access.mcpAuthFailed') || 'Could not start the sign-in');
+    } finally {
+      setBusy('');
+    }
+  }, [load, showToast]);
+
   const attach = useCallback(async () => {
     if (!draft.name || !draft.url) {
       showToast(t('profile.access.mcpNeedNameUrl') || 'A server needs a short name and an address.');
@@ -78,19 +107,29 @@ export function McpServersSection({ showToast }) {
     }
     setBusy('attach');
     try {
+      const oauth = draft.auth === 'oauth';
       const res = await apiPost('/v1/mcp-servers', {
         name: draft.name.trim(),
         url: draft.url.trim(),
         ...(draft.title ? { title: draft.title } : {}),
-        ...(draft.token ? { token: draft.token } : {}),
-        ...(draft.header ? { header: draft.header } : {}),
+        ...(oauth ? { auth: 'oauth' } : {}),
+        ...(!oauth && draft.token ? { token: draft.token } : {}),
+        ...(!oauth && draft.header ? { header: draft.header } : {}),
       });
-      const count = res?.data?.tools?.length ?? 0;
-      showToast((t('profile.access.mcpAttached') || 'Attached. {n} tool(s) available.')
-        .replace('{n}', String(count)));
       setDraft(EMPTY_DRAFT);
       setAddOpen(false);
       await load();
+
+      if (oauth) {
+        // Attached but not yet signed in. Send the person straight on rather than making them find
+        // a second button: they came here to connect it, and the consent screen is the rest of that
+        // one act.
+        await authorize({ id: res?.data?.server?.id, slug: draft.name.trim() });
+        return;
+      }
+      const count = res?.data?.tools?.length ?? 0;
+      showToast((t('profile.access.mcpAttached') || 'Attached. {n} tool(s) available.')
+        .replace('{n}', String(count)));
     } catch (err) {
       // The node's own sentence is the useful one here: it distinguishes a name already taken from
       // a server that would not answer from a node that cannot hold a secret, and a generic
@@ -100,7 +139,7 @@ export function McpServersSection({ showToast }) {
     } finally {
       setBusy('');
     }
-  }, [draft, load, showToast]);
+  }, [authorize, draft, load, showToast]);
 
   const toggle = useCallback(async (s) => {
     setBusy(s.id);
@@ -184,6 +223,11 @@ export function McpServersSection({ showToast }) {
             ${escHtml(s.slug)} · ${(t('profile.access.mcpToolCount') || '{n} tools')
               .replace('{n}', String(s.toolCount))}${statusNote(s) ? ' · ' + statusNote(s) : ''}
           </span>
+          ${s.status === 'needs_reauth' && html`
+            <button class="btn-outline" disabled=${busy === s.id} onClick=${() => authorize(s)}>
+              ${t('profile.access.mcpSignIn') || 'Sign in'}
+            </button>
+          `}
           <button class="btn-ghost" disabled=${busy === s.id} onClick=${() => showTools(s)}>
             ${toolsFor === s.id
               ? (t('profile.access.mcpHideTools') || 'Hide tools')
@@ -219,11 +263,18 @@ export function McpServersSection({ showToast }) {
             value=${draft.url} onInput=${e => setDraft({ ...draft, url: e.target.value })} />
           <input class="adm-input" placeholder=${t('profile.access.mcpTitleField') || 'What to call it (optional)'}
             value=${draft.title} onInput=${e => setDraft({ ...draft, title: e.target.value })} />
-          <input class="adm-input" type="password" autocomplete="off"
-            placeholder=${t('profile.access.mcpToken') || 'Token, if it needs one'}
-            value=${draft.token} onInput=${e => setDraft({ ...draft, token: e.target.value })} />
-          <input class="adm-input" placeholder=${t('profile.access.mcpHeader') || 'Header for the token (optional)'}
-            value=${draft.header} onInput=${e => setDraft({ ...draft, header: e.target.value })} />
+          <select class="adm-input" value=${draft.auth}
+            onChange=${e => setDraft({ ...draft, auth: e.target.value })}>
+            <option value="token">${t('profile.access.mcpAuthToken') || 'It gave me a token'}</option>
+            <option value="oauth">${t('profile.access.mcpAuthOauth') || 'I sign in to it'}</option>
+          </select>
+          ${draft.auth === 'token' && html`
+            <input class="adm-input" type="password" autocomplete="off"
+              placeholder=${t('profile.access.mcpToken') || 'Token, if it needs one'}
+              value=${draft.token} onInput=${e => setDraft({ ...draft, token: e.target.value })} />
+            <input class="adm-input" placeholder=${t('profile.access.mcpHeader') || 'Header for the token (optional)'}
+              value=${draft.header} onInput=${e => setDraft({ ...draft, header: e.target.value })} />
+          `}
           <p class="text-meta-sm">${t('profile.access.mcpAddNote')
             || 'The address is checked before anything is saved, so a wrong address or token is reported now. The token is encrypted here and never shown again.'}</p>
           <button class="btn-primary" disabled=${busy === 'attach'} onClick=${attach}>

@@ -615,6 +615,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_mcp_call: 'mcp:use',
     aimeat_mcp_attach: 'mcp:manage',
     aimeat_mcp_update: 'mcp:manage',
+    aimeat_mcp_authorize: 'mcp:manage',
     aimeat_mcp_detach: 'mcp:manage',
 
     // Commerce (TARGET-033/034 over MCP). NOTE: the REST commerce routes are requireAuth-only
