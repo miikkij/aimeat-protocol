@@ -17,6 +17,11 @@
  *   v2.1.0 — 2026-07-10 — Loopback egress now gated by AIMEAT_ALLOW_PRIVATE_EGRESS (config resolves
  *     it from the security profile; AIMEAT_DEV_MODE kept as a back-compat alias). RFC1918/link-local
  *     stay blocked regardless.
+ *   v2.5.0 — 2026-09-17 — A redirect that leaves the origin always drops Authorization, Cookie and
+ *     Proxy-Authorization; 301/302 turn a POST into a GET and 303 anything into a GET, without the
+ *     body; a 307/308 that would resend a body to another host is refused. Every hop repeated the
+ *     method, the body and any credential the caller forgot to name, so an A2A push secret and an
+ *     OAuth token call's client_secret reached whatever host a redirect named.
  *   v2.4.0 — 2026-09-06 — `sensitiveHeaders`: names the caller drops when a redirect leaves the
  *     origin they were meant for. The hop was re-validated for SSRF and then followed with the same
  *     headers, so an allowed address could 302 and collect whatever was in Authorization. It
@@ -169,7 +174,10 @@ export interface SafeFetchInit extends RequestInit {
  * AFTER URL validation. Per-hop because @authority changes across redirects. Best-effort: a
  * signer error or null result leaves the request unsigned — signing must never break egress.
  */
-type OutboundRequestSigner = (targetUrl: string) => Promise<Record<string, string> | null>;
+/** Dropped on every redirect that leaves the original origin, whatever the caller named. */
+const ALWAYS_SENSITIVE_HEADERS = ['authorization', 'cookie', 'proxy-authorization'];
+
+type OutboundRequestSigner =(targetUrl: string) => Promise<Record<string, string> | null>;
 let outboundSigner: OutboundRequestSigner | null = null;
 
 export function setOutboundRequestSigner(signer: OutboundRequestSigner | null): void {
@@ -201,20 +209,32 @@ export async function safeFetch(urlStr: string, init: SafeFetchInit = {}): Promi
     }
   };
   const firstOrigin = originOf(urlStr);
-  const sensitive = sensitiveHeaders.map(h => h.toLowerCase());
+  const hostOf = (u: string): string => (URL.canParse(u) ? new URL(u).hostname.toLowerCase() : u);
+  const firstHost = hostOf(urlStr);
+  // The credential headers every browser drops on a cross-origin redirect, whether or not the caller
+  // named them. A caller that forgot to name one (an A2A push target's Authorization did) handed its
+  // secret to whatever host the first one redirected to.
+  const sensitive = [...new Set([...ALWAYS_SENSITIVE_HEADERS, ...sensitiveHeaders.map(h => h.toLowerCase())])];
+  // What the request is on this hop. A redirect can change the method and drop the body.
+  let method = (fetchInit.method ?? 'GET').toUpperCase();
+  let body = fetchInit.body;
+  let headers = fetchInit.headers;
   for (let hop = 0; hop <= maxRedirects; hop++) {
     const check = await validateOutboundUrl(target);
     if (!check.valid) throw new Error(`Fetch blocked: ${check.reason}`);
-    let hopHeaders = fetchInit.headers;
-    if (sensitive.length && originOf(target) !== firstOrigin) {
-      const stripped = new Headers(fetchInit.headers);
-      for (const name of sensitive) stripped.delete(name);
+    let hopHeaders = headers;
+    if (originOf(target) !== firstOrigin) {
+      const stripped = new Headers(headers);
+      const dropped = sensitive.filter(name => stripped.has(name));
+      for (const name of dropped) stripped.delete(name);
       hopHeaders = stripped;
-      logger.warn('safeFetch: a redirect left the original origin, so the sensitive headers were dropped', {
-        from: firstOrigin, to: originOf(target), dropped: sensitive.join(', '),
-      });
+      if (dropped.length) {
+        logger.warn('safeFetch: a redirect left the original origin, so the sensitive headers were dropped', {
+          from: firstOrigin, to: originOf(target), dropped: dropped.join(', '),
+        });
+      }
     }
-    let hopInit: RequestInit = { ...fetchInit, headers: hopHeaders, redirect: 'manual' };
+    let hopInit: RequestInit = { ...fetchInit, method, body, headers: hopHeaders, redirect: 'manual' };
     if (outboundSigner) {
       try {
         const sigHeaders = await outboundSigner(target);
@@ -229,7 +249,25 @@ export async function safeFetch(urlStr: string, init: SafeFetchInit = {}): Promi
     }
     const resp = await fetch(target, hopInit);
     if (resp.status >= 300 && resp.status < 400 && resp.headers.has('location')) {
-      target = new URL(resp.headers.get('location') as string, target).toString();
+      const next = new URL(resp.headers.get('location') as string, target).toString();
+      // THE BODY. Every hop repeated the method and the body, so an OAuth token call's client_secret
+      // or refresh token went to whatever host a 302 named. fetch's own rule: 301 and 302 turn a POST
+      // into a GET, 303 turns anything but GET and HEAD into a GET, and the body goes with it.
+      const becomesGet = ((resp.status === 301 || resp.status === 302) && method === 'POST')
+        || (resp.status === 303 && method !== 'GET' && method !== 'HEAD');
+      if (becomesGet) {
+        method = 'GET';
+        body = undefined;
+        const trimmed = new Headers(headers);
+        trimmed.delete('content-type');
+        trimmed.delete('content-length');
+        headers = trimmed;
+      } else if (body !== undefined && body !== null && hostOf(next) !== firstHost) {
+        // 307 and 308 keep the body by definition. To the same host (http upgraded to https) that is
+        // what the caller sent it to; to another host it is somebody's secret handed on, so refuse.
+        throw new Error('Fetch blocked: a redirect to another host would resend the request body');
+      }
+      target = next;
       continue;
     }
     return resp;
