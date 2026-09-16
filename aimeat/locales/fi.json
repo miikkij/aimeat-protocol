@@ -14716,6 +14716,11 @@
           },
           "site": {
             "layout-write": "Järjestää tämän asennuksen etusivun ja sen sivun jolle jäsenet saapuvat: mitkä osat näkyvät, missä järjestyksessä, ja mitä tekstejä niiden välissä on. Toimii vain sille, joka pyörittää tätä asennusta; millä tahansa muulla tilillä tämä lupa ei tee mitään. Tämä muuttaa sen, mitä jokainen täällä näkee saapuessaan, joten \"Täydet oikeudet\" ei sisällä sitä."
+          },
+          "mcp": {
+            "read": "Näe mitkä MCP-palvelimet olet liittänyt ja mitä kukin niistä osaa.",
+            "use": "Kutsu työkalua palvelimella, jonka olet jo liittänyt. Tämä AIMEAT pitää kirjautumistiedot ja käyttää niitä puolestasi; agentti ei näe niitä.",
+            "manage": "Liitä uusia MCP-palvelimia tiliisi ja irrota niitä. Ei kuulu täyteen käyttöoikeuteen: liittäminen osoittaa tilisi uuteen osoitteeseen ja tallentaa sinne kirjautumistiedot."
           }
         },
         "domainAi": "Tekoäly",
@@ -14738,7 +14743,8 @@
         "domainPackages": "Paketit",
         "domainCompliance": "Vaatimustenmukaisuus",
         "domainSignals": "Tavoittavuus",
-        "domainSite": "Sivut joille saavutaan"
+        "domainSite": "Sivut joille saavutaan",
+        "domainMcp": "Liittämäsi MCP-palvelimet"
       },
       "deviceAuth": {
         "title": "Laitehyväksyntä",

@@ -38,6 +38,7 @@ import { sealMcpCredential, requireEncryptionKey } from './credential.js';
 import { listRemoteTools } from './invoke.js';
 import { mcpClientPool } from './pool.js';
 import { recordAccountEvent } from '../account-events.js';
+import { emitChange } from '../event-bus.js';
 
 export interface AttachInput {
   storage: Storage;
@@ -166,6 +167,11 @@ export async function attachMcpServer(input: AttachInput): Promise<AttachResult>
     data: { tools: String(probed.tools.length) },
   }, config);
 
+  // The settings panel is a live surface: this is what makes a newly attached server appear
+  // without a reload. Emitted HERE rather than in each door, so the REST route and the MCP tool
+  // cannot announce differently — which is the same reason the access checks live in this file.
+  emitChange('mcp-servers', ownerGhii);
+
   const stored = await storage.getMcpServer(row.id);
   return {
     ok: true,
@@ -216,4 +222,5 @@ export async function detachMcpServer(
 ): Promise<void> {
   await mcpClientPool.invalidate(server.id);
   await storage.deleteMcpServer(server.id);
+  if (server.ownerGhii) emitChange('mcp-servers', server.ownerGhii);
 }

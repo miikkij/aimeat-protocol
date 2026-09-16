@@ -19,7 +19,19 @@ import type {
   McpServerRecord, McpServerStatus, McpOwnership, McpTransport,
   McpAuthMode, McpCallerIdentity, McpExposure, RemoteToolSnapshot,
 } from '../../../../models/mcp-server-schemas.js';
-import type { SqliteStorage } from '../index.js';
+import type Database from 'better-sqlite3';
+
+/**
+ * What these methods need of the object they are merged onto, and nothing more.
+ *
+ * A structural type rather than `import type { SqliteStorage }`, which is what the older
+ * method files do: that import makes index.ts -> methods/x.ts -> index.ts a cycle, and
+ * dependency-cruiser is right to call it one. The older cycles are grandfathered in the known
+ * list; a new one is not, and re-seeding that list to admit this file would forgive every
+ * other entry in it at the same time. These methods only ever touch `this.db`, so saying so
+ * costs nothing and the arrow only points one way.
+ */
+interface HasDb { db: Database.Database }
 
 type Row = Record<string, unknown>;
 
@@ -58,7 +70,7 @@ function toMcpServer(r: Row): McpServerRecord {
 }
 
 export const mcpServerMethods = {
-  async createMcpServer(this: SqliteStorage, row: McpServerRecord): Promise<void> {
+  async createMcpServer(this: HasDb, row: McpServerRecord): Promise<void> {
     this.db.prepare(`
       INSERT INTO mcp_servers (id, slug, title, description, ownership, ownerGhii, organismId, ws,
         createdBy, transport, auth, credential, credentialShape, expiresAt, providerClientId,
@@ -75,13 +87,13 @@ export const mcpServerMethods = {
     );
   },
 
-  async getMcpServer(this: SqliteStorage, id: string): Promise<McpServerRecord | undefined> {
+  async getMcpServer(this: HasDb, id: string): Promise<McpServerRecord | undefined> {
     const r = this.db.prepare('SELECT * FROM mcp_servers WHERE id = ?').get(id) as Row | undefined;
     return r ? toMcpServer(r) : undefined;
   },
 
   async findMcpServerBySlug(
-    this: SqliteStorage,
+    this: HasDb,
     slug: string, ownership: McpOwnership, ownerGhii?: string, organismId?: string,
   ): Promise<McpServerRecord | undefined> {
     // COALESCE mirrors the unique index. `ownerGhii = NULL` is never true, so a bare comparison
@@ -94,7 +106,7 @@ export const mcpServerMethods = {
     return r ? toMcpServer(r) : undefined;
   },
 
-  async listMcpServers(this: SqliteStorage, query: McpServerQuery = {}): Promise<McpServerRecord[]> {
+  async listMcpServers(this: HasDb, query: McpServerQuery = {}): Promise<McpServerRecord[]> {
     const clauses: string[] = [];
     const params: unknown[] = [];
     if (query.ownership) { clauses.push('ownership = ?'); params.push(query.ownership); }
@@ -116,7 +128,7 @@ export const mcpServerMethods = {
     return rows.map(toMcpServer);
   },
 
-  async updateMcpServer(this: SqliteStorage, id: string, patch: McpServerPatch): Promise<void> {
+  async updateMcpServer(this: HasDb, id: string, patch: McpServerPatch): Promise<void> {
     const sets: string[] = [];
     const params: unknown[] = [];
     if (patch.title !== undefined) { sets.push('title = ?'); params.push(patch.title); }
@@ -133,7 +145,7 @@ export const mcpServerMethods = {
   },
 
   async updateMcpServerCredential(
-    this: SqliteStorage, id: string, credential: string | null, expiresAt: string | null,
+    this: HasDb, id: string, credential: string | null, expiresAt: string | null,
   ): Promise<void> {
     // status back to active and lastError cleared: a token exchange that worked is exactly the
     // evidence that whatever was wrong no longer is.
@@ -145,14 +157,14 @@ export const mcpServerMethods = {
   },
 
   async setMcpServerStatus(
-    this: SqliteStorage, id: string, status: McpServerStatus, error?: string | null,
+    this: HasDb, id: string, status: McpServerStatus, error?: string | null,
   ): Promise<void> {
     this.db.prepare(
       'UPDATE mcp_servers SET status = ?, lastError = ?, updatedAt = ? WHERE id = ?',
     ).run(status, error ?? null, new Date().toISOString(), id);
   },
 
-  async touchMcpServerOk(this: SqliteStorage, id: string): Promise<void> {
+  async touchMcpServerOk(this: HasDb, id: string): Promise<void> {
     const now = new Date().toISOString();
     this.db.prepare(
       "UPDATE mcp_servers SET lastOkAt = ?, lastError = NULL, status = 'active', updatedAt = ? WHERE id = ?",
@@ -160,7 +172,7 @@ export const mcpServerMethods = {
   },
 
   async setMcpServerToolCache(
-    this: SqliteStorage, id: string, tools: RemoteToolSnapshot[], hash: string,
+    this: HasDb, id: string, tools: RemoteToolSnapshot[], hash: string,
   ): Promise<void> {
     const now = new Date().toISOString();
     this.db.prepare(
@@ -168,7 +180,7 @@ export const mcpServerMethods = {
     ).run(JSON.stringify(tools), hash, now, now, id);
   },
 
-  async claimMcpRefresh(this: SqliteStorage, id: string, staleAfterMs: number): Promise<boolean> {
+  async claimMcpRefresh(this: HasDb, id: string, staleAfterMs: number): Promise<boolean> {
     const now = Date.now();
     const staleBefore = new Date(now - staleAfterMs).toISOString();
     // ONE conditional UPDATE, and `changes` is the answer. A read-then-write leaves exactly the
@@ -182,15 +194,15 @@ export const mcpServerMethods = {
     return res.changes > 0;
   },
 
-  async releaseMcpRefresh(this: SqliteStorage, id: string): Promise<void> {
+  async releaseMcpRefresh(this: HasDb, id: string): Promise<void> {
     this.db.prepare('UPDATE mcp_servers SET refreshClaimedAt = NULL WHERE id = ?').run(id);
   },
 
-  async deleteMcpServer(this: SqliteStorage, id: string): Promise<void> {
+  async deleteMcpServer(this: HasDb, id: string): Promise<void> {
     this.db.prepare('DELETE FROM mcp_servers WHERE id = ?').run(id);
   },
 
-  async deleteMcpServersByOwner(this: SqliteStorage, ownerGhii: string): Promise<number> {
+  async deleteMcpServersByOwner(this: HasDb, ownerGhii: string): Promise<number> {
     const res = this.db.prepare('DELETE FROM mcp_servers WHERE ownerGhii = ?').run(ownerGhii);
     return res.changes;
   },

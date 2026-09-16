@@ -24,6 +24,8 @@
  * @version-history
  *   v1.0.0 — 2026-07-25 — Initial: scope-gated SSE domains (an app-grant stream no longer
  *     sees every domain in the owner's keyspace).
+ *   v1.3.0 — 2026-09-16 — `mcp-servers` → mcp:read: the remote MCP servers this account has
+ *     attached. The read word, not the manage word, because a list on screen goes stale otherwise.
  *   v1.2.0 — 2026-09-06 — `secrets` → secrets:manage: the owner's credential vault.
  *   v1.1.0 — 2026-08-08 — Domain wildcards are honoured, via utils/scope-coverage.ts. The lookup
  *     was exact-set only, so a principal holding `memory:*` passed every requireScope('memory:…')
@@ -103,6 +105,13 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   // owner ticked for the vault hears it. Deny-by-default would have handled it, but a name in the
   // map is a decision somebody made and an absence is a question nobody asked.
   secrets: 'secrets:manage',
+
+  // Remote MCP servers. Gated on the READ word rather than the manage word, because the event says
+  // "the set of attached servers changed" and that is what a reader of the list needs to hear —
+  // an app holding mcp:use has a list on screen that would otherwise go stale until a reload.
+  // The name alone is still timing metadata about this account's integrations, which is why it is
+  // gated at all rather than left to deny-by-default.
+  'mcp-servers': 'mcp:read',
 });
 
 /**
