@@ -74,11 +74,13 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     enabled: z.boolean().optional().describe('false switches it off at once; true switches it back on.'),
     title: z.string().optional().describe('What to call it on screen.'),
     description: z.string().optional().describe('What it is for, in a sentence.'),
-  }, annotationsFor('aimeat_mcp_update'), async ({ server, enabled, title, description }) => out(
+    exposure: z.enum(['gateway', 'flatten']).optional().describe('How its tools are reached.'),
+  }, annotationsFor('aimeat_mcp_update'), async ({ server, enabled, title, description, exposure }) => out(
     await client.patch(path(server), {
       ...(enabled !== undefined ? { enabled } : {}),
       ...(title !== undefined ? { title } : {}),
       ...(description !== undefined ? { description } : {}),
+      ...(exposure !== undefined ? { exposure } : {}),
     }),
   ));
 

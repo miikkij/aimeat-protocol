@@ -72,6 +72,7 @@ export const mcpProxyTools: AimeatToolDefinition[] = [
             enabled: { type: 'boolean', description: 'false switches it off at once without removing it; true switches it back on.' },
             title: { type: 'string', description: 'What to call it on screen.' },
             description: { type: 'string', description: 'What it is for, in a sentence.' },
+            exposure: { type: 'string', description: "How its tools are reached: 'gateway' through aimeat_mcp_call, or 'flatten' listed one by one." },
         },
     },
     {

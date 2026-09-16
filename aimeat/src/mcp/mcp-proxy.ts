@@ -177,9 +177,11 @@ export function registerMcpProxyTools(
         .describe('false switches it off at once without removing it; true switches it back on.'),
       title: z.string().optional().describe('What to call it on screen.'),
       description: z.string().optional().describe('What it is for, in a sentence.'),
+      exposure: z.enum(['gateway', 'flatten']).optional()
+        .describe("How its tools are reached: 'gateway' through aimeat_mcp_call, or 'flatten' listed one by one."),
     },
     annotationsFor('aimeat_mcp_update'),
-    async ({ server, enabled, title, description }): Promise<TextResult> => {
+    async ({ server, enabled, title, description, exposure }): Promise<TextResult> => {
       const row = await requireUsableServer(storage, ownerGhii(), server);
       if (!row) return notFound(server);
 
@@ -189,6 +191,7 @@ export function registerMcpProxyTools(
         ...(enabled !== undefined ? { enabled } : {}),
         ...(title !== undefined ? { title } : {}),
         ...(description !== undefined ? { description } : {}),
+        ...(exposure !== undefined ? { exposure } : {}),
       });
       return ok({ server: toPublicMcpServer(updated) });
     });

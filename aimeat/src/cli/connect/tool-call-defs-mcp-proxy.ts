@@ -73,6 +73,7 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
                 ...(optionalBoolean(input, 'enabled') !== undefined ? { enabled: optionalBoolean(input, 'enabled') } : {}),
                 ...(optionalString(input, 'title') ? { title: optionalString(input, 'title') } : {}),
                 ...(optionalString(input, 'description') ? { description: optionalString(input, 'description') } : {}),
+                ...(optionalString(input, 'exposure') ? { exposure: optionalString(input, 'exposure') } : {}),
             },
         ),
     },
