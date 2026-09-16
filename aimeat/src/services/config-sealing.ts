@@ -40,11 +40,15 @@
  *   - sealedKeysFromEnv(raw): parse + validate the boot variable, throwing on an unknown path
  *   - isSealed(config, dotPath): the predicate every door asks
  *   - sealRefusal(dotPath): the single refusal sentence, so no door writes its own
- *   - sealedView(config): the sealed paths with their values, for the read doors
+ *   - isSecretField(field): true for a field no door may show the value of
+ *   - sealedView(config): the sealed paths with their values (a secret: only `configured`)
  * @usage
  *   import { isSealed, sealRefusal } from '../services/config-sealing.js';
  *   if (isSealed(config, path)) { const r = sealRefusal(path); ... }
  * @version-history
+ *   v1.1.0 — 2026-09-16 — isSecretField, and sealedView shows a sealed secret as `configured` only.
+ *     A host could seal ai.chat_agent_key to lock it, and the view then gave the key to the
+ *     operator it was locked against.
  *   v1.0.0 — 2026-08-18 — Initial. docs/plans/sealed-config-plan.md
  */
 import { ALL_CONFIG_MAP } from './config-schema.js';
@@ -108,11 +112,23 @@ export function sealRefusal(dotPath: string): { code: string; message: string } 
     };
 }
 
-/** The sealed settings with their values, for a read door that shows a subset of the config. */
-export function sealedView(config: SealedConfig): Array<{ path: string; value: unknown; description: string }> {
-    return config.sealedConfigKeys.map(path => ({
-        path,
-        value: (config as unknown as Record<string, unknown>)[ALL_CONFIG_MAP[path].key],
-        description: ALL_CONFIG_MAP[path].description,
-    }));
+/**
+ * Is this a field whose value no door may show? GET shows these only as a `_configured` flag, so
+ * every other door that would carry the value (a PUT's old_value, the sealed view) follows the
+ * same rule. Several are mutable, and a host can seal one: sealing locks it, and this hides it.
+ */
+export function isSecretField(field: { adminDisplay?: 'visible' | 'configured' | 'hidden' }): boolean {
+    return field.adminDisplay === 'configured' || field.adminDisplay === 'hidden';
+}
+
+/** The sealed settings with their values, for a read door that shows a subset of the config. A
+ *  secret carries `configured` in place of its value. */
+export function sealedView(config: SealedConfig): Array<{ path: string; value?: unknown; configured?: boolean; description: string }> {
+    return config.sealedConfigKeys.map(path => {
+        const field = ALL_CONFIG_MAP[path];
+        const value = (config as unknown as Record<string, unknown>)[field.key];
+        return isSecretField(field)
+            ? { path, configured: !!value, description: field.description }
+            : { path, value, description: field.description };
+    });
 }

@@ -21,6 +21,8 @@
  *   suite's own server with the variable unset.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-sealed-config.ts
  * @version-history
+ *   v1.1.0 — 2026-09-16 — Secrets: PUT on a secret answers with configured flags, not values
+ *     (2b), and a sealed secret is locked and still not shown on GET, PUT or MCP (5b, 6b, 13).
  *   v1.0.0 — 2026-08-18 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -39,10 +41,28 @@ const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 
 /** The settings this suite's node hands to its "host" to seal. One of each shape that matters. */
 const SEALED = ['quota.memory_mb', 'rate_limits.global', 'metrics.enabled'];
-const SEALED_LIST = SEALED.join(',');
+/**
+ * A SECRET the host injects and seals. It is mutable (an operator on an unsealed node may replace
+ * it) and shown on GET only as `_configured`, so no door may ever answer with its value: not the
+ * PUT response's old_value, and not the sealed view. Measured on aimeat.io 2026-09-16: PUT answered
+ * with the environment's OpenRouter key in old_value.
+ */
+const SEALED_SECRET = 'ai.chat_agent_key';
+const ALL_SEALED = [...SEALED, SEALED_SECRET];
+const SEALED_LIST = ALL_SEALED.join(',');
 /** What the host sets them TO, through the ordinary variables. The seal names paths, not values. */
 const HOST_MEMORY_QUOTA_MB = 1024;
 const HOST_RL_GLOBAL = 5000;
+const HOST_CHAT_KEY = 'sk-e2e-host-chat-key-must-never-be-shown-7f3a';
+const HOST_INSTANCE_KEY = 'sk-e2e-host-instance-key-must-never-be-shown-91c2';
+const HOST_TURN_CREDENTIAL = 'e2e-host-turn-credential-must-never-be-shown-44d0';
+const NEVER_SHOWN = [HOST_CHAT_KEY, HOST_INSTANCE_KEY, HOST_TURN_CREDENTIAL];
+
+/** Throw when any host secret appears anywhere in a serialised answer. */
+function assertNoSecret(where: string, body: unknown) {
+    const text = JSON.stringify(body);
+    for (const s of NEVER_SHOWN) assert(!text.includes(s), `${where} contains a host secret (${s.slice(0, 18)}…)`);
+}
 
 /**
  * Follow the runner's backend so both backends are genuinely exercised. The runner pins
@@ -131,6 +151,9 @@ async function startServer(sealed: boolean): Promise<ChildProcess> {
         AIMEAT_MEMORY_QUOTA_MB: String(HOST_MEMORY_QUOTA_MB),
         AIMEAT_RL_GLOBAL: String(HOST_RL_GLOBAL),
         AIMEAT_METRICS_ENABLED: 'false',
+        AIMEAT_GOOSE_PROVIDER_API_KEY: HOST_CHAT_KEY,
+        AIMEAT_OPENROUTER_INSTANCE_KEY: HOST_INSTANCE_KEY,
+        AIMEAT_TURN_CREDENTIAL: HOST_TURN_CREDENTIAL,
         AIMEAT_RL_AUTH: '1000', AIMEAT_RL_WORK: '1000', AIMEAT_RL_MEMORY: '1000',
         AIMEAT_REGISTRATION_RATE_LIMIT_MAX: '1000',
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
@@ -218,12 +241,39 @@ async function main() {
             assert(body.data.applied.length === 1, `applied: ${JSON.stringify(body.data.applied)}`);
         });
 
+        await test('2b. THE LEAK: replacing a secret does not answer with the old one, or the new one', async () => {
+            const probe = 'sk-e2e-operator-probe-value-3b9e';
+            const { status, body } = await json('/v1/admin/config', {
+                method: 'PUT', headers: auth(unsealedOp.token),
+                body: JSON.stringify({ changes: [
+                    { path: 'ai.chat_agent_key', value: probe },
+                    { path: 'ai.instance_key', value: probe },
+                    { path: 'realtime.turn_credential', value: probe },
+                ] }),
+            });
+            assert(status === 200, `status ${status}: ${JSON.stringify(body.error)}`);
+            assert(body.data.applied.length === 3, `applied: ${JSON.stringify(body.data.applied)}`);
+            assertNoSecret('the PUT response', body);
+            assert(!JSON.stringify(body).includes(probe), 'the PUT response echoes the new secret');
+            for (const a of body.data.applied) {
+                assert(a.secret === true, `${a.path}: marked secret: ${JSON.stringify(a)}`);
+                assert(a.old_value?.configured === true, `${a.path}: old_value says it was configured: ${JSON.stringify(a)}`);
+                assert(a.new_value?.configured === true, `${a.path}: new_value says it is configured: ${JSON.stringify(a)}`);
+            }
+            // Put the host's values back, so phase 2 starts from the environment alone. The PUT
+            // restore would leave database rows; the DELETE removes them.
+            for (const path of ['ai.instance_key', 'realtime.turn_credential']) {
+                const del = await json(`/v1/admin/config/${path}`, { method: 'DELETE', headers: auth(unsealedOp.token) });
+                assert(del.status === 200, `${path} delete: ${del.status}`);
+            }
+        });
+
         // Phase 3 needs that write left in the database, so the seal has something to refuse at boot.
         await stopServer(server);
         server = null;
 
         // ── Phase 2: the same node, started by a host that sealed three settings ──
-        console.log('\nPhase 2: the same node, started with three settings sealed');
+        console.log('\nPhase 2: the same node, started with three settings and one secret sealed');
         server = await startServer(true);
 
         // Same database, same operator: the ONLY difference between the two boots is the seal.
@@ -244,7 +294,7 @@ async function main() {
 
         await test('5. the value is VISIBLE and marked sealed, not hidden', async () => {
             const { body } = await json('/v1/admin/config', { headers: auth(opToken) });
-            assert(body.data.sealed.length === SEALED.length, `sealed list: ${JSON.stringify(body.data.sealed)}`);
+            assert(body.data.sealed.length === ALL_SEALED.length, `sealed list: ${JSON.stringify(body.data.sealed)}`);
             assert(typeof body.data.sealedNote === 'string', 'a sealed node explains itself on the page');
             for (const path of SEALED) {
                 const e = body.data.schema[path];
@@ -258,6 +308,24 @@ async function main() {
             }
             assert(body.data.schema['quota.memory_mb'].value === HOST_MEMORY_QUOTA_MB, 'the sealed quota shows the host value');
             assert(body.data.schema['rate_limits.global'].value === HOST_RL_GLOBAL, 'the sealed rate limit shows the host value');
+        });
+
+        await test('5b. a sealed SECRET is marked sealed and configured, and its value is not shown', async () => {
+            const { body } = await json('/v1/admin/config', { headers: auth(opToken) });
+            assertNoSecret('GET /v1/admin/config', body);
+            const e = body.data.schema[`${SEALED_SECRET}_configured`];
+            assert(e?.value === true, `configured flag: ${JSON.stringify(e)}`);
+            assert(e.sealed === true && e.source === 'sealed', `sealed marking: ${JSON.stringify(e)}`);
+        });
+
+        await test('6b. →403 SEALED_CONFIG on PUT of the sealed secret, and the refusal carries no value', async () => {
+            const { status, body } = await json('/v1/admin/config', {
+                method: 'PUT', headers: auth(opToken),
+                body: JSON.stringify({ changes: [{ path: SEALED_SECRET, value: 'sk-e2e-replace-attempt' }] }),
+            });
+            assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
+            assert(body.error.code === 'SEALED_CONFIG', `code ${body.error.code}`);
+            assertNoSecret('the refusal', body);
         });
 
         await test('6. →403 SEALED_CONFIG on PUT, for every sealed setting', async () => {
@@ -326,7 +394,7 @@ async function main() {
             assert(status === 400, `expected 400 INVALID_INPUT, got ${status}: ${JSON.stringify(body)}`);
             assert(body.error.code === 'INVALID_INPUT', `code ${body.error.code}`);
             const after = (await json('/v1/admin/config', { headers: auth(opToken) })).body;
-            assert(after.data.sealed.length === SEALED.length, 'the seal list is unchanged');
+            assert(after.data.sealed.length === ALL_SEALED.length, 'the seal list is unchanged');
         });
 
         // ── Phase 4: the MCP door answers the same question ──
@@ -368,9 +436,12 @@ async function main() {
             assert(body?.result?.isError !== true, `tool errored: ${JSON.stringify(body?.result ?? body)}`);
             const payload = JSON.parse(body.result.content[0].text);
             assert(Array.isArray(payload.sealed), `no sealed block: ${JSON.stringify(payload).slice(0, 300)}`);
-            assert(payload.sealed.length === SEALED.length, `sealed block: ${JSON.stringify(payload.sealed)}`);
+            assert(payload.sealed.length === ALL_SEALED.length, `sealed block: ${JSON.stringify(payload.sealed)}`);
             const quota = payload.sealed.find((s: any) => s.path === 'quota.memory_mb');
             assert(quota?.value === HOST_MEMORY_QUOTA_MB, `the MCP door shows the value too: ${JSON.stringify(quota)}`);
+            assertNoSecret('aimeat_admin_config', payload);
+            const secret = payload.sealed.find((s: any) => s.path === SEALED_SECRET);
+            assert(secret?.configured === true && !('value' in secret), `the sealed secret shows only that it is configured: ${JSON.stringify(secret)}`);
             assert(typeof payload.sealed_note === 'string', 'the MCP door says who set them');
         });
 
