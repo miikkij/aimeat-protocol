@@ -143,10 +143,10 @@ export function registerMcpProxyTools(
       url: z.string().optional().describe('The server address, https. Give this or peer.'),
       peer: z.string().optional()
         .describe('The id of a peer AIMEAT node, instead of url. Its address is looked up on every call, so the link follows the peering rather than outliving it. The peering must carry routing.'),
-      group: z.string().optional()
+      organism_id: z.string().optional()
         .describe("Attach it to a GROUP instead of to this person, so the group's members reach it without anybody handing out a token. Only an owner or an admin of the group may; using what is attached needs only membership."),
       ws: z.string().optional()
-        .describe("With group, bind it to ONE workspace inside that group. Then the workspace's own roles decide: a contributor may call it, a viewer only sees it is there, and a member of the group with no role in that workspace reaches nothing."),
+        .describe("With organism_id, bind it to ONE workspace inside that group. Then the workspace's own roles decide: a contributor may call it, a viewer only sees it is there, and a member of the group with no role in that workspace reaches nothing."),
       title: z.string().optional().describe('What to call it on screen. Defaults to the name.'),
       description: z.string().optional().describe('What it is for, in a sentence.'),
       transport: z.enum(['http', 'sse']).optional()
@@ -157,7 +157,7 @@ export function registerMcpProxyTools(
         .describe("Which header the token belongs in, when the server does not take a bearer (e.g. 'X-API-Key')."),
     },
     annotationsFor('aimeat_mcp_attach'),
-    async ({ name, url, peer, group, ws, title, description, transport, token, header }): Promise<TextResult> => {
+    async ({ name, url, peer, organism_id: group, ws, title, description, transport, token, header }): Promise<TextResult> => {
       if (!url && !peer) {
         return fail('Give either the server address, or the id of a peer node as peer.');
       }
