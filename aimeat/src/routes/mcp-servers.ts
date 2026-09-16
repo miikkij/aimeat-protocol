@@ -27,6 +27,7 @@
  *   GET    /v1/mcp-servers/:id/tools        -- what it can do, cached unless ?refresh=1
  *   POST   /v1/mcp-servers/:id/call         -- run one of its tools
  *   PATCH  /v1/mcp-servers/:id              -- the editable fields, never the slug or the credential
+ *   POST   /v1/mcp-servers/organism         -- attach one for a group (its owners and admins)
  *   GET    /v1/mcp-servers/node             -- the operator's registry (operator in person)
  *   POST   /v1/mcp-servers/node             -- attach one for the whole node
  *   PATCH  /v1/mcp-servers/node/:id         -- who may use it, what it costs, on or off
@@ -56,6 +57,7 @@ import {
 import {
   attachMcpServer, listUsableServers, requireUsableServer, detachMcpServer,
   updateMcpServerSettings, attachNodeServer, listNodeServers, setNodeServerPolicy,
+  attachOrganismServer,
 } from '../services/mcp-client/registry.js';
 import { callRemoteTool, listRemoteTools } from '../services/mcp-client/invoke.js';
 import { startMcpOAuth, finishMcpOAuth } from '../services/mcp-client/oauth.js';
@@ -81,7 +83,9 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
   // read OR use, because an app granted only `mcp:use` still has to learn the names it may call.
   router.get('/v1/mcp-servers', requireAuth(), requireAnyScope('mcp:read', 'mcp:use'),
     async (req: Request, res: Response) => {
-      res.json(success(config.nodeId, { servers: await listUsableServers(storage, ownerOf(req)) }));
+      res.json(success(config.nodeId, {
+        servers: await listUsableServers(storage, ownerOf(req), config),
+      }));
     });
 
   router.get('/v1/mcp-servers/:id/tools', requireAuth(), requireAnyScope('mcp:read', 'mcp:use'),
@@ -138,6 +142,59 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       }));
     });
 
+
+  // ── A group's server ────────────────────────────────────────────────────────────────────────
+
+  router.post('/v1/mcp-servers/organism', requireAuth(), requireScope('mcp:manage'),
+    async (req: Request, res: Response) => {
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const organismId = typeof b.organism_id === 'string' ? b.organism_id : '';
+      const name = typeof b.name === 'string' ? b.name : '';
+      const url = typeof b.url === 'string' ? b.url : '';
+      if (!organismId || !name || !url) {
+        return res.status(400).json(error(
+          config.nodeId, 'BAD_REQUEST', 'A group server needs a group, a short name and an address.',
+        ));
+      }
+
+      const credential: McpServerCredential | undefined = typeof b.token === 'string' && b.token
+        ? {
+          shape: 'static',
+          accessToken: b.token,
+          ...(typeof b.header === 'string' && b.header ? { headerName: b.header } : {}),
+        }
+        : undefined;
+
+      const result = await attachOrganismServer({
+        storage, config,
+        organismId,
+        ...(typeof b.ws === 'string' && b.ws ? { ws: b.ws } : {}),
+        // The bare owner name, because that is what an organism's rolls are compared against.
+        callerName: resolveIdentity(req.auth!, config.nodeId).split('@')[0],
+        createdBy: callerPrincipal(req.auth!, config.nodeId),
+        slug: name,
+        title: typeof b.title === 'string' && b.title ? b.title : name,
+        ...(typeof b.description === 'string' ? { description: b.description } : {}),
+        transport: { kind: b.transport === 'sse' ? 'sse' : 'http', url },
+        ...(credential ? { credential } : {}),
+        ...(b.auth === 'oauth' ? { deferCredential: true as const } : {}),
+      });
+
+      if (!result.ok) {
+        const status = result.code === 'SLUG_TAKEN' ? 409
+          : result.code === 'NOT_ALLOWED' ? 403
+            : result.code === 'NO_ENCRYPTION_KEY' ? 503
+              : result.code === 'UNREACHABLE' ? 502 : 400;
+        return res.status(status).json(error(config.nodeId, result.code, result.message));
+      }
+      return res.status(201).json(success(config.nodeId, {
+        server: result.server,
+        tools: result.tools,
+        note: b.ws
+          ? 'Everyone who can contribute to that workspace can use it; viewers can see it is there.'
+          : 'Everyone in that group can use it.',
+      }));
+    });
 
   // ── The operator's registry ─────────────────────────────────────────────────────────────────
   //
