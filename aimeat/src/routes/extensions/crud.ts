@@ -19,6 +19,9 @@
  *   v1.5.0 — 2026-09-13 — POST and PUT hand back a refused write's details, so an install refused with
  *                         ODPS_FIELD_TOO_LONG (services/extension-lifecycle.ts) names the field, its
  *                         length, the cap and the room left.
+ *   v1.6.0 — 2026-09-16 — Install, update, activate and deactivate answer with secret config masked
+ *                         (shownExtension), as GET :name does. They returned the ciphertext and the
+ *                         __secretKeys marker.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -40,6 +43,16 @@ import { hasExtWritePermission, canManageInstalledExt } from './permissions.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { workspaceDeclarationOf } from '../../services/extension-workspace-declaration.js';
+
+/**
+ * The record as a write door answers with it: secret config fields masked and the __secretKeys
+ * marker gone, as GET /v1/extensions/:name has always shown it. The install, update, activate and
+ * deactivate doors returned the stored record, ciphertext and marker included.
+ */
+function shownExtension<T extends { config?: Record<string, unknown> } | null | undefined>(ext: T): T {
+  if (!ext) return ext;
+  return { ...ext, config: maskSecretFields(ext.config, getExtSecretKeys(ext as unknown as Parameters<typeof getExtSecretKeys>[0])) };
+}
 
 export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, scheduler?: Scheduler): void {
   // ── GET /v1/extensions — List installed extensions ────────────
@@ -178,7 +191,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       const created = written.record;
       logger.info(`Extension installed: ${created.name}`, { version: created.version, by: req.auth!.owner });
 
-      res.status(201).json(success(config.nodeId, { extension: created, ...(built.warnings?.length ? { warnings: built.warnings } : {}) }, [
+      res.status(201).json(success(config.nodeId, { extension: shownExtension(created), ...(built.warnings?.length ? { warnings: built.warnings } : {}) }, [
         { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${created.name}/activate` },
         { description: 'View extension details', method: 'GET', url: `/v1/extensions/${created.name}` },
       ]));
@@ -252,7 +265,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
 
       if (written.action === 'installed') {
         logger.info(`Extension installed via upsert: ${name}`, { version: written.record.version, by: req.auth!.owner });
-        res.status(201).json(success(config.nodeId, { extension: written.record, action: 'created', ...warned }, [
+        res.status(201).json(success(config.nodeId, { extension: shownExtension(written.record), action: 'created', ...warned }, [
           { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${name}/activate` },
           { description: 'View extension details', method: 'GET', url: `/v1/extensions/${name}` },
         ]));
@@ -261,14 +274,14 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
 
       // Identical derived bytes ⇒ 200 no-op, and nothing was re-run.
       if (written.action === 'unchanged') {
-        res.json(success(config.nodeId, { extension: written.record, action: 'unchanged', message: 'Extension is already up to date' }, [
+        res.json(success(config.nodeId, { extension: shownExtension(written.record), action: 'unchanged', message: 'Extension is already up to date' }, [
           { description: 'View extension details', method: 'GET', url: `/v1/extensions/${name}` },
         ]));
         return;
       }
 
       logger.info(`Extension upserted: ${name}`, { version: record.version, by: req.auth!.sub, reinitialized: written.reinitialized });
-      res.json(success(config.nodeId, { extension: written.record, action: 'updated', reinitialized: written.reinitialized, ...warned }, [
+      res.json(success(config.nodeId, { extension: shownExtension(written.record), action: 'updated', reinitialized: written.reinitialized, ...warned }, [
         { description: 'Execute an action', method: 'POST', url: `/v1/ext/${name}/<actionId>` },
         { description: 'View extension details', method: 'GET', url: `/v1/extensions/${name}` },
       ]));
@@ -507,7 +520,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       logger.info(`Extension activated: ${name}`, { by: req.auth!.sub });
 
       // Capability aggregation deferred to explicit admin trigger to avoid race conditions
-      res.json(success(config.nodeId, { extension: updated }, [
+      res.json(success(config.nodeId, { extension: shownExtension(updated) }, [
         { description: 'Execute an action', method: 'POST', url: `/v1/ext/${name}/<actionId>` },
         { description: 'Deactivate extension', method: 'POST', url: `/v1/extensions/${name}/deactivate` },
       ]));
@@ -539,7 +552,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
 
       logger.info(`Extension deactivated: ${name}`, { by: req.auth!.sub });
 
-      res.json(success(config.nodeId, { extension: updated }, [
+      res.json(success(config.nodeId, { extension: shownExtension(updated) }, [
         { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${name}/activate` },
       ]));
     } catch (err) {

@@ -26,6 +26,8 @@
  *        capability down.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ext-hardening
  * @version-history
+ *   v1.2.0 — 2026-09-16 — 3a: install, update, activate and deactivate answer with secret config
+ *     masked. They returned the ciphertext and the __secretKeys marker.
  *   v1.1.0 — 2026-08-11 — Add the two H-17 mechanisms: the capability an app-tool binds must belong
  *     to the seller, and an internal pass only stands the paywall down on the call it names.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 4: H-4, H-18 and the email escape).
@@ -268,6 +270,44 @@ async function run() {
     assert(cfg.stolen === undefined,
       `a client-supplied ciphertext was stored as ${JSON.stringify(cfg.stolen)} — the node would decrypt it into the sandbox`);
     assert(cfg.greeting === 'hi', 'the installer\'s own config keys must survive untouched');
+  });
+
+  // ── 3a. The write doors answer the way the read door does ──────────────────────────────────
+  await test('install, update, activate and deactivate answer with the secret masked, never its ciphertext', async () => {
+    // GET /v1/extensions/:name masked secret config from the start; the four write doors returned the
+    // stored record, so whoever could manage the extension got the ciphertext and __secretKeys.
+    const name = `hardmask${Date.now()}`;
+    const SECRET = 'sk-ext-write-door-secret-6a1f';
+    const cfg = { apiKey: { type: 'secret', default: SECRET }, greeting: { default: 'hi' } };
+    const check = (door: string, body: unknown) => {
+      const text = JSON.stringify(body);
+      assert(!text.includes(SECRET), `${door} answered with the secret in the clear`);
+      assert(!text.includes('"encrypted"'), `${door} answered with the secret's ciphertext: ${text.slice(0, 300)}`);
+      assert(!text.includes('__secretKeys'), `${door} answered with the __secretKeys marker`);
+    };
+    const res = await install(ownerA.token, name, cfg);
+    assert(res.status === 201, `install ${res.status}: ${JSON.stringify(res.body?.error)}`);
+    check('POST /v1/extensions', res.body);
+    assert(res.body.data.extension.config.greeting === 'hi', 'the non-secret config still shows');
+    const act = await json(`/v1/extensions/${name}/activate`, { method: 'POST', headers: auth(ownerA.token) });
+    assert(act.status === 200, `activate ${act.status}`);
+    check('activate', act.body);
+    const put = await json(`/v1/extensions/${name}`, {
+      method: 'PUT', headers: auth(ownerA.token),
+      body: JSON.stringify({
+        manifest: JSON.stringify({
+          metadata: { name, version: '1.0.1', description: 'hardening e2e', author: 'e2e' },
+          actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'echo' }],
+          config: cfg, limits: { timeout_ms: 5000, max_api_calls: 1 },
+        }),
+        scripts: { echo: ECHO },
+      }),
+    });
+    assert(put.status === 200 || put.status === 201, `update ${put.status}: ${JSON.stringify(put.body?.error)}`);
+    check('PUT /v1/extensions/:name', put.body);
+    const deact = await json(`/v1/extensions/${name}/deactivate`, { method: 'POST', headers: auth(ownerA.token) });
+    assert(deact.status === 200, `deactivate ${deact.status}`);
+    check('deactivate', deact.body);
   });
 
   // ── 3b. The name IS the address ────────────────────────────────────────────────────────────
