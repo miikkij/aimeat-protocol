@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.11.0 — 2026-09-17 — ai.chat_agent_env_passthrough (AIMEAT_GOOSE_ENV_PASSTHROUGH), immutable: the
+ *     environment names the chat agent may see beside its allow-list.
  *   v1.10.0 — 2026-09-05 — mcp.session_sweep_ms (AIMEAT_MCP_SESSION_SWEEP_MS), immutable: the idle
  *     sweep's interval is read once at boot.
  *   v1.9.0 — 2026-09-03 — features.capability_call_counting (AIMEAT_CAPABILITY_CALL_COUNTING): whether
@@ -646,6 +648,11 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'goosePathRoot', dotPath: 'ai.chat_agent_path_root', envVar: 'AIMEAT_GOOSE_PATH_ROOT', type: 'string', validate: () => true, immutable: false, description: "The agent's own config and session store, away from any human's goose profile" },
   { key: 'gooseProvider', dotPath: 'ai.chat_agent_provider', envVar: 'AIMEAT_GOOSE_PROVIDER', type: 'string', validate: () => true, immutable: false, description: "Provider the chat agent runs on (e.g. openrouter). Empty leaves goose's own configuration alone" },
   { key: 'gooseModel', dotPath: 'ai.chat_agent_model', envVar: 'AIMEAT_GOOSE_MODEL', type: 'string', validate: () => true, immutable: false, description: 'Model the chat agent runs on. Also what the node records as the model that answered a turn' },
+  // Names, never values, and immutable: an operator who could add DATABASE_URL here from the admin
+  // screen would hand it to the agent again (services/goose-env.ts).
+  { key: 'gooseEnvPassthrough', dotPath: 'ai.chat_agent_env_passthrough', envVar: 'AIMEAT_GOOSE_ENV_PASSTHROUGH', type: 'object',
+    validate: v => Array.isArray(v) && v.every(item => typeof item === 'string'), immutable: true,
+    description: 'Environment variable names the chat agent may see beside its allow-list, for a provider key passed in the environment. Set by whoever runs this node' },
   { key: 'gooseProviderApiKey', dotPath: 'ai.chat_agent_key', envVar: 'AIMEAT_GOOSE_PROVIDER_API_KEY', type: 'string', validate: () => true, immutable: false, description: 'The key EVERY chat turn is spent from. Not metered per person: the allowance above does not apply to the chat', adminDisplay: 'configured' },
   { key: 'chatMaxLiveThreads', dotPath: 'ai.chat_max_live_threads', envVar: 'AIMEAT_CHAT_MAX_LIVE_THREADS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'How many conversations stay open before the oldest rolls into a per-month archive record', range: '1-1000' },
 

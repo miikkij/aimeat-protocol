@@ -116,7 +116,6 @@ await test('A1. Setup: seller (USD 0.10 offer + x402 payTo) + buyer', async () =
     seller = await sellerWithUsdOffer('s');
     buyer = await setupOwner('b');
 });
-
 await test('A2. Open USD session + unpaid complete → 402 with real base-sepolia exact scheme', async () => {
     const create = await json('/v1/commerce/checkout-sessions', {
         method: 'POST', headers: auth(buyer.token),
