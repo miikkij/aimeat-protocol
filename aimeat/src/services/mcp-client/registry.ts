@@ -39,6 +39,8 @@ import { sealMcpCredential, requireEncryptionKey } from './credential.js';
 import { listRemoteTools } from './invoke.js';
 import { mcpClientPool } from './pool.js';
 import { recordAccountEvent } from '../account-events.js';
+import { organismOwners } from '../organism-ownership.js';
+import { listWorkspaceMemberRoles } from '../workspace-roles.js';
 import { emitChange } from '../event-bus.js';
 
 export interface AttachInput {
@@ -74,6 +76,8 @@ export type AttachRefusal =
   | 'BAD_SLUG'
   | 'SLUG_TAKEN'
   | 'NO_ENCRYPTION_KEY'
+  /** Attaching to a group is governance: only its owners and admins may. */
+  | 'NOT_ALLOWED'
   | 'UNREACHABLE';
 
 /**
@@ -211,7 +215,7 @@ export async function attachMcpServer(input: AttachInput): Promise<AttachResult>
  * else's row and is then filtered is a lookup that leaks the day somebody forgets the filter.
  */
 export async function listUsableServers(
-  storage: Storage, ownerGhii: string,
+  storage: Storage, ownerGhii: string, config?: AimeatConfig,
 ): Promise<PublicMcpServer[]> {
   const mine = await storage.listMcpServers({ ownership: 'owner', ownerGhii });
   // Plus whatever the operator offers this owner. Shown in the same list on purpose: from where the
@@ -219,7 +223,17 @@ export async function listUsableServers(
   // discover the house's offerings would waste the registry.
   const offered = (await storage.listMcpServers({ ownership: 'node', enabled: true }))
     .filter((s) => nodeWideAdmits(s, ownerGhii));
-  return [...mine, ...offered].map(toPublicMcpServer);
+
+  // And whatever the groups this person belongs to have attached. Asked one at a time because
+  // membership is a per-organism question; the list is short, because an organism attaches a
+  // server for a reason rather than by the dozen.
+  const group: McpServerRecord[] = [];
+  if (config) {
+    for (const s of await storage.listMcpServers({ ownership: 'organism', enabled: true })) {
+      if (await organismAdmits(storage, config, s, ownerGhii, false)) group.push(s);
+    }
+  }
+  return [...mine, ...offered, ...group].map(toPublicMcpServer);
 }
 
 /**
@@ -363,6 +377,160 @@ export async function setNodeServerPolicy(
   return (await storage.getMcpServer(server.id)) ?? server;
 }
 
+/**
+ * May this owner reach a server bound to an organism?
+ *
+ * MEMBERSHIP DECIDES, which is the whole point of binding one to a group: the team's wiki is
+ * reachable by the team, and nobody has to hand a token to each person who joins. Owners, admins
+ * and members all count — the distinction between them governs the ORGANISM, and using a tool the
+ * organism attached is not an act of governance.
+ *
+ * WHEN THE SERVER NAMES A WORKSPACE, the workspace's own roles decide instead, and they are
+ * narrower by design: a contributor may CALL, a viewer may only see that it is there. That mirrors
+ * what those two words already mean for everything else in a workspace, and it is why binding to a
+ * workspace is worth having beside binding to the organism.
+ */
+export async function organismAdmits(
+  storage: Storage, config: AimeatConfig, server: McpServerRecord,
+  ownerGhii: string, wantToCall: boolean,
+): Promise<boolean> {
+  if (server.ownership !== 'organism' || !server.organismId) return false;
+
+  const organism = await storage.getOrganism(server.organismId);
+  if (!organism) return false;
+
+  const bare = ownerGhii.split('@')[0];
+  const inOrganism = organismOwners(organism).some((o) => o.split('@')[0] === bare)
+    || (organism.admins ?? []).some((a) => a.split('@')[0] === bare)
+    || (organism.members ?? []).some((m) => m.split('@')[0] === bare);
+  if (!inOrganism) return false;
+
+  // Bound to the organism as a whole: membership is the answer.
+  if (!server.ws) return true;
+
+  // Bound to one workspace inside it. The roles live as consents, and listWorkspaceMemberRoles is
+  // the one shared implementation of them — asking storage directly here would be the second.
+  const roles = await listWorkspaceMemberRoles(storage, config, {
+    creatorGhii: organismOwners(organism)[0] ?? '',
+    orgId: server.organismId,
+    ws: server.ws,
+  });
+  const role = roles.get(bare)?.role;
+  if (!role) return false;
+  return wantToCall ? role === 'contributor' : true;
+}
+
+/**
+ * Attach a server to an ORGANISM, so its members reach it without anybody handing out a token.
+ *
+ * Only an owner or an admin of the organism may: attaching is an act of governance even though
+ * USING the result is not, which is the same split membership already makes everywhere else here.
+ * The caller's authority is checked HERE rather than at the door, because the answer depends on the
+ * organism record and every door would otherwise have to fetch it and get the test right.
+ */
+export async function attachOrganismServer(input: Omit<AttachInput, 'ownerGhii'> & {
+  organismId: string;
+  ws?: string | null;
+  /** The bare owner name of whoever is attaching, to test against the organism. */
+  callerName: string;
+}): Promise<AttachResult> {
+  const { storage, config, slug, organismId } = input;
+
+  if (!MCP_SLUG_RE.test(slug)) {
+    return {
+      ok: false,
+      code: 'BAD_SLUG',
+      message: 'A server name is 2 to 32 characters of lowercase letters, digits and dashes, '
+        + 'starting and ending with a letter or digit.',
+    };
+  }
+
+  const organism = await storage.getOrganism(organismId);
+  const bare = input.callerName.split('@')[0];
+  const mayAttach = !!organism && (
+    organismOwners(organism).some((o) => o.split('@')[0] === bare)
+    || (organism.admins ?? []).some((a) => a.split('@')[0] === bare)
+  );
+  // Absent and not-allowed answer alike: naming an organism id must not confirm it exists.
+  if (!mayAttach) {
+    return {
+      ok: false,
+      code: 'NOT_ALLOWED',
+      message: 'Only an owner or an admin of that group can attach a server to it.',
+    };
+  }
+
+  const clash = await storage.findMcpServerBySlug(slug, 'organism', undefined, organismId);
+  if (clash) {
+    return { ok: false, code: 'SLUG_TAKEN', message: `That group already has "${slug}".` };
+  }
+
+  let sealed: string | null = null;
+  if (input.credential) {
+    const key = requireEncryptionKey(config);
+    if (!key) {
+      return {
+        ok: false,
+        code: 'NO_ENCRYPTION_KEY',
+        message: 'This node has no encryption key configured, so it cannot hold a credential for '
+          + 'this server. Set AIMEAT_ENCRYPTION_KEY.',
+      };
+    }
+    sealed = sealMcpCredential(input.credential, key);
+  }
+
+  const now = new Date().toISOString();
+  const row: McpServerRecord = {
+    id: randomUUID(),
+    slug,
+    title: input.title || slug,
+    description: input.description ?? '',
+    ownership: 'organism',
+    // Null, and load-bearing: the server belongs to the GROUP. Putting a person here would charge
+    // their account for the group's use and erase the group's server with their account, which is
+    // the ruling migration 0052 already made for workspace rows.
+    ownerGhii: null,
+    organismId,
+    ws: input.ws ?? null,
+    createdBy: input.createdBy,
+    transport: input.transport,
+    auth: input.credential ? (input.credential.shape === 'oauth2' ? 'oauth' : 'static') : 'none',
+    credential: sealed,
+    credentialShape: input.credential?.shape ?? null,
+    expiresAt: null,
+    providerClientId: null,
+    callerIdentity: input.callerIdentity ?? 'node-credential',
+    exposure: input.exposure ?? 'gateway',
+    toolCache: [],
+    toolCacheHash: '',
+    lastListedAt: null,
+    // Not node-wide: membership decides, and neither an allowlist nor a price applies.
+    availability: null,
+    allowlist: [],
+    price: null,
+    directory: { listed: false, visibility: 'private', tags: [] },
+    enabled: true,
+    status: input.deferCredential ? 'needs_reauth' : 'active',
+    lastOkAt: null,
+    lastError: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await storage.createMcpServer(row);
+  if (input.deferCredential) return { ok: true, server: toPublicMcpServer(row), tools: [] };
+
+  const probed = await listRemoteTools(storage, config, row);
+  if (!probed.ok) return { ok: false, code: 'UNREACHABLE', message: probed.message };
+
+  const stored = await storage.getMcpServer(row.id);
+  return {
+    ok: true,
+    server: toPublicMcpServer(stored ?? row),
+    tools: probed.tools.map((t) => t.name),
+  };
+}
+
 /** One of the node's own servers, by the short name an operator actually says. */
 export async function findNodeServer(
   storage: Storage, slug: string,
@@ -403,6 +571,12 @@ export async function listOwnedServers(
  */
 export async function requireUsableServer(
   storage: Storage, ownerGhii: string, idOrSlug: string,
+  /**
+   * Needed only to resolve an ORGANISM server's workspace roles. Optional so every existing caller
+   * keeps working unchanged: without it an organism-bound server is simply not found, which is the
+   * safe direction for a missing argument.
+   */
+  config?: AimeatConfig,
 ): Promise<McpServerRecord | null> {
   // The caller's OWN server first. A person who names `jira` means theirs, even on a node whose
   // operator happens to offer one under the same name — otherwise attaching your own would be
@@ -418,6 +592,10 @@ export async function requireUsableServer(
   if (!byId) return null;
   if (byId.ownerGhii === ownerGhii) return byId;
   if (byId.ownership === 'node' && nodeWideAdmits(byId, ownerGhii)) return byId;
+  if (byId.ownership === 'organism' && config
+      && await organismAdmits(storage, config, byId, ownerGhii, true)) {
+    return byId;
+  }
   // Absent and not-yours answer alike, and a node-wide server this owner is not on the list for is
   // "not yours" — naming it must not confirm that the node offers it.
   return null;
