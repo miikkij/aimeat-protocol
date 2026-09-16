@@ -18,6 +18,8 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.9.1 — 2026-09-16 — The `crews.llm.` comment said the runtime publishes its catalogue past this
+ *     gate. It did not; the catalogue now lives in the agent's own namespace.
  *   v1.9.0 — 2026-09-13 — `messages.organize.` joins the list: the owner's archive and rules for their
  *     Messages list, which decide what the server shows them.
  *   v1.8.0 — 2026-09-09 — `crews.llm.` joins the list: which model an agent thinks with, and the
@@ -117,11 +119,13 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // key from. A granted app that could write one could point every one of the owner's agents at an
   // endpoint of its choosing and have them read the key meant for somebody else's. That is the
   // `openrouter.` reasoning exactly, one layer out: the same class of record, on a machine this
-  // node does not own. `crews.llm.catalog` is on the list for the other half of the same trick —
-  // it is the list the picker offers, so forging it is how a person would be led to pick the
-  // poisoned entry themselves. The legitimate writers are the owner's own routes
-  // (PUT /v1/agents/:name/crew/llm, PUT /v1/agents/llm-default) and the runtime publishing its own
-  // catalogue with its agent token; neither passes through this gate. `crews.registry.` and
+  // node does not own. The legitimate writers are the owner's own routes
+  // (PUT /v1/agents/:name/crew/llm, PUT /v1/agents/llm-default), which do not pass through this gate.
+  // `crews.llm.catalog` is NOT written here: the runtime publishes it into the agent's OWN namespace
+  // (services/crew-menu.ts), where this gate does not apply and no reserved grant is needed. An
+  // agent writing into the owner's namespace does pass this gate, and memory:write-reserved would
+  // hand it openrouter.settings and commerce.psp too. The prefix still covers the key here, so
+  // nobody forges a catalogue in the owner's namespace; nothing reads it there. `crews.registry.` and
   // `crews.runtime.` stay OFF the list deliberately: a definition is checked by the runtime that
   // will run it, and misdirectedCrewKey already refuses one written into the wrong namespace.
   'crews.llm.',

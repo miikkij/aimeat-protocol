@@ -64,8 +64,9 @@ describe('the list holds every prefix the server reads and acts on', () => {
         // `crews.llm.` (2026-09-09): which model an agent thinks with. A `model` choice carries the
         // provider block whole — `base_url`, the endpoint that agent's own runtime will call, and
         // `api_key_env`, the variable it reads a key from — so an app that could write one could
-        // point every agent this owner has at an endpoint of its choosing. `crews.llm.catalog` is
-        // the list the picker offers, which is how a person would be led to pick it themselves.
+        // point every agent this owner has at an endpoint of its choosing. `crews.llm.catalog` lives in
+        // the agent's own namespace since 2026-09-16; the prefix still keeps a forged one out of the
+        // owner's.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
             ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'profile.', 'signals.'],
         );

@@ -404,5 +404,46 @@ await test('26. Another owner can neither read the menu nor set the choice', asy
 
 await test('Teardown — close tunnel', async () => { await tunnel?.close(); });
 
+console.log("\nPhase 6: the catalogue an offline agent left behind");
+
+const catalogue = {
+  spec: 'aimeat.llm-catalog/1',
+  profiles: ['from-the-agent'],
+  models: [{ label: 'openrouter:m/two', type: 'openrouter', id: 'm/two', api_key_env: 'OPENROUTER_API_KEY' }],
+};
+
+await test('27. The agent publishes its catalogue with its own token and no extra grant', async () => {
+  // The agent holds '*', which does NOT carry memory:write-reserved. Into the owner's namespace that
+  // write is refused, which is why the catalogue never reached a hosted node.
+  const intoOwner = await json('/v1/memory', {
+    method: 'POST', headers: auth(agentToken),
+    body: JSON.stringify({ key: 'crews.llm.catalog', value: catalogue, visibility: 'owner', owner_scope: true }),
+  });
+  assert(intoOwner.status === 403, `into the owner's namespace should be refused, got ${intoOwner.status}`);
+
+  const own = await json('/v1/memory', {
+    method: 'POST', headers: auth(agentToken),
+    body: JSON.stringify({ key: 'crews.llm.catalog', value: catalogue, visibility: 'owner' }),
+  });
+  assert(own.status === 201 || own.status === 200, `into its own namespace: ${own.status} ${JSON.stringify(own.body?.error)}`);
+});
+
+await test("28. The menu of an offline agent is that agent's own catalogue", async () => {
+  // A catalogue in the owner's namespace is not this agent's: another agent on another machine could
+  // have written it. The owner can write one there; the menu must not read it.
+  const decoy = await json('/v1/memory', {
+    method: 'POST', headers: auth(ownerToken),
+    body: JSON.stringify({ key: 'crews.llm.catalog', value: { ...catalogue, profiles: ['from-the-owner-key'] }, visibility: 'owner' }),
+  });
+  assert(decoy.status === 201 || decoy.status === 200, `decoy ${decoy.status}`);
+
+  let r = await json(crew('/menu'), { headers: auth(ownerToken) });
+  for (let i = 0; i < 20 && r.body?.data?.source === 'runtime'; i++) { await sleep(250); r = await json(crew('/menu'), { headers: auth(ownerToken) }); }
+  assert(r.status === 200, `menu ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.body.data.source === 'catalog', `expected the published catalogue, got ${r.body.data.source}`);
+  assert(JSON.stringify(r.body.data.profiles) === '["from-the-agent"]', `profiles ${JSON.stringify(r.body.data.profiles)}`);
+  assert(r.body.data.models[0]?.id === 'm/two', `models ${JSON.stringify(r.body.data.models)}`);
+});
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 process.exit(failed > 0 ? 1 : 0);
