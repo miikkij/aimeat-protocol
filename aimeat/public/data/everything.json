@@ -111,6 +111,24 @@
      "plain": "Prompt-driven road For AIs that cannot connect over MCP (a consumer Gemini app, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. Contacts, Email, Workflows, Portfolio, front page and home layout pages"
     },
     {
+     "slug": "g-1-attach-another-mcp-server",
+     "cells": [
+      "<strong>Attach another MCP server</strong>",
+      "Connect your issue tracker, wiki or any other MCP server to your node once, and everything acting for you can use it: your own AI, your agents, your crews. The node holds the credential and spends it for you, so it goes in one place instead of into every client you own. A server that stops working says so, and says what would repair it. Attaching needs the <code>mcp:manage</code> permission, which is deliberately not part of full access.",
+      "<code>POST /v1/mcp-servers</code> · <code>aimeat_mcp_attach</code>"
+     ],
+     "plain": "Attach another MCP server Connect your issue tracker, wiki or any other MCP server to your node once, and everything acting for you can use it: your own AI, your agents, your crews. The node holds the credential and spends it for you, so it goes in one place instead of into every client you own. A server that stops working says so, and says what would repair it. Attaching needs the mcp:manage permission, which is deliberately not part of full access. POST /v1/mcp-servers · aimeat_mcp_attach"
+    },
+    {
+     "slug": "g-1-use-what-you-attached-from-chat",
+     "cells": [
+      "<strong>Use what you attached, from chat</strong>",
+      "Three tools however many servers you have attached: which ones you can use, what each one can do, and call one. The credential never reaches the caller, and no caller ever names an address.",
+      "<code>aimeat_mcp_list</code> · <code>aimeat_mcp_tools</code> · <code>aimeat_mcp_call</code>"
+     ],
+     "plain": "Use what you attached, from chat Three tools however many servers you have attached: which ones you can use, what each one can do, and call one. The credential never reaches the caller, and no caller ever names an address. aimeat_mcp_list · aimeat_mcp_tools · aimeat_mcp_call"
+    },
+    {
      "slug": "g-1-help-from-the-operators",
      "cells": [
       "<strong>Help from the operators</strong>",
@@ -3101,6 +3119,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 304
+  "rows": 306
  }
 }
