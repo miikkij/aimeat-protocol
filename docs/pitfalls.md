@@ -19,7 +19,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 
 ## The five shapes
 
-1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §1, 4, 5, 9, 16b, 28, 31, 36, 61, 63, 64, 65, 67, 73, 74, 75, 76, 77, 78b, 80, 82, 84, 88
+1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §1, 4, 5, 9, 16b, 28, 31, 36, 61, 63, 64, 65, 67, 73, 74, 75, 76, 77, 78b, 80, 82, 84, 88, 92
 2. **A test or a measurement that cannot fail.** A test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run on sqlite only, a flag tested switched on only, a sweep total read as a regression. *Ask which line of the change turns the test red when it is reverted.* §12, 17, 18, 19, 21, 26, 34, 35, 37, 38, 45, 46, 50, 51, 54, 56, 57, 69, 72, 79, 89, 90, 91
 3. **One rule, N doors, and one forgets.** A rule changed in one place while other doors reach the same capability: the REST route, the node MCP tool, the connector MCP tool, the CLI dispatch, an operator door, a second writer of the same record, a second backend. *Grep the capability's name and ask whether every door goes through the changed code.* §3, 7, 8b, 25, 33, 41, 44, 47, 48, 52, 58, 78, 81
 4. **A name is not a principal.** A comparison or a storage key built from `req.auth.owner`, `sub`, a bare account name, a delivery target or a display identity where the holder or the addressed principal is meant. *Ask what the value holds for an agent, an app grant, a federated session and a namesake.* §6, 22, 43, 53, 66, 83
@@ -124,6 +124,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 89 | A new owner-scoped table passes storage-parity and is in no deletion cascade | 2 |
 | 90 | field-reach green locally, red in CI; or a door loses a twin nobody touched | 2 |
 | 91 | An agent retries forever, told 502 for a call its own grant refused | 2 |
+| 92 | One press, and "you already have one called X" for the thing just tried | 1 |
 
 ---
 
@@ -1031,3 +1032,12 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **Why it looked right.** The route's comment was true for the case its author was thinking of: an unreachable server or a rejected credential IS the far side failing, and 502 rather than 500 sends people to the right logs. The same `if (!result.ok) return 502` then caught every other refusal the service learned to return later.
 - **The rule.** A status says who has to act. For the MCP proxy, `statusForRemoteRefusal()` in `services/mcp-client/invoke.ts` is the one map, used by the REST route and the capability path: 403 this caller may not, 402 it costs money, 503 this node cannot serve it until a setting changes, 502 only when the far side failed. A new refusal code goes into that map, and the `switch` is exhaustive, so TypeScript refuses a code nobody placed.
 - **The tell.** One status for every `!ok` branch in a route whose service returns a union of refusal codes. Read the codes and ask, for each, whether the far side was ever asked.
+
+## 92. The SPA client retries a POST that already did its work
+
+*Symptoms: one press of a button, and the person reads that the thing they just tried to make already exists ("you already have a server called X", "name taken"). The network panel shows two identical POSTs a moment apart: the first answered 5xx, the second 409.*
+
+- **The case.** `public/js/api.js` retries any 429 or 5xx, and any network failure, with exponential backoff, for EVERY method. Attaching an MCP server stores the row first, parked, and then answers 502 when the address does not respond, because the owner wants to fix the address rather than retype everything. The retry then met its own row and answered 409, and the toast showed the 409. The useful sentence, "X could not be reached", was never seen. Found 2026-09-16 by pressing the button in a real browser; the route, the service and the E2E suite were all correct on their own.
+- **Why it looked right.** Retrying a 5xx is right for a GET and for a request that changed nothing. The client cannot tell which POSTs those are, and a 5xx does not promise that nothing happened.
+- **The rule.** A POST that stores something before it can fail with a 5xx is sent through `api(path, { method: 'POST', body, retries: 0 })`, not `apiPost()`. The crew tab, the inbox AI actions and chat already do this for the same reason. The global retry rule serves the whole app and is a separate decision.
+- **The tell.** A route that writes and THEN calls somewhere that can fail, with the write kept on failure. Ask what a second identical request does.
