@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-09-16 — export and bundle refuse a federated session (requireLocalSession). Both read
+ *     the bare owner name, which a visitor shares with the local account of the same name.
  *   v1.3.0 — 2026-09-13 — import lists a workspace record in a space the manifest does not declare
  *     under failed[] with UNDECLARED_SPACE instead of writing it, as every other write door refuses it.
  *     bulk, import and copy refuse an EXCHANGE listing source whose changed text breaks an ODPS cap.
@@ -17,7 +19,7 @@
 import type { Router } from 'express';
 import { ZipArchive } from 'archiver';
 import type { MemoryRecord } from '../../storage/interface.js';
-import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireScope, requireExternalPrincipal, requireLocalSession } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { checkMemoryQuota } from '../../services/quota.js';
@@ -143,7 +145,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // GET /v1/memory/export — download all of the caller's memory entries (full values) as a JSON
   // backup. Owner sessions export across their GHII + agents + ecosystem apps (owner-scope); agent
   // sessions export their own keyspace. Optional ?prefix= scopes the export to one namespace.
-  router.get('/v1/memory/export', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
+  router.get('/v1/memory/export', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     let gaii = req.auth!.sub;
     const agentParam = req.query.agent as string | undefined;
@@ -344,7 +346,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Backs the "collection cart" export: a pointer-free bundle of the caller's OWN data (GHII + owned
   // agents). Each item must be owned by the caller or one of their agents; anything else is skipped
   // and recorded in manifest.json. Body: { items: [{ kind:'memory'|'file', key, owner_gaii? }] }.
-  router.post('/v1/memory/bundle', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
+  router.post('/v1/memory/bundle', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
     const body = req.body ?? {};
     const items = Array.isArray(body.items) ? body.items : [];
     if (items.length === 0) {

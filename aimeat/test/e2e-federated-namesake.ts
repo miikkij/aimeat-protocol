@@ -204,6 +204,28 @@ async function run() {
         }
     });
 
+    await test('THE LEAK: the export, bundle, agent export and apps backup doors refuse the visitor', async () => {
+        // These doors read the bare owner NAME (listOwnerScope, getAgentsByOwner, agent.owner), which
+        // a federated session shares with the local account. The export handed the visitor every
+        // record the namesake owns, private ones included.
+        const ag = await json('/v1/agents', as(alice.token, { method: 'POST', body: JSON.stringify({ name: 'nsagent', owner: namesake, capabilities: ['social'] }) }));
+        assert(ag.status === 201, `setup: the namesake's agent: ${ag.status} ${JSON.stringify(ag.body?.error)}`);
+        const agentGaii = ag.body.data.agent.gaii as string;
+        const doors: Array<[string, string, RequestInit]> = [
+            ['GET /v1/memory/export', '/v1/memory/export', {}],
+            ['POST /v1/memory/bundle', '/v1/memory/bundle', { method: 'POST', body: JSON.stringify({ items: [{ kind: 'memory', key: 'namesake.private', owner_gaii: alice.ghii }] }) }],
+            ['POST /v1/agents/:gaii/export', `/v1/agents/${encodeURIComponent(agentGaii)}/export`, { method: 'POST' }],
+            ['GET /v1/apps/backup', '/v1/apps/backup', {}],
+        ];
+        for (const [label, path, init] of doors) {
+            const r = await json(path, as(fedToken, init));
+            assert(r.status === 403, `${label} did not refuse the visitor: ${r.status}`);
+            assert(!JSON.stringify(r.body ?? '').includes(`alice-${stamp}`), `${label} handed over the namesake's private record`);
+        }
+        const own = await json('/v1/memory/export', as(alice.token));
+        assert(own.status === 200 && JSON.stringify(own.body).includes(`alice-${stamp}`), `positive control: the local account exports its own memory: ${own.status}`);
+    });
+
     await test('A visitor\'s own write lands in THEIR namespace, never the namesake\'s', async () => {
         const vw = await json('/v1/memory', as(fedToken, { method: 'POST', body: JSON.stringify({ key: 'namesake.visitor', value: { by: `visitor-${stamp}` }, visibility: 'private' }) }));
         // The write is refused (no memory:write in this node's federated scopes) or it is stored
