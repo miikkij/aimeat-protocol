@@ -5,6 +5,9 @@
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-17 — key-exchange re-admits a peer at the address of its approved request, not the
+ *     address in the unauthenticated body, and checks that address as outbound traffic. Anyone who knew
+ *     a purged peer's id and public key could point it at a server of their own.
  *   v1.1.0 — 2026-08-10 — Security audit H-13/H-14: ping verifies the signature the heartbeat client has
  *     always sent and only lifts a peer out of a LIVENESS state; key-exchange refuses to re-admit a peer
  *     an operator parked, and admits with the key from the approved peering request rather than the body.
@@ -270,8 +273,22 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
             // presenting a different key gets admitted with the ESTABLISHED one, which they cannot
             // sign for, so the re-admission is worthless to anyone but the real node.
             const admittedKey = approvedRequest?.publicKey || (node_public_key as string);
+            // The same holds for the ADDRESS. This door is unauthenticated, and the address it
+            // re-admits a peer at is where this node then sends that peer's traffic: attached MCP
+            // credentials, relayed messages, a federated sign-in's password. It took the address from
+            // the body, so anyone who knew the node id and its published key could move the peer to a
+            // server of their own. The approved request's address is the one the operator saw; a node
+            // that really moved is re-introduced and approved again.
+            const admittedUrl = approvedRequest?.fromNodeUrl || senderUrl;
+            if (admittedUrl) {
+                const urlCheck = await validateOutboundUrl(admittedUrl);
+                if (!urlCheck.valid) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_URL', urlCheck.reason ?? 'The peer address is not allowed'));
+                    return;
+                }
+            }
 
-            if (hasApprovedRequest && senderUrl) {
+            if (hasApprovedRequest && admittedUrl) {
                 const now = new Date().toISOString();
                 // The tier the operator APPROVED, not a hardcoded 'member'. Same reasoning as the key
                 // just above: de-peering leaves the approved request standing, so this branch is a
@@ -280,7 +297,7 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
                 const tier: PeerTier = coerceTier(approvedRequest?.tier);
                 const newPeer: PeerInfo = {
                     nodeId: node_id,
-                    url: senderUrl,
+                    url: admittedUrl,
                     publicKey: admittedKey,
                     status: 'active',
                     addedAt: now,
