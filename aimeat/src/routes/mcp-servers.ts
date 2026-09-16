@@ -27,6 +27,10 @@
  *   GET    /v1/mcp-servers/:id/tools        -- what it can do, cached unless ?refresh=1
  *   POST   /v1/mcp-servers/:id/call         -- run one of its tools
  *   PATCH  /v1/mcp-servers/:id              -- the editable fields, never the slug or the credential
+ *   GET    /v1/mcp-servers/node             -- the operator's registry (operator in person)
+ *   POST   /v1/mcp-servers/node             -- attach one for the whole node
+ *   PATCH  /v1/mcp-servers/node/:id         -- who may use it, what it costs, on or off
+ *   DELETE /v1/mcp-servers/node/:id         -- take it away from everybody
  *   GET    /v1/mcp-servers/grants           -- who may use what
  *   PUT    /v1/mcp-servers/:id/grants       -- narrow one agent to named tools, with caps
  *   DELETE /v1/mcp-servers/:id/grants/:who  -- remove the narrowing (NOT the access)
@@ -41,12 +45,17 @@ import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.js';
+import {
+  requireAuth, requireScope, requireAnyScope, requireOperatorPrincipal,
+} from '../auth/middleware.js';
 import { resolveIdentity, ownerGhiiOf, callerPrincipal } from '../utils/gaii.js';
-import { toPublicMcpServer, type McpTransport, type McpServerCredential } from '../models/mcp-server-schemas.js';
+import {
+  toPublicMcpServer,
+  type McpTransport, type McpServerCredential, type McpPrice,
+} from '../models/mcp-server-schemas.js';
 import {
   attachMcpServer, listUsableServers, requireUsableServer, detachMcpServer,
-  updateMcpServerSettings,
+  updateMcpServerSettings, attachNodeServer, listNodeServers, setNodeServerPolicy,
 } from '../services/mcp-client/registry.js';
 import { callRemoteTool, listRemoteTools } from '../services/mcp-client/invoke.js';
 import { startMcpOAuth, finishMcpOAuth } from '../services/mcp-client/oauth.js';
@@ -129,6 +138,119 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       }));
     });
 
+
+  // ── The operator's registry ─────────────────────────────────────────────────────────────────
+  //
+  // requireOperatorPrincipal, not requireRole('operator'): the operator IN PERSON, never something
+  // acting on their behalf. Attaching a server to the whole node, deciding who reaches it and
+  // pricing it are three acts an agent must not perform in an operator's name.
+
+  router.get('/v1/mcp-servers/node', requireAuth(), requireOperatorPrincipal(storage, 'mcp:manage'),
+    async (_req: Request, res: Response) => {
+      const servers = await listNodeServers(storage);
+      // The operator's own view carries availability and price, which PublicMcpServer omits because
+      // an ordinary caller has no business knowing who else is on the list.
+      return res.json(success(config.nodeId, {
+        servers: servers.map((s) => ({
+          ...toPublicMcpServer(s),
+          availability: s.availability,
+          allowlist: s.allowlist,
+          price: s.price,
+        })),
+      }));
+    });
+
+  router.post('/v1/mcp-servers/node', requireAuth(), requireOperatorPrincipal(storage, 'mcp:manage'),
+    async (req: Request, res: Response) => {
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const name = typeof b.name === 'string' ? b.name : '';
+      const url = typeof b.url === 'string' ? b.url : '';
+      if (!name || !url) {
+        return res.status(400).json(error(
+          config.nodeId, 'BAD_REQUEST', 'A server needs a short name and an address.',
+        ));
+      }
+
+      const credential: McpServerCredential | undefined = typeof b.token === 'string' && b.token
+        ? {
+          shape: 'static',
+          accessToken: b.token,
+          ...(typeof b.header === 'string' && b.header ? { headerName: b.header } : {}),
+        }
+        : undefined;
+
+      const result = await attachNodeServer({
+        storage, config,
+        createdBy: callerPrincipal(req.auth!, config.nodeId),
+        slug: name,
+        title: typeof b.title === 'string' && b.title ? b.title : name,
+        ...(typeof b.description === 'string' ? { description: b.description } : {}),
+        transport: { kind: b.transport === 'sse' ? 'sse' : 'http', url },
+        ...(credential ? { credential } : {}),
+        ...(b.auth === 'oauth' ? { deferCredential: true as const } : {}),
+        ...(b.availability === 'all-owners' || b.availability === 'allowlist'
+          ? { availability: b.availability } : {}),
+        ...(Array.isArray(b.allowlist)
+          ? { allowlist: b.allowlist.filter((x): x is string => typeof x === 'string') } : {}),
+        ...(b.price && typeof b.price === 'object' ? { price: b.price as McpPrice } : {}),
+      });
+
+      if (!result.ok) {
+        const status = result.code === 'SLUG_TAKEN' ? 409
+          : result.code === 'NO_ENCRYPTION_KEY' ? 503
+            : result.code === 'UNREACHABLE' ? 502 : 400;
+        return res.status(status).json(error(config.nodeId, result.code, result.message));
+      }
+      return res.status(201).json(success(config.nodeId, {
+        server: result.server,
+        tools: result.tools,
+        // Said out loud because it is the one thing an operator gets wrong: attaching is not
+        // offering, and a server nobody may use yet looks identical to a broken one.
+        note: result.server.status === 'active' && !b.availability
+          ? 'Attached, and nobody may use it yet. Set availability to all-owners or allowlist.'
+          : '',
+      }));
+    });
+
+  router.patch('/v1/mcp-servers/node/:id', requireAuth(), requireOperatorPrincipal(storage, 'mcp:manage'),
+    async (req: Request, res: Response) => {
+      const server = await storage.getMcpServer(req.params.id as string);
+      // Scoped to node-wide rows on purpose: this door must not become a way for an operator to
+      // edit somebody's personal server, which is theirs and not the house's.
+      if (!server || server.ownership !== 'node') return notFound(res);
+
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const updated = await setNodeServerPolicy(storage, server, {
+        ...(b.availability === 'all-owners' || b.availability === 'allowlist'
+          ? { availability: b.availability } : {}),
+        ...(Array.isArray(b.allowlist)
+          ? { allowlist: b.allowlist.filter((x): x is string => typeof x === 'string') } : {}),
+        ...(b.price === null ? { price: null }
+          : b.price && typeof b.price === 'object' ? { price: b.price as McpPrice } : {}),
+        ...(typeof b.enabled === 'boolean' ? { enabled: b.enabled } : {}),
+        ...(b.exposure === 'gateway' || b.exposure === 'flatten' ? { exposure: b.exposure } : {}),
+      });
+      return res.json(success(config.nodeId, {
+        server: {
+          ...toPublicMcpServer(updated),
+          availability: updated.availability,
+          price: updated.price,
+        },
+      }));
+    });
+
+  router.delete('/v1/mcp-servers/node/:id', requireAuth(), requireOperatorPrincipal(storage, 'mcp:manage'),
+    async (req: Request, res: Response) => {
+      const server = await storage.getMcpServer(req.params.id as string);
+      if (!server || server.ownership !== 'node') return notFound(res);
+      await detachMcpServer(storage, server);
+      return res.json(success(config.nodeId, {
+        removed: server.slug,
+        // Everyone loses it at once, which is worth saying before an operator finds out from
+        // support tickets.
+        note: 'Every owner on this node has lost those tools.',
+      }));
+    });
 
   // ── Grants: which agent may use which tools ─────────────────────────────────────────────────
 

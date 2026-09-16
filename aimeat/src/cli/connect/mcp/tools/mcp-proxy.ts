@@ -93,6 +93,35 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     }),
   ));
 
+  mcp.tool('aimeat_mcp_registry_list', descriptionFor('aimeat_mcp_registry_list'), {},
+    annotationsFor('aimeat_mcp_registry_list'),
+    async () => out(await client.get('/v1/mcp-servers/node')));
+
+  mcp.tool('aimeat_mcp_registry_set', descriptionFor('aimeat_mcp_registry_set'), {
+    server: z.string().describe("Which server on this node's registry, by its short name."),
+    availability: z.enum(['all-owners', 'allowlist']).optional(),
+    allowlist: z.array(z.string()).optional(),
+    price_morsels: z.number().optional(),
+    enabled: z.boolean().optional(),
+  }, annotationsFor('aimeat_mcp_registry_set'), async ({ server, availability, allowlist, price_morsels, enabled }) => {
+    // The REST door takes an id, and this door takes the slug an operator actually says. One
+    // lookup here rather than a second listing route nobody else needs.
+    const listed = await client.get('/v1/mcp-servers/node');
+    const rows = ((listed.data as { servers?: { id: string; slug: string }[] } | undefined)?.servers) ?? [];
+    const row = rows.find((s) => s.slug === server);
+    if (!row) {
+      return { content: [{ type: 'text' as const, text: `This node offers no server called "${server}".` }], isError: true };
+    }
+    return out(await client.patch(`/v1/mcp-servers/node/${encodeURIComponent(row.id)}`, {
+      ...(availability ? { availability } : {}),
+      ...(allowlist ? { allowlist } : {}),
+      ...(price_morsels !== undefined
+        ? { price: price_morsels > 0 ? { unit: 'morsels', perCall: price_morsels } : null }
+        : {}),
+      ...(enabled !== undefined ? { enabled } : {}),
+    }));
+  });
+
   mcp.tool('aimeat_mcp_grant_list', descriptionFor('aimeat_mcp_grant_list'), {
     server: z.string().optional().describe('Only for this server, by its short name.'),
   }, annotationsFor('aimeat_mcp_grant_list'), async ({ server }) => out(

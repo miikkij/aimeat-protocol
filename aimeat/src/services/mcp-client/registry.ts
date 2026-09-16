@@ -33,6 +33,7 @@ import {
   MCP_SLUG_RE, toPublicMcpServer,
   type McpServerRecord, type McpServerCredential, type McpTransport,
   type McpCallerIdentity, type McpExposure, type PublicMcpServer,
+  type McpAvailability, type McpPrice,
 } from '../../models/mcp-server-schemas.js';
 import { sealMcpCredential, requireEncryptionKey } from './credential.js';
 import { listRemoteTools } from './invoke.js';
@@ -142,6 +143,11 @@ export async function attachMcpServer(input: AttachInput): Promise<AttachResult>
     toolCache: [],
     toolCacheHash: '',
     lastListedAt: null,
+    // An owner's own server: none of the node-wide questions apply to it. A person does not
+    // allowlist themselves and does not bill themselves.
+    availability: null,
+    allowlist: [],
+    price: null,
     directory: { listed: false, visibility: 'private', tags: [] },
     enabled: true,
     // A deferred credential is not a healthy server yet: it is one waiting for a person to
@@ -207,8 +213,166 @@ export async function attachMcpServer(input: AttachInput): Promise<AttachResult>
 export async function listUsableServers(
   storage: Storage, ownerGhii: string,
 ): Promise<PublicMcpServer[]> {
-  const rows = await storage.listMcpServers({ ownership: 'owner', ownerGhii });
-  return rows.map(toPublicMcpServer);
+  const mine = await storage.listMcpServers({ ownership: 'owner', ownerGhii });
+  // Plus whatever the operator offers this owner. Shown in the same list on purpose: from where the
+  // person stands these are all "servers I can use", and making them find a second screen to
+  // discover the house's offerings would waste the registry.
+  const offered = (await storage.listMcpServers({ ownership: 'node', enabled: true }))
+    .filter((s) => nodeWideAdmits(s, ownerGhii));
+  return [...mine, ...offered].map(toPublicMcpServer);
+}
+
+/**
+ * May this owner reach this node-wide server?
+ *
+ * `all-owners` means everyone with an account here. `allowlist` means the named ones, and an EMPTY
+ * allowlist means NOBODY — which is the safe reading rather than a loophole: an operator who has
+ * switched to allowlist and not yet named anybody has closed the door, not opened it.
+ */
+export function nodeWideAdmits(server: McpServerRecord, ownerGhii: string): boolean {
+  if (server.ownership !== 'node') return false;
+  if (server.availability === 'all-owners') return true;
+  if (server.availability === 'allowlist') return server.allowlist.includes(ownerGhii);
+  // No availability set at all: attached but not yet offered to anybody. The operator has to say.
+  return false;
+}
+
+/**
+ * Attach a server to the NODE rather than to a person.
+ *
+ * Separate from attachMcpServer() rather than a flag on it, because almost nothing is shared: there
+ * is no owner to scope the name against, the availability and the price have no meaning on a
+ * personal server, and the caller has already been proven to be the operator by the door. What IS
+ * shared — the slug rule, the sealing, the probe — is called from here so neither can drift.
+ */
+export async function attachNodeServer(input: Omit<AttachInput, 'ownerGhii'> & {
+  availability?: McpAvailability;
+  allowlist?: string[];
+  price?: McpPrice | null;
+}): Promise<AttachResult> {
+  const { storage, config, slug } = input;
+
+  if (!MCP_SLUG_RE.test(slug)) {
+    return {
+      ok: false,
+      code: 'BAD_SLUG',
+      message: 'A server name is 2 to 32 characters of lowercase letters, digits and dashes, '
+        + 'starting and ending with a letter or digit.',
+    };
+  }
+  const clash = await storage.findMcpServerBySlug(slug, 'node');
+  if (clash) {
+    return { ok: false, code: 'SLUG_TAKEN', message: `This node already offers "${slug}".` };
+  }
+
+  let sealed: string | null = null;
+  if (input.credential) {
+    const key = requireEncryptionKey(config);
+    if (!key) {
+      return {
+        ok: false,
+        code: 'NO_ENCRYPTION_KEY',
+        message: 'This node has no encryption key configured, so it cannot hold a credential for '
+          + 'this server. Set AIMEAT_ENCRYPTION_KEY.',
+      };
+    }
+    sealed = sealMcpCredential(input.credential, key);
+  }
+
+  const now = new Date().toISOString();
+  const row: McpServerRecord = {
+    id: randomUUID(),
+    slug,
+    title: input.title || slug,
+    description: input.description ?? '',
+    ownership: 'node',
+    // Null, and it is load-bearing: an operator's server belongs to nobody, which is what keeps it
+    // out of any one account's billing and out of its deletion cascade.
+    ownerGhii: null,
+    organismId: null,
+    ws: null,
+    createdBy: input.createdBy,
+    transport: input.transport,
+    auth: input.credential ? (input.credential.shape === 'oauth2' ? 'oauth' : 'static') : 'none',
+    credential: sealed,
+    credentialShape: input.credential?.shape ?? null,
+    expiresAt: null,
+    providerClientId: null,
+    callerIdentity: input.callerIdentity ?? 'node-credential',
+    exposure: input.exposure ?? 'gateway',
+    toolCache: [],
+    toolCacheHash: '',
+    lastListedAt: null,
+    // Attached is not offered. Until the operator says who may use it, nobody may — a registry that
+    // defaulted to everyone would hand the whole node an integration on the strength of a typo.
+    availability: input.availability ?? null,
+    allowlist: input.allowlist ?? [],
+    price: input.price ?? null,
+    directory: { listed: false, visibility: 'private', tags: [] },
+    enabled: true,
+    status: input.deferCredential ? 'needs_reauth' : 'active',
+    lastOkAt: null,
+    lastError: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await storage.createMcpServer(row);
+  if (input.deferCredential) {
+    return { ok: true, server: toPublicMcpServer(row), tools: [] };
+  }
+
+  const probed = await listRemoteTools(storage, config, row);
+  if (!probed.ok) return { ok: false, code: 'UNREACHABLE', message: probed.message };
+
+  const stored = await storage.getMcpServer(row.id);
+  return {
+    ok: true,
+    server: toPublicMcpServer(stored ?? row),
+    tools: probed.tools.map((t) => t.name),
+  };
+}
+
+/** What an operator may change about one of the node's own servers. */
+export interface NodePolicy {
+  availability?: McpAvailability;
+  allowlist?: string[];
+  price?: McpPrice | null;
+  enabled?: boolean;
+  exposure?: McpExposure;
+}
+
+/**
+ * Set who may use one of the node's servers, what it costs, and whether it is on.
+ *
+ * ONE IMPLEMENTATION, TWO DOORS, the same rule updateMcpServerSettings() follows: the operator's
+ * REST route and aimeat_mcp_registry_set both call this, so switching a server off cannot stop the
+ * pool on one door and leave it answering on the other.
+ *
+ * The CALLER proves it is the operator. This function does not, deliberately: "the operator in
+ * person" is a property of the request, and a service that tried to decide it from a principal
+ * string would be a second answer to a question the middleware already answers properly.
+ */
+export async function setNodeServerPolicy(
+  storage: Storage, server: McpServerRecord, policy: NodePolicy,
+): Promise<McpServerRecord> {
+  await storage.updateMcpServer(server.id, policy);
+  // Switching it off has to STOP it. Every owner on the node is holding a pooled client that would
+  // otherwise keep answering until the idle sweeper noticed.
+  if (policy.enabled === false) await mcpClientPool.invalidate(server.id);
+  return (await storage.getMcpServer(server.id)) ?? server;
+}
+
+/** One of the node's own servers, by the short name an operator actually says. */
+export async function findNodeServer(
+  storage: Storage, slug: string,
+): Promise<McpServerRecord | null> {
+  return (await storage.findMcpServerBySlug(slug, 'node')) ?? null;
+}
+
+/** Every server the node offers, whoever may use it. The operator's own view. */
+export async function listNodeServers(storage: Storage): Promise<McpServerRecord[]> {
+  return storage.listMcpServers({ ownership: 'node' });
 }
 
 /**
@@ -240,11 +404,23 @@ export async function listOwnedServers(
 export async function requireUsableServer(
   storage: Storage, ownerGhii: string, idOrSlug: string,
 ): Promise<McpServerRecord | null> {
+  // The caller's OWN server first. A person who names `jira` means theirs, even on a node whose
+  // operator happens to offer one under the same name — otherwise attaching your own would be
+  // silently shadowed by the house's.
   const bySlug = await storage.findMcpServerBySlug(idOrSlug, 'owner', ownerGhii);
   if (bySlug) return bySlug;
+
+  // Then the node's registry, if it admits this owner.
+  const nodeWide = await storage.findMcpServerBySlug(idOrSlug, 'node');
+  if (nodeWide && nodeWideAdmits(nodeWide, ownerGhii)) return nodeWide;
+
   const byId = await storage.getMcpServer(idOrSlug);
-  if (!byId || byId.ownerGhii !== ownerGhii) return null;
-  return byId;
+  if (!byId) return null;
+  if (byId.ownerGhii === ownerGhii) return byId;
+  if (byId.ownership === 'node' && nodeWideAdmits(byId, ownerGhii)) return byId;
+  // Absent and not-yours answer alike, and a node-wide server this owner is not on the list for is
+  // "not yours" — naming it must not confirm that the node offers it.
+  return null;
 }
 
 /** What either door may change after a server is attached. Not the slug and not the credential. */

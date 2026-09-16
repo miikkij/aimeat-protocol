@@ -58,6 +58,10 @@ export type RemoteCallRefusal =
   | 'UPSTREAM_UNAUTHORIZED'
   /** The owner's grant does not cover this tool, or its cap or its expiry ran out. */
   | 'NOT_GRANTED'
+  /** A node-wide server costs morsels and the caller's owner has not got them. */
+  | 'INSUFFICIENT'
+  /** The operator priced this in money, which does not have a rail here yet. */
+  | 'PRICE_UNSUPPORTED'
   | 'TOOL_FAILED';
 
 export interface RemoteCallInput {
@@ -246,6 +250,7 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
   // every other meter in this node collapses a principal to the human it acts for.
   const ownerGhii = server.ownerGhii ?? ownerGhiiOf(caller);
 
+  let charged = 0;
   const record = (outcome: 'ok' | 'refused' | 'error', reason = ''): void => {
     recordUsageCall({
       ownerGhii,
@@ -257,6 +262,9 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
       outcome,
       reason,
       durationMs: Date.now() - started,
+      // What this call actually cost, so an owner's spend on the operator's registry is visible in
+      // the same stream as everything else they are charged for.
+      ...(charged > 0 ? { chargedUnits: charged, unit: 'morsels' as const } : {}),
     });
   };
 
@@ -283,6 +291,16 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
   // The grant's fixed arguments WIN over what the caller sent. "Only in project SUPPORT" is not a
   // suggestion, and a caller supplying its own project must not steer out of the fence.
   const effectiveArgs = applyLockedInput(args, access.lockedInput);
+
+  // The operator's price, when there is one. Charged BEFORE the call and given back if the call
+  // never happened, which is the same order the app-tool path uses and for the same reason: a
+  // caller must never be charged for something that did not run.
+  const toll = await chargeForCall(storage, server, ownerGhii);
+  if (toll.ok) charged = toll.charged;
+  if (!toll.ok) {
+    record('refused', toll.code);
+    return { ok: false, code: toll.code, message: toll.message };
+  }
 
   const resolved = await resolveCredential(storage, config, server);
   if ('refusal' in resolved) {
@@ -311,8 +329,61 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
       isError,
     };
   } catch (err) {
+    // The call never happened, so whatever it cost goes back. Refunding before the row is written
+    // means a failure cannot leave somebody paying for nothing even if the next line throws.
+    await toll.refund();
     const described = await parkAndDescribe(storage, server, err);
     record('error', described.code);
     return { ok: false, ...described };
   }
+}
+
+/** What a priced call cost, and how to give it back. */
+type Toll =
+  | { ok: true; charged: number; refund: () => Promise<void> }
+  | { ok: false; code: 'INSUFFICIENT' | 'PRICE_UNSUPPORTED'; message: string };
+
+/**
+ * Charge the caller's owner for one call on a priced node-wide server.
+ *
+ * FREE UNLESS THE OPERATOR SAID OTHERWISE, and an owner's own server is never priced at all — a
+ * person does not bill themselves.
+ *
+ * MORSELS ONLY, DELIBERATELY. A morsel is this node's own pacer and `debitBalance` already resolves
+ * every agent to the human it acts for, so charging one is a complete act with nothing else to
+ * arrange. MONEY is refused by name rather than half-implemented: real money here means the
+ * entitlement rails — an offering the owner accepted, a budget, a receipt, a payout to the operator
+ * — and inventing a second path to move it would be exactly the parallel mechanism this project
+ * keeps deleting. The refusal says so, so an operator who priced in money learns why immediately
+ * instead of discovering that nobody was ever charged.
+ */
+async function chargeForCall(
+  storage: Storage, server: McpServerRecord, ownerGhii: string,
+): Promise<Toll> {
+  const price = server.ownership === 'node' ? server.price : null;
+  if (!price || price.perCall <= 0) return { ok: true, charged: 0, refund: async () => {} };
+
+  if (price.unit !== 'morsels') {
+    return {
+      ok: false,
+      code: 'PRICE_UNSUPPORTED',
+      message: `"${server.slug}" is priced in money, which this node cannot charge for a proxied `
+        + 'call yet. Whoever runs it can price it in morsels instead.',
+    };
+  }
+
+  const paid = await storage.debitBalance(ownerGhii, price.perCall);
+  if (!paid) {
+    return {
+      ok: false,
+      code: 'INSUFFICIENT',
+      message: `"${server.slug}" costs ${price.perCall} morsel(s) a call, and this account has not `
+        + 'got them right now.',
+    };
+  }
+  return {
+    ok: true,
+    charged: price.perCall,
+    refund: async () => { await storage.creditBalance(ownerGhii, price.perCall); },
+  };
 }

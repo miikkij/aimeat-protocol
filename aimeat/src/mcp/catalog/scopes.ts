@@ -128,6 +128,12 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     // the admin tools above them.
     'aimeat_admin_security_overview',
     'aimeat_admin_incident_resolve',
+    // This node's MCP registry: what it offers every owner, to whom, and at what price. Gated in
+    // the handler on the OWNER record's operator role, like the admin tools above. A scope word
+    // cannot say "the operator in person", and one that could would be grantable to an agent —
+    // which is exactly what must not happen to a control over the whole node.
+    'aimeat_mcp_registry_list',
+    'aimeat_mcp_registry_set',
     // The CORS page's read and its one write: the same decision.
     'aimeat_admin_cors_overview',
     'aimeat_admin_cors_set',
@@ -618,6 +624,9 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_mcp_authorize: 'mcp:manage',
     // The LIST is mcp:read: knowing which agent was narrowed to what is knowing what you have,
     // and an app showing a person their own permissions must not need the word that CHANGES them.
+    // aimeat_mcp_registry_list / _set are NOT here: they self-gate at runtime on the OWNER
+    // record's operator role, the way every other operator tool does. A scope word cannot say
+    // "the operator in person", and one that could would be grantable to an agent.
     aimeat_mcp_grant_list: 'mcp:read',
     aimeat_mcp_grant_set: 'mcp:manage',
     aimeat_mcp_grant_revoke: 'mcp:manage',

@@ -21,6 +21,7 @@ import type { McpServerQuery, McpServerPatch } from '../../../repositories/mcp-s
 import type {
   McpServerRecord, McpServerStatus, McpOwnership, McpTransport,
   McpAuthMode, McpCallerIdentity, McpExposure, RemoteToolSnapshot,
+  McpAvailability, McpPrice,
 } from '../../../../models/mcp-server-schemas.js';
 import type { McpServer as McpServerRow, Json, DB } from '../db-types.js';
 import { jsonb } from '../helpers.js';
@@ -60,6 +61,9 @@ function toMcpServer(r: Selectable<McpServerRow>): McpServerRecord {
     toolCache: (r.toolCache as unknown as RemoteToolSnapshot[] | null) ?? [],
     toolCacheHash: r.toolCacheHash ?? '',
     lastListedAt: r.lastListedAt ?? null,
+    availability: (r.availability as McpAvailability | null) ?? null,
+    allowlist: (r.allowlist as unknown as string[] | null) ?? [],
+    price: (r.price as unknown as McpPrice | null) ?? null,
     directory: (r.directory as unknown as McpServerRecord['directory'] | null)
       ?? { listed: false, visibility: 'private', tags: [] },
     enabled: r.enabled,
@@ -96,6 +100,9 @@ export const mcpServerMethods = {
       toolCache: jsonb(row.toolCache) as unknown as Json,
       toolCacheHash: row.toolCacheHash,
       lastListedAt: row.lastListedAt,
+      availability: row.availability,
+      allowlist: jsonb(row.allowlist) as unknown as Json,
+      price: row.price ? (jsonb(row.price) as unknown as Json) : null,
       directory: jsonb(row.directory) as unknown as Json,
       enabled: row.enabled,
       status: row.status,
@@ -163,6 +170,9 @@ export const mcpServerMethods = {
     if (patch.exposure !== undefined) set.exposure = patch.exposure;
     if (patch.directory !== undefined) set.directory = jsonb(patch.directory);
     if (patch.enabled !== undefined) set.enabled = patch.enabled;
+    if (patch.availability !== undefined) set.availability = patch.availability;
+    if (patch.allowlist !== undefined) set.allowlist = jsonb(patch.allowlist);
+    if (patch.price !== undefined) set.price = patch.price ? jsonb(patch.price) : null;
     if (!Object.keys(set).length) return;
     set.updatedAt = new Date().toISOString();
     await this.db.updateTable('McpServer')
