@@ -53,22 +53,31 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
         ),
     },
     {
-        // → POST /v1/mcp-servers — probes the address before anything is called attached.
+        // → POST /v1/mcp-servers, or POST /v1/mcp-servers/organism when `group` names one.
+        //   Probes the address before anything is called attached.
         name: 'aimeat_mcp_attach',
-        handler: ({ client }, input) => client.post(
-            // Two doors, one tool: a group server is the same act with a different owner.
-            optionalString(input, 'group') ? '/v1/mcp-servers/organism' : '/v1/mcp-servers', {
-            name: requiredString(input, 'name'),
-            ...(optionalString(input, 'group') ? { organism_id: optionalString(input, 'group') } : {}),
-            ...(optionalString(input, 'ws') ? { ws: optionalString(input, 'ws') } : {}),
-            ...(optionalString(input, 'url') ? { url: optionalString(input, 'url') } : {}),
-            ...(optionalString(input, 'peer') ? { peer: optionalString(input, 'peer') } : {}),
-            ...(optionalString(input, 'title') ? { title: optionalString(input, 'title') } : {}),
-            ...(optionalString(input, 'description') ? { description: optionalString(input, 'description') } : {}),
-            ...(optionalString(input, 'transport') ? { transport: optionalString(input, 'transport') } : {}),
-            ...(optionalString(input, 'token') ? { token: optionalString(input, 'token') } : {}),
-            ...(optionalString(input, 'header') ? { header: optionalString(input, 'header') } : {}),
-        }),
+        handler: ({ client }, input) => {
+            const body = {
+                name: requiredString(input, 'name'),
+                ...(optionalString(input, 'url') ? { url: optionalString(input, 'url') } : {}),
+                ...(optionalString(input, 'peer') ? { peer: optionalString(input, 'peer') } : {}),
+                ...(optionalString(input, 'title') ? { title: optionalString(input, 'title') } : {}),
+                ...(optionalString(input, 'description') ? { description: optionalString(input, 'description') } : {}),
+                ...(optionalString(input, 'transport') ? { transport: optionalString(input, 'transport') } : {}),
+                ...(optionalString(input, 'token') ? { token: optionalString(input, 'token') } : {}),
+                ...(optionalString(input, 'header') ? { header: optionalString(input, 'header') } : {}),
+            };
+            const group = optionalString(input, 'group');
+            // Both paths are written out as LITERALS rather than picked with a ternary: the gate
+            // matches a tool to its route by the path it calls, and a computed path matches nothing.
+            // See the note in the connector twin, which had the same ternary and the same cost.
+            if (!group) return client.post('/v1/mcp-servers', body);
+            return client.post('/v1/mcp-servers/organism', {
+                ...body,
+                organism_id: group,
+                ...(optionalString(input, 'ws') ? { ws: optionalString(input, 'ws') } : {}),
+            });
+        },
     },
     {
         // → POST /v1/mcp-servers/:id/authorize — returns an address a PERSON opens. Nothing here
