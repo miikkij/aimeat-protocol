@@ -40,7 +40,7 @@ import {
   type McpAvailability,
 } from '../../models/mcp-server-schemas.js';
 import { sealMcpCredential, requireEncryptionKey } from './credential.js';
-import { listRemoteTools } from './invoke.js';
+import { listRemoteTools, type RemoteCallRefusal } from './invoke.js';
 import { mcpClientPool } from './pool.js';
 import { recordAccountEvent } from '../account-events.js';
 import { organismOwners } from '../organism-ownership.js';
@@ -86,7 +86,46 @@ export type AttachRefusal =
   | 'NO_SUCH_PEER'
   /** A price that is not money, most often a morsel price. Morsels are a pacer and buy nothing. */
   | 'BAD_PRICE'
+  /**
+   * The far side answered, and wants a token or a sign-in this node does not have. The address is
+   * RIGHT, which is the whole reason this is not UNREACHABLE.
+   */
+  | 'UPSTREAM_UNAUTHORIZED'
+  /** A local process this node does not run, or a command nobody allowlisted. */
+  | 'STDIO_DISABLED'
+  | 'STDIO_NOT_ALLOWED'
   | 'UNREACHABLE';
+
+/**
+ * What attaching tells a person when the first look at the server failed.
+ *
+ * ONE MAPPING FOR ALL THREE ATTACH DOORS. There were three copies until 2026-09-16, and the owner's
+ * turned every failure but a peer into UNREACHABLE while the node's and the group's turned EVERY
+ * failure into it. So a server that answered "authentication required" was reported as not
+ * answering, although the address was right and only a token was missing. Found by attaching a
+ * sandbox node to itself.
+ *
+ * The row itself is parked by listRemoteTools either way, with a status the panel renders as the fix.
+ */
+function refusalFromProbe(
+  code: RemoteCallRefusal, message: string,
+): { ok: false; code: AttachRefusal; message: string } {
+  switch (code) {
+    case 'PEER_UNKNOWN':
+    case 'PEER_NOT_ROUTABLE':
+      // A mistyped peer id is a name to correct here, not somebody else's node being down.
+      return { ok: false, code: 'NO_SUCH_PEER', message };
+    case 'UPSTREAM_UNAUTHORIZED':
+    case 'CREDENTIAL_UNREADABLE':
+      return { ok: false, code: 'UPSTREAM_UNAUTHORIZED', message };
+    case 'NO_ENCRYPTION_KEY':
+    case 'STDIO_DISABLED':
+    case 'STDIO_NOT_ALLOWED':
+      return { ok: false, code, message };
+    default:
+      return { ok: false, code: 'UNREACHABLE', message };
+  }
+}
 
 /**
  * Attach a remote MCP server to an owner.
@@ -188,12 +227,7 @@ export async function attachMcpServer(input: AttachInput): Promise<AttachResult>
     // fix the token, not retype the whole attachment. listRemoteTools has already set the status
     // and the reason, so the panel can render the fix.
     //
-    // A mistyped PEER id is told apart from a server that would not answer, because they are two
-    // different mistakes: one is a name to correct here, the other is somebody else's node being
-    // down. Reporting both as 502 sends a person to look at a node that is fine.
-    return probed.code === 'PEER_UNKNOWN' || probed.code === 'PEER_NOT_ROUTABLE'
-      ? { ok: false, code: 'NO_SUCH_PEER', message: probed.message }
-      : { ok: false, code: 'UNREACHABLE', message: probed.message };
+    return refusalFromProbe(probed.code, probed.message);
   }
 
   // Attaching a server is news. A CALL through it is not, and there is deliberately no event for
@@ -361,7 +395,7 @@ export async function attachNodeServer(input: Omit<AttachInput, 'ownerGhii'> & {
   }
 
   const probed = await listRemoteTools(storage, config, row);
-  if (!probed.ok) return { ok: false, code: 'UNREACHABLE', message: probed.message };
+  if (!probed.ok) return refusalFromProbe(probed.code, probed.message);
 
   const stored = await storage.getMcpServer(row.id);
   return {
@@ -557,7 +591,7 @@ export async function attachOrganismServer(input: Omit<AttachInput, 'ownerGhii'>
   if (input.deferCredential) return { ok: true, server: toPublicMcpServer(row), tools: [] };
 
   const probed = await listRemoteTools(storage, config, row);
-  if (!probed.ok) return { ok: false, code: 'UNREACHABLE', message: probed.message };
+  if (!probed.ok) return refusalFromProbe(probed.code, probed.message);
 
   const stored = await storage.getMcpServer(row.id);
   return {

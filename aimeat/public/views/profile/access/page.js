@@ -19,6 +19,8 @@
  *   secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.5.0 -- 2026-09-16 -- Section 03 says the MCP servers list's own title and explanation. The
+ *     .ac-kept rule hid them, so the servers showed unlabelled under "not enabled on this server".
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.4.0 -- 2026-09-13 -- Compose the recovery frame from poster.css.
  *   v1.3.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
@@ -263,7 +265,13 @@ function secAccounts(ctx) {
       <!-- Beside the accounts, and not in a section of its own: a person looking for "what have I
            given something else access to" must find all of it in one place. An MCP server is the
            same promise pointing outward, so it belongs under the same heading. It does NOT follow
-           the connections master switch, because it is a different capability with its own. -->
+           the connections master switch, because it is a different capability with its own.
+           Its title and first paragraph are said HERE, not inside the component: .ac-kept hides a kept
+           component's own heading and first paragraph, because the section supplies them for the
+           connected accounts. Until 2026-09-16 that same rule hid the MCP list's name and explanation,
+           so the servers appeared unlabelled under "not enabled on this server". Found in a browser. -->
+      <p class="ac-label"><b>${t('profile.access.mcpTitle')}</b></p>
+      <p class="ac-para">${t('profile.access.mcpIntro')}</p>
       <div class="ac-kept"><${McpServersSection} showToast=${ctx.showToast} /></div>
     <//>`;
 }

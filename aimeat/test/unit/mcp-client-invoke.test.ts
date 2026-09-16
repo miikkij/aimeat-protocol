@@ -197,6 +197,39 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     expect(stored?.lastError).toBeTruthy();
   });
 
+  it('reads a 401 as a credential problem even when its body never says "unauthorized"', async () => {
+    // Exactly what an AIMEAT node's own /v1/mcp answers without a token. The words carry neither
+    // "401" nor "unauthorized"; only the status does, and the SDK puts the status in `.code`.
+    const refuser = http.createServer((_req, res) => {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        jsonrpc: '2.0', id: 0,
+        error: { code: -32001, message: 'Authentication required. MCP requires a GHII account.' },
+      }));
+    });
+    await new Promise<void>((r) => refuser.listen(40687, '127.0.0.1', () => r()));
+    try {
+      const storage = new SqliteStorage(':memory:');
+      const row = makeRow({ transport: { kind: 'http', url: 'http://127.0.0.1:40687/mcp' } });
+      await storage.createMcpServer(row);
+
+      const r = await callRemoteTool({
+        storage, config, server: row, tool: 'echo', args: { text: 'x' }, caller: 'alice@node-a',
+      });
+      expect(r.ok).toBe(false);
+      if (r.ok) return;
+      // Found on 2026-09-16 by attaching a sandbox node to itself: this came back UNREACHABLE, the
+      // server was parked as not answering, and the owner was told the address was wrong when it
+      // was right and only needed a token.
+      expect(r.code).toBe('UPSTREAM_UNAUTHORIZED');
+      // needs_reauth is what the panel renders as a button to sign in, rather than as a dead server.
+      expect((await storage.getMcpServer(row.id))?.status).toBe('needs_reauth');
+    } finally {
+      await mcpClientPool.closeAll();
+      await new Promise<void>((r) => refuser.close(() => r()));
+    }
+  });
+
   it('tells the owner to reconnect when the credential will not open', async () => {
     const storage = new SqliteStorage(':memory:');
     const row = makeRow({ credential: 'aa:bb:cc' });
