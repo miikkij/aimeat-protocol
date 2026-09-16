@@ -17,6 +17,7 @@
  *   Node V (vendor) 40287. Peer C is a keypair, not a running server: nothing here needs it to
  *   answer, only to sign.
  * @version-history
+ *   v1.1.0 — 2026-09-17 — I9: an unsigned key exchange re-admits a purged peer at its approved address only.
  *   v1.0.0 — 2026-08-23 — Initial, with the contact tier.
  */
 
@@ -568,6 +569,34 @@ await test('I8. A refused re-introduction does not destroy the existing (depeeri
     });
     assert(bad.status === 400, `expected 400 INVALID_URL, got ${bad.status}: ${JSON.stringify(bad.body)}`);
     assert(!!(await iRow()), 'the refused re-introduction must not have deleted the existing peer row');
+});
+
+await test('I9. THE LEAK: an unsigned key exchange cannot move a re-admitted peer to an address it chose', async () => {
+    // A purged peer with an approved request is re-admitted by POST /v1/federation/key-exchange, which
+    // is unauthenticated. It took the address from the REQUEST BODY, so anyone who knew the node id
+    // and its published key pointed the peer at their own server and received what this node sends
+    // that peer: attached MCP credentials, relayed messages, sign-in passwords under all_peers.
+    await dropPeer(I_NODE);
+    const mint = await V.json('/v1/federation/link-invites', {
+        method: 'POST', headers: auth(V.ownerToken), body: JSON.stringify({ tier: 'contact' }),
+    });
+    assert(mint.status === 201, `mint: ${mint.status}`);
+    const admitted = await introduce(mint.body.data.token);
+    assert(admitted.status === 200, `introduce: ${admitted.status} ${JSON.stringify(admitted.body)}`);
+    await dropPeer(I_NODE);
+
+    const r = await V.json('/v1/federation/key-exchange', {
+        method: 'POST',
+        body: JSON.stringify({ node_id: I_NODE, node_url: 'http://attacker.invalid:49990', node_public_key: iKeys.publicKey, timestamp: new Date().toISOString() }),
+    });
+    const list = await V.json('/v1/federation/peers', { headers: auth(V.ownerToken) });
+    const row = (list.body.data.peers as any[]).find(p => p.node_id === I_NODE);
+    if (r.status === 200) {
+        assert(!!row, 'a re-admitted peer is listed');
+        assert(row.url === I_URL, `the re-admitted peer must keep the address the operator approved, got ${row.url}`);
+    } else {
+        assert(!row || row.url !== 'http://attacker.invalid:49990', `a refused exchange moved the peer: ${JSON.stringify(row)}`);
+    }
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
