@@ -31,6 +31,11 @@
  *   const child = spawn('node', [...], { stdio: ['ignore', 'pipe', 'pipe'] });
  *   return waitForServer(child, BASE);
  * @version-history
+ *   v1.3.0 — 2026-09-16 — And where in the PROGRAM it is: SIGUSR2 to the child before the SIGKILL,
+ *     and the diagnostic report it writes gives the main thread's JavaScript stack and what it still
+ *     has open. The thread states narrowed the last one and could not name it; removing tsx from the
+ *     boot took the failure from most of a night to one, which proves the loader was one cause and
+ *     leaves the other unnamed. Armed in test/helpers/node-entry.ts, read back out of the child's argv.
  *   v1.2.0 — 2026-09-13 — And WHERE it is: the state letter of every thread, and the kernel
  *     function the main one is parked in. The share of a core narrowed the question and left it
  *     open — a node that sat out 420 seconds at 2% of a core beside siblings that booted in 7,
@@ -49,6 +54,7 @@
 import type { ChildProcess } from 'node:child_process';
 import { connect } from 'node:net';
 import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { URL } from 'node:url';
 
 /** How long a spawned node may take to answer. Generous on purpose: see the file header. */
@@ -138,11 +144,15 @@ export async function waitForServer(
             + `share means it is doing the work and not getting the processor, which is a machine running `
             + `more nodes than it has cores rather than a stuck one.`;
 
+    // WHERE IN THE PROGRAM IT IS WAITING, which is the one thing every earlier reading left out.
+    // Asked before the SIGKILL, because a dead process writes no report.
+    const report = await diagnosticReport(child);
+
     child.kill('SIGKILL');
     throw new Error(
         `${label} did not answer ${base}${path} within ${budgetMs}ms. `
         + `The port ${listening ? 'IS accepting connections, so something is there and not answering HTTP' : 'refuses connections, so nothing ever bound it'}; `
-        + `${said}.${burned}${threads} `
+        + `${said}.${burned}${threads}${report} `
         + `Raise AIMEAT_E2E_BOOT_MS if the machine is slow rather than broken.${tail()}`);
 }
 
@@ -235,4 +245,58 @@ async function portAnswers(base: string): Promise<boolean> {
         socket.on('connect', () => done(true));
         socket.on('error', () => done(false));
     });
+}
+
+/**
+ * The stuck node's own account of where it is: the JavaScript stack of its main thread, and what it
+ * still has open.
+ *
+ * Every reading before this one narrowed the failure without naming it — no log line after the
+ * import graph's warnings, an event loop parked in ep_poll, a few per cent of a core — and the
+ * answer to "waiting on WHAT" was never in the message. `node --report-on-signal` writes exactly
+ * that when it gets SIGUSR2, and test/helpers/node-entry.ts arms every spawned node with it and a
+ * directory of its own. The directory is read back out of the child's argv, so nothing has to be
+ * passed between the two files.
+ *
+ * Returns '' and stays quiet whenever it cannot help: on Windows, on a node started some other way,
+ * and when no report lands within the second it is given. A diagnostic that throws while explaining
+ * a failure hides the failure.
+ */
+async function diagnosticReport(child: ChildProcess): Promise<string> {
+    if (process.platform === 'win32') return '';
+    const dirArg = (child.spawnargs ?? []).find(a => a.startsWith('--report-directory='));
+    if (!dirArg || !child.pid) return '';
+    const dir = dirArg.slice('--report-directory='.length);
+    const before = new Set(safeList(dir));
+    try { child.kill('SIGUSR2'); } catch { return ''; }
+
+    let file = '';
+    for (let waited = 0; waited < 2000 && !file; waited += 100) {
+        await new Promise(r => setTimeout(r, 100));
+        file = safeList(dir).find(f => !before.has(f)) ?? '';
+    }
+    if (!file) return '';
+
+    try {
+        const report = JSON.parse(readFileSync(join(dir, file), 'utf-8')) as {
+            javascriptStack?: { stack?: string[] };
+            libuv?: Array<{ type?: string; is_active?: boolean; details?: string }>;
+        };
+        const frames = (report.javascriptStack?.stack ?? []).slice(0, 8).map(s => s.trim()).filter(Boolean);
+        const active = (report.libuv ?? []).filter(h => h.is_active)
+            .map(h => h.details ? `${h.type} (${h.details})` : String(h.type))
+            .slice(0, 8);
+        const parts: string[] = [];
+        if (frames.length) parts.push(`Its main thread is in:\n  ${frames.join('\n  ')}`);
+        if (active.length) parts.push(`Still open: ${active.join(', ')}.`);
+        return parts.length ? ` ${parts.join(' ')}` : '';
+    } catch {
+        // An unreadable report is one less thing to say, never a second failure on top of the first.
+        return '';
+    }
+}
+
+/** Directory listing that answers [] for a directory that is not there. */
+function safeList(dir: string): string[] {
+    try { return readdirSync(dir); } catch { return []; }
 }
