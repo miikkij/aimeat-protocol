@@ -27,6 +27,9 @@
  *   GET    /v1/mcp-servers/:id/tools        -- what it can do, cached unless ?refresh=1
  *   POST   /v1/mcp-servers/:id/call         -- run one of its tools
  *   PATCH  /v1/mcp-servers/:id              -- the editable fields, never the slug or the credential
+ *   GET    /v1/mcp-servers/grants           -- who may use what
+ *   PUT    /v1/mcp-servers/:id/grants       -- narrow one agent to named tools, with caps
+ *   DELETE /v1/mcp-servers/:id/grants/:who  -- remove the narrowing (NOT the access)
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
@@ -47,6 +50,10 @@ import {
 } from '../services/mcp-client/registry.js';
 import { callRemoteTool, listRemoteTools } from '../services/mcp-client/invoke.js';
 import { startMcpOAuth, finishMcpOAuth } from '../services/mcp-client/oauth.js';
+import {
+  listMcpGrants, putMcpGrant, removeMcpGrant, type McpGrant,
+} from '../services/mcp-client/grants.js';
+import { emitChange } from '../services/event-bus.js';
 import { recordAccountEvent } from '../services/account-events.js';
 
 export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router {
@@ -122,6 +129,78 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       }));
     });
 
+
+  // ── Grants: which agent may use which tools ─────────────────────────────────────────────────
+
+  router.get('/v1/mcp-servers/grants', requireAuth(), requireAnyScope('mcp:read', 'mcp:manage'),
+    async (req: Request, res: Response) => {
+      const server = typeof req.query.server === 'string' ? req.query.server : undefined;
+      const grants = await listMcpGrants(storage, ownerOf(req), server);
+      return res.json(success(config.nodeId, { grants }));
+    });
+
+  router.put('/v1/mcp-servers/:id/grants', requireAuth(), requireScope('mcp:manage'),
+    async (req: Request, res: Response) => {
+      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
+      if (!server) return notFound(res);
+
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const grantee = typeof b.grantee === 'string' ? b.grantee.trim() : '';
+      if (!grantee) {
+        return res.status(400).json(error(
+          config.nodeId, 'BAD_REQUEST', 'Name who the permission is for, or "*" for everything.',
+        ));
+      }
+      // `tools` is required and has no default. A grant written without it would be read as "every
+      // tool", which is the OPPOSITE of what somebody writing a grant is trying to say.
+      const tools = b.tools === '*' ? '*' as const
+        : Array.isArray(b.tools) ? b.tools.filter((x): x is string => typeof x === 'string')
+          : null;
+      if (tools === null) {
+        return res.status(400).json(error(
+          config.nodeId, 'BAD_REQUEST',
+          'Say which tools this may use: a list of names, or "*" for all of them.',
+        ));
+      }
+
+      const grant: McpGrant = {
+        type: 'aimeat:McpGrant',
+        ownerGhii: ownerOf(req),
+        server: server.slug,
+        grantee,
+        tools,
+        ...(b.locked_input && typeof b.locked_input === 'object'
+          ? { lockedInput: b.locked_input as Record<string, unknown> } : {}),
+        ...(b.call_cap && typeof b.call_cap === 'object'
+          ? { callCap: b.call_cap as { count: number; windowHours: number } } : {}),
+        expires: typeof b.expires === 'string' ? b.expires : null,
+        grantedBy: callerPrincipal(req.auth!, config.nodeId),
+        grantedAt: new Date().toISOString(),
+      };
+      await putMcpGrant(storage, grant);
+      // The list of who may use what is a live surface too: an owner narrowing an agent on one
+      // screen should see it on the other without a reload.
+      emitChange('mcp-servers', ownerOf(req));
+      return res.json(success(config.nodeId, { grant }));
+    });
+
+  router.delete('/v1/mcp-servers/:id/grants/:grantee', requireAuth(), requireScope('mcp:manage'),
+    async (req: Request, res: Response) => {
+      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
+      if (!server) return notFound(res);
+
+      const removed = await removeMcpGrant(
+        storage, ownerOf(req), server.slug, req.params.grantee as string,
+      );
+      if (!removed) return notFound(res);
+      emitChange('mcp-servers', ownerOf(req));
+      // Worth saying: removing a grant does not remove access, it removes the NARROWING. The scope
+      // is what decides again, and somebody expecting the opposite would be badly surprised.
+      return res.json(success(config.nodeId, {
+        removed: req.params.grantee,
+        note: 'That narrowing is gone. What this agent may do is decided by its permissions again.',
+      }));
+    });
 
   // ── The OAuth round ─────────────────────────────────────────────────────────────────────────
 

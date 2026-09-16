@@ -234,6 +234,14 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // authorization server.
     aimeat_mcp_authorize: { title: 'Sign In to an Attached Server', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     aimeat_mcp_update: { title: 'Change an Attached Server', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_mcp_grant_list: { title: 'Who May Use Which Server', readOnlyHint: true },
+    // Idempotent: writing the same grant twice leaves the same state. Not destructive, although
+    // it REPLACES an earlier grant for the same pair — what it replaces is a permission record,
+    // and the thing it might take away is itself recoverable by writing it again.
+    aimeat_mcp_grant_set: { title: 'Narrow an Agent to Named Tools', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    // NOT destructive in the direction people expect: removing a narrowing WIDENS what the agent
+    // may do, back to whatever its permissions allow.
+    aimeat_mcp_grant_revoke: { title: 'Remove a Narrowing', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_mcp_detach: { title: 'Remove an MCP Server', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_update: { title: 'Update Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_organism_overview: { title: 'Organism Structure Overview', readOnlyHint: true },

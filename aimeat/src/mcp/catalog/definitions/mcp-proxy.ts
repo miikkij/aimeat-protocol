@@ -86,6 +86,39 @@ export const mcpProxyTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_mcp_grant_list',
+        description: "Which of this person's agents and apps may use which attached servers, and which tools on them. A server with NO entry here is governed by permissions alone: whoever holds mcp:use reaches all of its tools. An entry is a NARROWING of that, so read this before telling somebody what an agent can do \u2014 the permission is only half the answer.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            server: { type: 'string', description: 'Only for this server, by its short name.' },
+        },
+    },
+    {
+        name: 'aimeat_mcp_grant_set',
+        description: "Narrow one agent or app to named tools on one attached server, optionally with arguments already decided, a call ceiling and an end date. This is how 'my coding agent may READ Jira' becomes true without also meaning it may close tickets. locked_input is the part worth understanding: {\"project\":\"SUPPORT\"} means every call lands in SUPPORT whatever the agent asks for, because those values win over what it sends. Writing a grant REPLACES any earlier one for the same agent on the same server. Needs the mcp:manage permission. Ask the person which tools before guessing; a narrowing that is too tight looks exactly like a broken server.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            server: { type: 'string', required: true, description: 'Which server, by its short name.' },
+            grantee: { type: 'string', required: true, description: "An agent's full name, an app as app:owner/file, or * for everything acting for this person." },
+            tools: { type: 'array', required: true, description: "Which tools it may use: a list of names, or the string '*' for all of them." },
+            locked_input: { type: 'object', description: 'Arguments it may not choose. These win over whatever it sends.' },
+            call_cap: { type: 'object', description: 'At most {count} calls in {windowHours} hours.' },
+            expires: { type: 'string', description: 'An ISO date after which this stops applying.' },
+        },
+    },
+    {
+        name: 'aimeat_mcp_grant_revoke',
+        description: "Remove a narrowing. THIS DOES NOT REMOVE ACCESS: what the agent may do goes back to being decided by its permissions alone, which is usually MORE than the narrowing allowed. If the intent is to stop an agent using a server, take the permission away or switch the server off instead, and say which you did. Needs the mcp:manage permission.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            server: { type: 'string', required: true, description: 'Which server, by its short name.' },
+            grantee: { type: 'string', required: true, description: 'Whose narrowing to remove.' },
+        },
+    },
+    {
         name: 'aimeat_mcp_detach',
         description: "Remove an attached MCP server and the credential stored with it. Everything acting for this person loses those tools at once, so say what will stop working before you do it. Needs the mcp:manage permission. This does not cancel anything at the far side: a token the person created there is still theirs to revoke, and worth mentioning if the point was to cut access off.",
         caller: 'agent',

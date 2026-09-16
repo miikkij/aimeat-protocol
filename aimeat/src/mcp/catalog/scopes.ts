@@ -616,6 +616,11 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_mcp_attach: 'mcp:manage',
     aimeat_mcp_update: 'mcp:manage',
     aimeat_mcp_authorize: 'mcp:manage',
+    // The LIST is mcp:read: knowing which agent was narrowed to what is knowing what you have,
+    // and an app showing a person their own permissions must not need the word that CHANGES them.
+    aimeat_mcp_grant_list: 'mcp:read',
+    aimeat_mcp_grant_set: 'mcp:manage',
+    aimeat_mcp_grant_revoke: 'mcp:manage',
     aimeat_mcp_detach: 'mcp:manage',
 
     // Commerce (TARGET-033/034 over MCP). NOTE: the REST commerce routes are requireAuth-only

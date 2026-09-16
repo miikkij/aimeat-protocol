@@ -93,6 +93,35 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     }),
   ));
 
+  mcp.tool('aimeat_mcp_grant_list', descriptionFor('aimeat_mcp_grant_list'), {
+    server: z.string().optional().describe('Only for this server, by its short name.'),
+  }, annotationsFor('aimeat_mcp_grant_list'), async ({ server }) => out(
+    await client.get('/v1/mcp-servers/grants' + (server ? `?server=${encodeURIComponent(server)}` : '')),
+  ));
+
+  mcp.tool('aimeat_mcp_grant_set', descriptionFor('aimeat_mcp_grant_set'), {
+    server: z.string().describe('Which server, by its short name.'),
+    grantee: z.string().describe("An agent's full name, an app as app:owner/file, or *."),
+    tools: z.union([z.literal('*'), z.array(z.string())]).describe("Tool names, or '*'."),
+    locked_input: z.record(z.string(), z.unknown()).optional().describe('Arguments it may not choose.'),
+    call_cap: z.object({ count: z.number(), windowHours: z.number() }).optional(),
+    expires: z.string().optional(),
+  }, annotationsFor('aimeat_mcp_grant_set'), async ({ server, grantee, tools, locked_input, call_cap, expires }) => out(
+    await client.put(path(server, '/grants'), {
+      grantee, tools,
+      ...(locked_input ? { locked_input } : {}),
+      ...(call_cap ? { call_cap } : {}),
+      ...(expires ? { expires } : {}),
+    }),
+  ));
+
+  mcp.tool('aimeat_mcp_grant_revoke', descriptionFor('aimeat_mcp_grant_revoke'), {
+    server: z.string().describe('Which server, by its short name.'),
+    grantee: z.string().describe('Whose narrowing to remove.'),
+  }, annotationsFor('aimeat_mcp_grant_revoke'), async ({ server, grantee }) => out(
+    await client.delete(path(server, `/grants/${encodeURIComponent(grantee)}`)),
+  ));
+
   mcp.tool('aimeat_mcp_detach', descriptionFor('aimeat_mcp_detach'), {
     server: z.string().describe('Which server, by its short name.'),
   }, annotationsFor('aimeat_mcp_detach'), async ({ server }) => out(

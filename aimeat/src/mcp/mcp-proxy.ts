@@ -45,6 +45,10 @@ import {
 } from '../services/mcp-client/registry.js';
 import { callRemoteTool, listRemoteTools } from '../services/mcp-client/invoke.js';
 import { startMcpOAuth } from '../services/mcp-client/oauth.js';
+import {
+  listMcpGrants, putMcpGrant, removeMcpGrant, type McpGrant,
+} from '../services/mcp-client/grants.js';
+import { emitChange } from '../services/event-bus.js';
 import { toPublicMcpServer, type McpTransport, type McpServerCredential } from '../models/mcp-server-schemas.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
@@ -224,6 +228,65 @@ export function registerMcpProxyTools(
         ...(exposure !== undefined ? { exposure } : {}),
       });
       return ok({ server: toPublicMcpServer(updated) });
+    });
+
+  mcp.tool('aimeat_mcp_grant_list', descriptionFor('aimeat_mcp_grant_list'),
+    { server: z.string().optional().describe('Only for this server, by its short name.') },
+    annotationsFor('aimeat_mcp_grant_list'),
+    async ({ server }): Promise<TextResult> =>
+      ok({ grants: await listMcpGrants(storage, ownerGhii(), server) }));
+
+  mcp.tool('aimeat_mcp_grant_set', descriptionFor('aimeat_mcp_grant_set'),
+    {
+      server: z.string().describe('Which server, by its short name.'),
+      grantee: z.string()
+        .describe("Who this is for: an agent's full name, an app as app:owner/file, or * for everything."),
+      tools: z.union([z.literal('*'), z.array(z.string())])
+        .describe("Which tools it may use: a list of names, or '*' for all of them."),
+      locked_input: z.record(z.string(), z.unknown()).optional()
+        .describe('Arguments it may not choose, e.g. {"project":"SUPPORT"}. These win over what it sends.'),
+      call_cap: z.object({ count: z.number(), windowHours: z.number() }).optional()
+        .describe('At most this many calls in this many hours.'),
+      expires: z.string().optional().describe('An ISO date after which this stops applying.'),
+    },
+    annotationsFor('aimeat_mcp_grant_set'),
+    async ({ server, grantee, tools, locked_input, call_cap, expires }): Promise<TextResult> => {
+      const row = await requireUsableServer(storage, ownerGhii(), server);
+      if (!row) return notFound(server);
+
+      const grant: McpGrant = {
+        type: 'aimeat:McpGrant',
+        ownerGhii: ownerGhii(),
+        server: row.slug,
+        grantee,
+        tools,
+        ...(locked_input ? { lockedInput: locked_input } : {}),
+        ...(call_cap ? { callCap: call_cap } : {}),
+        expires: expires ?? null,
+        grantedBy: getAgentGaii(),
+        grantedAt: new Date().toISOString(),
+      };
+      await putMcpGrant(storage, grant);
+      emitChange('mcp-servers', ownerGhii());
+      return ok({ grant });
+    });
+
+  mcp.tool('aimeat_mcp_grant_revoke', descriptionFor('aimeat_mcp_grant_revoke'),
+    {
+      server: z.string().describe('Which server, by its short name.'),
+      grantee: z.string().describe('Whose narrowing to remove.'),
+    },
+    annotationsFor('aimeat_mcp_grant_revoke'),
+    async ({ server, grantee }): Promise<TextResult> => {
+      const row = await requireUsableServer(storage, ownerGhii(), server);
+      if (!row) return notFound(server);
+      const removed = await removeMcpGrant(storage, ownerGhii(), row.slug, grantee);
+      if (!removed) return fail(`There is no narrowing for "${grantee}" on "${row.slug}".`);
+      emitChange('mcp-servers', ownerGhii());
+      return ok({
+        removed: grantee,
+        note: 'That narrowing is gone. What this agent may do is decided by its permissions again.',
+      });
     });
 
   mcp.tool('aimeat_mcp_detach', descriptionFor('aimeat_mcp_detach'),
