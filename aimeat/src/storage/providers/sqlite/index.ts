@@ -63,6 +63,7 @@ import { capabilityAgentsMethods } from './methods/capability-agents.js';
 import { messagingMethods } from './methods/messaging.js';
 import { aiProvenanceMethods } from './methods/ai-provenance.js';
 import { connectionMethods } from './methods/connections.js';
+import { mcpServerMethods } from './methods/mcp-servers.js';
 import { financeMethods } from './methods/finance.js';
 import { outboundMethods } from './methods/outbound.js';
 import { companyMethods } from './methods/companies.js';
@@ -216,6 +217,7 @@ Object.assign(
   messagingMethods,
   aiProvenanceMethods,
   connectionMethods,
+  mcpServerMethods,
   financeMethods,
   outboundMethods,
   companyMethods,

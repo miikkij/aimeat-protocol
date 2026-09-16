@@ -525,6 +525,50 @@ export interface Connection {
   updatedAt: string;
 }
 
+/**
+ * A remote MCP server this node connects OUT to (migration 0076). Not a Connection: that is an
+ * outbound ACCOUNT at one of eleven hand-written providers, and this is an arbitrary endpoint that
+ * describes its own tools over the protocol.
+ *
+ * `credential` is ciphertext. `transport` holds the URL and never reaches a response — a caller
+ * names the slug and the node builds the request.
+ */
+export interface McpServer {
+  auth: Generated<string>;
+  /** Whose credential is spent when an agent or app calls through. */
+  callerIdentity: Generated<string>;
+  createdAt: string;
+  createdBy: string;
+  credential: string | null;
+  credentialShape: string | null;
+  description: Generated<string>;
+  directory: Generated<Json>;
+  enabled: Generated<boolean>;
+  /** Null is legitimate: plenty of tokens never expire. Never read it as "expired". */
+  expiresAt: string | null;
+  /** gateway (three fixed tools) or flatten (every allowed tool listed with its real schema). */
+  exposure: Generated<string>;
+  id: string;
+  lastError: string | null;
+  lastListedAt: string | null;
+  lastOkAt: string | null;
+  organismId: string | null;
+  /** Null when ownership is 'node' — an operator's server belongs to nobody. */
+  ownerGhii: string | null;
+  ownership: Generated<string>;
+  providerClientId: string | null;
+  refreshClaimedAt: string | null;
+  /** The handle a caller names instead of a URL. Immutable after attach. */
+  slug: string;
+  status: Generated<string>;
+  title: string;
+  toolCache: Generated<Json>;
+  toolCacheHash: Generated<string>;
+  transport: Json;
+  updatedAt: string;
+  ws: string | null;
+}
+
 /** TARGET-057. One named errand over one connection, with the fixed parameters an app cannot alter. */
 export interface ConnectionDelegation {
   action: string;
@@ -2216,6 +2260,7 @@ export interface DB {
   AccountEventArchive: AccountEventArchive;
   WorkspaceRow: WorkspaceRow;
   SsoConnection: SsoConnection;
+  McpServer: McpServer;
   AiProvenance: AiProvenance;
   App: App;
   AppDownload: AppDownload;

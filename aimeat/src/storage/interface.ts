@@ -121,6 +121,7 @@ import type { FinanceRepository } from './repositories/finance.repository.js';
 import type { OutboundRepository } from './repositories/outbound.repository.js';
 import type { CompanyRepository } from './repositories/company.repository.js';
 import type { SsoConnectionRepository } from './repositories/sso-connection.repository.js';
+import type { McpServerRepository } from './repositories/mcp-server.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository, MemoryTallyRepository,
@@ -161,6 +162,7 @@ export interface Storage extends
   OutboundRepository,
   CompanyRepository,
   SsoConnectionRepository,
+  McpServerRepository,
   StatsRepository {
   /**
    * Run `fn` inside ONE database transaction: every storage call made underneath it commits together

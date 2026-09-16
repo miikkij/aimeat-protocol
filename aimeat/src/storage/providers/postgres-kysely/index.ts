@@ -51,6 +51,7 @@ import { agentTaskMethods } from './methods/agent-tasks.js';
 import { agentUsageMethods } from './methods/agent-usage.js';
 import { aiProvenanceMethods } from './methods/ai-provenance.js';
 import { connectionMethods } from './methods/connections.js';
+import { mcpServerMethods } from './methods/mcp-servers.js';
 import { financeMethods } from './methods/finance.js';
 import { outboundMethods } from './methods/outbound.js';
 import { companyMethods } from './methods/companies.js';
@@ -169,6 +170,7 @@ Object.assign(
   agentUsageMethods,
   aiProvenanceMethods,
   connectionMethods,
+  mcpServerMethods,
   financeMethods,
   outboundMethods,
   companyMethods,
