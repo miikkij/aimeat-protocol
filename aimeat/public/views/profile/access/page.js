@@ -37,6 +37,7 @@ import { Section, Fold, scrollTo } from '/views/profile/organisms/poster-parts.j
 import { TwoFactorSection } from '../security-tab/two-factor.js';
 import { PasskeysSection } from '../security-tab/passkeys.js';
 import { ConnectionsSection } from '../access-tab/connections.js';
+import { McpServersSection } from '../access-tab/mcp-servers.js';
 import { SharingGroupsSection } from '../access-tab/sharing-groups.js';
 import { SharesIncomingSection } from '../access-tab/shares-incoming.js';
 import { x, n, dateWord, crumb, pageLinks, FILTERS, filterRows, scopeSentence } from './frame.js';
@@ -259,6 +260,11 @@ function secAccounts(ctx) {
     <${Section} id="ac-accounts" num="03" title=${x('secAccounts')} count=${c?.enabled ? x('secAccountsSub', { n: count, providers: c.providers.length }) : x('secAccountsOff')}>
       <p class="ac-para">${x('accountsIntro')}</p>
       ${c?.enabled ? html`<div class="ac-kept"><${ConnectionsSection} showToast=${ctx.showToast} /></div>` : html`<p class="ac-empty">${x('accountsOffBody')}</p>`}
+      <!-- Beside the accounts, and not in a section of its own: a person looking for "what have I
+           given something else access to" must find all of it in one place. An MCP server is the
+           same promise pointing outward, so it belongs under the same heading. It does NOT follow
+           the connections master switch, because it is a different capability with its own. -->
+      <div class="ac-kept"><${McpServersSection} showToast=${ctx.showToast} /></div>
     <//>`;
 }
 
