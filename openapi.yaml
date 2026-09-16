@@ -27081,9 +27081,23 @@ paths:
           application/json:
             schema:
               type: object
+      parameters:
+        - name: X-AIMEAT-MCP-Via
+          in: header
+          required: false
+          description: >
+            The node ids a proxied call has already passed through, comma-separated. An AIMEAT sends
+            it on every request to a remote MCP server, with its own id last. Answered with 508 when
+            it names this node or lists 4 or more nodes.
+          schema:
+            type: string
       responses:
         '200':
           description: MCP response (may be SSE stream)
+        '508':
+          description: >
+            The call has already passed through this node (error.data.reason LOOP_DETECTED) or
+            through too many servers (TOO_MANY_HOPS). Checked before authentication.
 
     get:
       operationId: mcpResources
@@ -27136,6 +27150,8 @@ paths:
           description: MCP response (may be SSE stream)
         '400':
           description: Unknown surface role
+        '508':
+          description: The call has already passed through this node or too many servers, as on /v1/mcp.
     get:
       operationId: mcpResourcesV2
       summary: MCP SSE stream / resource list for a surface
@@ -46854,7 +46870,11 @@ paths:
         '201':
           description: Attached, with the tools the server reported
         '400':
-          description: The name is not one this node accepts, or the address is missing.
+          description: >
+            The name is not one this node accepts, or the address is missing. SELF_ADDRESS: the
+            address is this node's own MCP endpoint, or the peer named is this node; nothing is
+            stored. LOOP_DETECTED: the first look came back to this node by another spelling of its
+            address; the row is removed again.
         '409':
           description: This owner already has a server with that name.
         '502':
@@ -47341,6 +47361,8 @@ paths:
           description: No such server.
         '502':
           description: The server could not be reached, or its credential is dead.
+        '508':
+          description: LOOP_DETECTED. Asking the server would bring the call back to a node it already passed through.
   /v1/mcp-servers/{id}/call:
     post:
       operationId: callMcpServerTool
@@ -47382,6 +47404,10 @@ paths:
           description: No such server.
         '502':
           description: The server could not be reached, or its credential is dead.
+        '508':
+          description: >
+            LOOP_DETECTED. The server is an AIMEAT this call has already passed through, or the call
+            has passed through too many servers. The server stays in service for other calls.
   /v1/connections:
     get:
       operationId: listConnections

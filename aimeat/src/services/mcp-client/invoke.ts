@@ -19,6 +19,8 @@
  * @structure RemoteCallResult · callRemoteTool · listRemoteTools · toolCacheHash
  * @usage const r = await callRemoteTool({ storage, config, server, tool, args, caller });
  * @version-history
+ *   v1.3.0 — 2026-09-17 — A 508 from the far side is LOOP_DETECTED, answered with 508, and does not
+ *     park the server: only that call went round in a circle (hops.ts).
  *   v1.2.0 — 2026-09-16 — No morsel prices. The debit, its refund and the INSUFFICIENT refusal are
  *     gone, because morsels are a pacer and buy nothing; a stored morsel price reads as free.
  *   v1.1.0 — 2026-09-16 — Phase 6: a record naming a peer AIMEAT node is resolved to that peer's
@@ -73,6 +75,8 @@ export type RemoteCallRefusal =
   | 'NOT_GRANTED'
   /** The operator priced this in money, and a proxied call cannot take payment yet. */
   | 'PRICE_UNSUPPORTED'
+  /** An AIMEAT on the far side refused the call because it had already passed through it (hops.ts). */
+  | 'LOOP_DETECTED'
   | 'TOOL_FAILED';
 
 /**
@@ -89,9 +93,13 @@ export type RemoteCallRefusal =
  *         that stays true once it can, and a client should not have to learn it twice.
  *   503 — this node cannot serve it until whoever runs it, or owns the server, changes something.
  *   502 — the far side failed, or refused this node's credential. The only group that is its fault.
+ *   508 — the call would go round in a circle. The status HTTP names for exactly that, and a client
+ *         must not retry it: the same call comes back the same way every time.
  */
 export function statusForRemoteRefusal(code: RemoteCallRefusal): number {
   switch (code) {
+    case 'LOOP_DETECTED':
+      return 508;
     case 'NOT_GRANTED':
     case 'SERVER_DISABLED':
       return 403;
@@ -287,6 +295,16 @@ async function parkAndDescribe(
   }
   if (/cannot run a local MCP server|peer AIMEAT node/i.test(raw)) {
     return { code: 'TRANSPORT_UNSUPPORTED', message: raw };
+  }
+  // 508 is an AIMEAT on the far side saying this call has already passed through it (hops.ts). The
+  // SERVER is not parked and its client is kept: it answers every other call, and only this one went
+  // round in a circle. The SDK carries the status in `.code`, as it does for 401.
+  if (tagged === 508) {
+    return {
+      code: 'LOOP_DETECTED',
+      // One sentence for both refusals the far side sends with 508: a circle, and a chain too long.
+      message: `Calling "${server.slug}" would send this call round in a circle, or through more servers than one call should need, so it was stopped.`,
+    };
   }
   if (isUnauthorized(err)) {
     await storage.setMcpServerStatus(server.id, 'needs_reauth', raw);
