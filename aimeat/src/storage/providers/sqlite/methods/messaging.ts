@@ -201,11 +201,27 @@ export const messagingMethods = {
 
   async createOnboarding(this: SqliteStorage, record: AgentOnboardingRecord): Promise<AgentOnboardingRecord> {
     this.db.prepare(
+      // ONE ONBOARDING PER AGENT, AND WRITING IT TWICE IS NOT AN ERROR. Three paths create this row
+      // — agent registration, device authorization, and POST /onboarding/start — and the last one
+      // decides between create and update by reading first. A row that appears between that read and
+      // this write used to end as a 500: the Postgres sweep of 2026-09-16 failed exactly there
+      // ("duplicate key value violates unique constraint AgentOnboarding_agentGaii_key", one
+      // millisecond before the suite's INTERNAL_ERROR). agentGaii is the primary key here and a
+      // unique index there, so the same call is a constraint violation on both; SQLite only lost the
+      // race less often. The write is the caller's whole intent — this agent's onboarding is now
+      // THIS — so it replaces what is there instead of refusing.
       `INSERT INTO agent_onboarding
        (agentGaii, status, startedAt, completedAt, steps, readinessScore, readinessLevel,
         detectedPlatform, installedRuntime, onboardingBaseline, operationalHealth,
         healthComponents, healthRecalculatedAt, readinessOverride)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(agentGaii) DO UPDATE SET
+         status = excluded.status, startedAt = excluded.startedAt, completedAt = excluded.completedAt,
+         steps = excluded.steps, readinessScore = excluded.readinessScore,
+         readinessLevel = excluded.readinessLevel, detectedPlatform = excluded.detectedPlatform,
+         installedRuntime = excluded.installedRuntime, onboardingBaseline = excluded.onboardingBaseline,
+         operationalHealth = excluded.operationalHealth, healthComponents = excluded.healthComponents,
+         healthRecalculatedAt = excluded.healthRecalculatedAt, readinessOverride = excluded.readinessOverride`
     ).run(
       record.agentGaii,
       record.status,

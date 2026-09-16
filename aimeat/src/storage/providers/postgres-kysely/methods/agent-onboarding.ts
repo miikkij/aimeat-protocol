@@ -44,7 +44,33 @@ export const agentOnboardingMethods = {
       healthRecalculatedAt: record.healthRecalculatedAt ? new Date(record.healthRecalculatedAt) : null,
       readinessOverride: jsonb(record.readinessOverride ?? null),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any).returningAll().execute();
+    } as any)
+      // ONE ONBOARDING PER AGENT, AND WRITING IT TWICE IS NOT AN ERROR. Three paths create this row
+      // — agent registration, device authorization, and POST /onboarding/start — and the last one
+      // decides between create and update by reading first. A row that appeared between that read
+      // and this insert ended as a 500: the nightly sweep of 2026-09-16 failed on exactly that,
+      // "duplicate key value violates unique constraint AgentOnboarding_agentGaii_key" one
+      // millisecond before the suite's INTERNAL_ERROR. The SQLite provider has the same conflict
+      // (agentGaii is its primary key) and takes the same clause; it simply lost the race less
+      // often. The write is the caller's whole intent — this agent's onboarding is now THIS — so it
+      // replaces what is there instead of refusing.
+      .onConflict((oc) => oc.column('agentGaii').doUpdateSet({
+        status: record.status,
+        startedAt: new Date(record.startedAt),
+        completedAt: record.completedAt ? new Date(record.completedAt) : null,
+        steps: jsonb(record.steps),
+        readinessScore: record.readinessScore ?? null,
+        readinessLevel: record.readinessLevel ?? null,
+        detectedPlatform: record.detectedPlatform ?? null,
+        installedRuntime: record.installedRuntime ?? null,
+        onboardingBaseline: record.onboardingBaseline ?? null,
+        operationalHealth: record.operationalHealth ?? null,
+        healthComponents: jsonb(record.healthComponents ?? null),
+        healthRecalculatedAt: record.healthRecalculatedAt ? new Date(record.healthRecalculatedAt) : null,
+        readinessOverride: jsonb(record.readinessOverride ?? null),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any))
+      .returningAll().execute();
     return toRecord(row);
   },
 
