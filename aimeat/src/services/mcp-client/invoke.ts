@@ -29,6 +29,7 @@ import type {
 } from '../../models/mcp-server-schemas.js';
 import { mcpClientPool } from './pool.js';
 import { openMcpCredential } from './credential.js';
+import { refreshMcpOAuth } from './oauth.js';
 import { recordUsageCall } from '../usage/usage-buffer.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
@@ -95,7 +96,26 @@ async function resolveCredential(
 ): Promise<{ credential: McpServerCredential | null } | { refusal: RemoteCallResult }> {
   if (server.auth === 'none' || !server.credential) return { credential: null };
 
-  const opened = openMcpCredential(server.credential, config);
+  // Renew BEFORE the call rather than after a 401. A token that dies mid-flight costs a failed
+  // call and a parked server, and the owner is told to reconnect something that only needed a
+  // renewal. Single-flight inside, and a no-op when the token has time left or never expires.
+  const fresh = await refreshMcpOAuth(storage, config, server);
+  if (fresh === null) {
+    await storage.setMcpServerStatus(
+      server.id, 'needs_reauth', 'The stored credential could not be opened.',
+    );
+    return {
+      refusal: {
+        ok: false,
+        code: 'CREDENTIAL_UNREADABLE',
+        message: `The credential for "${server.slug}" cannot be read any more. Connect it again.`,
+      },
+    };
+  }
+  const row = fresh;
+  if (!row.credential) return { credential: null };
+
+  const opened = openMcpCredential(row.credential, config);
   if (opened === 'no-key') {
     return {
       refusal: {

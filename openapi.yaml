@@ -46804,6 +46804,15 @@ paths:
                   type: string
                   enum: [http, sse]
                   default: http
+                auth:
+                  type: string
+                  enum: [oauth]
+                  description: >
+                    Set to oauth for a server the person will SIGN IN to rather than paste a token
+                    for. The server is attached parked in needs_reauth and the probe is skipped,
+                    because a server awaiting a token refuses an anonymous tool list and the owner
+                    would be told their address was wrong when it was right. POST …/authorize then
+                    starts the round.
                 token:
                   type: string
                   description: Sealed with the node key. Never returned.
@@ -46859,6 +46868,76 @@ paths:
           description: Removed
         '404':
           description: No such server.
+  /v1/mcp-servers/{id}/authorize:
+    post:
+      operationId: authorizeMcpServer
+      summary: Begin signing in to an attached MCP server
+      description: >
+        Needs mcp:manage. Returns an address for a PERSON to open: consent happens at the far side,
+        never here, and fetching the address from a script accomplishes nothing. The PKCE verifier
+        stays on this node and never travels, and the single-use state is bound to the owner who
+        started the round, which is the CSRF gate. An empty authorize_url means the far side needed
+        nobody to sign in.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                return_url:
+                  type: string
+                  description: A path on this node the browser lands on afterwards. A path, not a URL.
+      responses:
+        '200':
+          description: The address to open, and whether a person is needed at all
+        '400':
+          description: This server does not offer OAuth.
+        '404':
+          description: No such server.
+        '502':
+          description: The server could not be asked how to sign in.
+        '503':
+          description: This node has no encryption key, so it cannot hold the resulting token.
+  /v1/mcp-servers/callback:
+    get:
+      operationId: mcpServerCallback
+      summary: The far side's redirect after a person approves
+      description: >
+        THE ONE UNAUTHENTICATED ROUTE in this group, and it has to be: the far side redirects a
+        browser here and that browser carries no bearer of ours. Its gate is the single-use state,
+        which is bound to the owner who started the round and consumed before the code is exchanged,
+        so a replayed callback finds nothing whether or not the first one succeeded.
+      tags: [MCP Servers]
+      parameters:
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Back to the page the person started from, when the round named one.
+        '200':
+          description: Connected, when there was nowhere to send them back to.
+        '400':
+          description: The link was already used, or it expired.
+        '502':
+          description: The far side refused the sign-in.
   /v1/mcp-servers/{id}/tools:
     get:
       operationId: listMcpServerTools

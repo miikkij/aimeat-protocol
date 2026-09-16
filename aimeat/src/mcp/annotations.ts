@@ -229,6 +229,10 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Idempotent: setting enabled to the value it already has changes nothing. Not destructive:
     // switching a server off keeps the setup and the credential, which is the whole difference
     // between this and detaching.
+    // Idempotent in the sense that matters: starting twice produces two addresses and signs in
+    // to nothing on its own. openWorld, because the whole point is reaching somebody else's
+    // authorization server.
+    aimeat_mcp_authorize: { title: 'Sign In to an Attached Server', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     aimeat_mcp_update: { title: 'Change an Attached Server', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_mcp_detach: { title: 'Remove an MCP Server', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_update: { title: 'Update Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

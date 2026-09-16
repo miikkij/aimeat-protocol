@@ -67,6 +67,11 @@ export function openMcpCredential(
       accessToken: c.accessToken,
       ...(typeof c.refreshToken === 'string' ? { refreshToken: c.refreshToken } : {}),
       ...(typeof c.headerName === 'string' ? { headerName: c.headerName } : {}),
+      // Without this the client registration is dropped on the way back out, and the FIRST refresh
+      // is the one that finds out: the exchange needs the client that minted the token.
+      ...(c.oauthClient && typeof c.oauthClient.client_id === 'string'
+        ? { oauthClient: c.oauthClient }
+        : {}),
     };
   } catch {
     // The FACT is logged; the exception is not. A failed decrypt's message can carry fragments of

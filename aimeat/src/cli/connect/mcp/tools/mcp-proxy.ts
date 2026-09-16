@@ -69,6 +69,15 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     }),
   ));
 
+  mcp.tool('aimeat_mcp_authorize', descriptionFor('aimeat_mcp_authorize'), {
+    server: z.string().describe('Which server, by its short name.'),
+    return_url: z.string().optional().describe('A path on this node the browser lands on afterwards.'),
+  }, annotationsFor('aimeat_mcp_authorize'), async ({ server, return_url }) => out(
+    await client.post(path(server, '/authorize'), {
+      ...(return_url ? { return_url } : {}),
+    }),
+  ));
+
   mcp.tool('aimeat_mcp_update', descriptionFor('aimeat_mcp_update'), {
     server: z.string().describe('Which server, by its short name.'),
     enabled: z.boolean().optional().describe('false switches it off at once; true switches it back on.'),

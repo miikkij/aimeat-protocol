@@ -16593,7 +16593,12 @@
       "mcpAttachFailed": "Palvelimen liittäminen ei onnistunut",
       "mcpNeedNameUrl": "Palvelin tarvitsee lyhyen nimen ja osoitteen.",
       "mcpToggleFailed": "Palvelimen muuttaminen ei onnistunut",
-      "mcpToolsFailed": "Palvelinta ei saatu juuri nyt luettua"
+      "mcpToolsFailed": "Palvelinta ei saatu juuri nyt luettua",
+      "mcpSignIn": "Kirjaudu",
+      "mcpAuthToken": "Sain siltä tunnisteen",
+      "mcpAuthOauth": "Kirjaudun siihen",
+      "mcpNoSignInNeeded": "Palvelin ei tarvinnut kirjautumista. Se on valmis.",
+      "mcpAuthFailed": "Kirjautumista ei saatu alkuun"
     },
     "nodes": {
       "title": "Omat palvelimet",

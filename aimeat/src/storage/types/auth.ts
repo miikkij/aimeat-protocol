@@ -254,7 +254,8 @@ export interface TrustedIssuerRecord {
 export interface VerificationNonceRecord {
   id: string;
   owner: string;
-  type: 'eudiw' | 'ftn' | 'google_login' | 'casdoor_login' | 'entra_login' | 'saml_login' | 'connect';
+  /** `mcp_connect` is a remote MCP server's OAuth round; `connect` is an outbound ACCOUNT's. */
+  type: 'eudiw' | 'ftn' | 'google_login' | 'casdoor_login' | 'entra_login' | 'saml_login' | 'connect' | 'mcp_connect';
   state: string;
   /** OIDC nonce for the login types; the PKCE code_verifier for `connect`. */
   nonce: string;

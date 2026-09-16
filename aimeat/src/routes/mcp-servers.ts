@@ -22,6 +22,8 @@
  * @structure mcpServersRouter(config, storage):
  *   GET    /v1/mcp-servers                  -- the caller's own servers
  *   POST   /v1/mcp-servers                  -- attach one (probes before it is called attached)
+ *   POST   /v1/mcp-servers/:id/authorize    -- begin the OAuth round; returns an address for a PERSON
+ *   GET    /v1/mcp-servers/callback         -- the far side's redirect (unauthenticated by necessity)
  *   GET    /v1/mcp-servers/:id/tools        -- what it can do, cached unless ?refresh=1
  *   POST   /v1/mcp-servers/:id/call         -- run one of its tools
  *   PATCH  /v1/mcp-servers/:id              -- the editable fields, never the slug or the credential
@@ -44,6 +46,7 @@ import {
   updateMcpServerSettings,
 } from '../services/mcp-client/registry.js';
 import { callRemoteTool, listRemoteTools } from '../services/mcp-client/invoke.js';
+import { startMcpOAuth, finishMcpOAuth } from '../services/mcp-client/oauth.js';
 import { recordAccountEvent } from '../services/account-events.js';
 
 export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router {
@@ -119,6 +122,66 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       }));
     });
 
+
+  // ── The OAuth round ─────────────────────────────────────────────────────────────────────────
+
+  router.post('/v1/mcp-servers/:id/authorize', requireAuth(), requireScope('mcp:manage'),
+    async (req: Request, res: Response) => {
+      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
+      if (!server) return notFound(res);
+
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const started = await startMcpOAuth({
+        storage, config, server,
+        ownerGhii: ownerOf(req),
+        ...(typeof b.return_url === 'string' ? { returnUrl: b.return_url } : {}),
+      });
+      if (!started.ok) {
+        const status = started.code === 'NO_ENCRYPTION_KEY' ? 503
+          : started.code === 'UNREACHABLE' ? 502 : 400;
+        return res.status(status).json(error(config.nodeId, started.code, started.message));
+      }
+      // An empty address means the far side needed nothing from a person: a client that was already
+      // registered with a grant in place. Saying which happened beats an address that goes nowhere.
+      return res.json(success(config.nodeId, {
+        authorize_url: started.authorizeUrl,
+        state: started.state,
+        needs_person: started.authorizeUrl !== '',
+      }));
+    });
+
+  /**
+   * THE ONE UNAUTHENTICATED ROUTE HERE, and it has to be: the far side redirects a BROWSER to it,
+   * and that browser carries no bearer of ours. Its gate is the single-use `state`, which is bound
+   * to the owner who started the round and consumed before the code is exchanged.
+   */
+  router.get('/v1/mcp-servers/callback', async (req: Request, res: Response) => {
+    const state = typeof req.query.state === 'string' ? req.query.state : '';
+    const code = typeof req.query.code === 'string' ? req.query.code : '';
+    if (!state || !code) {
+      return res.status(400).json(error(
+        config.nodeId, 'BAD_REQUEST', 'That sign-in did not come back complete. Start again.',
+      ));
+    }
+
+    const done = await finishMcpOAuth({ storage, config, state, code });
+    if (!done.ok) {
+      return res.status(done.code === 'BAD_STATE' ? 400 : 502)
+        .json(error(config.nodeId, done.code, done.message));
+    }
+    // Now that it has a credential, learn what it can do. Done HERE and not in the OAuth service
+    // because invoke.ts already imports that service for the refresh, and calling back the
+    // other way would be an import cycle. A failure is not fatal: the round DID succeed, and
+    // the first aimeat_mcp_tools call fills the cache instead.
+    await listRemoteTools(storage, config, done.server);
+
+    // A person is looking at this in a browser, so send them back where they came from rather than
+    // leaving them on a JSON page. Only a path of our own: a return URL from the round could
+    // otherwise be used to bounce somebody off this node.
+    if (done.returnUrl.startsWith('/')) return res.redirect(done.returnUrl);
+    return res.json(success(config.nodeId, { connected: done.server.slug }));
+  });
+
   // ── Attaching, which is a human act ─────────────────────────────────────────────────────────
 
   router.post('/v1/mcp-servers', requireAuth(), requireScope('mcp:manage'),
@@ -147,6 +210,11 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       const result = await attachMcpServer({
         storage, config,
         ownerGhii: ownerOf(req),
+        // A server the person will sign in to rather than paste a token for: it is attached
+        // unreachable-but-present, and POST …/authorize starts the round. Attaching first is
+        // deliberate — the round needs a row to hang the credential on, and a person who abandons
+        // the consent screen leaves something they can see and remove rather than nothing at all.
+        ...(b.auth === 'oauth' ? { deferCredential: true as const } : {}),
         createdBy: callerPrincipal(req.auth!, config.nodeId),
         slug: name,
         title: typeof b.title === 'string' && b.title ? b.title : name,

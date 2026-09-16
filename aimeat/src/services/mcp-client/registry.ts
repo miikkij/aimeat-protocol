@@ -55,6 +55,14 @@ export interface AttachInput {
   credential?: McpServerCredential;
   callerIdentity?: McpCallerIdentity;
   exposure?: McpExposure;
+  /**
+   * Attach it now and sign in afterwards, for a server that uses OAuth.
+   *
+   * The row is created parked in `needs_reauth` and the probe is SKIPPED, because a server
+   * that needs a token will refuse an anonymous tools/list and the owner would be told their
+   * address was wrong when it was right. The round hangs the credential on this row.
+   */
+  deferCredential?: boolean;
 }
 
 export type AttachResult =
@@ -136,7 +144,10 @@ export async function attachMcpServer(input: AttachInput): Promise<AttachResult>
     lastListedAt: null,
     directory: { listed: false, visibility: 'private', tags: [] },
     enabled: true,
-    status: 'active',
+    // A deferred credential is not a healthy server yet: it is one waiting for a person to
+    // sign in, which is exactly what needs_reauth means everywhere else here, and the panel
+    // already renders that as a button rather than an error.
+    status: input.deferCredential ? 'needs_reauth' : 'active',
     lastOkAt: null,
     lastError: null,
     createdAt: now,
@@ -144,6 +155,13 @@ export async function attachMcpServer(input: AttachInput): Promise<AttachResult>
   };
 
   await storage.createMcpServer(row);
+
+  // A server awaiting sign-in cannot answer a tool list yet, and probing it would report the
+  // address as wrong when it is right. The round fills the cache when it completes.
+  if (input.deferCredential) {
+    emitChange('mcp-servers', ownerGhii);
+    return { ok: true, server: toPublicMcpServer(row), tools: [] };
+  }
 
   // Probe. A server that does not answer is reported while the owner is still looking at the form.
   const probed = await listRemoteTools(storage, config, row);

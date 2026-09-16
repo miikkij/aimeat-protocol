@@ -16610,7 +16610,12 @@
       "mcpAttachFailed": "Could not attach that server",
       "mcpNeedNameUrl": "A server needs a short name and an address.",
       "mcpToggleFailed": "Could not change that server",
-      "mcpToolsFailed": "Could not read that server just now"
+      "mcpToolsFailed": "Could not read that server just now",
+      "mcpSignIn": "Sign in",
+      "mcpAuthToken": "It gave me a token",
+      "mcpAuthOauth": "I sign in to it",
+      "mcpNoSignInNeeded": "That server needed no sign-in. It is ready.",
+      "mcpAuthFailed": "Could not start the sign-in"
     },
     "nodes": {
       "title": "Your own servers",
