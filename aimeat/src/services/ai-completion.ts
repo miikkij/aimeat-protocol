@@ -21,6 +21,8 @@
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.2.1 — 2026-09-16 — prepareAiCall passes the call's baseUrl to resolveAiKey, which refuses
+ *     the node's shared key for any address but OpenRouter's own.
  *   v3.2.0 — 2026-09-13 — The result carries finishReason and truncated (finish_reason === 'length').
  *     The provider's reason was in hand and dropped, so a cut answer reached an app looking finished.
  *   v3.1.0 — 2026-08-31 — `signal` on the options, threaded to complete(), which composes it with
@@ -510,7 +512,7 @@ export async function prepareAiCall(
   // Whose key pays is one decision and it lives in services/ai-allowance.ts: the person's own key,
   // then the node's if they have allowance left. An own key is never metered here — it is their
   // money and their provider account, which is the whole reason bringing one is recommended.
-  const keyChoice = await resolveAiKey(storage, config, gaii, provider, apiKeyRecord?.value);
+  const keyChoice = await resolveAiKey(storage, config, gaii, provider, apiKeyRecord?.value, baseUrl);
 
   const usage = (usageRecord?.value as UsageRecord | undefined) ?? emptyUsage();
   const dailyBudgetUsd = assertWithinBudget(usage, prefs, opts.appId);

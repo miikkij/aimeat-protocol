@@ -20,18 +20,22 @@
  * @structure
  *   - AiKeyChoice — which key pays, and whether the allowance is spent
  *   - resolveAiKey() — the order above, with the free starter grant applied lazily
+ *   - isOpenRouterHost() — the one address the node's key may be sent to
  *   - debitAllowance() / grantAllowance() / readAllowance()
  * @usage
  *   const choice = await resolveAiKey(storage, config, gaii, prefs, apiKeyRecord?.value);
  *   if (choice.scope === 'node' && choice.exhausted) { … degrade or refuse … }
  * @version-history
+ *   v1.1.0 — 2026-09-16 — The node's key goes only to OpenRouter's host. resolveAiKey takes the
+ *     call's baseUrl and refuses the node key for any other address: a person with no key saved
+ *     their own address and received the node's key in the Authorization header.
  *   v1.0.0 — 2026-08-16 — Initial. Before this the node had no key of its own at all: every
  *     completion spent one individual owner's key, so a person with none simply had no AI.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { AiCompletionError, decryptOwnerKey } from './ai-completion.js';
-import type { ProviderType } from './openrouter.js';
+import { DEFAULT_BASE_URLS, type ProviderType } from './openrouter.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -104,6 +108,16 @@ async function writeAllowance(storage: Storage, gaii: string, rec: AllowanceReco
   });
 }
 
+/** True when a provider address points at OpenRouter's own host over https, the only place the
+ *  node's key may go. Compared against DEFAULT_BASE_URLS so there is one spelling of that host. */
+export function isOpenRouterHost(baseUrl: string): boolean {
+  // An address that does not parse is not OpenRouter's: that is the answer, not a failure.
+  if (typeof baseUrl !== 'string' || !URL.canParse(baseUrl)) return false;
+  const target = new URL(baseUrl);
+  const home = new URL(DEFAULT_BASE_URLS.openrouter);
+  return target.protocol === 'https:' && target.hostname.toLowerCase() === home.hostname && target.port === home.port;
+}
+
 /** What is left to spend on the node's key. Never negative: a call may overshoot by its own cost. */
 export function remainingOf(rec: AllowanceRecord): number {
   return Math.max(0, rec.granted_usd - rec.spent_usd);
@@ -122,6 +136,7 @@ export async function resolveAiKey(
   gaii: string,
   provider: ProviderType,
   apiKeyRecordValue: unknown,
+  baseUrl: string,
 ): Promise<AiKeyChoice> {
   const hasOwn = !!(apiKeyRecordValue as { encrypted?: string } | undefined)?.encrypted;
   if (hasOwn) {
@@ -133,6 +148,15 @@ export async function resolveAiKey(
 
   const instanceKey = (config.openrouterInstanceKey || '').trim();
   if (instanceKey && provider === 'openrouter') {
+    // The node's key goes to OpenRouter's own host and nowhere else. The address comes from the
+    // person's saved settings, and a person with no key of their own saved an address they
+    // control: the node then sent its key there in the Authorization header. Their OWN key may
+    // still go anywhere they point it (a local model server is the ordinary case); this one is
+    // not theirs to point.
+    if (!isOpenRouterHost(baseUrl)) {
+      throw new AiCompletionError('NODE_KEY_HOST', 403,
+        'This node\'s shared AI key is sent only to OpenRouter. To use another address, add your own API key in your AI settings.');
+    }
     const rec = await readAllowance(storage, config, gaii);
     const remaining = remainingOf(rec);
     return { key: instanceKey, scope: 'node', exhausted: remaining <= 0, remainingUsd: remaining };
