@@ -16,15 +16,27 @@
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy. Schema: migrations/0076_mcp_servers.sql.
  */
 import { sql } from 'kysely';
-import type { Selectable } from 'kysely';
+import type { Selectable, Kysely } from 'kysely';
 import type { McpServerQuery, McpServerPatch } from '../../../repositories/mcp-server.repository.js';
 import type {
   McpServerRecord, McpServerStatus, McpOwnership, McpTransport,
   McpAuthMode, McpCallerIdentity, McpExposure, RemoteToolSnapshot,
 } from '../../../../models/mcp-server-schemas.js';
-import type { McpServer as McpServerRow, Json } from '../db-types.js';
-import type { PostgresKyselyStorage } from '../index.js';
+import type { McpServer as McpServerRow, Json, DB } from '../db-types.js';
 import { jsonb } from '../helpers.js';
+
+/**
+ * What these methods need of the object they are merged onto, and nothing more.
+ *
+ * A structural type rather than `import type { PostgresKyselyStorage }`, which is what the older
+ * method files do: that import makes index.ts -> methods/x.ts -> index.ts a cycle, and
+ * dependency-cruiser is right to call it one. The older cycles are grandfathered in the known
+ * list; a new one is not, and re-seeding that list to admit this file would forgive every other
+ * entry in it at the same time. These methods only ever touch `this.db`, which on this provider is
+ * a getter returning the open transaction when there is one, so the structural type keeps the
+ * ambient-transaction behaviour exactly as it was.
+ */
+interface HasDb { db: Kysely<DB> }
 
 function toMcpServer(r: Selectable<McpServerRow>): McpServerRecord {
   return {
@@ -60,7 +72,7 @@ function toMcpServer(r: Selectable<McpServerRow>): McpServerRecord {
 }
 
 export const mcpServerMethods = {
-  async createMcpServer(this: PostgresKyselyStorage, row: McpServerRecord): Promise<void> {
+  async createMcpServer(this: HasDb, row: McpServerRecord): Promise<void> {
     await this.db.insertInto('McpServer').values({
       id: row.id,
       slug: row.slug,
@@ -95,7 +107,7 @@ export const mcpServerMethods = {
   },
 
   async getMcpServer(
-    this: PostgresKyselyStorage, id: string,
+    this: HasDb, id: string,
   ): Promise<McpServerRecord | undefined> {
     const r = await this.db.selectFrom('McpServer').selectAll()
       .where('id', '=', id).executeTakeFirst();
@@ -103,7 +115,7 @@ export const mcpServerMethods = {
   },
 
   async findMcpServerBySlug(
-    this: PostgresKyselyStorage,
+    this: HasDb,
     slug: string, ownership: McpOwnership, ownerGhii?: string, organismId?: string,
   ): Promise<McpServerRecord | undefined> {
     let q = this.db.selectFrom('McpServer').selectAll()
@@ -118,7 +130,7 @@ export const mcpServerMethods = {
   },
 
   async listMcpServers(
-    this: PostgresKyselyStorage, query: McpServerQuery = {},
+    this: HasDb, query: McpServerQuery = {},
   ): Promise<McpServerRecord[]> {
     let q = this.db.selectFrom('McpServer').selectAll();
     if (query.ownership) q = q.where('ownership', '=', query.ownership);
@@ -141,7 +153,7 @@ export const mcpServerMethods = {
   },
 
   async updateMcpServer(
-    this: PostgresKyselyStorage, id: string, patch: McpServerPatch,
+    this: HasDb, id: string, patch: McpServerPatch,
   ): Promise<void> {
     const set: Record<string, unknown> = {};
     if (patch.title !== undefined) set.title = patch.title;
@@ -158,7 +170,7 @@ export const mcpServerMethods = {
   },
 
   async updateMcpServerCredential(
-    this: PostgresKyselyStorage, id: string, credential: string | null, expiresAt: string | null,
+    this: HasDb, id: string, credential: string | null, expiresAt: string | null,
   ): Promise<void> {
     // status back to active and lastError cleared: a token exchange that worked is exactly the
     // evidence that whatever was wrong no longer is.
@@ -169,14 +181,14 @@ export const mcpServerMethods = {
   },
 
   async setMcpServerStatus(
-    this: PostgresKyselyStorage, id: string, status: McpServerStatus, error?: string | null,
+    this: HasDb, id: string, status: McpServerStatus, error?: string | null,
   ): Promise<void> {
     await this.db.updateTable('McpServer')
       .set({ status, lastError: error ?? null, updatedAt: new Date().toISOString() })
       .where('id', '=', id).execute();
   },
 
-  async touchMcpServerOk(this: PostgresKyselyStorage, id: string): Promise<void> {
+  async touchMcpServerOk(this: HasDb, id: string): Promise<void> {
     const now = new Date().toISOString();
     await this.db.updateTable('McpServer')
       .set({ lastOkAt: now, lastError: null, status: 'active', updatedAt: now })
@@ -184,7 +196,7 @@ export const mcpServerMethods = {
   },
 
   async setMcpServerToolCache(
-    this: PostgresKyselyStorage, id: string, tools: RemoteToolSnapshot[], hash: string,
+    this: HasDb, id: string, tools: RemoteToolSnapshot[], hash: string,
   ): Promise<void> {
     const now = new Date().toISOString();
     await this.db.updateTable('McpServer').set({
@@ -196,7 +208,7 @@ export const mcpServerMethods = {
   },
 
   async claimMcpRefresh(
-    this: PostgresKyselyStorage, id: string, staleAfterMs: number,
+    this: HasDb, id: string, staleAfterMs: number,
   ): Promise<boolean> {
     const now = Date.now();
     const staleBefore = new Date(now - staleAfterMs).toISOString();
@@ -212,18 +224,18 @@ export const mcpServerMethods = {
     return (res.numUpdatedRows ?? 0n) > 0n;
   },
 
-  async releaseMcpRefresh(this: PostgresKyselyStorage, id: string): Promise<void> {
+  async releaseMcpRefresh(this: HasDb, id: string): Promise<void> {
     await this.db.updateTable('McpServer')
       .set({ refreshClaimedAt: null })
       .where('id', '=', id).execute();
   },
 
-  async deleteMcpServer(this: PostgresKyselyStorage, id: string): Promise<void> {
+  async deleteMcpServer(this: HasDb, id: string): Promise<void> {
     await this.db.deleteFrom('McpServer').where('id', '=', id).execute();
   },
 
   async deleteMcpServersByOwner(
-    this: PostgresKyselyStorage, ownerGhii: string,
+    this: HasDb, ownerGhii: string,
   ): Promise<number> {
     const res = await this.db.deleteFrom('McpServer')
       .where('ownerGhii', '=', ownerGhii).executeTakeFirst();

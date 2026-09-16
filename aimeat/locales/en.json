@@ -14729,6 +14729,11 @@
           },
           "site": {
             "layout-write": "Arrange this installation's front page and the page its members land on: which parts are shown, in what order, and the text between them. Only works for whoever runs this installation; on any other account this permission does nothing. It changes what everyone here sees when they arrive, so \"Full access\" does not include it."
+          },
+          "mcp": {
+            "read": "See which MCP servers you have attached, and what each one can do.",
+            "use": "Call a tool on a server you have already attached. This AIMEAT holds the credential and spends it for you; the agent never sees it.",
+            "manage": "Attach new MCP servers to your account and remove them. Not part of full access, because attaching one points your account at an address and stores a credential behind it."
           }
         },
         "domainAi": "AI",
@@ -14751,7 +14756,8 @@
         "domainPackages": "Packages",
         "domainCompliance": "Compliance",
         "domainSignals": "Reach",
-        "domainSite": "The pages people arrive on"
+        "domainSite": "The pages people arrive on",
+        "domainMcp": "MCP servers you have attached"
       },
       "deviceAuth": {
         "title": "Device Authorization",

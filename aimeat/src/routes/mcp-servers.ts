@@ -45,6 +45,7 @@ import {
 import { callRemoteTool, listRemoteTools } from '../services/mcp-client/invoke.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { mcpClientPool } from '../services/mcp-client/pool.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -189,6 +190,10 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       // answering through it until the idle sweeper noticed, and "I turned it off and it kept
       // working" is the worst possible answer to somebody cutting an integration.
       if (patch.enabled === false) await mcpClientPool.invalidate(server.id);
+
+      // Emitted here rather than in the registry service, because this is the one door that edits:
+      // attach and detach announce from the service, where two doors share them.
+      emitChange('mcp-servers', ownerOf(req));
 
       const updated = await storage.getMcpServer(server.id);
       return res.json(success(config.nodeId, { server: toPublicMcpServer(updated ?? server) }));

@@ -12937,6 +12937,11 @@
           },
           "site": {
             "layout-write": "Organizar la portada de esta instalación y la página a la que llegan sus miembros: qué partes se muestran, en qué orden y qué texto va entre ellas. Solo funciona para quien administra esta instalación; en cualquier otra cuenta este permiso no hace nada. Cambia lo que ve todo el mundo al llegar, así que \"Acceso total\" no lo incluye."
+          },
+          "mcp": {
+            "read": "Ver qué servidores MCP tienes conectados y qué sabe hacer cada uno.",
+            "use": "Llamar a una herramienta en un servidor que ya tienes conectado. Este AIMEAT guarda las credenciales y las usa por ti; el agente nunca las ve.",
+            "manage": "Conectar servidores MCP nuevos a tu cuenta y desconectarlos. No forma parte del acceso completo: conectar uno apunta tu cuenta a una dirección y guarda unas credenciales detrás."
           }
         },
         "domainAi": "IA",
@@ -12959,7 +12964,8 @@
         "domainPackages": "Paquetes",
         "domainCompliance": "Cumplimiento",
         "domainSignals": "Alcance",
-        "domainSite": "Las páginas a las que se llega"
+        "domainSite": "Las páginas a las que se llega",
+        "domainMcp": "Servidores MCP que has conectado"
       },
       "deviceAuth": {
         "title": "Autorización de dispositivo",
