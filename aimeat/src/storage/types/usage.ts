@@ -20,6 +20,8 @@
  * @usage
  *   import type { UsageCallInput } from '../storage/interface.js';
  * @version-history
+ *   v1.1.0 — 2026-09-16 — UsageSurface gains 'mcp-remote': a call the node proxied OUT to a remote
+ *     MCP server, kept apart from 'mcp', which is a call somebody made IN.
  *   v1.0.0 — 2026-08-14 — Initial: three-layer usage telemetry substrate.
  */
 
@@ -31,6 +33,13 @@ export type UsageSurface =
   | 'capability'
   | 'app'
   | 'extension'
+  /**
+   * A call this node PROXIED to a remote MCP server. Its own surface rather than 'mcp', because
+   * 'mcp' means a call somebody made INTO this node and this is a call the node made out of it:
+   * folding them together would make the busiest surface on the node unreadable, and would answer
+   * "how much are we using what people attached" with our own traffic mixed in.
+   */
+  | 'mcp-remote'
   | 'http'
   | 'operator';
 
