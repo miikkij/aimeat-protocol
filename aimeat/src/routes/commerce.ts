@@ -16,6 +16,9 @@
  *   - PUT/DELETE /v1/commerce/payout/x402              the seller's stablecoin address
  *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
  * @version-history
+ *   v1.7.0 — 2026-09-16 — The Stripe secrets are stored encrypted (commerce/psp-secrets.ts): every
+ *     write to commerce.psp seals them, and PUT /payout/stripe refuses on a node with no encryption
+ *     key. The plain key had been readable through the generic memory doors.
  *   v1.6.0 — 2026-08-10 — Security audit H-3: pass the completing principal to completeSession so the
  *     spend gate can see it.
  *   v1.5.0 — 2026-08-06 — Hold rail (TINKI phase 1): POST/GET /v1/commerce/holds,
@@ -48,6 +51,8 @@ import { PaymentError } from '../commerce/payment-handlers.js';
 import { paymentChallenge, x402ExactAccepts } from '../commerce/x402.js';
 import { decodeXPayment, getX402Network, getX402Asset, x402SettlementCurrencies } from '../commerce/x402-facilitator.js';
 import { X402_HANDLER_ID } from '../commerce/x402-handler.js';
+import { sealPspRecord, pspSecretHint } from '../commerce/psp-secrets.js';
+import { getEncryptionKey } from '../services/encryption.js';
 
 const ItemsSchema = z.array(z.object({
   kind: z.enum(['offer', 'app-tool', 'ext-call']).optional(),
@@ -114,20 +119,20 @@ async function readPsp(storage: Storage, ownerGhii: string): Promise<PspRecord> 
  * they keep), and the version/createdAt of the existing one carry forward — a rail setting must not
  * reset the record's history just because the other rail was edited.
  */
-async function writePsp(storage: Storage, ownerGhii: string, next: PspRecord): Promise<void> {
+async function writePsp(storage: Storage, ownerGhii: string, next: PspRecord, encKey: Buffer | null): Promise<void> {
   const existing = await storage.getMemory(ownerGhii, PSP_KEY);
   const now = new Date().toISOString();
+  // Every write seals the secrets it carries, including a plain one read back from a record that
+  // predates encryption: a record this door touched never leaves it holding a secret in the clear.
+  // A node with no encryption key cannot seal; the door that SETS a secret refuses on such a node,
+  // so the only plain value that can pass here is one that was already stored.
+  const sealed = encKey ? sealPspRecord(encKey, next as Record<string, unknown>).record : next;
   await storage.setMemory({
-    key: PSP_KEY, ownerGaii: ownerGhii, value: next, visibility: 'private', tags: ['commerce'], ttlHours: null,
+    key: PSP_KEY, ownerGaii: ownerGhii, value: sealed, visibility: 'private', tags: ['commerce'], ttlHours: null,
     version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
   });
 }
 
-/** Last four characters of a stored secret, never the secret itself. */
-function maskSecret(secret: unknown): string | null {
-  if (typeof secret !== 'string' || !secret) return null;
-  return secret.length >= 4 ? `…${secret.slice(-4)}` : '(set)';
-}
 
 /** The x402 payout address in any of the shapes the facilitator accepts (extractPayTo mirrors this). */
 function payToOf(psp: PspRecord): string | null {
@@ -190,7 +195,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
       stripe: {
         configured: !!psp.secretKey,
         provider: psp.provider ?? null,
-        keyHint: maskSecret(psp.secretKey),
+        keyHint: pspSecretHint(psp.secretKey),
         currencies: ['EUR', 'USD'],
         note: 'Card settlement in real currency on YOUR OWN Stripe account: you are the merchant of record and the money lands on your balance. This node never holds the key or the funds.',
       },
@@ -220,13 +225,20 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
         'webhook_secret must be the Stripe endpoint signing secret (8-200 characters).'));
     }
     const provider = typeof raw.provider === 'string' && raw.provider.trim() ? raw.provider.trim().slice(0, 60) : 'stripe';
+    // Refuse before you write: a node that cannot encrypt would store the key where every memory
+    // door can read it (commerce/psp-secrets.ts).
+    const encKey = getEncryptionKey(config);
+    if (!encKey) {
+      return res.status(503).json(error(config.nodeId, 'ENCRYPTION_NOT_CONFIGURED',
+        'This node cannot store a payment secret safely because it has no encryption key. Ask whoever runs it to set AIMEAT_ENCRYPTION_KEY.'));
+    }
     const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
     await writePsp(storage, ownerGhii, {
       ...(await readPsp(storage, ownerGhii)), provider, secretKey,
       ...(webhookSecret ? { webhookSecret } : {}),
-    });
+    }, encKey);
     return res.json(success(config.nodeId, {
-      configured: true, provider, keyHint: maskSecret(secretKey),
+      configured: true, provider, keyHint: pspSecretHint(secretKey),
       webhook_configured: !!webhookSecret || undefined,
       note: 'Money sales now settle on this Stripe account. The secret is never returned by any endpoint.',
     }));
@@ -237,7 +249,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
     const next: PspRecord = { ...(await readPsp(storage, ownerGhii)) };
     delete next.secretKey; delete next.provider;
-    await writePsp(storage, ownerGhii, next);
+    await writePsp(storage, ownerGhii, next, getEncryptionKey(config));
     return res.json(success(config.nodeId, {
       configured: false,
       note: 'Card sales now fail until credentials are set again. Stablecoin and invoice settlement are unaffected.',
@@ -279,7 +291,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     // Store the canonical EIP-55 form: mixed case is what a wallet shows, so the seller can compare.
     const canonical = toChecksumAddress(address);
     const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
-    await writePsp(storage, ownerGhii, { ...(await readPsp(storage, ownerGhii)), payTo: canonical });
+    await writePsp(storage, ownerGhii, { ...(await readPsp(storage, ownerGhii)), payTo: canonical }, getEncryptionKey(config));
     return res.json(success(config.nodeId, {
       configured: true, address: canonical, network: config.x402Network,
       // One address receives every settlement asset this network carries — report them all, so the
@@ -297,7 +309,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     const next: PspRecord = { ...psp };
     delete next.payTo; delete next.address;
     if (next.x402) { const x = { ...next.x402 }; delete x.address; delete x.payTo; next.x402 = x; }
-    await writePsp(storage, ownerGhii, next);
+    await writePsp(storage, ownerGhii, next, getEncryptionKey(config));
     return res.json(success(config.nodeId, { configured: false, note: 'Stablecoin sales now fail until an address is set again. Card/invoice settlement is unaffected.' }));
   });
 

@@ -12,6 +12,8 @@
  * @structure commerceCliTools[] — the handler table, spread by tool-call.ts
  * @usage import { commerceCliTools } from './tool-call-defs-commerce.js';
  * @version-history
+ *   v1.1.0 — 2026-09-16 — The three PSP tools call /v1/commerce/payout. Through the generic memory
+ *     routes psp_set stored the Stripe key in plain text and psp_status returned it.
  *   v1.0.0 — 2026-08-25 — Extracted from tool-call-defs-apps.ts (max-file-lines)
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -19,34 +21,32 @@ import { query, requiredString, optionalString, optionalNumber, optionalBoolean,
 
 export const commerceCliTools: ConnectCliToolDefinition[] = [
     {
-        // Store the owner's PSP secret. No dedicated REST route (server MCP writes commerce.psp), so the
-        // shell proxy writes that private owner record via POST /v1/memory (memory:write authz unchanged).
+        // → PUT /v1/commerce/payout/stripe — the route stores the secret encrypted and merges it into
+        // commerce.psp. A raw POST /v1/memory stored it in plain text and replaced the whole record.
         name: 'aimeat_commerce_psp_set',
         description: 'Store your owner\'s payment-provider credentials (commerce.psp) for selling in money currencies. The secret is stored server-side.',
         input: {
             provider: { type: 'string', required: true, description: 'PSP identifier, e.g. "stripe".' },
             secret_key: { type: 'string', required: true, description: 'The PSP secret credential.' },
         },
-        handler: ({ client }, input) => client.post('/v1/memory', {
-            key: 'commerce.psp',
-            value: { provider: requiredString(input, 'provider'), secretKey: requiredString(input, 'secret_key') },
-            visibility: 'private',
-            tags: ['commerce'],
+        handler: ({ client }, input) => client.put('/v1/commerce/payout/stripe', {
+            provider: requiredString(input, 'provider'),
+            secret_key: requiredString(input, 'secret_key'),
         }),
     },
     {
-        // → GET /v1/memory/commerce.psp — the owner reads their own PSP record (shell runs as the owner).
+        // → GET /v1/commerce/payout — which rails are configured, the key as a last-four hint only.
         name: 'aimeat_commerce_psp_status',
-        description: 'Read your owner\'s stored PSP record (commerce.psp).',
+        description: 'Check whether your owner\'s payment-provider credentials are set. The key is shown as its last four characters.',
         input: {},
-        handler: ({ client }) => client.get('/v1/memory/commerce.psp'),
+        handler: ({ client }) => client.get('/v1/commerce/payout'),
     },
     {
-        // → DELETE /v1/memory/commerce.psp — delete the owner's PSP record.
+        // → DELETE /v1/commerce/payout/stripe — removes the card credentials and keeps the x402 address.
         name: 'aimeat_commerce_psp_delete',
         description: 'Delete your owner\'s stored PSP credentials (commerce.psp).',
         input: {},
-        handler: ({ client }) => client.delete('/v1/memory/commerce.psp'),
+        handler: ({ client }) => client.delete('/v1/commerce/payout/stripe'),
     },
     {
         // Publish the sellable tool manifest of an app. No dedicated REST route (server MCP validates +

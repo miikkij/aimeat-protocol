@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.17.1 — 2026-09-16 — stripePaymentHandler(config): the handler opens the sealed Stripe key.
  *   v1.17.0 — 2026-09-16 — Mounts mcpServersRouter (/v1/mcp-servers: the remote MCP servers this
  *     node connects OUT to). To make room, pure extraction of the node robots.txt handler to
  *     robots-mount.ts — the file was at 800 of 800, where no router could be added at all. Same
@@ -407,7 +408,7 @@ export async function mountRoutes(
   // Money rails. Neither carries a node-level credential: the Stripe handler charges on the
   // seller's own key (commerce.psp) and the invoice handler books an obligation instead of
   // capturing anything, so both are safe to register on every node.
-  registerPaymentHandler(stripePaymentHandler());
+  registerPaymentHandler(stripePaymentHandler(config));
   registerPaymentHandler(invoicePaymentHandler());
   resetSellableResolvers();
   registerSellableResolver(offerSellableResolver());

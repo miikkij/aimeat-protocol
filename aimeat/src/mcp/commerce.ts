@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.5.1 — 2026-09-16 — psp_set and psp_delete store the PSP secrets encrypted
+ *     (commerce/psp-secrets.ts); psp_set refuses on a node with no encryption key.
  *   v1.5.0 — 2026-09-13 — A refused write hands back its details with the text, so aimeat_app_tools_publish
  *     and aimeat_offer_price_set can say which field made an ODPS document too long, its length, the cap
  *     and the room left (the shared write refuses it, services/exchange-odps-write.ts). The listing
@@ -48,6 +50,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
+import { sealPspRecord, pspSecretHint } from '../commerce/psp-secrets.js';
+import { getEncryptionKey } from '../services/encryption.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
@@ -81,13 +85,6 @@ function commerceFail(err: unknown) {
         return fail(`${err.code}: ${err.message}`);
     }
     return fail(`COMMERCE_ERROR: ${(err as { message?: string }).message ?? 'Unexpected commerce error'}`);
-}
-
-/** Mask a stored PSP secret to its last 4 characters — the only form any tool ever returns. */
-function maskSecret(secret: unknown): string {
-    const s = typeof secret === 'string' ? s4(secret) : '';
-    return s ? `…${s}` : '(set)';
-    function s4(v: string): string { return v.length >= 4 ? v.slice(-4) : ''; }
 }
 
 /**
@@ -192,10 +189,15 @@ export function registerCommerceTools(
             }
             // MERGE: the same record also holds the seller's x402 USDC payout address. Replacing it
             // wholesale would silently delete the other rail's setting (and vice versa).
+            // Stored encrypted, so the generic memory doors carry only ciphertext and a hint
+            // (commerce/psp-secrets.ts). A node that cannot encrypt refuses rather than storing it plain.
+            const encKey = getEncryptionKey(config);
+            if (!encKey) return fail('ENCRYPTION_NOT_CONFIGURED: this node has no encryption key, so it cannot store a payment secret safely. Ask whoever runs it to set AIMEAT_ENCRYPTION_KEY.');
             const existing = (await storage.getMemory(ownerGhii, PSP_KEY))?.value as Record<string, unknown> | undefined;
-            const { refusal: pspRefusal } = await putOwnerRecord(PSP_KEY, { ...(existing ?? {}), provider, secretKey: key }, 'private', ['commerce'], 'commerce:psp');
+            const { record: sealed } = sealPspRecord(encKey, { ...(existing ?? {}), provider, secretKey: key });
+            const { refusal: pspRefusal } = await putOwnerRecord(PSP_KEY, sealed, 'private', ['commerce'], 'commerce:psp');
             if (pspRefusal) return { content: [{ type: 'text' as const, text: pspRefusal }], isError: true };
-            return ok({ configured: true, provider, key_hint: maskSecret(key), note: 'Stored server-side; money sales settle on this PSP account. The secret is never returned by any tool.' });
+            return ok({ configured: true, provider, key_hint: pspSecretHint(key), note: 'Stored server-side; money sales settle on this PSP account. The secret is never returned by any tool.' });
         },
     );
 
@@ -212,7 +214,7 @@ export function registerCommerceTools(
             // existence answered "configured" for a seller whose record holds only the stablecoin
             // payout address and no card credentials at all.
             if (!v.secretKey) return ok({ configured: false });
-            return ok({ configured: true, provider: v.provider ?? 'unknown', key_hint: maskSecret(v.secretKey), updated_at: rec?.updatedAt });
+            return ok({ configured: true, provider: v.provider ?? 'unknown', key_hint: pspSecretHint(v.secretKey), updated_at: rec?.updatedAt });
         },
     );
 
@@ -231,9 +233,11 @@ export function registerCommerceTools(
             if (!existing || (existing.secretKey === undefined && existing.provider === undefined)) {
                 return ok({ deleted: false, note: 'No PSP credentials were configured.' });
             }
-            const next = { ...existing };
-            delete next.secretKey;
-            delete next.provider;
+            const cleared = { ...existing };
+            delete cleared.secretKey;
+            delete cleared.provider;
+            const encKey = getEncryptionKey(config);
+            const next = encKey ? sealPspRecord(encKey, cleared).record : cleared;
             const { refusal: clearRefusal } = await putOwnerRecord(PSP_KEY, next, 'private', ['commerce'], 'commerce:psp');
             if (clearRefusal) return { content: [{ type: 'text' as const, text: clearRefusal }], isError: true };
             return ok({

@@ -8,6 +8,8 @@
  *   cross-owner 403/404 isolation Rule 10 requires.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=commerce
  * @version-history
+ *   v1.7.0 — 2026-09-16 — 34b: the Stripe secrets are stored encrypted, so the generic memory door
+ *     and the operator's memory door carry a hint and no secret; 35 asserts the encrypted shape.
  *   v1.6.0 — 2026-07-28 — Seller payment rails now that money settlement is core: payout status
  *     reports card/stablecoin/invoice, the Stripe secret is written and cleared through
  *     /v1/commerce/payout/stripe without ever being echoed, one rail's write never clears the
@@ -643,6 +645,35 @@ await test('34. Payout status reports all three money rails; the Stripe secret i
     assert(cleared.body.data.stripe?.configured === false, 'credentials are gone after delete');
 });
 
+await test('34b. THE LEAK: the Stripe secrets are not readable through the generic memory doors', async () => {
+    // The commerce doors masked the key, and the same record was readable whole through
+    // GET /v1/memory/commerce.psp (the door an app grant and an agent with owner_scope use) and the
+    // operator's GET /v1/admin/memory/:owner/:key. Stored encrypted now, so every such door carries
+    // ciphertext and a hint only.
+    const KEY = 'sk_test_e2e_generic_door_9d41';
+    const HOOK = 'whsec_e2e_generic_door_77c2';
+    const set = await json('/v1/commerce/payout/stripe', {
+        method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ secret_key: KEY, webhook_secret: HOOK }),
+    });
+    assert(set.status === 200, `set ${set.status}: ${JSON.stringify(set.body?.error)}`);
+    const raw = await json('/v1/memory/commerce.psp', { headers: auth(seller.token) });
+    assert(raw.status === 200, `memory read ${raw.status}`);
+    const rawText = JSON.stringify(raw.body);
+    assert(!rawText.includes(KEY) && !rawText.includes(HOOK), `GET /v1/memory/commerce.psp returns a Stripe secret: ${rawText.slice(0, 300)}`);
+    const v = (raw.body.data?.value ?? raw.body.data?.record?.value) as any;
+    assert(v.secretKey?.hint === '…9d41', `the stored key carries its hint: ${JSON.stringify(v.secretKey)}`);
+    if (op.roles.includes('operator')) {
+        const adm = await json(`/v1/admin/memory/${encodeURIComponent(`${seller.name}@${NODE_ID}`)}/commerce.psp`, { headers: auth(op.token) });
+        assert(adm.status === 200, `admin memory read ${adm.status}: ${JSON.stringify(adm.body?.error)}`);
+        const admText = JSON.stringify(adm.body);
+        assert(!admText.includes(KEY) && !admText.includes(HOOK), 'the operator\'s memory door returns a seller\'s Stripe secret');
+    }
+    const status = await json('/v1/commerce/payout', { headers: auth(seller.token) });
+    assert(status.body.data.stripe?.configured === true && status.body.data.stripe?.keyHint === '…9d41',
+        `payout status still reads the sealed key: ${JSON.stringify(status.body.data.stripe)}`);
+    await json('/v1/commerce/payout/stripe', { method: 'DELETE', headers: auth(seller.token) });
+});
+
 await test('35. A too-short Stripe secret is refused, and one rail never clears the other', async () => {
     const bad = await json('/v1/commerce/payout/stripe', {
         method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ secret_key: 'sk_1' }),
@@ -660,7 +691,8 @@ await test('35. A too-short Stripe secret is refused, and one rail never clears 
     const rec = await json('/v1/memory/commerce.psp', { headers: auth(seller.token) });
     const v = (rec.body.data?.value ?? rec.body.data?.record?.value) as any;
     assert(String(v.payTo ?? '').toLowerCase() === addr.toLowerCase(), `the x402 address survived: ${JSON.stringify(v)}`);
-    assert(v.secretKey === 'sk_test_kept_alongside', `the stripe key landed: ${JSON.stringify(v)}`);
+    assert(v.secretKey?.hint === '…side' && !JSON.stringify(v).includes('sk_test_kept_alongside'),
+        `the stripe key landed, encrypted: ${JSON.stringify(v)}`);
 
     // ...and clearing Stripe leaves the address alone.
     await json('/v1/commerce/payout/stripe', { method: 'DELETE', headers: auth(seller.token) });

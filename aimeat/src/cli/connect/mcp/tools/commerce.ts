@@ -9,6 +9,8 @@
  *   /v1/agents/:name/offers for offer pricing; and the generic /v1/memory routes (memory:write authz
  *   unchanged) for the commerce.psp / apps.{id}.tools records the server MCP writes directly.
  * @version-history
+ *   v1.2.0 -- 2026-09-16 -- psp_set, psp_status and psp_delete go through /v1/commerce/payout. Through
+ *     the generic memory routes psp_set stored the Stripe key in plain text and psp_status returned it.
  *   v1.1.0 -- 2026-07-30 -- Beneficiary splits: declare/list/withdraw, earnings + obligations, release,
  *     operator approval and payout quote/settle. The server registered these six; the connector did
  *     not, so `--surface service` was six tools short of what it claims to serve.
@@ -26,21 +28,21 @@ export function registerCommerceTools(mcp: McpServer, registry: AgentRegistry): 
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
-  // Seller PSP credentials — server MCP writes/masks commerce.psp; the connector runs as the owner so
-  // it reads/writes that private owner record directly via the generic memory routes.
+  // Seller PSP credentials — through the commerce payout routes, which store the secret encrypted and
+  // answer with a last-four hint. The generic memory routes stored it plain and returned it whole.
   mcp.tool('aimeat_commerce_psp_set', descriptionFor('aimeat_commerce_psp_set'), {
     provider: z.string().describe('PSP identifier, e.g. "stripe".'),
     secret_key: z.string().describe('The PSP secret credential.'),
   }, annotationsFor('aimeat_commerce_psp_set'), async ({ provider, secret_key }) => {
-    return out(await client.post('/v1/memory', { key: 'commerce.psp', value: { provider, secretKey: secret_key }, visibility: 'private', tags: ['commerce'] }));
+    return out(await client.put('/v1/commerce/payout/stripe', { provider, secret_key }));
   });
 
   mcp.tool('aimeat_commerce_psp_status', descriptionFor('aimeat_commerce_psp_status'), {}, annotationsFor('aimeat_commerce_psp_status'), async () => {
-    return out(await client.get('/v1/memory/commerce.psp'));
+    return out(await client.get('/v1/commerce/payout'));
   });
 
   mcp.tool('aimeat_commerce_psp_delete', descriptionFor('aimeat_commerce_psp_delete'), {}, annotationsFor('aimeat_commerce_psp_delete'), async () => {
-    return out(await client.delete('/v1/memory/commerce.psp'));
+    return out(await client.delete('/v1/commerce/payout/stripe'));
   });
 
   // Publish the sellable tool manifest — server MCP validates + writes apps.{id}.tools; the connector
