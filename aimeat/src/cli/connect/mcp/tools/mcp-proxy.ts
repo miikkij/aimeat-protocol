@@ -61,12 +61,9 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
     transport: z.enum(['http', 'sse']).optional().describe("'http' is the current transport and the default."),
     token: z.string().optional().describe('A token the server needs. Held encrypted on the node.'),
     header: z.string().optional().describe("Which header the token belongs in, when not a bearer."),
-  }, annotationsFor('aimeat_mcp_attach'), async ({ name, url, peer, group, ws, title, description, transport, token, header }) => out(
-    // Two doors, one tool: a group server is the same act with a different owner.
-    await client.post(group ? '/v1/mcp-servers/organism' : '/v1/mcp-servers', {
+  }, annotationsFor('aimeat_mcp_attach'), async ({ name, url, peer, group, ws, title, description, transport, token, header }) => {
+    const body = {
       name,
-      ...(group ? { organism_id: group } : {}),
-      ...(ws ? { ws } : {}),
       ...(url ? { url } : {}),
       ...(peer ? { peer } : {}),
       ...(title ? { title } : {}),
@@ -74,8 +71,15 @@ export function registerMcpProxyTools(mcp: McpServer, registry: AgentRegistry): 
       ...(transport ? { transport } : {}),
       ...(token ? { token } : {}),
       ...(header ? { header } : {}),
-    }),
-  ));
+    };
+    // Two doors, one tool: a group server is the same act with a different owner. The two paths are
+    // written out as LITERALS rather than picked with a ternary, because check:field-reach matches a
+    // tool to its route by the path it calls, and a computed path matches nothing. A ternary here
+    // cost BOTH doors their twin on 2026-09-16, including the one that already had one.
+    return out(group
+      ? await client.post('/v1/mcp-servers/organism', { ...body, organism_id: group, ...(ws ? { ws } : {}) })
+      : await client.post('/v1/mcp-servers', body));
+  });
 
   mcp.tool('aimeat_mcp_authorize', descriptionFor('aimeat_mcp_authorize'), {
     server: z.string().describe('Which server, by its short name.'),

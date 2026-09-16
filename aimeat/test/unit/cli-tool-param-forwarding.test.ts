@@ -98,6 +98,11 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     aimeat_workspace_transfer: { always: { direction: 'export', zip_base64: 'cHJvYmU=' } },
     // action='decide' needs a requester; the other two actions ignore it.
     aimeat_workspace_access: { always: { requester: 'probe-owner' } },
+    // `ws` narrows a GROUP server to one workspace inside that group, so it means nothing without
+    // `group` and the owner's own attach door does not read it. Holding group constant sends every
+    // probe to the group door, where the whole body is still read, so nothing else stops being
+    // measured by this.
+    aimeat_mcp_attach: { always: { group: 'zqxgroupzqx' } },
     // An inline install is a manifest AND its code, and `update` addresses the installed record by
     // the manifest's own metadata.name, so a manifest that names something is held constant. Without
     // it `update` would be measured only on the upload branch, which never reaches the redeploy door.
