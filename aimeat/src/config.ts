@@ -316,6 +316,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     gooseProviderApiKey: process.env.AIMEAT_GOOSE_PROVIDER_API_KEY ?? '',
     gooseProvider: process.env.AIMEAT_GOOSE_PROVIDER ?? '',
     gooseModel: process.env.AIMEAT_GOOSE_MODEL ?? '',
+    gooseEnvPassthrough: (process.env.AIMEAT_GOOSE_ENV_PASSTHROUGH ?? '').split(',').map(s => s.trim()).filter(Boolean),
     openrouterInstanceKey: process.env.AIMEAT_OPENROUTER_INSTANCE_KEY ?? '',
     chatFreeAllowanceUsd: parseFloat(process.env.AIMEAT_CHAT_FREE_ALLOWANCE_USD ?? '0') || 0,
     modelFreeFallback: process.env.AIMEAT_MODEL_FREE_FALLBACK ?? 'openrouter/free',

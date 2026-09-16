@@ -49,6 +49,12 @@ export interface AiCapabilityConfig {
   gooseProvider: string;
   gooseModel: string;
   /**
+   * Extra environment variable NAMES the chat agent child may see, beside the allow-list in
+   * services/goose-env.ts. For a host that runs goose on another provider and passes that
+   * provider's key in the environment. Read from the environment only, never from the admin screen.
+   */
+  gooseEnvPassthrough: string[];
+  /**
    * This node's own OpenRouter key, used for a person who has not brought one. Empty (the default)
    * means the node pays for nothing and everyone brings their own, which is how every node behaved
    * before this existed.

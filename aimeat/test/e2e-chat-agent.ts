@@ -34,6 +34,7 @@
  *   cd aimeat && node --import tsx test/e2e-chat-agent.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=chat-agent
  * @version-history
+ *   v1.1.0 — 2026-09-16 — The agent child receives no AIMEAT_* value and no DATABASE_URL.
  *   v1.0.0 — 2026-09-08 — Initial.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -115,6 +116,9 @@ async function startNode(opts: { port: number; gooseBin: string; tag: string }):
             AIMEAT_GOOSE_PROVIDER: 'fake-provider',
             AIMEAT_GOOSE_PROVIDER_API_KEY: 'sk-fake-e2e-key',
             AIMEAT_GOOSE_PATH_ROOT: dbDir,
+            // The fake agent writes its log where this names. The child's environment is an
+            // allow-list now, so the name is passed the way a host passes a provider key.
+            AIMEAT_GOOSE_ENV_PASSTHROUGH: 'FAKE_GOOSE_LOG',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -361,6 +365,9 @@ async function run(): Promise<void> {
         assert(started.env.OPENROUTER_API_KEY === 'sk-fake-e2e-key', `and the key it spends, got ${started.env.OPENROUTER_API_KEY}`);
         assert(typeof started.env.GOOSE_PATH_ROOT === 'string' && started.env.GOOSE_PATH_ROOT.length > 0,
             `and the path root, got ${started.env.GOOSE_PATH_ROOT}`);
+        // THE LEAK: the child had the node's whole environment, database address and keys included.
+        assert(Array.isArray(started.leaked) && started.leaked.length === 0,
+            `the agent must not receive the node's own configuration, got ${JSON.stringify(started.leaked)}`);
     });
 
     await test('an MCP server that failed to load is said out loud, and a human line on stdout is not an error', async () => {

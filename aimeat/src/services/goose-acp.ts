@@ -25,6 +25,9 @@
  *   const sessionId = await acp.newSession({ mcpServers: [aimeatMcpServer(base, token)] });
  *   for await (const u of acp.prompt(sessionId, 'build me a pong game')) { … }
  * @version-history
+ *   v2.5.0 — 2026-09-16 — The child starts with an allow-listed environment (services/goose-env.ts),
+ *     not a copy of the node's. It held DATABASE_URL, the node's private and encryption keys and
+ *     every other secret, and a chat user could ask an agent with a shell tool to print them.
  *   v2.4.0 — 2026-09-08 — `isClosed`, so chat-session can tell a dead process from a live one and
  *     start another instead of refusing every turn until the node restarts.
  *   v2.3.0 — 2026-08-16 — prompt() takes images and sends them as ACP image blocks. A picture the
@@ -53,6 +56,7 @@ import { EventEmitter } from 'node:events';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { cardFromToolResult, type ChatCard } from './chat-cards.js';
+import { gooseChildEnv } from './goose-env.js';
 
 /** An MCP server handed to one session. `http` is the transport goose reports as supported. */
 /** One picture handed to the model with a turn: the bytes, and what they are. */
@@ -141,16 +145,9 @@ export class GooseAcpClient {
      */
     static async start(config: AimeatConfig): Promise<GooseAcpClient> {
         const bin = config.gooseBin || 'goose';
-        const env: NodeJS.ProcessEnv = { ...process.env };
-        if (config.goosePathRoot) env.GOOSE_PATH_ROOT = config.goosePathRoot;
-        // Every model call this agent makes is billed to whoever owns this key. The node decides who
-        // may spend it before a turn is ever started; goose only sees the key.
-        if (config.gooseProviderApiKey) env.OPENROUTER_API_KEY = config.gooseProviderApiKey;
-        // The provider and model, when the operator names them here rather than in goose's own
-        // config. Set only when non-empty: an unset value must leave goose's configuration exactly
-        // as it was, because a node that overrides it with '' configures the agent to nothing.
-        if (config.gooseProvider) env.GOOSE_PROVIDER = config.gooseProvider;
-        if (config.gooseModel) env.GOOSE_MODEL = config.gooseModel;
+        // Only what the agent needs, never the node's whole environment (services/goose-env.ts): the
+        // agent talks to people and can run the tools goose's own config switches on.
+        const env = gooseChildEnv(config, process.env);
 
         const child = spawn(bin, ['acp'], { stdio: ['pipe', 'pipe', 'pipe'], env });
         const client = new GooseAcpClient(child);
