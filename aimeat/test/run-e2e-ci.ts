@@ -739,6 +739,7 @@ const ALL_SUITES = [
     // was written, which is also why 13 `assert(status < 500)` lines survived inside it.
     'test/e2e-profile-tabs.ts',
     'test/e2e-security.ts',
+    'test/e2e-idempotency.ts',
     // Owns its server, twice: sealing is decided at boot from the environment, so it cannot be
     // switched on against the shared node here. It follows THIS runner's backend rather than
     // hardcoding sqlite, so the both-backends claim is real.

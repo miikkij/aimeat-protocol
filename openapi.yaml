@@ -16,6 +16,22 @@ info:
     - **Tier 0.5**: One-time keys in URL parameters
     - **Tier 1**: JWT Bearer token via Ed25519 keypair signing
     - **Tier 2**: JWT with `operator` role
+
+    ## Request replay protection
+    POST and PUT accept an optional UUID `Idempotency-Key` header. Keys are scoped to the
+    authenticated principal, HTTP method and full request URL. The server reserves the key
+    before executing the handler. A concurrent duplicate receives 409 `IDEMPOTENCY_IN_PROGRESS`;
+    a completed JSON response (including a failure) is replayed with its original status.
+    A 401 is not retained, so a refreshed credential may use the same key. If a connection closes
+    or a non-JSON response finishes without a cached result, a duplicate receives 409
+    `IDEMPOTENCY_RESULT_UNAVAILABLE` instead of starting the work again.
+    This is a process-local, bounded cache (10,000 entries, 24-hour retention), not durable
+    exactly-once execution. Completed entries may be evicted for space. Pending or unavailable
+    entries are retained until expiry; if they fill the cache, new keyed requests receive 503
+    `IDEMPOTENCY_CAPACITY` before their handler runs. Restarting the process clears the cache.
+    Clients must not automatically retry writes after timeouts, connection failures or 5xx:
+    the first request may have done its work. Check the result before a deliberate retry.
+    PATCH and DELETE are not covered by this header.
   version: 1.2.0
   contact:
     name: Jouni Miikki
