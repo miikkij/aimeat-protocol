@@ -33,8 +33,9 @@ export function registerCommerceTools(mcp: McpServer, registry: AgentRegistry): 
   mcp.tool('aimeat_commerce_psp_set', descriptionFor('aimeat_commerce_psp_set'), {
     provider: z.string().describe('PSP identifier, e.g. "stripe".'),
     secret_key: z.string().describe('The PSP secret credential.'),
-  }, annotationsFor('aimeat_commerce_psp_set'), async ({ provider, secret_key }) => {
-    return out(await client.put('/v1/commerce/payout/stripe', { provider, secret_key }));
+    webhook_secret: z.string().optional().describe('Stripe endpoint signing secret for this seller\'s webhook.'),
+  }, annotationsFor('aimeat_commerce_psp_set'), async ({ provider, secret_key, webhook_secret }) => {
+    return out(await client.put('/v1/commerce/payout/stripe', { provider, secret_key, webhook_secret }));
   });
 
   mcp.tool('aimeat_commerce_psp_status', descriptionFor('aimeat_commerce_psp_status'), {}, annotationsFor('aimeat_commerce_psp_status'), async () => {
