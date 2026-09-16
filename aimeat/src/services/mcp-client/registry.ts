@@ -23,6 +23,10 @@
  * @structure attachMcpServer · listUsableServers · requireUsableServer · detachMcpServer
  * @usage const server = await requireUsableServer(storage, ownerGhii, idOrSlug);
  * @version-history
+ *   v1.1.0 — 2026-09-16 — attachNodeServer and setNodeServerPolicy read the price themselves and
+ *     refuse a morsel price with BAD_PRICE, before anything is written. The check was at each door
+ *     first, and check:field-reach then paired the operator's policy tool with the ATTACH route
+ *     through that shared validator; in the service, the doors share only the real job.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy. Owner-owned servers only; node-wide is phase 4
  *     and organism-bound is phase 5, and both refuse by name until then rather than half-working.
  */
@@ -30,10 +34,10 @@ import { randomUUID } from 'node:crypto';
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import {
-  MCP_SLUG_RE, toPublicMcpServer,
+  MCP_SLUG_RE, toPublicMcpServer, normalizeMcpPrice,
   type McpServerRecord, type McpServerCredential, type McpTransport,
   type McpCallerIdentity, type McpExposure, type PublicMcpServer,
-  type McpAvailability, type McpPrice,
+  type McpAvailability,
 } from '../../models/mcp-server-schemas.js';
 import { sealMcpCredential, requireEncryptionKey } from './credential.js';
 import { listRemoteTools } from './invoke.js';
@@ -80,6 +84,8 @@ export type AttachRefusal =
   | 'NOT_ALLOWED'
   /** The record names a peer AIMEAT node this one has no routable peering with. */
   | 'NO_SUCH_PEER'
+  /** A price that is not money, most often a morsel price. Morsels are a pacer and buy nothing. */
+  | 'BAD_PRICE'
   | 'UNREACHABLE';
 
 /**
@@ -270,9 +276,19 @@ export function nodeWideAdmits(server: McpServerRecord, ownerGhii: string): bool
 export async function attachNodeServer(input: Omit<AttachInput, 'ownerGhii'> & {
   availability?: McpAvailability;
   allowlist?: string[];
-  price?: McpPrice | null;
+  /**
+   * The price AS THE CALLER SENT IT. Read here through normalizeMcpPrice rather than at each door,
+   * so no door can store a morsel price by forgetting the check, and so the doors share the real
+   * job (attaching) instead of a validator that says nothing about which job they do.
+   */
+  price?: unknown;
 }): Promise<AttachResult> {
   const { storage, config, slug } = input;
+
+  // First, before anything is probed or stored: a server priced in morsels must not leave a
+  // half-made row behind the refusal.
+  const priced = normalizeMcpPrice(input.price);
+  if (!priced.ok) return { ok: false, code: 'BAD_PRICE', message: priced.message };
 
   if (!MCP_SLUG_RE.test(slug)) {
     return {
@@ -329,7 +345,7 @@ export async function attachNodeServer(input: Omit<AttachInput, 'ownerGhii'> & {
     // defaulted to everyone would hand the whole node an integration on the strength of a typo.
     availability: input.availability ?? null,
     allowlist: input.allowlist ?? [],
-    price: input.price ?? null,
+    price: priced.price,
     directory: { listed: false, visibility: 'private', tags: [] },
     enabled: true,
     status: input.deferCredential ? 'needs_reauth' : 'active',
@@ -359,7 +375,11 @@ export async function attachNodeServer(input: Omit<AttachInput, 'ownerGhii'> & {
 export interface NodePolicy {
   availability?: McpAvailability;
   allowlist?: string[];
-  price?: McpPrice | null;
+  /**
+   * The price AS THE CALLER SENT IT, read here through normalizeMcpPrice. Present means "set it";
+   * absent means "leave it as it is". null and a price of zero both mean free.
+   */
+  price?: unknown;
   enabled?: boolean;
   exposure?: McpExposure;
 }
@@ -374,15 +394,23 @@ export interface NodePolicy {
  * The CALLER proves it is the operator. This function does not, deliberately: "the operator in
  * person" is a property of the request, and a service that tried to decide it from a principal
  * string would be a second answer to a question the middleware already answers properly.
+ *
+ * The PRICE is checked here and not at the doors, and before anything is written: a morsel price is
+ * refused, because morsels are a pacer and buy nothing, and nothing else in the policy is applied
+ * when it is.
  */
 export async function setNodeServerPolicy(
   storage: Storage, server: McpServerRecord, policy: NodePolicy,
-): Promise<McpServerRecord> {
-  await storage.updateMcpServer(server.id, policy);
+): Promise<{ ok: true; server: McpServerRecord } | { ok: false; code: 'BAD_PRICE'; message: string }> {
+  const { price, ...rest } = policy;
+  const priced = 'price' in policy ? normalizeMcpPrice(price) : null;
+  if (priced && !priced.ok) return { ok: false, code: 'BAD_PRICE', message: priced.message };
+
+  await storage.updateMcpServer(server.id, { ...rest, ...(priced ? { price: priced.price } : {}) });
   // Switching it off has to STOP it. Every owner on the node is holding a pooled client that would
   // otherwise keep answering until the idle sweeper noticed.
   if (policy.enabled === false) await mcpClientPool.invalidate(server.id);
-  return (await storage.getMcpServer(server.id)) ?? server;
+  return { ok: true, server: (await storage.getMcpServer(server.id)) ?? server };
 }
 
 /**

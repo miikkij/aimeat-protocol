@@ -37,8 +37,11 @@
  *   - RemoteToolSnapshot — one tool as the far side described it, cached
  *   - McpServerRecord — the stored row, credential encrypted
  *   - PublicMcpServer — the only projection any response returns
+ *   - McpPrice / normalizeMcpPrice — what a call costs, in money only, and the one check every door uses
  * @usage import type { McpServerRecord } from '../models/mcp-server-schemas.js';
  * @version-history
+ *   v1.1.0 — 2026-09-16 — McpPrice is money only. Morsels are a pacer and buy nothing; a morsel price
+ *     is refused on every door through normalizeMcpPrice.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy: registry, client and gateway.
  */
 
@@ -94,16 +97,61 @@ export type McpAvailability =
 /**
  * What one call costs, when the operator decided it costs something.
  *
- * `money` is integer 6-decimal MICRO-units and `morsels` is whole morsels; the two are NEVER
- * conflated, which is the same rule EntitlementUnit states and the reason this carries the unit
- * rather than a bare number.
+ * MONEY ONLY. A morsel is a pacer, not a currency and not a credit, and it buys nothing: that is a
+ * rule in CLAUDE.md, and phase 4 broke it by letting an operator put a morsel price on a server,
+ * which is treating morsels as money. Ruled again by the developer on 2026-09-16: "MORSELS ARE NOT
+ * MONEY". Morsels keep their real job on a paid call, which is pacing, and the shared metered rail
+ * already burns that toll on every call it settles.
+ *
+ * `perCall` is integer 6-decimal MICRO-units, the same unit EntitlementUnit `money` uses, so a price
+ * written here means the same number the rail will charge.
  */
 export interface McpPrice {
-  unit: 'morsels' | 'money';
-  /** Per call, in the unit above. */
+  unit: 'money';
+  /** Per call, in integer 6-decimal micro-units of `currency`. */
   perCall: number;
-  /** ISO 4217, for `money` only. */
+  /** ISO 4217. The rail defaults to EUR when it is absent. */
   currency?: string;
+}
+
+/**
+ * Read a price somebody sent, or say plainly why it is not one.
+ *
+ * ONE IMPLEMENTATION FOR EVERY DOOR that writes a price: the operator's REST routes and the MCP tool
+ * both call this, so a morsel price cannot be refused on one door and stored through the other.
+ *
+ * `null` and a price of zero both mean "free", because that is how a person says it. A morsel price
+ * is refused rather than quietly dropped, so an operator who meant it learns why at once instead of
+ * finding later that the server was free all along.
+ */
+export function normalizeMcpPrice(
+  raw: unknown,
+): { ok: true; price: McpPrice | null } | { ok: false; message: string } {
+  if (raw === null || raw === undefined) return { ok: true, price: null };
+  if (typeof raw !== 'object') {
+    return { ok: false, message: 'A price is an amount per call and a currency, or nothing for free.' };
+  }
+  const p = raw as Record<string, unknown>;
+  if (p.unit === 'morsels') {
+    return {
+      ok: false,
+      message: 'A server cannot be priced in morsels. Morsels pace how much gets used; they are not '
+        + 'money and they buy nothing. Price it in money, or leave it free.',
+    };
+  }
+  if (p.unit !== undefined && p.unit !== 'money') {
+    return { ok: false, message: 'A price is in money: an amount per call and a currency.' };
+  }
+  const perCall = typeof p.perCall === 'number' && Number.isFinite(p.perCall) ? Math.floor(p.perCall) : NaN;
+  if (Number.isNaN(perCall) || perCall < 0) {
+    return { ok: false, message: 'The amount per call has to be a whole number, zero or more.' };
+  }
+  if (perCall === 0) return { ok: true, price: null };
+  const currency = typeof p.currency === 'string' && /^[A-Z]{3}$/.test(p.currency) ? p.currency : undefined;
+  if (p.currency !== undefined && !currency) {
+    return { ok: false, message: 'The currency is a three-letter code, such as EUR or USD.' };
+  }
+  return { ok: true, price: { unit: 'money', perCall, ...(currency ? { currency } : {}) } };
 }
 
 /**

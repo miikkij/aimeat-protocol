@@ -434,7 +434,10 @@ await test('a grant naming one tool refuses the others', async () => {
   const refused = await json('/v1/mcp-servers/upstream/call', {
     method: 'POST', headers: agentAuth(), body: JSON.stringify({ tool: 'refuses' }),
   });
-  assert(refused.status === 502, `expected 502, got ${refused.status}`);
+  // 403, not 502. This asserted 502 until 2026-09-16, which PINNED THE HOLE: 502 says the far side
+  // failed, so an agent refused by its own owner's grant was told the server was broken, and would
+  // retry or report it down. The far side was never asked.
+  assert(refused.status === 403, `expected 403, got ${refused.status}`);
   assert(JSON.stringify(refused.body).includes('NOT_GRANTED'), 'expected NOT_GRANTED');
 });
 
@@ -500,7 +503,9 @@ await test('disabling a server stops calls at once', async () => {
     method: 'POST', headers: ownerAuth(),
     body: JSON.stringify({ tool: 'echo', arguments: { text: 'x' } }),
   });
-  assert(status === 502, `expected 502, got ${status}`);
+  // 403: a switched-off server is this node refusing, not the far side failing. Asserted 502 until
+  // 2026-09-16, which pinned the wrong status in place.
+  assert(status === 403, `expected 403, got ${status}`);
   assert(JSON.stringify(body).includes('SERVER_DISABLED'), 'expected SERVER_DISABLED');
 });
 
@@ -551,7 +556,7 @@ await test('an agent the owner TRUSTED with mcp:manage can switch it off', async
     method: 'POST', headers: ownerAuth(),
     body: JSON.stringify({ tool: 'echo', arguments: { text: 'x' } }),
   });
-  assert(status === 502, `expected the server to be off, got ${status}`);
+  assert(status === 403, `expected the server to be off (403), got ${status}`);
 });
 
 await test('re-enabling it brings it back', async () => {
@@ -746,6 +751,88 @@ await test('somebody outside the group cannot attach to it, in the same words as
     `an outsider got ${outsider.status} and a missing group got ${nowhere.status}`);
   assert(outsider.body.error?.code === nowhere.body.error?.code,
     `${outsider.body.error?.code} vs ${nowhere.body.error?.code}`);
+});
+
+// ─── Phase 5c: the operator's registry, and what a price may be ───
+console.log('\nPhase 5c — The operator’s price');
+
+await test('a morsel price is refused BEFORE anything is attached', async () => {
+  const { status, body } = await json('/v1/mcp-servers/node', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({
+      name: 'morselpriced', url: UPSTREAM_URL, availability: 'all-owners',
+      price: { unit: 'morsels', perCall: 3 },
+    }),
+  });
+  // Morsels are a pacer and buy nothing. Refused rather than quietly dropped, so an operator who
+  // meant it learns why, instead of finding later that the server was free all along.
+  assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+  assert(body.error?.code === 'BAD_PRICE', `code was ${body.error?.code}`);
+
+  // Refuse before you write: attaching probes the far side and stores a row, and neither happened.
+  const listed = await json('/v1/mcp-servers/node', { headers: ownerAuth() });
+  assert(!(listed.body.data.servers as any[]).some(x => x.slug === 'morselpriced'),
+    'a server was attached from a request carrying a morsel price');
+});
+
+await test('a free node-wide server answers an admitted owner', async () => {
+  const attached = await json('/v1/mcp-servers/node', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ name: 'housewide', url: UPSTREAM_URL, availability: 'all-owners' }),
+  });
+  assert(attached.status === 201, `attach: ${attached.status}: ${JSON.stringify(attached.body)}`);
+
+  const called = await json('/v1/mcp-servers/housewide/call', {
+    method: 'POST', headers: strangerAuth(),
+    body: JSON.stringify({ tool: 'echo', arguments: { text: 'on the house' } }),
+  });
+  assert(called.status === 200, `a free server should answer, got ${called.status}`);
+});
+
+await test('setting a morsel price on it later is refused too, and the price stays as it was', async () => {
+  const listed = await json('/v1/mcp-servers/node', { headers: ownerAuth() });
+  const row = (listed.body.data.servers as any[]).find(x => x.slug === 'housewide');
+  assert(row, 'the house server is missing');
+
+  const patched = await json(`/v1/mcp-servers/node/${row.id}`, {
+    method: 'PATCH', headers: ownerAuth(),
+    body: JSON.stringify({ price: { unit: 'morsels', perCall: 5 } }),
+  });
+  assert(patched.status === 400, `expected 400, got ${patched.status}`);
+  assert(patched.body.error?.code === 'BAD_PRICE', `code was ${patched.body.error?.code}`);
+
+  const again = await json('/v1/mcp-servers/node', { headers: ownerAuth() });
+  const after = (again.body.data.servers as any[]).find(x => x.slug === 'housewide');
+  assert(after.price === null, `the price moved to ${JSON.stringify(after.price)}`);
+});
+
+await test('a money price is accepted, and a call answers 402 until payment can be taken', async () => {
+  const listed = await json('/v1/mcp-servers/node', { headers: ownerAuth() });
+  const row = (listed.body.data.servers as any[]).find(x => x.slug === 'housewide');
+
+  const patched = await json(`/v1/mcp-servers/node/${row.id}`, {
+    method: 'PATCH', headers: ownerAuth(),
+    body: JSON.stringify({ price: { unit: 'money', perCall: 250000, currency: 'EUR' } }),
+  });
+  assert(patched.status === 200, `expected 200, got ${patched.status}: ${JSON.stringify(patched.body)}`);
+
+  const called = await json('/v1/mcp-servers/housewide/call', {
+    method: 'POST', headers: strangerAuth(),
+    body: JSON.stringify({ tool: 'echo', arguments: { text: 'x' } }),
+  });
+  // 402 and not 502: nothing reached the far side, and the status is the one that stays true once
+  // payment works, so a client does not have to learn it twice.
+  assert(called.status === 402, `expected 402, got ${called.status}`);
+  assert(called.body.error?.code === 'PRICE_UNSUPPORTED', `code was ${called.body.error?.code}`);
+  assert(!String(called.body.error?.message).toLowerCase().includes('morsel'),
+    `the refusal points at morsels: ${called.body.error?.message}`);
+
+  // Made free again with a price of zero, which is how a person says it.
+  const freed = await json(`/v1/mcp-servers/node/${row.id}`, {
+    method: 'PATCH', headers: ownerAuth(), body: JSON.stringify({ price: { unit: 'money', perCall: 0 } }),
+  });
+  assert(freed.status === 200 && freed.body.data.server.price === null,
+    `a price of zero should clear it: ${JSON.stringify(freed.body)}`);
 });
 
 // ─── Phase 6: a local process, which this node does not run ───

@@ -52,14 +52,14 @@ import {
 import { resolveIdentity, ownerGhiiOf, callerPrincipal } from '../utils/gaii.js';
 import {
   toPublicMcpServer,
-  type McpTransport, type McpServerCredential, type McpPrice,
+  type McpTransport, type McpServerCredential,
 } from '../models/mcp-server-schemas.js';
 import {
   attachMcpServer, listUsableServers, requireUsableServer, detachMcpServer,
   updateMcpServerSettings, attachNodeServer, listNodeServers, setNodeServerPolicy,
   attachOrganismServer,
 } from '../services/mcp-client/registry.js';
-import { callRemoteTool, listRemoteTools } from '../services/mcp-client/invoke.js';
+import { callRemoteTool, listRemoteTools, statusForRemoteRefusal } from '../services/mcp-client/invoke.js';
 import { startMcpOAuth, finishMcpOAuth } from '../services/mcp-client/oauth.js';
 import {
   listMcpGrants, putMcpGrant, removeMcpGrant, type McpGrant,
@@ -101,7 +101,9 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
         }));
       }
       const listed = await listRemoteTools(storage, config, server);
-      if (!listed.ok) return res.status(502).json(error(config.nodeId, listed.code, listed.message));
+      if (!listed.ok) {
+        return res.status(statusForRemoteRefusal(listed.code)).json(error(config.nodeId, listed.code, listed.message));
+      }
       return res.json(success(config.nodeId, {
         server: server.slug, tools: listed.tools, listed_at: new Date().toISOString(), cached: false,
       }));
@@ -130,9 +132,10 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       });
 
       if (!result.ok) {
-        // 502 rather than 500: the far side is what failed, or its credential did. A 500 would read
-        // as this node being broken and send somebody to the wrong logs.
-        return res.status(502).json(error(config.nodeId, result.code, result.message));
+        // The status says WHO has to act: 403 this caller may not, 402 it costs money, 503 this node
+        // cannot serve it yet, 502 the far side failed. A single 502 for all four told an agent whose
+        // grant did not cover a tool that the server was broken.
+        return res.status(statusForRemoteRefusal(result.code)).json(error(config.nodeId, result.code, result.message));
       }
       return res.json(success(config.nodeId, {
         content: result.content,
@@ -251,7 +254,6 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
           { settings: ['AIMEAT_MCP_STDIO_ENABLED', 'AIMEAT_MCP_STDIO_ALLOWED_COMMANDS'] },
         ));
       }
-
       const credential: McpServerCredential | undefined = typeof b.token === 'string' && b.token
         ? {
           shape: 'static',
@@ -280,7 +282,9 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
           ? { availability: b.availability } : {}),
         ...(Array.isArray(b.allowlist)
           ? { allowlist: b.allowlist.filter((x): x is string => typeof x === 'string') } : {}),
-        ...(b.price && typeof b.price === 'object' ? { price: b.price as McpPrice } : {}),
+        // Passed as sent. attachNodeServer reads it before anything is probed or stored, and refuses
+        // a morsel price with BAD_PRICE, which falls through to 400 below.
+        ...('price' in b ? { price: b.price } : {}),
       });
 
       if (!result.ok) {
@@ -308,21 +312,23 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       if (!server || server.ownership !== 'node') return notFound(res);
 
       const b = (req.body ?? {}) as Record<string, unknown>;
-      const updated = await setNodeServerPolicy(storage, server, {
+      const set = await setNodeServerPolicy(storage, server, {
         ...(b.availability === 'all-owners' || b.availability === 'allowlist'
           ? { availability: b.availability } : {}),
         ...(Array.isArray(b.allowlist)
           ? { allowlist: b.allowlist.filter((x): x is string => typeof x === 'string') } : {}),
-        ...(b.price === null ? { price: null }
-          : b.price && typeof b.price === 'object' ? { price: b.price as McpPrice } : {}),
+        // Only when a price was sent at all: leaving `price` out of a PATCH leaves it as it is. The
+        // service reads it, and refuses a morsel price before anything in this policy is written.
+        ...('price' in b ? { price: b.price } : {}),
         ...(typeof b.enabled === 'boolean' ? { enabled: b.enabled } : {}),
         ...(b.exposure === 'gateway' || b.exposure === 'flatten' ? { exposure: b.exposure } : {}),
       });
+      if (!set.ok) return res.status(400).json(error(config.nodeId, set.code, set.message));
       return res.json(success(config.nodeId, {
         server: {
-          ...toPublicMcpServer(updated),
-          availability: updated.availability,
-          price: updated.price,
+          ...toPublicMcpServer(set.server),
+          availability: set.server.availability,
+          price: set.server.price,
         },
       }));
     });

@@ -110,13 +110,25 @@ describe('what a caller finds', () => {
     const storage = new SqliteStorage(':memory:');
     await storage.createMcpServer(server({
       ownership: 'node', ownerGhii: null, availability: 'all-owners',
-      price: { unit: 'morsels', perCall: 3 },
+      price: { unit: 'money', perCall: 250_000, currency: 'EUR' },
     }));
 
     const entries = await run(storage, ctx());
     expect(entries[0].tags).toContain('offered-by-this-node');
     // A caller deciding whether to call something should know it costs.
-    expect(entries[0].tags).toContain('costs-morsels');
+    expect(entries[0].tags).toContain('costs-money');
+  });
+
+  it('never says a tool costs morsels, even on a row still priced in them', async () => {
+    const storage = new SqliteStorage(':memory:');
+    await storage.createMcpServer(server({
+      ownership: 'node', ownerGhii: null, availability: 'all-owners',
+      price: { unit: 'morsels', perCall: 3 } as unknown as McpServerRecord['price'],
+    }));
+
+    const entries = await run(storage, ctx());
+    // Morsels buy nothing, and the call path reads this row as free, so the directory must agree.
+    expect(entries[0].tags.some((t: string) => t.startsWith('costs-'))).toBe(false);
   });
 });
 

@@ -290,12 +290,13 @@ export function registerMcpProxyTools(
         .describe('Who may use it: everyone with an account here, or only the named owners.'),
       allowlist: z.array(z.string()).optional()
         .describe('The owners who may use it, when availability is allowlist. An empty list means nobody.'),
+      // No `unit`: a price is money, and morsels are a pacer that buys nothing, so there is nothing
+      // for an agent to choose between. Leaving the field out means a morsel price cannot be asked for.
       price: z.object({
-        unit: z.enum(['morsels', 'money']),
         perCall: z.number(),
         currency: z.string().optional(),
       }).optional()
-        .describe("What one call costs the caller. unit 'morsels' spends their own balance; unit 'money' also needs currency, as ISO 4217. perCall 0 makes it free again."),
+        .describe('What one call costs the caller, in money: perCall in whole micro-units (1000000 is one unit of the currency), and currency as ISO 4217, such as EUR. perCall 0 makes it free again.'),
       exposure: z.enum(['gateway', 'flatten']).optional()
         .describe("How its tools are reached: 'gateway' through aimeat_mcp_call, or 'flatten' listed one by one in every caller's own tool list."),
       enabled: z.boolean().optional().describe('false takes it away from everybody at once.'),
@@ -308,21 +309,21 @@ export function registerMcpProxyTools(
       const row = await findNodeServer(storage, server);
       if (!row) return fail(`This node offers no server called "${server}".`);
 
-      // The same service the operator's REST door calls, so switching a server off cannot stop
-      // the pool on one door and leave it answering on the other.
-      const updated = await setNodeServerPolicy(storage, row, {
+      // The same service the operator's REST door calls, so switching a server off cannot stop the
+      // pool on one door and leave it answering on the other, and so the price is refused in one
+      // place for both. A price of 0 reads as free, because that is how somebody says "free again".
+      const set = await setNodeServerPolicy(storage, row, {
         ...(availability ? { availability } : {}),
         ...(allowlist ? { allowlist } : {}),
-        // A price of 0 is how somebody says "free again", and storing it as a price of zero would
-        // send every call through the meter to be charged nothing.
-        ...(price ? { price: price.perCall > 0 ? price : null } : {}),
+        ...(price ? { price: { unit: 'money', ...price } } : {}),
         ...(exposure ? { exposure } : {}),
         ...(enabled !== undefined ? { enabled } : {}),
       });
+      if (!set.ok) return fail(set.message);
       return ok({
-        server: toPublicMcpServer(updated),
-        availability: updated.availability,
-        price: updated.price,
+        server: toPublicMcpServer(set.server),
+        availability: set.server.availability,
+        price: set.server.price,
       });
     });
 

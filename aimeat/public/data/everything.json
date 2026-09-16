@@ -177,10 +177,10 @@
      "slug": "g-1-the-node-s-own-mcp-registry",
      "cells": [
       "<strong>The node's own MCP registry</strong>",
-      "The operator can attach a server for everyone with an account or for named owners only, and set a price per call. No availability policy, or an empty allowlist, offers it to nobody. Paid proxy calls currently charge morsels only, from the caller's owner's balance; money prices can be saved but calls at those prices are refused. Node-wide attachment requires the operator in person.",
+      "The operator can attach a server for everyone with an account or for named owners only, and set a price per call. No availability policy, or an empty allowlist, offers it to nobody. A price is in money only: morsels pace how much gets used and are never a price, so a morsel price is refused. Proxied calls cannot take payment yet, so a server with a money price refuses its calls by name until they can; leave it free for now. Node-wide attachment requires the operator in person.",
       "<code>POST /v1/mcp-servers/node</code> · <code>PATCH /v1/mcp-servers/node/{id}</code> · <code>aimeat_mcp_registry_list</code> · <code>aimeat_mcp_registry_set</code>"
      ],
-     "plain": "The node's own MCP registry The operator can attach a server for everyone with an account or for named owners only, and set a price per call. No availability policy, or an empty allowlist, offers it to nobody. Paid proxy calls currently charge morsels only, from the caller's owner's balance; money prices can be saved but calls at those prices are refused. Node-wide attachment requires the operator in person. POST /v1/mcp-servers/node · PATCH /v1/mcp-servers/node/{id} · aimeat_mcp_registry_list · aimeat_mcp_registry_set"
+     "plain": "The node's own MCP registry The operator can attach a server for everyone with an account or for named owners only, and set a price per call. No availability policy, or an empty allowlist, offers it to nobody. A price is in money only: morsels pace how much gets used and are never a price, so a morsel price is refused. Proxied calls cannot take payment yet, so a server with a money price refuses its calls by name until they can; leave it free for now. Node-wide attachment requires the operator in person. POST /v1/mcp-servers/node · PATCH /v1/mcp-servers/node/{id} · aimeat_mcp_registry_list · aimeat_mcp_registry_set"
     },
     {
      "slug": "g-1-a-server-that-belongs-to-a-team",
@@ -222,10 +222,10 @@
      "slug": "g-1-mcp-usage-and-refusals",
      "cells": [
       "<strong>MCP usage and refusals</strong>",
-      "Proxied calls record the caller, server and tool, duration, outcome and charged morsels in the usage stream. Operators can inspect these records to explain what an agent used and why a call was refused. Refusals recorded by the call service are separate from transport errors; not every rejection before that service produces a usage row.",
+      "Proxied calls record the caller, server and tool, duration and outcome in the usage stream. Operators can inspect these records to explain what an agent used and why a call was refused. Refusals recorded by the call service are separate from transport errors; not every rejection before that service produces a usage row.",
       "Usage surface <code>mcp-remote</code> · <code>GET /v1/admin/usage/calls</code>"
      ],
-     "plain": "MCP usage and refusals Proxied calls record the caller, server and tool, duration, outcome and charged morsels in the usage stream. Operators can inspect these records to explain what an agent used and why a call was refused. Refusals recorded by the call service are separate from transport errors; not every rejection before that service produces a usage row. Usage surface mcp-remote · GET /v1/admin/usage/calls"
+     "plain": "MCP usage and refusals Proxied calls record the caller, server and tool, duration and outcome in the usage stream. Operators can inspect these records to explain what an agent used and why a call was refused. Refusals recorded by the call service are separate from transport errors; not every rejection before that service produces a usage row. Usage surface mcp-remote · GET /v1/admin/usage/calls"
     },
     {
      "slug": "g-1-another-aimeat-node-as-a-server",

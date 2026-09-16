@@ -339,8 +339,9 @@ describe('switching a server off and removing it', () => {
     await call(app, 'PATCH', '/v1/mcp-servers/jira', { enabled: false });
     const res = await call(app, 'POST', '/v1/mcp-servers/jira/call', { tool: 'create_issue', arguments: { title: 'x' } });
     // Not later, when an idle sweeper notices: "I turned it off and it kept working" is the worst
-    // possible answer to somebody cutting an integration.
-    expect(res.status).toBe(502);
+    // possible answer to somebody cutting an integration. 403 rather than the 502 this asserted
+    // until 2026-09-16: switched off is this node refusing, and 502 blamed the far side for it.
+    expect(res.status).toBe(403);
     expect(JSON.stringify(res.body)).toContain('SERVER_DISABLED');
   });
 

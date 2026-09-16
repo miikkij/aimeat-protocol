@@ -114,11 +114,12 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
             const rows = ((listed.data as { servers?: { id: string; slug: string }[] } | undefined)?.servers) ?? [];
             const row = rows.find((s) => s.slug === slug);
             if (!row) return { ok: false, status: 404, data: { error: `This node offers no server called "${slug}".` } } as never;
-            const price = input.price as { perCall?: number } | undefined;
+            // Forwarded as sent: the route reads it through normalizeMcpPrice, so this door decides nothing.
+            const price = input.price && typeof input.price === 'object' ? input.price as Record<string, unknown> : null;
             return client.patch(`/v1/mcp-servers/node/${encodeURIComponent(row.id)}`, {
                 ...(optionalString(input, 'availability') ? { availability: optionalString(input, 'availability') } : {}),
                 ...(Array.isArray(input.allowlist) ? { allowlist: input.allowlist } : {}),
-                ...(price ? { price: (price.perCall ?? 0) > 0 ? price : null } : {}),
+                ...(price ? { price: { unit: 'money', ...price } } : {}),
                 ...(optionalString(input, 'exposure') ? { exposure: optionalString(input, 'exposure') } : {}),
                 ...(optionalBoolean(input, 'enabled') !== undefined ? { enabled: optionalBoolean(input, 'enabled') } : {}),
             });

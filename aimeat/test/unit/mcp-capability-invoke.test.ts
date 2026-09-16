@@ -22,7 +22,12 @@ import type { AimeatConfig } from '../../src/config.js';
 // The chokepoint is mocked because what is under test is WHICH server this path resolves and WHOSE
 // reach it uses, not the call itself: mcp-client-invoke.test.ts already holds the call to account.
 const callRemoteTool = vi.hoisted(() => vi.fn());
-vi.mock('../../src/services/mcp-client/invoke.js', () => ({ callRemoteTool }));
+// Only the call is faked. The status map is the REAL one, because whether this door answers 403 or
+// 502 for a refusal is part of what is under test here.
+vi.mock('../../src/services/mcp-client/invoke.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/services/mcp-client/invoke.js')>()),
+  callRemoteTool,
+}));
 
 const { invokeCapability } = await import('../../src/services/capability-invoke.js');
 
@@ -152,6 +157,18 @@ describe('a capability over an attached MCP tool', () => {
       });
     }
     expect(callRemoteTool).not.toHaveBeenCalled();
+  });
+
+  it('answers a grant refusal as 403, not as the far side failing', async () => {
+    const storage = new SqliteStorage(':memory:');
+    await storage.createMcpServer(server());
+    callRemoteTool.mockResolvedValue({ ok: false, code: 'NOT_GRANTED', message: 'Not this tool.' });
+
+    // The same map the REST route uses. Arriving through a capability must not turn "you may not"
+    // into "the server is down".
+    await expect(call(storage, capability('jira/create_issue'), ALICES_AGENT)).rejects.toMatchObject({
+      statusCode: 403, code: 'NOT_GRANTED',
+    });
   });
 
   it('reports the far side saying no as a failure of the call, not of the capability', async () => {

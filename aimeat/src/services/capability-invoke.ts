@@ -21,7 +21,7 @@ import { INTERNAL_PASS_HEADER } from '../routes/extensions/internal-pass.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { parseGaiiLoose, buildGEAI, ownerGhiiOf } from '../utils/gaii.js';
 import { requireUsableServer } from './mcp-client/registry.js';
-import { callRemoteTool } from './mcp-client/invoke.js';
+import { callRemoteTool, statusForRemoteRefusal } from './mcp-client/invoke.js';
 
 export interface InvokeResult {
   capability: string;
@@ -139,7 +139,9 @@ export async function invokeCapability(
         caller: callerGhii,
       });
       if (!called.ok) {
-        throw Object.assign(new Error(called.message), { statusCode: 502, code: called.code });
+        throw Object.assign(new Error(called.message), {
+          statusCode: statusForRemoteRefusal(called.code), code: called.code,
+        });
       }
       result = called.content;
       break;
