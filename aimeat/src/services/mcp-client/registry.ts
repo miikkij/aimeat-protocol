@@ -23,6 +23,9 @@
  * @structure attachMcpServer · listUsableServers · requireUsableServer · detachMcpServer
  * @usage const server = await requireUsableServer(storage, ownerGhii, idOrSlug);
  * @version-history
+ *   v1.2.0 — 2026-09-17 — All three attach doors refuse this AIMEAT's own address (SELF_ADDRESS),
+ *     and a first look that comes back here by another spelling (LOOP_DETECTED) removes the row it
+ *     just made, because an address cannot be edited and that row could never answer.
  *   v1.1.0 — 2026-09-16 — attachNodeServer and setNodeServerPolicy read the price themselves and
  *     refuse a morsel price with BAD_PRICE, before anything is written. The check was at each door
  *     first, and check:field-reach then paired the operator's policy tool with the ATTACH route
@@ -41,6 +44,7 @@ import {
 } from '../../models/mcp-server-schemas.js';
 import { sealMcpCredential, requireEncryptionKey } from './credential.js';
 import { listRemoteTools, type RemoteCallRefusal } from './invoke.js';
+import { selfAddressRefusal } from './hops.js';
 import { mcpClientPool } from './pool.js';
 import { recordAccountEvent } from '../account-events.js';
 import { organismOwners } from '../organism-ownership.js';
@@ -94,6 +98,10 @@ export type AttachRefusal =
   /** A local process this node does not run, or a command nobody allowlisted. */
   | 'STDIO_DISABLED'
   | 'STDIO_NOT_ALLOWED'
+  /** The address is this AIMEAT's own MCP endpoint, or the peer named is this node. */
+  | 'SELF_ADDRESS'
+  /** The first look at the server came back to this AIMEAT by another spelling of its address. */
+  | 'LOOP_DETECTED'
   | 'UNREACHABLE';
 
 /**
@@ -107,10 +115,17 @@ export type AttachRefusal =
  *
  * The row itself is parked by listRemoteTools either way, with a status the panel renders as the fix.
  */
-function refusalFromProbe(
-  code: RemoteCallRefusal, message: string,
-): { ok: false; code: AttachRefusal; message: string } {
+async function refusalFromProbe(
+  storage: Storage, rowId: string, code: RemoteCallRefusal, message: string,
+): Promise<{ ok: false; code: AttachRefusal; message: string }> {
   switch (code) {
+    case 'LOOP_DETECTED':
+      // The one failure where the row is NOT kept. Every other one is something a person fixes on
+      // the row (a token, a sign-in); this address leads back to this AIMEAT, the address cannot be
+      // edited, and a row that can never answer would only sit in the list. The attach-time address
+      // check catches the obvious spelling; this catches every other spelling of the same place.
+      await storage.deleteMcpServer(rowId);
+      return { ok: false, code: 'LOOP_DETECTED', message };
     case 'PEER_UNKNOWN':
     case 'PEER_NOT_ROUTABLE':
       // A mistyped peer id is a name to correct here, not somebody else's node being down.
@@ -137,6 +152,10 @@ function refusalFromProbe(
  */
 export async function attachMcpServer(input: AttachInput): Promise<AttachResult> {
   const { storage, config, ownerGhii, slug } = input;
+
+  // This AIMEAT attached to itself: refused while the form is still open (see selfAddressRefusal).
+  const self = selfAddressRefusal(config, input.transport);
+  if (self) return self;
 
   if (!MCP_SLUG_RE.test(slug)) {
     return {
@@ -227,7 +246,7 @@ export async function attachMcpServer(input: AttachInput): Promise<AttachResult>
     // fix the token, not retype the whole attachment. listRemoteTools has already set the status
     // and the reason, so the panel can render the fix.
     //
-    return refusalFromProbe(probed.code, probed.message);
+    return refusalFromProbe(storage, row.id, probed.code, probed.message);
   }
 
   // Attaching a server is news. A CALL through it is not, and there is deliberately no event for
@@ -324,6 +343,10 @@ export async function attachNodeServer(input: Omit<AttachInput, 'ownerGhii'> & {
   const priced = normalizeMcpPrice(input.price);
   if (!priced.ok) return { ok: false, code: 'BAD_PRICE', message: priced.message };
 
+  // This AIMEAT attached to itself: refused while the form is still open (see selfAddressRefusal).
+  const self = selfAddressRefusal(config, input.transport);
+  if (self) return self;
+
   if (!MCP_SLUG_RE.test(slug)) {
     return {
       ok: false,
@@ -395,7 +418,7 @@ export async function attachNodeServer(input: Omit<AttachInput, 'ownerGhii'> & {
   }
 
   const probed = await listRemoteTools(storage, config, row);
-  if (!probed.ok) return refusalFromProbe(probed.code, probed.message);
+  if (!probed.ok) return refusalFromProbe(storage, row.id, probed.code, probed.message);
 
   const stored = await storage.getMcpServer(row.id);
   return {
@@ -506,6 +529,10 @@ export async function attachOrganismServer(input: Omit<AttachInput, 'ownerGhii'>
 }): Promise<AttachResult> {
   const { storage, config, slug, organismId } = input;
 
+  // This AIMEAT attached to itself: refused while the form is still open (see selfAddressRefusal).
+  const self = selfAddressRefusal(config, input.transport);
+  if (self) return self;
+
   if (!MCP_SLUG_RE.test(slug)) {
     return {
       ok: false,
@@ -591,7 +618,7 @@ export async function attachOrganismServer(input: Omit<AttachInput, 'ownerGhii'>
   if (input.deferCredential) return { ok: true, server: toPublicMcpServer(row), tools: [] };
 
   const probed = await listRemoteTools(storage, config, row);
-  if (!probed.ok) return refusalFromProbe(probed.code, probed.message);
+  if (!probed.ok) return refusalFromProbe(storage, row.id, probed.code, probed.message);
 
   const stored = await storage.getMcpServer(row.id);
   return {

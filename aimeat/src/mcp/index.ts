@@ -11,6 +11,10 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.26.0 -- 2026-09-17 -- A POST that has already passed through this node (X-AIMEAT-MCP-Via) is
+ *            refused with 508 before anything else, and the chain it arrived with stays in scope so
+ *            a remote MCP call made while serving it carries the chain on. A node could attach its
+ *            own endpoint, and two nodes each other, and the calls went round in a circle.
  *   v1.25.0 -- 2026-09-05 -- The resource change event bus moves out to resource-events.ts, a leaf,
  *            and is re-exported from here. A service that notified an agent through this file
  *            imported the whole registry, and the registry imports services: the dependency cruiser
@@ -121,6 +125,7 @@ import { registerManagedPrompts } from './prompts-managed.js';
 import { registerOAuthRoutes } from './oauth.js';
 import { registerChatInstance, touchChatInstance } from '../services/chat-instance-write.js';
 import { markAgentMcpUse } from '../services/agent-mcp-touch.js';
+import { MCP_VIA_HEADER, parseVia, viaRefusal, runWithVia } from '../services/mcp-client/hops.js';
 
 // ── Resource change event bus ──
 // Lives in resource-events.ts, a leaf, so a service can notify an agent without importing the
@@ -291,7 +296,29 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
     }
 
     // MCP Streamable HTTP POST handler — shared by /v1/mcp (role 'all') and /v2/mcp/:role.
+    //
+    // THE LOOP BRAKE FIRST, before origin, auth or session: a request that has already passed
+    // through this node (X-AIMEAT-MCP-Via names it) is refused with 508 whoever sent it, because
+    // answering it would send it round in a circle. The list it arrived with then stays in scope for
+    // the whole request, so a remote MCP call this node makes while serving it carries the list
+    // onward. That is what stops two nodes that attached each other, which no address check can see.
+    // services/mcp-client/hops.ts has the rest of the argument. Only POST: it is where tools are
+    // called, and a GET stream belongs to a session whose initialize POST was already refused.
     const handleMcpPost = (serverRole: SurfaceRole | 'all') => async (req: Request, res: Response) => {
+        const via = parseVia(req.headers[MCP_VIA_HEADER]);
+        const loop = viaRefusal(via, config.nodeId);
+        if (loop) {
+            res.status(508).json({
+                jsonrpc: '2.0',
+                error: { code: -32001, message: loop.message, data: { reason: loop.code } },
+                id: req.body?.id ?? null,
+            });
+            return;
+        }
+        await runWithVia(via, () => handleMcpPostServed(serverRole)(req, res));
+    };
+
+    const handleMcpPostServed = (serverRole: SurfaceRole | 'all') => async (req: Request, res: Response) => {
         // Origin validation (MCP spec: REQUIRED to prevent DNS rebinding)
         const origin = req.headers.origin;
         if (origin) {

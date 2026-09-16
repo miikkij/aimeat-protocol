@@ -25,6 +25,7 @@
  * @structure McpClientPool — acquire · invalidate · closeAll · size
  * @usage const client = await pool.acquire(server, credential, identity);
  * @version-history
+ *   v1.1.0 — 2026-09-17 — The node id reaches the transport, for the loop-brake header.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -67,7 +68,7 @@ export class McpClientPool {
      * http and sse paths are unchanged, and a missing one is a refusal rather than a default: an
      * unanswered question about running a program is a no.
      */
-    config?: Pick<AimeatConfig, 'mcpStdioEnabled' | 'mcpStdioAllowedCommands'>,
+    config?: Pick<AimeatConfig, 'mcpStdioEnabled' | 'mcpStdioAllowedCommands' | 'nodeId'>,
   ): Promise<Client> {
     const key = this.key(server.id, identity);
     const existing = this.entries.get(key);

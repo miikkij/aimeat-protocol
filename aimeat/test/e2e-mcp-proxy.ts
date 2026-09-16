@@ -29,6 +29,8 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   v1.3.0 — 2026-09-17 — The loop brake: 508 on the node's own endpoint, and this node refused as a
+ *     server of its own by its address and by any other spelling of it.
  *   v1.2.0 — 2026-09-16 — The stdio refusals (proxy phase 7).
  *   v1.1.0 — 2026-09-16 — The directory and the capability path (proxy phase 6).
  *   v1.0.0 — 2026-09-16 — Initial suite, phase 1 of the MCP proxy.
@@ -218,6 +220,63 @@ await test('an unreachable server is refused as a bad gateway, not as our own er
     body: JSON.stringify({ name: 'deadone', url: `http://127.0.0.1:${UPSTREAM_PORT + 7}/mcp` }),
   });
   assert(status === 502, `expected 502, got ${status}`);
+});
+
+// ─── The loop brake: this node attached to itself ───
+
+await test('a call that has already passed through this node is refused with 508, before auth', async () => {
+  const res = await fetch(`${BASE}/v1/mcp`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+      'X-AIMEAT-MCP-Via': `some-peer, ${NODE_ID}`,
+    },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+  });
+  const body = await res.json() as any;
+  assert(res.status === 508, `expected 508, got ${res.status}: ${JSON.stringify(body)}`);
+  assert(body.error?.data?.reason === 'LOOP_DETECTED', `reason ${JSON.stringify(body.error)}`);
+});
+
+await test('a chain through too many servers is refused, and a short one goes through', async () => {
+  const send = (via: string) => fetch(`${BASE}/v1/mcp`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+      'X-AIMEAT-MCP-Via': via,
+    },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+  });
+  const long = await send('p1, p2, p3, p4');
+  const longBody = await long.json() as any;
+  assert(long.status === 508, `expected 508, got ${long.status}`);
+  assert(longBody.error?.data?.reason === 'TOO_MANY_HOPS', `reason ${JSON.stringify(longBody.error)}`);
+  // One hop that is not this node is an ordinary request, answered by whatever answers it today.
+  const short = await send('some-peer');
+  assert(short.status !== 508, `a one-hop chain was refused as a loop`);
+});
+
+await test("this node's own address is refused at attach, and nothing is stored", async () => {
+  const { status, body } = await json('/v1/mcp-servers', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ name: 'myself', url: `${BASE}/v1/mcp` }),
+  });
+  assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+  assert(body.error?.code === 'SELF_ADDRESS', `code ${body.error?.code}`);
+  const listed = await json('/v1/mcp-servers', { headers: ownerAuth() });
+  assert(!(listed.body.data.servers as any[]).some((s) => s.slug === 'myself'), 'a row was stored');
+});
+
+await test('another spelling of it is caught at the first look, and leaves no row behind', async () => {
+  const port = new URL(BASE).port || '80';
+  const { status, body } = await json('/v1/mcp-servers', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ name: 'myselfagain', url: `http://127.0.0.1:${port}/v1/mcp` }),
+  });
+  assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+  assert(body.error?.code === 'LOOP_DETECTED', `code ${body.error?.code}`);
+  const listed = await json('/v1/mcp-servers', { headers: ownerAuth() });
+  assert(!(listed.body.data.servers as any[]).some((s) => s.slug === 'myselfagain'), 'a row was left');
 });
 
 await test('attach probes the far side and reports its tools', async () => {

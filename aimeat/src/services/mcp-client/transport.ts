@@ -31,6 +31,9 @@
  * @usage const wire = await resolveWireAddress(storage, server);
  *   if (wire.ok) await client.connect(buildTransport(wire.server, credential));
  * @version-history
+ *   v1.4.0 — 2026-09-17 — Every request to a remote MCP server carries X-AIMEAT-MCP-Via, set at the
+ *     moment of sending from the chain the current request is serving under (hops.ts), so a call
+ *     that would come back to a node it already passed through is refused there.
  *   v1.3.0 — 2026-09-17 — guardedFetchNaming: a static credential in a header of its own name
  *     (X-API-Key) is dropped on a cross-origin redirect like Authorization. It was followed along.
  *   v1.2.0 — 2026-09-16 — Phase 7: `stdio`, behind the node's own policy and off by default.
@@ -44,6 +47,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import type { Transport, FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { safeFetch } from '../../utils/url-validator.js';
 import { checkStdioPolicy } from './stdio-policy.js';
+import { MCP_VIA_HEADER, outgoingVia } from './hops.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { McpServerRecord, McpServerCredential } from '../../models/mcp-server-schemas.js';
@@ -162,7 +166,7 @@ export async function resolveWireAddress(
 export function buildTransport(
   server: McpServerRecord,
   credential: McpServerCredential | null,
-  config?: Pick<AimeatConfig, 'mcpStdioEnabled' | 'mcpStdioAllowedCommands'>,
+  config?: Pick<AimeatConfig, 'mcpStdioEnabled' | 'mcpStdioAllowedCommands' | 'nodeId'>,
 ): Transport {
   const t = server.transport;
 
@@ -204,7 +208,18 @@ export function buildTransport(
   const headers = { ...(t.headers ?? {}), ...credHeaders };
   const url = new URL(t.url);
   // Every header the credential became is dropped on a cross-origin redirect, whatever its name.
-  const fetchFn = guardedFetchNaming(Object.keys(credHeaders));
+  const guarded = guardedFetchNaming(Object.keys(credHeaders));
+  // The loop brake rides on EVERY request, set at the moment of sending rather than when the pooled
+  // client was built: one client serves many calls, and each call may be passing through a different
+  // chain of nodes. See hops.ts. Without a node id there is nothing to name, so nothing is added.
+  const nodeId = config?.nodeId;
+  const fetchFn: FetchLike = nodeId
+    ? (u, init) => {
+      const h = Object.fromEntries(new Headers(init?.headers).entries());
+      h[MCP_VIA_HEADER] = outgoingVia(nodeId);
+      return guarded(u, { ...init, headers: h });
+    }
+    : guarded;
 
   return t.kind === 'sse'
     ? new SSEClientTransport(url, { fetch: fetchFn, requestInit: { headers } })
