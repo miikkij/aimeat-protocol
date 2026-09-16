@@ -27,10 +27,12 @@
  *
  *   A LOCAL PROCESS IS THE ONE THING HERE THAT IS NOT A NETWORK CALL, and its three conditions live
  *   in stdio-policy.ts with the argument for each. This file only asks, at the line that spawns.
- * @structure guardedFetch · resolveWireAddress · buildTransport · MCP_CONNECT_TIMEOUT_MS
+ * @structure guardedFetch · guardedFetchNaming · resolveWireAddress · buildTransport · MCP_CONNECT_TIMEOUT_MS
  * @usage const wire = await resolveWireAddress(storage, server);
  *   if (wire.ok) await client.connect(buildTransport(wire.server, credential));
  * @version-history
+ *   v1.3.0 — 2026-09-17 — guardedFetchNaming: a static credential in a header of its own name
+ *     (X-API-Key) is dropped on a cross-origin redirect like Authorization. It was followed along.
  *   v1.2.0 — 2026-09-16 — Phase 7: `stdio`, behind the node's own policy and off by default.
  *   v1.1.0 — 2026-09-16 — Phase 6: the `aimeat` transport kind resolves through the federation
  *     peer list, gated on allowRouting, which is member and genesis only.
@@ -63,11 +65,20 @@ export const MCP_CONNECT_TIMEOUT_MS = 20_000;
  * 302 and collect the bearer token. curl and every browser drop the credential on a cross-host
  * redirect for exactly this reason, and only the caller knows which of its headers carry a secret.
  */
-export const guardedFetch: FetchLike = (url, init) =>
-  safeFetch(typeof url === 'string' ? url : url.toString(), {
-    ...init,
-    sensitiveHeaders: ['authorization'],
-  });
+export const guardedFetch: FetchLike = guardedFetchNaming([]);
+
+/**
+ * guardedFetch that also drops the named headers on a cross-origin redirect. A static credential may
+ * travel in a header of its own name (X-API-Key), which safeFetch cannot know is a secret unless it
+ * is told; it followed the redirect with that header and handed the key to the next host.
+ */
+export function guardedFetchNaming(extraSensitive: string[]): FetchLike {
+  return (url, init) =>
+    safeFetch(typeof url === 'string' ? url : url.toString(), {
+      ...init,
+      sensitiveHeaders: ['authorization', ...extraSensitive],
+    });
+}
 
 /**
  * The headers a credential turns into.
@@ -189,10 +200,13 @@ export function buildTransport(
 
   // The record's own headers first, so a credential can never be shadowed by one somebody typed
   // into the transport when they attached the server.
-  const headers = { ...(t.headers ?? {}), ...authHeaders(credential) };
+  const credHeaders = authHeaders(credential);
+  const headers = { ...(t.headers ?? {}), ...credHeaders };
   const url = new URL(t.url);
+  // Every header the credential became is dropped on a cross-origin redirect, whatever its name.
+  const fetchFn = guardedFetchNaming(Object.keys(credHeaders));
 
   return t.kind === 'sse'
-    ? new SSEClientTransport(url, { fetch: guardedFetch, requestInit: { headers } })
-    : new StreamableHTTPClientTransport(url, { fetch: guardedFetch, requestInit: { headers } });
+    ? new SSEClientTransport(url, { fetch: fetchFn, requestInit: { headers } })
+    : new StreamableHTTPClientTransport(url, { fetch: fetchFn, requestInit: { headers } });
 }
