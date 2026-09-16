@@ -104,7 +104,18 @@ function refuse(status: number, code: string, message: string): CapabilityRefusa
     return { ok: false, status, code, message };
 }
 
-const CAPABILITY_SOURCE_TYPES: CapabilityRecord['source']['type'][] = ['extension', 'action', 'cortex', 'app', 'manual', 'ecosystem'];
+/**
+ * The source kinds a PERSON may name when they register one.
+ *
+ * Shorter than the type on the record, and deliberately: `app-tool` and `offering` are written by
+ * the node when a published app or an offer creates them, and letting a caller claim one would let
+ * them publish something that looks like it came from a place it did not.
+ *
+ * `mcp` is here because a remote tool IS somebody's own to publish: they attached the server. It is
+ * safe to accept because the ref is resolved through the CALLER's reach at invoke time, so naming
+ * somebody else's server in one buys nothing.
+ */
+const CAPABILITY_SOURCE_TYPES: CapabilityRecord['source']['type'][] = ['extension', 'action', 'cortex', 'app', 'manual', 'ecosystem', 'mcp'];
 
 /**
  * A PUBLIC capability on a moderated node waits for review, whoever registered it and whichever door

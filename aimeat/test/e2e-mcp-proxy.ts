@@ -19,13 +19,15 @@
  *   - Phase 2: the tool list, cached and refreshed
  *   - Phase 3: calling — the happy path, and a tool saying no
  *   - Phase 4: the fences — cross-owner 404, and the scope split on an agent session
- *   - Phase 5: off and gone — disable stops it, detach removes it
+ *   - Phase 5: the directory and a published capability over a remote tool
+ *   - Phase 6: off and gone — disable stops it, detach removes it
  *
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   v1.1.0 — 2026-09-16 — The directory and the capability path (proxy phase 6).
  *   v1.0.0 — 2026-09-16 — Initial suite, phase 1 of the MCP proxy.
  */
 
@@ -554,6 +556,137 @@ await test('re-enabling it brings it back', async () => {
   });
   assert(status === 200, `expected 200, got ${status}`);
 });
+
+// ─── Phase 5: the directory, and a capability over a remote tool ───
+console.log('\nPhase 5 — The directory and capabilities');
+
+await test('an attached tool is findable in the directory, one entry per TOOL', async () => {
+  const { status, body } = await json('/v1/discover?scope=own&q=echo', { headers: ownerAuth() });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  const hit = (body.data.entries as any[]).find(e => e.id === 'upstream__echo');
+  // The whole point of the source: an AI exploring the node finds the ability without being told
+  // the server exists first.
+  assert(hit, `no upstream__echo in ${JSON.stringify((body.data.entries as any[]).map(e => e.id))}`);
+  assert(hit.tags.includes('server:upstream'), `tags were ${JSON.stringify(hit.tags)}`);
+});
+
+await test('and the directory entry does not carry the far side address', async () => {
+  const { body } = await json('/v1/discover?scope=own&q=echo', { headers: ownerAuth() });
+  const hit = (body.data.entries as any[]).find(e => e.id === 'upstream__echo');
+  const whole = JSON.stringify(hit);
+  // A caller that learns the address calls it directly and leaves every gate behind.
+  assert(!whole.includes(String(UPSTREAM_PORT)), `the entry carried the endpoint: ${whole}`);
+  assert(hit.href === '/v1/mcp-servers/upstream/tools', `href was ${hit.href}`);
+});
+
+await test("what a second owner finds is their OWN, never the first owner's", async () => {
+  const { body } = await json('/v1/discover?scope=own&q=echo', { headers: strangerAuth() });
+  const found = (body.data.entries as any[]).filter(e => String(e.id).startsWith('upstream__'));
+  // Both owners attached a server under the name `upstream`, because the name is scoped to the
+  // person. So the question is not whether the id appears; it is WHOSE row is behind it. Learning
+  // that somebody else has a server IS the leak, even without calling it.
+  assert(found.length > 0, 'the second owner cannot see their own server');
+  for (const e of found) {
+    assert(String(e.owner).startsWith(`${strangerName}@`),
+      `the stranger was shown a row owned by ${e.owner}`);
+  }
+});
+
+await test('nothing at all on the public scope', async () => {
+  const { body } = await json('/v1/discover?scope=public');
+  const ids = (body.data.entries as any[]).map(e => e.id);
+  assert(!ids.some((i: string) => String(i).startsWith('upstream__')), `public carried ${JSON.stringify(ids)}`);
+});
+
+let capabilityId = '';
+let privateCapabilityId = '';
+
+await test('attach a second server under a name only this owner holds', async () => {
+  // The cross-owner arm below needs a slug the OTHER owner definitely does not have. Both owners
+  // hold one called `upstream`, because the name is scoped to the person, so `upstream` cannot
+  // tell the two apart.
+  const { status } = await json('/v1/mcp-servers', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ name: 'ownersonly', url: UPSTREAM_URL }),
+  });
+  assert(status === 201, `expected 201, got ${status}`);
+});
+
+await test('a remote tool can be published as a capability', async () => {
+  const { status, body } = await json('/v1/capabilities', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({
+      name: 'say-it-back',
+      summary: 'Says back whatever you give it, through the attached server.',
+      visibility: 'public',
+      source: { type: 'mcp', ref: 'upstream/echo' },
+      status: 'active',
+      callable: true,
+      authRequired: 'registered',
+      usage: 'Give it text.',
+    }),
+  });
+  assert(status === 201 || status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  capabilityId = body.data.capability?.id ?? body.data.id;
+  assert(capabilityId, `no id in ${JSON.stringify(body.data)}`);
+});
+
+await test('and invoking it reaches the remote tool', async () => {
+  const { status, body } = await json(`/v1/capabilities/${capabilityId}/invoke`, {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ input: { text: 'through the capability' } }),
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  assert(JSON.stringify(body.data).includes('through the capability'),
+    `the far side did not answer: ${JSON.stringify(body.data)}`);
+});
+
+await test('the ref is resolved through the CALLER, not the publisher', async () => {
+  // The stranger has their own `upstream`, so this call goes to THEIR server and succeeds. That is
+  // the design working: a capability names a slug, and a slug means whatever it means to whoever
+  // is calling. The arm that proves nothing is borrowed is the next one.
+  const { status } = await json(`/v1/capabilities/${capabilityId}/invoke`, {
+    method: 'POST', headers: strangerAuth(),
+    body: JSON.stringify({ input: { text: 'my own upstream' } }),
+  });
+  assert(status === 200, `expected the stranger's own server to answer, got ${status}`);
+});
+
+await test('a capability over a server only the publisher has', async () => {
+  const { status, body } = await json('/v1/capabilities', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({
+      name: 'say-it-back-privately',
+      summary: 'Goes through a server only its publisher has attached.',
+      visibility: 'public',
+      source: { type: 'mcp', ref: 'ownersonly/echo' },
+      status: 'active', callable: true, authRequired: 'registered',
+      usage: 'Give it text.',
+    }),
+  });
+  assert(status === 201 || status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  privateCapabilityId = body.data.capability?.id ?? body.data.id;
+  assert(privateCapabilityId, `no id in ${JSON.stringify(body.data)}`);
+
+  const mine = await json(`/v1/capabilities/${privateCapabilityId}/invoke`, {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ input: { text: 'mine' } }),
+  });
+  assert(mine.status === 200, `the publisher cannot use their own: ${mine.status}`);
+});
+
+await test('a capability is a signpost: it does not carry access with it', async () => {
+  const { status, body } = await json(`/v1/capabilities/${privateCapabilityId}/invoke`, {
+    method: 'POST', headers: strangerAuth(),
+    body: JSON.stringify({ input: { text: 'not mine' } }),
+  });
+  // The capability is PUBLIC and the stranger may read it. What they may not do is reach the
+  // publisher's server through it. If this ever answered 200, the capability register would be a
+  // way to launder access to every attached server on the node.
+  assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
+});
+
+// ─── Phase 6: off and gone ───
 
 await test('detach removes it, and the call path goes with it', async () => {
   const { status } = await json(`/v1/mcp-servers/upstream`, { method: 'DELETE', headers: ownerAuth() });

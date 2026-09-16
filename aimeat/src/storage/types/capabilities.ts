@@ -23,7 +23,12 @@ export interface CapabilitySource {
   // 'app-tool' = a sellable tool from an app's `apps.{appId}.tools` manifest; ref = 'app-tool:{owner}/{appId}:{tool}'.
   // 'offering' = an agent's published offer from `agents.{agent}.offers`; ref = 'offering:{owner}/{agent}:{offerId}'.
   // Both are discovery entries (callable: false): the call goes through the contract door their usage names.
-  type: 'extension' | 'action' | 'cortex' | 'app' | 'manual' | 'ecosystem' | 'app-tool' | 'offering';
+  /**
+   * `mcp` is a tool on a remote MCP server this node has attached. `ref` is `{serverSlug}/{tool}`,
+   * and the invoke path resolves it through the SAME access rule, grant and meter a direct call
+   * would go through — publishing a capability over one does not widen what it can reach.
+   */
+  type: 'extension' | 'action' | 'cortex' | 'app' | 'manual' | 'ecosystem' | 'app-tool' | 'offering' | 'mcp';
   ref: string;
   version: string;
 }

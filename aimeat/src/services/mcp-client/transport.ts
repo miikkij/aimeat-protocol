@@ -18,15 +18,25 @@
  *
  *   WHAT IS DELIBERATELY NOT HERE. No caller ever supplies a URL. The endpoint comes from the
  *   stored record, which only `mcp:manage` can write. A caller names a slug.
- * @structure guardedFetch · buildTransport · MCP_CONNECT_TIMEOUT_MS
- * @usage const t = buildTransport(server, credential); await client.connect(t);
+ *
+ *   A PEER AIMEAT NODE IS NOT A SPECIAL TRANSPORT, it is an address this node looks up instead of
+ *   being told. `resolveWireAddress` turns `{ kind: 'aimeat', peerNodeId }` into the peer's own
+ *   /v1/mcp over ordinary Streamable HTTP, so every line above still applies to it: the same
+ *   guarded fetch, the same credential, the same timeout. What it adds is the federation
+ *   relationship as the gate, which is the point of naming a node rather than typing its address.
+ * @structure guardedFetch · resolveWireAddress · buildTransport · MCP_CONNECT_TIMEOUT_MS
+ * @usage const wire = await resolveWireAddress(storage, server);
+ *   if (wire.ok) await client.connect(buildTransport(wire.server, credential));
  * @version-history
+ *   v1.1.0 — 2026-09-16 — Phase 6: the `aimeat` transport kind resolves through the federation
+ *     peer list, gated on allowRouting, which is member and genesis only.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import type { Transport, FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { safeFetch } from '../../utils/url-validator.js';
+import type { Storage } from '../../storage/interface.js';
 import type { McpServerRecord, McpServerCredential } from '../../models/mcp-server-schemas.js';
 
 /**
@@ -68,12 +78,66 @@ function authHeaders(credential: McpServerCredential | null): Record<string, str
 }
 
 /**
+ * Turn a stored transport into one that names an address, resolving a peer node when it names one.
+ *
+ * WHY THE LOOKUP IS HERE AND NOT AT ATTACH TIME. A peer's address can change, and a peering can be
+ * demoted or ended. Storing the URL when the server was attached would keep a link working after
+ * the relationship that justified it was over, which is the opposite of what the tiers are for.
+ *
+ * `allowRouting` IS THE GATE, and it is the flag whose own comment says "this node may forward
+ * traffic TO this peer". Calling a tool on somebody else's node is exactly that. It is on at
+ * `member` and `genesis` and cannot be raised at `visiting` or `contact`, so a peer the operator
+ * has not deliberately promoted is not a place this node makes calls into.
+ */
+export async function resolveWireAddress(
+  storage: Pick<Storage, 'listFederationPeers'>,
+  server: McpServerRecord,
+): Promise<
+  | { ok: true; server: McpServerRecord }
+  | { ok: false; code: 'PEER_UNKNOWN' | 'PEER_NOT_ROUTABLE'; message: string }
+> {
+  const t = server.transport;
+  if (t.kind !== 'aimeat') return { ok: true, server };
+
+  const peers = await storage.listFederationPeers();
+  const peer = peers.find((p) => p.nodeId === t.peerNodeId);
+  // Absent and not-peered answer alike, as everywhere else here: whether a node id is one this node
+  // knows is not a fact for whoever is calling.
+  if (!peer || peer.status !== 'active') {
+    return {
+      ok: false,
+      code: 'PEER_UNKNOWN',
+      message: `This node has no active peering with "${t.peerNodeId}".`,
+    };
+  }
+  if (!peer.allowRouting) {
+    return {
+      ok: false,
+      code: 'PEER_NOT_ROUTABLE',
+      message: `The peering with "${t.peerNodeId}" does not carry routing, so this node does not `
+        + 'make calls into it. An operator can promote the peer to member.',
+    };
+  }
+  return {
+    ok: true,
+    server: {
+      ...server,
+      // Streamable HTTP, because that is what this node serves at that path and a peer is a node.
+      transport: { kind: 'http', url: `${peer.url.replace(/\/+$/, '')}/v1/mcp` },
+    },
+  };
+}
+
+/**
  * Build the transport for one server.
  *
- * Throws for `stdio` and `aimeat`: both are later phases, and a stub that silently did nothing
- * would be found by a person wondering why their server never answers. `stdio` in particular runs
- * somebody else's code on this host and is operator-only, allowlisted and off by default when it
- * does arrive.
+ * Throws for `stdio`, which is a later phase: a stub that silently did nothing would be found by a
+ * person wondering why their server never answers. It runs somebody else's code on this host and is
+ * operator-only, allowlisted and off by default when it does arrive.
+ *
+ * Throws for `aimeat` too, and that one is a programming error rather than a missing feature:
+ * resolveWireAddress turns a peer into an http address before anything reaches here, so a record
+ * still naming a peer at this point means a caller skipped it.
  */
 export function buildTransport(
   server: McpServerRecord,
@@ -88,7 +152,7 @@ export function buildTransport(
   }
   if (t.kind === 'aimeat') {
     throw new Error(
-      'Reaching a peer AIMEAT node as an MCP server is not available yet. Attach it over https instead.',
+      'A peer node must be resolved to an address before it is connected to (resolveWireAddress).',
     );
   }
 

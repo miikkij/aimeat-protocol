@@ -2,9 +2,13 @@
  * @file capability-invoke.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Invoke proxy: routes capability invocations to the correct underlying system
- *   (extension localhost fetch, manual webhook, or — new — an ecosystem app over the connect-tunnel).
+ * @description Invoke proxy: routes capability invocations to the correct underlying system: an
+ *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
+ *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.3.0 - 2026-09-16 - Add `case 'mcp'`: a published capability can be a tool on an attached
+ *     remote MCP server. It resolves through the CALLER's own reach and the same callRemoteTool()
+ *     chokepoint, so publishing one does not hand anybody access to the server behind it.
  *   v1.0.0 - 2026-05-02 - Initial invoke proxy for extensions and manual webhooks
  *   v1.1.0 - 2026-06-14 - Add `case 'ecosystem'`: route invocation over the tunnel to a bound GEAI.
  *   v1.2.0 - 2026-07-25 - Name the caller-token failures (CALLER_TOKEN_MISSING / CALLER_TOKEN_INVALID)
@@ -15,7 +19,9 @@ import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { INTERNAL_PASS_HEADER } from '../routes/extensions/internal-pass.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
-import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
+import { parseGaiiLoose, buildGEAI, ownerGhiiOf } from '../utils/gaii.js';
+import { requireUsableServer } from './mcp-client/registry.js';
+import { callRemoteTool } from './mcp-client/invoke.js';
 
 export interface InvokeResult {
   capability: string;
@@ -100,6 +106,42 @@ export async function invokeCapability(
         throw Object.assign(new Error((body.error as { message?: string } | undefined)?.message || 'Extension invoke failed'), { statusCode: response.status, code: 'EXTENSION_ERROR' });
       }
       result = mode === 'raw' ? body : body.data;
+      break;
+    }
+
+    case 'mcp': {
+      // `{serverSlug}/{tool}`. Split on the FIRST slash: a tool name may contain one, a slug may
+      // not, so this is unambiguous in the direction that matters.
+      const at = capability.source.ref.indexOf('/');
+      const slug = at > 0 ? capability.source.ref.slice(0, at) : '';
+      const toolName = at > 0 ? capability.source.ref.slice(at + 1) : '';
+      if (!slug || !toolName) {
+        throw Object.assign(new Error('This capability does not name a server and a tool'), {
+          statusCode: 500, code: 'BAD_MCP_REF',
+        });
+      }
+
+      // The caller's OWN reach, not the publisher's. A capability is a signpost; it does not carry
+      // access with it, so somebody who publishes one over their Jira has not given the world a
+      // Jira. Absent and not-yours answer alike, as everywhere else here.
+      const server = await requireUsableServer(storage, ownerGhiiOf(callerGhii), slug, config);
+      if (!server) {
+        throw Object.assign(new Error(`You have no MCP server called "${slug}"`), {
+          statusCode: 404, code: 'NO_MCP_SERVER',
+        });
+      }
+
+      // The same chokepoint every other door uses: the grant, the locked arguments, the price and
+      // the usage row all happen in there and cannot be skipped by arriving this way.
+      const called = await callRemoteTool({
+        storage, config, server, tool: toolName,
+        args: (input && typeof input === 'object' ? input : {}) as Record<string, unknown>,
+        caller: callerGhii,
+      });
+      if (!called.ok) {
+        throw Object.assign(new Error(called.message), { statusCode: 502, code: called.code });
+      }
+      result = called.content;
       break;
     }
 

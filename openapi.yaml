@@ -46779,7 +46779,8 @@ paths:
         human act, and an agent holding full access still cannot do it. The address is PROBED before
         the server is called attached, so a wrong address or a wrong token is reported now rather
         than later as a server that never answers. A token given here is sealed with the node key
-        and appears in no response afterwards.
+        and appears in no response afterwards. Another AIMEAT node is named with peer instead of
+        url.
       tags: [MCP Servers]
       security:
         - BearerAuth: []
@@ -46789,13 +46790,21 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name, url]
+              required: [name]
               properties:
                 name:
                   type: string
                   description: The short name used instead of the address. Lowercase, digits, dashes.
                 url:
                   type: string
+                  description: The server address. Give this or peer.
+                peer:
+                  type: string
+                  description: >
+                    The node id of a federation peer, instead of url. The address is resolved from
+                    the peer list on EVERY call rather than stored here, so a peering that is ended
+                    or demoted stops the calls with it. The peering must carry routing, which is
+                    member and genesis only; anything less answers NO_SUCH_PEER.
                 title:
                   type: string
                 description:

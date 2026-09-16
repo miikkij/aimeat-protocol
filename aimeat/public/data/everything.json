@@ -129,6 +129,60 @@
      "plain": "Use what you attached, from chat Three tools however many servers you have attached: which ones you can use, what each one can do, and call one. The credential never reaches the caller, and no caller ever names an address. aimeat_mcp_list · aimeat_mcp_tools · aimeat_mcp_call"
     },
     {
+     "slug": "g-1-narrow-one-agent-to-named-tools",
+     "cells": [
+      "<strong>Narrow one agent to named tools</strong>",
+      "&quot;My coding agent may READ Jira&quot; without also meaning it may close tickets: pick the tools, decide arguments in advance so every call lands in one project whatever the agent asks, set a call ceiling and an end date. A narrowing REPLACES the earlier one for the same agent on the same server, and removing it gives the permission back rather than taking access away.",
+      "<code>aimeat_mcp_grant_set</code> · <code>PUT /v1/mcp-servers/{id}/grants</code>"
+     ],
+     "plain": "Narrow one agent to named tools \"My coding agent may READ Jira\" without also meaning it may close tickets: pick the tools, decide arguments in advance so every call lands in one project whatever the agent asks, set a call ceiling and an end date. A narrowing REPLACES the earlier one for the same agent on the same server, and removing it gives the permission back rather than taking access away. aimeat_mcp_grant_set · PUT /v1/mcp-servers/{id}/grants"
+    },
+    {
+     "slug": "g-1-a-server-s-own-tools-in-your-tool-list",
+     "cells": [
+      "<strong>A server's own tools in your tool list</strong>",
+      "For a server you use enough to spend the space on, its tools appear in your AI's list under their real names and real schemas instead of behind one call tool. Opt in per server, so the list does not grow with everything you ever attached.",
+      "<code>aimeat_mcp_update</code> with exposure"
+     ],
+     "plain": "A server's own tools in your tool list For a server you use enough to spend the space on, its tools appear in your AI's list under their real names and real schemas instead of behind one call tool. Opt in per server, so the list does not grow with everything you ever attached. aimeat_mcp_update with exposure"
+    },
+    {
+     "slug": "g-1-the-node-s-own-mcp-registry",
+     "cells": [
+      "<strong>The node's own MCP registry</strong>",
+      "The operator attaches a server once and offers it to everybody with an account here, or to named owners only, with a price per call. A refusal is recorded, so the operator can see who wanted something they could not reach. Operator in person: an agent holding their credential cannot attach one.",
+      "<code>aimeat_mcp_registry_list</code> · <code>aimeat_mcp_registry_set</code>"
+     ],
+     "plain": "The node's own MCP registry The operator attaches a server once and offers it to everybody with an account here, or to named owners only, with a price per call. A refusal is recorded, so the operator can see who wanted something they could not reach. Operator in person: an agent holding their credential cannot attach one. aimeat_mcp_registry_list · aimeat_mcp_registry_set"
+    },
+    {
+     "slug": "g-1-a-server-that-belongs-to-a-team",
+     "cells": [
+      "<strong>A server that belongs to a team</strong>",
+      "Attach the team wiki to the organism and the team reaches it. Nobody hands a token to each person who joins and nobody loses access when the person who set it up leaves. Bind it to one workspace instead and the workspace's own words decide: a contributor may call it, a viewer only sees it is there.",
+      "<code>POST /v1/mcp-servers/organism</code>"
+     ],
+     "plain": "A server that belongs to a team Attach the team wiki to the organism and the team reaches it. Nobody hands a token to each person who joins and nobody loses access when the person who set it up leaves. Bind it to one workspace instead and the workspace's own words decide: a contributor may call it, a viewer only sees it is there. POST /v1/mcp-servers/organism"
+    },
+    {
+     "slug": "g-1-attached-tools-are-findable",
+     "cells": [
+      "<strong>Attached tools are findable</strong>",
+      "What you attached joins the node's directory as one entry per TOOL, so an AI exploring the node finds &quot;there is something here that can open a ticket&quot; instead of having to be told the server exists. Only inside your own reach, and never carrying the far side's address.",
+      "<code>aimeat_discover</code>"
+     ],
+     "plain": "Attached tools are findable What you attached joins the node's directory as one entry per TOOL, so an AI exploring the node finds \"there is something here that can open a ticket\" instead of having to be told the server exists. Only inside your own reach, and never carrying the far side's address. aimeat_discover"
+    },
+    {
+     "slug": "g-1-another-aimeat-node-as-a-server",
+     "cells": [
+      "<strong>Another AIMEAT node as a server</strong>",
+      "Name a federation peer instead of typing an address, and its tools are yours to call. The address is looked up on every call, so the link follows the peering: end it or demote the peer and the calls stop with it. Needs a peering that carries routing.",
+      "<code>POST /v1/mcp-servers</code> with <code>peer</code>"
+     ],
+     "plain": "Another AIMEAT node as a server Name a federation peer instead of typing an address, and its tools are yours to call. The address is looked up on every call, so the link follows the peering: end it or demote the peer and the calls stop with it. Needs a peering that carries routing. POST /v1/mcp-servers with peer"
+    },
+    {
      "slug": "g-1-help-from-the-operators",
      "cells": [
       "<strong>Help from the operators</strong>",
@@ -3119,6 +3173,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 306
+  "rows": 312
  }
 }

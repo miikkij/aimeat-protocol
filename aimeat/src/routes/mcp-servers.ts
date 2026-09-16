@@ -447,16 +447,19 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       const b = (req.body ?? {}) as Record<string, unknown>;
       const name = typeof b.name === 'string' ? b.name : '';
       const url = typeof b.url === 'string' ? b.url : '';
-      if (!name || !url) {
+      // A peer AIMEAT node is named, not addressed: the address is looked up on every call, so a
+      // peering that ends or is demoted stops the calls with it.
+      const peer = typeof b.peer === 'string' ? b.peer.trim() : '';
+      if (!name || (!url && !peer)) {
         return res.status(400).json(error(
-          config.nodeId, 'BAD_REQUEST', 'A server needs a short name and an address.',
+          config.nodeId, 'BAD_REQUEST',
+          'A server needs a short name and either an address or the id of a peer node.',
         ));
       }
 
-      const transport: McpTransport = {
-        kind: b.transport === 'sse' ? 'sse' : 'http',
-        url,
-      };
+      const transport: McpTransport = peer
+        ? { kind: 'aimeat', peerNodeId: peer }
+        : { kind: b.transport === 'sse' ? 'sse' : 'http', url };
       const credential: McpServerCredential | undefined = typeof b.token === 'string' && b.token
         ? {
           shape: 'static',
