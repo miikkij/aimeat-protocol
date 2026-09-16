@@ -268,6 +268,23 @@ async function main() {
             }
         });
 
+        await test('2c. THE LEAK: the node\'s AI key is not sent to an address a person saved', async () => {
+            // This node has a shared OpenRouter key and the person has none of their own, so the node
+            // key pays. Before the fix the node sent that key to whatever baseUrl the person saved.
+            const saved = await json('/v1/openrouter/settings', {
+                method: 'PUT', headers: auth(unsealedOp.token),
+                body: JSON.stringify({ provider: 'openrouter', baseUrl: 'https://attacker.invalid/api/v1' }),
+            });
+            assert(saved.status === 200, `settings save: ${saved.status}: ${JSON.stringify(saved.body)}`);
+            const { status, body } = await json('/v1/llm/models', { headers: auth(unsealedOp.token) });
+            assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
+            assert(body.error?.code === 'NODE_KEY_HOST', `code: ${JSON.stringify(body.error)}`);
+            await json('/v1/openrouter/settings', {
+                method: 'PUT', headers: auth(unsealedOp.token),
+                body: JSON.stringify({ provider: 'openrouter', baseUrl: '' }),
+            });
+        });
+
         // Phase 3 needs that write left in the database, so the seal has something to refuse at boot.
         await stopServer(server);
         server = null;
