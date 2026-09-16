@@ -212,6 +212,25 @@ export async function listUsableServers(
 }
 
 /**
+ * The owner's own servers, as FULL records.
+ *
+ * Distinct from listUsableServers() on purpose: that returns the public projection, which is what a
+ * response may carry, and this returns the rows. The flattening path needs the cached tool list and
+ * the exposure setting, neither of which a projection holds — and it must not reach storage itself,
+ * because a tool surface doing its own storage work is the second implementation this project keeps
+ * fixing (check:shared-impl).
+ */
+export async function listOwnedServers(
+  storage: Storage, ownerGhii: string, onlyEnabled = true,
+): Promise<McpServerRecord[]> {
+  return storage.listMcpServers({
+    ownership: 'owner',
+    ownerGhii,
+    ...(onlyEnabled ? { enabled: true } : {}),
+  });
+}
+
+/**
  * The server, if this caller may use it. Null when they may not, and null when there is none — the
  * same answer for both, so a refusal cannot be used to discover what another owner has.
  *

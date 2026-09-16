@@ -111,6 +111,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { resolveSupportRoute } from '../services/message-alias.js';
 // Every tool group, in one list this file no longer keeps: mcp/register-all.ts.
 import { registerAllServerTools } from './register-all.js';
+import { registerRemoteTools } from './remote-tools.js';
 import { scopeAllowsTool } from './catalog/scopes.js';
 import { wrapToolHandler } from './tool-usage-wrap.js';
 import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from './catalog/surfaces.js';
@@ -260,6 +261,20 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // tool-gate window closes: the gate patches mcp.tool/registerTool, and a prompt is neither.
         // Awaited here rather than inside that window, so no storage round-trip happens while the
         // two methods are monkeypatched.
+        // Flattened remote tools, for a server the owner marked `exposure: flatten`. HERE and
+        // not inside the window above, and for exactly the reason prompts are here: that gate
+        // filters by the STATIC catalogue and descriptionFor() throws for a name it does not
+        // hold, while a remote tool is a runtime name that can never be in it. The gate is not
+        // skipped, it is answered earlier — nothing is registered unless this session holds
+        // mcp:use and the owner's grant allows the tool, and each call goes back through the
+        // same chokepoint the gateway uses.
+        const remoteCount = await registerRemoteTools(mcp, {
+            storage, config, scopes, agentGaii: () => agentGaii,
+        });
+        if (remoteCount > 0) {
+            logger.info(`[mcp-remote] ${remoteCount} flattened tool(s) offered to ${agentGaii}`);
+        }
+
         const promptCount = await registerManagedPrompts(mcp, storage, config, () => agentGaii);
         if (promptCount > 0) {
             logger.info(`[mcp-prompts] ${promptCount} managed prompt(s) offered to ${agentGaii}`);
