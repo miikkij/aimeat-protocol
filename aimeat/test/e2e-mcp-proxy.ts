@@ -20,13 +20,16 @@
  *   - Phase 3: calling — the happy path, and a tool saying no
  *   - Phase 4: the fences — cross-owner 404, and the scope split on an agent session
  *   - Phase 5: the directory and a published capability over a remote tool
- *   - Phase 6: off and gone — disable stops it, detach removes it
+ *   - Phase 5b: a server that belongs to a group, attached by an AGENT
+ *   - Phase 6: a local process, refused because this node does not run them
+ *   - Phase 7: off and gone — disable stops it, detach removes it
  *
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   v1.2.0 — 2026-09-16 — The stdio refusals (proxy phase 7).
  *   v1.1.0 — 2026-09-16 — The directory and the capability path (proxy phase 6).
  *   v1.0.0 — 2026-09-16 — Initial suite, phase 1 of the MCP proxy.
  */
@@ -143,6 +146,9 @@ let serverId = '';
 const ownerAuth = () => ({ Authorization: `Bearer ${ownerToken}` });
 const agentAuth = () => ({ Authorization: `Bearer ${agentToken}` });
 const strangerAuth = () => ({ Authorization: `Bearer ${strangerToken}` });
+/** The owner's OTHER agent, the one they trusted with mcp:manage. Minted in phase 5. */
+let manageAgentToken = '';
+const manageAgentAuth = () => ({ Authorization: `Bearer ${manageAgentToken}` });
 
 console.log('\n=== AIMEAT MCP Proxy E2E ===\n');
 
@@ -531,6 +537,8 @@ await test('an agent the owner TRUSTED with mcp:manage can switch it off', async
   // Minted AFTER the grant: a JWT carries the scopes it was minted from, so a token taken before
   // the PATCH would still say what the agent used to hold.
   const token = await agentTokenFor(made.body.data.agent.gaii, made.body.data.private_key);
+  // Kept, because the group arms need an agent that may attach and this is the only one.
+  manageAgentToken = token;
 
   const patched = await json('/v1/mcp-servers/upstream', {
     method: 'PATCH', headers: { Authorization: `Bearer ${token}` },
@@ -686,7 +694,94 @@ await test('a capability is a signpost: it does not carry access with it', async
   assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
 });
 
-// ─── Phase 6: off and gone ───
+// ─── Phase 5b: a server that belongs to a group ───
+console.log('\nPhase 5b — A group server');
+
+let organismId = '';
+
+await test('the owner makes a group', async () => {
+  const { status, body } = await json('/v1/organisms', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({
+      name: `mcp proxy team ${Date.now()}`,
+      description: 'For the group-server arms.',
+      type: 'team', visibility: 'private', join_policy: 'invite_only',
+    }),
+  });
+  assert(status === 201 || status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  organismId = body.data.organism?.id ?? body.data.id;
+  assert(organismId, `no organism id in ${JSON.stringify(body.data)}`);
+});
+
+await test('an AGENT holding mcp:manage can attach one to the group', async () => {
+  // check:field-reach found this: the group door had no agent twin at all, so a person could
+  // attach a server for their team from the screen and nothing an AI could call could. The twin
+  // is aimeat_mcp_attach with `group`, because it is the same act with a different owner.
+  const { status, body } = await json('/v1/mcp-servers/organism', {
+    method: 'POST', headers: manageAgentAuth(),
+    body: JSON.stringify({ organism_id: organismId, name: 'teamwiki', url: UPSTREAM_URL }),
+  });
+  assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('and it belongs to the GROUP, so a second owner outside it reaches nothing', async () => {
+  const { status } = await json('/v1/mcp-servers/teamwiki/call', {
+    method: 'POST', headers: strangerAuth(),
+    body: JSON.stringify({ tool: 'echo', arguments: { text: 'x' } }),
+  });
+  // Absent and not-a-member answer alike: naming it must not confirm it exists.
+  assert(status === 404, `expected 404, got ${status}`);
+});
+
+await test('somebody outside the group cannot attach to it, in the same words as a group that does not exist', async () => {
+  const outsider = await json('/v1/mcp-servers/organism', {
+    method: 'POST', headers: strangerAuth(),
+    body: JSON.stringify({ organism_id: organismId, name: 'sneaky', url: UPSTREAM_URL }),
+  });
+  const nowhere = await json('/v1/mcp-servers/organism', {
+    method: 'POST', headers: strangerAuth(),
+    body: JSON.stringify({ organism_id: 'org-does-not-exist', name: 'sneaky', url: UPSTREAM_URL }),
+  });
+  assert(outsider.status === nowhere.status,
+    `an outsider got ${outsider.status} and a missing group got ${nowhere.status}`);
+  assert(outsider.body.error?.code === nowhere.body.error?.code,
+    `${outsider.body.error?.code} vs ${nowhere.body.error?.code}`);
+});
+
+// ─── Phase 6: a local process, which this node does not run ───
+console.log('\nPhase 6 — A local process');
+
+await test('the operator naming a command is refused while the node does not run them', async () => {
+  const { status, body } = await json('/v1/mcp-servers/node', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ name: 'localone', command: 'npx', args: ['some-server'] }),
+  });
+  // Off by default, and the refusal names the setting that turns it on rather than reading as a
+  // broken server. The test node sets neither stdio value, which is the default this asserts.
+  assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+  assert(body.error?.code === 'STDIO_DISABLED', `code was ${body.error?.code}`);
+  // The sentence is for a person and the setting is in `details`, where a technical reader looks
+  // for it. check:plain-language refused the first version of this, which put the name in the
+  // prose, and it was right: the operator needs to know what happened before which switch.
+  assert(JSON.stringify(body.error?.details).includes('AIMEAT_MCP_STDIO_ENABLED'),
+    `the refusal does not name the setting: ${JSON.stringify(body.error)}`);
+});
+
+await test('an ordinary owner has no way to name a command at all', async () => {
+  // The only door that can write a stdio record stands behind requireOperatorPrincipal. This one
+  // does not read `command`, so what it sees is a request with no address.
+  const { status } = await json('/v1/mcp-servers', {
+    method: 'POST', headers: strangerAuth(),
+    body: JSON.stringify({ name: 'sneaky', command: 'npx', args: ['some-server'] }),
+  });
+  assert(status === 400, `expected 400, got ${status}`);
+
+  const listed = await json('/v1/mcp-servers', { headers: strangerAuth() });
+  assert(!(listed.body.data.servers as any[]).some(x => x.slug === 'sneaky'),
+    'a server was attached from a request that named only a command');
+});
+
+// ─── Phase 7: off and gone ───
 
 await test('detach removes it, and the call path goes with it', async () => {
   const { status } = await json(`/v1/mcp-servers/upstream`, { method: 'DELETE', headers: ownerAuth() });

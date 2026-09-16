@@ -183,6 +183,15 @@
      "plain": "Another AIMEAT node as a server Name a federation peer instead of typing an address, and its tools are yours to call. The address is looked up on every call, so the link follows the peering: end it or demote the peer and the calls stop with it. Needs a peering that carries routing. POST /v1/mcp-servers with peer"
     },
     {
+     "slug": "g-1-a-local-mcp-server-on-the-node",
+     "cells": [
+      "<strong>A local MCP server on the node</strong>",
+      "Whoever runs the node can have it start an MCP server as a program on its own host, rather than calling one over the network. Off by default and behind two settings: the switch, and the exact commands that may run, compared whole. Only the operator in person can attach one; no owner door and no agent can name a command.",
+      "<code>POST /v1/mcp-servers/node</code> with <code>command</code>"
+     ],
+     "plain": "A local MCP server on the node Whoever runs the node can have it start an MCP server as a program on its own host, rather than calling one over the network. Off by default and behind two settings: the switch, and the exact commands that may run, compared whole. Only the operator in person can attach one; no owner door and no agent can name a command. POST /v1/mcp-servers/node with command"
+    },
+    {
      "slug": "g-1-help-from-the-operators",
      "cells": [
       "<strong>Help from the operators</strong>",
@@ -3173,6 +3182,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 312
+  "rows": 313
  }
 }

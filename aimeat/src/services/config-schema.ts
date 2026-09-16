@@ -411,6 +411,12 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // show only as configured-or-not, and are immutable so a running node cannot have one swapped
   // under connections that were minted with it.
   { key: 'connectionsEnabled', dotPath: 'connections.enabled', envVar: 'AIMEAT_CONNECTIONS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Outbound connections master switch: off offers nothing, whoever brought what' },
+  // Running a local MCP server process is the one part of the MCP proxy that is code execution
+  // rather than a network call, so it is a setting and not a field on a record. Immutable: an
+  // operator who could turn this on through the admin API could start a process by writing two
+  // values, and the second one is already writable. It changes at a restart, deliberately.
+  { key: 'mcpStdioEnabled', dotPath: 'mcp.stdio_enabled', envVar: 'AIMEAT_MCP_STDIO_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Allow local MCP server PROCESSES on this host. Off by default, because it runs code that is not ours.' },
+  { key: 'mcpStdioAllowedCommands', dotPath: 'mcp.stdio_allowed_commands', envVar: 'AIMEAT_MCP_STDIO_ALLOWED_COMMANDS', type: 'object', validate: v => Array.isArray(v) && (v as unknown[]).every(c => typeof c === 'string'), immutable: true, description: 'The exact commands a stdio server may name, compared whole. Empty means nothing runs.' },
   { key: 'connectGoogleClientId', dotPath: 'connections.google_client_id', envVar: 'AIMEAT_CONNECT_GOOGLE_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'Google app for YouTube and both halves of Gmail (NOT the sign-in client)' },
   { key: 'connectGoogleClientSecret', dotPath: 'connections.google_client_secret', envVar: 'AIMEAT_CONNECT_GOOGLE_CLIENT_SECRET', type: 'string', validate: () => true, immutable: true, description: 'Google app secret (secret)', adminDisplay: 'configured' },
   { key: 'connectMicrosoftClientId', dotPath: 'connections.microsoft_client_id', envVar: 'AIMEAT_CONNECT_MICROSOFT_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'Microsoft (Entra) app for reading and sending Outlook mail (NOT the sign-in app)' },

@@ -57,6 +57,7 @@
  */
 import { deriveAppHost, derivePortfolioHost, deriveCoHost } from './config-hosts.js';
 import { parseSiteContacts } from './config-site-contacts.js';
+import { loadConnectionsConfig } from './config-load-connections.js';
 import { securityDoorDefaults } from './config-security.js';
 import { aiJobDefaults } from './config-ai-jobs.js';
 import { accountSecurityDefaults } from './config-types-account-security.js';
@@ -532,23 +533,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // env) turns the feature on; the admin connection-management routes work either way.
     ssoEnabled: process.env.AIMEAT_SSO_ENABLED === 'true',
     ssoConnectionsLocked: process.env.AIMEAT_SSO_CONNECTIONS_LOCKED === 'true',
-    // Outbound connections (TARGET-057). Opt-IN: `=== 'true'`, so a node that has never heard of
-    // this feature does not start offering to hold people's accounts.
-    connectionsEnabled: process.env.AIMEAT_CONNECTIONS_ENABLED === 'true',
-    connectGoogleClientId: process.env.AIMEAT_CONNECT_GOOGLE_CLIENT_ID ?? '',
-    connectGoogleClientSecret: process.env.AIMEAT_CONNECT_GOOGLE_CLIENT_SECRET ?? '',
-    connectMicrosoftClientId: process.env.AIMEAT_CONNECT_MICROSOFT_CLIENT_ID ?? '',
-    connectMicrosoftClientSecret: process.env.AIMEAT_CONNECT_MICROSOFT_CLIENT_SECRET ?? '',
-    // 'common' admits work, school and personal accounts; 'organizations' only work and school. A
-    // GUID pins one directory. This is the tenant the NODE's own app is registered in; a principal
-    // who brings their own single-tenant app supplies its tenant with the client credentials.
-    connectMicrosoftTenant: process.env.AIMEAT_CONNECT_MICROSOFT_TENANT ?? 'common',
-    connectLinkedinClientId: process.env.AIMEAT_CONNECT_LINKEDIN_CLIENT_ID ?? '',
-    connectLinkedinClientSecret: process.env.AIMEAT_CONNECT_LINKEDIN_CLIENT_SECRET ?? '',
-    connectXClientId: process.env.AIMEAT_CONNECT_X_CLIENT_ID ?? '',
-    connectXClientSecret: process.env.AIMEAT_CONNECT_X_CLIENT_SECRET ?? '',
-    connectRedirectUri: process.env.AIMEAT_CONNECT_REDIRECT_URI ?? '',
-    connectFakeBaseUrl: process.env.AIMEAT_CONNECT_FAKE_BASE_URL ?? '',
+    // The outbound connect registrations and the two stdio settings: config-load-connections.ts,
+    // moved there verbatim when this file crossed 800 lines again.
+    ...loadConnectionsConfig(),
     crossFederationEnabled: process.env.AIMEAT_CROSS_FEDERATION_ENABLED !== 'false',
     maxGenesisPeers: parseInt(process.env.AIMEAT_MAX_GENESIS_PEERS ?? '10', 10),
     genesisSyncIntervalHours: parseInt(process.env.AIMEAT_GENESIS_SYNC_INTERVAL_HOURS ?? '6', 10),

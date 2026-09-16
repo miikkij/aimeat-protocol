@@ -57,6 +57,10 @@ export type RemoteCallRefusal =
   | 'NO_ENCRYPTION_KEY'
   | 'CREDENTIAL_UNREADABLE'
   | 'TRANSPORT_UNSUPPORTED'
+  /** The record names a local process and this node does not run those at all. */
+  | 'STDIO_DISABLED'
+  /** It does run them, but nobody allowlisted this command. */
+  | 'STDIO_NOT_ALLOWED'
   /** The record names a peer AIMEAT node this one has no active peering with. */
   | 'PEER_UNKNOWN'
   /** The peering exists but does not carry routing, which is member and genesis only. */
@@ -195,7 +199,7 @@ export async function listRemoteTools(
   if (!wire.ok) return wire;
 
   try {
-    const client = await mcpClientPool.acquire(wire.server, resolved.credential, identity);
+    const client = await mcpClientPool.acquire(wire.server, resolved.credential, identity, config);
     const listed = await client.listTools();
     const tools: RemoteToolSnapshot[] = listed.tools.map((t) => ({
       name: t.name,
@@ -226,6 +230,12 @@ async function parkAndDescribe(
 ): Promise<{ code: RemoteCallRefusal; message: string }> {
   const raw = err instanceof Error ? err.message : String(err);
 
+  // The stdio policy attaches its own code, because "this node does not run local processes" and
+  // "nobody allowlisted that command" are fixed in two different places.
+  const tagged = (err as { code?: unknown }).code;
+  if (tagged === 'STDIO_DISABLED' || tagged === 'STDIO_NOT_ALLOWED') {
+    return { code: tagged, message: raw };
+  }
   if (/cannot run a local MCP server|peer AIMEAT node/i.test(raw)) {
     return { code: 'TRANSPORT_UNSUPPORTED', message: raw };
   }
@@ -330,7 +340,7 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
   }
 
   try {
-    const client = await mcpClientPool.acquire(wire.server, resolved.credential, identity);
+    const client = await mcpClientPool.acquire(wire.server, resolved.credential, identity, config);
     const result = await client.callTool({ name: tool, arguments: effectiveArgs }, undefined, {
       timeout: CALL_TIMEOUT_MS,
     });
