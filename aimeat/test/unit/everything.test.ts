@@ -46,7 +46,7 @@ describe('the complete feature guide', () => {
   });
 
   it('finds the requested capabilities, normalizes queries and filters contents', () => {
-    for (const query of ['app-tools', 'app tools', 'ODPS', 'Open Data Product Specification', 'standards', 'working copy', 'intake', 'SKOS', 'crew JSON', 'published crew', 'schedule limits', 'workflow checks', 'agent quality', 'workspace sharing', 'structured questions']) {
+    for (const query of ['app-tools', 'app tools', 'ODPS', 'Open Data Product Specification', 'standards', 'working copy', 'intake', 'SKOS', 'crew JSON', 'published crew', 'schedule limits', 'workflow checks', 'agent quality', 'workspace sharing', 'structured questions', 'MCP servers', 'MCP OAuth', 'fixed arguments', 'call limits', 'workspace MCP', 'morsels only', 'peer node', 'stdio', 'publish an attached tool', 'MCP usage']) {
       const matches = matchingGroups(guide, query);
       expect(matches.length, query).toBeGreaterThan(0);
       expect(matches.every((g: { rows: unknown[] }) => g.rows.length > 0)).toBe(true);

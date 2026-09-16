@@ -1,11 +1,11 @@
 {
  "title": "AIMEAT Feature List",
  "stamp": {
-  "version": "3.15.0",
-  "date": "2026-09-15"
+  "version": "3.16.0",
+  "date": "2026-09-16"
  },
  "intro": [
-  "<strong>What an AIMEAT node does today.</strong> Node version 3.15.0, checked against the code on 2026-09-15.",
+  "<strong>What an AIMEAT node does today.</strong> Node version 3.16.0, checked against the code on 2026-09-16.",
   "AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.",
   "This list covers two layers:",
   "- <strong>Core</strong> is the protocol any node can implement: identity, memory, consent, organisms and workspaces, the economy, federation. Specified in <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Core-full.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-RFC-v4.0-Core-full.md</a>.",
@@ -114,82 +114,136 @@
      "slug": "g-1-attach-another-mcp-server",
      "cells": [
       "<strong>Attach another MCP server</strong>",
-      "Connect your issue tracker, wiki or any other MCP server to your node once, and everything acting for you can use it: your own AI, your agents, your crews. The node holds the credential and spends it for you, so it goes in one place instead of into every client you own. A server that stops working says so, and says what would repair it. Attaching needs the <code>mcp:manage</code> permission, which is deliberately not part of full access.",
-      "<code>POST /v1/mcp-servers</code> · <code>aimeat_mcp_attach</code>"
+      "Attach your Jira, wiki or another service once. Your own AI, agents, apps and this node's chat can use its tools with the permissions you give them. The node stores the credential encrypted and makes the calls, so each client does not need a copy. Hosted servers can use Streamable HTTP or the older SSE transport, with a bearer token, a named API-key header or no sign-in. Attaching and managing need an explicit permission excluded from full access.",
+      "<a href=\"/spa.html#access\">Settings &amp; Controls &gt; Access &gt; MCP servers</a> · <code>POST /v1/mcp-servers</code> · <code>aimeat_mcp_attach</code> · <code>mcp:manage</code>"
      ],
-     "plain": "Attach another MCP server Connect your issue tracker, wiki or any other MCP server to your node once, and everything acting for you can use it: your own AI, your agents, your crews. The node holds the credential and spends it for you, so it goes in one place instead of into every client you own. A server that stops working says so, and says what would repair it. Attaching needs the mcp:manage permission, which is deliberately not part of full access. POST /v1/mcp-servers · aimeat_mcp_attach"
+     "plain": "Attach another MCP server Attach your Jira, wiki or another service once. Your own AI, agents, apps and this node's chat can use its tools with the permissions you give them. The node stores the credential encrypted and makes the calls, so each client does not need a copy. Hosted servers can use Streamable HTTP or the older SSE transport, with a bearer token, a named API-key header or no sign-in. Attaching and managing need an explicit permission excluded from full access. Settings & Controls > Access > MCP servers · POST /v1/mcp-servers · aimeat_mcp_attach · mcp:manage"
+    },
+    {
+     "slug": "g-1-sign-in-to-an-attached-mcp-server",
+     "cells": [
+      "<strong>Sign in to an attached MCP server</strong>",
+      "MCP OAuth lets you approve access at the service itself. Choose sign-in when attaching through Access or REST, then complete the consent screen in your browser. The node stores the tokens and refreshes them when supported. Your AI can start the sign-in and hand you the link; it cannot approve for you. A failed renewal asks you to sign in again.",
+      "<code>POST /v1/mcp-servers</code> with <code>auth: oauth</code> · <code>POST /v1/mcp-servers/{id}/authorize</code> · <code>aimeat_mcp_authorize</code>"
+     ],
+     "plain": "Sign in to an attached MCP server MCP OAuth lets you approve access at the service itself. Choose sign-in when attaching through Access or REST, then complete the consent screen in your browser. The node stores the tokens and refreshes them when supported. Your AI can start the sign-in and hand you the link; it cannot approve for you. A failed renewal asks you to sign in again. POST /v1/mcp-servers with auth: oauth · POST /v1/mcp-servers/{id}/authorize · aimeat_mcp_authorize"
     },
     {
      "slug": "g-1-use-what-you-attached-from-chat",
      "cells": [
       "<strong>Use what you attached, from chat</strong>",
-      "Three tools however many servers you have attached: which ones you can use, what each one can do, and call one. The credential never reaches the caller, and no caller ever names an address.",
-      "<code>aimeat_mcp_list</code> · <code>aimeat_mcp_tools</code> · <code>aimeat_mcp_call</code>"
+      "Ask your AI which servers you can use, inspect a server's tools and input schemas, then call a tool by name. The node's chat uses the same MCP access through its own agent. Apps can use the REST routes under their granted permissions. Tool discovery can be refreshed when the service changes. A tool's refusal is reported separately from an unreachable server or expired credential.",
+      "<code>aimeat_mcp_list</code> · <code>aimeat_mcp_tools</code> · <code>aimeat_mcp_call</code> · <code>GET /v1/mcp-servers/{id}/tools</code> · <code>POST /v1/mcp-servers/{id}/call</code> · <code>mcp:read</code>, <code>mcp:use</code>"
      ],
-     "plain": "Use what you attached, from chat Three tools however many servers you have attached: which ones you can use, what each one can do, and call one. The credential never reaches the caller, and no caller ever names an address. aimeat_mcp_list · aimeat_mcp_tools · aimeat_mcp_call"
+     "plain": "Use what you attached, from chat Ask your AI which servers you can use, inspect a server's tools and input schemas, then call a tool by name. The node's chat uses the same MCP access through its own agent. Apps can use the REST routes under their granted permissions. Tool discovery can be refreshed when the service changes. A tool's refusal is reported separately from an unreachable server or expired credential. aimeat_mcp_list · aimeat_mcp_tools · aimeat_mcp_call · GET /v1/mcp-servers/{id}/tools · POST /v1/mcp-servers/{id}/call · mcp:read, mcp:use"
+    },
+    {
+     "slug": "g-1-manage-attached-mcp-servers",
+     "cells": [
+      "<strong>Manage attached MCP servers</strong>",
+      "See server status and tools beside Connected accounts on the Access page. Switch a server off without deleting its setup, turn it back on, change its display title or description, or remove it and its stored credential. Removing a server does not revoke a token you created at the outside service; revoke that there too when ending access.",
+      "<a href=\"/spa.html#access\">Access &gt; MCP servers</a> · <code>PATCH /v1/mcp-servers/{id}</code> · <code>DELETE /v1/mcp-servers/{id}</code> · <code>aimeat_mcp_update</code> · <code>aimeat_mcp_detach</code>"
+     ],
+     "plain": "Manage attached MCP servers See server status and tools beside Connected accounts on the Access page. Switch a server off without deleting its setup, turn it back on, change its display title or description, or remove it and its stored credential. Removing a server does not revoke a token you created at the outside service; revoke that there too when ending access. Access > MCP servers · PATCH /v1/mcp-servers/{id} · DELETE /v1/mcp-servers/{id} · aimeat_mcp_update · aimeat_mcp_detach"
     },
     {
      "slug": "g-1-narrow-one-agent-to-named-tools",
      "cells": [
       "<strong>Narrow one agent to named tools</strong>",
-      "&quot;My coding agent may READ Jira&quot; without also meaning it may close tickets: pick the tools, decide arguments in advance so every call lands in one project whatever the agent asks, set a call ceiling and an end date. A narrowing REPLACES the earlier one for the same agent on the same server, and removing it gives the permission back rather than taking access away.",
-      "<code>aimeat_mcp_grant_set</code> · <code>PUT /v1/mcp-servers/{id}/grants</code>"
+      "Allow a coding agent to read Jira while withholding tools that change tickets. On a personal server, a grant can narrow one agent, one app or everyone acting for you to named tools. Fixed arguments override the caller's values, for example keeping requests in the SUPPORT project. An exact grant takes precedence over the default grant for everyone. Grants narrow existing permissions; they do not create access.",
+      "<code>aimeat_mcp_grant_list</code> · <code>aimeat_mcp_grant_set</code> · <code>GET /v1/mcp-servers/grants</code> · <code>PUT /v1/mcp-servers/{id}/grants</code> · <code>tools</code>, <code>locked_input</code>, <code>grantee</code>"
      ],
-     "plain": "Narrow one agent to named tools \"My coding agent may READ Jira\" without also meaning it may close tickets: pick the tools, decide arguments in advance so every call lands in one project whatever the agent asks, set a call ceiling and an end date. A narrowing REPLACES the earlier one for the same agent on the same server, and removing it gives the permission back rather than taking access away. aimeat_mcp_grant_set · PUT /v1/mcp-servers/{id}/grants"
+     "plain": "Narrow one agent to named tools Allow a coding agent to read Jira while withholding tools that change tickets. On a personal server, a grant can narrow one agent, one app or everyone acting for you to named tools. Fixed arguments override the caller's values, for example keeping requests in the SUPPORT project. An exact grant takes precedence over the default grant for everyone. Grants narrow existing permissions; they do not create access. aimeat_mcp_grant_list · aimeat_mcp_grant_set · GET /v1/mcp-servers/grants · PUT /v1/mcp-servers/{id}/grants · tools, locked_input, grantee"
+    },
+    {
+     "slug": "g-1-mcp-call-limits-and-grant-expiry",
+     "cells": [
+      "<strong>MCP call limits and grant expiry</strong>",
+      "Set a rolling call limit and an end date for an agent or app's grant. Expiry blocks calls until the grant is changed or removed. The call limit counts recorded successful calls and is best-effort: concurrent calls or unavailable usage records can exceed it. Replacing a grant replaces its earlier restrictions. Removing it restores scope-based access, so revoke the agent's use permission when you mean to stop access.",
+      "<code>aimeat_mcp_grant_set</code> with <code>call_cap</code>, <code>expires</code> · <code>aimeat_mcp_grant_revoke</code> · <code>DELETE /v1/mcp-servers/{id}/grants/{grantee}</code>"
+     ],
+     "plain": "MCP call limits and grant expiry Set a rolling call limit and an end date for an agent or app's grant. Expiry blocks calls until the grant is changed or removed. The call limit counts recorded successful calls and is best-effort: concurrent calls or unavailable usage records can exceed it. Replacing a grant replaces its earlier restrictions. Removing it restores scope-based access, so revoke the agent's use permission when you mean to stop access. aimeat_mcp_grant_set with call_cap, expires · aimeat_mcp_grant_revoke · DELETE /v1/mcp-servers/{id}/grants/{grantee}"
     },
     {
      "slug": "g-1-a-server-s-own-tools-in-your-tool-list",
      "cells": [
       "<strong>A server's own tools in your tool list</strong>",
-      "For a server you use enough to spend the space on, its tools appear in your AI's list under their real names and real schemas instead of behind one call tool. Opt in per server, so the list does not grow with everything you ever attached.",
-      "<code>aimeat_mcp_update</code> with exposure"
+      "Opt a personal server into direct tool listing, called flattening. Permitted tools appear individually with a server prefix, such as <code>jira__search</code>, so your AI can select them directly. The gateway remains available for the rest. This currently covers personal servers; selecting flattening on a node-wide registry entry does not yet add its tools. Direct listing describes top-level arguments; the upstream server validates the full schema.",
+      "<code>aimeat_mcp_update</code> with <code>exposure: flatten</code> or <code>gateway</code> · <code>PATCH /v1/mcp-servers/{id}</code>"
      ],
-     "plain": "A server's own tools in your tool list For a server you use enough to spend the space on, its tools appear in your AI's list under their real names and real schemas instead of behind one call tool. Opt in per server, so the list does not grow with everything you ever attached. aimeat_mcp_update with exposure"
+     "plain": "A server's own tools in your tool list Opt a personal server into direct tool listing, called flattening. Permitted tools appear individually with a server prefix, such as jira__search, so your AI can select them directly. The gateway remains available for the rest. This currently covers personal servers; selecting flattening on a node-wide registry entry does not yet add its tools. Direct listing describes top-level arguments; the upstream server validates the full schema. aimeat_mcp_update with exposure: flatten or gateway · PATCH /v1/mcp-servers/{id}"
     },
     {
      "slug": "g-1-the-node-s-own-mcp-registry",
      "cells": [
       "<strong>The node's own MCP registry</strong>",
-      "The operator attaches a server once and offers it to everybody with an account here, or to named owners only, with a price per call. A refusal is recorded, so the operator can see who wanted something they could not reach. Operator in person: an agent holding their credential cannot attach one.",
-      "<code>aimeat_mcp_registry_list</code> · <code>aimeat_mcp_registry_set</code>"
+      "The operator can attach a server for everyone with an account or for named owners only, and set a price per call. No availability policy, or an empty allowlist, offers it to nobody. Paid proxy calls currently charge morsels only, from the caller's owner's balance; money prices can be saved but calls at those prices are refused. Node-wide attachment requires the operator in person.",
+      "<code>POST /v1/mcp-servers/node</code> · <code>PATCH /v1/mcp-servers/node/{id}</code> · <code>aimeat_mcp_registry_list</code> · <code>aimeat_mcp_registry_set</code>"
      ],
-     "plain": "The node's own MCP registry The operator attaches a server once and offers it to everybody with an account here, or to named owners only, with a price per call. A refusal is recorded, so the operator can see who wanted something they could not reach. Operator in person: an agent holding their credential cannot attach one. aimeat_mcp_registry_list · aimeat_mcp_registry_set"
+     "plain": "The node's own MCP registry The operator can attach a server for everyone with an account or for named owners only, and set a price per call. No availability policy, or an empty allowlist, offers it to nobody. Paid proxy calls currently charge morsels only, from the caller's owner's balance; money prices can be saved but calls at those prices are refused. Node-wide attachment requires the operator in person. POST /v1/mcp-servers/node · PATCH /v1/mcp-servers/node/{id} · aimeat_mcp_registry_list · aimeat_mcp_registry_set"
     },
     {
      "slug": "g-1-a-server-that-belongs-to-a-team",
      "cells": [
       "<strong>A server that belongs to a team</strong>",
-      "Attach the team wiki to the organism and the team reaches it. Nobody hands a token to each person who joins and nobody loses access when the person who set it up leaves. Bind it to one workspace instead and the workspace's own words decide: a contributor may call it, a viewer only sees it is there.",
-      "<code>POST /v1/mcp-servers/organism</code>"
+      "An organism owner or admin can attach the team's wiki to the group, keeping its credential with the group rather than one member. Membership governs the shared server's visibility and intended use. Attachment and membership-aware REST listing are implemented. Group servers are not yet resolved by the ordinary REST and native MCP tool-list and call routes, so attachment alone does not provide a working shared call path there.",
+      "<code>POST /v1/mcp-servers/organism</code> · <code>aimeat_mcp_attach</code> with <code>organism_id</code> · <code>GET /v1/mcp-servers</code>"
      ],
-     "plain": "A server that belongs to a team Attach the team wiki to the organism and the team reaches it. Nobody hands a token to each person who joins and nobody loses access when the person who set it up leaves. Bind it to one workspace instead and the workspace's own words decide: a contributor may call it, a viewer only sees it is there. POST /v1/mcp-servers/organism"
+     "plain": "A server that belongs to a team An organism owner or admin can attach the team's wiki to the group, keeping its credential with the group rather than one member. Membership governs the shared server's visibility and intended use. Attachment and membership-aware REST listing are implemented. Group servers are not yet resolved by the ordinary REST and native MCP tool-list and call routes, so attachment alone does not provide a working shared call path there. POST /v1/mcp-servers/organism · aimeat_mcp_attach with organism_id · GET /v1/mcp-servers"
+    },
+    {
+     "slug": "g-1-workspace-mcp-access",
+     "cells": [
+      "<strong>Workspace MCP access</strong>",
+      "Bind a group's server to one workspace to use that workspace's roles. The access policy allows contributors to call, lets viewers see the server, and excludes group members with no workspace role. This binding shares the group call-path limitation above.",
+      "<code>POST /v1/mcp-servers/organism</code> · <code>aimeat_mcp_attach</code> with <code>organism_id</code> and <code>ws</code>"
+     ],
+     "plain": "Workspace MCP access Bind a group's server to one workspace to use that workspace's roles. The access policy allows contributors to call, lets viewers see the server, and excludes group members with no workspace role. This binding shares the group call-path limitation above. POST /v1/mcp-servers/organism · aimeat_mcp_attach with organism_id and ws"
     },
     {
      "slug": "g-1-attached-tools-are-findable",
      "cells": [
       "<strong>Attached tools are findable</strong>",
-      "What you attached joins the node's directory as one entry per TOOL, so an AI exploring the node finds &quot;there is something here that can open a ticket&quot; instead of having to be told the server exists. Only inside your own reach, and never carrying the far side's address.",
-      "<code>aimeat_discover</code>"
+      "Attached tools appear individually in discovery within your own access, so you can search for a task such as opening a ticket. Entries describe the tool and its server without exposing the outside address or credential. Disabled and unavailable servers are excluded. Discovering an entry does not grant permission to call it.",
+      "<code>aimeat_discover</code> with <code>scope: own</code> · discovery source <code>remote-mcp</code>"
      ],
-     "plain": "Attached tools are findable What you attached joins the node's directory as one entry per TOOL, so an AI exploring the node finds \"there is something here that can open a ticket\" instead of having to be told the server exists. Only inside your own reach, and never carrying the far side's address. aimeat_discover"
+     "plain": "Attached tools are findable Attached tools appear individually in discovery within your own access, so you can search for a task such as opening a ticket. Entries describe the tool and its server without exposing the outside address or credential. Disabled and unavailable servers are excluded. Discovering an entry does not grant permission to call it. aimeat_discover with scope: own · discovery source remote-mcp"
+    },
+    {
+     "slug": "g-1-publish-an-attached-tool-as-a-capability",
+     "cells": [
+      "<strong>Publish an attached tool as a capability</strong>",
+      "Give an attached tool a reusable capability description that apps and agents can discover and invoke. Invocation uses the caller's accessible server and credential, with its call restrictions and price. Publishing your Jira capability does not give other people access to your Jira account.",
+      "<code>/v1/capabilities</code> · <code>aimeat_capabilities_create</code> · <code>aimeat_capabilities_invoke</code> · source type <code>mcp</code>, reference <code>server/tool</code>"
+     ],
+     "plain": "Publish an attached tool as a capability Give an attached tool a reusable capability description that apps and agents can discover and invoke. Invocation uses the caller's accessible server and credential, with its call restrictions and price. Publishing your Jira capability does not give other people access to your Jira account. /v1/capabilities · aimeat_capabilities_create · aimeat_capabilities_invoke · source type mcp, reference server/tool"
+    },
+    {
+     "slug": "g-1-mcp-usage-and-refusals",
+     "cells": [
+      "<strong>MCP usage and refusals</strong>",
+      "Proxied calls record the caller, server and tool, duration, outcome and charged morsels in the usage stream. Operators can inspect these records to explain what an agent used and why a call was refused. Refusals recorded by the call service are separate from transport errors; not every rejection before that service produces a usage row.",
+      "Usage surface <code>mcp-remote</code> · <code>GET /v1/admin/usage/calls</code>"
+     ],
+     "plain": "MCP usage and refusals Proxied calls record the caller, server and tool, duration, outcome and charged morsels in the usage stream. Operators can inspect these records to explain what an agent used and why a call was refused. Refusals recorded by the call service are separate from transport errors; not every rejection before that service produces a usage row. Usage surface mcp-remote · GET /v1/admin/usage/calls"
     },
     {
      "slug": "g-1-another-aimeat-node-as-a-server",
      "cells": [
       "<strong>Another AIMEAT node as a server</strong>",
-      "Name a federation peer instead of typing an address, and its tools are yours to call. The address is looked up on every call, so the link follows the peering: end it or demote the peer and the calls stop with it. Needs a peering that carries routing.",
-      "<code>POST /v1/mcp-servers</code> with <code>peer</code>"
+      "Name a peer node instead of entering its address. The node resolves the peer's current address on every call and requires an active peering with routing allowed. Ending the peering or removing routing stops calls through this attachment. The peer's own authentication requirements still apply.",
+      "<code>POST /v1/mcp-servers</code> · <code>aimeat_mcp_attach</code> with <code>peer</code>"
      ],
-     "plain": "Another AIMEAT node as a server Name a federation peer instead of typing an address, and its tools are yours to call. The address is looked up on every call, so the link follows the peering: end it or demote the peer and the calls stop with it. Needs a peering that carries routing. POST /v1/mcp-servers with peer"
+     "plain": "Another AIMEAT node as a server Name a peer node instead of entering its address. The node resolves the peer's current address on every call and requires an active peering with routing allowed. Ending the peering or removing routing stops calls through this attachment. The peer's own authentication requirements still apply. POST /v1/mcp-servers · aimeat_mcp_attach with peer"
     },
     {
      "slug": "g-1-a-local-mcp-server-on-the-node",
      "cells": [
-      "<strong>A local MCP server on the node</strong>",
-      "Whoever runs the node can have it start an MCP server as a program on its own host, rather than calling one over the network. Off by default and behind two settings: the switch, and the exact commands that may run, compared whole. Only the operator in person can attach one; no owner door and no agent can name a command.",
-      "<code>POST /v1/mcp-servers/node</code> with <code>command</code>"
+      "<strong>A local MCP server on the node</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "The operator can attach an MCP server program running on the node's own host over stdio. It requires both the local-process switch and an allowlisted executable command. The executable is matched exactly, and arguments are passed without a shell; the allowlist does not constrain argument values. Only the operator in person can attach a command through the node registry.",
+      "<code>POST /v1/mcp-servers/node</code> with <code>command</code>, <code>args</code> · <code>AIMEAT_MCP_STDIO_ENABLED</code> · <code>AIMEAT_MCP_STDIO_ALLOWED_COMMANDS</code>"
      ],
-     "plain": "A local MCP server on the node Whoever runs the node can have it start an MCP server as a program on its own host, rather than calling one over the network. Off by default and behind two settings: the switch, and the exact commands that may run, compared whole. Only the operator in person can attach one; no owner door and no agent can name a command. POST /v1/mcp-servers/node with command"
+     "plain": "A local MCP server on the node off The operator can attach an MCP server program running on the node's own host over stdio. It requires both the local-process switch and an allowlisted executable command. The executable is matched exactly, and arguments are passed without a shell; the allowlist does not constrain argument values. Only the operator in person can attach a command through the node registry. POST /v1/mcp-servers/node with command, args · AIMEAT_MCP_STDIO_ENABLED · AIMEAT_MCP_STDIO_ALLOWED_COMMANDS"
     },
     {
      "slug": "g-1-help-from-the-operators",
@@ -3182,6 +3236,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 313
+  "rows": 319
  }
 }
