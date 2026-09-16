@@ -19,6 +19,7 @@
  *   services/owner-secrets.js — the module is not there. Every assertion below is new behaviour.
  * @usage pnpm test -- owner-secrets
  * @version-history
+ *   v1.1.0 — 2026-09-16 — The summary carries `hosts`, the hosts a secret is bound to.
  *   v1.0.0 — 2026-09-06 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -103,7 +104,7 @@ describe('the envelope — a value goes in, and only the node key opens it', () 
 describe('the summary — what a caller may know', () => {
     const record = (usedBy: Record<string, string>): SecretRecord => ({
         ownerGaii: 'alice@node', name: 'TOKEN', ciphertext: encrypt('v', key),
-        setAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-02-01T00:00:00.000Z', usedBy,
+        setAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-02-01T00:00:00.000Z', usedBy, hosts: ['api.example.com'],
     });
     const now = Date.parse('2026-09-06T00:00:00.000Z');
     const daysAgo = (d: number) => new Date(now - d * 24 * 60 * 60 * 1000).toISOString();
@@ -111,7 +112,9 @@ describe('the summary — what a caller may know', () => {
     it('never carries the value or the ciphertext', () => {
         const s = toSummary(record({}), now);
         expect(JSON.stringify(s)).not.toContain(record({}).ciphertext);
-        expect(Object.keys(s).sort()).toEqual(['name', 'setAt', 'updatedAt', 'usedBy']);
+        // `hosts` names where the value may go, which the owner needs to see; it carries no value.
+        expect(Object.keys(s).sort()).toEqual(['hosts', 'name', 'setAt', 'updatedAt', 'usedBy']);
+        expect(s.hosts).toEqual(['api.example.com']);
     });
 
     it('reports the extensions that used it inside the window, most recent first', () => {

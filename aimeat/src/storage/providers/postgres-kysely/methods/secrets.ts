@@ -13,6 +13,7 @@
  * @structure secretMethods — listSecrets · getSecret · setSecret · deleteSecret · noteSecretUse ·
  *   deleteSecretsByOwner
  * @version-history
+ *   v1.1.0 — 2026-09-16 — hosts column (migration 0078) and bindSecretHost; setSecret clears the hosts.
  *   v1.0.0 — 2026-09-06 — Initial.
  */
 import type { Kysely } from 'kysely';
@@ -41,6 +42,19 @@ function parseUsedBy(raw: unknown): SecretUseStamps {
   }
 }
 
+/** The bound hosts, or none. A malformed column throws: reading it as unbound would let the next
+ *  call bind the secret to whatever host it names. */
+function parseHosts(raw: unknown): string[] {
+  if (typeof raw !== 'string' || !raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`secrets: the hosts column does not parse: ${String(err)}`, { cause: err });
+  }
+  return Array.isArray(parsed) ? parsed.filter((h): h is string => typeof h === 'string') : [];
+}
+
 function toRecord(r: Record<string, unknown>): SecretRecord {
   return {
     ownerGaii: r.ownerGaii as string,
@@ -49,6 +63,7 @@ function toRecord(r: Record<string, unknown>): SecretRecord {
     setAt: r.setAt as string,
     updatedAt: r.updatedAt as string,
     usedBy: parseUsedBy(r.usedBy),
+    hosts: parseHosts(r.hosts),
   };
 }
 
@@ -75,20 +90,34 @@ export const secretMethods = {
       ...record,
       setAt: prior?.setAt ?? record.setAt,
       usedBy: prior?.usedBy ?? record.usedBy ?? {},
+      // A new value is the owner's own act, so it clears where the old one was allowed to go.
+      hosts: [],
     };
     if (prior) {
       await this.db.updateTable('Secret')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .set({ ciphertext: stored.ciphertext, updatedAt: stored.updatedAt } as any)
+        .set({ ciphertext: stored.ciphertext, updatedAt: stored.updatedAt, hosts: '[]' } as any)
         .where('ownerGaii', '=', stored.ownerGaii).where('name', '=', stored.name).execute();
     } else {
       await this.db.insertInto('Secret').values({
         ownerGaii: stored.ownerGaii, name: stored.name, ciphertext: stored.ciphertext,
         setAt: stored.setAt, updatedAt: stored.updatedAt, usedBy: JSON.stringify(stored.usedBy ?? {}),
+        hosts: '[]',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any).execute();
     }
     return stored;
+  },
+
+  async bindSecretHost(this: Db, ownerGaii: string, name: string, host: string): Promise<string[]> {
+    // Conditional on the list being empty, so a second first use cannot add a second host.
+    await this.db.updateTable('Secret')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .set({ hosts: JSON.stringify([host]) } as any)
+      .where('ownerGaii', '=', ownerGaii).where('name', '=', name).where('hosts', '=', '[]').execute();
+    const r = await this.db.selectFrom('Secret').select(['hosts'])
+      .where('ownerGaii', '=', ownerGaii).where('name', '=', name).executeTakeFirst();
+    return r ? parseHosts((r as unknown as Record<string, unknown>).hosts) : [];
   },
 
   async deleteSecret(this: Db, ownerGaii: string, name: string): Promise<boolean> {

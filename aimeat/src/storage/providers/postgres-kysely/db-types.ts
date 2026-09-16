@@ -1363,6 +1363,7 @@ export interface Secret {
   setAt: string;
   updatedAt: string;
   usedBy: Generated<string>;
+  hosts: Generated<string>;
 }
 
 export interface DependencyEdge {

@@ -12,6 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-09-16 — secrets.hosts (migration 0078): the hosts a vault secret may be sent to.
  *   2026-08-30 — boards.rules (migration 0057): the board's own rules as JSON.
  *   v1.12.0 — 2026-08-22 — direct_messages.ownerReadAt plus its backfill: inbound copies inherit
  *     readAt so today's badge is unchanged, everything else is stamped seen so the whole history
@@ -668,6 +669,9 @@ export function initializeSchema(db: Database.Database): void {
   // the next GET served nothing. Review item 5.4, 2026-09-06.
   safeAddColumn('extension_instances', 'createdByAgent', 'TEXT');
   safeAddColumn('extension_instances', 'translations', 'TEXT');
+
+  // The hosts a vault secret may be sent to, bound at its first use. Mirrors Postgres 0078.
+  safeAddColumn('secrets', 'hosts', "TEXT NOT NULL DEFAULT '[]'");
 
   // ── Memory full-text search (Tier-1 librarian retrieval) ──
   // FTS5 is built into better-sqlite3 — no dependency. A standalone virtual table mirrors the

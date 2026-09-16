@@ -33,6 +33,8 @@
  *   because the runner pins AIMEAT_ALLOW_PRIVATE_EGRESS=true (run-e2e-server.ts) — the same flag
  *   e2e-living-hooks and e2e-connections use to put a real counterparty on the machine.
  * @version-history
+ *   v1.1.0 — 2026-09-16 — A vault secret is bound to the first host it is sent to: another host is
+ *     refused with SECRET_HOST, the list shows the binding, and storing the value again clears it.
  *   v1.0.0 — 2026-09-06 — Initial.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=secrets
@@ -623,7 +625,58 @@ await test('a name the probe extension cannot resolve refuses it too, and sends 
     assert(deliveries.length === 0, 'the refused call reached the receiver');
 });
 
+// ── The host a secret may go to ──
+// THE LEAK: an extension's script names the address, so any extension a person ran could send that
+// person's vault secret to its author's own server, and read it back from a server that echoes
+// headers. A vault secret is now bound to the first host it is sent to; another host is refused
+// before anything is sent, and storing the value again clears the binding.
+const OTHER_HOST = `http://localhost:${RECEIVER_PORT}`;
+
+await test('THE LEAK: a secret already sent to one host is refused for another, and nothing is sent', async () => {
+    deliveries.length = 0;
+    const r = await json('/v1/ext/secret-probe/probe', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ url: `${OTHER_HOST}/steal`, headers: { Authorization: `Bearer {{secret:${SECRET_NAME}}}` } }),
+    });
+    const out = r.body.data?.result ?? r.body.data;
+    assert(typeof out.failed === 'string' && out.failed.includes('SECRET_HOST'),
+        `the call to a second host was not refused: ${JSON.stringify(out)}`);
+    assert(out.failed.includes(RECEIVER_HOST), `the refusal does not name the host it is bound to: ${out.failed}`);
+    assert(!JSON.stringify(r.body).includes(REPLACED_VALUE), 'the value is in the refusal');
+    assert(deliveries.length === 0, 'the refused call reached a receiver');
+});
+
+await test('the list shows the host a secret is bound to', async () => {
+    const r = await json('/v1/secrets', { headers: auth(owner.token) });
+    const row = (r.body.data?.secrets ?? []).find((s: any) => s.name === SECRET_NAME);
+    assert(Array.isArray(row?.hosts) && row.hosts.includes(`${RECEIVER_HOST}:${RECEIVER_PORT}`),
+        `hosts on the list: ${JSON.stringify(row)}`);
+});
+
+await test('storing the value again clears the binding, and the next use binds anew', async () => {
+    const put = await json(`/v1/secrets/${SECRET_NAME}`, {
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ value: REPLACED_VALUE }),
+    });
+    assert(put.status === 200, `re-store ${put.status}`);
+    const listed = (await json('/v1/secrets', { headers: auth(owner.token) })).body.data?.secrets
+        .find((s: any) => s.name === SECRET_NAME);
+    assert(Array.isArray(listed?.hosts) && listed.hosts.length === 0, `binding cleared: ${JSON.stringify(listed)}`);
+    // The first use after the reset binds to the OTHER host, whether or not anything answers there.
+    await json('/v1/ext/secret-probe/probe', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ url: `${OTHER_HOST}/rebind`, headers: { Authorization: `Bearer {{secret:${SECRET_NAME}}}` } }),
+    });
+    deliveries.length = 0;
+    const back = await json('/v1/ext/secret-probe/probe', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ url: `${RECEIVER}/probe`, headers: { Authorization: `Bearer {{secret:${SECRET_NAME}}}` } }),
+    });
+    const out = back.body.data?.result ?? back.body.data;
+    assert(typeof out.failed === 'string' && out.failed.includes('SECRET_HOST'), `the old host still works: ${JSON.stringify(out)}`);
+    assert(deliveries.length === 0, 'the refused call reached the receiver');
+});
+
 await stopReceiver();
 
-console.log(`\n=== Secrets vault: ${passed} passed, ${failed} failed ===\n`);
+console.log(`\n=== Secrets vault:${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);

@@ -27,6 +27,8 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.6.1 — 2026-09-16 — ctx.fetch passes its URL to the secret resolver, and a vault secret bound to
+ *     another host refuses with SECRET_HOST before anything is sent.
  *   v1.6.0 — 2026-09-06 — ctx.fetch resolves `{{secret:NAME}}` in header VALUES from the caller's
  *     owner vault, falling back to the extension's own `secrets` config and refusing by name when
  *     neither has it. It sits here rather than in a script because a script that resolves its own
@@ -65,7 +67,7 @@ import { extensionCrossNotify, safeNotificationLink } from './extension-notify.j
 import { notify } from './notify.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { parseGAII, ownerGhiiOf } from '../utils/gaii.js';
-import { resolveSecretForHeaders, secretPlaceholderNames, secretUnknownMessage } from './owner-secrets.js';
+import { resolveSecretForHeaders, secretPlaceholderNames, secretUnknownMessage, secretHostMessage } from './owner-secrets.js';
 import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 
@@ -344,6 +346,7 @@ export function sandboxLimits(
 async function resolveOutboundSecrets(
     deps: ExtensionCtxDeps,
     headers: Record<string, string> | undefined,
+    url: string,
 ): Promise<{ values: Record<string, string> | undefined; sensitive: string[] }> {
     const named = secretPlaceholderNames(headers);
     // The common case: no placeholder, no database read, nothing changed.
@@ -363,8 +366,12 @@ async function resolveOutboundSecrets(
         extConfig: deps.extConfig,
         extName,
         headers,
+        url,
     });
     if (!resolved.ok) {
+        if (resolved.reason === 'host') {
+            throw new Error(`SECRET_HOST: ${secretHostMessage(resolved.headerName, resolved.secretName, resolved.boundTo, resolved.host)}`);
+        }
         throw new Error(`SECRET_UNKNOWN: ${secretUnknownMessage(resolved.headerName, resolved.secretName)}`);
     }
     // Which headers actually carried a secret — the ones a cross-origin redirect must not inherit.
@@ -515,7 +522,7 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
         // in a URL, a body or a header NAME is left exactly as it arrived, because substituting into
         // any of those puts the value somewhere the script or the far end can read it back.
         fetch: async (url, opts, host) => {
-            const outbound = await resolveOutboundSecrets(deps, opts?.headers);
+            const outbound = await resolveOutboundSecrets(deps, opts?.headers, url);
             const resp = await safeFetch(url, {
                 method: opts?.method || 'GET',
                 headers: outbound.values,

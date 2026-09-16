@@ -6,6 +6,7 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.9.0 — 2026-09-16 — secrets.hosts: the hosts a vault secret may be sent to. Mirrors Postgres 0078.
  *   v1.8.0 — 2026-09-16 — mcp_servers table: the remote MCP servers this node connects OUT to.
  *     Mirrors Postgres 0076.
  *   v1.7.0 — 2026-09-06 — secrets table: the owner's write-only credential vault.
@@ -614,6 +615,7 @@ export function applySchemaTables4(db: Database.Database): void {
       setAt      TEXT NOT NULL,
       updatedAt  TEXT NOT NULL,
       usedBy     TEXT NOT NULL DEFAULT '{}',
+      hosts      TEXT NOT NULL DEFAULT '[]',
       PRIMARY KEY (ownerGaii, name)
     );
     CREATE INDEX IF NOT EXISTS idx_secrets_owner ON secrets(ownerGaii);
