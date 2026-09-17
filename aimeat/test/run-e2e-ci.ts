@@ -469,6 +469,8 @@ const ALL_SUITES = [
     // The setup wizard and the verification doors: spawns nodes of its own on 40320
     // (E2E_SETUP_SECOND_PORT). Lane 0 in the coverage runner.
     'test/e2e-setup-and-verification.ts',
+    // A node whose port is taken exits and says why, instead of announcing a start (own port 40433).
+    'test/e2e-boot-port-in-use.ts',
     // The moderation appeal end to end: the four target arms, the queue, the review, every refusal.
     'test/e2e-appeals.ts',
     // BR-04: deactivation ends every credential family, now; each assertion is a refusal.

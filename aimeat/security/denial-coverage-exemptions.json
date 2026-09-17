@@ -1,6 +1,10 @@
 {
   "note": "Registered E2E suites with no assertion about a 401 or 403. Seeded from the state on 2026-08-15 so the gate can only ratchet down. The `sha` pins the reason to the file it was written about: EDIT THE SUITE AND ITS EXEMPTION EXPIRES, because the person editing it is the one person who has the context to add the missing case. Re-stamping the sha without adding a denial is available and is a decision someone has to write down.",
   "exempt": {
+    "test/e2e-boot-port-in-use.ts": {
+      "reason": "REVIEWED 2026-09-17 — the suite has no principal at all. It starts a node on a port another listener already holds and asserts the process exits with the port and the cause named, instead of printing its start banner over the failed listen (docs/pitfalls.md §93). No request ever reaches the node, so there is no door to refuse anyone at.",
+      "sha": "fa3fd32da42b4f14"
+    },
     "test/e2e-oauth-login.ts": {
       "reason": "REVIEWED 2026-09-04 — in the standard test config no provider is configured, so every authorize and callback answers 503 before any principal question can be reached. That is the suite's purpose against a running node: prove the routes are MOUNTED and gated rather than 404, which is the failure a mounting mistake produces and which no unit test can see. The refusals that involve an identity — an unmapped subject, a state that does not match, a session issued to the wrong account — need a working IdP and are covered by test/unit/oauth-login.test.ts against a fake one.",
       "sha": "0b3718a6714b3ae4"

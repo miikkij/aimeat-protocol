@@ -63,6 +63,15 @@ jobs:
           cp .env.test.sqlite.example .env.test.sqlite
           cp .env.test.postgres-kysely.example .env.test.postgres-kysely
 
+      # KEEP THE E2E PORTS OUT OF THE KERNEL'S EPHEMERAL RANGE. Every port a suite or a lane binds is
+      # in 40000-40999, and Linux hands out local ports for OUTGOING connections from 32768-60999, so
+      # a database or HTTP client socket could hold 40320 at the moment a node wanted to listen there.
+      # The listen then failed with EADDRINUSE while the port refused connections, and until
+      # 2026-09-17 the node hid that error behind its start banner (index-start.ts). Reserving the
+      # range takes it out of automatic allocation only; binding it explicitly still works.
+      - name: Reserve the E2E port range
+        run: sudo sysctl -w net.ipv4.ip_local_reserved_ports=40000-40999
+
       # Four lanes: four nodes at once, every suite still alone on an empty database. Measured on
       # one lane before this existed: 285 suites, 38 minutes, 20 of them restarts between suites.
       #

@@ -32,6 +32,10 @@
  * @structure nodeEntryArgs() · NODE_ENTRY_ENV
  * @usage spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', ...])
  * @version-history
+ *   v1.0.1 — 2026-09-17 — Correction, no code change. The loader was not the cause this header gives.
+ *     Nodes started from dist stalled the same way, and on 2026-09-17 a stalled node's log showed its
+ *     start banner: listen had failed with the error hidden (docs/pitfalls.md §93). dist stays,
+ *     because it is faster and it is what production runs.
  *   v1.0.0 — 2026-09-15 — Initial.
  */
 import { existsSync, mkdirSync } from 'node:fs';

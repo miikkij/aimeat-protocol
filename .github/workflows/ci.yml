@@ -170,6 +170,10 @@ jobs:
         working-directory: aimeat
         run: cp .env.test.sqlite.example .env.test.sqlite
 
+      # The E2E ports sit inside Linux's ephemeral range; see the same step in e2e-full.yml.
+      - name: Reserve the E2E port range
+        run: sudo sysctl -w net.ipv4.ip_local_reserved_ports=40000-40999
+
       - name: E2E guard tier (SQLite) — blocking
         working-directory: aimeat
         run: pnpm test:e2e:guards:sqlite
@@ -210,6 +214,10 @@ jobs:
       - name: Prepare E2E env file (from the committed example)
         working-directory: aimeat
         run: cp .env.test.postgres-kysely.example .env.test.postgres-kysely
+
+      # The E2E ports sit inside Linux's ephemeral range; see the same step in e2e-full.yml.
+      - name: Reserve the E2E port range
+        run: sudo sysctl -w net.ipv4.ip_local_reserved_ports=40000-40999
 
       # The runner's lanes 1–3 each create a sibling database (aimeat_kysely_e2e_w1 …) beside the
       # service's; POSTGRES_USER is the superuser here, so CREATE DATABASE is allowed.
