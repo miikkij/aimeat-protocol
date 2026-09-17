@@ -482,7 +482,9 @@ await test('B can route to A (direct peer)', async () => {
     assert(body.data.routed_to === 'aimeat-hub-001-testa', 'routed to A');
 });
 
-await test('Multi-hop B->A->C succeeds (relay forwards auth)', async () => {
+// A authenticates B's hop by the relay claim B signed, not by a token: B no longer sends one, and a
+// token of B would mean nothing on A once the nodes run in separate processes.
+await test('Multi-hop B->A->C succeeds (the hop authenticates with its signed relay claim)', async () => {
     const { status, body } = await nodeB!.json('/v1/federation/route', {
         method: 'POST',
         headers: { Authorization: `Bearer ${nodeB!.ownerToken}` },
