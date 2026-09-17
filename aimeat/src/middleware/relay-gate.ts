@@ -30,6 +30,11 @@
  * @structure relayGate(config, storage, peers) -> express.RequestHandler
  * @usage app.use(relayGate(config, storage, services.peers));
  * @version-history
+ *   v1.1.0 — 2026-09-17 — A claim that verifies is left on the request as `req.relay` (peer and
+ *     caller), for POST /v1/federation/route to authenticate a multi-hop hop with. adf8aa1e5 stopped
+ *     forwarding the caller's token to the next hop, rightly, since the peer could replay it against
+ *     the node that issued it; but that hop's door still asked for a token, so every multi-hop relay
+ *     ended as "no route". Nothing else reads the field: every other route's own auth still runs.
  *   v1.0.0 — 2026-09-03 — Initial (wish-vastaanottaja-voi-kieltaytya-relaysta).
  */
 import type { RequestHandler } from 'express';
@@ -41,6 +46,37 @@ import { logger } from '../utils/logger.js';
 import {
   RELAY_HEADERS, claimsToBeRelayed, hasRelayClaim, verifyRelayClaim,
 } from '../services/relay-claim.js';
+
+/**
+ * What this gate proved about a relayed request, for the one route that may act on it.
+ *
+ * Set only after verifyRelayClaim() accepted the claim: an active peer this node lets route, a claim
+ * written for this node, bound to this request's method and exact path, inside its window, signed
+ * with the key pinned for that peer, and spent. Because the claim names the path, a `relay` on the
+ * request is proof about THAT request-target and nothing wider; a claim for one endpoint arrives
+ * here refused, not attached to another.
+ *
+ * Nearly every route ignores it, and must: a relayed call to an ordinary endpoint still carries
+ * whatever credentials it carried and that route's own auth still runs. The multi-hop hop of
+ * POST /v1/federation/route is the exception, and the only one, because the call it receives is a
+ * peer relaying on someone else's behalf and there is no credential of THIS node that the caller
+ * could have. See requireOwnerPrincipalOrVerifiedRelay() in routes/federation-sync/routing.ts.
+ */
+export interface VerifiedRelay {
+  /** The peer that forwarded the request. */
+  peer: string;
+  /** The principal the relaying node was acting for, as signed in the claim. */
+  caller: string;
+}
+
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      relay?: VerifiedRelay;
+    }
+  }
+}
 
 /**
  * Refuse, accept, or decide by policy — for every inbound request that says it was relayed.
@@ -103,6 +139,8 @@ export function relayGate(
           res.status(check.status).json(error(config.nodeId, check.code, check.message));
           return;
         }
+        // What was proved, handed to the one route that may act on it (see VerifiedRelay above).
+        req.relay = { peer: check.peer.nodeId, caller: typeof check.claim.caller === 'string' ? check.claim.caller : '' };
         // Remember that this peer can sign, once. Fire and forget: measuring a peer's capability
         // must never fail the request it was measured on, and the next valid claim writes it again
         // if this one did not land.

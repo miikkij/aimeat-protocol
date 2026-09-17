@@ -30,6 +30,8 @@
  *   cd aimeat && pnpm check:federation-signatures            # report
  *   cd aimeat && pnpm check:federation-signatures --strict   # the hook/CI gate
  * @version-history
+ *   v1.1.0 — 2026-09-17 — POST /v1/federation/route listed: a multi-hop hop authenticates with the
+ *     relay claim the global relay gate verified, which a chain-reading script cannot see.
  *   v1.0.0 — 2026-09-04 — Initial. The door inventory counted 300 REST doors reachable with no
  *     credential and 55 of those writing; 18 were federation, which is the one group no gate was
  *     watching.
@@ -61,6 +63,14 @@ const ALLOWED: Record<string, string> = {
         + 'session and no peer relationship can exist yet by construction. Bounded by the login rate '
         + 'limit and a five-minute timestamp window, and it answers the same FEDERATION_AUTH_FAILED '
         + 'whether the account is missing, has no password or gave the wrong one.',
+    'src/routes/federation-sync/routing.ts:POST:/v1/federation/route':
+        'Both credentials, one per caller, and this script can read neither. A person starting a route '
+        + 'meets requireAuth then requireOwnerPrincipal inside requireOwnerPrincipalOrVerifiedRelay. A '
+        + 'peer forwarding a hop is admitted only on req.relay, which middleware/relay-gate.ts sets '
+        + 'after verifyRelayClaim checked an Ed25519 signature with the key pinned for that active, '
+        + 'routing-permitted peer, over a single-use claim bound to POST and this exact path. The '
+        + 'signature check is global middleware rather than a call in the handler, so it is not on '
+        + 'the chain this script reads. e2e-federation-relay-claim asserts the 401 with neither.',
     // POST /v1/federation/genesis-memory-read was here on 2026-09-04, listed as an open question:
     // requireAuth alone, so any principal carrying the account name could make this node fan out one
     // request per active genesis peer whatever it had been granted. It carries requireScope('memory:read')

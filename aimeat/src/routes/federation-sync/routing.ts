@@ -5,6 +5,9 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-09-17 — A multi-hop hop authenticates with its verified relay claim, since v1.2.0
+ *     left it no token to show and every multi-hop route answered "no route". The routing fee is
+ *     charged only on the node where the route began.
  *   v1.2.0 — 2026-09-16 — The multi-hop relay no longer forwards the caller's Authorization header to
  *     the peers it tries. The token is valid only on this node, so any relaying peer could replay it.
  *   v1.1.0 — 2026-09-03 — Every outbound relay carries a SIGNED relay claim (services/relay-claim.ts)
@@ -15,7 +18,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from federation-sync.ts (max-file-lines)
  */
 
-import type { Router } from 'express';
+import type { Router, RequestHandler } from 'express';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -30,6 +33,41 @@ import { buildHopSigningMessage } from '../../types/route-manifest.js';
 import { emitChange } from '../../services/event-bus.js';
 import { buildRelayClaim } from '../../services/relay-claim.js';
 
+/**
+ * Who may drive POST /v1/federation/route: this node's own account holder, or a peer relaying a hop.
+ *
+ * THE TWO CALLERS ARE DIFFERENT KINDS. The first hop is a person on THIS node starting a route; they
+ * hold a credential of this node, and the A23 rule stands for them unchanged (an owner principal, so a
+ * scope-limited app grant cannot drive an outbound call in this node's name). Every later hop is a
+ * PEER forwarding on somebody else's behalf, and that caller can hold no credential of this node at
+ * all: the token it used to forward was minted by another node, meaningless here and replayable
+ * there, which is why adf8aa1e5 stopped sending it. Asking that hop for a token therefore refused
+ * every multi-hop relay, and B->A->C answered "no route" from 2026-09-16.
+ *
+ * A HOP AUTHENTICATES WITH WHAT IT CAN PROVE. middleware/relay-gate.ts has already verified the signed
+ * relay claim before any route runs: an active peer this node lets route, written for this node,
+ * bound to POST and this exact path, inside a short window, signed with the key pinned for that peer,
+ * and spent so it cannot be replayed. What it proved is on `req.relay`, and a claim for any other
+ * path never gets that far. That is stronger than the bearer token it replaces, which named none of
+ * those things. A request with no verified claim takes the ordinary road and meets the owner check.
+ *
+ * WHY IT DID NOT MATTER IN THE TEST UNTIL NOW. federation-multinode boots all three nodes in one
+ * process, where the node signing keys are module state, so a token minted by B verified at A. On two
+ * machines it would not have: multi-hop leaned on a forwarded token that only a shared process could
+ * accept.
+ */
+function requireOwnerPrincipalOrVerifiedRelay(): RequestHandler {
+    const auth = requireAuth();
+    const owner = requireOwnerPrincipal();
+    return (req, res, next) => {
+        if (req.relay) { next(); return; }
+        auth(req, res, (err?: unknown) => {
+            if (err) { next(err); return; }
+            owner(req, res, next);
+        });
+    };
+}
+
 export function registerRoutingRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // ── Cross-Node Query Routing ──
 
@@ -43,7 +81,10 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
     // find ZERO callers, and federation-multinode drives it with an owner token. The wider answer —
     // a `federation:relay` word an agent could hold — is available the day someone wants an agent to
     // relay; it is not invented here for a caller that does not exist.
-    router.post('/v1/federation/route', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
+    //
+    // A hop from a peer is admitted on its verified relay claim instead; see
+    // requireOwnerPrincipalOrVerifiedRelay() above.
+    router.post('/v1/federation/route', requireOwnerPrincipalOrVerifiedRelay(), async (req, res) => {
         const { target_node, method, path, body: reqBody, max_hops } = req.body ?? {};
 
         if (!target_node || !path) {
@@ -70,10 +111,21 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
             return;
         }
 
-        const requesterGaii = req.auth!.sub;
+        // On a hop, the principal is the one the previous node signed into the claim: the person who
+        // started the route, on their own node. Nothing here can re-check that name, and nothing
+        // here needs to; it is carried forward into the next claim so the far end sees who asked.
+        const requesterGaii = req.relay ? req.relay.caller : req.auth!.sub;
 
-        // Helper: charge 1 morsel routing fee per hop (atomic debit)
+        // Helper: charge 1 morsel routing fee (atomic debit), ONLY on the node where the route began.
+        //
+        // A morsel paces a person, and the person who asked has their balance on the node they asked
+        // from, which charges them once there. A hop holds no account for a name from another node,
+        // so a debit there has nothing to take from. Charging the relaying node's own operator
+        // instead would make a node pay for carrying other people's traffic, which is the opposite
+        // of what allowRouting lets an operator choose. Ruled 2026-09-17 with the relay-claim
+        // authentication.
         async function chargeRoutingFee(): Promise<void> {
+            if (req.relay) return;
             const debited = await storage.debitBalance(requesterGaii, 1);
             if (debited) {
                 await storage.addTransaction({

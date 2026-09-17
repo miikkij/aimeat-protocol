@@ -18,6 +18,9 @@
  *
  *   Node R (receiver) 40293. Peers: relay-ok (permitted), relay-demoted (allowRouting false).
  * @version-history
+ *   v1.1.0 — 2026-09-17 — A multi-hop hop is admitted to POST /v1/federation/route on its verified
+ *     claim alone; a claim for another path, a claim on another owner door, and a request with
+ *     neither are each refused.
  *   v1.0.0 — 2026-09-03 — Initial (wish-vastaanottaja-voi-kieltaytya-relaysta).
  */
 
@@ -200,6 +203,52 @@ await test('a claim for a different path than the request carries is refused', a
     const body = await res.json() as any;
     assert(body.error.code === 'RELAY_CLAIM_MISMATCH', `code: ${body.error.code}`);
     assert(body.error.message.includes('/v1/health'), `the refusal names what was signed: ${body.error.message}`);
+});
+
+// ── A multi-hop hop authenticates with its claim, and only there ─────────────
+//
+// A peer forwarding a route holds no credential of this node, so from 2026-09-16 (when the relay
+// stopped forwarding the caller's token) every hop was refused at the door and multi-hop answered
+// "no route". The claim is the hop's credential now. These pin both halves: the hop gets in on the
+// claim alone, and the claim opens that one door and nothing else.
+
+await test('a hop to /v1/federation/route is admitted on its verified claim, with no token', async () => {
+    // The relay path already names OK_NODE, so the handler has no peer left to try and answers
+    // "no route" without touching the network. Reaching that answer is the proof the door opened.
+    const h = await claimHeaders(okKeys, { relay: OK_NODE, method: 'POST', path: '/v1/federation/route', caller: 'alice@aimeat-test-001-relayok' });
+    const res = await fetch(`${BASE}/v1/federation/route`, {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json', 'X-Relay-Path': OK_NODE, 'X-Relay-Hops': '2' },
+        body: JSON.stringify({ target_node: 'aimeat-test-001-nowhere', method: 'GET', path: '/v1/health' }),
+    });
+    const body = await res.json() as any;
+    assert(res.status === 404, `claimed hop: ${res.status} ${JSON.stringify(body)}`);
+    assert(body.error.code === 'FEDERATION_ERROR' && /No route/.test(body.error.message), `reached the handler: ${JSON.stringify(body.error)}`);
+});
+
+await test('without a claim, the route door still asks for an owner of this node → 401', async () => {
+    const r = await json('/v1/federation/route', {
+        method: 'POST', body: JSON.stringify({ target_node: DEMOTED_NODE, method: 'GET', path: '/v1/health' }),
+    });
+    assert(r.status === 401, `no claim, no token: ${r.status} ${JSON.stringify(r.body)}`);
+});
+
+await test('a claim signed for another path does not open the route door', async () => {
+    const h = await claimHeaders(okKeys, { relay: OK_NODE, method: 'POST', path: '/v1/memory' });
+    const res = await fetch(`${BASE}/v1/federation/route`, {
+        method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_node: DEMOTED_NODE, method: 'GET', path: '/v1/health' }),
+    });
+    assert(res.status === 403, `claim for another path: ${res.status}`);
+    assert(((await res.json()) as any).error.code === 'RELAY_CLAIM_MISMATCH', 'refused by the gate for the path');
+});
+
+await test('a verified claim authenticates no other door → 401 on the peer list', async () => {
+    // The claim verifies (right method, right path), so the gate lets the request on. The peer list
+    // then asks for its own credential, and the claim is not one.
+    const h = await claimHeaders(okKeys, { relay: OK_NODE, method: 'GET', path: '/v1/federation/peers' });
+    const res = await fetch(`${BASE}/v1/federation/peers`, { headers: h });
+    assert(res.status === 401, `claim on an owner door: ${res.status} ${await res.text()}`);
 });
 
 await test('a claim written for another node is refused here', async () => {
