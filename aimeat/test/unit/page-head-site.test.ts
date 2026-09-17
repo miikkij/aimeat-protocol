@@ -1,5 +1,13 @@
+/**
+ * @file page-head-site.test.ts
+ * @description Verify node identity, page overrides and truthful software metadata.
+ * @version-history
+ *   2026-09-17 - TARGET-078: reject the generic free-hosting price claim.
+ */
 import { describe, it, expect } from 'vitest';
 import { injectSiteHead, injectPageHead } from '../../src/utils/page-head.js';
+import { buildLandingMarkdown } from '../../src/services/markdown-negotiation.js';
+import { findPublicPage } from '../../src/data/public-pages.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { PublicPage } from '../../src/data/public-pages.js';
 
@@ -22,6 +30,7 @@ import type { PublicPage } from '../../src/data/public-pages.js';
  */
 
 const cfg = (over: Partial<AimeatConfig> = {}): AimeatConfig => ({
+  nodeId: 'acme-node',
   baseUrl: 'https://node.example',
   seoIndexing: 'on',
   seoSiteName: 'Acme Knowledge',
@@ -54,6 +63,24 @@ const page = (over: Partial<PublicPage> = {}): PublicPage => ({
 } as PublicPage);
 
 describe('injectSiteHead', () => {
+  it('introduces the root Markdown with the same promise as its HTML metadata', () => {
+    // TARGET-078: root negotiation used its own stale introduction instead of the page copy.
+    const root = findPublicPage('/')!;
+    expect(buildLandingMarkdown(cfg())).toContain(root.description);
+    expect(findPublicPage('/v1/portal')!.description).toBe(root.description);
+  });
+
+  it('describes productivity software without claiming every deployment is free', () => {
+    // TARGET-078: closes the false generic price claim, not a test-setup mismatch.
+    const out = injectSiteHead(shell, cfg());
+    const records = [...out.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)]
+      .map(match => JSON.parse(match[1]));
+    const software = records.find(record => record['@type'] === 'SoftwareApplication');
+    expect(software.applicationCategory).toBe('ProductivityApplication');
+    expect(software.description).toBe(cfg().seoSiteDescription);
+    expect(software).not.toHaveProperty('offers');
+  });
+
   it('says who THIS node is, not who the software vendor is', () => {
     const out = injectSiteHead(shell, cfg());
     expect(out).toContain('<title>Acme Knowledge</title>');

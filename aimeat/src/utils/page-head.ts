@@ -23,6 +23,7 @@
  *   html = injectSiteHead(html, config, nonceAttr);
  *   html = injectPageHead(html, findPublicPage('/v1/connect'), config, nonceAttr);
  * @version-history
+ *   2026-09-17 - TARGET-078: productivity category; omit a price that depends on deployment.
  *   v1.2.1 — 2026-08-26 — SECURITY (CodeQL js/reflected-xss): the per-page WebPage JSON-LD embedded
  *     page.title/description via JSON.stringify, which does not escape `<`, so a `</script>` in a
  *     title taken from a URL path (/v1/portfolio/:username with no portfolio) broke out of the
@@ -159,9 +160,8 @@ export function injectSiteHead(html: string, config: AimeatConfig, nonceAttr = '
       alternateName: 'AI Memory Exchange and Action Transfer',
       url: b,
       description: config.seoSiteDescription,
-      applicationCategory: 'DeveloperApplication',
+      applicationCategory: 'ProductivityApplication',
       operatingSystem: 'Any',
-      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       ...(config.seoSameAs.length ? { sameAs: config.seoSameAs } : {}),
     });
     out = out.replace('</head>', `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(software)}</script>\n</head>`);

@@ -13,14 +13,15 @@
  *   read. The showroom's own blocks (the counters, the store, the safety list) are reused where the
  *   frame keeps them.
  *
- *   The order, top to bottom: the hero (the claim, the wish box, the two doors, the picture) · the
+ *   The default order (operators can save another): the hero (the claim, the wish box, the two doors, the picture) · the
  *   counters · ten seconds under the hood (six outcomes, then the question, then the answer that is
  *   the hinge of the whole page) · the slide projector (landing-v2-projector.js) · prompts and what
  *   they produced (landing-v2-cards.js) · the wall, the community first (same file) · the store ·
- *   why the safety list is checkable · the safety list · the last word.
+ *   ownership and AI processing limits · the safety list · the last word.
  * @structure Hero2 · WishBox2 · TenSeconds · LinuxLine · Close2
  * @usage import { Hero2, TenSeconds, LinuxLine, Close2 } from '/views/landing-v2.js';
  * @version-history
+ *   v1.2.0 - 2026-09-17 - TARGET-078: ownership, AI processing limits and continuity in one block.
  *   v1.1.0 — 2026-09-15 — Built here, with itself: the kicker says it, and the ten seconds end on a
  *     frame of this very page. Jouni, as the proof of the hero's claim.
  *   v1.0.0 — 2026-09-14 — The front page. The sections are exported for the block registry and the
@@ -238,16 +239,20 @@ export function TenSeconds({ navigate }) {
 }
 
 /**
- * The one place the page says "the Linux of AI": above the safety list, as the reason the list
- * can be checked rather than as the first thing a visitor reads.
+ * Ownership with its hosting, AI processing and licence limits. The stable block id lets
+ * operators move it without losing their saved layout.
  */
 export function LinuxLine() {
+  const continuity = tr('landing2.linuxContinuity', 'The protocol and server software are open source under the MIT license. What you build remains yours. If we are sold or stop operating, you can continue running that software yourself with your data.');
+  const [beforeMit, afterMit] = continuity.split('MIT');
   return html`
-    <div class="ld-sh-box poster-aside ld-v2-linux">
-      <span class="ld-sh-box-label">${tr('landing2.linuxLabel', 'Why the list below is checkable:')}</span>
-      ${' '}
-      ${tr('landing2.linuxText', 'AIMEAT is the Linux of AI. The code is open, the server is yours and the rules are yours, so every item on the list is something to read for yourself rather than take on trust.')}
-    </div>`;
+    <section class="ld-sh-box poster-aside ld-v2-linux">
+      <h2 class="ld-sh-box-label">${tr('landing2.linuxLabel', 'You own your data and your AI memory.')}</h2>
+      <p>${tr('landing2.linuxText', 'Run your own AIMEAT on a server in the EU or on your own machine. Your data and saved AI memory are stored there. You decide who can access them.')}</p>
+      <p>${tr('landing2.linuxAi', 'Cloud AI processes the information you send to it, even when you use your own API key. A local model lets you keep AI processing on your own machine.')}</p>
+      <p>${afterMit === undefined ? continuity : html`${beforeMit}<a href="https://github.com/miikkij/aimeat-protocol/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>${afterMit}`}</p>
+      <a class="showroom-door" href="/v1/business">${tr('landing2.linuxBusiness', 'AIMEAT for your business →')}</a>
+    </section>`;
 }
 
 /**

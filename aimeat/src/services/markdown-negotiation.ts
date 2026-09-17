@@ -21,6 +21,7 @@
  *   import { prefersMarkdown, sendMarkdown, htmlToMarkdown } from '../services/markdown-negotiation.js';
  *   if (prefersMarkdown(req)) { sendMarkdown(res, htmlToMarkdown(html), html); return; }
  * @version-history
+ *   2026-09-17 - TARGET-078: root Markdown leads with the same ownership promise as HTML.
  *   v1.1.0 — 2026-08-01 — prefersHtmlPage(): the same negotiation question asked the other way,
  *     so /v1/ai-transparency can send a person who pasted the machine URL into a browser to the
  *     page at /v1/transparency while every machine keeps getting JSON (TARGET-058 Phase 10b).
@@ -143,9 +144,7 @@ export function buildLandingMarkdown(config: AimeatConfig): string {
   const b = config.baseUrl;
   return `# AIMEAT node \`${config.nodeId}\`
 
-An [AIMEAT protocol](${b}/llms.txt) node — persistent memory, identity, shared workspaces
-(organisms), skills, tasks and workflows, app hosting, and a morsel economy for humans and
-their AI agents, over REST and MCP.
+You own your data and what you build. Give your AI a lasting memory, apps and tasks with AIMEAT, then run your own server.
 
 ## For humans
 

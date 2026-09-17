@@ -19,6 +19,7 @@
  * @structure StoreSection · parseTiers · Star · TrustList · Rooms
  * @usage import { StoreSection, TrustList, Rooms } from '/views/landing-showroom-rooms.js';
  * @version-history
+ *   2026-09-17 - TARGET-078: qualify ownership and data-location statements.
  *   2026-09-13 -- V2: compose the safety band and named sun/coral room frames.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.1.0 — 2026-08-28 — The store section reads its ladder and its "from" price from the store's
@@ -103,7 +104,7 @@ export function StoreSection({ fromPrice, tiers }) {
         </p>
         <ul class="ld-sh-list">
           <li>${Star}<span>${tr('landing.storeLi1', 'Every AI you use, Claude, ChatGPT, local models, under one roof, working on the same memory.')}</span></li>
-          <li>${Star}<span>${tr('landing.storeLi2', 'Keeping your own stuff is a joy. Nobody takes it, rents it back to you, or peeks at it.')}</span></li>
+          <li>${Star}<span>${tr('landing.storeLi2', 'Your data and what you build remain yours. You decide whom to grant access.')}</span></li>
           <li>${Star}<span>${tr('landing.storeLi3', 'Sell what you build: payment rails and agent-to-agent commerce come with the house.')}</span></li>
         </ul>
         ${ladder.length > 0 ? html`
@@ -126,7 +127,7 @@ export function TrustList({ navigate }) {
     [tr('landing.trust1Title', 'Every action signed'), tr('landing.trust1Text', 'Whatever a person, an app or an AI does here carries the name of who did it, and you can read the trail.')],
     [tr('landing.trust2Title', 'AI content labeled'), tr('landing.trust2Text', 'What a model wrote says so where a person reads it, with a record of how it was made. The EU AI Act disclosure is served, live.')],
     [tr('landing.trust3Title', 'Consent you can revoke'), tr('landing.trust3Text', 'A helper reaches exactly what you handed it. Taking a permission back is one click, and it holds.')],
-    [tr('landing.trust4Title', 'GDPR as buttons'), tr('landing.trust4Text', 'Export and delete are things you press, in Europe, on European terms.')],
+    [tr('landing.trust4Title', 'GDPR as buttons'), tr('landing.trust4Text', 'Export and deletion controls are available in your account. Where data is stored and AI processes it depends on the hosting and model you choose.')],
   ];
   return html`
     <section class="ld-sh-trust showroom-band">
