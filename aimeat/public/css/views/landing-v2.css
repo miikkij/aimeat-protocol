@@ -8,6 +8,7 @@
  *   offset shadows in ink, sun and coral, and every colour a theme token so the dark theme inverts.
  *   Mobile first: the base rules are the phone, and the wider screens add columns.
  * @version-history
+ *   2026-09-17 - TARGET-078: readable heading and paragraphs for the ownership block.
  *   v0.2.0 — 2026-09-14 — The cloud's words are buttons, and the apps in the show are a third group.
  *   v0.1.0 — 2026-09-14 — Design round.
  */
@@ -197,6 +198,8 @@
 
 /* ── The Linux line and the last word ───────────────────────────────────────────────────────── */
 .ld-v2-linux { margin: 3rem 0 1.25rem; }
+.ld-v2-linux h2 { margin: 0; font-size: clamp(1.3rem, 3vw, 2rem); line-height: 1.2; }
+.ld-v2-linux p { max-width: 76ch; margin: 1rem 0; }
 .ld-v2-close-line { margin: 0; display: flex; flex-direction: column; gap: .2rem; font-family: var(--font-showroom); text-transform: uppercase; font-size: clamp(1.1rem, 2.6vw, 1.7rem); line-height: 1.2; }
 .ld-v2-close-line span:last-child { color: var(--sun); }
 @media (min-width: 900px) { .ld-v2-close-line { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: .3rem 1.2rem; } }

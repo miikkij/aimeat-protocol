@@ -4040,7 +4040,7 @@
     "sov1": "Data pysyy palvelimella jota sinä hallitset ja pysyy sinulla, joten sinun oma sertifiointisi on se joka ratkaisee.",
     "sov2": "Jokainen teko kirjautuu: kuka luki mitä, kuka valtuutti ja mitä se maksoi. Auditointi on raportti, ei projekti.",
     "sov3": "Agentit ja appit toimivat nimetyillä luvilla jotka voit ottaa pois yhdellä klikkauksella, ja jokainen teko kirjautuu tekijälleen.",
-    "sov4": "Koodi on MIT-lisensoitua ja luettavissa. Suljettu kilpailija voi tarjota siitä vain lupauksen.",
+    "sov4": "Protokolla ja palvelinohjelmisto ovat saatavilla MIT-lisenssillä. Lisenssi ei velvoita julkaisemaan rakentamiasi sovelluksia tai sisältöä.",
     "ctaAssessment": "Ilmainen: missä tekoälynne on nyt? →"
   },
   "biz.trans1": "EU:n tekoälyasetuksen 50 artiklaa on sovellettu 2.8.2026 alkaen. Täällä saat eurooppalaisen, itse ylläpidettävän alustan, jossa tekoälyn alkuperätieto kuuluu siihen kerrokseen jonka päällä jokainen appi toimii: mallin tuottama sisältö kantaa mukanaan tiedon siitä miten se syntyi, noden omilla pinnoilla lukija näkee merkinnän, ja ylläpitäjän oikeushenkilö sekä valvova viranomainen ovat kiinteässä koneluettavassa osoitteessa, jonka vastuuhenkilösi voi hakea kysymättä meiltä. Noden lähettämän sisällön voi kuka tahansa tarkistaa tavu tavulta ilman tiliä.",
@@ -12628,7 +12628,7 @@
     "storeTitle2": "Hanki oma.",
     "storeText": "Kaikki, mitä sä just kokeilit, on esittelykappale. Sun oma AIMEAT on koko tää sivusto sun omassa osoitteessa, sun nimellä. Me pidetään se käynnissä ja ajan tasalla kuukausimaksua vastaan. Ja kaikki tämä on sinun käytössäsi, eiks oo siistiä vai mitä?",
     "storeLi1": "Kaikki sun tekoälyt, Claude, ChatGPT ja paikalliset mallit, saman katon alla ja samalla muistilla: minkä kerrot yhdelle, sen muut tietää.",
-    "storeLi2": "Sun data on sun. Kukaan ei vie sitä, ei myy sitä sulle takaisin eikä kurki olan yli.",
+    "storeLi2": "Tietosi ja rakentamasi sovellukset ovat sinun. Sinä päätät, kenelle annat niihin pääsyn.",
     "storeLi3": "Myy, mitä rakennat: maksut ja agenttien välinen kauppa kuuluu hintaan.",
     "storePerMonth": "kuukaudessa",
     "storeCta": "Astu kauppaan →",
@@ -12640,7 +12640,7 @@
     "trust3Title": "Suostumus, jonka voi perua",
     "trust3Text": "Agentti pääsee vain siihen, mihin sä annoit sille pääsyn. Vedä lupa pois, ja se pysyy poissa. Yksi klikkaus.",
     "trust4Title": "GDPR nappeina",
-    "trust4Text": "Vienti ja poisto on nappeja, joita sä painat. Sun data on Euroopassa, eurooppalaisilla säännöillä.",
+    "trust4Text": "Tililläsi on toiminnot tietojen vientiin ja poistoon. Tietojen säilytys- ja käsittelypaikat riippuvat valitsemastasi palvelimesta ja tekoälymallista.",
     "trustEu": "Tehty Suomessa, EU:ssa. Tämän listan säännöt on ne, joiden mukaan me itse eletään.",
     "transCta": "Näin tämä paikka merkitsee tekoälysisällön →",
     "roomIncAlt": "Ilahtunut tutkija hautomossa, jossa robottitipuja kuoriutuu hohtavista munista",
@@ -12840,8 +12840,11 @@
     "wallTitle": "Ihmiset rakensivat nämä tekoälynsä kanssa.",
     "wallCommunity": "Nämä rakensivat ihmiset, jotka tulivat tänne oman tekoälynsä kanssa. Jokainen niistä on todiste joltakulta, jota emme ole koskaan tavanneet.",
     "wallOwn": "Ja me, täällä, joka päivä.",
-    "linuxLabel": "Miksi alla oleva lista on tarkistettavissa:",
-    "linuxText": "AIMEAT on tekoälyn Linux. Koodi on avointa, palvelin on sinun ja säännöt ovat sinun, joten jokainen listan kohta on luettavissa itse eikä sitä tarvitse uskoa.",
+    "linuxLabel": "Omistat tietosi ja tekoälysi muistin.",
+    "linuxText": "Voit käyttää omaa AIMEATia EU:ssa sijaitsevalla palvelimella tai omalla tietokoneellasi. Tietosi ja tekoälylle tallennettu muisti säilytetään siellä. Sinä päätät, kenelle annat niihin pääsyn.",
+    "linuxAi": "Pilvessä toimiva tekoäly käsittelee sille lähettämäsi tiedot, vaikka käyttäisit omaa API-avainta. Paikallisella mallilla voit pitää myös tekoälykäsittelyn omalla koneellasi.",
+    "linuxContinuity": "Protokolla ja palvelinohjelmisto ovat avointa lähdekoodia MIT-lisenssillä. Rakentamasi sovellukset ja sisältö ovat sinun. Jos meidät myydään tai toimintamme päättyy, voit jatkaa ohjelmiston käyttöä itsenäisesti omilla tiedoillasi.",
+    "linuxBusiness": "AIMEAT yrityksellesi →",
     "closeWork": "AI & me at work.",
     "closeShop": "AI & me at the shop.",
     "closeSeven": "AI & me at 7 am.",
@@ -19538,8 +19541,8 @@
           "summary": "Täällä julkaistut apit, ensin muiden rakentamat ja niiden jälkeen tämän palvelun omat."
         },
         "frame-linux": {
-          "label": "Miksi turvalista on tarkistettavissa",
-          "summary": "Yksi rivi turvalistan yläpuolella: AIMEAT on tekoälyn Linux, avoin koodi, oma palvelin, omat säännöt."
+          "label": "Omistat tietosi ja tekoälysi muistin.",
+          "summary": "Voit käyttää omaa AIMEATia EU:ssa sijaitsevalla palvelimella tai omalla tietokoneellasi. Tietosi ja tekoälylle tallennettu muisti säilytetään siellä. Sinä päätät, kenelle annat niihin pääsyn."
         },
         "frame-close": {
           "label": "Loppurivi",

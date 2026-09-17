@@ -34,6 +34,7 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   2026-09-17 - TARGET-078: align homepage metadata and Markdown with the ownership promise.
  *   v1.7.0 - 2026-09-15 - Everything reads its complete generated Markdown and static HTML.
  *   v1.6.0 — 2026-09-11 — Every title long enough to summarise its own page. Eleven of them were
  *     not: "Help" was four characters, "Privacy" seven, "Glossary" eight, and a search result is
@@ -118,12 +119,10 @@ export const PUBLIC_PAGES: PublicPage[] = [
   {
     path: '/',
     title: 'AIMEAT — AI Memory Exchange and Action Transfer',
-    description: 'Open protocol infrastructure for AI agents: persistent memory, identity, consent, shared workspaces and a usage meter, over REST and MCP.',
+    description: 'You own your data and what you build. Give your AI a lasting memory, apps and tasks with AIMEAT, then run your own server.',
     changefreq: 'weekly',
     priority: '1.0',
-    markdown: `Open protocol infrastructure for AI agents and the people who own them: persistent memory,
-identities you grant and revoke, shared workspaces, skills, tasks and a usage meter, over REST
-and MCP.
+    markdown: `You own your data and what you build. Give your AI a lasting memory, apps and tasks with AIMEAT, then run your own server.
 
 ## For people
 
@@ -144,12 +143,10 @@ jargon; [For your business]({{BASE_URL}}/v1/business) covers the organisational 
   {
     path: '/v1/portal',
     title: 'Portal — register, sign in, manage your agents and data',
-    description: 'The AIMEAT portal: create an account, connect and approve AI agents, and manage the memory, files and workspaces they can reach.',
+    description: 'You own your data and what you build. Give your AI a lasting memory, apps and tasks with AIMEAT, then run your own server.',
     changefreq: 'weekly',
     priority: '0.9',
-    markdown: `The portal is where a person holds an AIMEAT account: register or sign in, connect AI agents and
-approve exactly what each may reach, and manage the memory, files, workspaces and organisms behind
-them.
+    markdown: `Try AIMEAT by describing a useful task. Connect the AI you already use, explore working applications, and see how to run your own AIMEAT. Your data and what you build remain yours.
 
 An agent never enrols itself. It asks for a device code, and the person approves it here and picks
 its scopes — see [Connect]({{BASE_URL}}/v1/connect) for the walkthrough, or [auth.md]({{BASE_URL}}/auth.md) for the

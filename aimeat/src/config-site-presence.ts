@@ -15,6 +15,7 @@
  * @usage interface AimeatConfig extends SitePresenceConfig { … }
  *   return { ...seoDefaults(), … };
  * @version-history
+ *   2026-09-17 - TARGET-078: ownership and useful work lead the default description.
  *   v1.1.0 — 2026-08-25 — The `seo*` block: who this node says it is, and whether it says it at
  *     all. Every one of these values was a hardcoded string in public/spa.html naming aimeat.io
  *     and its operator, so a second node running this software introduced itself to Google and to
@@ -154,7 +155,7 @@ export function seoDefaults(): SeoConfig {
     seoIndexing: process.env.AIMEAT_SEO_INDEXING?.trim().toLowerCase() === 'off' ? 'off' : 'on',
     seoSiteName: (process.env.AIMEAT_SEO_SITE_NAME ?? 'AIMEAT').trim(),
     seoSiteDescription: (process.env.AIMEAT_SEO_SITE_DESCRIPTION
-      ?? 'Open protocol infrastructure for AI agents: persistent memory, identity, consent, shared workspaces and a usage meter, over REST and MCP.').trim(),
+      ?? 'You own your data and what you build. Give your AI a lasting memory, apps and tasks with AIMEAT, then run your own server.').trim(),
     seoOgImage: (process.env.AIMEAT_SEO_OG_IMAGE ?? '/og-image.png').trim(),
     seoOrganizationName: (process.env.AIMEAT_SEO_ORGANIZATION_NAME ?? 'AIMEAT').trim(),
     // Empty resolves to the node's own base URL where it is rendered. It cannot default to

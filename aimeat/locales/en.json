@@ -4041,7 +4041,7 @@
     "sov1": "Your data stays on a server you control and stays with you, so your own certification is the one that counts.",
     "sov2": "Every action is logged: who read what, who authorised it, what it cost. The audit is a report, not a project.",
     "sov3": "Agents and apps work under named permissions you can take back with one click, and every action is attributed to whoever took it.",
-    "sov4": "The code is MIT licensed and readable. A closed competitor can only promise the same thing.",
+    "sov4": "The protocol and server software are available under the MIT license. That license does not require you to publish the applications or content you create.",
     "ctaAssessment": "Free: where is your AI right now? →"
   },
   "biz.trans1": "Article 50 of the EU AI Act has applied since 2 August 2026. What you get here is an EU-built, self-hostable platform where AI provenance is a primitive of the layer every app sits on: content a model produced carries a record of how it was made, a person reading it on the node’s own surfaces sees a label, and the operator’s legal identity and supervisory authority sit at a fixed machine-readable address your compliance officer can fetch without asking us. Content the node served can be checked by anyone, byte for byte, with no account.",
@@ -12641,7 +12641,7 @@
     "storeTitle2": "Get your own.",
     "storeText": "Everything you just tried is the showroom model. Your own AIMEAT is this whole site, on a domain that is yours. We keep it running and current for a monthly fee. And all of it is yours to use. Pretty sweet, right?",
     "storeLi1": "Every AI you use (Claude, ChatGPT, local models) under one roof, working from the same store of what you know.",
-    "storeLi2": "Your data is yours. Nobody takes it, rents it back, or reads over your shoulder.",
+    "storeLi2": "Your data and what you build remain yours. You decide whom to grant access.",
     "storeLi3": "Sell what you build: payments and agent-to-agent commerce are built in.",
     "storePerMonth": "a month",
     "storeCta": "Go to the store →",
@@ -12653,7 +12653,7 @@
     "trust3Title": "Consent you can take back",
     "trust3Text": "An agent reaches only what you gave it access to. One click pulls a permission, and it stays pulled.",
     "trust4Title": "GDPR as buttons",
-    "trust4Text": "Export and delete are buttons you press. Your data sits in Europe, under European rules.",
+    "trust4Text": "Export and deletion controls are available in your account. Where data is stored and AI processes it depends on the hosting and model you choose.",
     "trustEu": "Built in Finland, in the EU. The rules on this list are the ones we hold ourselves to.",
     "transCta": "How this node marks AI content →",
     "roomIncAlt": "A delighted scientist in a hatchery full of robot chicks hatching from glowing eggs",
@@ -12853,8 +12853,11 @@
     "wallTitle": "Built by people and their AI.",
     "wallCommunity": "These were built by people who came here with their own AI. Every one of them is proof from somebody we have never met.",
     "wallOwn": "And by us, here, every day.",
-    "linuxLabel": "Why the list below is checkable:",
-    "linuxText": "AIMEAT is the Linux of AI. The code is open, the server is yours and the rules are yours, so every item on the list is something to read for yourself rather than take on trust.",
+    "linuxLabel": "You own your data and your AI memory.",
+    "linuxText": "Run your own AIMEAT on a server in the EU or on your own machine. Your data and saved AI memory are stored there. You decide who can access them.",
+    "linuxAi": "Cloud AI processes the information you send to it, even when you use your own API key. A local model lets you keep AI processing on your own machine.",
+    "linuxContinuity": "The protocol and server software are open source under the MIT license. What you build remains yours. If we are sold or stop operating, you can continue running that software yourself with your data.",
+    "linuxBusiness": "AIMEAT for your business →",
     "closeWork": "AI & me at work.",
     "closeShop": "AI & me at the shop.",
     "closeSeven": "AI & me at 7 am.",
@@ -19569,8 +19572,8 @@
           "summary": "The apps published here, the ones other people built first and this site's own after them."
         },
         "frame-linux": {
-          "label": "Why the safety list is checkable",
-          "summary": "One line above the safety list: AIMEAT is the Linux of AI, open code, your server, your rules."
+          "label": "You own your data and your AI memory.",
+          "summary": "Run your own AIMEAT on a server in the EU or on your own machine. Your data and saved AI memory are stored there. You decide who can access them."
         },
         "frame-close": {
           "label": "Closing line",
