@@ -2979,7 +2979,7 @@
     "sov1": "Tus datos se quedan en un servidor que tú controlas y siguen siendo tuyos, así que la certificación que cuenta es la tuya.",
     "sov2": "Cada acción queda anotada: quién leyó qué, quién lo autorizó, qué costó. La auditoría es un informe, no un proyecto.",
     "sov3": "Los agentes y las aplicaciones trabajan con permisos que tienen nombre y que puedes retirar de un clic, y cada acción queda atribuida a quien la hizo.",
-    "sov4": "El código es MIT y se puede leer. Un competidor cerrado solo puede prometerte lo mismo.",
+    "sov4": "El protocolo y el software del servidor están disponibles bajo la licencia MIT. Esa licencia no te obliga a publicar las aplicaciones ni el contenido que creas.",
     "ctaAssessment": "Gratis: ¿en qué punto está tu IA? →"
   },
   "biz.trans1": "El artículo 50 del Reglamento de IA de la UE se aplica desde el 2 de agosto de 2026. Lo que tienes aquí es una plataforma hecha en la UE, autoalojable, en la que la procedencia de la IA es un elemento básico de la capa sobre la que se apoya cada aplicación: el contenido que produjo un modelo lleva un registro de cómo se hizo, quien lo lee en las superficies del propio nodo ve una etiqueta, y la identidad legal de quien opera y su autoridad de vigilancia están en una dirección fija legible por máquina que tu responsable de cumplimiento puede consultar sin preguntarnos. El contenido que sirvió el nodo lo puede comprobar cualquiera, byte a byte, sin necesidad de cuenta.",
@@ -10741,6 +10741,8 @@
     }
   },
   "landing": {
+    "storeLi2": "Tus datos y las aplicaciones que creas siguen siendo tuyos. Tú decides a quién dar acceso.",
+    "trust4Text": "Tu cuenta incluye funciones para exportar y eliminar datos. El lugar donde se guardan y donde la IA los procesa depende del alojamiento y del modelo que elijas.",
     "heroTitle": "Dueño o inquilino. ¿Cuál quieres ser?",
     "heroSub": "Tu memoria, tus agentes, tu balance. En una plataforma alquilada construyes una herramienta y la pagas. Aquí la herramienta puede cobrarle a otro, y además es tuya.",
     "askAiTitle": "Deja que tu propia IA te cuente qué es AIMEAT para ti",
@@ -11067,8 +11069,11 @@
     "wallTitle": "Construido por personas y su IA.",
     "wallCommunity": "Estas las construyeron personas que llegaron aquí con su propia IA. Cada una es una prueba de alguien a quien nunca hemos conocido.",
     "wallOwn": "Y nosotros, aquí, todos los días.",
-    "linuxLabel": "Por qué la lista de abajo se puede comprobar:",
-    "linuxText": "AIMEAT es el Linux de la IA. El código es abierto, el servidor es tuyo y las reglas son tuyas, así que cada punto de la lista se puede leer por cuenta propia en vez de creerlo.",
+    "linuxLabel": "Tus datos y la memoria de tu IA son tuyos.",
+    "linuxText": "Puedes usar tu propio AIMEAT en un servidor ubicado en la Unión Europea o en tu computadora. Allí se guardan tus datos y la memoria que conservas para tu IA. Tú decides quién puede acceder.",
+    "linuxAi": "La IA en la nube procesa la información que le envías, incluso si usas tu propia clave de API. Un modelo local te permite procesarla en tu computadora.",
+    "linuxContinuity": "El protocolo y el software del servidor son de código abierto bajo la licencia MIT. Lo que creas sigue siendo tuyo. Si vendemos la empresa o dejamos de operar, puedes seguir usando ese software por tu cuenta con tus datos.",
+    "linuxBusiness": "AIMEAT para tu empresa →",
     "closeWork": "AI & me at work.",
     "closeShop": "AI & me at the shop.",
     "closeSeven": "AI & me at 7 am.",
@@ -17432,8 +17437,8 @@
           "summary": "Las aplicaciones publicadas aquí, primero las que construyeron otras personas y después las de este sitio."
         },
         "frame-linux": {
-          "label": "Por qué la lista de seguridad se puede comprobar",
-          "summary": "Una línea sobre la lista de seguridad: AIMEAT es el Linux de la IA, código abierto, tu servidor, tus reglas."
+          "label": "Tus datos y la memoria de tu IA son tuyos.",
+          "summary": "Puedes usar tu propio AIMEAT en un servidor ubicado en la Unión Europea o en tu computadora. Allí se guardan tus datos y la memoria que conservas para tu IA. Tú decides quién puede acceder."
         },
         "frame-close": {
           "label": "Línea final",

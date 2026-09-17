@@ -14,6 +14,7 @@
  *   explained on first use.
  * @usage routed at /v1/business by spa.html
  * @version-history
+ *   2026-09-17 - TARGET-078: distinguish the MIT software from customer applications.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v2.2.0 — 2026-08-29 — The showroom face (design canvas "AIMEAT Index Pages"): the demo button
@@ -200,7 +201,7 @@ export default function Business({ navigate }) {
           <li>${tr('biz.sov1', 'Your data stays on a server you control. We do not see it and do not keep it, so your own certification is the one that counts.')}</li>
           <li>${tr('biz.sov2', 'Every action is logged: who read what, who authorised it, what it cost. The audit is a report, not a project.')}</li>
           <li>${tr('biz.sov3', 'Agents and apps work under named permissions you can take back with one click, and every action is attributed to whoever took it.')}</li>
-          <li>${tr('biz.sov4', 'The code is MIT licensed and readable. A closed competitor can only promise the same thing.')}</li>
+          <li>${tr('biz.sov4', 'The protocol and server software are available under the MIT license. That license does not require you to publish the applications or content you create.')}</li>
         </ul>
       </section>
 

@@ -24,6 +24,7 @@
  *   and falls back to this one. A new block, or a rewritten sentence, moves both: the locale key is
  *   what a Finnish operator actually reads.
  * @version-history
+ *   2026-09-17 - TARGET-078: describe the expanded ownership block.
  *   v1.3.0 — 2026-09-14 — Seven portal.frame-* blocks: the front page as the message frame says it
  *     (TARGET-075). The showroom blocks are untouched.
  *   v1.2.0 — 2026-09-12 — The summaries an operator reads say what the part is, in plain words.
@@ -409,7 +410,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'One line above the safety list: AIMEAT is the Linux of AI, open code, your server, your rules, so the list can be checked rather than believed.',
+        summary: 'Data and AI memory ownership, hosting choices, cloud AI processing limits, MIT-licensed protocol and server software, and a link to the business page.',
     },
     {
         id: 'portal.frame-close',
