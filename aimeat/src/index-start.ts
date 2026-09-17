@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-09-17 — A failed listen is reported and ends the process. Express 5 hands the
+ *     listen error to the same callback as success, and the banner used to print over it.
  *   v1.0.0 — 2026-07-13 — Extracted from index.ts (max-file-lines)
  */
 
@@ -60,7 +62,20 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     config.adminPassword = randomBytes(16).toString('base64url');
   }
   const { app, tunnelManager, connectTunnelManager, realtimeManager, storage } = await createServer(config, { envKeys, fileKeys, cliKeys, fileName });
-  const server = app.listen(config.port, () => {
+  const server = app.listen(config.port, (listenError?: Error) => {
+    // Express 5 calls this for the server's 'error' event too, not only for 'listening'. Without
+    // this check a node whose port was taken printed "AIMEAT node started", ran its schedulers and
+    // served nothing, and the error was lost: every "node never bound its port" failure of the
+    // nightly Postgres sweep from 2026-09-15 to 2026-09-17 was this. A node that cannot serve says
+    // why and stops, so whatever supervises it sees the failure at once.
+    if (listenError) {
+      const code = (listenError as NodeJS.ErrnoException).code;
+      logger.error(`AIMEAT node could not listen on port ${config.port}: ${code ?? ''} ${listenError.message}`.replace(/\s+/g, ' ').trim());
+      if (code === 'EADDRINUSE') {
+        logger.error(`Port ${config.port} is in use. Stop what holds it, or start this node with another port (--port or AIMEAT_PORT).`);
+      }
+      process.exit(1);
+    }
     // ── Node type banner ──
     const bannerLabel =
       config.federationRole === 'operator' ? 'GENESIS-OPERATOR NODE' :
