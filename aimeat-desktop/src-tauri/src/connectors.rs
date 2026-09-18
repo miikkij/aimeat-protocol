@@ -38,10 +38,15 @@ pub struct Connector {
     pub connected: bool,
     /// The AIMEAT endpoint it is attached to, when that is a different node.
     pub connected_url: Option<String>,
-    /// "file" — this app can write it · "manual" — the person pastes the snippet.
+    /// "file" — this app writes the tool's own config · "manual" — the person pastes the lines
+    /// into a file on this machine · "cloud" — the tool is attached in its own settings and
+    /// reaches the address from somewhere else, so there is nothing on this machine to read.
     pub method: String,
-    /// The config file, whether or not it exists yet.
+    /// The config file, whether or not it exists yet. None for a cloud tool.
     pub config_path: Option<String>,
+    /// True when the address the person gave answers only on this machine. It is what decides
+    /// whether a cloud tool can reach their AIMEAT at all.
+    pub address_is_local: bool,
 }
 
 /// What a client accepts, and where it keeps it.
@@ -52,9 +57,9 @@ struct ClientSpec {
     key: &'static str,
     /// Whether the entry carries `"type": "http"`. VS Code requires it, Cursor rejects it.
     with_type: bool,
-    /// False when this project has not verified the file shape: report, do not write.
-    writable: bool,
-    /// Why this one is attached by hand. It reaches a person only through the refusal below, as
+    /// How this tool is attached: see Connector::method.
+    method: &'static str,
+    /// Why this one is not written here. It reaches a person only through the refusal below, as
     /// a safety net; the words the screen shows are the frontend's, in the person's language.
     note: Option<&'static str>,
 }
@@ -65,23 +70,31 @@ const SPECS: &[ClientSpec] = &[
         name: "Claude Code",
         key: "mcpServers",
         with_type: true,
-        writable: true,
+        method: "file",
         note: None,
     },
+    // Claude Desktop takes a remote MCP server as a CUSTOM CONNECTOR, added in its own settings,
+    // on every plan including the free one. There is no file here to write and no bridge to build:
+    // "When you add a custom connector, Claude connects to your remote MCP server from Anthropic's
+    // cloud infrastructure, rather than from your local device", and "Servers hosted on a private
+    // corporate network, behind a VPN, or blocked by a firewall won't connect, even if you can
+    // reach them from your own machine" (support.claude.com article 11175166, read 2026-09-18).
+    // So this row's real question is not which file to edit; it is whether the person's AIMEAT
+    // answers from the internet at all, which is what `address_is_local` tells the screen.
     ClientSpec {
         id: "claude-desktop",
         name: "Claude Desktop",
         key: "mcpServers",
         with_type: true,
-        writable: false,
-        note: Some("Claude Desktop reads only a server that runs on this machine, so a remote node needs a small bridge beside it. Until that ships, attach the node in Claude Desktop's own connector settings."),
+        method: "cloud",
+        note: Some("Claude Desktop is attached in its own connector settings, and it reaches the address from Anthropic's cloud rather than from this machine."),
     },
     ClientSpec {
         id: "cursor",
         name: "Cursor",
         key: "mcpServers",
         with_type: false,
-        writable: true,
+        method: "file",
         note: None,
     },
     ClientSpec {
@@ -89,7 +102,7 @@ const SPECS: &[ClientSpec] = &[
         name: "VS Code",
         key: "servers",
         with_type: true,
-        writable: true,
+        method: "file",
         note: None,
     },
     ClientSpec {
@@ -97,8 +110,8 @@ const SPECS: &[ClientSpec] = &[
         name: "Codex",
         key: "mcp_servers",
         with_type: false,
-        writable: false,
-        note: Some("Codex keeps its servers in a TOML file. Paste the lines below into it; this app does not edit TOML yet."),
+        method: "manual",
+        note: Some("Codex keeps its servers in a TOML file, and a URL server also needs its client feature switched on. Paste the lines below into it; this app does not edit TOML yet."),
     },
 ];
 
@@ -189,6 +202,51 @@ fn is_installed(id: &str) -> bool {
 /// The MCP endpoint of a node, from the base URL a person typed.
 pub fn mcp_url(node_url: &str) -> String {
     format!("{}/v1/mcp", node_url.trim().trim_end_matches('/'))
+}
+
+/// Whether an address answers only on this machine or on a private network. A tool that reaches
+/// the address from somebody else's cloud cannot use one, however well it works in a browser here.
+/// A bare hostname with no dot counts: it resolves on a local network and nowhere else.
+pub fn is_local_address(node_url: &str) -> bool {
+    let rest = node_url
+        .trim()
+        .trim_start_matches("https://")
+        .trim_start_matches("http://");
+    let host = rest
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or("")
+        .rsplit('@')
+        .next()
+        .unwrap_or("")
+        .to_lowercase();
+    // Strip the port, but leave an IPv6 literal's colons alone.
+    let host = if host.starts_with('[') {
+        host.split(']').next().unwrap_or("").trim_start_matches('[').to_string()
+    } else {
+        host.split(':').next().unwrap_or("").to_string()
+    };
+    if host.is_empty() || host == "localhost" || host == "::1" || host.ends_with(".localhost") {
+        return true;
+    }
+    if host.ends_with(".local") || host.ends_with(".internal") || host.ends_with(".home") {
+        return true;
+    }
+    if !host.contains('.') {
+        return true;
+    }
+    let octets: Vec<&str> = host.split('.').collect();
+    if octets.len() == 4 && octets.iter().all(|o| o.parse::<u8>().is_ok()) {
+        let n: Vec<u8> = octets.iter().map(|o| o.parse::<u8>().unwrap()).collect();
+        return match (n[0], n[1]) {
+            (127, _) | (10, _) | (0, _) => true,
+            (192, 168) => true,
+            (169, 254) => true,
+            (172, b) if (16..=31).contains(&b) => true,
+            _ => false,
+        };
+    }
+    false
 }
 
 /// Whether a configured URL points at this node. Compared whole and case-insensitively, so
@@ -308,8 +366,13 @@ fn write_config(path: &Path, content: &str) -> Result<(), String> {
 // ── What the frontend calls ─────────────────────────────────────────────────
 
 /// Build one connector's current state.
+///
+/// A cloud tool keeps nothing on this machine, so there is no file to read and no honest way to
+/// say whether it is attached: that answer lives in the person's Claude account. It is reported
+/// as not connected and the screen says where to look, rather than inventing a state.
 fn read_connector(s: &ClientSpec, node_url: &str) -> Connector {
-    let path = config_path(s.id);
+    let cloud = s.method == "cloud";
+    let path = if cloud { None } else { config_path(s.id) };
     let text = path
         .as_ref()
         .and_then(|p| fs::read_to_string(p).ok())
@@ -327,8 +390,9 @@ fn read_connector(s: &ClientSpec, node_url: &str) -> Connector {
         installed: is_installed(s.id),
         connected,
         connected_url: if connected { None } else { other },
-        method: if s.writable { "file" } else { "manual" }.to_string(),
+        method: s.method.to_string(),
         config_path: path.map(|p| p.display().to_string()),
+        address_is_local: is_local_address(node_url),
     }
 }
 
@@ -346,7 +410,7 @@ pub fn connect_connector(
     name: Option<String>,
 ) -> Result<Connector, String> {
     let s = spec(&id).ok_or_else(|| format!("Unknown tool: {}", id))?;
-    if !s.writable {
+    if s.method != "file" {
         return Err(s
             .note
             .unwrap_or("This tool is attached by hand.")
@@ -374,7 +438,7 @@ pub fn disconnect_connector(
     name: Option<String>,
 ) -> Result<Connector, String> {
     let s = spec(&id).ok_or_else(|| format!("Unknown tool: {}", id))?;
-    if !s.writable {
+    if s.method != "file" {
         return Err(s
             .note
             .unwrap_or("This tool is attached by hand.")
@@ -393,7 +457,8 @@ pub fn disconnect_connector(
     Ok(read_connector(s, &node_url))
 }
 
-/// The lines a person pastes into a tool this app does not edit.
+/// What a person copies for a tool this app does not write: the address itself for a cloud tool,
+/// and the lines to paste for the others.
 #[tauri::command]
 pub fn connector_snippet(
     id: String,
@@ -403,9 +468,18 @@ pub fn connector_snippet(
     let s = spec(&id).ok_or_else(|| format!("Unknown tool: {}", id))?;
     let name = server_name(name);
     let url = mcp_url(&node_url);
+    // A custom connector asks for one address in a form. Anything else copied into that field is
+    // a mistake the person then has to find.
+    if s.method == "cloud" {
+        return Ok(url);
+    }
     if s.id == "codex" {
+        // The URL entry does nothing on its own: Codex reaches an HTTP server through its RMCP
+        // client, which is behind a feature switch. Newer builds spell it `[features] rmcp_client`
+        // and older ones `experimental_use_rmcp_client`, so both lines are given and the extra one
+        // is ignored by whichever build reads it.
         return Ok(format!(
-            "[mcp_servers.{}]\nurl = \"{}\"\n",
+            "experimental_use_rmcp_client = true\n\n[features]\nrmcp_client = true\n\n[mcp_servers.{}]\nurl = \"{}\"\n",
             name, url
         ));
     }
@@ -529,15 +603,78 @@ mod tests {
         assert!(cursor.contains("\"mcpServers\""));
         assert!(!cursor.contains("\"type\""));
 
+        // Codex needs its RMCP client switched on, under either spelling, or the url is ignored.
         let codex = connector_snippet("codex".into(), "https://aimeat.io".into(), None).unwrap();
-        assert_eq!(codex, "[mcp_servers.aimeat]\nurl = \"https://aimeat.io/v1/mcp\"\n");
+        assert!(codex.contains("experimental_use_rmcp_client = true"));
+        assert!(codex.contains("rmcp_client = true"));
+        assert!(codex.contains("[mcp_servers.aimeat]"));
+        assert!(codex.contains("url = \"https://aimeat.io/v1/mcp\""));
+    }
+
+    #[test]
+    fn a_cloud_tool_copies_the_address_and_nothing_else() {
+        // Its settings ask for one address in a form; a JSON block pasted there is a mistake the
+        // person then has to find.
+        let desktop =
+            connector_snippet("claude-desktop".into(), "https://aimeat.io".into(), None).unwrap();
+        assert_eq!(desktop, "https://aimeat.io/v1/mcp");
     }
 
     #[test]
     fn a_tool_this_app_does_not_edit_is_refused_with_its_reason() {
         let err = connect_connector("claude-desktop".into(), "https://aimeat.io".into(), None)
             .unwrap_err();
-        assert!(err.contains("bridge"));
+        assert!(err.contains("own connector settings"));
+        let err = disconnect_connector("codex".into(), "https://aimeat.io".into(), None)
+            .unwrap_err();
+        assert!(err.contains("TOML"));
+    }
+
+    #[test]
+    fn a_cloud_tool_has_no_file_on_this_machine() {
+        let list = detect_connectors("https://aimeat.io".to_string()).unwrap();
+        let desktop = list.iter().find(|c| c.id == "claude-desktop").unwrap();
+        assert_eq!(desktop.method, "cloud");
+        assert!(desktop.config_path.is_none());
+        assert!(!desktop.connected);
+        let code = list.iter().find(|c| c.id == "claude-code").unwrap();
+        assert_eq!(code.method, "file");
+        assert!(code.config_path.is_some());
+    }
+
+    #[test]
+    fn an_address_only_this_machine_answers_is_named_as_one() {
+        for local in [
+            "http://localhost:41050",
+            "http://127.0.0.1:41050",
+            "https://LOCALHOST",
+            "http://192.168.1.20:41050",
+            "http://10.0.0.5",
+            "http://172.16.4.4",
+            "http://172.31.0.1",
+            "http://169.254.1.1",
+            "https://desktop.local",
+            "https://aimeat",
+            "http://[::1]:41050",
+        ] {
+            assert!(is_local_address(local), "{} should read as local", local);
+        }
+        for public in [
+            "https://aimeat.io",
+            "https://node.example.com/",
+            "https://172.32.0.1",
+            "https://8.8.8.8",
+        ] {
+            assert!(!is_local_address(public), "{} should read as public", public);
+        }
+    }
+
+    #[test]
+    fn the_local_address_travels_with_every_tool() {
+        let list = detect_connectors("http://localhost:41050".to_string()).unwrap();
+        assert!(list.iter().all(|c| c.address_is_local));
+        let list = detect_connectors("https://aimeat.io".to_string()).unwrap();
+        assert!(list.iter().all(|c| !c.address_is_local));
     }
 
     #[test]
