@@ -187,8 +187,12 @@ auto-trigger via Claude's native skill discovery.
 - **`aimeat_workspace_overview` includes a "Skills (loadable expertise)" table** with
   ready-to-copy `ws:` refs — an AI connected to a workspace sees available expertise in the
   same single map read it already does, no extra calls.
-- 7 seeded node runbooks teach node/profile management (`aimeat-node-operations`,
-  `manage-my-agents`, `configure-routing`, …) — list them with `aimeat_skill_list`.
+- The node seeds its built-in skills from `src/data/builtin-skills*.ts` on every boot: runbooks for
+  node and profile management (`aimeat-node-operations`, `manage-my-agents`, `configure-routing`, …),
+  the app builders, the game skills, and the conversation skills that steer the node's own chat
+  (`aimeat-first-conversation`, `aimeat-welcome-pages`, `aimeat-paying-for-the-ai`, …). An
+  unedited copy follows the repo; a copy edited on the node is kept. List them with
+  `aimeat_skill_list`.
 
 ## Security
 

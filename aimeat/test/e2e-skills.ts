@@ -805,6 +805,23 @@ await test('27b2. seeded aimeat-node-guide serves anonymously and its bytes hash
     assert(body.includes('handbook'), 'guide covers handbooks');
 });
 
+// The six conversation skills existed only as hand-published skills on aimeat.io until 2026-09-18,
+// so a fresh node had the chat and none of the guidance that steers it. They were moved in byte for
+// byte, and the digest below is the one aimeat.io published that day: equal bytes is what lets that
+// node ADOPT its own copies instead of keeping them as unknown (services/skill-seeds.ts).
+await test('27b2b. a fresh node carries the six conversation skills, byte-identical to what aimeat.io served', async () => {
+    const idx = await (await rawFetch('/.well-known/agent-skills/index.json')).json() as any;
+    const names = ['aimeat-first-conversation', 'aimeat-welcome-pages', 'aimeat-activating-a-person',
+        'aimeat-offering-choices', 'aimeat-paying-for-the-ai', 'aimeat-mail-to-data'];
+    for (const n of names) assert(idx.skills.some((s: any) => s.name === n), `${n} is not on a fresh node`);
+    const first = idx.skills.find((s: any) => s.name === 'aimeat-first-conversation');
+    assert(first.digest === 'sha256:3a67c66d0f38235c0c7a460c88fc78a8bc83dac87c6a300e0fb2e99b2e129a6e',
+        `aimeat-first-conversation is not the text aimeat.io published: ${first.digest}`);
+    const res = await rawFetch('/.well-known/agent-skills/aimeat-welcome-pages/SKILL.md');
+    assert(res.status === 200, `a moved skill serves anonymously, got ${res.status}`);
+    assert((await res.text()).includes('aimeat_portfolio_publish'), 'and it is the welcome-page skill');
+});
+
 await test('27b3. seeded aimeat-app-builder is public and serves the paved-path workflow', async () => {
     const idxRes = await rawFetch('/.well-known/agent-skills/index.json');
     const idx = await idxRes.json() as any;
