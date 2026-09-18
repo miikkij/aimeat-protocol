@@ -6808,8 +6808,9 @@ paths:
   /v1/auth/challenge:
     get:
       operationId: getChallenge
-      summary: Get signing challenge
-      description: Returns a nonce to sign with Ed25519 key. Used for both JWT token acquisition and Tier 0.5 OTK sessions.
+      summary: Get signing challenge (legacy)
+      description: Returns a nonce for the legacy Ed25519 owner-key login (RFC Core §9). `POST /v1/auth/token` signs a timestamp and does not consume this nonce, and the Tier 0.5 OTK sessions that also used it were removed on 2026-08-23. Kept mounted for older clients.
+      deprecated: true
       tags: [Auth]
       parameters:
         - name: owner
@@ -6840,8 +6841,18 @@ paths:
   /v1/auth/token:
     post:
       operationId: getToken
-      summary: Get JWT session token
-      description: Sign the challenge with Ed25519 key, receive JWT for Tier 1+ operations.
+      summary: Mint a JWT by Ed25519 signature
+      description: |
+        Two callers share this endpoint, told apart by which identity field is sent.
+
+        With `gaii`, an AGENT renews its own token: it signs `gaii + timestamp` with the key it
+        received from device authorization. This is the sanctioned renewal path (RFC Core §6.2,
+        step 6). On every mint the node checks that the agent still exists and that its owner's
+        account is active, and it issues the scopes as the owner has them set at that moment.
+
+        With `owner`, an owner logs in with an older Ed25519 key, signing
+        `owner + node id + timestamp`. That form is the legacy owner-key login (RFC Core §9);
+        password login at `POST /v1/ghii/login` is the one to use.
       tags: [Auth]
       security:
         - SignatureAuth: []
@@ -6851,18 +6862,21 @@ paths:
           application/json:
             schema:
               type: object
-              required: [owner, challenge, signature]
+              required: [timestamp, signature]
               properties:
+                gaii:
+                  type: string
+                  description: The agent's GAII. Send this OR `owner`.
                 owner:
                   type: string
-                challenge:
+                  description: The owner's name, for the legacy owner-key login. Send this OR `gaii`.
+                timestamp:
                   type: string
+                  format: date-time
+                  description: Current time, ISO 8601. The node refuses a stale or future timestamp.
                 signature:
                   type: string
-                  description: Ed25519 signature (base64)
-                agent:
-                  type: string
-                  description: Agent name (if requesting agent-level token)
+                  description: Ed25519 signature (base64) over `gaii + timestamp`, or over `owner + node id + timestamp`.
       responses:
         '200':
           description: JWT session token

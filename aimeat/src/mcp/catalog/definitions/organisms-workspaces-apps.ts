@@ -5,6 +5,8 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.7.2 — 2026-09-18 — Two descriptions sent an agent to aimeat_workspace_write_draft, which is
+ *     not a tool; the tool is aimeat_workspace_write. Instruction review.
  *   v1.7.1 — 2026-09-13 — aimeat_app_publish declares cortex_agents, which the node's tool has taken
  *     since 2026-07-16 and no other surface did.
  *   v1.7.0 — 2026-09-06 — workspace_access.action/decision/role, workspace_member_grant.role and
@@ -338,7 +340,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_object_delete',
-        description: 'Permanently remove ONE object (record or document) from a workspace — its draft, its published .latest, and all .version.N history — and unfile it from any document section. Use this to retract a mistake or clean up a duplicate. Irreversible; member-only. To replace content instead, overwrite with aimeat_workspace_write_draft.',
+        description: 'Permanently remove ONE object (record or document) from a workspace — its draft, its published .latest, and all .version.N history — and unfile it from any document section. Use this to retract a mistake or clean up a duplicate. Irreversible; member-only. To replace content instead, overwrite with aimeat_workspace_write.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -408,7 +410,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_create',
-        description: 'Create a new WORKSPACE inside an organism from a CUSTOM MANIFEST you supply — its objectTypes (each a records space with a JSON schema, or a document/wiki space) plus the per-namespace schemas. Registers it, locks the schemas, writes the manifest + readme. This is how an agent bootstraps a structured space; then fill it with aimeat_workspace_write_draft / _add_document and publish. Member-only.',
+        description: 'Create a new WORKSPACE inside an organism from a CUSTOM MANIFEST you supply — its objectTypes (each a records space with a JSON schema, or a document/wiki space) plus the per-namespace schemas. Registers it, locks the schemas, writes the manifest + readme. This is how an agent bootstraps a structured space; then fill it with aimeat_workspace_write (records and documents alike) and publish with aimeat_workspace_publish. Member-only.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

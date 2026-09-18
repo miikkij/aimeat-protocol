@@ -328,8 +328,12 @@ async function main() {
             const args: string[] = (entry.arguments ?? []).map((a: any) => a.name);
             // node_url and node_id are things the session knows, so the person is never asked.
             assert(!args.includes('node_url') && !args.includes('node_id'), `node-known variables stay off the form; got ${args.join(', ')}`);
-            assert(args.includes('agent_count') && args.includes('action_count'), `the rest are offered as arguments; got ${args.join(', ')}`);
-            assert(args.includes('language'), `language is offered so a Finnish body can be asked for; got ${args.join(', ')}`);
+            // Until 2026-09-18 this also asserted agent_count and action_count as offered arguments.
+            // The prompt became a short pointer to /v1/prompts/build-app and no longer declares them
+            // (instruction review: it taught a registration contract that never existed), and no
+            // pickable seed declares a variable the node cannot fill, so that half has no subject.
+            assert(!args.includes('agent_count') && !args.includes('action_count'), `the pointer prompt asks the person for nothing but a language; got ${args.join(', ')}`);
+            assert(args.includes('language'),`language is offered so a Finnish body can be asked for; got ${args.join(', ')}`);
         });
 
         await test('9. prompts/get returns the body with the node values already substituted', async () => {

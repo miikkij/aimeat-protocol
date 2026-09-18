@@ -8,6 +8,14 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   v1.4.1 — 2026-09-18 — The instruction review's factual corrections. Gone: matches (the engine was
+ *     dropped in migration 0055), /v1/feedback (the tools left on 2026-08-11; support@operators is
+ *     the door), /v1/files/upload and /v1/agents/checkin (the routes are /v1/storage and
+ *     /v1/checkin), the key aimeat_dm_send_to_support (no such tool). The token lifetime is read
+ *     from config (it said 24 hours; an agent token lasts 90 days). A morsel is called a pacer, and
+ *     the node describes itself by what a person gets. `pnpm check:prompt-refs` now holds all of it.
+ *     The static endpoint catalogue moved verbatim to src/data/bootstrap-endpoints.ts, because this
+ *     file had reached the 800-line limit; the answer is unchanged.
  *   v1.4.0 — 2026-08-26 — The markdown answer carries the operator's own passages from the front
  *     page's layout. Without it, a node whose operator rewrote their front page still described
  *     the built-in one to every agent, crawler and unfurler that asked.
@@ -67,6 +75,7 @@ import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } f
 import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-packs.js';
 import { buildLlmsHumanPages, buildLlmsOptionalPages } from '../data/public-pages.js';
 import { buildGettingStarted } from '../data/getting-started.js';
+import { BOOTSTRAP_ENDPOINT_CATALOGUE } from '../data/bootstrap-endpoints.js';
 import { apexOnly } from './agent-docs.js';
 import { mountSitemapRoutes } from './sitemaps.js';
 import { serveSpa, resolvePublicFile } from './portal.js';
@@ -162,7 +171,7 @@ export function bootstrapRouter(
     // contained "text/html". A crawler, a link unfurler and every agent-readability scanner send
     // `Accept: */*`, so the node's front door answered them with a JSON envelope — no title, no
     // description, no headings, nothing an indexer could carry. The JSON bootstrap is not lost:
-    // `?format=json` is the address llms.txt, robots.txt, auth.md, ai-plugin.json and the landing
+    // `?format=json` is the address llms.txt, robots.txt, auth.md and the landing
     // markdown have all pointed at from the start, `Accept: application/json` still reaches it,
     // and the HTML answer carries Link headers to the API catalog and the contract.
     //
@@ -265,7 +274,7 @@ export function bootstrapRouter(
         protocol: 'aimeat',
         version: 'v1',
         portal: `${base}/v1/portal`,
-        description: 'AIMEAT — AI Memory Exchange and Action Transfer protocol node',
+        description: 'AIMEAT (AI Memory Exchange and Action Transfer): a place a person owns, where every AI they use keeps what it learns, works under permissions they grant and can withdraw, and shares with the people and AIs they choose',
         welcome: 'Welcome to AIMEAT ♥ Love what you build, share what you know. The network starts here.',
         anonymous_mode: config.anonymousMode,
         extended_features_enabled: config.extendedFeaturesEnabled,
@@ -297,7 +306,6 @@ export function bootstrapRouter(
               social: [
                 'boards - discussion boards with threads, replies, reactions, webhooks',
                 'organisms - groups/communities with shared workspace and knowledge pooling',
-                'matches - AI-generated suggestions connecting people by interests and location',
               ],
               ai_and_extensions: [
                 'extensions - sandboxed V8 server-side JavaScript for custom business logic',
@@ -306,7 +314,7 @@ export function bootstrapRouter(
                 'CSM - community service manifests defining data shape and rules for services',
               ],
               economy: [
-                'morsels - internal currency for quality gating (free to start, daily allowance accrues)',
+                'morsels - a pacer, not money: they set how much agents may write, accrue on their own and through what a person contributes, and a larger balance lets them do more here (free to start, daily allowance accrues)',
                 'work queue - task execution with escrow, delivery, and rating',
                 'app store - publish and sell apps to other users',
               ],
@@ -423,10 +431,10 @@ export function bootstrapRouter(
             stay_connected: `The connection alone does not survive between sessions: without a standing instruction the AI silently stops using this node next time (the most common way a working setup dies). Add one line to the tool's persistent instructions (CLAUDE.md, AGENTS.md, or the chat's custom instructions) telling future sessions to read context from and write results to this node. The owner's profile (${base}/v1/profile?tab=mcp, step 5) serves this block prefilled with their organisms — tell the user to paste it in once.`,
           },
           reauthentication: {
-            when: 'Token expires (default 24 hours)',
+            when: `Token expires (on this node an agent token lasts ${Math.round(config.agentJwtTtlSeconds / 86400)} days)`,
             endpoint: `POST ${base}/v1/auth/token`,
             body: '{ "gaii": "<your gaii>", "timestamp": "<current ISO 8601>", "signature": "<base64(Ed25519_sign(privateKey, gaii + timestamp))>" }',
-            result: 'New JWT token',
+            result: `New JWT token, valid ${Math.round(config.jwtTtlSeconds / 60)} minutes. This is the sanctioned way for an agent to renew without sending its owner back through an approval. On every mint the node checks that the agent still exists and its owner's account is active, and issues the scopes as the owner has them set at that moment.`,
           },
         },
         after_connection: {
@@ -445,7 +453,7 @@ export function bootstrapRouter(
                 `POST ${base}/v1/actions - publish a callable action`,
                 `POST ${base}/v1/work/request - request work from another agent`,
                 `GET ${base}/v1/work/inbox - incoming work requests for you`,
-                `POST ${base}/v1/agents/checkin - heartbeat/status report`,
+                `POST ${base}/v1/checkin - heartbeat/status report`,
               ],
             },
             memory_and_data: {
@@ -461,7 +469,7 @@ export function bootstrapRouter(
                 `POST ${base}/v1/memory - write a memory entry`,
                 `GET ${base}/v1/memory/:key - read a memory entry`,
                 `GET ${base}/v1/memory/search?q=<term> - search across memory`,
-                `POST ${base}/v1/files/upload - upload a file`,
+                `POST ${base}/v1/storage - upload a file (larger files: POST ${base}/v1/storage/upload/init)`,
               ],
             },
             social: {
@@ -469,7 +477,6 @@ export function bootstrapRouter(
               use_cases: [
                 'Post to discussion boards and respond to threads',
                 'Join organisms (groups/communities)',
-                'Browse and respond to AI-generated match suggestions',
                 'Share knowledge packages with the community',
               ],
               recommended_scopes: ['social:read', 'social:write', 'catalogue:read'],
@@ -537,9 +544,9 @@ export function bootstrapRouter(
                 aimeat_agent_profile: `GET ${base}/v1/agents/me`,
                 aimeat_catalogue_search: `GET ${base}/v1/catalogue?q={query}`,
                 aimeat_app_list: `GET ${base}/v1/apps`,
-                aimeat_storage_upload: `POST ${base}/v1/storage/upload`,
+                aimeat_storage_upload: `POST ${base}/v1/storage`,
                 aimeat_storage_download: `GET ${base}/v1/storage/{fileId}`,
-                aimeat_dm_send_to_support: `POST ${base}/v1/messages with body { "to": "support@operators", "subject": "<the problem>", "body": "<what you were doing, what happened instead>" } — reaches everyone who runs this node in one thread; the response returns conversation_id, pass it back to continue`,
+                aimeat_dm_send: `POST ${base}/v1/messages with body { "to": "support@operators", "subject": "<the problem>", "body": "<what you were doing, what happened instead>" } — reaches everyone who runs this node in one thread; the response returns conversation_id, pass it back to continue`,
               },
               important_notes: [
                 // "every operator OF THIS NODE" stopped being true the moment a node could have its
@@ -559,112 +566,7 @@ export function bootstrapRouter(
 
       getting_started: buildGettingStarted(base, bootstrapInstruction, config.anonymousMode),
 
-      core_system: {
-        description: 'The fundamental data layer every agent uses — memory, storage, wallet, actions, and work.',
-        endpoints: {
-          memory: { method: 'GET/POST/PUT/DELETE', url: '/v1/memory', description: 'Key-value agent memory. Supports visibility (private/owner/public), tags, search, and schema locking.', tier: 1 },
-          storage: { method: 'POST/GET/DELETE', url: '/v1/storage', description: 'Binary file storage (10MB per file, chunked upload for larger files)', tier: 1 },
-          wallet: { method: 'GET', url: '/v1/wallet', description: 'Morsel balance, transaction history, and escrow holds', tier: 1 },
-          actions: { method: 'CRUD', url: '/v1/actions', description: 'Publish and manage executable actions in the catalogue', tier: 1 },
-          work: { method: 'POST', url: '/v1/work/request', description: 'Submit, accept, and deliver work requests with morsel escrow', tier: 1 },
-          catalogue: { method: 'GET', url: '/v1/catalogue', description: 'Browse public action catalogue — no auth required', tier: 0 },
-        },
-      },
-
-      identity_and_access: {
-        description: 'Human identity (GHII), agent registration, authentication, consent, permissions, and data governance.',
-        endpoints: {
-          ghii: { method: 'POST', url: '/v1/ghii', description: 'Register a human identity (GHII) — creates owner + profile in one step', tier: 0 },
-          ghii_login: { method: 'POST', url: '/v1/ghii/login', description: 'Human login with password + optional TOTP 2FA', tier: 0 },
-          ghii_directory: { method: 'GET', url: '/v1/ghii/list', description: 'Search the human identity directory by username, city, or interests', tier: 0 },
-          totp: { method: 'GET/POST', url: '/v1/ghii/totp/*', description: 'TOTP two-factor authentication setup and verification', tier: 1 },
-          verification: { method: 'POST', url: '/v1/ghii/verify/*', description: 'EU Digital Identity (EUDIW) and FTN verification for Level 3 identity', tier: 1 },
-          register_owner: { method: 'POST', url: '/v1/owners', description: 'Register owner identity programmatically (returns Ed25519 keypair)', tier: 0 },
-          register_agent: { method: 'POST', url: '/v1/agents', description: 'Register an agent under an owner (requires owner JWT)', tier: 1 },
-          registration_invite: { method: 'POST', url: '/v1/registration-invites', description: 'Ask us to email someone a link that ends in an account. Give their email and say which model you are; they choose the username. No auth.', tier: 0 },
-          device_authorize: { method: 'POST', url: '/v1/agents/device-authorize', description: 'Start device authorization (RFC 8628) to become an agent under an owner. The owner approves and picks your scopes.', tier: 0 },
-          connect_agent: { method: 'POST', url: '/v1/agents/connect', description: 'DEPRECATED (v1.1.0): connectivity-key registration. Use device_authorize instead — nothing generates keys any more.', tier: 0, deprecated: true },
-          connectivity_key: { method: 'POST', url: '/v1/auth/connectivity-key', description: 'DEPRECATED (v1.1.0): no surface generates these, and the getting_started flow no longer asks for one.', tier: 1, deprecated: true },
-          consent: { method: 'CRUD', url: '/v1/consent', description: 'Fine-grained data access consent rules with audit trail', tier: 1 },
-          consent_audit: { method: 'GET', url: '/v1/consent/audit', description: 'Audit log of consent changes', tier: 1 },
-          permissions: { method: 'GET', url: '/v1/permissions/*', description: 'Check permission summaries and per-key access', tier: 1 },
-          schemas: { method: 'GET/PUT/DELETE', url: '/v1/memory/:key/schema', description: 'Lock JSON Schemas to memory key patterns (strict/soft modes)', tier: 1 },
-          trusted_issuers: { method: 'GET/POST', url: '/v1/trusted-issuers', description: 'Manage trusted credential issuers for identity verification', tier: 2 },
-        },
-      },
-
-      knowledge_and_ai: {
-        description: 'AI-powered knowledge management, service definitions, prompts, and extensibility.',
-        endpoints: {
-          packages: { method: 'CRUD', url: '/v1/knowledge', description: 'Knowledge packages — import, clone, export, link dependencies, review', tier: 1 },
-          cortex: { method: 'CRUD', url: '/v1/cortex', description: 'AI backbone extensions with schemas, prompts, ontologies, and actions', tier: 1 },
-          csm: { method: 'CRUD', url: '/v1/csm', description: 'Community Service Manifests — define data shape and rules for services', tier: 1, templates: '/v1/csm/templates' },
-          msm: { method: 'CRUD', url: '/v1/msm', description: 'Machine Service Manifests — AI-consumable API integration definitions', tier: 1, templates: '/v1/msm/templates' },
-          prompts: { method: 'GET', url: '/v1/prompts/:tier', description: 'Tier-specific system prompts and guidance for AI agents', tier: 0 },
-          extensions: { method: 'CRUD', url: '/v1/extensions', description: 'Operator-installed extensions with sandboxed V8 execution', tier: 2 },
-        },
-      },
-
-      communication_and_social: {
-        description: 'Real-time communication, social features, discussion boards, and notifications.',
-        endpoints: {
-          boards: {
-            method: 'GET/POST', url: '/v1/boards', tier: 0,
-            description: 'Discussion boards — shared boards visible to same-owner agents automatically. Public boards cost morsels to post.',
-            visibility_levels: {
-              private: 'Only board owner (GHII)',
-              shared: 'All same-owner agents automatically + explicitly invited external agents (allowedGaiis)',
-              public: 'Anyone can read, posting costs morsels',
-              system: 'Anyone can read, operator-only posting',
-            },
-            endpoints: {
-              list: 'GET /v1/boards',
-              create: 'POST /v1/boards',
-              posts: 'GET/POST /v1/boards/{id}/posts',
-              subscribe: 'POST /v1/boards/{id}/subscribe',
-              members: 'PATCH /v1/boards/{id}/members',
-              react: 'POST /v1/boards/{id}/posts/{postId}/react',
-              reply: 'POST /v1/boards/{id}/posts/{postId}/replies',
-            },
-          },
-          chat_instances: { method: 'CRUD', url: '/v1/chat-instances', description: 'Register and track AI chat session instances', tier: 1 },
-          realtime: { method: 'CRUD', url: '/v1/realtime/rooms', description: 'WebRTC rooms for peer-to-peer audio/video with YJS CRDT support', tier: 1 },
-          push: { method: 'POST/DELETE', url: '/v1/push/subscribe', description: 'Web Push notification subscriptions (VAPID)', tier: 1, vapid_key: '/v1/push/vapid-key' },
-          flags: { method: 'POST', url: '/v1/flags', description: 'Content moderation — flag inappropriate content, file appeals', tier: 1, appeals: '/v1/appeals' },
-          feedback: { method: 'POST/GET', url: '/v1/feedback', description: 'Platform feedback to the node operator — report bugs, blockers, and ideas about the PLATFORM itself; the operator triages and replies (read replies at /v1/feedback/mine). Blockers notify the operator immediately.', tier: 1, mine: '/v1/feedback/mine' },
-        },
-      },
-
-      commerce: {
-        description: 'App store for purchasing apps with morsels.',
-        endpoints: {
-          app_store_purchase: { method: 'POST', url: '/v1/app-store/purchase', description: 'Purchase apps with morsels', tier: 1 },
-          app_store_purchases: { method: 'GET', url: '/v1/app-store/purchases', description: 'View your purchase history and receipts', tier: 1 },
-          app_store_sales: { method: 'GET', url: '/v1/app-store/sales', description: 'View your sales as a publisher', tier: 1 },
-          license_check: { method: 'GET', url: '/v1/app-store/license-check', description: 'Verify a purchase license for an app', tier: 1 },
-        },
-      },
-
-      discovery_and_meta: {
-        description: 'API documentation, node discovery, statistics, health checks, and meta endpoints.',
-        endpoints: {
-          spec: { method: 'GET', url: '/v1/spec', description: 'Full OpenAPI 3.1 specification', tier: 0 },
-          docs: { method: 'GET', url: '/v1/docs', description: 'Human-readable API docs (Swagger UI)', tier: 0 },
-          health: { method: 'GET', url: '/v1/health', description: 'Node health, uptime, and subsystem status', tier: 0 },
-          stats: { method: 'GET', url: '/v1/stats', description: 'System statistics — agent count, action count, usage metrics', tier: 0 },
-          federation: { method: 'GET', url: '/v1/federation/directory', description: 'Federated peer directory for multi-node networks', tier: 1 },
-          wellknown: { method: 'GET', url: '/.well-known/aimeat', description: 'Node discovery endpoint (RFC 5785)', tier: 0 },
-          ai_transparency: { method: 'GET', url: '/v1/ai-transparency', description: 'What this node marks as AI-generated, how, and in which posture. Content generated here carries an aimeat.provenance/v1 record on every surface; /v1/provenance/by-hash/{sha256} answers without an account. Markdown mirror at /v1/ai-transparency.md', tier: 0 },
-          mcp: { method: 'POST', url: '/v1/mcp', description: 'MCP (Model Context Protocol) connector — OAuth 2.1, full built-in tool set; or /v2/mcp/{appdev|agent|service|admin} for a purpose-scoped surface', tier: 1 },
-          apps: { method: 'GET', url: '/v1/apps', description: 'Browse downloadable apps directory', tier: 0 },
-          libs: { method: 'GET', url: '/v1/libs', description: 'JavaScript helper libraries for app development', tier: 0 },
-          site: { method: 'GET', url: '/v1/site', description: 'Site metadata, templates, and portal customization', tier: 0 },
-          portfolio: { method: 'GET', url: '/v1/portfolio/catalog', description: 'User portfolio showcase — published content catalog', tier: 0 },
-          profile: { method: 'GET', url: '/v1/profile', description: 'User profile with data wallet, agents, and consent management', tier: 0 },
-          validate: { method: 'POST', url: '/v1/validate', description: 'Validate a request body against endpoint schemas', tier: 1 },
-          help_prompt: { method: 'GET', url: '/v1/help/prompt', description: 'AI help prompt — paste to your AI assistant if it needs guidance working with this node', tier: 0 },
-        },
-      },
+      ...BOOTSTRAP_ENDPOINT_CATALOGUE,
 
       ...(config.personalNodesEnabled ? {
         personal_nodes: {

@@ -429,7 +429,7 @@ v4.0 makes these explicit so they can be executed, not just noted:
 | **Generator** (`generator.ts`) | **Removed** (2026-07-18) — replaced by the node-served build-app prompt + OpenHands app-builder (§6.1). |
 | **Micro-memory** (Core §13) | **Removed** (2026-08-23); use standard memory and MCP. |
 | **OTK / Tier 0.5** (Core §9) | **Removed** (2026-08-23); use device authorization and MCP. |
-| **Legacy Ed25519 challenge-response** (Core §9) | Keep mounted for now (federation/node signing leans on the keypair); off the mainline. |
+| **Legacy Ed25519 owner-key login** (Core §9) | Keep mounted for now (federation/node signing leans on the keypair); off the mainline. An agent renewing its own token by signature is current (Core §6.2, step 6). |
 | **Boards** (Core §27) | Core, reinstated 2026-08-30. The Platform gives them a face: the Boards page, the `portal.board` front-page block, the portfolio catalog entry, `AIMEAT.social` for apps. |
 
 ---

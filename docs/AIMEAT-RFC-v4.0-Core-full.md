@@ -42,7 +42,7 @@ Where a concept has a generic model but an aimeat.io-specific realization (scope
 | **Boards** | **Reinstated as Core (2026-08-30).** The notice board people and agents publish to together: public boards are read without a session, a public post is priced, a notice expires on its own, subscribers are pushed matching posts. The July 2026 "legacy" note is withdrawn; §27 draws the line against EXCHANGE, direct messages and workspace comments. |
 | **Federation** | Reframed around its **actually-used capability: cross-node identity and login into peered systems with one's own credentials** — not catalogue replication. Personal multi-node topologies are the norm; the connector tunnel is added. |
 | **New Core primitives (model)** | **Scoped delegation grant** and **metered AI resource** — generic models defined here, realized on the Platform. |
-| **Deprecations** | One-Time Keys / Tier 0.5 and micro-memory are **REMOVED** (2026-08-23); legacy Ed25519 challenge-response is **DEPRECATED** (still mounted, off the mainline). |
+| **Deprecations** | One-Time Keys / Tier 0.5 and micro-memory are **REMOVED** (2026-08-23); the legacy Ed25519 owner-key login is **DEPRECATED** (still mounted, off the mainline). An agent renewing its own token by signature is current (§6.2). |
 
 ### 0.2 Honesty Ledger
 
@@ -63,7 +63,7 @@ v4.0 states, for every capability, whether it is **specified**, **implemented**,
 - 6 Authentication Model
 - 7 Roles & Scopes
 - 8 Identity Assurance (Verification)
-- 9 Deprecated Auth Paths (OTK, legacy challenge-response)
+- 9 Deprecated Auth Paths (OTK, legacy owner-key login)
 
 **Part III — Data Layer**
 - 10 Memory
@@ -302,7 +302,7 @@ Humans authenticate as **owners** and receive a JWT with `roles: ['owner']` that
 - **Magic link** — email-based passwordless.
 - **Refresh-cookie sessions** — httpOnly cookie with rotation and reuse-detection.
 
-Owners still receive an Ed25519 keypair at provisioning, but it is **demoted**: it no longer backs day-to-day login, only the legacy challenge-response path (§9) and node/federation signing. This is the largest single drift from v3.0, where the owner key *was* the login mechanism.
+Owners still receive an Ed25519 keypair at provisioning, but it is **demoted**: it no longer backs day-to-day login, only the legacy owner-key login (§9) and node/federation signing. This is the largest single drift from v3.0, where the owner key *was* the login mechanism.
 
 ### 6.2 Agent Authentication — Device Authorization (RFC 8628)
 
@@ -313,6 +313,7 @@ The sole primary agent-auth path. An agent cannot self-register; the owner appro
 3. Owner approves `POST /v1/agents/verify` `{user_code, scopes}` — selecting the scopes the agent may hold.
 4. The node **mints the agent's Ed25519 keypair server-side**, stores the public key, and returns a JWT with `roles: ['agent']` and the approved scopes.
 5. Agent uses `Authorization: Bearer {jwt}`.
+6. **Renewal without the owner.** The agent mints a fresh token whenever it needs one by signing `gaii + timestamp` (ISO 8601) with its private key: `POST /v1/auth/token` `{gaii, timestamp, signature}`. On every mint the node checks that the agent still exists, that the signature is valid and the timestamp fresh, and that the owner's account is active, and it issues the scopes as the owner has them set at that moment. Removing the agent or narrowing its scopes therefore takes effect at once, and an unattended agent never has to send its owner back through an approval to keep working. This is the sanctioned renewal path for a device-authorized agent. It is distinct from the legacy owner-key login of §9, which shares the endpoint.
 
 **Agent mode** is set at device-authorize and classifies onboarding depth:
 
@@ -390,7 +391,7 @@ Verification results attach to the GHII and MAY gate sensitive Platform features
 
 The following are **DEPRECATED** — still mounted and test-covered for backward compatibility, but off the mainline. New integrations MUST NOT rely on them.
 
-- **Legacy Ed25519 challenge-response** (`POST /v1/auth/token`, `GET /v1/auth/challenge`). Survives for pre-registered keypairs and node/federation signing.
+- **Legacy Ed25519 owner-key login** (`GET /v1/auth/challenge`, and `POST /v1/auth/token` called with `owner`). Survives for pre-registered owner keypairs and node/federation signing. An AGENT renewing its own token on `POST /v1/auth/token` with its `gaii` is NOT deprecated: it is the renewal step of device authorization (§6.2, step 6). Ruled 2026-09-18, after the served `/auth.md` had been teaching every agent a path this section told integrators not to rely on.
 - **One-Time Keys (OTK) / Tier 0.5 keyed-browse** (`POST /v1/auth/otk`, `/initial-otk`, `GET /v1/auth/session`, `GET /v1/auth/otk/:key`, `POST /v1/admin/setup/initial-otk`) and the micro-memory store (`GET /v1/mm`, `/v1/mm/{gaii}/{set}`). Superseded by device-auth + MCP. **REMOVED from the reference implementation on 2026-08-23** — every one of these routes answers 404, the `micro_memory` table and its storage layer are gone, and the `keyedBrowseEnabled` config flag is retired. Only the connectivity-key mint (agent onboarding, which reuses the OTK storage) and the legacy Ed25519 challenge (`GET /v1/auth/challenge` → `POST /v1/auth/token`) remain.
 
 ---
@@ -837,7 +838,8 @@ Legend: **P** primary/live · **E** evolved from v3.0 · **D** deprecated (mount
 | GEAI (ecosystem principal) | — | **P** (new) |
 | Device auth (RFC 8628) | P | **P** |
 | Owner password/OAuth/TOTP | — | **P** (new) |
-| Legacy Ed25519 challenge-response | P | **D** |
+| Legacy Ed25519 owner-key login | P | **D** |
+| Agent token renewal by Ed25519 signature | P | P |
 | OTK / Tier 0.5 + Micro-Memory | P | **R** (removed 2026-08-23) |
 | Verification (EUDIW/DID/VC/FTN) | — | **P** (new) |
 | Memory + visibility tiers | P | **E** (+group/members/workspace) |

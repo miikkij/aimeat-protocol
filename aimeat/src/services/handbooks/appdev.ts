@@ -5,6 +5,9 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-18 — Names only tools this surface carries: the package line listed versions, publish
+ *     and delete, which stay on the connector by design, and the contract paragraph named
+ *     aimeat_agent_tags_set, which lives on the agent surface. Instruction review.
  *   2026-07-19 — Research-first flow (AppDev KB Phase 7): Step 0 + tier decision tree + finish checklist / appdev-flow prompt / handbook module
  *   v1.0.0 -- 2026-05-30 -- Initial appdev-surface handbook
  *   v1.1.0 -- 2026-06-09 -- Add the Organism workspaces & agent-contracts section (points to
@@ -27,8 +30,9 @@ content, PUT the file to the returned URL; inline for tiny files) · \`aimeat_ap
 FILENAME, on every surface — MCP, the connector, and \`/local/call\`.
 
 **Component packages are a different thing** and have their own tools: \`aimeat_package_list\` ·
-\`aimeat_package_get\` · \`aimeat_package_versions\` · \`aimeat_package_publish\` ·
-\`aimeat_package_delete\`, addressed by \`group_id\`. If you want the thing a person opens in a
+\`aimeat_package_get\` · \`aimeat_package_compose\` · \`aimeat_package_status_set\` ·
+\`aimeat_package_install\`, addressed by \`group_id\` (authoring a package by hand and pruning its
+history are done from the connector at a keyboard, not here). If you want the thing a person opens in a
 browser, you want the app tools above.
 
 **Extensions (server-side sandboxed WASM; can store ext: memory + ctx.fetch external APIs).**
@@ -89,7 +93,8 @@ them into the manifest, skips any that already exist, fills defaults — no need
 manifest; creator-only, so a *same-owner* agent self-provisions, otherwise the creator does it)
 + **grant** the agent the \`contributor\` role. Writes are attributed to the agent (it appears in
 "Who works here" + the activity heatmap) and are visible to the whole workspace. **Advertise the
-contract** with owner-managed tags via \`aimeat_agent_tags_set\`: \`workspace-contract\` (the discovery
+contract** with owner-managed tags (the owner sets them on the agent's profile, or the agent sets
+its own from the agent surface): \`workspace-contract\` (the discovery
 marker — the workspace UI surfaces such agents to their owner) + \`contract.<id>\` per contract served
 (this convention uses dots so \`contract.<id>\` parses by prefix; tags are \`[a-z0-9._:-]\`, no \`@\`). Full guide — machine-readable contract template, exact
 provision calls, the processing loop, schema rules, discovery tags:

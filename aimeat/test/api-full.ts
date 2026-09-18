@@ -96,8 +96,8 @@ console.log('\n=== AIMEAT Full E2E Test ===\n');
 console.log('Phase 1 — Core');
 
 await test('GET / bootstrap', async () => {
-    // The bootstrap lives at ?format=json — the address llms.txt, robots.txt, auth.md and
-    // ai-plugin.json have always pointed agents at. A bare GET / now answers HTML, because a
+    // The bootstrap lives at ?format=json — the address llms.txt, robots.txt and auth.md
+    // have always pointed agents at. A bare GET / now answers HTML, because a
     // wildcard Accept is what crawlers and readability scanners send and they were getting a JSON
     // envelope with nothing indexable in it (agent-readability phase 10).
     const { body } = await json('/?format=json');

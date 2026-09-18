@@ -6,6 +6,10 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   v1.1.1 — 2026-09-18 — chat-session-human connects by device authorization. It taught the
+ *     connectivity-key flow, which nothing has generated a key for since v1.1.0 of the bootstrap,
+ *     followed by the Ed25519 signature login; it named /v1/knowledge and /v1/openapi.yaml, neither
+ *     of which answers. Found by the instruction review and now held by `pnpm check:prompt-refs`.
  *   v1.1.0 — 2026-08-30 — +knowledge-packager-mcp: the agent road in is MCP (the tools, not the REST
  *     surface), so the Knowledge page offers this one beside the chat prompt; the OpenClaw-era agent
  *     prompt stays for the API it documents.
@@ -419,58 +423,46 @@ Now ask the user for the material to package, or start from what they already ga
     id: 'chat-session-human',
     group: 'knowledge',
     name: 'Chat Session Connect',
-    description: 'Full chat session connection prompt — connectivity key flow, Ed25519 auth, and AIMEAT service overview',
+    description: 'Chat session connection prompt: MCP first, device authorization for a session that can only make HTTP requests, and an AIMEAT service overview',
     content: `You are about to connect to an AIMEAT node as a chat session agent.
 
 This lets your conversation be registered on the AIMEAT network, giving you access to the user's memory, knowledge packages, wallet, and other AIMEAT services.
 
 ## How to Connect
 
-### Step 1: Get a connectivity key
-The user needs to generate one from their profile, or you can request one:
+If your platform speaks MCP, connect that way instead: point it at {{node_url}}/v1/mcp and sign in with OAuth 2.1. The steps below are for a session that can only make HTTP requests.
 
+### Step 1: Ask for access
 \`\`\`
-POST {{node_url}}/v1/auth/connectivity-key
-Authorization: Bearer <owner_jwt>
+POST {{node_url}}/v1/agents/device-authorize
 Content-Type: application/json
 
 {
   "agent_name": "session-<platform>-<timestamp>",
-  "description": "Chat session from <platform>"
+  "owner": "{{owner_name}}"
 }
 \`\`\`
 
-### Step 2: Register using the connectivity key
+The response carries a verification address and a short code.
+
+### Step 2: The user approves you
+Give the user the verification address and the code. They sign in to their own portal, approve you and choose what you may do. The user's password and keys stay with them, so ask for neither.
+
+### Step 3: Collect your token
+Poll until the user has approved:
 \`\`\`
-POST {{node_url}}/v1/agents/connect
+POST {{node_url}}/v1/agents/device-token
 Content-Type: application/json
 
-{
-  "connectivity_key": "<key_from_step_1>",
-  "agent_name": "session-<platform>-<timestamp>",
-  "display_name": "Chat Session — <Platform Name>"
-}
+{ "device_code": "<device_code_from_step_1>", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }
 \`\`\`
 
-This returns your agent credentials (GAII + private key). Store the private key — it's shown only once.
-
-### Step 3: Authenticate
-Sign your GAII + timestamp with your Ed25519 private key:
-\`\`\`
-POST {{node_url}}/v1/auth/token
-Content-Type: application/json
-
-{
-  "gaii": "<your_gaii>",
-  "timestamp": "<ISO_timestamp>",
-  "signature": "<base64_ed25519_signature>"
-}
-\`\`\`
+The answer carries your access token and your identity (GAII). The full flow, with every field: GET {{node_url}}/auth.md
 
 ### Step 4: Use AIMEAT services
-With your JWT token, you can now:
+Send the token on every call as \`Authorization: Bearer <access_token>\`. You can now:
 - Read/write memory: GET/POST {{node_url}}/v1/memory
-- Access knowledge: GET {{node_url}}/v1/knowledge
+- Browse knowledge packages: GET {{node_url}}/v1/catalogue/knowledge
 - Check wallet: GET {{node_url}}/v1/wallet
 - Browse catalogue: GET {{node_url}}/v1/catalogue
 - Post to boards: POST {{node_url}}/v1/boards/:id/posts
@@ -478,7 +470,7 @@ With your JWT token, you can now:
 Node: {{node_id}}
 Node URL: {{node_url}}
 Owner: {{owner_name}}
-API Spec: {{node_url}}/v1/openapi.yaml`,
+API Spec: {{node_url}}/v1/spec`,
     variables: ['node_url', 'node_id', 'owner_name'],
     usedIn: ['/v1/templates/chat-session-human'],
   },
