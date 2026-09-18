@@ -34,6 +34,12 @@ const localAdapters = {
   },
 };
 function record(event) { log.push(event); if (log.length > 80) log.shift(); el('events').textContent = log.map(e => JSON.stringify(e)).join('\n'); }
+function announce(options) {
+  const usesNode = ['stt', 'llm', 'tts'].some(stage => options[stage].provider === 'node');
+  el('notice').textContent = usesNode
+    ? 'You are talking to AI. Node stages send their inputs to your configured provider and use your AI budget.'
+    : 'Local test mode produces tones, not synthesized speech. Microphone audio stays in this browser.';
+}
 function settings() {
   const local = /** @type {HTMLSelectElement} */ (el('backend')).value === 'local';
   const options = sdk.voice.configure({ appId: 'voice-lab', preset: /** @type {HTMLSelectElement} */ (el('preset')).value,
@@ -41,7 +47,7 @@ function settings() {
     stt: { provider: local ? 'custom' : 'node' }, llm: { provider: local ? 'custom' : 'node' },
     tts: { provider: local ? 'custom' : 'node', model: '', format: 'pcm' } });
   /** @type {HTMLTextAreaElement} */ (el('config')).value = JSON.stringify(options, null, 2);
-  el('notice').textContent = local ? 'Local test mode produces tones, not synthesized speech. Microphone audio stays in this browser.' : 'You are talking to AI. Node mode sends audio and text to your configured provider and uses your AI budget.';
+  announce(options);
 }
 function controls(active) {
   for (const id of ['send', 'interrupt', 'stop']) /** @type {HTMLButtonElement} */ (el(id)).disabled = !active;
@@ -55,6 +61,7 @@ el('start').onclick = async () => {
   try {
     if (session) await session.close();
     session = sdk.voice.createSession(JSON.parse(/** @type {HTMLTextAreaElement} */ (el('config')).value), localAdapters);
+    announce(session.config);
     session.on('state', event => { el('state').textContent = event.state; record(event); });
     session.on('transcript', event => {
       let row = document.getElementById('turn-' + event.turn + '-' + event.role);
