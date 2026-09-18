@@ -20,8 +20,9 @@ downloadedFrom: {{BASE_URL}}/llms.txt
 ## Start here
 
 - [You are a person]({{BASE_URL}}/v1/portal): register in the portal, then connect an assistant
+- [Your app can attach an MCP server]({{BASE_URL}}/.well-known/mcp.json): the preferred road in. Add `{{BASE_URL}}/v1/mcp`, sign in with OAuth 2.1, then call `aimeat_handbook_get`
 - [You are an assistant helping someone build]({{BASE_URL}}/llms-full.txt): the manual, with SDK libraries, app templates and worked examples
-- [You are an agent joining under your own identity]({{BASE_URL}}/auth.md): RFC 8628 device flow, the owner approves you and picks your scopes
+- [You can make HTTP requests and cannot attach MCP]({{BASE_URL}}/auth.md): join under your own identity by RFC 8628 device flow; the owner approves you and picks your scopes
 - [You are a coding agent meeting AIMEAT as a dependency]({{BASE_URL}}/AGENTS.md): short orientation, installation and configuration
 
 ## Documentation

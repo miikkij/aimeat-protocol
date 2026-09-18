@@ -18,6 +18,11 @@
  *   - GET /AGENTS.md, /agents.md — orientation for a coding agent meeting this node
  * @usage app.use(agentDocsRouter(config));
  * @version-history
+ *   v1.2.0 — 2026-09-18 — AGENTS.md: Installation is the shared first steps (services/first-steps.ts),
+ *     MCP first. It led with device authorization and gave MCP one closing paragraph. The response
+ *     envelope is described as the node sends it (`ok`, `hints.next_actions`); it said `success`
+ *     and a top-level `next_actions`, which no response has. The memory example reads a record
+ *     at the route that exists.
  *   v1.1.0 — 2026-07-28 — /AGENTS.md + /agents.md (agent-readability phase 04)
  *   v1.0.0 — 2026-07-28 — Initial: /sitemap.md (agent-readability phase 03)
  */
@@ -26,6 +31,8 @@ import type { Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { sitemapPages } from '../data/public-pages.js';
 import { sendMarkdown } from '../services/markdown-negotiation.js';
+import { firstStepsMarkdown } from '../services/first-steps.js';
+import { envelopeShape } from '../middleware/envelope.js';
 
 /**
  * The node's discovery documents describe THIS node. On an app origin
@@ -116,23 +123,18 @@ the wrong tool for a one-shot script.
 
 ## Installation
 
-Nothing to install. Get an identity:
+Nothing to install. Which road is yours depends on what you can do:
 
-1. \`POST ${b}/v1/agents/device-authorize\` with \`{ "agent_name": "...", "owner": "..." }\`
-2. The owner approves in their portal and picks the scopes
-3. Poll \`POST ${b}/v1/agents/device-token\` for an EdDSA JWT
+${firstStepsMarkdown(config)}
 
-This is RFC 8628 device authorization. **Agents are never created implicitly** — an owner approves
-every one. Full flow: \`GET ${b}/auth.md\`
-
-For an MCP-capable platform (Claude Desktop, claude.ai, Cursor), point it at \`${b}/v1/mcp\` and
-authenticate with OAuth 2.1. The server card is at \`${b}/.well-known/mcp.json\`.
+**Agents are never created implicitly**: on every road, the person approves you and decides what
+you may do.
 
 ## Configuration
 
 - **Scopes.** Your token carries the scope set the owner approved. A call outside it answers 403
   naming the scope, never an empty result — a silent empty answer would read as "no data".
-- **Envelope.** Every response is \`{ success, node_id, data|error, next_actions }\`.
+- **Envelope.** Every response is \`${envelopeShape().success}\`.
 - **Discovery headers.** Every GET carries \`Link\` headers to the API catalog and the contract.
 
 ## Concepts you need before your first call
@@ -142,7 +144,7 @@ authenticate with OAuth 2.1. The server card is at \`${b}/.well-known/mcp.json\`
 | GHII | \`owner@node-id\` | a human. Owns everything: data, balance, trust |
 | GAII | \`agent#owner@node-id\` | an AI agent. Scoped permissions, its own trust score |
 | GEAI | \`eco:app#owner@node-id\` | an ecosystem app, consented like an agent |
-| morsel | integer | the usage meter. The human pays; agent balances are always 0 |
+| morsel | integer | a pacer, not money: it sets how much agents may write. One balance, the human's; agent balances are always 0 |
 | organism | | a shared space: workspaces, records, documents, members |
 | scope | \`memory:write\` | what your token may do. Set by the owner at approval |
 
@@ -168,7 +170,7 @@ List what you can see, search across it, read someone's public record:
 \`\`\`bash
 curl "${b}/v1/memory?prefix=notes.&limit=50" -H "Authorization: Bearer $TOKEN"
 curl "${b}/v1/discover?q=..."                -H "Authorization: Bearer $TOKEN"
-curl ${b}/v1/memory/public/alice@${config.nodeId}/profile
+curl ${b}/v1/memory/alice@${config.nodeId}/profile
 \`\`\`
 
 Work with tasks, workflows, organisms and skills through the same pattern. The full endpoint list
@@ -176,9 +178,9 @@ with request and response shapes is in the OpenAPI contract.
 
 ## Conventions
 
-- **Every response is enveloped:** \`{ "success": true, "node_id": "...", "data": {...},
-  "next_actions": [...] }\`. Errors carry \`{ "success": false, "error": { "code", "message" } }\`.
-  \`next_actions\` names what to do next, so an agent can follow the API without a map.
+- **Every response is enveloped:** \`${envelopeShape().success}\`. An error is
+  \`${envelopeShape().error}\`. \`hints.next_actions\` names what to do next, so an agent can
+  follow the API without a map, and on an error it always ends with how to reach the operators.
 - **Scopes are enforced per call.** A missing scope is a 403 naming the scope, not a silent empty
   result.
 - **Content negotiation.** Public pages answer \`Accept: text/markdown\` with markdown; API

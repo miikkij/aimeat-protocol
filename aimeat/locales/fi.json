@@ -14501,6 +14501,7 @@
       "cliDesc": "Pidä tämä palvelin käynnissä, kun AI-ympäristö on liitetty. Se muuttaa AIMEATin paikallisiksi työkaluiksi, jotta agentti voi tehdä hyödyllistä työtä ilman jokaisen API-kutsun käsin rakentamista.",
       "agentInstructionTitle": "Kerro yhdistetylle agentille mitä tehdä seuraavaksi:",
       "agentInstructionDesc": "Kun MCP-palvelin on liitetty agenttiympäristöön, liitä tämä ohje Hello Integration -prosessin aloittamiseen:",
+      "agentInstructionLoadFailed": "Ohjetta ei saatu ladattua. Lataa sivu uudelleen tai aja npx aimeat connect, joka tulostaa saman tekstin.",
       "noNodejs": "Eikö Node.js:aa ole asennettuna?",
       "pasteAlt": "Varapolku: yhdistä AI-agentti API-kutsuilla",
       "pasteDesc": "Jos liitin tai MCP-työkalut eivät ole käytettävissä, kopioi tämä kehote agentille, joka voi tehdä HTTPS-pyyntöjä. Se kertoo, miten AIMEATiin yhdistetään ja Hello Integration aloitetaan API:n kautta:",

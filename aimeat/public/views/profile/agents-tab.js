@@ -7,6 +7,8 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.0.2 -- 2026-09-18 -- The Hello Integration instruction is fetched from the node
+ *     (GET /v1/prompts/hello-integration) instead of built from a hand copy that had drifted.
  *   v4.0.1 -- 2026-09-14 -- The tag filter folds (FilterBar).
  *   v4.0.0 -- 2026-09-14 -- The poster face (design canvas "Your Agents"): crumb, masthead, chips, a
  *     strip of figures, slab-headed sections that fold and stay folded per browser, the agents as a
@@ -104,7 +106,7 @@ import { useConfirm } from '/components/Modal.js';
 import { AgentConsent } from '/components/AgentConsent.js';
 import { McpSetupGuide } from './ai-setup-guide.js';
 import { Section, Fold, scrollTo } from '/views/profile/organisms/poster-parts.js';
-import { buildAgentPrompt, buildTaskRunnerPrompt, buildMcpOnboardingPrompt, PLATFORMS, PLATFORM_KEYS, PLATFORM_LABELS } from './agents/connect-prompts.js';
+import { buildAgentPrompt, buildTaskRunnerPrompt, PLATFORMS, PLATFORM_KEYS, PLATFORM_LABELS } from './agents/connect-prompts.js';
 import { loadAgentOrder, saveAgentOrder, UNGROUPED_ID, loadCollapsedGroups, saveCollapsedGroups, loadSeen, saveSeen, markTabSeen, effectiveOrderedNames, matchesAgentQuery, popOutAgent, loadFold, saveFold } from './agents/tab-helpers.js';
 import { AgentSearch, FilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
 import { agentState } from './agents/state-detector.js';
@@ -140,6 +142,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [pasteExpanded, setPasteExpanded] = useState(false);
   const [taskRunnerExpanded, setTaskRunnerExpanded] = useState(false);
   const [taskRunnerName, setTaskRunnerName] = useState('');
+  // The Hello Integration instruction, from the node. It is the text `aimeat connect` prints, served
+  // by GET /v1/prompts/hello-integration, so this page and the CLI cannot say different things. A
+  // hand copy stood here until 2026-09-18 and had fallen two versions behind the CLI's.
+  const [helloPrompt, setHelloPrompt] = useState('');
+  const [helloFailed, setHelloFailed] = useState(false);
   const [taskStatsMap, setTaskStatsMap] = useState({});
   // Currently-active tasks per agent { name: Task[] } — powers the fleet
   // "running now" panel. Reuses the active list already fetched in loadData().
@@ -185,6 +192,15 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
   // Load the owner's saved group definitions once per session. Mutations below
   // update state optimistically and persist, so no need to re-fetch on the poll.
+  useEffect(() => {
+    // A failure is shown as one: an empty box that says "Loading" for ever would read as a
+    // page that is still working.
+    fetch('/v1/prompts/hello-integration?format=txt')
+      .then(r => { if (!r.ok) throw new Error(`hello-integration answered ${r.status}`); return r.text(); })
+      .then(setHelloPrompt)
+      .catch((err) => { console.warn('Hello Integration instruction not loaded', err); setHelloFailed(true); });
+  }, []);
+
   useEffect(() => {
     if (!session) { setAgentGroups([]); return; }
     setCollapsedGroups(loadCollapsedGroups(session.owner));
@@ -606,9 +622,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
                   <p class="mt-1 mb-half text-bold">${t('profile.agents.agentInstructionTitle')}</p>
                   <p class="text-caption mb-half">${t('profile.agents.agentInstructionDesc')}</p>
-                  <div class="agent-prompt-box">${buildMcpOnboardingPrompt()}</div>
+                  <div class="agent-prompt-box">${helloPrompt || (helloFailed ? t('profile.agents.agentInstructionLoadFailed') : t('common.loading'))}</div>
                   <${CopyButton}
-                    text=${buildMcpOnboardingPrompt()}
+                    text=${helloPrompt}
                     className="btn-primary"
                     label=${t('profile.agents.copyAgentInstruction')}
                     />

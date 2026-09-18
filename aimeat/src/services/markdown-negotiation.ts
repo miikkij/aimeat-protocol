@@ -21,6 +21,8 @@
  *   import { prefersMarkdown, sendMarkdown, htmlToMarkdown } from '../services/markdown-negotiation.js';
  *   if (prefersMarkdown(req)) { sendMarkdown(res, htmlToMarkdown(html), html); return; }
  * @version-history
+ *   2026-09-18 - The landing markdown tells an agent how to get in, from services/first-steps.ts:
+ *     MCP first. It listed addresses and left the order to the reader.
  *   2026-09-17 - TARGET-078: root Markdown leads with the same ownership promise as HTML.
  *   v1.1.0 — 2026-08-01 — prefersHtmlPage(): the same negotiation question asked the other way,
  *     so /v1/ai-transparency can send a person who pasted the machine URL into a browser to the
@@ -29,6 +31,7 @@
  */
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
+import { firstStepsMarkdown } from './first-steps.js';
 
 /**
  * True when the request prefers text/markdown over text/html. req.accepts() honors
@@ -152,7 +155,11 @@ You own your data and what you build. Give your AI a lasting memory, apps and ta
 - Connect an AI assistant to this node: ${b}/v1/connect
 - Privacy: ${b}/v1/privacy · Terms: ${b}/v1/terms
 
-## For AI agents
+## For AI agents: how to get in
+
+${firstStepsMarkdown(config)}
+
+## For AI agents: where things are
 
 - Machine-readable getting-started: \`GET ${b}/?format=json\`
 - Full agent manual: \`GET ${b}/llms-full.txt\` (index: \`GET ${b}/llms.txt\`)

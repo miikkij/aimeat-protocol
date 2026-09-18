@@ -94,6 +94,7 @@ import { registerConnectionTools } from './connections.js';
 import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerAccessTools } from './access.js';
 import { registerSecretTools } from './secrets.js';
+import type { SurfaceRole } from './catalog/surfaces.js';
 
 /** What every tool group needs. The two emitters are passed in so this file has no cycle home. */
 export interface ServerToolDeps {
@@ -110,6 +111,8 @@ export interface ServerToolDeps {
     getToken: () => string | undefined;
     emitResourceUpdated: (agentGaii: string, uri: string) => void;
     emitResourceListChanged: (agentGaii: string) => void;
+    /** The v2 surface this session is on, 'all' on /v1/mcp. The handbook tool answers by it. */
+    role?: SurfaceRole | 'all';
 }
 
 /**
@@ -151,7 +154,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerExchangeRunTools(mcp, storage, config, agentGaii, getToken);
     registerChatInstancesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerFlagsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
-    registerPromptsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerPromptsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, deps.role ?? 'all');
     registerCapabilitiesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, getToken);
     // The second primitive, beside aimeat_discover: run what you found. Needs the session's
     // raw bearer, because the call is dispatched as the caller through the node's own routes.

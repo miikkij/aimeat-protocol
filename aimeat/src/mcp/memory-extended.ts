@@ -20,6 +20,9 @@
  *     `.version.N` snapshots are owned by the agent GAII, so a broad query pulled the whole history).
  *     Adds a `limit` (default 50) and skips `.version.N` history by default (include_versions to keep it).
  *     Read a hit's full value with aimeat_memory_read on its exact key.
+ *   v1.4.0 -- 2026-09-18 -- An empty search says what it covered and what an empty answer means. It
+ *     carried the snippet hint regardless, so an agent asked for a record that did not exist kept
+ *     looking in other places: eleven and twelve calls in the cold-agent baseline.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -95,7 +98,13 @@ export function registerMemoryExtendedTools(
                         total: hits.length,
                         truncated: (include_versions ? typed.length : typed.filter(r => !isVersionKey(r.key)).length) > hits.length,
                         hits: hits.map(r => searchHitShape(r, q)),
-                        hint: 'Snippets only. Read a full value with aimeat_memory_read(key).',
+                        // An empty answer has to say what it covered, or the agent goes looking
+                        // for the place it did not search. The cold-agent baseline of 2026-09-18:
+                        // asked for a record that did not exist, the agent took eleven and twelve
+                        // calls (list, read, capabilities, discover) to dare say so.
+                        hint: hits.length > 0
+                            ? 'Snippets only. Read a full value with aimeat_memory_read(key).'
+                            : `Nothing matches "${q}". This searched the keys and values of every record you hold as this agent. It does not cover what the person or their other agents hold: aimeat_memory_list with owner_scope: true lists those, and its \`prefix\` narrows by key. When that shows nothing either, the record does not exist, and saying so to the person is the answer.`,
                     }, null, 2),
                 }],
             };

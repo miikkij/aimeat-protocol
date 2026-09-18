@@ -12724,6 +12724,7 @@
       "cliDesc": "Deja este servidor corriendo mientras tu entorno de IA esté enganchado. Convierte AIMEAT en herramientas locales para que el agente pueda trabajar sin componer a mano cada llamada a la API.",
       "agentInstructionTitle": "Dile al agente conectado qué hacer ahora:",
       "agentInstructionDesc": "Cuando el servidor MCP esté enganchado a tu entorno de agentes, pega esta instrucción para empezar Hello Integration:",
+      "agentInstructionLoadFailed": "No se pudo cargar la instrucción. Vuelve a cargar la página o ejecuta npx aimeat connect, que muestra el mismo texto.",
       "noNodejs": "¿No tienes Node.js?",
       "pasteAlt": "Alternativa: conectar un agente de IA con APIs",
       "pasteDesc": "Si no hay conector ni herramientas MCP, copia este prompt para un agente que pueda hacer peticiones HTTPS. Le explica cómo conectarse a AIMEAT y empezar Hello Integration por la API:",

@@ -158,7 +158,10 @@ export const TASKS: Task[] = [
         prompt: 'I just connected you to this. What can you actually do for me here?',
         goodTools: ['aimeat_handbook_get', 'aimeat_discover'],
         verify: async (ctx) => {
-            const ok = says(ctx, 'remember') || says(ctx, 'memory');
+            // The point is that keeping what the person knows comes up, in whatever words. The
+            // first Opus run said "hold your knowledge somewhere your AIs can reach it" and was
+            // failed for not saying "memory", which is the word this task hopes it avoids.
+            const ok = /\b(remember|memory|memories|knowledge|notes?|keep track|records?)\b/i.test(ctx.metrics.finalText);
             const plain = !/aimeat_[a-z_]+/.test(ctx.metrics.finalText);
             return { ok: ok && plain, detail: !ok ? 'the answer never mentions remembering things' : plain ? 'answered in the person\'s words' : 'the answer recites tool names at the person' };
         },
@@ -170,8 +173,11 @@ export const TASKS: Task[] = [
         goodTools: ['aimeat_memory_search'],
         verify: async (ctx) => {
             const honest = /(no|not|nothing|couldn't|could not|can't find|cannot find|don't see)/i.test(ctx.metrics.finalText);
-            const calm = ctx.metrics.toolCalls.length <= 6;
-            return { ok: honest && calm, detail: !honest ? 'the answer does not say the record is missing' : calm ? 'said so, without thrashing' : `said so after ${ctx.metrics.toolCalls.length} calls` };
+            // Calls to the NODE. ToolSearch is the client loading a tool definition, and an agent
+            // that loads three tools one at a time has not searched the node three times.
+            const nodeCalls = ctx.metrics.toolCalls.filter(c => c.name !== 'ToolSearch').length;
+            const calm = nodeCalls <= 6;
+            return { ok: honest && calm, detail: !honest ? 'the answer does not say the record is missing' : calm ? `said so after ${nodeCalls} call(s) to the node` : `said so after ${nodeCalls} calls to the node` };
         },
     },
     {

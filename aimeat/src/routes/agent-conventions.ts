@@ -25,6 +25,8 @@
  *   - GET /.well-known/x402.json    — machine-payment discovery, derived from the network registry
  * @usage app.use(agentConventionsRouter(config, storage));
  * @version-history
+ *   2026-09-18 - skill.md: Installation is the shared first steps (services/first-steps.ts), and the
+ *     envelope is described from what the node sends (it said `success`, `node_id`, `next_actions`).
  *   2026-09-04 - /.well-known/x402.json names the seller. It carried the network, the assets and
  *     the facilitator and nothing that said who the counterparty was, which every x402 scanner
  *     asks for. The node id, not a brand: a self-hosted node is its own seller.
@@ -37,6 +39,8 @@ import YAML from 'yaml';
 import type { AimeatConfig } from '../config.js';
 import { getX402Network } from '../commerce/x402-facilitator.js';
 import { apexOnly } from './agent-docs.js';
+import { firstStepsMarkdown } from '../services/first-steps.js';
+import { envelopeShape } from '../middleware/envelope.js';
 
 /** Locate openapi.yaml the same way specRouter does — the file moves with the deployment layout. */
 function findSpecFile(): string | null {
@@ -74,12 +78,9 @@ material. It is the wrong tool for a one-shot script that needs no state.
 
 ## Installation
 
-Nothing to install. Two ways in:
+Nothing to install. Which road is yours depends on what you can do:
 
-- **MCP** — point any MCP-capable client at \`${b}/mcp\` (also \`${b}/v1/mcp\`) and authenticate with
-  OAuth 2.1. Server Card: \`${b}/.well-known/mcp.json\`
-- **HTTP** — get an identity through the RFC 8628 device flow at \`${b}/auth.md\`, then call the
-  endpoints in \`${b}/openapi.json\`
+${firstStepsMarkdown(config)}
 
 ## Usage
 
@@ -91,8 +92,8 @@ curl -X POST ${b}/v1/memory -H "Authorization: Bearer $TOKEN" \\
 curl ${b}/v1/memory/notes.today -H "Authorization: Bearer $TOKEN"
 \`\`\`
 
-Every response is enveloped as \`{ success, node_id, data|error, next_actions }\`, and
-\`next_actions\` names what to do next, so the API can be followed without a map.
+Every response is enveloped as \`${envelopeShape().success}\`, and
+\`hints.next_actions\` names what to do next, so the API can be followed without a map.
 
 ## Configuration
 

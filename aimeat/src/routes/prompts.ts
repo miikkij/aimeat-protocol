@@ -48,6 +48,7 @@ import { HELLO_MCP_KEY, buildHelloMcpPrompt, buildOrganismSetupPrompt } from '..
 import { registerIntentPoolPrompt } from './prompts-intent-pool.js';
 import { registerOpenItemsPrompt } from './prompts-open-items.js';
 import { registerAtelierPrompt } from './prompts-atelier.js';
+import { registerHelloIntegrationPrompt } from './prompts-hello-integration.js';
 import { buildAgentConnectPrompt, buildAgentConnectSteps } from '../services/agent-connect-prompt.js';
 import { buildAgentOnboardPrompt } from '../services/agent-onboard-prompt.js';
 import { buildAiToolSetup } from '../services/ai-tool-setup.js';
@@ -348,6 +349,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   registerOpenItemsPrompt(router, config, storage);
+  registerHelloIntegrationPrompt(router, config);
 
   router.get('/v1/prompts/agent-onboard', (req, res) => {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';

@@ -8,6 +8,9 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.0.1 — 2026-09-18 — This is what aimeat_handbook_get returns on /v1/mcp when called with no
+ *     arguments, so it is the first thing most connected agents read. The primitives row no
+ *     longer states a tool count: it said twelve, and the surface carries thirteen.
  *   v1.0.0 — 2026-09-03 — Initial, with the `full` surface.
  */
 export const FULL_HANDBOOK = `# Working here with everything
@@ -40,7 +43,7 @@ A focused surface is less to hold and gives fewer ways to reach for the wrong to
 | \`service\` | offering a service: work, actions, wallet, capabilities, organisms |
 | \`admin\` | governance: operator settings, flags, groups, consent, agent management |
 | \`commerce\` | selling and getting paid: priced manifests, checkout, receipts |
-| \`primitives\` | twelve tools, and everything else found with \`aimeat_discover\` and run with \`aimeat_invoke\` |
+| \`primitives\` | a handful of tools, and everything else found with \`aimeat_discover\` and run with \`aimeat_invoke\` |
 
 Each of those has its own handbook, and it is more use than this page.
 

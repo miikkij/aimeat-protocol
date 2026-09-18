@@ -10,6 +10,9 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.12.6 — 2026-09-18 — aimeat-social is `stable`. v1.3.1 renamed it back to "Boards" and rewrote
+ *     its aiDoc when boards were reinstated, and left `status: 'deprecated'`, so the pack index
+ *     still told a builder the library was deprecated. Confirmed current by the developer.
  *   v1.12.5 — 2026-09-13 — Four facts appdev pitfalls carried and the aiDocs did not: getSession() is null
  *     for a visitor (aimeat-auth), RESERVED_KEY (aimeat-data), declare() stores the bare record and
  *     disclose() replaces its target (aimeat-ai).
@@ -763,7 +766,7 @@ export const SDK_PACKS: LibraryPack[] = [
     tierHint: 'T1',
     interviewTriggers: [],
     sizeEstimate: '~6KB',
-    status: 'deprecated',
+    status: 'stable',
     modelTier: 'needs-doc',
   },
 ];
