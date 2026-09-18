@@ -29,6 +29,31 @@ async function owner(prefix: string) {
   const token = await call('/v1/auth/token', { owner: name, timestamp, signature: await sign(registration.data.data.private_key, name + NODE + timestamp) });
   assert(token.status === 200, token.text); return { name, token: token.data.data.token as string };
 }
+async function agent(owner: { name: string; token: string }, scopes: string[]) {
+  const started = await call('/v1/agents/device-authorize', { agent_name: 'voice' + Date.now(), owner: owner.name });
+  assert(started.status === 200, started.text);
+  const approved = await call('/v1/agents/verify', { user_code: started.data.data.user_code, action: 'approve', scopes, owner_token: owner.token });
+  assert(approved.status === 200, approved.text);
+  const token = await call('/v1/agents/device-token', { device_code: started.data.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' });
+  assert(token.status === 200, token.text); return token.data.token as string;
+}
+async function mcp(token: string) {
+  let session = '', id = 0;
+  async function rpc(method: string, params: object) {
+    const response = await fetch(BASE + '/v1/mcp', { method: 'POST', headers: {
+      'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: 'Bearer ' + token,
+      ...(session ? { 'mcp-session-id': session, 'mcp-protocol-version': '2025-03-26' } : {}),
+    }, body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method, params }) });
+    session = response.headers.get('mcp-session-id') ?? session;
+    const raw = await response.text();
+    assert(response.status === 200, raw);
+    return response.headers.get('content-type')?.includes('text/event-stream')
+      ? raw.split('\n').filter(line => line.startsWith('data: ')).map(line => JSON.parse(line.slice(6))).find(row => row.id === id)
+      : JSON.parse(raw);
+  }
+  await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'Voice integration', version: '1' } });
+  return (name: string, args: object) => rpc('tools/call', { name, arguments: args });
+}
 const peer = createServer(async (req, res) => {
   providerCalls++;
   const chunks: Buffer[] = []; for await (const chunk of req) chunks.push(chunk);
@@ -58,6 +83,48 @@ try {
   });
   const request = { app_id: app, messages: [{ role: 'user', content: 'hello' }], model: 'reply', temperature: 0.2, max_tokens: 128 };
   const speech = { app_id: app, model: 'speech', input: 'Hei maailma', voice: 'test', response_format: 'pcm' };
+  await test('JSON reply preserves completed text and usage', async () => {
+    const result = await call('/v1/ai/stream?json=1', request, alice.token);
+    assert(result.status === 200 && result.data.data.text === 'Ensimmäinen lause. Toinen lause.', result.text);
+    assert(result.data.data.usage && result.data.data.cost_exact, result.text);
+    const cut = await call('/v1/ai/stream?json=1', { ...request, messages: [{ role: 'user', content: 'fail' }] }, alice.token);
+    assert(cut.status === 502 && !cut.data.ok, cut.text);
+  });
+  async function checkPrivateAudio(result: Record<string, any>, token: string) {
+    assert(result.storage_key && result.visibility === 'private' && result.size_bytes === 4800 && !result.data, JSON.stringify(result));
+    const own = await fetch(BASE + result.fetch_url, { headers: { Authorization: 'Bearer ' + token } });
+    assert(own.status === 200 && (await own.arrayBuffer()).byteLength === 4800, 'Own audio must download');
+    const foreign = await call(result.fetch_url, undefined, bob.token, 'GET'); assert(foreign.status === 404, foreign.text);
+    const anonymous = await call(result.fetch_url, undefined, undefined, 'GET'); assert(anonymous.status === 401, anonymous.text);
+    const removed = await call(result.fetch_url, undefined, token, 'DELETE'); assert(removed.status === 200, removed.text);
+  }
+  await test('JSON speech is a private downloadable and deletable artifact', async () => {
+    const result = await call('/v1/ai/speak?json=1', speech, alice.token); assert(result.status === 200, result.text);
+    await checkPrivateAudio(result.data.data, alice.token);
+  });
+  await test('Agent REST and node MCP use the owner budget and caller storage namespace', async () => {
+    const token = await agent(alice, ['ai:use', 'storage:read', 'storage:write']);
+    const reply = await call('/v1/ai/stream?json=1', request, token); assert(reply.status === 200, reply.text);
+    const audio = await call('/v1/ai/speak?json=1', speech, token); assert(audio.status === 200, audio.text);
+    await checkPrivateAudio(audio.data.data, token);
+    const invoke = await mcp(token);
+    const spoken = await invoke('aimeat_voice_speak', speech);
+    assert(spoken.result && !spoken.result.isError, JSON.stringify(spoken));
+    await checkPrivateAudio(JSON.parse(spoken.result.content[0].text), token);
+    const answered = await invoke('aimeat_voice_reply', request);
+    assert(answered.result && !answered.result.isError && JSON.parse(answered.result.content[0].text).text.includes('Ensimmäinen'), JSON.stringify(answered));
+  });
+  await test('Agent without ai:use is refused by REST and MCP before provider access', async () => {
+    const token = await agent(alice, ['memory:read']); const before = providerCalls;
+    for (const [path, body] of [['stream', request], ['speak', speech]] as const) {
+      const result = await call('/v1/ai/' + path + '?json=1', body, token); assert(result.status === 403, result.text);
+    }
+    const invoke = await mcp(token);
+    for (const [name, input] of [['aimeat_voice_reply', request], ['aimeat_voice_speak', speech]] as const) {
+      const result = await invoke(name, input); assert(result.error || result.result?.isError, JSON.stringify(result));
+    }
+    assert(providerCalls === before, 'Unscoped agent called provider');
+  });
   await test('Anonymous caller is refused before provider access', async () => {
     const before = providerCalls; const result = await call('/v1/ai/speak', speech); assert(result.status === 401, result.text); assert(providerCalls === before, 'provider called');
   });

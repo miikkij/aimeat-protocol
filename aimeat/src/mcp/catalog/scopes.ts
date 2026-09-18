@@ -261,6 +261,8 @@ export const TOOL_SCOPES: Record<string, string> = {
     // The same word as the status it acts on; the route behind it is operator-gated on top.
     aimeat_seo_announce:                      'app:write',
     aimeat_image_generate:                    'ai:use',
+    aimeat_voice_reply:                       'ai:use',
+    aimeat_voice_speak:                       'ai:use',
     // Background AI jobs. The same word as every other door that spends the owner's AI budget --
     // starting one IS a completion, only with a handle instead of a held request. Reading and
     // cancelling take it too: a job is the owner's own AI activity, and the routes admit exactly
