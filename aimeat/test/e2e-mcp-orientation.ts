@@ -499,6 +499,23 @@ async function main() {
             assert(listed.node_templates.some((t: any) => t.id === 'shell-pure-client'), 'the list names the shell');
         });
 
+        await test('18b. a shipped template too large for one answer comes in parts that join into the file', async () => {
+            // The game-genre templates are 26 to 32 kB; a result that size never reaches a chat.
+            const first = JSON.parse(toolText((await v1('tools/call', { name: 'aimeat_app_template_get', arguments: { id: 'genre-match' } }, 430)).body));
+            assert(first.parts > 1 && first.part === 1, `it says it comes in parts: ${first.parts}`);
+            assert(typeof first.how_to_read === 'string' && first.how_to_read.includes('part: 2'), 'and how to read the rest');
+            let joined = '';
+            for (let part = 1; part <= first.parts; part++) {
+                const text = toolText((await v1('tools/call', { name: 'aimeat_app_template_get', arguments: { id: 'genre-match', part } }, 431 + part)).body);
+                assert(text.length < 24_000, `part ${part} fits one tool result: ${text.length} characters`);
+                joined += JSON.parse(text).content;
+            }
+            const rest = await json('/v1/app-templates/genre-match');
+            assert(joined === rest.body.data.template.content, 'the parts joined are the file GET /v1/app-templates/:id serves');
+            const past = await v1('tools/call', { name: 'aimeat_app_template_get', arguments: { id: 'genre-match', part: first.parts + 1 } }, 440);
+            assert(past.body.result?.isError === true && toolText(past.body).includes(`1 to ${first.parts}`), `a part past the end is refused: ${toolText(past.body).slice(0, 120)}`);
+        });
+
         await test('19. a template nobody ships or proposed is an error that names the shells', async () => {
             const { body } = await v1('tools/call', { name: 'aimeat_app_template_get', arguments: { id: 'no-such-template' } }, 422);
             assert(body.result?.isError === true, 'isError');

@@ -423,7 +423,10 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
         description: 'Read one agent-proposed template: the full manifest (reuse notes, packs, per-model notes, proofs) plus the source app\'s LIVE state (forkable, price, version, download URL) and a concrete how_to_start instruction (fork via aimeat_app_fork vs scaffold from the notes; priced apps are bought through checkout, never with morsels directly). An id the node ships (a shell such as shell-pure-client, a component, a use case) returns that template with its starting file in `content`, the same as GET /v1/app-templates/{id}.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { id: { type: 'string', required: true, description: 'Template proposal id.' } },
+        input: {
+            id: { type: 'string', required: true, description: 'Template id: a proposal, or one the node ships.' },
+            part: { type: 'number', description: 'Only for a template the node ships whose file is too large for one answer: which part to return (1-based). The first answer says how many parts there are.' },
+        },
     },
     {
         name: 'aimeat_app_template_delete',

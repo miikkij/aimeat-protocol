@@ -13484,6 +13484,14 @@ paths:
         - BearerAuth: []
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
+        - name: part
+          in: query
+          schema: { type: integer, minimum: 1 }
+          description: >-
+            Only for a template the node ships whose file is over 16 000 characters: which part to
+            return (1-based, default 1). Such an answer carries `part`, `parts` and `how_to_read`,
+            and the `content` values joined in order are the file. A part the template does not
+            have answers 400.
       responses:
         '200':
           description: >-
