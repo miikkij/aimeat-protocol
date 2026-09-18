@@ -2,10 +2,14 @@
  * @file public/views/profile/agents/connect-prompts.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Copy-pasteable agent connection prompts (device-auth, CrewAI task-runner,
- *   MCP onboarding) + per-platform Node.js setup instructions. Extracted from
- *   ../agents-tab.js to satisfy max-file-lines.
+ * @description Copy-pasteable agent connection prompts (device-auth, CrewAI task-runner) +
+ *   per-platform Node.js setup instructions. Extracted from ../agents-tab.js to satisfy
+ *   max-file-lines. The Hello Integration instruction is NOT here: the Agents tab fetches it
+ *   from GET /v1/prompts/hello-integration, which serves the CLI's own text.
  * @version-history
+ *   v1.2.0 — 2026-09-18 — buildMcpOnboardingPrompt is gone. It was a hand copy of the CLI's Hello
+ *     Integration text and had fallen two versions behind it: no rule that only five
+ *     aimeat_onboarding_* tools exist, no stop condition. The page reads the node's copy now.
  *   v1.1.1 — 2026-09-18 — PLATFORMS: Windows no longer says it requires WSL2 (the connect CLI has
  *     had native win32 branches for months), and every install line asks for Node.js 24, which is
  *     what package.json requires; they said 22. Instruction review.
@@ -210,29 +214,6 @@ eventual-consistency on onboarding_status). Regressions there are
 aimeat-crewai bugs, not improvisation targets.
 
 Full docs: ${url}/docs/integrations/crewai (or the GitHub repo).`;
-}
-
-export function buildMcpOnboardingPrompt() {
-  return `Run this with your strongest reasoning model, thinking enabled — onboarding is the step that most rewards it.
-
-You are connected to AIMEAT through MCP in this runtime.
-
-Use the available AIMEAT tools to complete Hello Integration, AIMEAT's required first-run onboarding handshake for every newly connected agent. The names below are MCP tools shown by your AI runtime; do not type them as terminal commands:
-1. Call aimeat_handbook_get and read the operating handbook.
-2. Call aimeat_onboarding_status and follow its next-step hints.
-3. Call aimeat_onboarding_identify_platform with your runtime/platform name.
-4. Call aimeat_onboarding_confirm_skill_installed after confirming the local skill bundle is available.
-5. Call aimeat_agent_capabilities_report with your useful capabilities.
-6. Call aimeat_onboarding_confirm_directives_read after reading the handbook/directives.
-7. Call aimeat_message_send with a short Hello Integration test message.
-8. Call aimeat_agent_telemetry_report with an agent_report event.
-9. Call aimeat_task_list and find the task named "Onboarding verification".
-10. Call aimeat_task_propose_todos with a short TODO plan for that task.
-11. Call aimeat_onboarding_status again. If the test task is active, use aimeat_task_event, aimeat_task_todo, and aimeat_task_complete to finish it.
-12. Call aimeat_onboarding_status one final time and report any remaining pending step.
-13. After Hello Integration passes, publish your real owner-facing slash commands, actual runtime/config descriptors, any produced knowledge packages, and use shared tag memory (agents.tag.<tag>.*, visibility owner, tags ["<tag>"]) if the owner assigned shared tags in Data Access/directives.
-
-If AIMEAT tools are not available in this runtime, tell me the MCP server is not attached yet.`;
 }
 
 /* ── Platform instructions ── */

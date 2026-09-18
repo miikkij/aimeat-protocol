@@ -76,7 +76,10 @@ function parseArgs(argv: string[]): Args {
     return {
         driver: get('driver') === 'scripted' ? 'scripted' : 'claude',
         suite,
-        model: get('model') ?? 'sonnet',
+        // Opus, by the developer's ruling of 2026-09-18: the point is what a GOOD model does here.
+        // Tuning the node's guidance until a weaker model copes measures the wrong reader, and the
+        // first baseline, taken on Sonnet, had to be taken again.
+        model: get('model') ?? 'opus',
         runs: Number(get('runs') ?? 3),
         tasks: get('tasks')?.split(',') ?? null,
         arm: get('arm') ?? null,

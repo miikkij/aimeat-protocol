@@ -11971,6 +11971,25 @@ paths:
       responses:
         '200': { description: The prompt, plus the skill name. }
 
+  /v1/prompts/hello-integration:
+    get:
+      operationId: helloIntegrationPrompt
+      tags: [Prompts]
+      summary: The instruction an owner pastes into a newly connected agent
+      description: >
+        Walks Hello Integration, the first-run handshake: the handbook, the onboarding steps, a
+        test message and the test task. The same text `aimeat connect` prints and the skill bundle
+        carries, from the same function, so the profile page shows what the CLI shows. It says
+        that only five `aimeat_onboarding_*` tools exist and to stop when `summary.completable` is
+        true. Public: it names no account and no secret.
+      parameters:
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: '`txt` answers the prompt as text/plain instead of the JSON envelope.'
+      responses:
+        '200': { description: 'The prompt, and the tool sequence it walks as `tool_sequence`.' }
+
   /v1/prompts/ai-instructions:
     get:
       operationId: aiInstructionsPrompt

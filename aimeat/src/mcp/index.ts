@@ -257,7 +257,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // (mcp/register-all.ts). It used to stand here and the audit kept its own copy; the copies
         // drifted to 52 against 26 without either side going quiet about it.
         registerAllServerTools(mcp, {
-            storage, config, peers, scopes, getToken,
+            storage, config, peers, scopes, getToken, role,
             agentGaii: () => agentGaii,
             owner: () => owner ?? '',
             emitResourceUpdated, emitResourceListChanged,

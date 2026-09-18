@@ -76,6 +76,7 @@ import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-pack
 import { buildLlmsHumanPages, buildLlmsOptionalPages } from '../data/public-pages.js';
 import { buildGettingStarted } from '../data/getting-started.js';
 import { BOOTSTRAP_ENDPOINT_CATALOGUE } from '../data/bootstrap-endpoints.js';
+import { buildFirstSteps } from '../services/first-steps.js';
 import { apexOnly } from './agent-docs.js';
 import { mountSitemapRoutes } from './sitemaps.js';
 import { serveSpa, resolvePublicFile } from './portal.js';
@@ -281,15 +282,26 @@ export function bootstrapRouter(
         personal_nodes_enabled: config.personalNodesEnabled,
       },
 
+      // How to get in, first and in one order, from the function every public surface reads
+      // (services/first-steps.ts). The two sections below keep their detail; this is what an AI
+      // that reads only the top of the document needs.
+      first_steps: buildFirstSteps(config),
+
       for_ai_assistants: {
         context: 'A human user shared this AIMEAT node URL with you. Your role is to help them build something or explore what this node offers. Do not just summarize the technical response below. Instead, guide the user through a conversation to understand what they want to do.',
         first_message: 'Start by asking the user: Are you familiar with AIMEAT, or is this your first time? Then based on their answer, guide them to one of the paths below.',
         paths: {
           build_an_app: {
             description: 'User wants to build an app or service on this node',
-            requires_registration: false,
-            quick_start: `POST ${base}/v1/auth/anonymous for immediate access with no registration`,
-            guide: 'Ask what kind of app they want to build. Show examples from the list below. Help them build it step by step using the available capabilities. They can start immediately with anonymous access.',
+            // The anonymous road is a node setting, and it ships OFF. Offered unconditionally it sent
+            // every assistant to a route that answers 403 on most nodes (instruction review, 2026-09-18).
+            requires_registration: !config.anonymousMode,
+            quick_start: config.anonymousMode
+              ? `POST ${base}/v1/auth/anonymous for immediate access with no registration`
+              : `The person registers at ${base}/v1/portal, then connects you: see first_steps at the top of this document.`,
+            guide: config.anonymousMode
+              ? 'Ask what kind of app they want to build. Show examples from the list below. Help them build it step by step using the available capabilities. They can start immediately with anonymous access.'
+              : 'Ask what kind of app they want to build. Show examples from the list below. Help them build it step by step using the available capabilities, once they have an account here and you are connected to it.',
             examples: [
               'Note-taking app with persistent cloud memory',
               'Hobby community where people find each other by interests and location',
@@ -324,12 +336,14 @@ export function bootstrapRouter(
                 'push notifications - browser push via VAPID',
               ],
             },
-            anonymous_access: {
-              endpoint: `POST ${base}/v1/auth/anonymous`,
-              result: 'JWT token for immediate access, no registration needed',
-              available_scopes: ['memory:read', 'memory:write', 'memory:delete', 'storage:read', 'storage:write', 'catalogue:read', 'social:read'],
-              limitation: 'Memory keys limited to anonymous.* namespace',
-            },
+            ...(config.anonymousMode ? {
+              anonymous_access: {
+                endpoint: `POST ${base}/v1/auth/anonymous`,
+                result: 'JWT token for immediate access, no registration needed',
+                available_scopes: ['memory:read', 'memory:write', 'memory:delete', 'storage:read', 'storage:write', 'catalogue:read', 'social:read'],
+                limitation: 'Memory keys limited to anonymous.* namespace',
+              },
+            } : {}),
             app_building: {
               note: 'When building an app, always use the standard template with the AIMEAT login bar. FIRST fetch the canonical build prompt: GET /v1/prompts/build-app (?format=txt for raw text, ?idea=<what to build>) — the same battle-tested prompt the app-catalog Create-new-app button copies. MCP-equipped agents: load the paved-path skill node:aimeat-app-builder via aimeat_skill_get. Starter skeletons: GET /v1/app-templates. Curated what-breaks-app-builds registry: GET /v1/appdev/pitfalls. See the "Building Apps on AIMEAT" section in /llms-full.txt for the full SDK documentation.',
               build_prompt: `${base}/v1/prompts/build-app`,
@@ -521,7 +535,7 @@ export function bootstrapRouter(
                 service: `${base}/v2/mcp/service — provide a service / marketplace: boards, work, wallet, capabilities, organisms`,
                 admin: `${base}/v2/mcp/admin — operator/owner governance: node admin, moderation, groups, consent`,
                 commerce: `${base}/v2/mcp/commerce — selling and getting paid: priced manifests, checkout, receipts, beneficiary splits`,
-                primitives: `${base}/v2/mcp/primitives — twelve tools; everything else found with aimeat_discover and run with aimeat_invoke`,
+                primitives: `${base}/v2/mcp/primitives — a handful of tools; everything else found with aimeat_discover and run with aimeat_invoke`,
                 full: `${base}/v2/mcp/full — everything this node offers, for work that does not fit one of the focused surfaces`,
               },
             },

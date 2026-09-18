@@ -14514,6 +14514,7 @@
       "cliDesc": "Keep this server running while your AI runtime is attached. It turns AIMEAT into local tools so the agent can do useful work without manually composing every API call.",
       "agentInstructionTitle": "Tell the connected agent what to do next:",
       "agentInstructionDesc": "After the MCP server is attached to your agent runtime, paste this instruction to start Hello Integration:",
+      "agentInstructionLoadFailed": "The instruction could not be loaded. Reload the page, or run npx aimeat connect, which prints the same text.",
       "noNodejs": "Don't have Node.js?",
       "pasteAlt": "Fallback: connect an AI agent with APIs",
       "pasteDesc": "If the connector or MCP tools are not available, copy this prompt for an agent that can make HTTPS requests. It explains how to connect to AIMEAT and start Hello Integration through the API:",

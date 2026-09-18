@@ -235,15 +235,20 @@ async function main() {
             assert(instructions.includes('aimeat_app_list'), 'instructions name aimeat_app_list');
         });
 
-        await test('2. /v2/mcp/agent names its own surface before the shared body', async () => {
+        await test('2. /v2/mcp/agent names its own surface, after what every agent has to act on', async () => {
             const { status, body } = await v2agent('initialize', {
                 protocolVersion: '2025-03-26', capabilities: {},
                 clientInfo: { name: 'MCP Orientation E2E', version: '1.0.0' },
             });
             assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
             const instructions = body.result?.instructions ?? '';
-            assert(instructions.startsWith('This surface is the owner'), `agent surface introduces itself first: ${instructions.slice(0, 60)}`);
-            assert(instructions.includes('aimeat_handbook_get'), 'the shared body follows the surface line');
+            // Until 2026-09-18 the surface line came first. Several clients cut the instructions at
+            // about 2 kB, so what an agent acts on now leads and the surface line follows it; both
+            // still arrive inside the part a cutting client shows.
+            const core = instructions.indexOf('aimeat_handbook_get first');
+            const surface = instructions.indexOf('This surface is the owner');
+            assert(core >= 0 && core < 400, `the way in leads, at ${core}`);
+            assert(surface > core && surface < 1900, `the agent surface still introduces itself, at ${surface}`);
         });
 
         // ── Phase 2: the address a person can open ──

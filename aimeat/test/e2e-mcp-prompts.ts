@@ -267,6 +267,46 @@ await test('4. aimeat_handbook_get handles both "tier1" and "tier-1" notation', 
     assert(isError1 === isError2, `tier1 and tier-1 should have same error status: ${isError1} vs ${isError2}`);
 });
 
+// The server instructions send every agent to this tool first, with no arguments. Until 2026-09-18
+// that call returned the REST tier-1 handbook with its {{variables}} unfilled: HTTP calls and a
+// cron watchdog, and no MCP tool by name. Five of nine cold-agent baseline tasks opened with it.
+await test('5. with no arguments it returns the handbook of the surface, and the node\'s skills by situation', async () => {
+    const { body } = await mcpRpc('tools/call', { name: 'aimeat_handbook_get', arguments: {} }, 105);
+    assert(body.result?.isError !== true, `not an error: ${JSON.stringify(body.result).slice(0, 300)}`);
+    const text: string = body.result.content[0].text;
+    assert(!text.trimStart().startsWith('{'), 'markdown for an agent to read, not a prompt record');
+    assert(text.includes('aimeat_memory_search') && text.includes('aimeat_app_list'), 'it names the MCP tools for the grounds that carry the work');
+    assert(!/GET \/v1\/agents\/me\/directives/.test(text), 'it is not the REST boot sequence');
+    assert(!/\{\{\w+\}\}/.test(text), `no unfilled variable: ${/\{\{\w+\}\}/.exec(text)?.[0]}`);
+    // Built from the registry: the seeded public guide is on every node.
+    assert(text.includes('## A skill may already cover this'), 'the skills section is there');
+    assert(text.includes('`aimeat-node-guide`'), 'a seeded skill is listed by name');
+    assert(text.includes('`aimeat-phaser`') && !text.includes('`aimeat-phaser-boot`'), 'entry points only: a part of a listed skill is left out');
+    assert(text.includes('aimeat_skill_get'), 'and it says how to load one');
+});
+
+await test('6. a tier asked for by name comes back with its variables filled', async () => {
+    const { body } = await mcpRpc('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'tier1' } }, 106);
+    assert(body.result?.isError !== true, 'tier-1 is seeded on a fresh node');
+    const prompt = JSON.parse(body.result.content[0].text);
+    assert(prompt.id === 'tier-1', `the tier handbook is still served by name, got ${prompt.id}`);
+    assert(!/\{\{\w+\}\}/.test(prompt.content), `no unfilled variable: ${/\{\{\w+\}\}/.exec(prompt.content)?.[0]}`);
+    assert(prompt.content.includes('#'), 'the agent\'s own GAII is in the text');
+});
+
+await test('7. FAILURE MODE: a surface that is not one is refused by the schema, not answered with a guess', async () => {
+    const { body } = await mcpRpc('tools/call', { name: 'aimeat_handbook_get', arguments: { surface: 'nonsense' } }, 107);
+    assert(body.error !== undefined || body.result?.isError === true, `refused, got ${JSON.stringify(body).slice(0, 200)}`);
+});
+
+await test('8. every one of the seven surfaces has a handbook this tool can reach', async () => {
+    for (const surface of ['appdev', 'agent', 'service', 'admin', 'commerce', 'primitives', 'full']) {
+        const { body } = await mcpRpc('tools/call', { name: 'aimeat_handbook_get', arguments: { surface } }, 108);
+        assert(body.result?.isError !== true && body.result?.content?.[0]?.text?.length > 200,
+            `${surface}: ${JSON.stringify(body.error ?? body.result).slice(0, 160)}`);
+    }
+});
+
 // ─── Summary ───
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

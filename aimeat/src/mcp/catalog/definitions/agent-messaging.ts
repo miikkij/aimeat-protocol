@@ -29,12 +29,12 @@ import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenan
 export const agentMessagingTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_handbook_get',
-        description: 'Fetch a managed system prompt (the agent operating handbook), addressed by tier or prompt ID. Pass "tier1"/"tier2" (or "tier-1") for the standard onboarding/operating directives, or a custom prompt ID. Returns the prompt name, description, content, and any variables. Read this during onboarding to learn how to operate on the node; confirm you have read it with aimeat_onboarding_confirm_directives_read.',
+        description: 'This node\'s operating guide. Call it with no arguments, first: it returns the handbook for the surface you are connected to, which names the tools that matter for the job and the order to use them in, followed by this node\'s skills, one line each, saying which situation each one covers. When a line matches what the person asked for, load that skill with aimeat_skill_get before you start. Pass `surface` only to read another surface\'s handbook. An agent working over HTTP can ask for a tier handbook by id ("tier1", "tier2") or a managed prompt by its id; that answer carries the prompt name, description, content and variables.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             module: { type: 'string', description: 'Optional handbook module name, such as tasks or messages.' },
-            surface: { type: 'string', enum: ['appdev', 'agent', 'service', 'admin'], description: 'Optional v2 surface role — returns that surface\'s operating handbook.' },
+            surface: { type: 'string', enum: ['appdev', 'agent', 'service', 'admin', 'commerce', 'primitives', 'full'], description: 'Another surface\'s handbook than your own. Leave it out to get the one for the surface you are connected to.' },
         },
     },
     {

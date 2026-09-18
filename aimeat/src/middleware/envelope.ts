@@ -98,6 +98,23 @@ const SUPPORT_HINT: HintAction = {
   example_body: { to: 'support@operators', subject: 'What went wrong', body: 'What you were doing, and what happened instead.' },
 };
 
+/**
+ * The envelope, described from what success() and error() return, for the documents that tell an
+ * agent what a response looks like (AGENTS.md, skill.md). Until 2026-09-18 both said
+ * `{ success, node_id, data|error, next_actions }`, written by hand and wrong on three of four
+ * fields, while /llms-full.txt said `ok`: an agent reading two of this node's own documents got
+ * two different shapes. Built from a real call, so a field added or renamed above reaches them.
+ */
+export function envelopeShape(): { success: string; error: string } {
+  const keysOf = (r: AimeatResponse) => Object.entries(r)
+    .filter(([k, v]) => v !== undefined && k !== 'meta')
+    .map(([k]) => (k === 'hints' ? 'hints: { next_actions }' : k));
+  return {
+    success: `{ ${keysOf(success('node-id', {}, [])).join(', ')} }`,
+    error: `{ ${keysOf(error('node-id', 'CODE', 'message')).map(k => (k === 'error' ? 'error: { code, message }' : k)).join(', ')} }`,
+  };
+}
+
 export function error(nodeId: string, code: string, message: string, httpStatus?: number, details?: unknown, hints?: HintAction[]): AimeatResponse {
   return {
     ok: false,

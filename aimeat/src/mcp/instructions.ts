@@ -15,6 +15,11 @@
  *   import { instructionsFor } from './instructions.js';
  *   new McpServer({ name, version }, { capabilities, instructions: instructionsFor(role, { guidance }) });
  * @version-history
+ *   v1.2.0 — 2026-09-18 — What an agent acts on comes first, inside the first 1 500 characters, and
+ *     the long form follows. Several clients cut this string at about 2 kB; the cut fell inside
+ *     the block on how to speak and removed "their own language", the order to work in when
+ *     something stops, who answers support, and the owner's proactive guidance. Reordered, not
+ *     rewritten: CORE is the short form of what DETAIL says, and DETAIL is the old text.
  *   v1.1.0 — 2026-08-22 — Optional proactive guidance appended when the owner keeps that setting on
  *     (services/proactive-mode.ts). Appended rather than woven in: the base text is what every
  *     agent needs, the guidance is a choice this account made, and a reader can see which is which.
@@ -33,24 +38,32 @@ export const SURFACE_INTROS: Record<SurfaceRole, string> = {
     service: 'This surface is for offering a service: work, actions, wallet, capabilities and organisms.',
     admin: 'This surface is for governance: operator settings, flags, groups, consent and agent management.',
     commerce: 'This surface is for selling and getting paid: credentials, priced manifests, checkout and receipts.',
-    primitives: 'This surface is twelve tools, and everything else is data: search what this node can do with aimeat_discover (type="capability"), then run what you found with aimeat_invoke. It runs as you, so it can do what you can do and nothing more.',
+    primitives: 'This surface is a handful of tools, and everything else is data: search what this node can do with aimeat_discover (type="capability"), then run what you found with aimeat_invoke. It runs as you, so it can do what you can do and nothing more.',
     full: 'This surface carries everything the node offers, so nothing here is narrowed to one kind of work. If your work does have a shape — building apps, running the owner\'s own agent, offering a service, governing the node, selling — the surface named after it is smaller to hold and harder to misfire from. Start with aimeat_handbook_get either way.',
 };
 
-const BASE = `You are connected to an AIMEAT node, the personal knowledge and action store of the person who authorised this connection. They own everything here, and your work lands under their identity in surfaces they can see.
+/**
+ * What an agent has to act on, in the first 1 500 characters. Several clients cut the instructions
+ * at about 2 kB (measured on 2026-09-18: one stopped mid-word at character 2 052), and until then
+ * the cut removed "speak their language", the order to work in when something stops, the line about
+ * who answers support, and the owner's proactive guidance, all of which came after a long block on
+ * how to speak. Nothing here is new: each sentence is the short form of something DETAIL says at
+ * length, so a client that shows everything reads the point twice and one that cuts reads it once.
+ */
+const CORE = `You are connected to an AIMEAT node, the personal knowledge and action store of the person who authorised this connection. They own everything here, and your work lands under their identity in surfaces they can see.
 
-Call aimeat_handbook_get first. It is this node's operating guide, and it names the few tools that matter for the job in front of you.
+Call aimeat_handbook_get first, with no arguments. It is this node's operating guide: it names the tools that matter for the job in front of you, and it lists this node's skills by the situation each one covers.
 
 Three grounds carry most of the work:
 - Memory holds the person's own knowledge. aimeat_memory_list takes a key prefix and an owner scope, aimeat_memory_search finds by content, and many features here live as a memory record under a key prefix plus a prompt that reads it.
 - Apps are single-file web apps published on this node. aimeat_app_list gives each one a \`url\`, which is the address to hand the person when they want to open it.
 - Organisms and workspaces are how the person shares knowledge with others. Skills (aimeat_skill_list, aimeat_skill_get) are the operating guide for one named capability.
 
-When something here does not work, when a step will not complete, or when you need a decision only a
-human can make: send it to \`support@operators\` with aimeat_dm_send. That address reaches the people
-who run this node, in one thread they answer in. Say what you were doing and what happened instead;
-you will get a conversation id to continue in. Asking is the expected move, not a last resort, and
-what you report is how this node gets better.
+When something does not work, act on what the error says. When that does not get there, or a decision is a human's to make, send it to \`support@operators\` with aimeat_dm_send: it reaches the people who run this node in one thread they answer in. Say what you were doing and what happened instead.
+
+Speak to the person in their own language and in their words: what you did and what happens next. Ids, keys, scopes and tool names belong in what you do, not in what you say, unless they ask.`;
+
+const DETAIL = `More on asking the operators. \`support@operators\` gives you a conversation id to continue in. Asking is the expected move, not a last resort, and what you report is how this node gets better.
 
 SPEAK TO THE PERSON, NOT ABOUT THE SYSTEM. They did not ask for a receipt, and most of them will
 never learn our vocabulary. Say what you did and what happens next, in their words:
@@ -109,15 +122,25 @@ export interface InstructionsOptions {
  * up front, since on those the agent is looking at an allowlist rather than everything.
  */
 export function instructionsFor(role: SurfaceRole | 'all', opts: InstructionsOptions = {}): string {
-    let base = role === 'all' ? BASE : `${SURFACE_INTROS[role]}\n\n${BASE}`;
+    // In the order a cut hurts least. CORE is what an agent acts on. Who answers support is one
+    // line and belongs next to the address it explains. The surface line and DETAIL are the long
+    // form. The owner's proactive guidance comes last because it is the longest part by far and
+    // aimeat_handbook_get carries it as well, so an agent that reads the handbook has it anyway.
+    const parts: string[] = [CORE];
 
-    // Appended, never substituted: the address is unchanged and the agent does the same thing with
-    // it. What this adds is only the answer to "did that actually go anywhere".
+    // The address is unchanged and the agent does the same thing with it. What this adds is only
+    // the answer to "did that actually go anywhere".
     const answeredBy = opts.supportAnsweredBy?.trim();
     if (answeredBy) {
-        base += `\n\nSupport here is answered by ${answeredBy}, who run this node. Write to \`support@operators\` exactly as you would anywhere; it reaches them.`;
+        parts.push(`Support here is answered by ${answeredBy}, who run this node. Write to \`support@operators\` exactly as you would anywhere; it reaches them.`);
     }
+    if (role !== 'all') parts.push(SURFACE_INTROS[role]);
+    parts.push(DETAIL);
 
     const guidance = opts.proactiveGuidance?.trim();
-    return guidance ? `${base}\n\n${guidance}` : base;
+    if (guidance) parts.push(guidance);
+    return parts.join('\n\n');
 }
+
+/** Where a client that cuts the instructions is known to cut them. The tests hold CORE under it. */
+export const INSTRUCTIONS_CUT_AT = 1900;
