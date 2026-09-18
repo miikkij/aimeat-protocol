@@ -11,6 +11,11 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.15.0 -- 2026-09-18 -- Six conversation skills join from builtin-skills.conversation.ts:
+ *     aimeat-first-conversation, aimeat-welcome-pages, aimeat-activating-a-person,
+ *     aimeat-offering-choices, aimeat-paying-for-the-ai and aimeat-mail-to-data. They existed only
+ *     as hand-published skills on aimeat.io, so a node somebody else stood up had the chat and none
+ *     of its guidance. Moved byte for byte, so aimeat.io adopts its own copies on the next boot.
  *   v1.14.1 -- 2026-09-18 -- Three skills called morsels an economy agents spend from; a morsel is a
  *     pacer, not money. aimeat-node-guide names the device-token route, says the token works at
  *     once, and presents the signature mint as the agent's renewal (RFC Core §6.2 step 6, ruled the
@@ -69,6 +74,7 @@
 
 import { OPEN_ITEMS_SKILL_ENTRY } from './builtin-skills.open-items.js';
 import { HATCHERY_SKILL_ENTRY } from './builtin-skills.hatchery.js';
+import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
 import { WORKSTATION_SKILL_ENTRY } from './builtin-skills.workstation.js';
 import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
 import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
@@ -85,6 +91,7 @@ export interface BuiltinSkill {
 export const BUILTIN_SKILLS: BuiltinSkill[] = [
   OPEN_ITEMS_SKILL_ENTRY,
   HATCHERY_SKILL_ENTRY,
+  ...CONVERSATION_SKILL_ENTRIES,
   WORKSTATION_SKILL_ENTRY,
   APP_BUILDER_SKILL_ENTRY,
   APP_BUILDER_ATELIER_SKILL_ENTRY,

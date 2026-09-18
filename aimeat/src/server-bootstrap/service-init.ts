@@ -168,7 +168,14 @@ export async function initializeServices(
   // Bring the built-in node-scope skills into step with this build. A skill edited on THIS node is
   // left alone and named in the log; an untouched one follows the repo. Before 2026-08-25 this was
   // create-if-missing, which could not tell those two apart and so never updated anything.
-  seedBuiltinSkills(storage, config)
+  //
+  // AWAITED since 2026-09-18, for the reason the prompts above are. Agents are told to list the
+  // skills first, tool descriptions point at skills by name, and the public index is cached: on a
+  // fresh node the first request cached whatever had landed so far. With 25 skills the seed won
+  // that race; the six conversation skills made it 31, and on Postgres the index then came back
+  // with exactly 20 entries and no aimeat-node-guide (e2e-skills 27b, two runs of two). On a node
+  // that is already seeded this is two reads per skill.
+  await seedBuiltinSkills(storage, config)
     .then(r => {
       const moved = r.created + r.updated + r.adopted;
       if (moved > 0) logger.info(`Built-in skills: ${r.created} created, ${r.updated} updated, ${r.adopted} adopted, ${r.unchanged} already current`);

@@ -76,6 +76,17 @@ const SOURCES: string[] = [
     'aimeat/src/services/skill-bundle',
     'aimeat/src/cli/connect/onboarding-prompt.ts',
     'aimeat/src/data/builtin-skills.ts',
+    'aimeat/src/data/builtin-skills.conversation.ts',
+    'aimeat/src/data/builtin-skills.hatchery.ts',
+    'aimeat/src/data/builtin-skills.open-items.ts',
+    'aimeat/src/data/builtin-skills.workstation.ts',
+    'aimeat/src/data/builtin-skills.app-builder.ts',
+    'aimeat/src/data/builtin-skills.app-builder-atelier.ts',
+    'aimeat/src/data/builtin-skills-games.ts',
+    'aimeat/src/data/builtin-skills-games.boot-assets.ts',
+    'aimeat/src/data/builtin-skills-games.menus-audio.ts',
+    'aimeat/src/data/builtin-skills-games.saves-controls.ts',
+    'aimeat/src/data/builtin-skills-games.world.ts',
     'aimeat/src/mcp/catalog/definitions',
     'aimeat/public/views/profile/agents/connect-prompts.js',
     'aimeat/public/views/home/journey-prompts.js',
@@ -96,7 +107,7 @@ const BANNED: Banned[] = [
     { id: 'boards-deprecated', pattern: /Boards?\b[^.\n]{0,80}\bDEPRECATED|DEPRECATED[^.\n]{0,80}\bBoards?\b/i, why: 'Boards were reinstated on 2026-08-30 and are current' },
     { id: 'morsel-as-money', pattern: /morsel[^.\n]{0,120}\b(currency|micro-currency|micro-transactions?|economy)\b|\b(currency|micro-currency|economy)\b[^.\n]{0,120}morsel/i, // `currency` as an SDK field or parameter (`{ amount, currency }`, `session.currency`) is the
     // commerce API's own name for morsel-or-money, and stays.
-    unless: /\bnot (a |an )?(internal )?(currency|money)\b|not money|never morsels|money-currency|pacing meter|\bcurrency\??\s*[:}\]]|\.currency\b|,\s*currency\b|currency\??\)\s*(\/\/|→|$)/i, why: 'a morsel is a pacer, not money: it buys nothing and is never called a currency or an economy' },
+    unless: /\bnot (a |an )?(internal )?(currency|money)\b|not money|never morsels|never a currency|money-currency|pacing meter|\bcurrency\??\s*[:}\]]|\.currency\b|,\s*currency\b|currency\??\)\s*(\/\/|→|$)/i, why: 'a morsel is a pacer, not money: it buys nothing and is never called a currency or an economy' },
     { id: 'oauth-routes', pattern: /\/v1\/oauth\//, why: 'the OAuth routes are /v1/mcp/register, /v1/mcp/authorize and /v1/mcp/token' },
 ];
 
