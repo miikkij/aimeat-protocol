@@ -605,6 +605,200 @@
     .or-steps li { margin-bottom: 8px; }
     .or-note { color: #fbbf24 !important; font-size: 0.85rem !important; }
     .or-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       THE HOUSE FACE, OVER THE TOP OF THE OLD ONE.
+
+       This window used to be dark purple and hot pink with rounded cards, and the front door
+       (index.html) is the house poster face. One click between them showed a person two different
+       products, which is what Jouni saw on 2026-09-18 ("se ei tuntunut hyvälle enää").
+
+       It is written as an override rather than a rewrite on purpose. The rules above carry this
+       window's whole layout, and a from-scratch sheet would have had to reproduce every one of the
+       hundred-odd selectors above, with an unstyled corner wherever one was missed. So the layout
+       stays where it is and only the visual layer is taken over: the tokens, the type, the shapes,
+       the colours. The values are the literal ones from aimeat/public/css/theme.css and poster.css,
+       because this app runs outside the node and cannot read them (skill aimeat-design-language).
+
+       The machine room is not the front door, so it stays quieter: no wordmark, no big slab, and
+       the loud action belongs to Start and Stop.
+       ══════════════════════════════════════════════════════════════════════ */
+
+    @font-face {
+      font-family: 'Fjalla One'; font-style: normal; font-weight: 400; font-display: swap;
+      src: url('fonts/fjalla-one-latin.woff2') format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+    @font-face {
+      font-family: 'Fjalla One'; font-style: normal; font-weight: 400; font-display: swap;
+      src: url('fonts/fjalla-one-latin-ext.woff2') format('woff2');
+      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+    @font-face {
+      font-family: 'Archivo'; font-style: normal; font-weight: 100 900; font-display: swap;
+      src: url('fonts/archivo-var-latin.woff2') format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+    @font-face {
+      font-family: 'Archivo'; font-style: normal; font-weight: 100 900; font-display: swap;
+      src: url('fonts/archivo-var-latin-ext.woff2') format('woff2');
+      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+    @font-face {
+      font-family: 'Archivo Black'; font-style: normal; font-weight: 400; font-display: swap;
+      src: url('fonts/archivo-black-latin.woff2') format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+    @font-face {
+      font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800; font-display: swap;
+      src: url('fonts/jetbrains-mono-var-latin.woff2') format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+    @font-face {
+      font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800; font-display: swap;
+      src: url('fonts/jetbrains-mono-var-latin-ext.woff2') format('woff2');
+      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+
+    :root {
+      --font-poster: 'Fjalla One', 'Arial Narrow', sans-serif;
+      --font-body: 'Archivo', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+      --text: #1A1A2E; --bg: #FAFAF8; --card-bg: #FFFFFF; --text-dim: #6B7280;
+      --border: #E5E7EB; --accent: #E8564A; --sun: #FFB52E; --on-sun: #1A1A2E;
+      --success-fg: #047857; --danger-fg: #B91C1C;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text: #EDEEF2; --bg: #14151A; --card-bg: #1C1E26; --text-dim: #A4A9B6;
+        --border: #33363F; --accent: #FF6F62; --success-fg: #6EE7B7; --danger-fg: #FCA5A5;
+      }
+    }
+
+    body { background: var(--bg); color: var(--text); font-family: var(--font-body); }
+    main { color: var(--text); }
+    h1 {
+      font-family: var(--font-poster); font-weight: 400; letter-spacing: .01em; line-height: 1;
+      text-transform: uppercase; color: var(--text); font-size: 2.4rem;
+      /* The old rule painted the heading with a pink gradient through background-clip, which a
+         colour alone cannot undo: the text fill has to be given back to the colour. */
+      background: none; -webkit-background-clip: border-box; -webkit-text-fill-color: currentColor;
+    }
+    .card h2, .welcome-box h1, .or-box h1, .home-card h2 {
+      font-family: var(--font-poster); font-weight: 400; letter-spacing: .01em; line-height: 1;
+      text-transform: uppercase; color: var(--text);
+    }
+
+    /* Header: paper, ink words, one ink rule under the whole thing. */
+    .app-header { background: var(--bg); }
+    nav { background: var(--bg); border-bottom: 1px solid var(--border); }
+    nav .brand { font-family: 'Archivo Black', system-ui, sans-serif; color: var(--text); letter-spacing: -.01em; }
+    nav a {
+      color: var(--text); border-radius: 0; font-weight: 600; font-size: .8rem;
+      text-transform: uppercase; letter-spacing: .04em; padding: 6px 0; margin-right: 4px;
+      border-bottom: 3px solid transparent;
+    }
+    nav a:hover { background: none; color: var(--accent); border-bottom-color: var(--accent); }
+    nav a.active { background: none; color: var(--text); border-bottom-color: var(--text); }
+    .status-bar { background: var(--bg); border-bottom: 3px solid var(--text); color: var(--text-dim); font-size: .8rem; }
+    .status-dot { border-radius: 0; background: var(--success-fg); animation: none; }
+    .status-dot.offline { background: var(--text-dim); }
+
+    /* A card is a box with an ink frame; nothing here has a radius or a blurred shadow. */
+    .card {
+      background: var(--card-bg); border: 2px solid var(--text); border-radius: 0; box-shadow: none;
+      color: var(--text);
+    }
+    .card p, .form-hint, .home-sub, .fw-step-desc, .service-url, .or-steps { color: var(--text-dim); }
+
+    /* One loud action shape, and a quieter one beside it. */
+    .btn {
+      background: var(--text); color: var(--bg); border: 0; border-radius: 0;
+      box-shadow: 4px 4px 0 var(--sun); padding: 10px 16px;
+      font-family: var(--font-body); font-weight: 600; font-size: .8rem;
+      text-transform: uppercase; letter-spacing: .04em;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    .btn:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); color: var(--sun); background: var(--text); }
+    .btn:disabled { opacity: .45; box-shadow: none; transform: none; }
+    .btn.secondary {
+      background: none; color: var(--text); box-shadow: none; border: 0;
+      border-bottom: 3px solid var(--text); padding: 0 0 2px; font-weight: 800;
+    }
+    .btn.secondary:hover { background: none; color: var(--accent); border-bottom-color: var(--accent); transform: none; }
+    .btn.danger { background: var(--accent); color: #FFFFFF; box-shadow: 4px 4px 0 var(--text); }
+    .btn.danger:hover { color: #FFFFFF; background: var(--accent); }
+
+    /* Fields: one ink underline, coral while being filled. */
+    .form-group label, .fw-idea-label, .welcome-lang-label {
+      color: var(--accent); text-transform: uppercase; letter-spacing: .1em;
+      font-weight: 800; font-size: .72rem;
+    }
+    .form-group input, .form-group select, .fw-input, .fw-idea, .ai-model-select, .welcome-lang, .lang-select {
+      background: transparent; color: var(--text); border: 0; border-bottom: 3px solid var(--text);
+      border-radius: 0; font-family: var(--font-mono); font-size: .95rem;
+    }
+    .form-group input:focus, .form-group select:focus, .fw-input:focus, .fw-idea:focus, .ai-model-select:focus {
+      outline: none; border-bottom-color: var(--accent); box-shadow: none;
+    }
+    .form-group select option, .ai-model-select option, .welcome-lang option { background: var(--card-bg); color: var(--text); }
+    .lang-select { border: 1px solid var(--text); padding: .15rem .35rem; font-size: .75rem; }
+
+    /* Chips and readouts are mono and square. */
+    .status-indicator, .home-badge {
+      border-radius: 0; border: 1px solid var(--text); background: transparent;
+      font-family: var(--font-mono); font-size: .68rem; font-weight: 500; color: var(--text);
+    }
+    .status-indicator.online { color: var(--success-fg); border-color: var(--success-fg); background: transparent; }
+    .status-indicator.offline { color: var(--text-dim); border-color: var(--border); background: transparent; }
+    .status-indicator .dot, .dot { border-radius: 0; }
+    .home-badge-warn { color: var(--accent); border-color: var(--accent); }
+    .info-grid dt { color: var(--text-dim); font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 800; }
+    .info-grid dd { color: var(--text); font-family: var(--font-mono); }
+
+    /* Anything that shows machine text: mono, in a framed box. */
+    .log-viewer, .code-box, .fw-log, .fw-result {
+      background: var(--card-bg); border: 2px solid var(--text); border-radius: 0;
+      color: var(--text); font-family: var(--font-mono);
+    }
+    .code-box code { color: var(--text); font-family: var(--font-mono); }
+    .log-viewer::-webkit-scrollbar-track { background: var(--card-bg); }
+    .log-viewer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 0; }
+    .log-controls label { color: var(--text-dim); }
+    .fw-result.working { border-color: var(--sun); }
+    .fw-result.failed { border-color: var(--accent); }
+
+    .service-item, .fw-step, .home-card, .welcome-box, .or-box, .home-banner {
+      background: var(--card-bg); border: 2px solid var(--text); border-radius: 0; box-shadow: none;
+      color: var(--text);
+    }
+    .home-banner { border: 3px dashed var(--accent); }
+    .home-banner-update { border-style: dashed; border-color: var(--accent); }
+    .service-name, .fw-step-title, .home-get strong { color: var(--text); }
+    .fw-step-num { background: var(--text); color: var(--bg); border-radius: 0; }
+    .fw-step.active .fw-step-num { background: var(--sun); color: var(--on-sun); }
+    .fw-step.done .fw-step-num, .fw-step.done .fw-step-check { background: none; color: var(--success-fg); }
+    .fw-step.active { border-color: var(--accent); }
+    .empty-state, .empty-state p, .fw-hint, .fw-step-status { color: var(--text-dim); }
+    .welcome-overlay { background: color-mix(in srgb, var(--bg) 88%, transparent); }
+    .or-note { color: var(--accent) !important; }
+
+    .toast { border-radius: 0; border: 2px solid var(--text); background: var(--card-bg); color: var(--text); box-shadow: 4px 4px 0 var(--sun); }
+    .toast.success { border-color: var(--success-fg); }
+    .toast.error { border-color: var(--accent); }
+
+    .chat-msg { border-radius: 0; }
+    .chat-msg.user { background: var(--text); color: var(--bg); }
+    .chat-msg.assistant { background: var(--card-bg); color: var(--text); border: 2px solid var(--text); }
+    .chat-msg.system { background: none; color: var(--text-dim); font-family: var(--font-mono); font-size: .78rem; }
+    .chat-log { background: var(--bg); }
+    .chat-msg.assistant .cm-link { color: var(--accent); }
+    .chat-model-chip { color: var(--text-dim); font-family: var(--font-mono); }
+    .chat-tool .tname { color: var(--accent); font-family: var(--font-mono); }
+    .log-controls input[type="checkbox"], .form-group input[type="checkbox"] { accent-color: var(--accent); }
+
+    /* The old palette also sits in a handful of inline styles in the markup; those are edited
+       there rather than fought with !important here. */
   </style>
 </head>
 <body>
@@ -632,8 +826,8 @@
     <div class="status-bar">
       <div class="status-dot" id="statusDot"></div>
       <span id="statusText">Checking node status...</span>
-      <span id="appVersion" style="margin-left: auto; color: #8a8aa0; font-size: 0.82rem;"></span>
-      <span id="statusPort" style="margin-left: 16px; color: #a78bfa;">Port: 41050</span>
+      <span id="appVersion" style="margin-left: auto; color: var(--text-dim); font-size: 0.82rem;"></span>
+      <span id="statusPort" style="margin-left: 16px; color: var(--text-dim);">Port: 41050</span>
     </div>
     </header>
 
@@ -722,7 +916,7 @@
         <div class="card">
           <h2 data-i18n="pg.dash.nodeStatus">Node Status</h2>
           <p id="nodeStatus">Loading...</p>
-          <p id="nodeUptime" style="font-size: 0.85rem; color: #a78bfa; margin-top: 8px;"></p>
+          <p id="nodeUptime" style="font-size: 0.85rem; color: var(--text-dim); margin-top: 8px;"></p>
           <br />
           <div style="display: flex; gap: 12px; flex-wrap: wrap;">
             <button class="btn" id="startStopBtn" onclick="toggleNode()">Start Node</button>
@@ -795,7 +989,7 @@
 
         <div class="card">
           <h2 data-i18n="pg.ai.signIn">Sign in to your node</h2>
-          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;" data-i18n="pg.ai.signInDesc">
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 16px;" data-i18n="pg.ai.signInDesc">
             Choosing an AI below saves it to your owner account on this node (the same place the web Dashboard
             stores it). Start the node, then sign in. No account yet? Open the Dashboard in your browser and register first.
           </p>
@@ -831,7 +1025,7 @@
 
         <div class="card">
           <h2 data-i18n="pg.ai.localServices">Local AI Services</h2>
-          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;" data-i18n="pg.ai.localServicesDesc">
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 16px;" data-i18n="pg.ai.localServicesDesc">
             Detect a local AI (LM Studio, Ollama) and set it as your node's AI. Pick a model, then "Use this".
           </p>
           <div id="aiServicesList">
@@ -843,7 +1037,7 @@
 
         <div class="card">
           <h2 data-i18n="pg.ai.noAiTitle">No local AI yet? Set up Ollama (free)</h2>
-          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;" data-i18n="pg.ai.noAiDesc">
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 16px;" data-i18n="pg.ai.noAiDesc">
             Ollama runs open models locally on your machine and serves them at http://localhost:11434.
           </p>
           <ol class="steps">
@@ -861,7 +1055,7 @@
 
         <div class="card">
           <h2 data-i18n="pg.ai.customTitle">Custom AI Endpoint</h2>
-          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;" data-i18n="pg.ai.customDesc">
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 16px;" data-i18n="pg.ai.customDesc">
             Manually set an OpenAI-compatible endpoint. Saves to your account's AI settings on this node
             (same as the web Dashboard).
           </p>
@@ -942,7 +1136,7 @@
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
             <span class="status-indicator online"><span class="dot"></span><span id="chatAgentLabel">agent</span></span>
             <span id="chatModelLabel" class="chat-model-chip"></span>
-            <label style="font-size: 0.8rem; color: #a78bfa; display: flex; align-items: center; gap: 6px; cursor: pointer; margin-left: auto;">
+            <label style="font-size: 0.8rem; color: var(--text-dim); display: flex; align-items: center; gap: 6px; cursor: pointer; margin-left: auto;">
               <input type="checkbox" id="chatAutoApprove" onchange="chatToggleAuto()" /> <span data-i18n="pg.chat.autoApprove">Auto-approve writes</span>
             </label>
             <button class="btn secondary" onclick="chatClearCurrent()" style="padding: 6px 14px; font-size: 0.8rem;" data-i18n="pg.chat.clear">Clear</button>
@@ -980,7 +1174,7 @@
 
         <div class="card">
           <h2 data-i18n="pg.ag.local">Local agents (runs on your machine)</h2>
-          <p style="color:#a78bfa; font-size:0.9rem;" data-i18n="pg.ag.localDesc">
+          <p style="color:var(--text-dim); font-size:0.9rem;" data-i18n="pg.ag.localDesc">
             Set up a CrewAI agent that runs fully on your computer using a local Ollama model (Gemma) —
             no API keys, nothing leaves your machine. One-time setup, then start/stop it here.
           </p>
@@ -992,7 +1186,7 @@
             <label style="display:block; margin:6px 0;"><input id="agentPullModel" type="checkbox" checked /> <span data-i18n="pg.ag.pullModel">Pull the model with Ollama</span></label>
           </div>
           <button class="btn" id="agentProvisionBtn" onclick="provisionAgents()" data-i18n="pg.ag.enable">Enable local agents</button>
-          <p id="agentProvisionHint" style="font-size:0.82rem; color:#9ca3af; margin-top:8px;" data-i18n-html="pg.ag.needs">
+          <p id="agentProvisionHint" style="font-size:0.82rem; color:var(--text-dim); margin-top:8px;" data-i18n-html="pg.ag.needs">
             Needs Git, <code>uv</code> (or check the box above) and <a href="#" onclick="openExternal('https://ollama.com');return false;">Ollama</a>.
           </p>
         </div>
@@ -1009,8 +1203,8 @@
           </div>
           <button class="btn" id="agentStartBtn" onclick="startAgent()" data-i18n="pg.ag.start">Start agent</button>
           <button class="btn secondary" id="agentStopBtn" onclick="stopAgent()" data-i18n="pg.ag.stop">Stop</button>
-          <span id="agentState" style="margin-left:12px; color:#a78bfa;" data-i18n="pg.ag.stopped">stopped</span>
-          <p style="font-size:0.82rem; color:#9ca3af; margin-top:8px;" data-i18n-html="pg.ag.queueHint">
+          <span id="agentState" style="margin-left:12px; color:var(--text-dim);" data-i18n="pg.ag.stopped">stopped</span>
+          <p style="font-size:0.82rem; color:var(--text-dim); margin-top:8px;" data-i18n-html="pg.ag.queueHint">
             Queue work for it from the web dashboard: Profile → Agents → your agent → Tasks → + New Task.
             <button class="btn secondary" onclick="openPortal()">Open Dashboard</button>
           </p>
@@ -1018,7 +1212,7 @@
 
         <div class="card">
           <h2 data-i18n="fw.activity">Activity</h2>
-          <pre id="agentLog" style="max-height:280px; overflow:auto; background:#0b0b12; padding:10px; border-radius:8px; font-size:0.78rem; white-space:pre-wrap;"></pre>
+          <pre id="agentLog" style="max-height:280px; overflow:auto; background:var(--card-bg); border:2px solid var(--text); padding:10px; font-size:0.78rem; white-space:pre-wrap;"></pre>
         </div>
       </div>
 
@@ -2118,7 +2312,7 @@
         container.innerHTML = html;
       } catch (err) {
         container.innerHTML =
-          '<p style="color: #fca5a5;">Detection failed: ' + escapeHtml(String(err)) + '</p>';
+          '<p style="color: var(--accent);">Detection failed: ' + escapeHtml(String(err)) + '</p>';
       }
     }
 
@@ -2676,7 +2870,7 @@
       } else if (ev.type === 'approval_request') {
         const d = document.createElement('div');
         d.className = 'chat-approve';
-        d.innerHTML = '<div><strong>Approve write?</strong> <span class="tname" style="color:#a78bfa;">' + escapeHtml(ev.name) + '</span><br>' +
+        d.innerHTML = '<div><strong>Approve write?</strong> <span class="tname">' + escapeHtml(ev.name) + '</span><br>' +
           '<code style="word-break:break-all;">' + escapeHtml(JSON.stringify(ev.args || {})) + '</code></div>' +
           '<div class="row"><button class="btn" style="padding:5px 14px;font-size:0.78rem;">Approve</button>' +
           '<button class="btn secondary" style="padding:5px 14px;font-size:0.78rem;">Deny</button></div>';
