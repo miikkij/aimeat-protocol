@@ -13,25 +13,14 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
-import { resolveIdentity } from '../utils/gaii.js';
-import { error } from '../middleware/envelope.js';
+import { ownerGhiiOf, resolveIdentity } from '../utils/gaii.js';
+import { error, success } from '../middleware/envelope.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { AiCompletionError } from '../services/ai-completion.js';
 import { streamReply, streamSpeech } from '../services/ai-voice.js';
 import { logger } from '../utils/logger.js';
-
-const attribution = { app_id: z.string().min(1).max(200) };
-const reply = z.object({ ...attribution,
-  messages: z.array(z.object({ role: z.enum(['system', 'user', 'assistant']), content: z.string().max(100000) }).strict()).min(1).max(201),
-  model: z.string().max(200).optional(), temperature: z.number().min(0).max(2).optional(),
-  top_p: z.number().min(0).max(1).optional(), max_tokens: z.number().int().min(1).max(32768).optional(),
-  reasoning: z.object({ enabled: z.boolean().optional(), effort: z.enum(['low', 'medium', 'high']).optional(),
-    max_tokens: z.number().int().positive().max(32768).optional(), exclude: z.boolean().optional() }).strict().nullable().optional(),
-}).strict().refine(value => value.messages.reduce((sum, message) => sum + message.content.length, 0) <= 200000, 'messages exceed 200k characters');
-const speech = z.object({ ...attribution, input: z.string().trim().min(1).max(4000), model: z.string().min(1).max(200),
-  voice: z.string().min(1).max(200), response_format: z.enum(['pcm', 'mp3']).default('pcm'),
-  speed: z.number().min(0.25).max(4).default(1), instructions: z.string().max(2000).optional(),
-}).strict();
+import { voiceReplySchema as reply, voiceSpeechSchema as speech } from '../services/ai-voice-contract.js';
+import { createVoiceResult } from '../services/ai-voice-result.js';
 
 /** App tokens may not charge another app's quota by changing a body field. */
 export function voiceAppId(req: Request, requested?: string): string | undefined {
@@ -53,8 +42,10 @@ export function registerVoiceRoutes(router: Router, config: AimeatConfig, storag
     res.on('close', closed);
     try {
       const body = { ...req.body, app_id: voiceAppId(req, req.body?.app_id) };
+      const buffered = req.query.json === '1' ? createVoiceResult() : null;
       const emit = async (event: Record<string, unknown>) => {
         controller.signal.throwIfAborted();
+        if (buffered) { await buffered.emit(event); return; }
         if (!res.headersSent) {
           res.setHeader('Content-Type', 'application/x-ndjson'); res.setHeader('Cache-Control', 'no-store, no-transform');
           res.setHeader('X-Accel-Buffering', 'no'); res.setHeader('AI-Disclosure', 'ai-generated');
@@ -63,9 +54,15 @@ export function registerVoiceRoutes(router: Router, config: AimeatConfig, storag
         res.flush?.();
       };
       const principal = resolveIdentity(req.auth!, config.nodeId);
-      if (kind === 'reply') await streamReply(storage, config, principal, reply.parse(body), controller.signal, emit);
-      else await streamSpeech(storage, config, principal, speech.parse(body), controller.signal, emit);
-      res.end();
+      const payer = ownerGhiiOf(principal);
+      if (kind === 'reply') await streamReply(storage, config, payer, reply.parse(body), controller.signal, emit);
+      else await streamSpeech(storage, config, payer, speech.parse(body), controller.signal, emit);
+      if (buffered) {
+        controller.signal.throwIfAborted();
+        const result = kind === 'reply' ? buffered.reply() : await buffered.speech(storage, config, principal, speech.parse(body).response_format, controller.signal);
+        res.setHeader('AI-Disclosure', 'ai-generated'); res.setHeader('Cache-Control', 'no-store');
+        res.json(success(config.nodeId, result));
+      } else res.end();
     } catch (failure) {
       if (res.destroyed) { logger.debug('[voice] disconnected request settled', { error: String(failure) }); return; }
       const typed = failure instanceof AiCompletionError;

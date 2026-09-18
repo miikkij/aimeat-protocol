@@ -142,6 +142,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_app_visitors', 'aimeat_app_visitors_measure',
         'aimeat_seo_announce',
         'aimeat_image_generate',
+        'aimeat_voice_reply', 'aimeat_voice_speak',
         'aimeat_ai_job_start', 'aimeat_ai_job_list', 'aimeat_ai_job_get', 'aimeat_ai_job_cancel',
         'aimeat_extension_install', 'aimeat_extension_invoke', 'aimeat_extension_get', 'aimeat_extension_list',
         'aimeat_extension_activate', 'aimeat_extension_deactivate', 'aimeat_extension_delete', 'aimeat_iam_define',
@@ -158,6 +159,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
     ],
     agent: [
         'aimeat_image_generate',
+        'aimeat_voice_reply', 'aimeat_voice_speak',
         'aimeat_ai_job_start', 'aimeat_ai_job_list', 'aimeat_ai_job_get', 'aimeat_ai_job_cancel',
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
         'aimeat_datamap_get', 'aimeat_datamap_set', 'aimeat_memory_hands',
