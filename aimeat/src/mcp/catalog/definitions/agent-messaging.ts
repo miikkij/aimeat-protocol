@@ -5,6 +5,11 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.5.1 — 2026-09-18 — aimeat_dm_send declares `subject` and `conversation_id`. The node's tool and
+ *     the connector's dispatch have both taken them all along; only this shared definition did
+ *     not, so the one place an agent reads the tool's fields said it had no way to title a thread,
+ *     while every instruction tells it to send a subject to support@operators. Found by building
+ *     the cold-agent runner against a real node.
  *   v1.5.0 — 2026-09-13 — aimeat_dm_archive_as_owner and aimeat_dm_organize_as_owner: archiving the
  *     owner's conversations and the rules for their Messages list, on messages:organize-as-owner.
  *   v1.4.0 — 2026-09-12 — aimeat_dm_inbox_as_owner and aimeat_dm_thread_as_owner: reading the owner's
@@ -283,6 +288,8 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
             to: { type: 'string', required: true, description: 'Recipient: owner@node, agent#owner@node, or eco:app#owner@node.' },
             body: { type: 'string', description: 'Message body (GFM markdown). Optional only if you attach ≥1 file.' },
             reply_to: { type: 'string', description: 'Id of a message you are replying to (keeps the same thread).' },
+            subject: { type: 'string', description: 'Open a NEW topic thread with this title, instead of one endless thread with the recipient. Give one when you write to support@operators, so the operators see what the thread is about.' },
+            conversation_id: { type: 'string', description: 'Continue a specific existing thread by its id: the one a send returned, or one from aimeat_dm_inbox.' },
             attachments: { type: 'array', description: 'Up to 20 attachment descriptors { storage_key, mime, kind, size, name }, each pre-uploaded via aimeat_storage_upload.' },
         },
     },
