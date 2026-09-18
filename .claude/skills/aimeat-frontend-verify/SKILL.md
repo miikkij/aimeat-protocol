@@ -9,7 +9,7 @@ description: AIMEAT frontend rules: the styling conventions to write to, and how
 
 **Trigger:** a completed change to `public/views/`, `public/components/`, `public/js/`, `public/css/`, `locales/`, or a `*.html` page, or a published single-file AIMEAT app (`aimeat_app_publish`). Mid-development is not the trigger; done is.
 
-Against the running dev server (`pnpm dev`, port 40050): navigate to the page, reach the authenticated state, perform the real interactions, and confirm the expected result actually happens. Elements appear, data persists, edits and deletes take effect.
+Against your own sandbox node (`pnpm sandbox`, port 40600 upward, owners and passwords in `aimeat/.sandbox.json`; restart it to pick up a backend change), not the shared dev server on 40050, which belongs to the developer and may be restarted by another session: navigate to the page, reach the authenticated state, perform the real interactions, and confirm the expected result actually happens. Elements appear, data persists, edits and deletes take effect.
 
 If you could not drive the browser (MCP unavailable, server down, no credentials), say so. Do not report it as working.
 

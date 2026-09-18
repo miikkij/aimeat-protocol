@@ -18,7 +18,7 @@ $env:AIMEAT_SESSION = 'cc-owner-unique-tag'
 $env:AIMEAT_PROJECT = 'aimeat-protocol'
 $env:AIMEAT_E2E_PORT = '<port from your claim>'
 git fetch origin
-git worktree add -b $env:AIMEAT_SESSION ".worktrees/$env:AIMEAT_SESSION" origin/main
+git worktree add --detach ".worktrees/$env:AIMEAT_SESSION" origin/main
 Set-Location ".worktrees/$env:AIMEAT_SESSION/aimeat"
 pnpm install
 pnpm test:env:init

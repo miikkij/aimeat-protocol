@@ -1,7 +1,7 @@
 ---
 name: note-writer
 description: Writes the durable record of a finished piece of work in the places this project keeps it: a Platform Development Notes or App Development Notes document on the node, a decision record when a ruling was made, the wish's status and notes, and a pitfalls entry when a repeatable trap was hit. Use after a commit lands, with the commit hash and the lead's list of what was decided, what it cost and what is open.
-tools: Read, Glob, Grep, Bash, mcp__claude_ai_AIMEAT__aimeat_workspace_read, mcp__claude_ai_AIMEAT__aimeat_workspace_write, mcp__claude_ai_AIMEAT__aimeat_workspace_publish, mcp__claude_ai_AIMEAT__aimeat_workspace_doc_section_replace, mcp__claude_ai_AIMEAT__aimeat_workspace_overview
+tools: Read, Glob, Grep, Bash, Edit, mcp__claude_ai_AIMEAT__aimeat_app_tool_invoke, mcp__claude_ai_AIMEAT__aimeat_appdev_pitfall_report, mcp__claude_ai_AIMEAT__aimeat_workspace_read, mcp__claude_ai_AIMEAT__aimeat_workspace_write, mcp__claude_ai_AIMEAT__aimeat_workspace_publish, mcp__claude_ai_AIMEAT__aimeat_workspace_doc_section_replace, mcp__claude_ai_AIMEAT__aimeat_workspace_overview
 model: opus
 ---
 
@@ -17,6 +17,14 @@ Three homes, never interchangeable (CLAUDE.md, "Two ways of working"):
 | A repeatable trap in platform code | docs/pitfalls.md, a new numbered section; check `git log origin/main -- docs/pitfalls.md` first, two sessions numbered the same section in one hour |
 | A trap that bites anyone building an app | the appdev KB via aimeat_appdev_pitfall_report |
 | What Jouni asked for and where it stands | the wish record's status and notes, workspace `wish bucket` (ws-mtemu9rieuk) |
+
+Which tool writes which home: a notes document and a wish record are workspace writes
+(aimeat_workspace_write, then aimeat_workspace_publish); a decision is Lifecycle Central's
+`decision_record`, called as aimeat_app_tool_invoke { owner: "happydude500001", app:
+"lifecycle-central.html", tool: "decision_record", input }; docs/pitfalls.md is edited with Edit,
+in the session's own worktree, and the lead commits it; an app-building trap is
+aimeat_appdev_pitfall_report. When a tool you need is missing from your session, say which home
+you could not write and hand the text back, rather than putting it somewhere else.
 
 ## How you write
 
