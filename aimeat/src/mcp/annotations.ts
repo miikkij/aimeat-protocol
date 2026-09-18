@@ -31,6 +31,7 @@
  *     destructive — what it replaces is a value nobody could read) and _delete (destructive:
  *     whatever named that secret stops working).
  *   2026-09-05 — aimeat_admin_security_overview (read-only) and aimeat_admin_incident_resolve.
+ *   2026-09-18 — aimeat_app_visitors (read-only) and aimeat_app_visitors_measure.
  *   2026-08-29 — aimeat_app_marks_set, aimeat_app_legal_set, aimeat_app_audit.
  *   2026-08-28 — The five crew-definition tools.
  *   2026-08-25 — The three data-map tools.
@@ -381,6 +382,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_app_seo_set: { title: 'App Search Visibility', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_app_marks_set: { title: 'App Badge and Install Chip', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_app_legal_set: { title: 'App Legal Pages', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_app_visitors: { title: 'App Visitors', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_app_visitors_measure: { title: 'App Visitor Measurement', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_app_audit: { title: 'App Audit Log', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_seo_status: { title: 'Search Visibility Status', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     // Open world: it posts to api.indexnow.org. Idempotent: the same notice twice is the same notice.

@@ -238,7 +238,7 @@ The node owns the clock, so your data can act without you present.
 | **Cortex** | Installable bundles of schemas, prompts, actions, boards, ontologies, seed data and browser libraries that apps compose from. | `/v1/cortex`, `aimeat_cortex_*` |
 | **Packages** | Install versioned bundles with a dry run and rollback on failed installation. Track installed instances, check for updates, detect local customizations and use a migration prompt before applying an update. | `/v1/packages`, `/v1/instances`, `aimeat_package_*` |
 | **Tracked responses** | A promised reply that goes out once a memory key meets a condition. | `/v1/tracked-responses` |
-| **Signals** | Count something: define it and record hits from a tracking image or a JSON call. | `/v1/signals` |
+| **Signals** | Count something: define it and record hits from a tracking image or a JSON call. A stream can also keep where each person came from, at the precision its owner picks (country, region or city). That needs a reverse proxy that reports the place (`AIMEAT_GEO_HEADERS`, `docs/visitor-geography.md`); no address is stored, and AI fetchers are never placed. | `/v1/signals` |
 
 ---
 
@@ -281,6 +281,7 @@ An app is a single-file web app hosted by the node. It reaches the owner's data 
 | **Backup and restore** | Download a ZIP of every version of your apps and your own cortex extensions, inspect it, restore what you choose. | `/v1/apps/backup` |
 | **Search engines only if you say so** | Each app has a Search section, off by default. Turned on, the app joins the sitemap, invites crawlers and notifies the engines that accept instant updates. A shared link shows a preview card with the app's screenshot. | `aimeat_app_seo_set` |
 | **App legal pages** | Write or link terms, privacy, imprint, refunds, accessibility, cookies and support pages under the app's own address. The details view identifies recommended pages that are missing. | `/v1/apps/:owner/:filename/legal`, `aimeat_app_legal_set` |
+| **Visitors** | See who opened your own app over the last 0 to 360 days: opens by signed-in people against opens by nobody signed in, as counts and never as names. Switch visitor measurement on to also count people against named AIs against other bots, and to see where people came from on a world map drawn from the node's own files. Measurement is off until the app's owner switches it on; switching it off keeps what was counted. The place needs the reverse proxy described under Signals. | `/v1/apps/visitors`, `aimeat_app_visitors`, `aimeat_app_visitors_measure`, App Catalog > Visitors |
 | **Marks and authorship** | Set the app's marks and authorship information. Naming the person responsible for an app is a separate declaration with its own approval rules. | `aimeat_app_marks_set`, App Catalog > Marks and authorship |
 | **App audit history** | Read the app's recorded changes and who made them, including changes made through delegated development rights. | `/v1/apps/:owner/:filename/audit` |
 | **Installable apps and their notifications** | Install a published app with its own name and icon. An installed app can register push notifications for its own origin under the `push:receive` permission. | App manifest, `/v1/libs/aimeat-push.js`, `/v1/push/*` |

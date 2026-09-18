@@ -25,6 +25,9 @@
  * @usage
  *   import { CUTS, cutsForStream } from './rollup-cuts.js';
  * @version-history
+ *   v1.1.0 — 2026-09-18 — call.app.visitor: an app's opens split by whether anybody was signed in,
+ *     for the Visitors section of the App Catalog. Needs the rebuild on a node that already has
+ *     history, or the split starts on the day this shipped.
  *   v1.0.0 — 2026-08-14 — Initial: twenty cuts over the llm and call streams.
  */
 
@@ -96,6 +99,12 @@ export const CUTS: UsageCut[] = [
   { name: 'call.provider.coordinate', stream: 'call',
     dims: ['counterpartyGhii', 'coordinate', 'outcome'], grains: DAY,
     answers: 'what a seller sold and what they refused; also an app author own traffic' },
+  // `surface` is in the key because an app id also rides on metered tool calls, and an author
+  // asking who OPENED the app must not be answered with who called its paid tool. `ownerGhii` is
+  // '' for an open nobody was signed in for, which is the whole split the author asks about; the
+  // reader (services/app-visitors.ts) answers counts and never hands the identities out.
+  { name: 'call.app.visitor', stream: 'call', dims: ['appId', 'surface', 'ownerGhii'], grains: DAY,
+    answers: 'an app author: opens by signed-in people against opens by nobody signed in' },
 ];
 
 const BY_STREAM = new Map<'llm' | 'call', UsageCut[]>([

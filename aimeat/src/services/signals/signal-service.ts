@@ -27,6 +27,10 @@
  * @structure SignalError · createStream/listStreams/getStream/deleteStream · recordHit · readReport
  * @usage await recordHit(storage, { ownerGhii, streamId, event: 'open', userAgent });
  * @version-history
+ *   v1.1.0 — 2026-09-18 — A stream may keep WHERE a person came from, at the precision its owner
+ *     set (`geo`). The place arrives as plain fields the route read from the reverse proxy's
+ *     headers; this file still never sees an address. People only: an AI fetcher's place is a data
+ *     centre. readReport takes a day window as well as a month one, and answers countries and places.
  *   v1.0.0 — 2026-08-24 — Initial: the generic hit collector.
  *   v1.0.1 — 2026-08-24 — SECURITY (CodeQL js/prototype-polluting-assignment): `subject` is the one
  *     map key a stranger supplies, so a prototype key (`__proto__`) let a public hit reach
@@ -37,7 +41,9 @@ import {
   SIGNAL_EVENTS, SIGNAL_CHANNELS, MAX_STREAMS_PER_OWNER, MAX_SUBJECTS_PER_MONTH,
   MAX_HITS_PER_STREAM_PER_DAY, RETAIN_MONTHS, MAX_SUBJECT_LEN, MAX_REF_LEN, STREAM_ID_RE,
   streamKey, STREAM_KEY_PREFIX, monthKey, monthKeyPrefix, monthOf, dayOf, emptyDay, emptyMonth,
+  SIGNAL_GEO_LEVELS, MAX_PLACES_PER_MONTH, MAX_PLACE_NAME_LEN, UNKNOWN_COUNTRY,
   type SignalStreamConfig, type SignalMonthRecord, type SignalEvent, type SignalChannel,
+  type SignalGeoLevel, type SignalGeoInput, type SignalPlace, type SignalDayCounts,
 } from '../../models/signal-schemas.js';
 import { classifyVisitor } from './visitor-class.js';
 import { logger } from '../../utils/logger.js';
@@ -84,6 +90,8 @@ export interface StreamInput {
   perSubject?: boolean;
   group?: string | null;
   enabled?: boolean;
+  /** One of SIGNAL_GEO_LEVELS. Absent keeps what the stream had, and a new stream starts `off`. */
+  geo?: string;
 }
 
 async function readStreamRecord(
@@ -123,6 +131,9 @@ export async function saveStream(
   }
   const label = (input.label ?? '').trim().slice(0, 200);
   const group = input.group ? String(input.group).trim().slice(0, 80) : null;
+  if (input.geo !== undefined && !(SIGNAL_GEO_LEVELS as readonly string[]).includes(input.geo)) {
+    throw new SignalError('INVALID_STREAM', 400, `geo must be one of: ${SIGNAL_GEO_LEVELS.join(', ')}`);
+  }
 
   const existing = await readStreamRecord(storage, ownerGhii, streamId);
   if (!existing) {
@@ -142,6 +153,7 @@ export async function saveStream(
     perSubject: input.perSubject ?? existing?.cfg.perSubject ?? true,
     enabled: input.enabled ?? existing?.cfg.enabled ?? true,
     group: group ?? existing?.cfg.group ?? null,
+    geo: (input.geo as SignalGeoLevel | undefined) ?? existing?.cfg.geo ?? 'off',
     createdAt: existing?.cfg.createdAt ?? now,
     updatedAt: now,
   };
@@ -183,6 +195,56 @@ export interface HitInput {
   /** Which link, page or item inside the stream. */
   ref?: string | null;
   userAgent?: string | null;
+  /** Where the request came from, as the reverse proxy reported it. Null when the node is not told. */
+  geo?: SignalGeoInput | null;
+}
+
+/** A name from a header, made safe to be part of a map key: no separator, no control character. */
+function placeName(raw: string | null | undefined): string {
+  let out = '';
+  for (const ch of raw ?? '') out += (ch === '|' || ch.charCodeAt(0) < 32) ? ' ' : ch;
+  return out.trim().slice(0, MAX_PLACE_NAME_LEN);
+}
+
+/**
+ * Count one person's place into a day, at the stream's precision.
+ *
+ * The country is validated to two capital letters before it is used as a key, and every place key
+ * starts with it, so neither map can be handed a prototype name. A place the proxy could not tell
+ * is counted under UNKNOWN_COUNTRY rather than dropped: a map that leaves out what it does not
+ * know looks more complete than it is.
+ */
+function countPlace(
+  rec: SignalMonthRecord, dayCounts: SignalDayCounts, level: SignalGeoLevel, geo: SignalGeoInput | null | undefined,
+): void {
+  const raw = (geo?.country ?? '').trim().toUpperCase();
+  const country = /^[A-Z]{2}$/.test(raw) ? raw : UNKNOWN_COUNTRY;
+  dayCounts.countries = dayCounts.countries ?? {};
+  dayCounts.countries[country] = (dayCounts.countries[country] ?? 0) + 1;
+  if (level === 'country' || country === UNKNOWN_COUNTRY) return;
+
+  const region = placeName(geo?.region);
+  const city = level === 'city' ? placeName(geo?.city) : '';
+  if (!region && !city) return;
+
+  const key = `${country}|${region}|${city}`;
+  rec.places = rec.places ?? {};
+  if (!Object.hasOwn(rec.places, key)) {
+    if (Object.keys(rec.places).length >= MAX_PLACES_PER_MONTH) {
+      rec.placesTruncated = true;
+      return;
+    }
+    const coord = (n: number | null | undefined, max: number): number | null =>
+      typeof n === 'number' && Number.isFinite(n) && Math.abs(n) <= max ? Math.round(n * 10) / 10 : null;
+    const place: SignalPlace = {
+      country, region, city: city || null,
+      lat: city ? coord(geo?.lat, 90) : null,
+      lon: city ? coord(geo?.lon, 180) : null,
+    };
+    rec.places[key] = place;
+  }
+  dayCounts.places = dayCounts.places ?? {};
+  dayCounts.places[key] = (dayCounts.places[key] ?? 0) + 1;
 }
 
 export interface HitOutcome {
@@ -291,6 +353,10 @@ export async function recordHit(storage: Storage, input: HitInput): Promise<HitO
         const agentKey = visitor.aiKind === 'assistant' ? `${visitor.aiAgent}:asked` : visitor.aiAgent;
         dayCounts.aiAgents[agentKey] = (dayCounts.aiAgents[agentKey] ?? 0) + 1;
       }
+      const geoLevel = stream.geo ?? 'off';
+      // `input.geo` is null on a node that is not told where requests come from. Counting those
+      // as "unknown place" would paint every visit grey on a map that can never fill in.
+      if (geoLevel !== 'off' && visitor.klass === 'human' && input.geo) countPlace(rec, dayCounts, geoLevel, input.geo);
       rec.days[day] = dayCounts;
 
       if (subject) {
@@ -376,6 +442,10 @@ export interface ReportOptions {
   /** `YYYY-MM` bounds, inclusive. Defaults to the current month only. */
   from?: string;
   to?: string;
+  /** `YYYY-MM-DD` bounds, inclusive. When given they win over the month bounds, and the months
+   *  that hold those days are read. For a trailing window ("the last 30 days"). */
+  fromDay?: string;
+  toDay?: string;
   /** Include the per-subject roll-up. Off by default: a report is usually read as totals. */
   includeSubjects?: boolean;
 }
@@ -390,8 +460,16 @@ export interface SignalReport {
     channels: Record<string, number>;
     classes: Record<string, number>;
     aiAgents: Record<string, number>;
+    /** People by country, and by finer place (keys into `places`). Empty when `geo` is `off`. */
+    countries: Record<string, number>;
+    places: Record<string, number>;
     dropped: number;
   };
+  /** The precision this stream keeps a place at NOW. Earlier days may hold less. */
+  geo: SignalGeoLevel;
+  /** The regions and cities `totals.places` refers to. */
+  places: Record<string, SignalPlace>;
+  placesTruncated: boolean;
   days: Record<string, { total: number; events: Record<string, number>; classes: Record<string, number> }>;
   subjects?: Record<string, { firstAt: string; lastAt: string; events: Record<string, number>; lastRef: string | null; machine: boolean }>;
   subjectsTruncated: boolean;
@@ -400,7 +478,7 @@ export interface SignalReport {
    * An open count that travels without this line gets read as "people who read it", which it is
    * not, and the person who repeats it to their own customer is the one who pays for the gap.
    */
-  reading: { opens: string; clicks: string; ai: string };
+  reading: { opens: string; clicks: string; ai: string; geo: string };
 }
 
 export async function readReport(
@@ -410,8 +488,11 @@ export async function readReport(
   if (!stream) throw new SignalError('NOT_FOUND', 404, 'No such signal stream');
 
   const thisMonth = monthOf(nowIso());
-  const from = opts.from && /^\d{4}-\d{2}$/.test(opts.from) ? opts.from : thisMonth;
-  const to = opts.to && /^\d{4}-\d{2}$/.test(opts.to) ? opts.to : thisMonth;
+  const isDay = (d?: string): d is string => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d);
+  const fromDay = isDay(opts.fromDay) ? opts.fromDay : null;
+  const toDay = isDay(opts.toDay) ? opts.toDay : null;
+  const from = fromDay ? monthOf(fromDay) : (opts.from && /^\d{4}-\d{2}$/.test(opts.from) ? opts.from : thisMonth);
+  const to = toDay ? monthOf(toDay) : (opts.to && /^\d{4}-\d{2}$/.test(opts.to) ? opts.to : thisMonth);
 
   const { items } = await storage.listAllMemory({ prefix: monthKeyPrefix(streamId), limit: 200 });
   const records = items
@@ -422,9 +503,11 @@ export async function readReport(
     .sort((a, b) => a.month.localeCompare(b.month));
 
   const totals: SignalReport['totals'] = {
-    hits: 0, events: {}, channels: {}, classes: {}, aiAgents: {}, dropped: 0,
+    hits: 0, events: {}, channels: {}, classes: {}, aiAgents: {}, countries: {}, places: {}, dropped: 0,
   };
   const days: SignalReport['days'] = {};
+  const places: SignalReport['places'] = {};
+  let placesTruncated = false;
   const subjects: NonNullable<SignalReport['subjects']> = {};
   let truncated = false;
 
@@ -435,12 +518,21 @@ export async function readReport(
   for (const rec of records) {
     totals.dropped += rec.dropped ?? 0;
     truncated = truncated || !!rec.subjectsTruncated;
+    placesTruncated = placesTruncated || !!rec.placesTruncated;
     for (const [day, counts] of Object.entries(rec.days ?? {})) {
+      if ((fromDay && day < fromDay) || (toDay && day > toDay)) continue;
       totals.hits += counts.total;
       add(totals.events, counts.events);
       add(totals.channels, counts.channels);
       add(totals.classes, counts.classes);
       add(totals.aiAgents, counts.aiAgents ?? {});
+      add(totals.countries, counts.countries ?? {});
+      add(totals.places, counts.places ?? {});
+      // Only the places this window actually counted: the month's table may hold more.
+      for (const key of Object.keys(counts.places ?? {})) {
+        const place = rec.places && Object.hasOwn(rec.places, key) ? rec.places[key] : undefined;
+        if (place) places[key] = place;
+      }
       days[day] = {
         total: counts.total,
         events: { ...counts.events } as Record<string, number>,
@@ -471,12 +563,15 @@ export async function readReport(
     streamId, label: stream.label,
     months: records.map((r) => r.month),
     totals, days,
+    geo: stream.geo ?? 'off',
+    places, placesTruncated,
     subjects: opts.includeSubjects ? subjects : undefined,
     subjectsTruncated: truncated,
     reading: {
       opens: 'An estimate. Mail apps fetch images on the reader\'s behalf (Apple Mail always, and it cannot be told apart from a person), so treat opens as a floor with machine noise in it.',
       clicks: 'An act. Somebody chose the link, and known scanners are counted as machines instead.',
       ai: 'Named AI fetchers, split by why they came: a name ending in :asked means a person asked an AI something and it fetched this to answer.',
+      geo: 'People only, and where their network is, which is not always where they are: a VPN or a mobile carrier moves a person to another city or country. ZZ is a visit whose place could not be told. No address is kept.',
     },
   };
 }

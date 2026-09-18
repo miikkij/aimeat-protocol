@@ -3084,6 +3084,90 @@ textarea.cx-code { resize: vertical; tab-size: 2; }
 }
 
 /**
+ * @file app-catalog-visitors.css
+ * @description The Visitors section of the App Detail view (js/visitors.js, js/visitors-map.js):
+ *   the day window, the stat row, the stacked bar charts, the measurement rows, the world map and
+ *   the two tables beside it. Appended after app-catalog-poster.css by scripts/build-app-catalog.ts
+ *   and composed from that sheet's tokens and shapes: the ink rule, the mono small print, the
+ *   coral accent, the sun. It defines no colour of its own.
+ *
+ *   THE MAP'S FIVE SHADES ARE ONE COLOUR AT FIVE STRENGTHS, mixed into the page background with
+ *   color-mix, so they follow the theme: on the dark page the lightest shade is still the one
+ *   closest to the background. Land nobody came from is the ink at 13 %, mixed the same way: the
+ *   subtle surface token was tried first and the continents could not be told from the sea, so the
+ *   map did not read as a map until a country was coloured.
+ * @version-history
+ *   v1.0.0 — 2026-09-18 — Initial.
+ */
+
+.vis-intro { font-size: .95rem; line-height: 1.55; color: var(--text-dim); margin: 0 0 18px; max-width: 70ch; }
+.vis-note { font-size: .85rem; line-height: 1.55; color: var(--text-dim); margin: 10px 0 0; max-width: 78ch; }
+.vis-dim { color: var(--text-dim); font-weight: 400; }
+.vis-block { margin-top: 30px; }
+.vis-h { font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; margin: 0 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--text); }
+
+/* The day window: presets as plain doors, the typed number beside them. */
+.vis-window { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin: 0 0 22px; }
+.vis-window .vis-stat-label { margin-left: 8px; }
+.vis-days-input { width: 92px; margin: 0; }
+.vis-geo-select { width: auto; min-width: 150px; margin: 0; }
+
+/* The numbers, in the band's own voice: a large figure over a small coral label. */
+.vis-stats { display: flex; flex-wrap: wrap; gap: 18px 36px; margin: 0 0 22px; }
+.vis-stat-val { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.9rem; line-height: 1; }
+.vis-stat-label { font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; margin-top: 6px; }
+
+/* Stacked bars. Three parts at most, told apart by strength and not by hue alone. */
+.vis-chart { margin-top: 4px; }
+.vis-bar-mark.vis-part-a, .vis-key-mark.vis-part-a { fill: var(--text); background: var(--text); }
+.vis-bar-mark.vis-part-b, .vis-key-mark.vis-part-b { fill: var(--text-dim); background: var(--text-dim); }
+.vis-bar-mark.vis-part-c, .vis-key-mark.vis-part-c { fill: var(--accent); background: var(--accent); }
+.vis-keys { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: .78rem; color: var(--text-dim); }
+.vis-key { display: inline-flex; align-items: center; gap: 6px; }
+.vis-key-mark { display: inline-block; width: 12px; height: 12px; }
+
+/* Tables: the AIs by name, the countries, the places of one country. */
+.vis-table { width: 100%; border-collapse: collapse; font-size: .92rem; margin-top: 14px; }
+.vis-table th { text-align: left; font-size: .72rem; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; padding: 0 0 6px; border-bottom: 2px solid var(--text); }
+.vis-table td { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.vis-table .vis-num { text-align: right; font-family: var(--font-mono); white-space: nowrap; padding-left: 16px; }
+.vis-country-btn { background: none; border: 0; border-bottom: 2px solid transparent; padding: 0 0 1px; font: inherit; font-weight: 700; color: var(--text); cursor: pointer; text-align: left; }
+.vis-country-btn:hover, .vis-country-btn:focus-visible { color: var(--accent); border-bottom-color: var(--accent); }
+.vis-country-btn.is-focus { border-bottom-color: var(--text); }
+.vis-country-name { font-weight: 700; }
+.vis-places { margin-top: 26px; }
+
+/* The map beside its list; the list drops under the map when there is no room for both. */
+.vis-geo { display: grid; grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); gap: 24px 32px; align-items: start; }
+.vis-map-controls { display: flex; flex-wrap: wrap; gap: 20px; margin: 0 0 10px; }
+.vis-map-controls .dtl-btn { font-size: .9rem; min-width: 24px; min-height: 28px; }
+.vis-map-frame { border: 3px solid var(--text); background: var(--bg); line-height: 0; }
+.vis-map-svg { display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; }
+.vis-map-wait { aspect-ratio: 2 / 1; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); line-height: 1.4; }
+.vis-land { fill: color-mix(in srgb, var(--text) 13%, var(--bg)); stroke: var(--bg); stroke-width: .6; vector-effect: non-scaling-stroke; }
+.vis-land[onclick] { cursor: pointer; }
+.vis-land[onclick]:hover { stroke: var(--text); stroke-width: 1.5; }
+.vis-land.is-focus { stroke: var(--text); stroke-width: 2; }
+.vis-shade-1 { fill: color-mix(in srgb, var(--accent) 22%, var(--bg)); background: color-mix(in srgb, var(--accent) 22%, var(--bg)); }
+.vis-shade-2 { fill: color-mix(in srgb, var(--accent) 40%, var(--bg)); background: color-mix(in srgb, var(--accent) 40%, var(--bg)); }
+.vis-shade-3 { fill: color-mix(in srgb, var(--accent) 58%, var(--bg)); background: color-mix(in srgb, var(--accent) 58%, var(--bg)); }
+.vis-shade-4 { fill: color-mix(in srgb, var(--accent) 78%, var(--bg)); background: color-mix(in srgb, var(--accent) 78%, var(--bg)); }
+.vis-shade-5 { fill: var(--accent); background: var(--accent); }
+.vis-dot { fill: var(--sun); stroke: var(--text); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.vis-legend { display: flex; align-items: center; gap: 4px; margin-top: 10px; font-size: .72rem; font-family: var(--font-mono); color: var(--text-dim); line-height: 1; }
+.vis-legend span:first-child { margin-right: 6px; }
+.vis-legend span:last-child { margin-left: 6px; }
+.vis-legend-step { display: inline-block; width: 22px; height: 10px; }
+.vis-map-side .vis-table { margin-top: 0; }
+
+@media (max-width: 760px) {
+  .vis-geo { grid-template-columns: minmax(0, 1fr); }
+  .vis-stats { gap: 16px 24px; }
+  .vis-stat-val { font-size: 1.5rem; }
+  .vis-window .vis-stat-label { margin-left: 0; }
+}
+
+/**
  * @file dialog.css
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
@@ -4671,6 +4755,78 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "cost.remaining": "{n} left",
       "cost.needLogin": "Sign in to view this app’s cost & contracts.",
       "cost.loadFailed": "Could not load cost & contracts",
+      // Visitors: who opened this app, when and from where (visitors.js, visitors-map.js)
+      "visitors.title": "Visitors",
+      "visitors.intro": "Every open of this app is counted. What kind of visitor it was, and where people came from, is counted only after you switch visitor measurement on below.",
+      "visitors.today": "Today",
+      "visitors.days": "{n} days",
+      "visitors.daysLabel": "Days (0 to 360)",
+      "visitors.show": "Show",
+      "visitors.opensToday": "Opens today",
+      "visitors.opensInPeriod": "Opens in this period",
+      "visitors.signedIn": "Signed in",
+      "visitors.anonymous": "Not signed in",
+      "visitors.signedInPeople": "Different signed-in people",
+      "visitors.lifetime": "Opens since publishing",
+      "visitors.opensChart": "Opens per day",
+      "visitors.maxPerDay": "most in a day: {n}",
+      "visitors.maxPerWeek": "most in a week: {n}",
+      "visitors.noOpens": "Nobody opened this app in this period.",
+      "visitors.opensNote": "An open is one time the app was shown to somebody. You see how many of them were signed in, and never who they were.",
+      "visitors.measure": "Visitor measurement",
+      "visitors.measureOff": "Off. Opens are counted, and nothing is kept about who came.",
+      "visitors.measureOn": "On. Each visit is counted as a person, a named AI or another bot.",
+      "visitors.measurePaused": "Off. The numbers counted earlier are kept and shown below.",
+      "visitors.turnOn": "Turn on",
+      "visitors.turnOff": "Turn off",
+      "visitors.turnedOn": "Visitor measurement is on.",
+      "visitors.turnedOff": "Visitor measurement is off. The earlier numbers are kept.",
+      "visitors.geoSaved": "Saved.",
+      "visitors.saveFailed": "Could not save.",
+      "visitors.geoLabel": "Where people come from",
+      "visitors.geo.off": "Not kept",
+      "visitors.geo.country": "Country",
+      "visitors.geo.region": "Region",
+      "visitors.geo.city": "City",
+      "visitors.geoMeaning.off": "No place is kept.",
+      "visitors.geoMeaning.country": "The country of each person is kept. A country identifies nobody.",
+      "visitors.geoMeaning.region": "Country and region are kept. When an app has few visitors, a person from a small region can be guessed.",
+      "visitors.geoMeaning.city": "Country, region and city are kept, with coordinates to about 11 km. When an app has few visitors, this comes close to telling one person from the others. Say so in the app’s privacy notice.",
+      "visitors.geoUnavailable": "This server is not told where requests come from, so no place can be kept. Its administrator can switch that on (AIMEAT_GEO_HEADERS).",
+      "visitors.whoTitle": "Visits by kind of visitor",
+      "visitors.humans": "People",
+      "visitors.ai": "AI",
+      "visitors.bots": "Other bots",
+      "visitors.whoChart": "Visits per day",
+      "visitors.colAi": "AI",
+      "visitors.colAsked": "A person asked",
+      "visitors.colCrawled": "Crawling",
+      "visitors.aiNote": "“A person asked” means somebody asked that AI a question and it fetched this app to answer. “Crawling” means the AI was collecting content for a search index or a training set.",
+      "visitors.noAi": "No AI fetched this app in this period.",
+      "visitors.noneYet": "Nothing has been counted in this period yet.",
+      "visitors.whereTitle": "Where people came from",
+      "visitors.whereNote": "People only. An AI is never placed, because its address is a data centre. The place is where a person’s network connection is: a VPN or a mobile network can move them to another city or country. No IP address is stored.",
+      "visitors.mapEmpty": "No place has been counted in this period.",
+      "visitors.mapLoading": "Loading the map…",
+      "visitors.mapFailed": "The map could not be loaded. The list has the same numbers.",
+      "visitors.mapLabel": "World map of where people came from",
+      "visitors.people": "visits: {n}",
+      "visitors.colCountry": "Country",
+      "visitors.colPeople": "Visits",
+      "visitors.zoomIn": "+",
+      "visitors.zoomOut": "−",
+      "visitors.zoomInTitle": "Zoom in",
+      "visitors.zoomOutTitle": "Zoom out",
+      "visitors.zoomReset": "Whole world",
+      "visitors.legendFew": "Fewer",
+      "visitors.legendMany": "More",
+      "visitors.notDrawn": "(too small for this map)",
+      "visitors.noPlaces": "No region or city has been kept for this country. Choose Region or City above, and they are kept from then on.",
+      "visitors.unknownPlace": "Place unknown",
+      "visitors.placesTruncated": "More than 300 different places in one month. The countries are exact; regions and cities after the 300th were not kept.",
+      "visitors.needLogin": "Sign in to see the visitors.",
+      "visitors.loadFailed": "The visitor numbers could not be loaded.",
+      "visitors.loading": "Loading…",
       "detail.editAccess": "Access code",
       "detail.accessCodeHint": "Set or remove an optional code required to open this app.",
       "detail.accessCodeLabel": "Access code",
@@ -5692,6 +5848,78 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "cost.remaining": "{n} jäljellä",
       "cost.needLogin": "Kirjaudu sisään nähdäksesi tämän appin kulut & sopimukset.",
       "cost.loadFailed": "Kulujen & sopimusten lataus epäonnistui",
+      // Kävijät: kuka avasi sovelluksen, milloin ja mistä (visitors.js, visitors-map.js)
+      "visitors.title": "Kävijät",
+      "visitors.intro": "Jokainen sovelluksen avaus lasketaan. Se, millainen kävijä oli ja mistä ihmiset tulivat, lasketaan vasta, kun kytket kävijämittauksen päälle alempana.",
+      "visitors.today": "Tänään",
+      "visitors.days": "{n} päivää",
+      "visitors.daysLabel": "Päiviä (0–360)",
+      "visitors.show": "Näytä",
+      "visitors.opensToday": "Avauksia tänään",
+      "visitors.opensInPeriod": "Avauksia tällä jaksolla",
+      "visitors.signedIn": "Kirjautuneita",
+      "visitors.anonymous": "Kirjautumattomia",
+      "visitors.signedInPeople": "Eri kirjautuneita ihmisiä",
+      "visitors.lifetime": "Avauksia julkaisusta lähtien",
+      "visitors.opensChart": "Avaukset päivittäin",
+      "visitors.maxPerDay": "eniten päivässä: {n}",
+      "visitors.maxPerWeek": "eniten viikossa: {n}",
+      "visitors.noOpens": "Kukaan ei avannut sovellusta tällä jaksolla.",
+      "visitors.opensNote": "Avaus on yksi kerta, jolloin sovellus näytettiin jollekulle. Näet, kuinka moni heistä oli kirjautunut, mutta et sitä, keitä he olivat.",
+      "visitors.measure": "Kävijämittaus",
+      "visitors.measureOff": "Pois päältä. Avaukset lasketaan, mutta kävijästä ei tallenneta mitään.",
+      "visitors.measureOn": "Päällä. Jokaisesta käynnistä lasketaan, oliko kävijä ihminen, nimetty tekoäly vai muu botti.",
+      "visitors.measurePaused": "Pois päältä. Aiemmin lasketut luvut säilyvät ja näkyvät alla.",
+      "visitors.turnOn": "Kytke päälle",
+      "visitors.turnOff": "Kytke pois",
+      "visitors.turnedOn": "Kävijämittaus on päällä.",
+      "visitors.turnedOff": "Kävijämittaus on pois päältä. Aiemmat luvut säilyvät.",
+      "visitors.geoSaved": "Tallennettu.",
+      "visitors.saveFailed": "Tallennus ei onnistunut.",
+      "visitors.geoLabel": "Mistä ihmiset tulevat",
+      "visitors.geo.off": "Ei tallenneta",
+      "visitors.geo.country": "Maa",
+      "visitors.geo.region": "Alue",
+      "visitors.geo.city": "Kaupunki",
+      "visitors.geoMeaning.off": "Sijaintia ei tallenneta.",
+      "visitors.geoMeaning.country": "Jokaisesta ihmisestä tallennetaan maa. Maa ei tunnista ketään.",
+      "visitors.geoMeaning.region": "Maa ja alue tallennetaan. Jos sovelluksella on vähän kävijöitä, pieneltä alueelta tulleen ihmisen voi arvata.",
+      "visitors.geoMeaning.city": "Maa, alue ja kaupunki tallennetaan, ja koordinaatit noin 11 kilometrin tarkkuudella. Jos sovelluksella on vähän kävijöitä, yksittäisen ihmisen voi lähes erottaa muista. Kerro tästä sovelluksen tietosuojaselosteessa.",
+      "visitors.geoUnavailable": "Tämä palvelin ei saa tietoa siitä, mistä pyynnöt tulevat, joten sijaintia ei voi tallentaa. Palvelimen ylläpitäjä voi kytkeä tiedon päälle (AIMEAT_GEO_HEADERS).",
+      "visitors.whoTitle": "Käynnit kävijän lajin mukaan",
+      "visitors.humans": "Ihmiset",
+      "visitors.ai": "Tekoälyt",
+      "visitors.bots": "Muut botit",
+      "visitors.whoChart": "Käynnit päivittäin",
+      "visitors.colAi": "Tekoäly",
+      "visitors.colAsked": "Ihminen kysyi",
+      "visitors.colCrawled": "Indeksointi",
+      "visitors.aiNote": "”Ihminen kysyi” tarkoittaa, että joku kysyi tekoälyltä jotain ja se haki tämän sovelluksen vastatakseen. ”Indeksointi” tarkoittaa, että tekoäly keräsi sisältöä hakuindeksiin tai opetusaineistoon.",
+      "visitors.noAi": "Yksikään tekoäly ei hakenut sovellusta tällä jaksolla.",
+      "visitors.noneYet": "Tällä jaksolla ei ole vielä laskettu mitään.",
+      "visitors.whereTitle": "Mistä ihmiset tulivat",
+      "visitors.whereNote": "Vain ihmiset. Tekoälyä ei sijoiteta kartalle, koska sen osoite on konesali. Sijainti kertoo, missä ihmisen verkkoyhteys on: VPN tai mobiiliverkko voi siirtää hänet toiseen kaupunkiin tai maahan. IP-osoitetta ei tallenneta.",
+      "visitors.mapEmpty": "Tällä jaksolla ei ole laskettu yhtään sijaintia.",
+      "visitors.mapLoading": "Ladataan karttaa…",
+      "visitors.mapFailed": "Karttaa ei voitu ladata. Samat luvut ovat luettelossa.",
+      "visitors.mapLabel": "Maailmankartta siitä, mistä ihmiset tulivat",
+      "visitors.people": "käyntejä: {n}",
+      "visitors.colCountry": "Maa",
+      "visitors.colPeople": "Käyntejä",
+      "visitors.zoomIn": "+",
+      "visitors.zoomOut": "−",
+      "visitors.zoomInTitle": "Lähennä",
+      "visitors.zoomOutTitle": "Loitonna",
+      "visitors.zoomReset": "Koko maailma",
+      "visitors.legendFew": "Vähemmän",
+      "visitors.legendMany": "Enemmän",
+      "visitors.notDrawn": "(liian pieni tälle kartalle)",
+      "visitors.noPlaces": "Tästä maasta ei ole tallennettu aluetta eikä kaupunkia. Valitse yllä Alue tai Kaupunki, niin ne tallennetaan siitä eteenpäin.",
+      "visitors.unknownPlace": "Sijainti tuntematon",
+      "visitors.placesTruncated": "Kuukaudessa kertyi yli 300 eri paikkaa. Maat ovat tarkat, mutta 300. paikan jälkeen tulleita alueita ja kaupunkeja ei tallennettu.",
+      "visitors.needLogin": "Kirjaudu sisään, niin näet kävijät.",
+      "visitors.loadFailed": "Kävijälukuja ei voitu ladata.",
+      "visitors.loading": "Ladataan…",
       "detail.skillDetach": "Irrota",
       "detail.skillAttachError": "Taidon liittäminen epäonnistui",
       "detail.editAccess": "Pääsykoodi",
@@ -6255,32 +6483,32 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     return btoa(binary);
   }
   async function extractZip(arrayBuffer) {
-    var view = new DataView(arrayBuffer);
+    var view2 = new DataView(arrayBuffer);
     var files = [];
     var eocd = -1;
-    for (var p = view.byteLength - 22; p >= 0; p--) {
-      if (view.getUint32(p, true) === 101010256) {
+    for (var p = view2.byteLength - 22; p >= 0; p--) {
+      if (view2.getUint32(p, true) === 101010256) {
         eocd = p;
         break;
       }
     }
     if (eocd === -1) throw new Error("Not a valid ZIP (no end-of-central-directory record)");
-    var cdCount = view.getUint16(eocd + 10, true);
-    var cdPos = view.getUint32(eocd + 16, true);
-    for (var n = 0; n < cdCount && cdPos + 46 <= view.byteLength; n++) {
-      if (view.getUint32(cdPos, true) !== 33639248) break;
-      var compressionMethod = view.getUint16(cdPos + 10, true);
-      var compressedSize = view.getUint32(cdPos + 20, true);
-      var nameLen = view.getUint16(cdPos + 28, true);
-      var extraLen = view.getUint16(cdPos + 30, true);
-      var commentLen = view.getUint16(cdPos + 32, true);
-      var localOffset = view.getUint32(cdPos + 42, true);
+    var cdCount = view2.getUint16(eocd + 10, true);
+    var cdPos = view2.getUint32(eocd + 16, true);
+    for (var n = 0; n < cdCount && cdPos + 46 <= view2.byteLength; n++) {
+      if (view2.getUint32(cdPos, true) !== 33639248) break;
+      var compressionMethod = view2.getUint16(cdPos + 10, true);
+      var compressedSize = view2.getUint32(cdPos + 20, true);
+      var nameLen = view2.getUint16(cdPos + 28, true);
+      var extraLen = view2.getUint16(cdPos + 30, true);
+      var commentLen = view2.getUint16(cdPos + 32, true);
+      var localOffset = view2.getUint32(cdPos + 42, true);
       var name = new TextDecoder().decode(new Uint8Array(arrayBuffer, cdPos + 46, nameLen));
       cdPos += 46 + nameLen + extraLen + commentLen;
       if (name.endsWith("/")) continue;
-      if (view.getUint32(localOffset, true) !== 67324752) continue;
-      var lNameLen = view.getUint16(localOffset + 26, true);
-      var lExtraLen = view.getUint16(localOffset + 28, true);
+      if (view2.getUint32(localOffset, true) !== 67324752) continue;
+      var lNameLen = view2.getUint16(localOffset + 26, true);
+      var lExtraLen = view2.getUint16(localOffset + 28, true);
       var dataStart = localOffset + 30 + lNameLen + lExtraLen;
       var rawData = new Uint8Array(arrayBuffer, dataStart, compressedSize);
       var data;
@@ -7664,7 +7892,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var line = "responseTime " + ms + " milliseconds — " + t("odps.measuredNote");
     el.value = el.value.trim() ? el.value.trim() + "\n" + line : line;
   }
-  function odpsGenerateSample(ctx, rerender6) {
+  function odpsGenerateSample(ctx, rerender7) {
     var statusEl = document.getElementById("od-sample-status");
     var token = getCortexOwnerToken();
     if (!token) {
@@ -7740,15 +7968,15 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       }
     });
   }
-  function odpsToggleDefaults(rerender6) {
+  function odpsToggleDefaults(rerender7) {
     odDefaultsOpen = !odDefaultsOpen;
-    if (rerender6) rerender6();
+    if (rerender7) rerender7();
   }
-  function odpsToggleTool(rerender6) {
+  function odpsToggleTool(rerender7) {
     odToolOpen = !odToolOpen;
-    if (rerender6) rerender6();
+    if (rerender7) rerender7();
   }
-  function odpsSuggestForTool(ctx, rerender6) {
+  function odpsSuggestForTool(ctx, rerender7) {
     var statusEl = document.getElementById("od-tool-status");
     var token = getCortexOwnerToken();
     if (!token) {
@@ -7813,7 +8041,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
         st.textContent = "✔ " + t("odps.suggestDone");
       }
       showNotice(t("odps.suggestDone"), "success");
-      if (rerender6) {
+      if (rerender7) {
       }
     }).catch(function(e) {
       odBusy = false;
@@ -8270,6 +8498,653 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     return html;
   }
 
+  // src/static/app-catalog/js/visitors-model.js
+  var ISO_NUMERIC = {
+    AF: "004",
+    AL: "008",
+    DZ: "012",
+    AO: "024",
+    AQ: "010",
+    AR: "032",
+    AM: "051",
+    AU: "036",
+    AT: "040",
+    AZ: "031",
+    BS: "044",
+    BD: "050",
+    BY: "112",
+    BE: "056",
+    BZ: "084",
+    BJ: "204",
+    BT: "064",
+    BO: "068",
+    BA: "070",
+    BW: "072",
+    BR: "076",
+    BN: "096",
+    BG: "100",
+    BF: "854",
+    BI: "108",
+    KH: "116",
+    CM: "120",
+    CA: "124",
+    CF: "140",
+    TD: "148",
+    CL: "152",
+    CN: "156",
+    CO: "170",
+    CG: "178",
+    CD: "180",
+    CR: "188",
+    CI: "384",
+    HR: "191",
+    CU: "192",
+    CY: "196",
+    CZ: "203",
+    DK: "208",
+    DJ: "262",
+    DO: "214",
+    EC: "218",
+    EG: "818",
+    SV: "222",
+    GQ: "226",
+    ER: "232",
+    EE: "233",
+    SZ: "748",
+    ET: "231",
+    FK: "238",
+    FJ: "242",
+    FI: "246",
+    FR: "250",
+    TF: "260",
+    GA: "266",
+    GM: "270",
+    GE: "268",
+    DE: "276",
+    GH: "288",
+    GR: "300",
+    GL: "304",
+    GT: "320",
+    GN: "324",
+    GW: "624",
+    GY: "328",
+    HT: "332",
+    HN: "340",
+    HU: "348",
+    IS: "352",
+    IN: "356",
+    ID: "360",
+    IR: "364",
+    IQ: "368",
+    IE: "372",
+    IL: "376",
+    IT: "380",
+    JM: "388",
+    JP: "392",
+    JO: "400",
+    KZ: "398",
+    KE: "404",
+    KP: "408",
+    KR: "410",
+    KW: "414",
+    KG: "417",
+    LA: "418",
+    LV: "428",
+    LB: "422",
+    LS: "426",
+    LR: "430",
+    LY: "434",
+    LT: "440",
+    LU: "442",
+    MG: "450",
+    MW: "454",
+    MY: "458",
+    ML: "466",
+    MR: "478",
+    MX: "484",
+    MD: "498",
+    MN: "496",
+    ME: "499",
+    MA: "504",
+    MZ: "508",
+    MM: "104",
+    NA: "516",
+    NP: "524",
+    NL: "528",
+    NC: "540",
+    NZ: "554",
+    NI: "558",
+    NE: "562",
+    NG: "566",
+    MK: "807",
+    NO: "578",
+    OM: "512",
+    PK: "586",
+    PS: "275",
+    PA: "591",
+    PG: "598",
+    PY: "600",
+    PE: "604",
+    PH: "608",
+    PL: "616",
+    PT: "620",
+    PR: "630",
+    QA: "634",
+    RO: "642",
+    RU: "643",
+    RW: "646",
+    SA: "682",
+    SN: "686",
+    RS: "688",
+    SL: "694",
+    SK: "703",
+    SI: "705",
+    SB: "090",
+    SO: "706",
+    ZA: "710",
+    SS: "728",
+    ES: "724",
+    LK: "144",
+    SD: "729",
+    SR: "740",
+    SE: "752",
+    CH: "756",
+    SY: "760",
+    TW: "158",
+    TJ: "762",
+    TZ: "834",
+    TH: "764",
+    TL: "626",
+    TG: "768",
+    TT: "780",
+    TN: "788",
+    TR: "792",
+    TM: "795",
+    UG: "800",
+    UA: "804",
+    AE: "784",
+    GB: "826",
+    US: "840",
+    UY: "858",
+    UZ: "860",
+    VU: "548",
+    VE: "862",
+    VN: "704",
+    EH: "732",
+    YE: "887",
+    ZM: "894",
+    ZW: "716"
+  };
+  var ALPHA2_BY_NUMERIC = (function() {
+    var out = {};
+    Object.keys(ISO_NUMERIC).forEach(function(a2) {
+      out[ISO_NUMERIC[a2]] = a2;
+    });
+    return out;
+  })();
+  function numericOf(alpha2) {
+    var key = String(alpha2 || "").toUpperCase();
+    return Object.prototype.hasOwnProperty.call(ISO_NUMERIC, key) ? ISO_NUMERIC[key] : null;
+  }
+  function alpha2Of(numeric) {
+    var key = String(numeric || "");
+    return Object.prototype.hasOwnProperty.call(ALPHA2_BY_NUMERIC, key) ? ALPHA2_BY_NUMERIC[key] : null;
+  }
+  var WINDOW_MIN = 0;
+  var WINDOW_MAX = 360;
+  var WINDOW_DEFAULT = 30;
+  function clampWindow(raw) {
+    var n = Number(raw);
+    if (raw === "" || raw === null || raw === void 0 || !isFinite(n) || n < 0 || Math.floor(n) !== n) return WINDOW_DEFAULT;
+    return Math.min(n, WINDOW_MAX);
+  }
+  function addDays(day, n) {
+    var d = /* @__PURE__ */ new Date(day + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+  function barsFromSeries(series, from, to, keys) {
+    var byDay = {};
+    (series || []).forEach(function(row) {
+      byDay[row.day] = row;
+    });
+    var days = [];
+    for (var d = from; d <= to && days.length <= WINDOW_MAX + 1; d = addDays(d, 1)) days.push(d);
+    var step = days.length > 120 ? 7 : 1;
+    var bars = [];
+    for (var i = 0; i < days.length; i += step) {
+      var slice = days.slice(i, i + step);
+      var bar = { from: slice[0], to: slice[slice.length - 1], total: 0 };
+      keys.forEach(function(k) {
+        bar[k] = 0;
+      });
+      slice.forEach(function(day) {
+        var row = byDay[day];
+        if (!row) return;
+        keys.forEach(function(k) {
+          var v = Number(row[k]) || 0;
+          bar[k] += v;
+          bar.total += v;
+        });
+      });
+      bars.push(bar);
+    }
+    var max = bars.reduce(function(m, b) {
+      return Math.max(m, b.total);
+    }, 0);
+    return { bars, max, grain: step === 7 ? "week" : "day" };
+  }
+  function shadeStep(count, max) {
+    if (!count || !max) return 0;
+    return Math.max(1, Math.min(5, Math.ceil(Math.sqrt(count / max) * 5)));
+  }
+  function projectPoint(lat, lon, w, h) {
+    return { x: (Number(lon) + 180) / 360 * w, y: (90 - Number(lat)) / 180 * h };
+  }
+  function zoomBox(bbox, w, h, minSpan) {
+    var cx = (bbox[0] + bbox[2]) / 2;
+    var cy = (bbox[1] + bbox[3]) / 2;
+    var spanX = Math.max((bbox[2] - bbox[0]) * 1.6, minSpan);
+    var spanY = Math.max((bbox[3] - bbox[1]) * 1.6, minSpan / 2);
+    var width = Math.min(w, Math.max(spanX, spanY * 2));
+    var height = width / 2;
+    var x = Math.max(0, Math.min(w - width, cx - width / 2));
+    var y = Math.max(0, Math.min(h - height, cy - height / 2));
+    return { x, y, w: width, h: height };
+  }
+  function placesOfCountry(places, alpha2) {
+    return (places || []).filter(function(p) {
+      return p.country === alpha2;
+    }).slice().sort(function(a, b) {
+      return b.people - a.people;
+    });
+  }
+
+  // src/static/app-catalog/js/visitors-map.js
+  var atlas = null;
+  var atlasState = "idle";
+  var atlasWaiters = [];
+  var MIN_SPAN = 60;
+  var view = null;
+  var focus = null;
+  function apiBase4() {
+    var cfg = loadConfig();
+    return (cfg.aimeatUrl || "").replace(/\/+$/, "");
+  }
+  function loadAtlas(done) {
+    if (atlasState === "ready" || atlasState === "error") {
+      if (done) done();
+      return;
+    }
+    if (done) atlasWaiters.push(done);
+    if (atlasState === "loading") return;
+    atlasState = "loading";
+    var finish = function(state) {
+      atlasState = state;
+      var waiters = atlasWaiters;
+      atlasWaiters = [];
+      waiters.forEach(function(fn) {
+        fn();
+      });
+    };
+    fetch(apiBase4() + "/lib/aimeat-atlas@1.json").then(function(r) {
+      if (!r.ok) throw new Error("atlas " + r.status);
+      return r.json();
+    }).then(function(json) {
+      if (!json || !Array.isArray(json.countries)) throw new Error("atlas shape");
+      atlas = json;
+      finish("ready");
+    }).catch(function() {
+      finish("error");
+    });
+  }
+  function mapReset() {
+    view = null;
+    focus = null;
+  }
+  function mapZoom(factor) {
+    if (!atlas) return;
+    var cur = view || { x: 0, y: 0, w: atlas.w, h: atlas.h };
+    var w = Math.max(MIN_SPAN, Math.min(atlas.w, cur.w * factor));
+    var h = w / 2;
+    if (w >= atlas.w) {
+      view = null;
+      return;
+    }
+    var cx = cur.x + cur.w / 2;
+    var cy = cur.y + cur.h / 2;
+    view = {
+      x: Math.max(0, Math.min(atlas.w - w, cx - w / 2)),
+      y: Math.max(0, Math.min(atlas.h - h, cy - h / 2)),
+      w,
+      h
+    };
+  }
+  function mapFocus(alpha2) {
+    if (!alpha2 || focus === alpha2) {
+      mapReset();
+      return;
+    }
+    focus = alpha2;
+    var shape = shapeOf(alpha2);
+    view = shape && atlas ? zoomBox(shape.bbox, atlas.w, atlas.h, MIN_SPAN * 2) : null;
+  }
+  function shapeOf(alpha2) {
+    var id = numericOf(alpha2);
+    if (!id || !atlas) return null;
+    for (var i = 0; i < atlas.countries.length; i++) if (atlas.countries[i].id === id) return atlas.countries[i];
+    return null;
+  }
+  var nameCache = { lang: "", names: null };
+  function countryName(alpha2, unknownCode) {
+    if (alpha2 === unknownCode) return t("visitors.unknownPlace");
+    var lang = getLang();
+    if (nameCache.lang !== lang) {
+      nameCache.lang = lang;
+      try {
+        nameCache.names = new Intl.DisplayNames([lang], { type: "region" });
+      } catch (e) {
+        nameCache.names = null;
+      }
+    }
+    try {
+      var n = nameCache.names ? nameCache.names.of(alpha2) : "";
+      if (n && n !== alpha2) return n;
+    } catch (e) {
+    }
+    var shape = shapeOf(alpha2);
+    return shape ? shape.name : alpha2;
+  }
+  function fill(key, n) {
+    return t(key).replace("{n}", String(n));
+  }
+  function mapHtml(visitors) {
+    var countries = visitors.countries || [];
+    var unknown = visitors.unknown_country;
+    if (!countries.length) return '<p class="vis-note">' + escapeHtml(t("visitors.mapEmpty")) + "</p>";
+    var byCode = {};
+    var max = 0;
+    countries.forEach(function(c) {
+      byCode[c.country] = c.people;
+      if (c.country !== unknown && c.people > max) max = c.people;
+    });
+    var svg;
+    if (atlasState === "error") {
+      svg = '<p class="vis-note">' + escapeHtml(t("visitors.mapFailed")) + "</p>";
+    } else if (atlasState !== "ready") {
+      svg = '<div class="vis-map-wait">' + escapeHtml(t("visitors.mapLoading")) + "</div>";
+    } else {
+      var vb = view || { x: 0, y: 0, w: atlas.w, h: atlas.h };
+      var paths = "";
+      atlas.countries.forEach(function(shape) {
+        var a2 = alpha2Of(shape.id);
+        var n = a2 ? byCode[a2] || 0 : 0;
+        var cls = "vis-land vis-shade-" + shadeStep(n, max) + (a2 && a2 === focus ? " is-focus" : "");
+        var label2 = (a2 ? countryName(a2, unknown) : shape.name) + (n ? " · " + fill("visitors.people", n) : "");
+        paths += '<path class="' + cls + '" d="' + shape.d + '"' + (n ? ` onclick="window._launcher.visitorsCountry('` + jsArg(a2) + `')"` : "") + "><title>" + escapeHtml(label2) + "</title></path>";
+      });
+      var dots = "";
+      var r = vb.w / 1e3 * 5;
+      (visitors.places || []).forEach(function(p) {
+        if (p.lat === null || p.lon === null || p.lat === void 0 || p.lon === void 0) return;
+        var pt = projectPoint(p.lat, p.lon, atlas.w, atlas.h);
+        var label2 = [p.city, p.region, countryName(p.country, unknown)].filter(Boolean).join(", ") + " · " + fill("visitors.people", p.people);
+        dots += '<circle class="vis-dot" cx="' + pt.x.toFixed(1) + '" cy="' + pt.y.toFixed(1) + '" r="' + r.toFixed(2) + '"><title>' + escapeHtml(label2) + "</title></circle>";
+      });
+      svg = '<svg class="vis-map-svg" viewBox="' + [vb.x, vb.y, vb.w, vb.h].map(function(v) {
+        return v.toFixed(1);
+      }).join(" ") + '" role="img" aria-label="' + escapeHtml(t("visitors.mapLabel")) + '">' + paths + dots + "</svg>";
+    }
+    var controls = '<div class="vis-map-controls">' + dtlBtn(escapeHtml(t("visitors.zoomIn")), "window._launcher.visitorsZoom(0.6)", { title: t("visitors.zoomInTitle") }) + dtlBtn(escapeHtml(t("visitors.zoomOut")), "window._launcher.visitorsZoom(1.6)", { title: t("visitors.zoomOutTitle"), disabled: !view }) + dtlBtn(escapeHtml(t("visitors.zoomReset")), "window._launcher.visitorsCountry('')", { disabled: !view && !focus }) + "</div>";
+    var legend = '<div class="vis-legend"><span>' + escapeHtml(t("visitors.legendFew")) + "</span>" + [1, 2, 3, 4, 5].map(function(s) {
+      return '<i class="vis-legend-step vis-shade-' + s + '"></i>';
+    }).join("") + "<span>" + escapeHtml(t("visitors.legendMany")) + "</span></div>";
+    var rows = countries.map(function(c) {
+      var drawn = c.country !== unknown && !!shapeOf(c.country);
+      var name = escapeHtml(countryName(c.country, unknown));
+      var cell = c.country === unknown ? '<span class="vis-country-name">' + name + "</span>" : '<button type="button" class="vis-country-btn' + (c.country === focus ? " is-focus" : "") + `" onclick="window._launcher.visitorsCountry('` + jsArg(c.country) + `')">` + name + "</button>";
+      return "<tr><td>" + cell + (!drawn && c.country !== unknown && atlasState === "ready" ? ' <span class="vis-dim">' + escapeHtml(t("visitors.notDrawn")) + "</span>" : "") + '</td><td class="vis-num">' + c.people + "</td></tr>";
+    }).join("");
+    var list = '<table class="vis-table"><thead><tr><th>' + escapeHtml(t("visitors.colCountry")) + '</th><th class="vis-num">' + escapeHtml(t("visitors.colPeople")) + "</th></tr></thead><tbody>" + rows + "</tbody></table>";
+    var detail = "";
+    if (focus) {
+      var places = placesOfCountry(visitors.places, focus);
+      detail = '<div class="vis-places"><h4 class="vis-h">' + escapeHtml(countryName(focus, unknown)) + "</h4>" + (places.length ? '<table class="vis-table"><tbody>' + places.map(function(p) {
+        return "<tr><td>" + escapeHtml([p.city, p.region].filter(Boolean).join(", ")) + '</td><td class="vis-num">' + p.people + "</td></tr>";
+      }).join("") + "</tbody></table>" : '<p class="vis-note">' + escapeHtml(t("visitors.noPlaces")) + "</p>") + "</div>";
+    }
+    return '<div class="vis-geo"><div class="vis-map">' + controls + '<div class="vis-map-frame">' + svg + "</div>" + legend + '</div><div class="vis-map-side">' + list + detail + "</div></div>";
+  }
+
+  // src/static/app-catalog/js/visitors.js
+  var vAppId = "";
+  var vState = "off";
+  var vData = null;
+  var vBusy = false;
+  var vDays = WINDOW_DEFAULT;
+  var GEO_LEVELS = ["off", "country", "region", "city"];
+  var PRESETS = [0, 7, 30, 90, 360];
+  function apiBase5() {
+    var cfg = loadConfig();
+    return (cfg.aimeatUrl || "").replace(/\/+$/, "");
+  }
+  function rerender3() {
+    var el = document.getElementById("detail-visitors");
+    if (el) el.innerHTML = visitorsSectionInner();
+  }
+  function fill2(key, n) {
+    return t(key).replace("{n}", String(n));
+  }
+  function load() {
+    var token = getCortexOwnerToken();
+    if (!token) {
+      vState = "login";
+      vData = null;
+      rerender3();
+      return;
+    }
+    var asked = vAppId;
+    fetch(apiBase5() + "/v1/apps/visitors?app_id=" + encodeURIComponent(vAppId) + "&days=" + vDays, {
+      headers: { "Authorization": "Bearer " + token }
+    }).then(function(r) {
+      return r.json();
+    }).then(function(res) {
+      if (asked !== vAppId) return;
+      if (!res || !res.ok || !res.data) throw new Error("bad response");
+      vData = res.data;
+      vState = "ready";
+      if (vData.visitors && vData.visitors.countries.length) loadAtlas(rerender3);
+      rerender3();
+    }).catch(function() {
+      if (asked === vAppId) {
+        vState = "error";
+        vData = null;
+        rerender3();
+      }
+    });
+  }
+  function visitorsOnOpen(owner, appId, isOwn) {
+    vData = null;
+    vBusy = false;
+    mapReset();
+    if (!isOwn || !owner || !appId) {
+      vState = "off";
+      vAppId = "";
+      return;
+    }
+    vAppId = owner + "/" + appId;
+    vState = "loading";
+    load();
+  }
+  function visitorsSetDays(days) {
+    vDays = clampWindow(days);
+    vState = "loading";
+    rerender3();
+    load();
+  }
+  function visitorsApplyDays() {
+    var el = document.getElementById("vis-days");
+    visitorsSetDays(el ? el.value : WINDOW_DEFAULT);
+  }
+  function putMeasurement(body, doneKey) {
+    if (vBusy || !vData) return;
+    vBusy = true;
+    rerender3();
+    var token = getCortexOwnerToken();
+    fetch(apiBase5() + "/v1/apps/visitors/measurement", {
+      method: "PUT",
+      headers: Object.assign({ "Content-Type": "application/json" }, token ? { "Authorization": "Bearer " + token } : {}),
+      body: JSON.stringify(Object.assign({ app_id: vAppId }, body))
+    }).then(function(r) {
+      return r.json();
+    }).then(function(res) {
+      vBusy = false;
+      if (!res || !res.ok) {
+        showNotice(res && res.error && res.error.message || t("visitors.saveFailed"));
+        rerender3();
+        return;
+      }
+      showNotice(t(doneKey));
+      load();
+    }).catch(function(err) {
+      vBusy = false;
+      showNotice(String(err && err.message ? err.message : err));
+      rerender3();
+    });
+  }
+  function visitorsToggle() {
+    if (!vData) return;
+    var m = vData.measurement;
+    if (m.on) {
+      putMeasurement({ on: false }, "visitors.turnedOff");
+      return;
+    }
+    var body = { on: true };
+    if (m.geo === "off" && !vData.visitors && m.geo_available) body.geo = "country";
+    putMeasurement(body, "visitors.turnedOn");
+  }
+  function visitorsSetGeo() {
+    var el = document.getElementById("vis-geo");
+    var level = el ? el.value : "";
+    if (GEO_LEVELS.indexOf(level) < 0 || !vData) return;
+    putMeasurement({ on: vData.measurement.on, geo: level }, "visitors.geoSaved");
+  }
+  function visitorsCountry(alpha2) {
+    mapFocus(alpha2);
+    rerender3();
+  }
+  function visitorsZoom(factor) {
+    mapZoom(Number(factor) || 1);
+    rerender3();
+  }
+  function stat(value, label2) {
+    return '<div class="vis-stat"><div class="vis-stat-val">' + escapeHtml(String(value)) + '</div><div class="vis-stat-label">' + escapeHtml(label2) + "</div></div>";
+  }
+  function chartHtml(title, series, parts) {
+    var folded = barsFromSeries(series, vData.from, vData.to, parts.map(function(p) {
+      return p.key;
+    }));
+    if (!folded.max) return "";
+    var bars = folded.bars;
+    var W = 720, H = 96, PAD = 2, BASE = H - 1;
+    var bw = Math.min(28, Math.max(2, Math.floor((W - PAD * (bars.length - 1)) / bars.length)));
+    var svgW = bars.length * bw + PAD * (bars.length - 1);
+    var rects = "";
+    bars.forEach(function(bar, i) {
+      var x = i * (bw + PAD);
+      var when = (/* @__PURE__ */ new Date(bar.from + "T00:00:00")).toLocaleDateString() + (bar.to !== bar.from ? " – " + (/* @__PURE__ */ new Date(bar.to + "T00:00:00")).toLocaleDateString() : "");
+      var label2 = when + " · " + parts.map(function(p) {
+        return t(p.label) + " " + bar[p.key];
+      }).join(" · ");
+      var marks = "";
+      var y = BASE;
+      var full = bar.total ? Math.max(4, Math.round(bar.total / folded.max * (H - 14))) : 0;
+      parts.forEach(function(p) {
+        if (!bar[p.key]) return;
+        var h = Math.max(1, Math.round(full * (bar[p.key] / bar.total)));
+        y -= h;
+        marks += '<rect class="vis-bar-mark ' + p.cls + '" x="' + x + '" y="' + y + '" width="' + bw + '" height="' + h + '"></rect>';
+      });
+      rects += '<g class="version-bar"><title>' + escapeHtml(label2) + '</title><rect class="version-bar-hit" x="' + x + '" y="0" width="' + bw + '" height="' + H + '" fill="transparent"></rect>' + marks + "</g>";
+    });
+    var key = parts.map(function(p) {
+      return '<span class="vis-key"><i class="vis-key-mark ' + p.cls + '"></i>' + escapeHtml(t(p.label)) + "</span>";
+    }).join("");
+    return '<div class="version-chart vis-chart"><div class="version-chart-head"><span class="version-chart-title">' + escapeHtml(title) + '</span><span class="version-chart-max">' + escapeHtml(fill2(folded.grain === "week" ? "visitors.maxPerWeek" : "visitors.maxPerDay", folded.max)) + '</span></div><svg class="version-chart-svg" width="' + svgW + '" height="' + H + '" viewBox="0 0 ' + svgW + " " + H + '" role="img" aria-label="' + escapeHtml(title) + '"><line class="version-chart-base" x1="0" y1="' + BASE + '" x2="' + svgW + '" y2="' + BASE + '"></line>' + rects + '</svg><div class="version-chart-axis"><span>' + escapeHtml((/* @__PURE__ */ new Date(vData.from + "T00:00:00")).toLocaleDateString()) + "</span><span>" + escapeHtml((/* @__PURE__ */ new Date(vData.to + "T00:00:00")).toLocaleDateString()) + '</span></div><div class="vis-keys">' + key + "</div></div>";
+  }
+  function windowHtml() {
+    var presets = PRESETS.map(function(d) {
+      return dtlBtn(
+        escapeHtml(d === 0 ? t("visitors.today") : fill2("visitors.days", d)),
+        "window._launcher.visitorsSetDays(" + d + ")",
+        { variant: d === vDays ? "primary" : "", disabled: vState === "loading" }
+      );
+    }).join("");
+    return '<div class="vis-window">' + presets + '<label class="vis-stat-label" for="vis-days">' + escapeHtml(t("visitors.daysLabel")) + '</label><input id="vis-days" class="modal-input vis-days-input" type="number" inputmode="numeric" min="' + WINDOW_MIN + '" max="' + WINDOW_MAX + '" step="1" value="' + vDays + `" onkeydown="if(event.key==='Enter')window._launcher.visitorsApplyDays()">` + dtlBtn(escapeHtml(t("visitors.show")), "window._launcher.visitorsApplyDays()", { disabled: vState === "loading" }) + "</div>";
+  }
+  function opensHtml() {
+    var o = vData.opens;
+    var html = '<div class="vis-stats">' + stat(o.total, t(vData.days === 0 ? "visitors.opensToday" : "visitors.opensInPeriod")) + stat(o.signed_in, t("visitors.signedIn")) + stat(o.anonymous, t("visitors.anonymous")) + stat(o.signed_in_people, t("visitors.signedInPeople")) + stat(o.lifetime, t("visitors.lifetime")) + "</div>";
+    html += o.total ? chartHtml(t("visitors.opensChart"), o.series, [
+      { key: "signed_in", label: "visitors.signedIn", cls: "vis-part-a" },
+      { key: "anonymous", label: "visitors.anonymous", cls: "vis-part-b" }
+    ]) : '<p class="vis-note">' + escapeHtml(t("visitors.noOpens")) + "</p>";
+    html += '<p class="vis-note">' + escapeHtml(t("visitors.opensNote")) + "</p>";
+    return html;
+  }
+  function measurementHtml() {
+    var m = vData.measurement;
+    var html = '<div class="mk-row"><div class="mk-row-name">' + escapeHtml(t("visitors.measure")) + '</div><div class="mk-row-meaning">' + escapeHtml(t(m.on ? "visitors.measureOn" : vData.visitors ? "visitors.measurePaused" : "visitors.measureOff")) + '</div><div class="mk-row-action">' + dtlBtn(
+      escapeHtml(t(m.on ? "visitors.turnOff" : "visitors.turnOn")),
+      "window._launcher.visitorsToggle()",
+      { variant: m.on ? "" : "primary", disabled: vBusy }
+    ) + "</div></div>";
+    if (!m.on && !vData.visitors) return html;
+    var options = GEO_LEVELS.map(function(level) {
+      return '<option value="' + level + '"' + (level === m.geo ? " selected" : "") + ">" + escapeHtml(t("visitors.geo." + level)) + "</option>";
+    }).join("");
+    html += '<div class="mk-row"><div class="mk-row-name"><label for="vis-geo">' + escapeHtml(t("visitors.geoLabel")) + '</label></div><div class="mk-row-meaning">' + escapeHtml(t(m.geo_available ? "visitors.geoMeaning." + m.geo : "visitors.geoUnavailable")) + '</div><div class="mk-row-action"><select id="vis-geo" class="modal-input vis-geo-select" onchange="window._launcher.visitorsSetGeo()"' + (vBusy || !m.geo_available ? " disabled" : "") + ">" + options + "</select></div></div>";
+    return html;
+  }
+  function whoHtml() {
+    var v = vData.visitors;
+    if (!v) return "";
+    var html = '<div class="vis-block"><h4 class="vis-h">' + escapeHtml(t("visitors.whoTitle")) + "</h4>";
+    if (!v.total) return html + '<p class="vis-note">' + escapeHtml(t("visitors.noneYet")) + "</p></div>";
+    html += '<div class="vis-stats">' + stat(v.humans, t("visitors.humans")) + stat(v.ai, t("visitors.ai")) + stat(v.bots, t("visitors.bots")) + "</div>";
+    html += chartHtml(t("visitors.whoChart"), v.series, [
+      { key: "humans", label: "visitors.humans", cls: "vis-part-a" },
+      { key: "ai", label: "visitors.ai", cls: "vis-part-c" },
+      { key: "bots", label: "visitors.bots", cls: "vis-part-b" }
+    ]);
+    if (v.ai_agents.length) {
+      html += '<table class="vis-table"><thead><tr><th>' + escapeHtml(t("visitors.colAi")) + '</th><th class="vis-num">' + escapeHtml(t("visitors.colAsked")) + '</th><th class="vis-num">' + escapeHtml(t("visitors.colCrawled")) + "</th></tr></thead><tbody>" + v.ai_agents.map(function(a) {
+        return "<tr><td>" + escapeHtml(a.name) + '</td><td class="vis-num">' + a.asked + '</td><td class="vis-num">' + a.crawled + "</td></tr>";
+      }).join("") + '</tbody></table><p class="vis-note">' + escapeHtml(t("visitors.aiNote")) + "</p>";
+    } else {
+      html += '<p class="vis-note">' + escapeHtml(t("visitors.noAi")) + "</p>";
+    }
+    return html + "</div>";
+  }
+  function whereHtml() {
+    var v = vData.visitors;
+    var m = vData.measurement;
+    if (!v) return "";
+    if (m.geo === "off" && !v.countries.length) return "";
+    var html = '<div class="vis-block"><h4 class="vis-h">' + escapeHtml(t("visitors.whereTitle")) + "</h4>" + mapHtml(v) + '<p class="vis-note">' + escapeHtml(t("visitors.whereNote")) + "</p>";
+    if (v.places_truncated) html += '<p class="vis-note">' + escapeHtml(t("visitors.placesTruncated")) + "</p>";
+    if (m.geo_attribution) html += '<p class="vis-note vis-dim">' + escapeHtml(m.geo_attribution) + "</p>";
+    return html + "</div>";
+  }
+  function visitorsSectionInner() {
+    if (vState === "off") return "";
+    var head = "<h3>" + escapeHtml(t("visitors.title")) + '</h3><p class="vis-intro">' + escapeHtml(t("visitors.intro")) + "</p>";
+    if (vState === "login") return head + '<p class="vis-note">' + escapeHtml(t("visitors.needLogin")) + "</p>";
+    if (vState === "error") return head + '<p class="vis-note">' + escapeHtml(t("visitors.loadFailed")) + "</p>";
+    if (!vData) return head + windowHtml() + '<p class="vis-note">' + escapeHtml(t("visitors.loading")) + "</p>";
+    return head + windowHtml() + opensHtml() + '<div class="vis-block">' + measurementHtml() + "</div>" + whoHtml() + whereHtml();
+  }
+
   // src/static/app-catalog/js/seo.js
   var seoOwner = "";
   var seoAppId = "";
@@ -8277,11 +9152,11 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
   var seoData = null;
   var seoBusy = false;
   var seoOpenEditor = false;
-  function apiBase4() {
+  function apiBase6() {
     var cfg = loadConfig();
     return (cfg.aimeatUrl || "").replace(/\/+$/, "");
   }
-  function rerender3() {
+  function rerender4() {
     var el = document.getElementById("detail-seo");
     if (el) el.innerHTML = seoSectionInner();
   }
@@ -8299,7 +9174,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     seoAppId = appId;
     seoState = "loading";
     var token = getCortexOwnerToken();
-    fetch(apiBase4() + "/v1/apps?limit=200", {
+    fetch(apiBase6() + "/v1/apps?limit=200", {
       headers: token ? { "Authorization": "Bearer " + token } : {}
     }).then(function(r) {
       return r.json();
@@ -8314,7 +9189,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       }
       if (!mine) {
         seoState = "error";
-        rerender3();
+        rerender4();
         return;
       }
       seoData = {
@@ -8327,10 +9202,10 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
         tags: mine.manifest && mine.manifest.tags || []
       };
       seoState = "ready";
-      rerender3();
+      rerender4();
     }).catch(function() {
       seoState = "error";
-      rerender3();
+      rerender4();
     });
   }
   function seoToggle() {
@@ -8354,13 +9229,13 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
   }
   function seoToggleEditor() {
     seoOpenEditor = !seoOpenEditor;
-    rerender3();
+    rerender4();
   }
   function patch(seo) {
     seoBusy = true;
-    rerender3();
+    rerender4();
     var token = getCortexOwnerToken();
-    fetch(apiBase4() + "/v1/apps/" + encodeURIComponent(seoAppId), {
+    fetch(apiBase6() + "/v1/apps/" + encodeURIComponent(seoAppId), {
       method: "PATCH",
       headers: Object.assign(
         { "Content-Type": "application/json" },
@@ -8373,18 +9248,18 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       seoBusy = false;
       if (!res || !res.ok) {
         showNotice(res && res.error && res.error.message || t("seo.saveFailed"));
-        rerender3();
+        rerender4();
         return;
       }
       var d = res.data || {};
       seoData.state = d.seo && d.seo.state || seoData.state;
       seoData.seo = d.seo || seoData.seo;
       showNotice(d.note || t("seo.saved"));
-      rerender3();
+      rerender4();
     }).catch(function(err) {
       seoBusy = false;
       showNotice(String(err && err.message ? err.message : err));
-      rerender3();
+      rerender4();
     });
   }
   function stateLine(state, blockReason) {
@@ -8471,15 +9346,15 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
   var mkState = "off";
   var mkData = null;
   var mkBusy = false;
-  function apiBase5() {
+  function apiBase7() {
     var cfg = loadConfig();
     return (cfg.aimeatUrl || "").replace(/\/+$/, "");
   }
-  function rerender4() {
+  function rerender5() {
     var el = document.getElementById("detail-marks");
     if (el) el.innerHTML = marksSectionInner();
   }
-  function fill(text, vars) {
+  function fill3(text, vars) {
     return String(text).replace(/\{(\w+)\}/g, function(m, k) {
       return vars[k] != null ? vars[k] : m;
     });
@@ -8497,7 +9372,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     mkAppId = appId;
     mkState = "loading";
     var token = getCortexOwnerToken();
-    fetch(apiBase5() + "/v1/apps?limit=200", { headers: token ? { "Authorization": "Bearer " + token } : {} }).then(function(r) {
+    fetch(apiBase7() + "/v1/apps?limit=200", { headers: token ? { "Authorization": "Bearer " + token } : {} }).then(function(r) {
       return r.json();
     }).then(function(res) {
       var apps = res && res.ok && res.data && res.data.apps || [];
@@ -8510,7 +9385,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       }
       if (!mine) {
         mkState = "error";
-        rerender4();
+        rerender5();
         return;
       }
       var m = mine.manifest || {};
@@ -8523,10 +9398,10 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
         cortex: m.usesCortex || []
       };
       mkState = "ready";
-      rerender4();
+      rerender5();
     }).catch(function() {
       mkState = "error";
-      rerender4();
+      rerender5();
     });
   }
   function marksToggle(key) {
@@ -8551,9 +9426,9 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
   }
   function patch2(body) {
     mkBusy = true;
-    rerender4();
+    rerender5();
     var token = getCortexOwnerToken();
-    fetch(apiBase5() + "/v1/apps/" + encodeURIComponent(mkAppId), {
+    fetch(apiBase7() + "/v1/apps/" + encodeURIComponent(mkAppId), {
       method: "PATCH",
       headers: Object.assign({ "Content-Type": "application/json" }, token ? { "Authorization": "Bearer " + token } : {}),
       body: JSON.stringify(body)
@@ -8563,7 +9438,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       mkBusy = false;
       if (!res || !res.ok) {
         showNotice(res && res.error && res.error.message || t("marks.saveFailed"));
-        rerender4();
+        rerender5();
         return;
       }
       var d = res.data || {};
@@ -8571,11 +9446,11 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       if ("authorship" in d) mkData.authorship = d.authorship || null;
       if (d.authorshipLog) mkData.log = d.authorshipLog;
       showNotice(d.note || t("marks.saved"));
-      rerender4();
+      rerender5();
     }).catch(function(err) {
       mkBusy = false;
       showNotice(String(err && err.message ? err.message : err));
-      rerender4();
+      rerender5();
     });
   }
   function switchRow(key, on) {
@@ -8605,7 +9480,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     html += '<ol class="mk-log">';
     for (var i = log.length - 1; i >= 0; i--) {
       var e = log[i];
-      html += '<li><span class="mk-log-when">' + escapeHtml(fmtDate(e.at)) + '</span> <span class="mk-log-action">' + escapeHtml(t(e.action === "cleared" ? "marks.logCleared" : "marks.logDeclared")) + '</span> <span class="mk-log-name">' + escapeHtml(e.name) + '</span> <span class="mk-log-by">' + escapeHtml(fill(t("marks.by"), { by: e.by })) + "</span></li>";
+      html += '<li><span class="mk-log-when">' + escapeHtml(fmtDate(e.at)) + '</span> <span class="mk-log-action">' + escapeHtml(t(e.action === "cleared" ? "marks.logCleared" : "marks.logDeclared")) + '</span> <span class="mk-log-name">' + escapeHtml(e.name) + '</span> <span class="mk-log-by">' + escapeHtml(fill3(t("marks.by"), { by: e.by })) + "</span></li>";
     }
     return html + "</ol>";
   }
@@ -8618,7 +9493,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var html = head + '<p class="dtl-ai-status">' + escapeHtml(t("marks.intro")) + '</p><div class="mk-rows">' + switchRow("badge", d.marks.badge) + switchRow("install", d.marks.install) + "</div>";
     html += "<h4>" + escapeHtml(t("marks.authorTitle")) + "</h4>";
     if (d.authorship) {
-      html += '<p class="mk-author-is">' + escapeHtml(fill(t("marks.authorIs"), { name: d.authorship.name, when: fmtDate(d.authorship.declaredAt) })) + '</p><div class="dtl-btn-row">' + dtlBtn(t("marks.withdraw"), "window._launcher.marksWithdraw()", { disabled: mkBusy }) + "</div>";
+      html += '<p class="mk-author-is">' + escapeHtml(fill3(t("marks.authorIs"), { name: d.authorship.name, when: fmtDate(d.authorship.declaredAt) })) + '</p><div class="dtl-btn-row">' + dtlBtn(t("marks.withdraw"), "window._launcher.marksWithdraw()", { disabled: mkBusy }) + "</div>";
     } else {
       html += '<p class="dtl-ai-status">' + escapeHtml(t("marks.authorNone")) + '</p><div class="mk-author-form"><label class="mz-label" for="mk-author">' + escapeHtml(t("marks.authorLabel")) + '</label><input id="mk-author" type="text" class="modal-input" maxlength="120" placeholder="' + escapeHtml(t("marks.authorPh")) + '"><div class="dtl-btn-row">' + dtlBtn(t("marks.declare"), "window._launcher.marksDeclare()", { variant: "primary", disabled: mkBusy }) + "</div></div>";
     }
@@ -8640,7 +9515,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
   var auEntries = [];
   var auTotal = 0;
   var auShown = 12;
-  function apiBase6() {
+  function apiBase8() {
     var cfg = loadConfig();
     return (cfg.aimeatUrl || "").replace(/\/+$/, "");
   }
@@ -8650,7 +9525,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     if (token) h["Authorization"] = "Bearer " + token;
     return h;
   }
-  function rerender5() {
+  function rerender6() {
     var el = document.getElementById("detail-legal");
     if (el) el.innerHTML = legalSectionInner();
     var au = document.getElementById("detail-audit");
@@ -8695,49 +9570,49 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     lgAppId = appId;
     lgState = "loading";
     auState = "loading";
-    fetch(apiBase6() + appPath() + "/legal", { headers: authHeaders(false) }).then(function(r) {
+    fetch(apiBase8() + appPath() + "/legal", { headers: authHeaders(false) }).then(function(r) {
       return r.json();
     }).then(function(res) {
       if (!res || !res.ok) {
         lgState = "error";
-        rerender5();
+        rerender6();
         return;
       }
       lgData = res.data;
       lgState = "ready";
-      rerender5();
+      rerender6();
     }).catch(function() {
       lgState = "error";
-      rerender5();
+      rerender6();
     });
     loadAudit();
   }
   function loadAudit() {
-    fetch(apiBase6() + appPath() + "/audit", { headers: authHeaders(false) }).then(function(r) {
+    fetch(apiBase8() + appPath() + "/audit", { headers: authHeaders(false) }).then(function(r) {
       return r.json();
     }).then(function(res) {
       if (!res || !res.ok) {
         auState = "error";
-        rerender5();
+        rerender6();
         return;
       }
       auEntries = res.data && res.data.entries || [];
       auTotal = res.data && res.data.total || auEntries.length;
       auState = "ready";
-      rerender5();
+      rerender6();
     }).catch(function() {
       auState = "error";
-      rerender5();
+      rerender6();
     });
   }
   function legalEdit(kind) {
     if (lgBusy) return;
     lgEditing = kind;
-    rerender5();
+    rerender6();
   }
   function legalCancel() {
     lgEditing = null;
-    rerender5();
+    rerender6();
   }
   function legalSave(kind) {
     if (lgBusy || !lgData) return;
@@ -8762,12 +9637,12 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
   }
   function auditMore() {
     auShown += 25;
-    rerender5();
+    rerender6();
   }
   function patch3(legal) {
     lgBusy = true;
-    rerender5();
-    fetch(apiBase6() + "/v1/apps/" + encodeURIComponent(lgAppId), {
+    rerender6();
+    fetch(apiBase8() + "/v1/apps/" + encodeURIComponent(lgAppId), {
       method: "PATCH",
       headers: authHeaders(true),
       body: JSON.stringify({ legal })
@@ -8777,7 +9652,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       lgBusy = false;
       if (!res || !res.ok) {
         showNotice(res && res.error && res.error.message || t("legal.saveFailed"));
-        rerender5();
+        rerender6();
         return;
       }
       showNotice(res.data && res.data.note || t("legal.saved"));
@@ -8786,7 +9661,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     }).catch(function(err) {
       lgBusy = false;
       showNotice(String(err && err.message ? err.message : err));
-      rerender5();
+      rerender6();
     });
   }
   function fmtLabel(format) {
@@ -9467,6 +10342,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     detailHasWorkCopy = !!(wcState && wcState.hasDraft);
     monetizeOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     costOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
+    visitorsOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     seoOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     marksOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     legalOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
@@ -9670,6 +10546,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var odpsHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-odps">' + odpsSectionInner() + "</div>" : "";
     var monetizeHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-monetize">' + monetizeSectionInner() + "</div>" : "";
     var seoHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-seo">' + seoSectionInner() + "</div>" : "";
+    var visitorsHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-visitors">' + visitorsSectionInner() + "</div>" : "";
     var marksHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-marks">' + marksSectionInner() + "</div>" : "";
     var legalHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-legal">' + legalSectionInner() + '</div><div class="dtl-section" id="detail-audit">' + auditSectionInner() + "</div>" : "";
     var costHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-cost">' + costSectionInner() + "</div>" : "";
@@ -9724,7 +10601,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var bandHtml = bandItems ? '<div class="cat-band dtl-band"><div class="cat-band-in">' + bandItems + "</div></div>" : "";
     var bodyEl = document.getElementById("detail-body");
     bodyEl.innerHTML = detailRailPage(
-      heroHtml + bandHtml + statusHtml + aiHtml + aboutHtml + dataMapHtml + requiresHtml + historyHtml + versionsHtml + mgmtHtml + skillsHtml + seoHtml + marksHtml + legalHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml
+      heroHtml + bandHtml + statusHtml + aiHtml + aboutHtml + dataMapHtml + requiresHtml + historyHtml + versionsHtml + visitorsHtml + mgmtHtml + skillsHtml + seoHtml + marksHtml + legalHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml
     );
     var chapters = bodyEl.querySelectorAll(".dtl-section").length;
     bodyEl.style.setProperty("--dtl-chapters", '"' + (chapters < 10 ? "0" : "") + chapters + '"');
@@ -9780,14 +10657,14 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
         showNotice(t("wc.gone"));
         return;
       }
-      var view = document.getElementById("iframe-view");
+      var view2 = document.getElementById("iframe-view");
       var iframe = document.getElementById("app-iframe");
       document.getElementById("iframe-title").textContent = (app.name || "App") + " — " + t("wc.previewTitle");
       iframe.removeAttribute("src");
       iframe.srcdoc = blobToHtml(b64);
       setIframeUrl("");
       delete iframe.dataset.appId;
-      view.hidden = false;
+      view2.hidden = false;
     });
   }
   async function detailCheckpointRestore(id) {
@@ -10682,7 +11559,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
   function detailAiTest() {
     var app = detailGetApp();
     if (!app || !detailDraftBlob) return;
-    var view = document.getElementById("iframe-view");
+    var view2 = document.getElementById("iframe-view");
     var iframe = document.getElementById("app-iframe");
     var title = document.getElementById("iframe-title");
     title.textContent = (app.name || "App") + " (draft)";
@@ -10690,7 +11567,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     iframe.srcdoc = blobToHtml(detailDraftBlob);
     setIframeUrl("");
     delete iframe.dataset.appId;
-    view.hidden = false;
+    view2.hidden = false;
   }
   function detailAiKeep() {
     var app = detailGetApp();
@@ -11989,16 +12866,16 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     grid.style.display = communityVisible ? "" : "none";
     arrow.classList.toggle("open", communityVisible);
   }
-  function switchView(view) {
-    if (view !== "community" && view !== "favorites") view = "library";
-    document.body.setAttribute("data-active-view", view);
+  function switchView(view2) {
+    if (view2 !== "community" && view2 !== "favorites") view2 = "library";
+    document.body.setAttribute("data-active-view", view2);
     var names = ["library", "community", "favorites"];
     for (var i = 0; i < names.length; i++) {
       var el = document.getElementById("view-tab-" + names[i]);
-      if (el) el.classList.toggle("active", view === names[i]);
+      if (el) el.classList.toggle("active", view2 === names[i]);
     }
     try {
-      localStorage.setItem("appCatalogView", view);
+      localStorage.setItem("appCatalogView", view2);
     } catch (e) {
     }
     updateCommunityEmpty();
@@ -12848,12 +13725,12 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     return '<button type="button" class="cat-rail-item' + (isTag ? " cat-rail-item--tag" : "") + (on ? " active" : "") + '" onclick="' + onclick + '"><span>' + escapeHtml(label2) + "</span>" + (typeof count === "number" ? '<span class="cat-rail-count">' + count + "</span>" : "") + "</button>";
   }
   function railCollection(entries) {
-    var view = document.body.getAttribute("data-active-view") || "library";
+    var view2 = document.body.getAttribute("data-active-view") || "library";
     var pick = function(sa) {
       return { tags: sa.manifest && sa.manifest.tags || [] };
     };
-    if (view === "community") return getCommunityApps().map(pick);
-    if (view === "favorites") return getFavoriteServerApps().map(pick);
+    if (view2 === "community") return getCommunityApps().map(pick);
+    if (view2 === "favorites") return getFavoriteServerApps().map(pick);
     return entries || [];
   }
   function renderTags(entries) {
@@ -13009,7 +13886,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     btn.style.display = currentIframeUrl && !isSameOriginUrl(currentIframeUrl) ? "" : "none";
   }
   function launchInIframe(app) {
-    var view = document.getElementById("iframe-view");
+    var view2 = document.getElementById("iframe-view");
     var iframe = document.getElementById("app-iframe");
     var title = document.getElementById("iframe-title");
     title.textContent = app.name || "App";
@@ -13024,7 +13901,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       currentIframeUrl = "";
     }
     updateOpenExternalBtn();
-    view.hidden = false;
+    view2.hidden = false;
   }
   var ownServerApps = [];
   var serverStateByFilename = {};
@@ -13291,9 +14168,9 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
   }
   var currentIframeUrl = "";
   function closeIframe() {
-    var view = document.getElementById("iframe-view");
+    var view2 = document.getElementById("iframe-view");
     var iframe = document.getElementById("app-iframe");
-    view.hidden = true;
+    view2.hidden = true;
     iframe.removeAttribute("src");
     iframe.removeAttribute("srcdoc");
     delete iframe.dataset.appId;
@@ -13678,6 +14555,12 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     marksToggle,
     marksDeclare,
     marksWithdraw,
+    visitorsSetDays,
+    visitorsApplyDays,
+    visitorsToggle,
+    visitorsSetGeo,
+    visitorsCountry,
+    visitorsZoom,
     legalEdit,
     legalCancel,
     legalSave,
