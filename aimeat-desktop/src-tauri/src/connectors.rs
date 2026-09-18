@@ -1,0 +1,558 @@
+// AIMEAT Desktop — MCP connectors: which AIs on this machine are attached to the node.
+//
+// This is the app's front door. A person installs one program and their own AI is attached to
+// their node, without a terminal and without walking a settings menu. The web cannot do this:
+// only a program on the machine can see which tools are installed and edit their config files.
+//
+// NOTHING HERE HOLDS A SECRET. The node speaks OAuth 2.1 with dynamic client registration
+// (aimeat/src/mcp/oauth.ts), so a client needs the endpoint URL and nothing else: it registers
+// itself, opens a browser, and the person signs in as themselves. That is why connecting is a
+// four-line edit rather than a token dance, and why the same edit is safe for every client.
+//
+// THE SHAPES COME FROM THE NODE, NOT FROM GUESSWORK. aimeat/src/services/mcp-install.ts is the
+// one place that says what each client accepts: Claude Code and Cursor key on `mcpServers`,
+// VS Code on `servers`; VS Code needs `type`, Cursor rejects it. Those three are written here.
+// A client whose file shape this project has not verified is reported as `manual` with a snippet
+// to paste, because a file a client loads and silently ignores is the failure this path exists
+// to remove.
+//
+// EVERY WRITE KEEPS A COPY. Before the first change to a config file the original is copied to
+// `<file>.aimeat-backup`, and the new content is written to a temporary file in the same folder
+// and renamed over the original, so a crash mid-write cannot leave a half-file behind.
+
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use std::fs;
+use std::path::{Path, PathBuf};
+
+/// One AI tool on this machine, as the front screen shows it.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Connector {
+    /// Stable id used by the frontend and by connect/disconnect.
+    pub id: String,
+    /// What the tool calls itself.
+    pub name: String,
+    /// Whether this machine has the tool at all.
+    pub installed: bool,
+    /// Whether it is attached to the node that was asked about.
+    pub connected: bool,
+    /// The AIMEAT endpoint it is attached to, when that is a different node.
+    pub connected_url: Option<String>,
+    /// "file" — this app can write it · "manual" — the person pastes the snippet.
+    pub method: String,
+    /// The config file, whether or not it exists yet.
+    pub config_path: Option<String>,
+}
+
+/// What a client accepts, and where it keeps it.
+struct ClientSpec {
+    id: &'static str,
+    name: &'static str,
+    /// The object the servers live under: `mcpServers` or `servers`.
+    key: &'static str,
+    /// Whether the entry carries `"type": "http"`. VS Code requires it, Cursor rejects it.
+    with_type: bool,
+    /// False when this project has not verified the file shape: report, do not write.
+    writable: bool,
+    /// Why this one is attached by hand. It reaches a person only through the refusal below, as
+    /// a safety net; the words the screen shows are the frontend's, in the person's language.
+    note: Option<&'static str>,
+}
+
+const SPECS: &[ClientSpec] = &[
+    ClientSpec {
+        id: "claude-code",
+        name: "Claude Code",
+        key: "mcpServers",
+        with_type: true,
+        writable: true,
+        note: None,
+    },
+    ClientSpec {
+        id: "claude-desktop",
+        name: "Claude Desktop",
+        key: "mcpServers",
+        with_type: true,
+        writable: false,
+        note: Some("Claude Desktop reads only a server that runs on this machine, so a remote node needs a small bridge beside it. Until that ships, attach the node in Claude Desktop's own connector settings."),
+    },
+    ClientSpec {
+        id: "cursor",
+        name: "Cursor",
+        key: "mcpServers",
+        with_type: false,
+        writable: true,
+        note: None,
+    },
+    ClientSpec {
+        id: "vscode",
+        name: "VS Code",
+        key: "servers",
+        with_type: true,
+        writable: true,
+        note: None,
+    },
+    ClientSpec {
+        id: "codex",
+        name: "Codex",
+        key: "mcp_servers",
+        with_type: false,
+        writable: false,
+        note: Some("Codex keeps its servers in a TOML file. Paste the lines below into it; this app does not edit TOML yet."),
+    },
+];
+
+fn spec(id: &str) -> Option<&'static ClientSpec> {
+    SPECS.iter().find(|s| s.id == id)
+}
+
+// ── Where each client keeps its file ────────────────────────────────────────
+
+fn home_dir() -> Option<PathBuf> {
+    let key = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+    std::env::var_os(key).map(PathBuf::from)
+}
+
+/// The per-user application-data folder, per platform.
+fn app_data_dir() -> Option<PathBuf> {
+    if cfg!(windows) {
+        return std::env::var_os("APPDATA").map(PathBuf::from);
+    }
+    let home = home_dir()?;
+    if cfg!(target_os = "macos") {
+        Some(home.join("Library").join("Application Support"))
+    } else {
+        std::env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .or_else(|| Some(home.join(".config")))
+    }
+}
+
+/// Claude Code keeps its user-scope servers in `~/.claude.json`, under the top-level `mcpServers`
+/// key, and reads that file at session start; the `claude mcp add` command writes the same place,
+/// and a hand-written entry needs no index anywhere else. CLAUDE_CONFIG_DIR moves the file, and a
+/// person who has set it would otherwise get an edit to a file nothing reads.
+fn claude_code_config_in(config_dir: Option<PathBuf>, home: Option<PathBuf>) -> Option<PathBuf> {
+    config_dir.or(home).map(|d| d.join(".claude.json"))
+}
+
+fn claude_code_config() -> Option<PathBuf> {
+    claude_code_config_in(
+        std::env::var_os("CLAUDE_CONFIG_DIR").map(PathBuf::from),
+        home_dir(),
+    )
+}
+
+/// The config file for a client, whether or not it exists yet.
+fn config_path(id: &str) -> Option<PathBuf> {
+    let home = home_dir();
+    let data = app_data_dir();
+    match id {
+        "claude-code" => claude_code_config(),
+        "claude-desktop" => data.map(|d| d.join("Claude").join("claude_desktop_config.json")),
+        "cursor" => home.map(|h| h.join(".cursor").join("mcp.json")),
+        "vscode" => data.map(|d| d.join("Code").join("User").join("mcp.json")),
+        "codex" => home.map(|h| h.join(".codex").join("config.toml")),
+        _ => None,
+    }
+}
+
+/// Whether the tool is on this machine at all. A tool that has never been configured has no
+/// config file, so the folder it makes on first run is what answers this, not the file.
+fn is_installed(id: &str) -> bool {
+    let home = home_dir();
+    let data = app_data_dir();
+    let marks: Vec<PathBuf> = match id {
+        "claude-code" => {
+            let mut marks = Vec::new();
+            if let Some(h) = home {
+                marks.push(h.join(".claude"));
+            }
+            if let Some(file) = claude_code_config() {
+                marks.push(file);
+            }
+            marks
+        }
+        "claude-desktop" => data.map(|d| vec![d.join("Claude")]).unwrap_or_default(),
+        "cursor" => home.map(|h| vec![h.join(".cursor")]).unwrap_or_default(),
+        "vscode" => data
+            .map(|d| vec![d.join("Code").join("User")])
+            .unwrap_or_default(),
+        "codex" => home.map(|h| vec![h.join(".codex")]).unwrap_or_default(),
+        _ => vec![],
+    };
+    marks.iter().any(|p| p.exists())
+}
+
+// ── The node's endpoint, and what counts as the same node ───────────────────
+
+/// The MCP endpoint of a node, from the base URL a person typed.
+pub fn mcp_url(node_url: &str) -> String {
+    format!("{}/v1/mcp", node_url.trim().trim_end_matches('/'))
+}
+
+/// Whether a configured URL points at this node. Compared whole and case-insensitively, so
+/// `https://AIMEAT.io/v1/mcp/` and `https://aimeat.io/v1/mcp` are one node, and a different
+/// host or a different path is a different node.
+fn is_same_node(configured: &str, node_url: &str) -> bool {
+    let a = configured.trim().trim_end_matches('/').to_lowercase();
+    let b = mcp_url(node_url).to_lowercase();
+    a == b
+}
+
+/// The server name the node appears under in the client's own list.
+fn server_name(raw: Option<String>) -> String {
+    let cleaned: String = raw
+        .unwrap_or_default()
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '-' })
+        .collect();
+    let trimmed = cleaned.trim_matches('-').to_string();
+    if trimmed.is_empty() {
+        "aimeat".to_string()
+    } else {
+        trimmed.chars().take(32).collect()
+    }
+}
+
+// ── Reading and editing a client's JSON, as pure functions ──────────────────
+
+/// Every `url` under the client's servers object, in file order.
+fn configured_urls(text: &str, key: &str) -> Vec<String> {
+    let root: Value = match serde_json::from_str(text) {
+        Ok(v) => v,
+        Err(_) => return vec![],
+    };
+    let servers = match root.get(key).and_then(|v| v.as_object()) {
+        Some(m) => m,
+        None => return vec![],
+    };
+    servers
+        .values()
+        .filter_map(|entry| entry.get("url").and_then(|u| u.as_str()))
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// The entry a client accepts for this node.
+fn server_entry(with_type: bool, url: &str) -> Value {
+    if with_type {
+        json!({ "type": "http", "url": url })
+    } else {
+        json!({ "url": url })
+    }
+}
+
+/// The client's file with this node added under `name`, everything else left as it was.
+/// An empty file becomes a new one. A file that is not a JSON object is refused rather than
+/// replaced, because the person's own settings live in it.
+fn merge_entry(text: &str, key: &str, name: &str, entry: Value) -> Result<String, String> {
+    let mut root: Value = if text.trim().is_empty() {
+        json!({})
+    } else {
+        serde_json::from_str(text)
+            .map_err(|e| format!("This file is not valid JSON, so it was left alone: {}", e))?
+    };
+    let obj = root
+        .as_object_mut()
+        .ok_or_else(|| "This file does not hold a JSON object, so it was left alone.".to_string())?;
+    let servers = obj.entry(key).or_insert_with(|| json!({}));
+    let servers = servers.as_object_mut().ok_or_else(|| {
+        format!("`{}` in this file is not a JSON object, so it was left alone.", key)
+    })?;
+    servers.insert(name.to_string(), entry);
+    serde_json::to_string_pretty(&root).map_err(|e| format!("Could not write the JSON: {}", e))
+}
+
+/// The client's file with this node removed. Absent is not an error.
+fn remove_entry(text: &str, key: &str, name: &str) -> Result<String, String> {
+    let mut root: Value = if text.trim().is_empty() {
+        json!({})
+    } else {
+        serde_json::from_str(text)
+            .map_err(|e| format!("This file is not valid JSON, so it was left alone: {}", e))?
+    };
+    if let Some(obj) = root.as_object_mut() {
+        if let Some(servers) = obj.get_mut(key).and_then(|v| v.as_object_mut()) {
+            servers.remove(name);
+        }
+    }
+    serde_json::to_string_pretty(&root).map_err(|e| format!("Could not write the JSON: {}", e))
+}
+
+// ── Writing the file safely ─────────────────────────────────────────────────
+
+/// Replace a file's content, keeping one copy of the original and never leaving a half-file.
+fn write_config(path: &Path, content: &str) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Could not make the folder {}: {}", parent.display(), e))?;
+    }
+    if path.exists() {
+        let backup = path.with_extension(format!(
+            "{}.aimeat-backup",
+            path.extension().and_then(|e| e.to_str()).unwrap_or("bak")
+        ));
+        fs::copy(path, &backup)
+            .map_err(|e| format!("Could not keep a copy of {}: {}", path.display(), e))?;
+    }
+    let temp = path.with_extension("aimeat-tmp");
+    fs::write(&temp, content).map_err(|e| format!("Could not write {}: {}", temp.display(), e))?;
+    fs::rename(&temp, path).map_err(|e| {
+        let _ = fs::remove_file(&temp);
+        format!("Could not replace {}: {}", path.display(), e)
+    })
+}
+
+// ── What the frontend calls ─────────────────────────────────────────────────
+
+/// Build one connector's current state.
+fn read_connector(s: &ClientSpec, node_url: &str) -> Connector {
+    let path = config_path(s.id);
+    let text = path
+        .as_ref()
+        .and_then(|p| fs::read_to_string(p).ok())
+        .unwrap_or_default();
+    let urls = configured_urls(&text, s.key);
+    let connected = urls.iter().any(|u| is_same_node(u, node_url));
+    let other = urls
+        .iter()
+        .find(|u| u.to_lowercase().ends_with("/v1/mcp"))
+        .cloned();
+
+    Connector {
+        id: s.id.to_string(),
+        name: s.name.to_string(),
+        installed: is_installed(s.id),
+        connected,
+        connected_url: if connected { None } else { other },
+        method: if s.writable { "file" } else { "manual" }.to_string(),
+        config_path: path.map(|p| p.display().to_string()),
+    }
+}
+
+/// Every AI tool this app knows, with its current state against the given node.
+#[tauri::command]
+pub fn detect_connectors(node_url: String) -> Result<Vec<Connector>, String> {
+    Ok(SPECS.iter().map(|s| read_connector(s, &node_url)).collect())
+}
+
+/// Attach one tool to the node by editing its own config file.
+#[tauri::command]
+pub fn connect_connector(
+    id: String,
+    node_url: String,
+    name: Option<String>,
+) -> Result<Connector, String> {
+    let s = spec(&id).ok_or_else(|| format!("Unknown tool: {}", id))?;
+    if !s.writable {
+        return Err(s
+            .note
+            .unwrap_or("This tool is attached by hand.")
+            .to_string());
+    }
+    let path = config_path(&id).ok_or_else(|| {
+        format!("Could not work out where {} keeps its settings.", s.name)
+    })?;
+    let text = fs::read_to_string(&path).unwrap_or_default();
+    let merged = merge_entry(
+        &text,
+        s.key,
+        &server_name(name),
+        server_entry(s.with_type, &mcp_url(&node_url)),
+    )?;
+    write_config(&path, &merged)?;
+    Ok(read_connector(s, &node_url))
+}
+
+/// Detach one tool from the node.
+#[tauri::command]
+pub fn disconnect_connector(
+    id: String,
+    node_url: String,
+    name: Option<String>,
+) -> Result<Connector, String> {
+    let s = spec(&id).ok_or_else(|| format!("Unknown tool: {}", id))?;
+    if !s.writable {
+        return Err(s
+            .note
+            .unwrap_or("This tool is attached by hand.")
+            .to_string());
+    }
+    let path = config_path(&id).ok_or_else(|| {
+        format!("Could not work out where {} keeps its settings.", s.name)
+    })?;
+    if !path.exists() {
+        return Ok(read_connector(s, &node_url));
+    }
+    let text = fs::read_to_string(&path)
+        .map_err(|e| format!("Could not read {}: {}", path.display(), e))?;
+    let stripped = remove_entry(&text, s.key, &server_name(name))?;
+    write_config(&path, &stripped)?;
+    Ok(read_connector(s, &node_url))
+}
+
+/// The lines a person pastes into a tool this app does not edit.
+#[tauri::command]
+pub fn connector_snippet(
+    id: String,
+    node_url: String,
+    name: Option<String>,
+) -> Result<String, String> {
+    let s = spec(&id).ok_or_else(|| format!("Unknown tool: {}", id))?;
+    let name = server_name(name);
+    let url = mcp_url(&node_url);
+    if s.id == "codex" {
+        return Ok(format!(
+            "[mcp_servers.{}]\nurl = \"{}\"\n",
+            name, url
+        ));
+    }
+    let mut servers = serde_json::Map::new();
+    servers.insert(name, server_entry(s.with_type, &url));
+    let mut root = serde_json::Map::new();
+    root.insert(s.key.to_string(), Value::Object(servers));
+    serde_json::to_string_pretty(&Value::Object(root))
+        .map_err(|e| format!("Could not write the JSON: {}", e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mcp_url_is_the_base_plus_the_endpoint() {
+        assert_eq!(mcp_url("https://aimeat.io"), "https://aimeat.io/v1/mcp");
+        assert_eq!(mcp_url("https://aimeat.io/"), "https://aimeat.io/v1/mcp");
+        assert_eq!(mcp_url(" http://localhost:41050 "), "http://localhost:41050/v1/mcp");
+    }
+
+    #[test]
+    fn the_same_node_survives_a_slash_and_a_capital() {
+        assert!(is_same_node("https://AIMEAT.io/v1/mcp/", "https://aimeat.io"));
+        assert!(!is_same_node("https://other.example/v1/mcp", "https://aimeat.io"));
+        assert!(!is_same_node("https://aimeat.io/v1/other", "https://aimeat.io"));
+    }
+
+    #[test]
+    fn claude_code_follows_its_config_dir_when_one_is_set() {
+        let home = Some(PathBuf::from("C:\\Users\\someone"));
+        let moved = Some(PathBuf::from("D:\\claude"));
+        assert_eq!(
+            claude_code_config_in(None, home.clone()).unwrap(),
+            PathBuf::from("C:\\Users\\someone\\.claude.json")
+        );
+        assert_eq!(
+            claude_code_config_in(moved, home).unwrap(),
+            PathBuf::from("D:\\claude\\.claude.json")
+        );
+        assert!(claude_code_config_in(None, None).is_none());
+    }
+
+    #[test]
+    fn a_name_is_reduced_to_something_a_client_accepts() {
+        assert_eq!(server_name(None), "aimeat");
+        assert_eq!(server_name(Some("".to_string())), "aimeat");
+        assert_eq!(server_name(Some("---".to_string())), "aimeat");
+        assert_eq!(server_name(Some("My Node!".to_string())), "my-node");
+    }
+
+    #[test]
+    fn merging_keeps_every_other_setting() {
+        let before = r#"{"theme":"dark","mcpServers":{"other":{"url":"https://x/v1/mcp"}}}"#;
+        let after = merge_entry(
+            before,
+            "mcpServers",
+            "aimeat",
+            server_entry(true, "https://aimeat.io/v1/mcp"),
+        )
+        .unwrap();
+        let v: Value = serde_json::from_str(&after).unwrap();
+        assert_eq!(v["theme"], "dark");
+        assert_eq!(v["mcpServers"]["other"]["url"], "https://x/v1/mcp");
+        assert_eq!(v["mcpServers"]["aimeat"]["url"], "https://aimeat.io/v1/mcp");
+        assert_eq!(v["mcpServers"]["aimeat"]["type"], "http");
+    }
+
+    #[test]
+    fn merging_into_an_empty_file_makes_a_whole_one() {
+        let after = merge_entry("", "servers", "aimeat", server_entry(true, "https://aimeat.io/v1/mcp"))
+            .unwrap();
+        let v: Value = serde_json::from_str(&after).unwrap();
+        assert_eq!(v["servers"]["aimeat"]["type"], "http");
+    }
+
+    #[test]
+    fn cursor_gets_no_type_field() {
+        let after = merge_entry("", "mcpServers", "aimeat", server_entry(false, "https://aimeat.io/v1/mcp"))
+            .unwrap();
+        let v: Value = serde_json::from_str(&after).unwrap();
+        assert!(v["mcpServers"]["aimeat"].get("type").is_none());
+    }
+
+    #[test]
+    fn a_file_that_is_not_json_is_refused_rather_than_replaced() {
+        let err = merge_entry("// comments\n{\"a\":1}", "mcpServers", "aimeat", json!({})).unwrap_err();
+        assert!(err.contains("not valid JSON"));
+    }
+
+    #[test]
+    fn removing_leaves_the_rest_alone_and_absent_is_fine() {
+        let before = r#"{"theme":"dark","mcpServers":{"aimeat":{"url":"u"},"other":{"url":"v"}}}"#;
+        let after = remove_entry(before, "mcpServers", "aimeat").unwrap();
+        let v: Value = serde_json::from_str(&after).unwrap();
+        assert!(v["mcpServers"].get("aimeat").is_none());
+        assert_eq!(v["mcpServers"]["other"]["url"], "v");
+        assert_eq!(v["theme"], "dark");
+
+        let again = remove_entry(&after, "mcpServers", "aimeat").unwrap();
+        let v2: Value = serde_json::from_str(&again).unwrap();
+        assert!(v2["mcpServers"].get("aimeat").is_none());
+    }
+
+    #[test]
+    fn urls_are_read_from_the_clients_own_key() {
+        let text = r#"{"servers":{"a":{"url":"https://aimeat.io/v1/mcp"}},"mcpServers":{"b":{"url":"https://x/v1/mcp"}}}"#;
+        assert_eq!(configured_urls(text, "servers"), vec!["https://aimeat.io/v1/mcp"]);
+        assert_eq!(configured_urls(text, "mcpServers"), vec!["https://x/v1/mcp"]);
+        assert!(configured_urls("not json", "servers").is_empty());
+    }
+
+    #[test]
+    fn the_snippet_matches_what_the_client_accepts() {
+        let vscode = connector_snippet("vscode".into(), "https://aimeat.io".into(), None).unwrap();
+        assert!(vscode.contains("\"servers\""));
+        assert!(vscode.contains("\"type\": \"http\""));
+
+        let cursor = connector_snippet("cursor".into(), "https://aimeat.io".into(), None).unwrap();
+        assert!(cursor.contains("\"mcpServers\""));
+        assert!(!cursor.contains("\"type\""));
+
+        let codex = connector_snippet("codex".into(), "https://aimeat.io".into(), None).unwrap();
+        assert_eq!(codex, "[mcp_servers.aimeat]\nurl = \"https://aimeat.io/v1/mcp\"\n");
+    }
+
+    #[test]
+    fn a_tool_this_app_does_not_edit_is_refused_with_its_reason() {
+        let err = connect_connector("claude-desktop".into(), "https://aimeat.io".into(), None)
+            .unwrap_err();
+        assert!(err.contains("bridge"));
+    }
+
+    #[test]
+    fn writing_keeps_a_copy_and_lands_whole() {
+        let dir = std::env::temp_dir().join(format!("aimeat-connectors-{}", std::process::id()));
+        let _ = fs::create_dir_all(&dir);
+        let file = dir.join("mcp.json");
+        fs::write(&file, r#"{"a":1}"#).unwrap();
+
+        write_config(&file, r#"{"a":2}"#).unwrap();
+        assert_eq!(fs::read_to_string(&file).unwrap(), r#"{"a":2}"#);
+        let backup = file.with_extension("json.aimeat-backup");
+        assert_eq!(fs::read_to_string(&backup).unwrap(), r#"{"a":1}"#);
+        assert!(!file.with_extension("aimeat-tmp").exists());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
