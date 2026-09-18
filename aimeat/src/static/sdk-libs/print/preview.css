@@ -1,0 +1,16 @@
+/**
+ * @file print/preview.css
+ * @description Keyboard-accessible print preview on the host page, including short and mobile viewports.
+ * @version-history v1.0.0 - 2026-09-18 - Initial preview.
+ */
+.ap-preview { position: fixed; inset: 0; width: min(1100px, 100%); height: 100dvh; max-width: 100%; max-height: 100dvh; margin: auto; padding: 0; border: 0; background: var(--card, #fff); color: var(--text, #18212d); }
+.ap-preview::backdrop { background: #0008; }
+.ap-preview[open] { display: flex; flex-direction: column; }
+.ap-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; flex: 0 0 auto; border-bottom: 1px solid var(--border, #c9ced5); }
+.ap-toolbar strong { flex: 1; min-width: 100px; overflow-wrap: anywhere; }
+.ap-toolbar button { font: inherit; min-height: 44px; padding: 8px 16px; border: 1px solid var(--border, #c9ced5); border-radius: 6px; color: inherit; background: var(--bg, #fff); cursor: pointer; }
+.ap-toolbar button:focus-visible { outline: 3px solid var(--accent, #2563eb); outline-offset: 2px; }
+.ap-preview-host { flex: 1; min-height: 0; }
+.ap-preview-host iframe { display: block; width: 100%; height: 100%; border: 0; }
+.ap-status { padding: 12px; }
+.ap-build-frame { position: fixed; left: -20000px; top: 0; width: 1200px; height: 1000px; border: 0; }

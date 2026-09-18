@@ -10,6 +10,7 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=library-packs).
  * @version-history
+ *   v1.3.0 - 2026-09-18 - Execute calendar and print APIs, including a malformed ICS refusal.
  *   v1.0.0 — 2026-07-16 — initial (Library Acceleration Program, Phase 1).
  *   v1.1.0 — 2026-07-30 — ffmpeg-core: the loader, its classic-script twin and the fetched 32 MB
  *     wasm are served with the right content-type and an immutable cache. The wasm is checked with
@@ -20,6 +21,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -443,6 +445,28 @@ await test('installing a community pack refuses an anonymous caller', async () =
 });
 
 console.log('\n' + '─'.repeat(40));
+await test('calendar and print bundles are served, discoverable and callable without a session', async () => {
+  const apis: Record<string, any> = {};
+  for (const name of ['calendar', 'print']) {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-${name}.js`);
+    assert(res.status === 200, `${name} bundle status ${res.status}`);
+    assert((res.headers.get('content-type') || '').includes('javascript'), `${name} MIME type`);
+    const window: Record<string, any> = {};
+    runInNewContext(await res.text(), { window, Intl, Date, console, TextEncoder }, { timeout: 5000 });
+    const api = window.AIMEAT?.[name];
+    apis[name] = api;
+    assert(api?.version === '1.0.0', `${name} did not attach its API`);
+    const { body } = await json(`/v1/library-packs/aimeat-${name}`);
+    assert(body.data?.pack?.ai_doc?.includes(`AIMEAT.${name}`), `${name} has no AI usage guide`);
+  }
+  const rows = apis.calendar.occurrences([{ id: 'dst', start: '2026-03-23T09:00:00', end: '2026-03-23T10:00:00', timeZone: 'Europe/Helsinki', rrule: 'FREQ=WEEKLY;COUNT=2' }], { from: '2026-03-01T00:00:00Z', to: '2026-04-01T00:00:00Z' });
+  assert(rows.length === 2 && rows[1].start === '2026-03-30T06:00:00Z', 'served recurrence lost its timezone');
+  let refused = false;
+  try { apis.calendar.fromICS('not a calendar'); } catch { refused = true; }
+  assert(refused === true, 'invalid ICS was silently accepted');
+  assert(typeof apis.print.preview === 'function' && typeof apis.print.prepare === 'function', 'print methods missing');
+  assert(apis.print.templates().includes('calendar'), 'calendar print preset missing');
+});
 console.log(`Library packs E2E: ${passed} passed, ${failed} failed of ${passed + failed}`);
 if (failed > 0) process.exit(1);
 console.log('✅ All library-pack tests passed!\n');

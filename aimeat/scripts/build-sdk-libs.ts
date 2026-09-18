@@ -15,6 +15,7 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.11.0 - 2026-09-18 - Register the calendar and print libraries.
  *   v1.10.0 — 2026-09-15 — Register aimeat-push (an installed app receives notifications on its own
  *     origin, under its own name and icon; needs the push:receive app grant).
  *   v1.9.0 — 2026-09-08 — Register aimeat-onto (what a record MEANS: types, and a SKOS vocabulary
@@ -57,6 +58,8 @@ interface SdkLib {
  * (and the drift guard makes sure every committed bundle stays in sync with its sources).
  */
 export const SDK_LIBS: SdkLib[] = [
+  { name: 'calendar', entry: 'calendar/index.js' },
+  { name: 'print', entry: 'print/index.js' },
   { name: 'speech', entry: 'speech/index.js' },
   { name: 'data', entry: 'data/index.js' },
   { name: 'rows', entry: 'rows/index.js' },

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Calendar and print library examples</title>
+  <link rel="stylesheet" href="/dev/calendar-print.css">
+  <script src="/v1/libs/aimeat-calendar.js"></script>
+  <script src="/v1/libs/aimeat-print.js"></script>
+  <script src="/v1/libs/aimeat-markdown.js"></script>
+  <script src="/dev/calendar-print.js" defer></script>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">AIMEAT LIBRARIES</p>
+    <h1>One calendar.<br>Many ways to print.</h1>
+    <p class="lead">A weekly Helsinki meeting keeps its local time when daylight saving starts. Print the programme, a table, cards or an existing document with your own headers and footers.</p>
+    <section>
+      <h2>Calendar logic</h2>
+      <label>Display timezone <select id="zone"><option>Europe/Helsinki</option><option>Europe/London</option><option>America/New_York</option><option>UTC</option></select></label>
+      <div class="actions"><button id="move">Move one meeting</button><button id="cancel">Cancel one meeting</button><button id="reset">Reset</button><button id="ics">Download ICS</button></div>
+      <p id="calendar-summary" role="status"></p>
+      <div class="table-scroll"><table><thead><tr><th>Date</th><th>Local time</th><th>UTC</th><th>Title</th></tr></thead><tbody id="events"></tbody></table></div>
+    </section>
+    <section>
+      <h2>Print a document</h2>
+      <label>Paper <select id="paper"><option>A4</option><option>A5</option><option>A3</option><option>Letter</option></select></label>
+      <label>Orientation <select id="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>
+      <div class="actions"><button id="print-calendar">Calendar</button><button id="print-table">Library catalogue</button><button id="print-cards">Library cards</button><button id="print-document">Markdown report</button><button id="print-element">This section</button></div>
+      <p id="print-status" role="status">Each page has its own header, footer and page number.</p>
+    </section>
+  </main>
+</body>
+</html>

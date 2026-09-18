@@ -8,6 +8,7 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.9.0 - 2026-09-18 - Serve calendar computation and paged printing libraries.
  * v2.8.0 - 2026-09-15 - aimeat-push.js joins SDK_LIB_NAMES: an installed app turns on notifications
  *   for its own origin (register /sw.js, permission, VAPID key, subscribe), holding `push:receive`.
  * v2.7.0 - 2026-09-08 - aimeat-onto.js joins SDK_LIB_NAMES, the second time a lib was built and
@@ -189,6 +190,7 @@ import { logger } from '../utils/logger.js';
 // reads dist/aimeat-<name>.js. `auth` (OIDC-provider prelude) + `portfolio-standalone` (non-aimeat
 // URL) are wired explicitly below; everything else is this list. Sources: src/static/sdk-libs/<name>/.
 const SDK_LIB_NAMES = [
+  'calendar', 'print',
   'speech', 'data', 'wallet', 'ai', 'capabilities', 'agents', 'agentface', 'intake', 'organism',
   'workflows', 'header', 'editor', 'live', 'storage', 'social', 'work', 'commerce', 'exchange',
   'webmcp', 'markdown', 'audio', 'tunnel', 'game', 'iam', 'connect', 'datapackage', 'events',
