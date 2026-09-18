@@ -7,6 +7,7 @@
  *   more context to AI agents based on their authentication level.
  * @version-history
  *   v1.11.0 -- 2026-09-18 -- Mounts the layered build specification (prompts-build-app-layers.ts).
+ *     GET /v1/ai-tools carries `model_recommendation` (services/model-recommendation.ts).
  *   v1.0.0 -- 2026-03-01 -- Initial tiered prompts (0, 1, 2, anonymous)
  *   v1.1.0 -- 2026-05-21 -- Extend tier1 response with directives, task queue, and agent endpoints
  *   v1.2.0 -- 2026-05-22 -- Add GET /v1/prompts/tier1/:module for modular prompt system
@@ -54,6 +55,7 @@ import { registerBuildAppLayerPrompts } from './prompts-build-app-layers.js';
 import { buildAgentConnectPrompt, buildAgentConnectSteps } from '../services/agent-connect-prompt.js';
 import { buildAgentOnboardPrompt } from '../services/agent-onboard-prompt.js';
 import { buildAiToolSetup } from '../services/ai-tool-setup.js';
+import { MODEL_RECOMMENDATION } from '../services/model-recommendation.js';
 import { logger } from '../utils/logger.js';
 
 export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
@@ -496,7 +498,9 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/ai-tools', (req, res) => {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
     const tools = buildAiToolSetup(config, { lang });
-    res.json(success(config.nodeId, { lang, mcp_url: `${config.baseUrl.replace(/\/+$/, '')}/v1/mcp`, tools }, [
+    // model_recommendation: the one value every "pick this model" sentence reads, for a client
+    // that writes such a sentence itself (the Agents tab's connect prompt).
+    res.json(success(config.nodeId, { lang, mcp_url: `${config.baseUrl.replace(/\/+$/, '')}/v1/mcp`, tools, model_recommendation: MODEL_RECOMMENDATION }, [
       { description: 'The proof prompt to run once a tool is connected', method: 'GET', url: '/v1/prompts/hello-mcp' },
       { description: 'One-click installs and the technical details', method: 'GET', url: '/v1/connect' },
     ]));

@@ -38,6 +38,7 @@ import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/mcp/catalog/definitions.js';
 import { MCP_SURFACES, type SurfaceRole } from '../src/mcp/catalog/surfaces.js';
+import { MODEL_RECOMMENDATION, MODEL_REVIEW_MAX_AGE_DAYS, modelReviewAgeDays } from '../src/services/model-recommendation.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = join(here, '..');
@@ -113,6 +114,9 @@ const BANNED: Banned[] = [
     // commerce API's own name for morsel-or-money, and stays.
     unless: /\bnot (a |an )?(internal )?(currency|money)\b|not money|never morsels|never a currency|money-currency|pacing meter|\bcurrency\??\s*[:}\]]|\.currency\b|,\s*currency\b|currency\??\)\s*(\/\/|→|$)/i, why: 'a morsel is a pacer, not money: it buys nothing and is never called a currency or an economy' },
     { id: 'oauth-routes', pattern: /\/v1\/oauth\//, why: 'the OAuth routes are /v1/mcp/register, /v1/mcp/authorize and /v1/mcp/token' },
+    // A recommended model written out by hand. `anthropic/claude-opus-5` as an EXAMPLE of a model
+    // id (provenance, compliance) is a different thing and does not match: no "Opus 5", no "GPT-".
+    { id: 'model-name-written-out', pattern: /\bOpus \d|\bGPT-\d|\bGemini \d/, why: 'a recommended model is named in one place, services/model-recommendation.ts; read MODEL_RECOMMENDATION instead of writing the name out' },
 ];
 
 /**
@@ -120,6 +124,7 @@ const BANNED: Banned[] = [
  * Key: `<banned id or "tool" or "route">|<repo-relative file>|<the token or a fragment of the line>`.
  */
 const ALLOWED: Record<string, string> = {
+    'model-name-written-out|aimeat/src/data/builtin-skills.conversation.ts|Claude → Opus 5 or better': 'The skill aimeat-first-conversation is kept byte for byte equal to the copy on aimeat.io and a digest test holds that (e2e-skills 27b2b), so its text cannot read a constant. When the recommendation moves, change the skill on aimeat.io, regenerate this file and its digest.',
     'route|aimeat/src/data/bootstrap-endpoints.ts|/v1/profile': 'A page of the SPA, served by the static handler and not by a router declaration; the bootstrap lists it as where a person manages their data.',
     'contract-gap|aimeat/src/routes/bootstrap.ts|/v1/portal': 'A page a person opens in a browser. The contract describes the API, and an HTML page is not part of it.',
     'contract-gap|aimeat/src/services/markdown-negotiation.ts|/v1/portal': 'The same page, named in the landing markdown as where a person registers.',
@@ -260,6 +265,14 @@ function main(): void {
         for (const f of list) console.error(`    ${f.file}:${f.line}  ${f.token}`);
     }
     for (const s of missing) console.error(`\n✗ source not found: ${s} (moved or deleted; update SOURCES)`);
+    // The model recommendation and the vendors' menu paths go stale without anything breaking.
+    const age = modelReviewAgeDays();
+    if (age > MODEL_REVIEW_MAX_AGE_DAYS) {
+        console.error(`\n✗ the model recommendation was last checked ${age} days ago (${MODEL_RECOMMENDATION.reviewedOn}; the limit is ${MODEL_REVIEW_MAX_AGE_DAYS}).`
+            + '\n    Open the sources listed at the top of aimeat/src/services/ai-tool-setup.ts, confirm the model names and the menu paths,'
+            + '\n    then move reviewedOn in aimeat/src/services/model-recommendation.ts. The skill aimeat-first-conversation names the same models and is changed on aimeat.io first.');
+        process.exit(1);
+    }
     if (findings.length || missing.length) {
         console.error(`\n${findings.length} finding(s) in agent-facing text. Fix the text, or add an ANSWER to ALLOWED with the reason it is right.`);
         process.exit(1);

@@ -7,6 +7,8 @@
  *   max-file-lines. The Hello Integration instruction is NOT here: the Agents tab fetches it
  *   from GET /v1/prompts/hello-integration, which serves the CLI's own text.
  * @version-history
+ *   v1.3.0 — 2026-09-18 — buildAgentPrompt takes the model recommendation as a parameter (the
+ *     node's one value, GET /v1/ai-tools) instead of carrying two model names of its own.
  *   v1.2.0 — 2026-09-18 — buildMcpOnboardingPrompt is gone. It was a hand copy of the CLI's Hello
  *     Integration text and had fallen two versions behind it: no rule that only five
  *     aimeat_onboarding_* tools exist, no stop condition. The page reads the node's copy now.
@@ -22,9 +24,17 @@
 import { getNodeUrl } from '/js/services/auth.js';
 
 /* -- Safe agent connection prompt -- */
-export function buildAgentPrompt(sess) {
+/**
+ * `rec` is `model_recommendation` from GET /v1/ai-tools ({ claude, chatgpt }), the one value every
+ * "pick this model" sentence reads. Until it has loaded, or when it cannot be fetched, the line
+ * asks for the strongest reasoning model without naming one, which stays true for ever.
+ */
+export function buildAgentPrompt(sess, rec) {
   const url = getNodeUrl();
-  return `Run this with your strongest reasoning model (Claude: Opus 5 or better; ChatGPT: GPT-5.6 with thinking; reasoning enabled) — the connection is the step that most rewards it.
+  const named = rec && rec.claude && rec.chatgpt
+    ? ` (Claude: ${rec.claude} or better; ChatGPT: ${rec.chatgpt} with thinking; reasoning enabled)`
+    : ' (reasoning enabled)';
+  return `Run this with your strongest reasoning model${named} — the connection is the step that most rewards it.
 
 I'd like to connect you as an AI agent to my AIMEAT node so you can help me with tasks across sessions. AIMEAT gives you an authenticated identity, owner-approved scopes, persistent memory, tasks, messages, and shared context with my other agents. AIMEAT is an open-source agent coordination platform (see ${url}/llms.txt). I'm the owner; my handle is ${sess.owner}.
 

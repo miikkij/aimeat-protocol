@@ -7,6 +7,8 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.0.3 -- 2026-09-18 -- The connect prompt's model names come from the node
+ *     (GET /v1/ai-tools, model_recommendation); without them it names no model.
  *   v4.0.2 -- 2026-09-18 -- The Hello Integration instruction is fetched from the node
  *     (GET /v1/prompts/hello-integration) instead of built from a hand copy that had drifted.
  *   v4.0.1 -- 2026-09-14 -- The tag filter folds (FilterBar).
@@ -147,6 +149,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
   // hand copy stood here until 2026-09-18 and had fallen two versions behind the CLI's.
   const [helloPrompt, setHelloPrompt] = useState('');
   const [helloFailed, setHelloFailed] = useState(false);
+  const [modelRec, setModelRec] = useState(null);
   const [taskStatsMap, setTaskStatsMap] = useState({});
   // Currently-active tasks per agent { name: Task[] } — powers the fleet
   // "running now" panel. Reuses the active list already fetched in loadData().
@@ -199,6 +202,12 @@ export default function AgentsTab({ session, showToast, onStats }) {
       .then(r => { if (!r.ok) throw new Error(`hello-integration answered ${r.status}`); return r.text(); })
       .then(setHelloPrompt)
       .catch((err) => { console.warn('Hello Integration instruction not loaded', err); setHelloFailed(true); });
+    // Which model the connect prompt names. Without it the prompt asks for "your strongest
+    // reasoning model" and names none, which is a complete sentence, so a failure needs no notice.
+    fetch('/v1/ai-tools')
+      .then(r => { if (!r.ok) throw new Error(`ai-tools answered ${r.status}`); return r.json(); })
+      .then(body => setModelRec(body?.data?.model_recommendation || null))
+      .catch((err) => { console.warn('Model recommendation not loaded; the connect prompt names no model', err); });
   }, []);
 
   useEffect(() => {
@@ -650,9 +659,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
                 <${Fold} id="agp-connect-paste" num="" title=${t('profile.agents.pasteAlt')} open=${pasteExpanded} onToggle=${() => setPasteExpanded(v => !v)}>
                   <p class="text-caption mb-half">${t('profile.agents.pasteDesc')}</p>
-                  <div class="agent-prompt-box">${buildAgentPrompt(session)}</div>
+                  <div class="agent-prompt-box">${buildAgentPrompt(session, modelRec)}</div>
                   <${CopyButton}
-                    text=${buildAgentPrompt(session)}
+                    text=${buildAgentPrompt(session, modelRec)}
                     className="btn-primary"
                     label=${t('common.copyPrompt')}
                     />

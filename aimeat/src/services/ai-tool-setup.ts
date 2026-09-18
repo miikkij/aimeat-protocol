@@ -17,7 +17,7 @@
  *   a reader can check rather than trust, and so the page degrades honestly when a vendor moves
  *   their UI.
  *
- *   Sources, all verified 2026-07-31:
+ *   Sources, all verified 2026-07-31 (MODEL_RECOMMENDATION.reviewedOn is this date; move both together):
  *   - Claude connectors https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp
  *   - Claude personalization https://support.claude.com/en/articles/10185728-understanding-claude-s-personalization-features
  *   - Claude Code MCP https://code.claude.com/docs/en/mcp
@@ -32,6 +32,8 @@
  *   remake's branch decision, kept beside the list it reads rather than in the calling code.
  * @usage import { buildAiToolSetup } from '../services/ai-tool-setup.js';
  * @version-history
+ *   v1.6.1 — 2026-09-18 — The model names in the three setup notes come from
+ *     services/model-recommendation.ts, which also carries the "verified" date below.
  *   v1.6.0 — 2026-09-18 — A name two apps share (Gemini, Microsoft Copilot) raises ONE question,
  *     `which-variant`, and the person's answer decides: the Gemini app goes to B, Gemini CLI to A.
  *     Neither name was known before, so such a person lost one attempt down the MCP road before
@@ -66,6 +68,7 @@
  *     as the default selection in the pickers.
  */
 import type { AimeatConfig } from '../config.js';
+import { MODEL_RECOMMENDATION as MODEL } from './model-recommendation.js';
 import { MCP_INSTALL_SCRIPT_OS, mcpConfigFile, mcpInstallLink, mcpInstallScript, type McpInstallClientId } from './mcp-install.js';
 
 export interface AiToolParam {
@@ -227,8 +230,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                 params: [nameParam(), { label: 'Remote MCP server URL', value: mcpUrl }, oauthParam()],
                 plans: s(l, 'Free, Pro, Max, Team and Enterprise. On Team and Enterprise an owner adds it under Organization settings > Connectors > Add > Custom > Web, and until they do, you cannot.',
                     'Free, Pro, Max, Team ja Enterprise. Team- ja Enterprise-tileillä omistaja lisää sen kohdassa Organization settings > Connectors > Add > Custom > Web, ja ennen sitä sinä et voi.'),
-                note: s(l, 'Pick Opus 5 or better in the model menu and turn extended thinking on. The connection steps and the first conversations go right the first time on a strong model.',
-                    'Valitse mallivalikosta Opus 5 tai parempi ja kytke laajennettu ajattelu päälle. Vahvalla mallilla kytkentä ja ensimmäiset keskustelut menevät kerralla oikein.'),
+                note: s(l, `Pick ${MODEL.claude} or better in the model menu and turn extended thinking on. The connection steps and the first conversations go right the first time on a strong model.`,
+                    `Valitse mallivalikosta ${MODEL.claude} tai parempi ja kytke laajennettu ajattelu päälle. Vahvalla mallilla kytkentä ja ensimmäiset keskustelut menevät kerralla oikein.`),
             },
             instructions: {
                 where: s(l, 'Settings > General > Instructions for Claude (shown under Profile in some versions). Applies to every new conversation on the account.',
@@ -256,8 +259,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                 params: [nameParam(), { label: 'Remote MCP server URL', value: mcpUrl }, oauthParam()],
                 plans: s(l, 'Free, Pro, Max, Team and Enterprise. A free account can hold exactly one custom connector, which is enough for this.',
                     'Free, Pro, Max, Team ja Enterprise. Ilmaisella tilillä voi olla tasan yksi oma konnektori, mikä riittää tähän.'),
-                note: s(l, 'Pick Opus 5 or better in the model menu and turn extended thinking on. The connection steps and the first conversations go right the first time on a strong model.',
-                    'Valitse mallivalikosta Opus 5 tai parempi ja kytke laajennettu ajattelu päälle. Vahvalla mallilla kytkentä ja ensimmäiset keskustelut menevät kerralla oikein.'),
+                note: s(l, `Pick ${MODEL.claude} or better in the model menu and turn extended thinking on. The connection steps and the first conversations go right the first time on a strong model.`,
+                    `Valitse mallivalikosta ${MODEL.claude} tai parempi ja kytke laajennettu ajattelu päälle. Vahvalla mallilla kytkentä ja ensimmäiset keskustelut menevät kerralla oikein.`),
             },
             instructions: {
                 where: s(l, 'Settings > General > Instructions for Claude. Applies to every new conversation on the account.',
@@ -334,8 +337,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                     'Plus, Pro, Business, Enterprise ja Education. Ei ilmaisella tasolla eikä sovelluksissa: vain selaimessa.'),
                 warn: s(l, 'OpenAI marks developer mode as being for people who understand the risk: it grants both read and write tools. Their own warning is worth reading before you switch it on.',
                     'OpenAI merkitsee developer moden niille jotka ymmärtävät riskin: se antaa sekä luku- että kirjoitustyökalut. Heidän oma varoituksensa kannattaa lukea ennen kuin kytket sen päälle.'),
-                note: s(l, 'Use GPT-5.6 with thinking enabled. A strong model makes the setup and the first conversations go right the first time.',
-                    'Käytä GPT-5.6:ta ajattelu päällä. Vahva malli vie kytkennän ja ensimmäiset keskustelut kerralla oikein.'),
+                note: s(l, `Use ${MODEL.chatgpt} with thinking enabled. A strong model makes the setup and the first conversations go right the first time.`,
+                    `Käytä mallia ${MODEL.chatgpt} ajattelu päällä. Vahva malli vie kytkennän ja ensimmäiset keskustelut kerralla oikein.`),
             },
             instructions: {
                 where: s(l, 'Settings > Personalization > Custom instructions, in the field for what ChatGPT should know about you.',
