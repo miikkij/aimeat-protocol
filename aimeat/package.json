@@ -140,6 +140,7 @@
     "check:config-coverage:seed": "tsx scripts/check-config-coverage.ts --seed",
     "check:no-max-tokens": "tsx scripts/check-no-max-tokens.ts",
     "check:openapi": "tsx scripts/check-openapi.ts",
+    "check:openapi-routes": "tsx scripts/check-openapi-routes.ts",
     "check:silent-catch": "tsx scripts/check-silent-catch.ts",
     "check:js-syntax": "node --experimental-vm-modules --import tsx scripts/check-js-syntax.ts",
     "check:ai-disclosure": "tsx scripts/check-ai-disclosure.ts",
