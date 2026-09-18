@@ -15,6 +15,9 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.13.0 — 2026-09-18 — geoHeaders (AIMEAT_GEO_HEADERS): the reverse proxy tells this node where
+ *     a request came from. Off by default, the same on every node: without such a proxy the headers
+ *     would be the visitor's own. docs/visitor-geography.md
  *   v1.12.0 — 2026-09-05 — The six AI job settings (feat/ai-jobs, 2026-08-31) arrive with the merge
  *     and move straight out to config-ai-jobs.ts, spread in as aiJobDefaults(): the file was at 801
  *     lines with them inline. A pure move.
@@ -235,6 +238,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // from the baseUrl. Left empty for host-less baseUrls (so nothing breaks in dev).
     appHost: (process.env.AIMEAT_APP_HOST ?? deriveAppHost(process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`)).trim().toLowerCase(),
     appOriginEnabled,
+    // Visitor geography: read the place headers only when the operator says a proxy sets them.
+    // The safe value is the same on localhost and on the public internet: off. docs/visitor-geography.md
+    geoHeaders: process.env.AIMEAT_GEO_HEADERS === 'true',
+    geoAttribution: (process.env.AIMEAT_GEO_ATTRIBUTION ?? '').trim().slice(0, 200),
     // Portfolio origin: explicit AIMEAT_PORTFOLIO_HOST wins; otherwise derive
     // `portfolio.<apexHost>` from the baseUrl (empty for host-less baseUrls).
     portfolioHost: (process.env.AIMEAT_PORTFOLIO_HOST ?? derivePortfolioHost(process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`)).trim().toLowerCase(),

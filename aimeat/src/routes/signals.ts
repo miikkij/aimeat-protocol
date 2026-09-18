@@ -24,6 +24,8 @@
  * @structure PIXEL_SVG · signalsRouter (streams CRUD · report · public pixel · public hit)
  * @usage app.use(signalsRouter(config, storage)) in routes-loader
  * @version-history
+ *   v1.1.0 — 2026-09-18 — A stream takes `geo` (off, country, region, city), and both public doors
+ *     hand the hit the place the proxy reported. The report takes a day window (`from_day`, `to_day`).
  *   v1.0.0 — 2026-08-24 — Initial: generic hit collection.
  */
 import { Router, type Response } from 'express';
@@ -39,7 +41,8 @@ import { logger } from '../utils/logger.js';
 import {
   SignalError, saveStream, listStreams, deleteStream, recordHit, readReport,
 } from '../services/signals/signal-service.js';
-import { SIGNAL_CHANNELS, SIGNAL_EVENTS } from '../models/signal-schemas.js';
+import { SIGNAL_CHANNELS, SIGNAL_EVENTS, SIGNAL_GEO_LEVELS } from '../models/signal-schemas.js';
+import { geoFromHeaders } from '../utils/geo-headers.js';
 
 /**
  * A 1x1 fully transparent SVG. SVG rather than a GIF because it is text, so it is readable in the
@@ -55,6 +58,7 @@ const StreamSchema = z.object({
   per_subject: z.boolean().optional(),
   group: z.string().max(80).nullish(),
   enabled: z.boolean().optional(),
+  geo: z.enum(SIGNAL_GEO_LEVELS).optional(),
 }).strict();
 
 const HitSchema = z.object({
@@ -106,6 +110,7 @@ export function signalsRouter(config: AimeatConfig, storage: Storage): Router {
         perSubject: parsed.data.per_subject,
         group: parsed.data.group ?? null,
         enabled: parsed.data.enabled,
+        geo: parsed.data.geo,
       });
       const owner = (req.auth!.owner as string);
       emitChange('signals', owned(req));
@@ -142,6 +147,8 @@ export function signalsRouter(config: AimeatConfig, storage: Storage): Router {
       const report = await readReport(storage, owned(req), req.params.streamId as string, {
         from: typeof req.query.from === 'string' ? req.query.from : undefined,
         to: typeof req.query.to === 'string' ? req.query.to : undefined,
+        fromDay: typeof req.query.from_day === 'string' ? req.query.from_day : undefined,
+        toDay: typeof req.query.to_day === 'string' ? req.query.to_day : undefined,
         includeSubjects: req.query.subjects === 'true',
       });
       res.json(success(config.nodeId, report));
@@ -167,6 +174,7 @@ export function signalsRouter(config: AimeatConfig, storage: Storage): Router {
           subject: typeof req.query.s === 'string' ? req.query.s : null,
           ref: typeof req.query.r === 'string' ? req.query.r : null,
           userAgent: req.get('user-agent'),
+          geo: geoFromHeaders(config.geoHeaders, (name) => req.get(name)),
         });
       } catch (e) {
         // A counter must never cost the reader their image, so this is swallowed on purpose —
@@ -199,6 +207,7 @@ export function signalsRouter(config: AimeatConfig, storage: Storage): Router {
           subject: parsed.data.subject ?? null,
           ref: parsed.data.ref ?? null,
           userAgent: req.get('user-agent'),
+          geo: geoFromHeaders(config.geoHeaders, (name) => req.get(name)),
         });
         counted = out.counted;
       } catch (e) {

@@ -49,6 +49,7 @@ import { aiJobTools } from './definitions/ai-jobs.js';
 import { discoveryWorkBoardsTools } from './definitions/discovery-work-boards.js';
 import { capabilitiesGroupsSkillsTools } from './definitions/capabilities-groups-skills.js';
 import { organismsWorkspacesAppsTools } from './definitions/organisms-workspaces-apps.js';
+import { appVisitorsTools } from './definitions/app-visitors.js';
 import { extensionsCortexTools } from './definitions/extensions-cortex.js';
 import { packagesTools } from './definitions/packages.js';
 import { commerceTools } from './definitions/commerce.js';
@@ -69,6 +70,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...discoveryWorkBoardsTools,
     ...capabilitiesGroupsSkillsTools,
     ...organismsWorkspacesAppsTools,
+    ...appVisitorsTools,
     // Extensions, the per-app IAM door and the cortex packs. They used to sit inside the slice
     // above and moved out when that file passed the line ceiling. One entry changes relative
     // position as a result — the operator-only aimeat_admin_mint, which used to come after them and

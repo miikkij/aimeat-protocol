@@ -14,6 +14,8 @@
  *   - buildAppCatalog() → assemble + write src/static/app-catalog.html (+ a generated-file banner)
  * @usage  pnpm build:app-catalog   (also run by `pnpm build` and `pnpm dev`)
  * @version-history
+ *   v1.3.0 — 2026-09-18 — styles/app-catalog-visitors.css is appended after the poster sheet: the
+ *     Visitors section's own sheet, because the poster sheet is at the line ceiling.
  *   v1.2.0 — 2026-09-13 — public/css/dialog.css is appended after the poster sheet, and the bundle
  *     takes public/js/dialog.js through js/dialogs.js, so the catalog's dialogs are the site's one
  *     dialog rather than a copy; a change to either file makes check:app-catalog fail until the page
@@ -97,6 +99,10 @@ export async function renderAppCatalog(): Promise<string> {
   const tokens = themePosterTokens(readFileSync(THEME_FILE, 'utf-8'));
   const css = readFileSync(join(SRC_DIR, 'styles', 'app-catalog.css'), 'utf-8') + '\n' +
     poster.replace(TOKENS_MARKER, () => tokens.trimStart()) + '\n' +
+    // The Visitors section's own sheet: the poster sheet is at the 800-line ceiling, and a section
+    // with a chart, a map and two tables is a coherent group to keep together. After the poster
+    // sheet, because it composes the poster's tokens and shapes.
+    readFileSync(join(SRC_DIR, 'styles', 'app-catalog-visitors.css'), 'utf-8') + '\n' +
     readFileSync(DIALOG_CSS_FILE, 'utf-8');
   const bundle = await bundleJs();
 

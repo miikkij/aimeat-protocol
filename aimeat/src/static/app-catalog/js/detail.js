@@ -8,6 +8,8 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-09-18 — The Visitors section (visitors.js) for the owner's own published app, after the
+ *     versions: who opened it, when and from where.
  *   2026-09-13 — Lineage, copy protection and versions open and close through dialogs.js (the
  *     site's one dialog), and "is it open" asks the dialog rather than its hidden flag.
  *   2026-09-13 — The About and Promote headlines lose their inline flex styles: the headline is a
@@ -74,6 +76,7 @@ import { t, getLang } from './i18n.js';
 import { getPromotion, setPromotion, loadPromoted } from './promote.js';
 import { monetizeSectionInner, monetizeOnOpen, odpsSectionInner } from './monetize.js';
 import { costSectionInner, costOnOpen } from './cost.js';
+import { visitorsSectionInner, visitorsOnOpen } from './visitors.js';
 import { seoSectionInner, seoOnOpen } from './seo.js';
 import { marksSectionInner, marksOnOpen } from './marks.js';
 import { legalSectionInner, auditSectionInner, legalOnOpen, legalChipHtml } from './legal.js';
@@ -246,6 +249,7 @@ function openDetailView(appId) {
   monetizeOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
   // Cost & contracts (EXCHANGE G3): async-load this app's EXCHANGE entitlements for OWN published apps.
   costOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
+  visitorsOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
   seoOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
   marksOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
   legalOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
@@ -679,6 +683,13 @@ function renderDetailView() {
     ? '<div class="dtl-section" id="detail-seo">' + seoSectionInner() + '</div>'
     : '';
 
+  // ── VISITORS — who opened this app, when and from where. For the owner's own published app.
+  //   Stable container: visitors.js re-renders #detail-visitors in place as the report arrives,
+  //   the window changes or measurement is switched.
+  var visitorsHtml = (app.published && detailIsOwnPublished(app))
+    ? '<div class="dtl-section" id="detail-visitors">' + visitorsSectionInner() + '</div>'
+    : '';
+
   // ── MARKS AND AUTHORSHIP — the badge and install-offer switches, the named reviewer who
   //   answers for the app (which lifts the visible AI-generated label), what the node sees of
   //   the app's AI use, and the log. Stable container: marks.js re-renders #detail-marks in place.
@@ -803,7 +814,7 @@ function renderDetailView() {
   bodyEl.innerHTML = detailRailPage(
     heroHtml + bandHtml +
     statusHtml + aiHtml + aboutHtml + dataMapHtml + requiresHtml + historyHtml + versionsHtml +
-    mgmtHtml + skillsHtml + seoHtml + marksHtml + legalHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml);
+    visitorsHtml + mgmtHtml + skillsHtml + seoHtml + marksHtml + legalHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml);
   // The chapter number over every headline ("03 / 09") is a CSS counter; only the total needs
   // counting here, and it goes on the body as a string so the stylesheet can print it. Counted
   // AFTER the assembly so a section a later load re-renders in place keeps its number.

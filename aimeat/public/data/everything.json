@@ -1293,10 +1293,10 @@
      "slug": "g-8-signals",
      "cells": [
       "<strong>Signals</strong>",
-      "Count something: define it and record hits from a tracking image or a JSON call.",
+      "Count something: define it and record hits from a tracking image or a JSON call. A stream can also keep where each person came from, at the precision its owner picks (country, region or city). That needs a reverse proxy that reports the place (<code>AIMEAT_GEO_HEADERS</code>, <code>docs/visitor-geography.md</code>); no address is stored, and AI fetchers are never placed.",
       "<code>/v1/signals</code>"
      ],
-     "plain": "Signals Count something: define it and record hits from a tracking image or a JSON call. /v1/signals"
+     "plain": "Signals Count something: define it and record hits from a tracking image or a JSON call. A stream can also keep where each person came from, at the precision its owner picks (country, region or city). That needs a reverse proxy that reports the place (AIMEAT_GEO_HEADERS, docs/visitor-geography.md); no address is stored, and AI fetchers are never placed. /v1/signals"
     }
    ]
   },
@@ -1545,6 +1545,15 @@
       "<code>/v1/apps/:owner/:filename/legal</code>, <code>aimeat_app_legal_set</code>"
      ],
      "plain": "App legal pages Write or link terms, privacy, imprint, refunds, accessibility, cookies and support pages under the app's own address. The details view identifies recommended pages that are missing. /v1/apps/:owner/:filename/legal, aimeat_app_legal_set"
+    },
+    {
+     "slug": "g-10-visitors",
+     "cells": [
+      "<strong>Visitors</strong>",
+      "See who opened your own app over the last 0 to 360 days: opens by signed-in people against opens by nobody signed in, as counts and never as names. Switch visitor measurement on to also count people against named AIs against other bots, and to see where people came from on a world map drawn from the node's own files. Measurement is off until the app's owner switches it on; switching it off keeps what was counted. The place needs the reverse proxy described under Signals.",
+      "<code>/v1/apps/visitors</code>, <code>aimeat_app_visitors</code>, <code>aimeat_app_visitors_measure</code>, App Catalog &gt; Visitors"
+     ],
+     "plain": "Visitors See who opened your own app over the last 0 to 360 days: opens by signed-in people against opens by nobody signed in, as counts and never as names. Switch visitor measurement on to also count people against named AIs against other bots, and to see where people came from on a world map drawn from the node's own files. Measurement is off until the app's owner switches it on; switching it off keeps what was counted. The place needs the reverse proxy described under Signals. /v1/apps/visitors, aimeat_app_visitors, aimeat_app_visitors_measure, App Catalog > Visitors"
     },
     {
      "slug": "g-10-marks-and-authorship",
@@ -3236,6 +3245,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 319
+  "rows": 320
  }
 }
