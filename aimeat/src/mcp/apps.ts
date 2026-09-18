@@ -11,6 +11,8 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.17.1 — 2026-09-18 — `url` on aimeat_app_list and aimeat_app_get is filled on a node without
+ *     an app origin as well (routes/apps/helpers.ts v1.3.0). Comments here said it was absent.
  *   v1.17.0 — 2026-09-13 — aimeat_app_publish and aimeat_app_draft_publish return
  *     `served_marks_removed` / `served_marks_note` when the HTML was a served copy, which the shared
  *     publish now stores without the node's serve marks (the developer's decision). The draft save
@@ -591,7 +593,8 @@ export function registerAppsTools(
                     forkable: !!app.forkable,
                     downloads,
                     forks,
-                    // The address to give a person. Absent when this node runs without an app origin.
+                    // The address to give a person: the app's own origin, or on a node without one,
+                    // the node's own address in inline mode. Never absent since 2026-09-18.
                     url: urlByApp[`${app.ownerName}/${app.filename}`] ?? null,
                     download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
                     created_at: app.createdAt,
@@ -662,7 +665,7 @@ export function registerAppsTools(
                         forked_from: app.manifest.forkedFrom ?? null,
                         downloads,
                         forks,
-                        // The address to give a person. Absent when this node runs without an app origin.
+                        // The address to give a person; on a node without an app origin, its inline address.
                         url: urlByApp[`${app.ownerName}/${app.filename}`] ?? null,
                         download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
                         inline_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}?mode=inline`,

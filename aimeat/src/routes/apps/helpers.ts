@@ -12,6 +12,11 @@
  *   - appOriginUrl() — WRITES: assigns a subdomain on first use, then builds the URL
  *   - resolveAppUrls() — READ-ONLY: one listSubdomainSites() for a batch of apps
  * @version-history
+ *   v1.3.0 — 2026-09-18 — resolveAppUrls answers on a node WITHOUT an app origin too: the node's
+ *     own address in inline mode, which is how such a node opens an app anyway. It returned
+ *     nothing, so aimeat_app_list said `url: null`, and the cold-agent baseline measured the
+ *     cost: three runs of three, the agent told the person their apps had no address. Ruled by
+ *     the developer the same day.
  *   v1.2.0 — 2026-09-08 — AppTargetFor and appTargetOr: an app write can land in ANOTHER owner's
  *     bucket when they granted the caller a development right, and one helper asks that question so
  *     that thirty doors do not each carry their own version of the answer.
@@ -121,7 +126,20 @@ export async function resolveAppUrls(
     refs: Array<{ owner: string; filename: string }>,
 ): Promise<Record<string, string>> {
     const out: Record<string, string> = {};
-    if (!config.appOriginEnabled || !config.appHost || refs.length === 0) return out;
+    if (refs.length === 0) return out;
+    // No app origin on this node: an app opens on the node's own address, in inline mode. That
+    // is the address a person can be handed, and the one the node prints for its own apps. It
+    // also holds on a node that gains an app origin later, because the inline route redirects
+    // to it (routes/apps/read.ts). This returned nothing until 2026-09-18, so aimeat_app_list
+    // answered `url: null` and an agent asked how to open an app had a filename to offer.
+    if (!config.appOriginEnabled || !config.appHost) {
+        const base = config.baseUrl.replace(/\/+$/, '');
+        for (const ref of refs) {
+            const bareOwner = bare(ref.owner);
+            out[`${bareOwner}/${ref.filename}`] = `${base}/v1/apps/${encodeURIComponent(bareOwner)}/${encodeURIComponent(ref.filename)}?mode=inline`;
+        }
+        return out;
+    }
 
     const { scheme, portSuffix } = appOriginScheme(config);
     let byTarget = new Map<string, string>();
