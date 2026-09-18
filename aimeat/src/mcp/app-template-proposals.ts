@@ -10,6 +10,7 @@
  * @structure registerAppTemplateProposalTools()
  * @usage registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.2.0 — 2026-09-19 — _get takes `part`, for a shipped template too large for one answer.
  *   v1.1.0 — 2026-09-18 — _get and _list also answer for the templates the node ships (shells,
  *     components, use cases). They read agent proposals only, so the shell every build text names
  *     as the starting point could not be read over MCP at all.
@@ -96,9 +97,12 @@ export function registerAppTemplateProposalTools(
     mcp.tool(
         'aimeat_app_template_get',
         descriptionFor('aimeat_app_template_get'),
-        { id: z.string().min(1).max(64) },
+        {
+            id: z.string().min(1).max(64),
+            part: z.number().int().min(1).optional().describe('Only for a template the node ships whose file is too large for one answer: which part to return (1-based). The first answer says how many parts there are.'),
+        },
         annotationsFor('aimeat_app_template_get'),
-        async ({ id }) => {
+        async ({ id, part }) => {
             const found = await getTemplateProposal(storage, config, agentGaii, id);
             if (!found) {
                 // The templates the node ships: the shells, the components, the use cases. Every
@@ -106,8 +110,9 @@ export function registerAppTemplateProposalTools(
                 // connected over MCP cannot make that call: a cold-agent build run asked this
                 // tool for `shell-pure-client` and was told it did not exist (2026-09-18). Same
                 // registry and same fields as GET /v1/app-templates/:id (services/node-templates.ts).
-                const shipped = nodeTemplateAnswer(id);
-                return shipped ? text(shipped) : errText(unknownTemplateMessage(id));
+                const shipped = nodeTemplateAnswer(id, part);
+                if (!shipped) return errText(unknownTemplateMessage(id));
+                return typeof shipped.part_error === 'string' ? errText(shipped.part_error) : text(shipped);
             }
             const m = found.manifest;
 

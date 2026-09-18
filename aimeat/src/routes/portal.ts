@@ -592,21 +592,10 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     });
   }
 
-  // Agent device authorization consent page — standalone HTML (not SPA)
-  router.get('/v1/agents/verify', (_req, res) => {
-    const htmlPath = resolvePublicFile('agent-consent.html');
-    if (htmlPath) {
-      let html = readFileSync(htmlPath, 'utf-8');
-      const nonce = res.locals.cspNonce as string || '';
-      if (nonce) {
-        html = html.replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`);
-        html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
-      }
-      res.type('text/html').send(html);
-    } else {
-      res.status(404).type('text/plain').send('Agent consent page not found');
-    }
-  });
+  // The agent device-authorization consent page, GET /v1/agents/verify, is served by
+  // routes/agents/registration.ts, which has to declare it before that router's `:gaii`
+  // catch-all. A second copy stood here until 2026-09-19 and never ran: the agents router is
+  // mounted first (server-bootstrap/routes-loader.ts), so it answered every request.
 
   // OAuth consent page — standalone HTML (not SPA)
   router.get('/v1/oauth/consent', (_req, res) => {

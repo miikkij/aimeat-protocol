@@ -692,8 +692,11 @@ export const appTools: ConnectCliToolDefinition[] = [
         // → GET /v1/appdev/templates/:id — one proposal + the source app's live state.
         name: 'aimeat_app_template_get',
         description: 'Get one app-template proposal by id (with the source app\'s live state).',
-        input: { id: { type: 'string', required: true, description: 'Template id.' } },
-        handler: ({ client }, input) => client.get(`/v1/appdev/templates/${encodeURIComponent(requiredString(input, 'id'))}`),
+        input: {
+            id: { type: 'string', required: true, description: 'Template id.' },
+            part: { type: 'number', description: 'Only for a template the node ships whose file is too large for one answer: which part to return (1-based).' },
+        },
+        handler: ({ client }, input) => client.get(`/v1/appdev/templates/${encodeURIComponent(requiredString(input, 'id'))}${query({ part: optionalNumber(input, 'part') })}`),
     },
     {
         // → DELETE /v1/appdev/templates/:id — remove a proposal.

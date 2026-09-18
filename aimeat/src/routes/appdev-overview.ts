@@ -9,6 +9,7 @@
  * @structure appdevOverviewRouter(config, storage) → Router
  * @usage app.use(appdevOverviewRouter(config, storage)) from the routes loader.
  * @version-history
+ *   v1.2.0 — 2026-09-19 — GET /v1/appdev/templates/:id takes ?part=N for a large shipped template.
  *   v1.1.0 — 2026-09-18 — GET /v1/appdev/templates/:id answers for a template the node ships when
  *     no proposal carries the id, and the list names them (`node_templates`).
  *   2026-07-19 — AppDev tab (KB UI): learned-pitfall + template management surface, start-prompt copy, model badge
@@ -63,7 +64,13 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
     if (!found) {
       // A template the node ships answers here too, as it does on the MCP tool: this route is
       // what the connector's aimeat_app_template_get calls (services/node-templates.ts).
-      const shipped = nodeTemplateAnswer(req.params.id as string);
+      // ?part=N: a shipped file too large for one tool result comes one part at a time.
+      const rawPart = typeof req.query.part === 'string' ? Number(req.query.part) : undefined;
+      const shipped = nodeTemplateAnswer(req.params.id as string, rawPart);
+      if (shipped && typeof shipped.part_error === 'string') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', shipped.part_error));
+        return;
+      }
       if (shipped) {
         res.json(success(config.nodeId, { template: shipped }));
         return;

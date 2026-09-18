@@ -112,8 +112,9 @@ export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): vo
 
   mcp.tool('aimeat_app_template_get', descriptionFor('aimeat_app_template_get'), {
     id: z.string().describe('Template id.'),
-  }, annotationsFor('aimeat_app_template_get'), async ({ id }) => {
-    return out(await client.get(`/v1/appdev/templates/${encodeURIComponent(id)}`));
+    part: z.number().int().min(1).optional().describe('Only for a template the node ships whose file is too large for one answer: which part to return (1-based). The first answer says how many parts there are.'),
+  }, annotationsFor('aimeat_app_template_get'), async ({ id, part }) => {
+    return out(await client.get(`/v1/appdev/templates/${encodeURIComponent(id)}${part ? `?part=${part}` : ''}`));
   });
 
   mcp.tool('aimeat_app_template_delete', descriptionFor('aimeat_app_template_delete'), {
