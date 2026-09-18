@@ -252,6 +252,10 @@ export function LinuxLine() {
       <p>${tr('landing2.linuxAi', 'Cloud AI processes the information you send to it, even when you use your own API key. A local model lets you keep AI processing on your own machine.')}</p>
       <p>${afterMit === undefined ? continuity : html`${beforeMit}<a href="https://github.com/miikkij/aimeat-protocol/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>${afterMit}`}</p>
       <a class="showroom-door" href="/v1/business">${tr('landing2.linuxBusiness', 'AIMEAT for your business →')}</a>
+      <!-- "or on your own machine" above had no way to act on it until 2026-09-18: the desktop
+           app was built but nothing on this site linked to it. The address carries no version,
+           because the release workflow copies every new installer to this same name. -->
+      <a class="showroom-door" href="https://github.com/miikkij/aimeat-protocol/releases/download/desktop-latest/AIMEAT-Personal-Node-setup.exe">${tr('landing.heroGetApp', 'Put it on your computer (Windows) →')}</a>
     </section>`;
 }
 
