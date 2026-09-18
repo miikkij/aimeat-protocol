@@ -6,6 +6,9 @@
  *   MCP onboarding) + per-platform Node.js setup instructions. Extracted from
  *   ../agents-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.1 — 2026-09-18 — PLATFORMS: Windows no longer says it requires WSL2 (the connect CLI has
+ *     had native win32 branches for months), and every install line asks for Node.js 24, which is
+ *     what package.json requires; they said 22. Instruction review.
  *   v1.1.0 — 2026-08-17 — One model-recommendation line at the top of buildAgentPrompt and
  *     buildMcpOnboardingPrompt: run the connection on the strongest reasoning model. Watched in
  *     production — setup on a mid-tier default wanders; the same steps on a strong model complete
@@ -235,9 +238,8 @@ If AIMEAT tools are not available in this runtime, tell me the MCP server is not
 /* ── Platform instructions ── */
 export const PLATFORMS = {
   windows: `<h4>Install Node.js</h4>
-<p>Windows requires WSL2. Open PowerShell as Admin:</p>
-<ol><li>Install WSL2: <code>wsl --install</code> (restart if prompted)</li>
-<li>In WSL2: <code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>
+<p>Windows works as it is; WSL2 is not needed. Open PowerShell:</p>
+<ol><li>Install Node.js 24 or newer: <code>winget install OpenJS.NodeJS.LTS</code>, then open a new PowerShell window</li>
 <li>Run: <code>npx aimeat connect</code> and follow the prompts</li></ol>
 <h4>Compatible Agent Runtimes</h4>
 <p><a href="https://openclaw.ai" target="_blank">OpenClaw</a>, Claude Code, Hermes, or any MCP-capable tool.</p>`,
@@ -247,7 +249,7 @@ export const PLATFORMS = {
 <h4>Compatible Agent Runtimes</h4>
 <p><a href="https://openclaw.ai" target="_blank">OpenClaw</a>, Claude Code, Hermes, or any MCP-capable tool.</p>`,
   linux: `<h4>Install Node.js</h4>
-<ol><li><code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>
+<ol><li><code>curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>
 <li>Run: <code>npx aimeat connect</code> and follow the prompts</li></ol>
 <h4>Compatible Agent Runtimes</h4>
 <p><a href="https://openclaw.ai" target="_blank">OpenClaw</a>, Claude Code, Hermes, or any MCP-capable tool.</p>`,
@@ -255,7 +257,7 @@ export const PLATFORMS = {
 <ol><li>Open PowerShell as Admin: <code>wsl --install</code></li>
 <li>Restart and set up your Linux username/password</li></ol>
 <h4>Install Node.js</h4>
-<ol><li><code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>
+<ol><li><code>curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>
 <li>Run: <code>npx aimeat connect</code> and follow the prompts</li></ol>`,
   android: `<h4>Termux</h4>
 <ol><li>Install <a href="https://f-droid.org/packages/com.termux/" target="_blank">Termux from F-Droid</a></li>
@@ -263,7 +265,7 @@ export const PLATFORMS = {
 <li>Run: <code>npx aimeat connect</code> and follow the prompts</li></ol>`,
   aws: `<h4>EC2 Setup</h4>
 <ol><li>Launch an EC2 instance (t3.micro is fine)</li>
-<li>SSH in and install Node.js 22+</li>
+<li>SSH in and install Node.js 24 or newer</li>
 <li>Run: <code>npx aimeat connect</code></li>
 <li>Then: <code>npx aimeat connect serve</code> for persistent MCP server</li></ol>`,
 };
