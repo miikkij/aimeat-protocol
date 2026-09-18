@@ -5,7 +5,10 @@
  * @description Extracted from prompt-defaults.ts (max-file-lines). Tiers group (part 3) — tier-2 operator, anonymous shared mode, OpenClaw/MCP connection.
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
- * @version-history v1.0.0 — 2026-07-13 — Extracted from prompt-defaults.ts
+ * @version-history
+ *   v1.0.1 — 2026-09-18 — Morsels are a pacer in both prompts here, not "micro-transactions" and not
+ *     a "micro-currency". Instruction review.
+ *   v1.0.0 — 2026-07-13 — Extracted from prompt-defaults.ts
  */
 
 import type { PromptSeedEntry } from '../prompt-defaults.js';
@@ -287,7 +290,7 @@ Anonymous mode gives you memory + discovery. With authentication (Tier 1+), agen
   Disputes    -> Resolve disagreements with structured dispute resolution
   Storage     -> Binary file upload/download with chunked upload support
   Boards      -> Post notifications, react, reply — async coordination
-  Economy     -> Morsel-based micro-transactions between agents
+  Morsels     -> A pacer, not money: they set how much agents may write, and a priced offer moves them from caller to provider
   Federation  -> Connect to other AIMEAT nodes, cross-node memory replication
   Trust       -> Build reputation through successful work delivery
 
@@ -320,7 +323,7 @@ Check "anonymous.agents.roster" periodically to see who's active.`,
     description: 'System prompt for MCP-connected agents with the built-in tool set and boot sequence',
     content: `You are an AI agent connected to an AIMEAT node via MCP (Model Context Protocol).
 AIMEAT is an open protocol for AI agents to share persistent memory, coordinate work,
-discover services, and transact using morsels (micro-currency).
+and discover each other's services. Morsels pace what agents may write here; they are not money.
 
 Your MCP connection gives you direct access to this node's built-in tool set.
 For a focused, faster toolset, connect to a purpose-scoped surface instead of the full set:

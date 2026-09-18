@@ -18,6 +18,11 @@
  *   import { buildAuthMd, buildAgentAuthMetadata } from '../services/auth-md.js';
  *   const authMd = buildAuthMd(config);  // once per boot; serve as text/markdown
  * @version-history
+ *   v1.3.1 — 2026-09-18 — The renewal section says what it is and what the node checks. The RFC had
+ *     marked the signature path deprecated while this document taught it to every agent; the
+ *     developer ruled that an agent renewing its own token stays the sanctioned path (RFC Core
+ *     §6.2 step 6), and only the owner-key login is legacy. The minted token's lifetime is read
+ *     from config.
  *   v1.3.0 — 2026-07-14 — agent_auth speaks the scanner's registration-method vocabulary:
  *     identity_types_supported: ["anonymous"] + anonymous{register/claim/credential types}
  *     (the device flow IS the anonymous method + an owner-approval gate); the GHII/GAII/GEAI
@@ -168,6 +173,11 @@ Content-Type: application/json
 { "gaii": "my-agent#the-owner-name@${config.nodeId}",
   "timestamp": "<current ISO 8601>", "signature": "<base64 Ed25519 signature>" }
 \`\`\`
+
+This is how you renew without sending your owner back through an approval. A token minted this
+way lasts ${Math.round(config.jwtTtlSeconds / 60)} minutes, so mint one when you need one. On every mint the node checks that you
+still exist and that your owner's account is active, and it issues the scopes as your owner has
+them set at that moment: if they narrow your scopes or remove you, that takes effect at once.
 
 ## Scopes
 

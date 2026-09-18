@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.4.0 (2026-09-18): check:prompt-refs, agent-facing text held to the catalogue and the routes.
  *  - 1.3.0 (2026-09-14): check:field-reach, the REST-only record field ratchet.
  *  - 1.2.1 (2026-09-13): check:viewport also holds the library-packs registry to the manifests.
  *  - 1.2.0 (2026-09-13): Hold the always-loaded instruction size and every path rule's globs.
@@ -51,6 +52,9 @@ export const FAST_CHECKS = [
     { script: 'check:doc-counts -- --strict', label: 'The counts this project states about itself' },
     { script: 'check:instructions', label: 'What every session loads stays small, and every path rule names real files' },
     { script: 'check:scope-parity', label: 'One permission word, every door' },
+    // From the instruction review of 2026-09-18: production's manual documented routes deleted
+    // three weeks earlier, and every structural check was green because none reads the prose.
+    { script: 'check:prompt-refs', label: 'What an agent is told names only tools and routes that exist' },
     // Built on 2026-09-03 for exactly this axis and wired into nothing until 2026-09-14, when an
     // agent's company update dropped organism_id in silence: REST took the field and MCP did not.
     { script: 'check:field-reach', label: 'A record field REST can set, an agent can set too' },

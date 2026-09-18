@@ -3,19 +3,24 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Serves the node's discovery documents at /.well-known — the AIMEAT node
- *   descriptor, the OpenAI-style ai-plugin.json manifest, the MCP Server Card (SEP-1649),
+ *   descriptor, the MCP Server Card (SEP-1649),
  *   and the RFC 9727 API catalog — plus the RFC 8288 discovery Link-header middleware.
  *
  * @structure
  *   - wellknownRouter(config, storage): mounts the well-known GET endpoints
  *   - GET /.well-known/aimeat: node id/type, public key, capability set, federation settings, key endpoints
- *   - GET /.well-known/ai-plugin.json: ChatGPT-plugin manifest pointing at /v1/spec
  *   - GET /.well-known/mcp.json: MCP Server Card (SEP-1649) describing the /v1/mcp server + the WebMCP bridge
  *   - GET /.well-known/api-catalog: RFC 9727 linkset (application/linkset+json) pointing at spec/docs/descriptors
  *   - GET /.well-known/ucp: UCP business profile (transports, checkout capability, payment handlers, signing keys)
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
  *
  * @version-history
+ *   v1.8.0 — 2026-09-18 — GET /.well-known/ai-plugin.json is removed. ChatGPT stopped reading the
+ *     plugin format on 2024-04-09; what ChatGPT connects through today is MCP, which the Server
+ *     Card here already describes. The manifest had also rotted: it told an agent to authenticate
+ *     "via connectivity key (POST /v1/agents/connect)", a flow the bootstrap marks deprecated, and
+ *     pointed authorization_url at the Ed25519 signature endpoint. Ruled by the developer in the
+ *     instruction review. The MCP card no longer calls morsels an economy.
  *   v1.7.0 — 2026-07-28 — Discovery documents answer with Access-Control-Allow-Origin: * so a
  *     browser-resident agent can read them; the MCP Server Card carries name/description/version at
  *     the ROOT per server.json (SEP-2127) instead of only inside serverInfo; the UCP profile
@@ -131,7 +136,7 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
         };
       }
     }
-    const description = 'AIMEAT protocol node — persistent memory, agent identity (GHII/GAII), organisms and workspaces, knowledge, tasks, skills, and morsel economy for AI agents.';
+    const description = 'AIMEAT protocol node — persistent memory, agent identity (GHII/GAII), organisms and workspaces, knowledge, tasks and skills for AI agents, under permissions the owner grants and can withdraw.';
     res.json({
       $schema: 'https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json',
       // A Server Card follows the server.json shape (SEP-2127): name, description and version at
@@ -278,30 +283,6 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
         })) : [],
       },
       signing_keys: signingKeys,
-    });
-  });
-
-  router.get('/.well-known/ai-plugin.json', (_req, res) => {
-    const b = config.baseUrl;
-    res.json({
-      schema_version: 'v1',
-      name_for_human: 'AIMEAT',
-      name_for_model: 'aimeat',
-      description_for_human: 'AI Memory Exchange and Action Transfer — persistent memory, identity, morsel economy, app generation, and federated node networks for AI agents.',
-      description_for_model: 'AIMEAT protocol node. Provides persistent memory storage, AI agent identity (GHII/GAII), morsel micro-transactions, knowledge base, consent management, MCP tools, and federation between nodes. Agents authenticate via connectivity key (POST /v1/agents/connect) then Ed25519 JWT. Full API contract at /v1/spec. Getting-started guide at /?format=json.',
-      auth: {
-        type: 'oauth',
-        authorization_url: `${b}/v1/auth/token`,
-        scope: 'memory:read memory:write wallet:read',
-      },
-      api: {
-        type: 'openapi',
-        url: `${b}/v1/spec`,
-        is_user_authenticated: false,
-      },
-      logo_url: `${b}/og-image.png`,
-      contact_email: 'hello@aimeat.io',
-      legal_info_url: `${b}/v1/portal`,
     });
   });
 

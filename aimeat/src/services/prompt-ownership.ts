@@ -21,6 +21,10 @@
  *   import { promptSourceKind, promptDiffersFromDefault } from './prompt-ownership.js';
  *   const kind = promptSourceKind(record.id, record.group);   // 'code' | 'yours' | 'orphan'
  * @version-history
+ *   v1.2.0 — 2026-09-18 — The `platform` group is written from source too. Two of its prompts taught
+ *     a registration contract that never existed, and as an operator's group a node that had edited
+ *     them would have kept the wrong text for good. They say how to connect and how to build, which
+ *     is what the software can do. Ruled by the developer in the instruction review.
  *   v1.1.0 — 2026-09-15 — 'yours' is described as it now behaves: an unchanged prompt follows updates.
  *   v1.0.0 — 2026-09-12 — Initial, with the System Prompts page in the poster face.
  */
@@ -32,7 +36,7 @@ import type { SystemPromptRecord } from '../storage/interface.js';
  * do — the agent handbook, the app builders, the generator — so a node serving last month's text
  * hands an AI names and flows it no longer has.
  */
-export const PROMPT_SYNC_GROUPS: readonly string[] = ['generator', 'builders', 'tiers'];
+export const PROMPT_SYNC_GROUPS: readonly string[] = ['generator', 'builders', 'tiers', 'platform'];
 
 /** Individual prompts synced for the same reason, in groups that are otherwise the operator's. */
 export const PROMPT_SYNC_IDS: readonly string[] = ['site-portal', 'bootstrap-anon', 'surface-layout'];

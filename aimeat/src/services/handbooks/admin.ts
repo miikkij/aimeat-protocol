@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — most tools require operator role and
  *   are runtime-gated (a non-operator caller will get "Operator role required").
  * @version-history
+ *   v1.6.1 -- 2026-09-18 -- The moderation paragraph no longer names aimeat_knowledge_list, which this
+ *     surface does not carry. Instruction review.
  *   v1.6.0 -- 2026-09-12 -- aimeat_admin_federation, with the thing that trips every operator:
  *     approving a peering request connects nothing until somebody presses Activate.
  *   v1.5.0 -- 2026-09-12 -- aimeat_admin_knowledge, with the thing an AI reading it has to say out
@@ -56,7 +58,7 @@ true: \`signin.reaches_nobody\` means the sign-in policy is on and admits nobody
 usually nobody's decision. \`book.age_days\` says whether the directory is worth mirroring again.
 
 **Moderation.** \`aimeat_admin_knowledge\` (EVERY knowledge package on the node, not just the
-catalogued ones — \`aimeat_knowledge_list\` is the catalogue and is a subset. Lead with
+catalogued ones — the public knowledge catalogue is a subset. Lead with
 \`paging.total\`, never with how many rows you got: a page of twenty out of two hundred reported as
 the whole store is the one mistake this surface cannot make. \`facets\` counts the whole match, so
 you can say what the collection IS — one person's bulk import, or six things somebody wrote. Filter

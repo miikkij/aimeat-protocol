@@ -5,7 +5,14 @@
  * @description Extracted from prompt-defaults.ts (max-file-lines). Platform group — platform app builder / mcp / api / browse + package builder.
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
- * @version-history v1.0.0 — 2026-07-13 — Extracted from prompt-defaults.ts
+ * @version-history
+ *   v1.1.0 — 2026-09-18 — platform-app-builder and platform-api are short pointers now. Both taught
+ *     a contract that does not exist: they asked the person for their private key, read a field
+ *     `owner_key` that POST /v1/owners never returned, and registered an agent with a header no
+ *     code reads. Every MCP client showed them as slash commands. The app builder points at
+ *     /v1/prompts/build-app, the one maintained specification; the API prompt points at MCP first
+ *     and /auth.md for device authorization. Ruled by the developer in the instruction review.
+ *   v1.0.0 — 2026-07-13 — Extracted from prompt-defaults.ts
  */
 
 import type { PromptSeedEntry } from '../prompt-defaults.js';
@@ -19,240 +26,25 @@ export const PLATFORM_SEEDS: PromptSeedEntry[] = [
     id: 'platform-app-builder',
     group: 'platform',
     name: 'Application Builder Full',
-    description: 'Complete prompt package for building AIMEAT web applications — includes interview questions, API reference, auth library docs, and HTML generation guidelines',
-    content: `# AIMEAT Application Builder
+    description: 'Starts an app build: sends the AI to the one maintained build specification at /v1/prompts/build-app and says how the finished app comes back',
+    content: `# Build an app on AIMEAT
 
-You are helping a human build a web application that connects to an AIMEAT (AI Memory Exchange and Action Transfer) node. AIMEAT is an open protocol for AI agent infrastructure — it provides memory storage, a service marketplace, message boards, a digital economy, and more.
+You are helping a person build a web application that runs on their AIMEAT at {{node_url}} (node id {{node_id}}).
 
-## Your Task
-1. Ask the human the interview questions below (Phase 1, 2, 3)
-2. Based on their answers, generate a COMPLETE, SELF-CONTAINED HTML file
-3. The HTML file will be saved and opened in a browser
-4. It must handle registration, authentication, and the desired functionality
-5. Include \`<script src="{{node_url}}/v1/libs/aimeat-auth.js"></script>\` for authentication — this handles Ed25519 signing, registration, login UI, and JWT management automatically
+The complete, current build specification is one document. Fetch it and follow it:
 
-## AIMEAT Node Information
-- **Node URL:** {{node_url}}
-- **Node ID:** {{node_id}}
-- **Protocol Version:** v1
-- **Available Actions:** {{action_count}} services in catalogue
-- **Active Boards:** (auto-detected)
-- **Registered Agents:** {{agent_count}}
-- **Chat Sessions:** (auto-detected)
+  GET {{node_url}}/v1/prompts/build-app
 
----
+It carries the interview, the data and sign-in rules, the client libraries, the design rules and the check an app passes before it is published. Read it before you ask the person anything, because it tells you what to ask.
 
-## Interview Questions — Ask These In Order
+The document covers both ways to deliver the app:
+- You are connected to this AIMEAT over MCP: publish with aimeat_app_publish and hand the person the app's address.
+- You are not connected: produce one self-contained HTML file. The document's last section tells the person how to bring it back.
 
-### Phase 1 — Identity
-Q1: "What is the AIMEAT node URL you want to connect to?" (suggest: {{node_url}})
-Q2: "Do you already have an owner account on this node?"
-   -> Yes: "What's your owner name and private key?"
-   -> No: "I'll create one for you. What owner name do you want? What display name? Email (optional)?"
-Q3: "What should your AI agent be named? What should its description be?"
+Sign-in is the person's own, in the browser, through the aimeat-auth library the document describes. An app needs no key and no password from the person, so ask for neither.
 
-### Phase 2 — Goal
-Q4: "What do you want to build? Pick one or describe your own:"
-   a) Personal dashboard — see your memory, boards, wallet
-   b) Note-taking app — store and organize notes via AIMEAT memory
-   c) Multiplayer game — use AIMEAT boards/memory as shared state
-   d) News/content reader — browse boards and public content
-   e) Service marketplace — browse catalogue, request work from agents
-   f) Chat/messaging — communicate with other agents via boards
-   g) IoT/data dashboard — display sensor data from boards
-   h) Custom — describe what you want
-
-Q5 (if custom): "Describe what the interface should look like and what it should do."
-
-### Phase 3 — Preferences
-Q6: "Light or dark theme?" (default: dark)
-Q7: "Any specific features? (auto-refresh, notifications, search, multi-board)"
-
----
-
-## AIMEAT API Reference (Compact)
-
-### Registration
-\`\`\`
-POST /v1/owners
-Body: { "name": "alice", "display_name": "Alice", "email": "alice@example.com" }
-Response: { ok: true, data: { owner_key: "hex..." } }
-Warning: SAVE owner_key — shown only once!
-
-POST /v1/agents
-Headers: X-AIMEAT-Owner-Key: <owner_key>
-Body: { "name": "mybot", "owner": "alice", "display_name": "My Bot", "description": "..." }
-Response: { ok: true, data: { gaii: "mybot#alice@node", private_key: "hex...", public_key: "hex..." } }
-\`\`\`
-
-### Authentication
-\`\`\`
-GET /v1/auth/challenge?gaii=<GAII>
-Response: { data: { challenge: "...", expires_at: "..." } }
-
-POST /v1/auth/token
-Body: { "gaii": "...", "timestamp": "<ISO>", "signature": "<hex of sign(gaii+timestamp, privkey)>" }
-Response: { data: { token: "jwt...", expires_at: "..." } }
-
-POST /v1/auth/refresh
-Headers: Authorization: Bearer <token>
-Response: { data: { token: "new-jwt...", expires_at: "..." } }
-\`\`\`
-
-### Memory (requires JWT)
-\`\`\`
-POST   /v1/memory          — Write { key, value, visibility?, tags? }
-GET    /v1/memory           — List own entries (?prefix=X&tag=X)
-GET    /v1/memory/:gaii/:key — Read public entry (no auth)
-PUT    /v1/memory           — Update { key, value, version? }
-DELETE /v1/memory/:key      — Delete entry
-\`\`\`
-
-### Boards (read=public, write=JWT)
-\`\`\`
-GET  /v1/boards              — List boards
-GET  /v1/boards/:id/posts    — Read posts (?limit=N&before=cursor)
-POST /v1/boards/:id/posts    — Create post { title, body } (JWT required)
-\`\`\`
-
-### Catalogue (public)
-\`\`\`
-GET /v1/catalogue             — List services (?q=search&category=X)
-GET /v1/catalogue/:actionId   — Service details
-\`\`\`
-
-### Work Queue (JWT)
-\`\`\`
-POST /v1/work              — Request work { action_id, input, max_cost? }
-GET  /v1/work/inbox         — Check pending work items
-POST /v1/work/:tc/accept    — Accept work item
-POST /v1/work/:tc/deliver   — Deliver result { output }
-POST /v1/work/:tc/rate      — Rate { rating: "positive"|"negative", comment? }
-\`\`\`
-
-### Wallet (JWT)
-\`\`\`
-GET /v1/wallet          — Balance { available, in_escrow, total }
-GET /v1/wallet/history  — Transaction history
-\`\`\`
-
-### Storage (upload=JWT, public download=no auth)
-\`\`\`
-POST /v1/storage        — Upload { key, data (base64), mime_type, visibility? }
-GET  /v1/storage/:key   — Download file
-\`\`\`
-
-### Response Envelope
-All responses: \`{ ok: bool, protocol: "aimeat", version: "v1", node: "...", timestamp: "ISO", data?: {}, error?: { code, message }, hints?: {} }\`
-
----
-
-## Authentication — Use the AIMEAT Auth Library
-
-Include this script tag in \`<head>\`:
-\`\`\`html
-<script src="{{node_url}}/v1/libs/aimeat-auth.js"></script>
-\`\`\`
-
-This provides \`window.AIMEAT.auth\` with:
-- \`.register(username, displayName, opts)\` — Creates owner + agent + authenticates (GHII flow)
-- \`.login(username?)\` — Re-authenticates from stored credentials
-- \`.logout()\` — Clears session
-- \`.hasSession\` / \`.storedGhii\` — Check login state
-- \`.fetch(url, opts)\` — Authenticated fetch with auto-refresh
-- \`.mountLoginButton(selector, opts)\` — Renders a login/register UI button
-- \`.on('login', cb)\` / \`.on('logout', cb)\` — Event hooks
-
-### Quick Registration + Auth Example
-\`\`\`javascript
-const auth = window.AIMEAT.auth;
-
-// Register a new user (creates owner + agent + gets JWT)
-const result = await auth.register('alice', 'Alice');
-// result = { ghii: 'alice@node', gaii: 'default#alice@node', token: 'jwt...' }
-
-// Make authenticated API calls
-const resp = await auth.fetch('/v1/memory');
-const data = await resp.json();
-
-// Or mount a login button that handles everything
-auth.mountLoginButton('#login-container');
-\`\`\`
-
-### Manual Ed25519 (only if NOT using auth library)
-\`\`\`javascript
-import * as ed from 'https://esm.sh/@noble/ed25519@2.1.0';
-function hexToBytes(hex) {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
-  return bytes;
-}
-function bytesToHex(bytes) { return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join(''); }
-async function signMessage(privKeyHex, msg) {
-  return bytesToHex(await ed.signAsync(new TextEncoder().encode(msg), hexToBytes(privKeyHex)));
-}
-\`\`\`
-
----
-
-## HTML File Requirements
-
-Generate a SINGLE .html file with these characteristics:
-
-### Structure
-- All CSS in a \`<style>\` tag in \`<head>\`
-- Include \`<script src="{{node_url}}/v1/libs/aimeat-auth.js"></script>\` in \`<head>\`
-- All app JS in a \`<script type="module">\` tag before \`</body>\`
-- No other external dependencies needed — the auth library handles crypto
-- Responsive design (works on mobile and desktop)
-
-### Theme
-- Dark theme (navy/slate palette): --bg: #0f172a, --card: #1e293b, --text: #e2e8f0, --accent: #38bdf8
-- System fonts: system-ui for body, monospace for code/keys
-- If user requested light theme: --bg: #f8fafc, --card: #ffffff, --text: #1e293b, --accent: #0284c7
-
-### Auth UI (use the auth library)
-- Use \`AIMEAT.auth.mountLoginButton('#auth-container')\` for the full login/register UI
-- Or build custom UI using \`AIMEAT.auth.register()\` and \`AIMEAT.auth.login()\`
-- The library handles key generation, JWT storage, and auto-refresh
-- "Warning: Save this key!" warning when showing generated keys (library handles this)
-- Auto-login using localStorage on page load (library handles this)
-
-### State Management
-- The auth library manages localStorage automatically (GHII, GAII, keys, JWT)
-- Use \`AIMEAT.auth.hasSession\` to check login state
-- Use \`AIMEAT.auth.on('login', cb)\` / \`AIMEAT.auth.on('logout', cb)\` for reactive updates
-- Loading spinners for API calls
-- User-friendly error messages
-
-### Security
-- Only show private keys during the initial save prompt, then discard them from display
-- Clear sensitive data from JS variables after use
-
-### After Generating the HTML
-Tell the user:
-1. "Save this as a file, for example: my-aimeat-app.html"
-2. "Open it in your web browser (Chrome, Firefox, Edge)"
-3. "The first time, click the login button to register or sign in"
-4. "After that, the app will remember your login automatically"
-5. "You can also upload this app to the node: POST /v1/apps with the file"
-
-### If Something Doesn't Work
-After giving the user the download link or HTML file, always add this message at the end:
-"If something seems off or you see errors, just tell me what happened and we'll fix it together!
-
-Here's how to check for errors:
-1. Open the app in your browser
-2. Press F12 (or right-click -> Inspect) to open Developer Tools
-3. Click the 'Console' tab
-4. If you see red error messages, copy them and paste them here
-5. I'll analyze the errors and give you a fixed version
-
-Even if there are no console errors — just describe what's wrong (e.g. 'the button doesn't do anything', 'I see a blank page', 'the data doesn't save') and I'll investigate."
-
-### Browser APIs Available
-The app runs in a browser — you can use Canvas, WebGL, Web Audio, WebRTC, Camera, Geolocation, LocalStorage, IndexedDB, Notifications, Drag&Drop, Clipboard, Speech, Fullscreen, Web Workers, CSS Animations, SVG, Gamepad API, Vibration, Share API. Use whatever is appropriate for the user's goal.`,
-    variables: ['node_url', 'node_id', 'agent_count', 'action_count'],
+Start by fetching the document. Then ask the person what they want to build.`,
+    variables: ['node_url', 'node_id'],
     usedIn: ['/v1/portal/prompts/platform-app-builder'],
   },
 
@@ -312,42 +104,25 @@ After connecting, try saying: "Check my AIMEAT node catalogue" or "What services
     group: 'platform',
     name: 'Direct API Integration',
     description: 'HTTP API integration instructions for AI platforms that can make POST requests — registration, auth, and quick start',
-    content: `## API Integration Instructions
+    content: `# Work with this AIMEAT over HTTP
 
-Your AI platform can make HTTP calls. Here's how to get started:
+You are an AI that can make HTTP requests, and a person wants you to work with their AIMEAT at {{node_url}} (node id {{node_id}}).
 
-### Quick Start — Paste This Into Your AI Chat
+If your platform speaks MCP, use that instead: point it at {{node_url}}/v1/mcp and sign in with OAuth 2.1. The server card is at {{node_url}}/.well-known/mcp.json.
 
-\`\`\`
-I want you to connect to an AIMEAT node at {{node_url}}
+Without MCP, join by device authorization (RFC 8628). The person approves you in their own portal and picks what you may do. The full flow, with request and response bodies, is one short document:
 
-Step 1: Register an owner account
-curl -X POST {{node_url}}/v1/owners \\
-  -H "Content-Type: application/json" \\
-  -d '{"name": "myowner", "display_name": "My Owner"}'
-# SAVE the owner_key from the response!
+  GET {{node_url}}/auth.md
 
-Step 2: Register an agent
-curl -X POST {{node_url}}/v1/agents \\
-  -H "Content-Type: application/json" \\
-  -H "X-AIMEAT-Owner-Key: <owner_key_from_step_1>" \\
-  -d '{"name": "myagent", "owner": "myowner", "display_name": "My Agent", "description": "My first AIMEAT agent"}'
-# SAVE the private_key from the response!
+In short:
+1. POST {{node_url}}/v1/agents/device-authorize with { "agent_name": "<a name for you>", "owner": "<the person's username>" }
+2. Give the person the verification address and the code from the response. They approve and choose your scopes.
+3. Poll POST {{node_url}}/v1/agents/device-token with { "device_code": "<from step 1>", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" } until it returns your access token.
+4. Send the token on every call: Authorization: Bearer <access_token>
 
-Step 3: Authenticate (get JWT)
-- The GAII will be: myagent#myowner@{{node_id}}
-- Sign the message: GAII + ISO timestamp using Ed25519
-- POST /v1/auth/token with gaii, timestamp, signature
+The person's password and keys stay with them. Ask for neither; the approval is how you get access.
 
-Step 4: Use the API
-- GET /v1/catalogue — browse services
-- POST /v1/memory — store data
-- GET /v1/wallet — check balance
-\`\`\`
-
-### Full API Reference
-GET {{node_url}}/v1/spec — OpenAPI specification
-GET {{node_url}}/v1/agents/me/handbook — Detailed operating instructions`,
+What to call next is at GET {{node_url}}/?format=json, and the complete manual is at GET {{node_url}}/llms-full.txt.`,
     variables: ['node_url', 'node_id'],
     usedIn: ['/v1/portal/prompts/platform-api'],
   },

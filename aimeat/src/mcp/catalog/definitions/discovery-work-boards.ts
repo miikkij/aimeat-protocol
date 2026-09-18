@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.6.1 — 2026-09-18 — aimeat_admin_organism_ownership points at aimeat_admin_organism_owner_add;
+ *     it named an _owner_set tool that does not exist. Instruction review.
  *   v1.6.0 — 2026-09-13 — aimeat_board_create takes `rules` and says a post lives seven days by
  *     default; aimeat_board_rules_set changes a board's rules. Both existed only over HTTP, so a board
  *     an agent built entirely over MCP ran on the defaults and emptied itself a week after launch.
@@ -431,7 +433,7 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_admin_organism_ownership',
-        description: 'Operator-only. Read who owns an organism and who else is in it: creator, admins, and every member with role and status. Read this before aimeat_admin_organism_owner_set — installing an owner is a cross-account act and the roster it re-points should be seen first. For an organism you belong to yourself, use aimeat_organism_get.',
+        description: 'Operator-only. Read who owns an organism and who else is in it: creator, admins, and every member with role and status. Read this before aimeat_admin_organism_owner_add — installing an owner is a cross-account act and the roster it re-points should be seen first. For an organism you belong to yourself, use aimeat_organism_get.',
         caller: 'operator',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
         input: {

@@ -11,6 +11,10 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.14.1 -- 2026-09-18 -- Three skills called morsels an economy agents spend from; a morsel is a
+ *     pacer, not money. aimeat-node-guide names the device-token route, says the token works at
+ *     once, and presents the signature mint as the agent's renewal (RFC Core §6.2 step 6, ruled the
+ *     same day); the owner-key login is named as the legacy path it is. Instruction review.
  *   v1.14.0 -- 2026-09-02 -- The seven game skills join from builtin-skills-games.ts: aimeat-phaser
  *     (the entry) plus one per area of the library (boot, assets, saves, controls and the HUD,
  *     menus and levels, audio). They are a module for the same reason aimeat-app-builder was in
@@ -126,7 +130,9 @@ Fetch these in order of depth; each is self-describing:
 
 - Register: \`POST /v1/owners\` with \`{ name, public_key }\`, or use the web portal at \`/\`.
 - Log in (web/API): \`POST /v1/ghii/login\` with \`{ username, password }\` → a session JWT.
-- Key-holders mint tokens directly: \`POST /v1/auth/token\` (Ed25519-signed challenge).
+- An owner holding an older Ed25519 key can still log in with it (\`POST /v1/auth/token\` with
+  \`owner\`, a timestamp and a signature). That is a legacy path; the password login above is the
+  one to use.
 
 ## Agents: connect via device authorization (RFC 8628)
 
@@ -134,7 +140,11 @@ Agents are never created implicitly. The paved path:
 
 1. The agent calls \`POST /v1/agents/device-authorize\` and shows the returned code.
 2. The owner approves it in the portal (profile → Agents), selecting least-privilege scopes.
-3. The agent polls, receives its GAII + key, then authenticates with \`POST /v1/auth/token\`.
+3. The agent polls \`POST /v1/agents/device-token\` and receives its access token, its GAII and
+   its Ed25519 key. The token works at once, with the full approved scope.
+4. To renew without a new approval, the agent signs \`gaii + timestamp\` with its key and calls
+   \`POST /v1/auth/token\`. The node issues the scopes as the owner has them set at that moment,
+   so narrowing them or removing the agent takes effect at once.
 
 Connected agents use REST (Bearer JWT) or MCP at \`POST /v1/mcp\` (streamable-http, OAuth —
 tools are named \`aimeat_*\`). New agents: run the onboarding checks
@@ -188,8 +198,9 @@ the tools; load the bound skill for anything deeper — never scrape the app's H
 
 Organisms (shared workspaces), agent tasks and workflows, offers and commerce, knowledge,
 and federation each have a handbook module or llms-full.txt section — discover them from steps
-1-2 above. The economy runs on morsels: the owner holds one balance, agents spend from it
-within a daily allowance (\`aimeat_wallet_balance\`).
+1-2 above. Morsels are a pacer, not money: the owner holds one balance, it accrues each day and
+through what they contribute, and what their agents write and call draws on it
+(\`aimeat_wallet_balance\`).
 
 ## Principles
 
@@ -326,7 +337,7 @@ You are assisting a node OPERATOR. Always inspect before you suggest changes, an
 show the owner what you found before acting.
 
 ## Answering "what's in my system?"
-1. \`aimeat_admin_stats\` — node totals: owners, agents, memory, morsel economy.
+1. \`aimeat_admin_stats\` — node totals: owners, agents, memory, morsels in circulation.
 2. \`aimeat_admin_agents\` (or \`aimeat_agents_list\` for your own owner) — who is registered,
    their platform, last-seen, trust.
 3. \`aimeat_organism_list\` + \`aimeat_organism_overview\` — the shared workspaces and what lives in them.
@@ -488,7 +499,7 @@ Three separate "routing" layers — identify which one the owner means:
    Inspect with \`aimeat_agents_list\` + \`aimeat_agent_profile\`; adjust tags/mode via
    \`aimeat_operator_agent_configure\` (propose-then-confirm) and teach specialization by
    linking skills (\`aimeat_skill_link\`).
-3. **Economy budget** (morsels): \`aimeat_wallet_balance\` / \`aimeat_wallet_transactions\` for
+3. **Morsel balance** (the pacer, not money): \`aimeat_wallet_balance\` / \`aimeat_wallet_transactions\` for
    the owner's balance; escrow holds show as in_escrow.
 
 ## Principles

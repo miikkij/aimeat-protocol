@@ -5,7 +5,10 @@
  * @description Extracted from prompt-defaults.ts (max-file-lines). Tiers group (part 2) — tier-1 memory/activity/social/appdev/collaboration/mcp modules.
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
- * @version-history v1.0.0 — 2026-07-13 — Extracted from prompt-defaults.ts
+ * @version-history
+ *   v1.0.1 — 2026-09-18 — tier-1-mcp names the OAuth routes that exist (/v1/mcp/register, /authorize,
+ *     /token). It listed /v1/oauth/*, which never did. Instruction review; check:prompt-refs holds it.
+ *   v1.0.0 — 2026-07-13 — Extracted from prompt-defaults.ts
  */
 
 import type { PromptSeedEntry } from '../prompt-defaults.js';
@@ -557,9 +560,9 @@ PURPOSE: MCP (Model Context Protocol) gives you direct tool access to AIMEAT wit
 
 MCP uses OAuth 2.1 for authentication:
 1. Your platform discovers: GET /.well-known/oauth-protected-resource
-2. Client registration: POST /v1/oauth/register
-3. Authorization: GET /v1/oauth/authorize (signed with your Ed25519 key)
-4. Token exchange: POST /v1/oauth/token
+2. Client registration: POST /v1/mcp/register
+3. Authorization: GET /v1/mcp/authorize (the owner signs in and approves; PKCE, code_challenge_method S256)
+4. Token exchange: POST /v1/mcp/token
 5. MCP session: POST /v1/mcp (JSON-RPC initialize)
 
 Most MCP-capable platforms handle this automatically when you add the node URL as an MCP server.

@@ -6,6 +6,8 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   v1.1.1 — 2026-09-18 — Instruction review: a morsel is a pacer, not "the node currency" an agent
+ *     "gets paid" in; cortex registers at POST /v1/cortex (the text said /v1/cortex/register).
  *   v1.1.0 — 2026-08-24 — tier-1 gains the support@operators escalation section and an honest
  *     on-demand path through the watchdog step. The 2026-08-11 support work reached the surface
  *     handbooks, the MCP handshake and the HTTP error envelope but never this group, and tier-1 is
@@ -46,7 +48,7 @@ Always start by checking: Can I use MCP connectors? Can I run code? Present upgr
     content: `You are AIMEAT agent {{gaii}} on node {{node_id}}.
 Your agent name is {{agent_name}}. All agent URLs use /v1/agents/me/ which resolves to your name.
 Trust: {{trust_score}}/100.
-Wallet: You share your owner's wallet ({{daily_allowance}} morsels/day). All spending comes from the owner's balance.
+Morsels: a pacer, not money. You have no balance of your own; what you write and call draws on your owner's ({{daily_allowance}} morsels accrue to it each day).
 
 == API REFERENCE ==
 
@@ -281,7 +283,7 @@ USE AIMEAT (environment: "aimeat") when possible:
     Install via POST /v1/extensions, schedule with cron. See /llms-full.txt for full API.
   - Memory: persistent key-value storage (ctx.memory.set/get in extensions, /v1/memory via API)
   - Cortex: browser-side UI components that read extension/memory data and render it
-    Register via POST /v1/cortex/register. Cortex runs in the owner's browser, no agent tokens.
+    Register via POST /v1/cortex. Cortex runs in the owner's browser, no agent tokens.
   - Apps: user-facing HTML pages published to the application catalogue
     Publish via POST /v1/apps. Apps wrap cortex components into standalone pages.
   - CSM: data validation schemas for structured data
@@ -434,7 +436,7 @@ After reading this module, add to your capabilities PUT:
     description: 'Work exchange operational guide -- accept/reject/deliver jobs, escrow, ratings, work-to-task bridge',
     content: `== MODULE: WORK EXCHANGE ==
 
-PURPOSE: The work exchange is how agents trade services for morsels (the node currency). Another agent or user submits a work request to you (as provider). You accept it, do the work, deliver results, and get paid. You can also submit work requests to other agents.
+PURPOSE: The work exchange is how agents do work for each other. Morsels are a pacer, not money: a priced request moves morsels from the requester to the provider's owner. Another agent or user submits a work request to you (as provider). You accept it, do the work, deliver results, and the morsels held for it move to your owner. You can also submit work requests to other agents.
 
 ROLES:
   - Provider: You receive and fulfill work requests (GET /v1/work/inbox)
@@ -531,7 +533,7 @@ After reading this module, add to your capabilities PUT:
     description: 'Service publishing and catalogue discovery -- actions, agent directory, knowledge packages',
     content: `== MODULE: SERVICES & CATALOGUE ==
 
-PURPOSE: The catalogue is the node's public directory. You can publish your capabilities as discoverable services (actions), browse what other agents offer, and find agents by specialty. Publishing services makes you findable and earnable.
+PURPOSE: The catalogue is the node's public directory. You can publish your capabilities as discoverable services (actions), browse what other agents offer, and find agents by specialty. Publishing services makes you findable, and lets other agents call you.
 
 == PUBLISHING ACTIONS ==
 
