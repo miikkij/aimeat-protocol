@@ -47,6 +47,7 @@
  *     dropdown for custom providers). `owned_by` is carried into `description` when present.
  */
 import { logger } from '../utils/logger.js';
+import { safeFetch } from '../utils/url-validator.js';
 
 export interface OpenRouterCompletionResult {
   content: string;
@@ -459,7 +460,7 @@ export async function chatCompletionRaw(
   body: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<Response> {
-  return fetch(`${baseUrl}/chat/completions`, {
+  return safeFetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...providerHeaders(apiKey, baseUrl) },
     body: JSON.stringify(body),
@@ -467,12 +468,32 @@ export async function chatCompletionRaw(
   });
 }
 
+/** Speech transport shares the same guarded caller and never receives a client-selected URL. */
+export async function speechRaw(apiKey: string | undefined, baseUrl: string, body: Record<string, unknown>, signal: AbortSignal): Promise<Response> {
+  return safeFetch(`${baseUrl}/audio/speech`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...providerHeaders(apiKey, baseUrl) },
+    body: JSON.stringify(body), signal,
+  });
+}
+
+/** OpenRouter reports the actual charge separately for binary speech responses. */
+export async function generationCost(apiKey: string | undefined, baseUrl: string, id: string): Promise<number | undefined> {
+  if (new URL(baseUrl).hostname !== 'openrouter.ai') return undefined;
+  const response = await safeFetch(`${baseUrl}/generation?id=${encodeURIComponent(id)}`, {
+    headers: providerHeaders(apiKey, baseUrl), signal: AbortSignal.timeout(5000),
+  });
+  if (!response.ok) return undefined;
+  const value = await response.json() as { data?: { total_cost?: number } };
+  const cost = value.data?.total_cost;
+  return typeof cost === 'number' && Number.isFinite(cost) && cost >= 0 ? cost : undefined;
+}
+
 export async function transcribe(
   apiKey: string | undefined,
   model: string,
   audio: TranscriptionAudio,
   baseUrl: string = OPENROUTER_BASE,
-  opts?: { language?: string; temperature?: number; verbose?: boolean },
+  opts?: { language?: string; temperature?: number; verbose?: boolean; signal?: AbortSignal },
 ): Promise<TranscriptionResult> {
   const form = new FormData();
   form.append('file', new Blob([new Uint8Array(audio.data)], { type: audio.mime }), audio.filename);
@@ -490,11 +511,11 @@ export async function transcribe(
   logger.info(`[openrouter] STT: model=${model}, mime=${audio.mime}, bytes=${audio.data.length}, lang=${opts?.language ?? 'auto'}`);
 
   try {
-    const resp = await fetch(`${baseUrl}/audio/transcriptions`, {
+    const resp = await safeFetch(`${baseUrl}/audio/transcriptions`, {
       method: 'POST',
       headers: providerHeaders(apiKey, baseUrl),
       body: form,
-      signal: controller.signal,
+      signal: opts?.signal ? AbortSignal.any([controller.signal, opts.signal]) : controller.signal,
     });
 
     if (!resp.ok) {

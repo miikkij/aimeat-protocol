@@ -771,6 +771,7 @@ const ALL_SUITES = [
     // The audio/speech served libs and their sample files — also registered nowhere until now.
     'test/e2e-audio-speech.ts',
     'test/e2e-ai-transcribe.ts',
+    'test/e2e-voice.ts',
     'test/e2e-ai-image.ts',
     'test/e2e-chat.ts',
     // The other half of e2e-chat: a node that HAS an agent. Runs two nodes of its own (40300 and
